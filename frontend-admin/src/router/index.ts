@@ -38,6 +38,24 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/dashboard/index.vue'),
             meta: { title: '合同审批' },
           },
+          {
+            path: 'create',
+            name: 'ContractCreate',
+            component: () => import('@/pages/contract/ContractFormPage.vue'),
+            meta: { title: '新建合同', icon: 'file-add' },
+          },
+          {
+            path: ':id',
+            name: 'ContractDetail',
+            component: () => import('@/pages/contract/ContractDetailPage.vue'),
+            meta: { title: '合同详情', hidden: true },
+          },
+          {
+            path: ':id/edit',
+            name: 'ContractEdit',
+            component: () => import('@/pages/contract/ContractFormPage.vue'),
+            meta: { title: '编辑合同', hidden: true },
+          },
         ],
       },
       {

@@ -29,6 +29,16 @@ export interface ContractPaymentTerm {
   sortOrder: number
 }
 
+export interface ContractApprovalRecord {
+  id: string
+  nodeName: string
+  operatorName: string
+  actionType: string
+  actionName: string
+  comment?: string
+  createdAt: string
+}
+
 export interface ContractVO {
   id: string
   tenantId: string

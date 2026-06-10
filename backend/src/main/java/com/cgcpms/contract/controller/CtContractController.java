@@ -3,8 +3,10 @@ package com.cgcpms.contract.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.service.CtContractService;
 import com.cgcpms.contract.vo.CtContractVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,5 +36,17 @@ public class CtContractController {
     @GetMapping("/{id}")
     public ApiResponse<CtContractVO> getById(@PathVariable Long id) {
         return ApiResponse.success(ctContractService.getById(id));
+    }
+
+    @PostMapping
+    public ApiResponse<Long> create(@Valid @RequestBody CtContract contract) {
+        return ApiResponse.success(ctContractService.create(contract));
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CtContract contract) {
+        contract.setId(id);
+        ctContractService.update(contract);
+        return ApiResponse.success();
     }
 }

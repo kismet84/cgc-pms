@@ -7,6 +7,8 @@ import {
   rejectTask,
   withdrawInstance,
   resubmitInstance,
+  transferTask,
+  addSignTask,
   type WfInstanceVO,
 } from '@/api/modules/workflow'
 import { message } from 'ant-design-vue'
@@ -22,6 +24,14 @@ const approvalComment = ref('')
 const showApproveModal = ref(false)
 const showRejectModal = ref(false)
 const pendingAction = ref<'APPROVE' | 'REJECT'>('APPROVE')
+
+const showTransferModal = ref(false)
+const transferTargetUserId = ref('')
+const transferComment = ref('')
+
+const showAddSignModal = ref(false)
+const addSignUserIds = ref<string[]>([])
+const addSignComment = ref('')
 
 const statusMap: Record<string, { text: string; color: string }> = {
   RUNNING: { text: '审批中', color: 'processing' },
@@ -82,6 +92,14 @@ function handleAction(action: string) {
     handleWithdraw()
   } else if (action === 'resubmit') {
     handleResubmit()
+  } else if (action === 'transfer') {
+    transferTargetUserId.value = ''
+    transferComment.value = ''
+    showTransferModal.value = true
+  } else if (action === 'addSign') {
+    addSignUserIds.value = []
+    addSignComment.value = ''
+    showAddSignModal.value = true
   }
 }
 
@@ -129,6 +147,54 @@ async function handleReject() {
     })
     message.success('已驳回')
     showRejectModal.value = false
+    fetchDetail()
+  } catch (e: any) {
+    message.error(e?.message || '操作失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function handleTransfer() {
+  if (!transferTargetUserId.value.trim()) {
+    message.warning('请输入转办目标用户ID')
+    return
+  }
+  actionLoading.value = true
+  try {
+    const activeNode = detail.value?.nodes.find(n => n.nodeStatus === 'ACTIVE')
+    const myTask = activeNode?.tasks.find(t => t.taskStatus === 'PENDING')
+    if (!myTask) {
+      message.error('未找到待处理任务')
+      return
+    }
+    await transferTask(myTask.id, transferTargetUserId.value.trim(), transferComment.value || undefined)
+    message.success('已转办')
+    showTransferModal.value = false
+    fetchDetail()
+  } catch (e: any) {
+    message.error(e?.message || '操作失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function handleAddSign() {
+  if (addSignUserIds.value.length === 0) {
+    message.warning('请选择至少一个加签审批人')
+    return
+  }
+  actionLoading.value = true
+  try {
+    const activeNode = detail.value?.nodes.find(n => n.nodeStatus === 'ACTIVE')
+    const myTask = activeNode?.tasks.find(t => t.taskStatus === 'PENDING')
+    if (!myTask) {
+      message.error('未找到待处理任务')
+      return
+    }
+    await addSignTask(myTask.id, addSignUserIds.value, addSignComment.value || undefined)
+    message.success('已加签')
+    showAddSignModal.value = false
     fetchDetail()
   } catch (e: any) {
     message.error(e?.message || '操作失败')
@@ -217,6 +283,18 @@ onMounted(() => {
               驳回
             </a-button>
             <a-button
+              v-if="detail.availableActions.includes('transfer')"
+              @click="handleAction('transfer')"
+            >
+              转办
+            </a-button>
+            <a-button
+              v-if="detail.availableActions.includes('addSign')"
+              @click="handleAction('addSign')"
+            >
+              加签
+            </a-button>
+            <a-button
               v-if="detail.availableActions.includes('withdraw')"
               @click="handleAction('withdraw')"
             >
@@ -301,6 +379,56 @@ onMounted(() => {
         placeholder="请输入驳回原因（必填）"
         :rows="3"
       />
+    </a-modal>
+
+    <!-- Transfer Modal -->
+    <a-modal
+      v-model:open="showTransferModal"
+      title="转办"
+      :confirm-loading="actionLoading"
+      @ok="handleTransfer"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="目标用户ID" required>
+          <a-input
+            v-model:value="transferTargetUserId"
+            placeholder="请输入目标用户的ID"
+          />
+        </a-form-item>
+        <a-form-item label="转办说明">
+          <a-textarea
+            v-model:value="transferComment"
+            placeholder="转办说明（选填）"
+            :rows="3"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- Add Sign Modal -->
+    <a-modal
+      v-model:open="showAddSignModal"
+      title="加签"
+      :confirm-loading="actionLoading"
+      @ok="handleAddSign"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="加签审批人" required>
+          <a-select
+            v-model:value="addSignUserIds"
+            mode="tags"
+            placeholder="请输入审批人用户ID（可输入多个）"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="加签说明">
+          <a-textarea
+            v-model:value="addSignComment"
+            placeholder="加签说明（选填）"
+            :rows="3"
+          />
+        </a-form-item>
+      </a-form>
     </a-modal>
   </div>
 </template>

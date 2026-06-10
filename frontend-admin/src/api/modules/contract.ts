@@ -1,6 +1,13 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { ContractVO, ContractQueryParams, ContractKpiVO } from '@/types/contract'
+import type {
+  ContractVO,
+  ContractQueryParams,
+  ContractKpiVO,
+  ContractItem,
+  ContractPaymentTerm,
+  ContractApprovalRecord,
+} from '@/types/contract'
 
 /** 合同台账分页查询 */
 export function getContractLedger(params: ContractQueryParams) {
@@ -21,7 +28,7 @@ export function getContractDetail(id: string) {
 
 /** 新建合同 */
 export function createContract(data: Partial<ContractVO>) {
-  return request<void>({
+  return request<ContractVO>({
     url: '/contracts',
     method: 'post',
     data,
@@ -51,5 +58,60 @@ export function submitForApproval(id: string) {
   return request<void>({
     url: `/contracts/${id}/submit`,
     method: 'post',
+  })
+}
+
+/** 获取合同明细项 */
+export function getContractItems(contractId: string) {
+  return request<ContractItem[]>({
+    url: `/contracts/${contractId}/items`,
+    method: 'get',
+  })
+}
+
+/** 批量保存合同明细项 */
+export function saveContractItems(contractId: string, items: Partial<ContractItem>[]) {
+  return request<void>({
+    url: `/contracts/${contractId}/items/batch`,
+    method: 'post',
+    data: items,
+  })
+}
+
+/** 获取合同付款条款 */
+export function getPaymentTerms(contractId: string) {
+  return request<ContractPaymentTerm[]>({
+    url: `/contracts/${contractId}/payment-terms`,
+    method: 'get',
+  })
+}
+
+/** 批量保存合同付款条款 */
+export function savePaymentTerms(contractId: string, terms: Partial<ContractPaymentTerm>[]) {
+  return request<void>({
+    url: `/contracts/${contractId}/payment-terms/batch`,
+    method: 'post',
+    data: terms,
+  })
+}
+
+/** 获取合同付款条款（别名，供 store 使用） */
+export function getContractPaymentTerms(contractId: string) {
+  return getPaymentTerms(contractId)
+}
+
+/** 批量保存合同付款条款（别名，供 store 使用） */
+export function saveContractPaymentTerms(
+  contractId: string,
+  terms: Partial<ContractPaymentTerm>[],
+) {
+  return savePaymentTerms(contractId, terms)
+}
+
+/** 获取合同审批记录 */
+export function getContractApprovalRecords(contractId: string) {
+  return request<ContractApprovalRecord[]>({
+    url: `/contracts/${contractId}/approval-records`,
+    method: 'get',
   })
 }

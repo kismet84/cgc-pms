@@ -13,8 +13,10 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 @Service
@@ -49,6 +51,39 @@ public class CtContractService {
         CtContract c = ctContractMapper.selectById(id);
         if (c == null) throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
         return toVO(c);
+    }
+
+    @Transactional
+    public Long create(CtContract contract) {
+        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String prefix = "CT-" + today + "-";
+
+        LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
+        wrapper.likeRight(CtContract::getContractCode, prefix)
+                .orderByDesc(CtContract::getContractCode)
+                .last("LIMIT 1");
+        CtContract last = ctContractMapper.selectOne(wrapper);
+
+        int seq = 1;
+        if (last != null && last.getContractCode() != null && last.getContractCode().length() == prefix.length() + 3) {
+            try {
+                seq = Integer.parseInt(last.getContractCode().substring(prefix.length())) + 1;
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        contract.setContractCode(prefix + String.format("%03d", seq));
+        contract.setContractStatus("DRAFT");
+        contract.setApprovalStatus("DRAFT");
+
+        ctContractMapper.insert(contract);
+        return contract.getId();
+    }
+
+    @Transactional
+    public void update(CtContract contract) {
+        if (ctContractMapper.selectById(contract.getId()) == null)
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        ctContractMapper.updateById(contract);
     }
 
     private CtContractVO toVO(CtContract c) {

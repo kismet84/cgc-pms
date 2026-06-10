@@ -331,3 +331,25 @@ CREATE TABLE IF NOT EXISTS wf_idempotency (
     PRIMARY KEY (id)
 );
 
+-- ====== File Management Tables ======
+
+CREATE TABLE IF NOT EXISTS sys_file (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    business_type VARCHAR(50) NOT NULL,
+    business_id BIGINT NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    original_name VARCHAR(500) NOT NULL,
+    file_size BIGINT NOT NULL DEFAULT 0,
+    content_type VARCHAR(200),
+    storage_path VARCHAR(500) NOT NULL,
+    bucket_name VARCHAR(100) NOT NULL DEFAULT 'cgc-pms',
+    created_by BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    PRIMARY KEY (id)
+);
+

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import VChart from 'vue-echarts'
 import {
   FileTextOutlined,
@@ -15,6 +16,12 @@ import {
 import { getContractLedger, getContractKpi } from '@/api/modules/contract'
 import type { ContractVO, ContractQueryParams, ContractKpiVO, ContractType, ContractStatus } from '@/types/contract'
 import type { PageResult } from '@/types/api'
+
+const router = useRouter()
+
+function handleCreate() {
+  router.push('/contract/create')
+}
 
 // ---- Filter state ----
 const filter = reactive({
@@ -321,7 +328,7 @@ const gridColumns = computed(() => [
         <!-- Toolbar -->
         <div class="cl-toolbar">
           <div class="cl-toolbar-left">
-            <a-button type="primary"><template #icon><PlusOutlined /></template>新建合同</a-button>
+            <a-button type="primary" @click="handleCreate"><template #icon><PlusOutlined /></template>新建合同</a-button>
             <a-button><template #icon><DownloadOutlined /></template>导出</a-button>
             <a-dropdown>
               <a-button><template #icon><SettingOutlined /></template>列设置</a-button>
