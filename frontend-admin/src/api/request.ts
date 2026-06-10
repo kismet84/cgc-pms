@@ -11,7 +11,7 @@ import type { ApiResponse } from '@/types/api'
 const SUCCESS_CODE = '0'
 
 const service: AxiosInstance = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/api',
   timeout: 15000,
 })
 

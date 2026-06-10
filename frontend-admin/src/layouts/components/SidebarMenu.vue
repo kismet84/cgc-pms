@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { routes } from '@/router'
 import type { RouteRecordRaw } from 'vue-router'
@@ -13,7 +13,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 
-const iconMap: Record<string, unknown> = {
+const iconMap: Record<string, any> = {
   HomeOutlined,
   FileTextOutlined,
   ProjectOutlined,
@@ -27,19 +27,14 @@ const menuItems = computed(() => {
     .map((r) => buildMenuItem(r))
 })
 
-function buildMenuItem(route: RouteRecordRaw): unknown {
-  const item: {
-    key: string
-    label: string
-    icon?: unknown
-    children?: unknown[]
-  } = {
+function buildMenuItem(route: RouteRecordRaw): any {
+  const item: any = {
     key: route.path,
     label: route.meta?.title as string,
   }
   const iconName = route.meta?.icon as string
   if (iconName && iconMap[iconName]) {
-    item.icon = iconMap[iconName]
+    item.icon = () => h(iconMap[iconName])
   }
   if (route.children && route.children.length > 0) {
     item.children = route.children.filter((c) => !c.meta?.hidden).map((c) => buildMenuItem(c))
