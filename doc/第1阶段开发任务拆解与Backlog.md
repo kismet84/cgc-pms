@@ -2,9 +2,9 @@
 
 # 第 0 阶段工程启动与第 1 阶段开发任务拆解 Backlog
 
-版本：V1.0  
+版本：V1.1  
 适用文档基线：V1.2 修正版开发文档   
-适用阶段：开发启动阶段 / 第 1 阶段 POC 阶段  
+适用阶段：开发启动阶段 / 第 1 阶段 POC 阶段 / 安全加固  
 适用对象：项目负责人、产品经理、前端开发、后端开发、测试、实施、运维
 
 ---
@@ -88,11 +88,11 @@ API 契约审查通过
 
 ### 4.1 前端技术栈
 
-| 项目 | 技术 |
-|---|---|
-| 框架 | Vue 3 |
-| 语言 | TypeScript |
-| 构建工具 | Vite |
+| 项目 | 技术 | 版本 |
+|---|---|---|
+| 框架 | Vue 3 | |
+| 语言 | TypeScript | |
+| 构建工具 | Vite | 6.4.3 |
 | UI 组件库 | Ant Design Vue |
 | 状态管理 | Pinia |
 | 路由 | Vue Router |
@@ -639,8 +639,8 @@ ContractLedgerPage
 第 1 周验收标准：
 
 ```text
-✅ 后端服务可启动（91 源文件 BUILD SUCCESS）
-✅ 前端服务可启动（pnpm build 零错误）
+✅ 后端服务可启动（101+ 源文件 BUILD SUCCESS）
+✅ 前端构建通过（vite 6.4.3，vue-tsc + vite build 零错误）
 ✅ MySQL 可初始化（8 个 Flyway 迁移脚本 V1~V8）
 ✅ Swagger 可访问
 ✅ 登录页可访问（JWT + RBAC）
@@ -811,6 +811,7 @@ ContractLedgerPage
 | 密钥硬编码 | 安全泄露 | 所有 profile 改用 ${ENV_VAR:default} | ✅ 已解决 |
 | 文件无校验 | 存储滥用/攻击 | 50MB 限制 + 扩展名白名单 + 路径注入防护 | ✅ 已解决 |
 | Mock 静默回退 | 后端故障不可见 | 移除全部 5 处 mock 回退，统一 message.error 提示 | ✅ 已解决 |
+| vite/esbuild CVE | 开发服务器安全 | vite 5→6.4.3 + esbuild 0.25.0，修复 GHSA-4w7w-66w2-5vf9 / GHSA-67mh-4wv8-2f99 | ✅ 已解决 |
 
 ---
 
@@ -867,6 +868,7 @@ ContractLedgerPage
 12. ✅ availableActions 由后端返回（已含转办/加签按钮）。
 13. ✅ taskVersion 和 idempotencyKey 验证通过。
 14. ✅ 安全审计全部高危项修复完成（方法级RBAC、Refresh Token、文件安全、输入校验、密钥脱敏、幂等修复）[2026-06-11]
+14-1. ✅ vite 5→6.4.3 升级完成，2 个中等漏洞已修复 (2026-06-11)
 15. 🔲 合同提交审批与审批回调（Week 4，CT-008/CT-009）。
 16. 🔲 WorkflowBusinessHandler 支持合同审批回调（Week 4，已定义接口）。
 17. 🔲 成本生成幂等机制实现（Week 4+，COST-001~005）。
