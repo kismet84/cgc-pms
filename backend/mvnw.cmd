@@ -59,6 +59,12 @@ set ERROR_CODE=0
 @REM ==== START VALIDATION ====
 if not "%JAVA_HOME%" == "" goto OkJHome
 
+@REM Auto-detect JDK if JAVA_HOME not set
+if exist "D:\projects-test\jdk-21\jdk-21.0.11+10\bin\javac.exe" set JAVA_HOME=D:\projects-test\jdk-21\jdk-21.0.11+10
+if not "%JAVA_HOME%" == "" goto OkJHome
+if exist "C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot\bin\javac.exe" set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot
+if not "%JAVA_HOME%" == "" goto OkJHome
+
 echo. >&2
 echo Error: JAVA_HOME not found in your environment. >&2
 echo Please set the JAVA_HOME variable in your environment to match the >&2

@@ -43,8 +43,34 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'project',
         name: 'Project',
-        component: () => import('@/pages/dashboard/index.vue'),
+        component: () => import('@/pages/project/index.vue'),
         meta: { title: '项目管理', icon: 'ProjectOutlined' },
+      },
+      {
+        path: 'partner',
+        name: 'Partner',
+        component: () => import('@/pages/partner/index.vue'),
+        meta: { title: '合作方管理', icon: 'TeamOutlined' },
+      },
+      {
+        path: 'approval',
+        name: 'Approval',
+        redirect: '/approval/todo',
+        meta: { title: '审批管理', icon: 'AuditOutlined' },
+        children: [
+          {
+            path: 'todo',
+            name: 'ApprovalTodo',
+            component: () => import('@/pages/approval/todo.vue'),
+            meta: { title: '我的待办' },
+          },
+          {
+            path: ':instanceId',
+            name: 'ApprovalDetail',
+            component: () => import('@/pages/approval/detail.vue'),
+            meta: { title: '审批详情', hidden: true },
+          },
+        ],
       },
       {
         path: 'system',

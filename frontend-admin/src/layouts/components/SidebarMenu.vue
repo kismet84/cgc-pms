@@ -7,6 +7,8 @@ import {
   HomeOutlined,
   FileTextOutlined,
   ProjectOutlined,
+  TeamOutlined,
+  AuditOutlined,
   SettingOutlined,
 } from '@ant-design/icons-vue'
 
@@ -17,6 +19,8 @@ const iconMap: Record<string, any> = {
   HomeOutlined,
   FileTextOutlined,
   ProjectOutlined,
+  TeamOutlined,
+  AuditOutlined,
   SettingOutlined,
 }
 
