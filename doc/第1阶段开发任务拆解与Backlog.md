@@ -593,14 +593,14 @@ ContractLedgerPage
 
 ### 13.3 审批页面
 
-| 编号 | 任务 | 优先级 | 依赖 | 验收标准 |
-|---|---|---|---|---|
-| FE-WF-001 | 我的待办页面 | P0 | WF-003 | 可查看待办列表 |
-| FE-WF-002 | 审批详情页面 | P0 | WF-004 | 可查看审批流程和记录 |
-| FE-WF-003 | availableActions 渲染 | P0 | WF-013 | 按后端返回按钮渲染 |
-| FE-WF-004 | 同意 / 驳回弹窗 | P0 | WF-005、WF-006 | 可提交审批动作 |
-| FE-WF-005 | 转办 / 加签弹窗 | P1 | WF-009、WF-010 | 可选择目标用户 |
-| FE-WF-006 | 审批时间轴 | P1 | WF-004 | 可展示审批记录 |
+| 编号 | 任务 | 优先级 | 依赖 | 验收标准 | 状态 |
+|---|---|---|---|---|---|
+| FE-WF-001 | 我的待办页面 | P0 | WF-003 | 可查看待办列表 | ✅ 完成 |
+| FE-WF-002 | 审批详情页面 | P0 | WF-004 | 可查看审批流程和记录 | ✅ 完成 |
+| FE-WF-003 | availableActions 渲染 | P0 | WF-013 | 按后端返回按钮渲染 | ✅ 完成 |
+| FE-WF-004 | 同意 / 驳回弹窗 | P0 | WF-005、WF-006 | 可提交审批动作 | ✅ 完成 |
+| FE-WF-005 | 转办 / 加签弹窗 | P1 | WF-009、WF-010 | 可选择目标用户 | 🔲 待开发 |
+| FE-WF-006 | 审批时间轴 | P1 | WF-004 | 可展示审批记录 | ✅ 完成 |
 
 ---
 
@@ -656,17 +656,29 @@ ContractLedgerPage
 | 前端 | 合作方列表页 | ✅ |
 | 前端 | 审批待办列表页 | ✅ |
 | 前端 | 审批详情页（节点流程 + 操作 + 记录时间轴） | ✅ |
-| 测试 | 审批并发、重复提交、驳回重提测试 | 🔲 待数据库就绪后执行 |
+| 测试 | 集成测试 11 用例（H2 + MySQL 双环境验证） | ✅ |
 
 第 2 周验收标准：
 
 ```text
 ✅ 审批 POC 主流程跑通（WorkflowEngine 450行，9 个 API 端点）
-✅ 项目和合作方可维护（完整 CRUD）
+✅ 项目和合作方可维护（完整 CRUD，前端页面就绪）
 ✅ 审批待办和详情页面可查看（含同意/驳回/撤回/重提交交互）
-✅ 并发审批只能成功一次（taskVersion @Version 乐观锁）
-✅ 重复提交不会重复写记录（wf_idempotency 幂等表）
+✅ 并发审批只能成功一次（taskVersion @Version 乐观锁，3线程并发验证）
+✅ 重复提交不会重复写记录（wf_idempotency 幂等表，重复key被拒绝）
+✅ MySQL 8.0 全栈可用（Flyway 迁移 + 登录 + 项目/合作方/合同查询 + 审批提交/待办）
+✅ 测试报告：doc/审批引擎POC测试报告.md
 ```
+
+第 2 周修复的问题：
+
+| 问题 | 影响 | 修复 |
+|------|------|------|
+| Flyway V3 缺 BaseEntity 审计列 | MySQL 下 workflow INSERT 报 SQLSyntaxErrorException | V3 脚本补全 created_by/updated_by/remark |
+| MyMetaObjectHandler 未填 updatedAt | 新建记录 updated_at 为 NULL | insertFill 同步填充 updatedAt |
+| MySQL root 密码丢失 | 无法使用本地 MySQL | --init-file 重置为 root123 |
+| JDK 缺失 (仅有 JRE) | mvnw compile 失败 | 安装 Eclipse Temurin JDK 21 |
+| mvnw.cmd 缺 JAVA_HOME | 每次需手动设置 | 自动检测 D:\projects-test\jdk-21 |
 
 ### 15.3 第 3 周：合同中心基础
 
