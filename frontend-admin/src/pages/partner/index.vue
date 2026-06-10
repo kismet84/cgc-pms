@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { message } from 'ant-design-vue'
 import { getPartnerList } from '@/api/modules/partner'
 import type { PartnerVO } from '@/types/partner'
 
@@ -16,13 +17,6 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const MOCK_RECORDS: PartnerVO[] = [
-  { id: '1', partnerCode: 'HZF-2024-001', partnerName: '宏远建筑工程有限公司', partnerType: 'SUB', creditCode: '91310000MA1FL3XY0K', legalPerson: '张建国', contactName: '李明', contactPhone: '13812345678', bankName: '工商银行', bankAccount: '6222021234567890', qualificationLevel: '一级', blacklistFlag: false, riskLevel: 'LOW', status: 'ENABLED', createdAt: '2024-01-10' },
-  { id: '2', partnerCode: 'HZF-2024-002', partnerName: '华东钢材供应有限公司', partnerType: 'SUPPLIER', creditCode: '91310000MA1FL3XY1L', legalPerson: '王伟', contactName: '陈芳', contactPhone: '13987654321', bankName: '建设银行', bankAccount: '6227002345678901', qualificationLevel: '二级', blacklistFlag: false, riskLevel: 'MEDIUM', status: 'ENABLED', createdAt: '2024-02-05' },
-  { id: '3', partnerCode: 'HZF-2024-003', partnerName: '上海设计研究院', partnerType: 'DESIGN', creditCode: '91310000MA1FL3XY2M', legalPerson: '刘洋', contactName: '赵敏', contactPhone: '13611223344', bankName: '招商银行', bankAccount: '6225881234567890', qualificationLevel: '甲级', blacklistFlag: false, riskLevel: 'LOW', status: 'ENABLED', createdAt: '2024-02-18' },
-  { id: '4', partnerCode: 'HZF-2024-004', partnerName: '中铁监理咨询公司', partnerType: 'SUPERVISOR', creditCode: '91310000MA1FL3XY3N', legalPerson: '孙强', contactName: '周涛', contactPhone: '13755667788', bankName: '农业银行', bankAccount: '6228480987654321', qualificationLevel: '甲级', blacklistFlag: true, riskLevel: 'HIGH', status: 'DISABLED', createdAt: '2024-03-01' },
-  { id: '5', partnerCode: 'HZF-2024-005', partnerName: '绿城物料采购公司', partnerType: 'OTHER', creditCode: '91310000MA1FL3XY4P', legalPerson: '吴磊', contactName: '郑华', contactPhone: '13900112233', bankName: '交通银行', bankAccount: '6222600876543210', qualificationLevel: '三级', blacklistFlag: false, riskLevel: 'LOW', status: 'ENABLED', createdAt: '2024-03-15' },
-]
 
 const TYPE_LABEL: Record<string, string> = {
   SUPPLIER: '供应商', SUB: '分包商', DESIGN: '设计单位', SUPERVISOR: '监理单位', OTHER: '其他',
@@ -63,8 +57,9 @@ async function fetchData() {
     tableData.value = res.records
     total.value = res.total
   } catch {
-    tableData.value = MOCK_RECORDS
-    total.value = MOCK_RECORDS.length
+    tableData.value = []
+    total.value = 0
+    message.error('加载合作方列表失败，请稍后重试')
   } finally {
     loading.value = false
   }

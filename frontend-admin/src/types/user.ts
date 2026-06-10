@@ -8,6 +8,7 @@ export interface LoginParams {
 /** 登录响应 */
 export interface LoginResult {
   token: string
+  refreshToken: string
   userInfo: UserInfo
 }
 

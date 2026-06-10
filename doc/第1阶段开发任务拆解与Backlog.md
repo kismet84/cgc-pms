@@ -307,6 +307,8 @@ fix(auth): fix token refresh error
 | AUTH-007 | 用户角色分配 | P1 | AUTH-004、AUTH-005 | 用户可绑定角色 | ✅ 完成 |
 | AUTH-008 | 菜单权限返回接口 | P1 | AUTH-006 | 前端可渲染菜单 | ✅ 完成 |
 | AUTH-009 | 按钮权限返回接口 | P1 | AUTH-006 | 前端可控制按钮展示 | ✅ 完成 |
+| AUTH-010 | 方法级权限控制 | P0 | AUTH-002 | @PreAuthorize 全量覆盖 10 个 Controller，JWT 携带权限码 | ✅ 完成 |
+| AUTH-011 | Refresh Token + 黑名单 | P0 | AUTH-001、DB-001 | access/refresh 双 token，logout 黑名单，/auth/refresh 轮换 | ✅ 完成 |
 
 ### 9.3 项目管理
 
@@ -361,7 +363,8 @@ database/
     ├── V4__init_cost_payment_tables.sql
     ├── V5__init_dict_data.sql
     ├── V6__init_demo_data.sql
-    └── V7__init_file_tables.sql
+    ├── V7__init_file_tables.sql
+    └── V8__add_missing_indexes.sql
 ```
 
 ### 10.2 数据库任务
@@ -376,6 +379,7 @@ database/
 | DB-006 | 初始化测试数据 | P1 | DB-001~DB-005 | 可登录并看到演示项目、合同 | ✅ 完成 |
 | DB-007 | 增加核心索引 | P0 | DB-001~DB-004 | 查询字段具备索引 | ✅ 完成 |
 | DB-008 | 增加成本来源唯一索引 | P0 | DB-004 | cost_item 防重复生成 | ✅ 完成 |
+| DB-009 | V8 排序索引补充 | P0 | DB-001~DB-002 | sys_user/pm_project/md_partner/ct_contract 的 created_at 索引 | ✅ 完成 |
 
 ### 10.3 核心索引要求
 
@@ -611,9 +615,10 @@ ContractLedgerPage
 |---|---|---|---|---|---|
 | FILE-001 | MinIO 配置 | P1 | ENV-003 | 后端可连接 MinIO | ✅ 完成 |
 | FILE-002 | 文件上传接口 | P1 | FILE-001 | 可上传文件并返回 fileId | ✅ 完成 |
-| FILE-003 | 文件下载 / 预览接口 | P1 | FILE-001 | 可访问文件 URL | ✅ 完成 |
-| FILE-004 | 业务附件关联表 | P1 | DB-001 | 文件可关联业务单据 | ✅ 完成 |
-| FILE-005 | 前端上传组件 | P1 | FILE-002 | 合同页面可上传附件 | ✅ 完成 |
+| FILE-003 | 文件类型/大小校验 | P0 | FILE-002 | 50MB 限制 + 20 种扩展名白名单 + 路径注入防护 | ✅ 完成 |
+| FILE-004 | 文件下载 / 预览接口 | P1 | FILE-001 | 可访问文件 URL | ✅ 完成 |
+| FILE-005 | 业务附件关联表 | P1 | DB-001 | 文件可关联业务单据 | ✅ 完成 |
+| FILE-006 | 前端上传组件 | P1 | FILE-002 | 合同页面可上传附件 | ✅ 完成 |
 
 ---
 
@@ -636,7 +641,7 @@ ContractLedgerPage
 ```text
 ✅ 后端服务可启动（91 源文件 BUILD SUCCESS）
 ✅ 前端服务可启动（pnpm build 零错误）
-✅ MySQL 可初始化（6 个 Flyway 迁移脚本）
+✅ MySQL 可初始化（8 个 Flyway 迁移脚本 V1~V8）
 ✅ Swagger 可访问
 ✅ 登录页可访问（JWT + RBAC）
 ✅ 合同台账静态页面可访问（725行完整组件）
@@ -786,21 +791,26 @@ ContractLedgerPage
 | 字典数据 | 合同类型、审批状态等可查询 |
 | 成本幂等 | 重复来源不能生成重复成本 |
 | V7 文件表迁移 | Flyway 自动创建 sys_file 表（含 3 索引） |
+| V8 排序索引迁移 | 补充 sys_user/pm_project/md_partner/ct_contract 的 created_at 索引 |
+| 种子数据幂等 | V5/V6 使用 INSERT IGNORE，repair 后重跑不报错 |
 | 索引检查 | 核心查询字段具备索引 |
 
 ---
 
 ## 17. 风险与控制措施
 
-| 风险 | 影响 | 控制措施 |
-|---|---|---|
-| 审批引擎过晚完成 | 所有业务流程阻塞 | 第 1 阶段独立 POC，优先级 P0 |
-| DDL 不可执行 | 后端开发受阻 | 使用 Flyway，第一周完成初始化脚本 |
-| 前端页面只停留在静态 HTML | 页面无法扩展 | 第 1 周完成 Vue 组件化 POC |
-| 业务审批回调缺失 | 审批通过后业务状态不同步 | 建立 WorkflowBusinessHandler 机制 |
-| 成本重复生成 | 成本数据错误 | source_type + source_id + source_item_id + cost_type 唯一索引 |
-| 技术栈摇摆 | 开发返工 | 技术栈冻结，不再二选一 |
-| 移动端过早启动 | Mock 开发返工 | 移动端第 6 周后再启动基础工程 |
+| 风险 | 影响 | 控制措施 | 状态 |
+|------|------|---------|------|
+| 审批引擎过晚完成 | 所有业务流程阻塞 | 第 1 阶段独立 POC，优先级 P0 | ✅ 已解决 |
+| DDL 不可执行 | 后端开发受阻 | 使用 Flyway，第一周完成初始化脚本 | ✅ 已解决 |
+| 前端页面只停留在静态 HTML | 页面无法扩展 | 第 1 周完成 Vue 组件化 POC | ✅ 已解决 |
+| 业务审批回调缺失 | 审批通过后业务状态不同步 | 建立 WorkflowBusinessHandler 机制 | 🔲 Week 4 |
+| 成本重复生成 | 成本数据错误 | source_type + source_id + source_item_id + cost_type 唯一索引 | 🔲 Week 4+ |
+| Token 无刷新技术 | 用户频繁登录 | Refresh Token + Redis 黑名单已实现 | ✅ 已解决 |
+| RBAC 仅在 UI 层 | 后端无权限校验 | @PreAuthorize 方法级权限已全覆盖 | ✅ 已解决 |
+| 密钥硬编码 | 安全泄露 | 所有 profile 改用 ${ENV_VAR:default} | ✅ 已解决 |
+| 文件无校验 | 存储滥用/攻击 | 50MB 限制 + 扩展名白名单 + 路径注入防护 | ✅ 已解决 |
+| Mock 静默回退 | 后端故障不可见 | 移除全部 5 处 mock 回退，统一 message.error 提示 | ✅ 已解决 |
 
 ---
 
@@ -856,9 +866,10 @@ ContractLedgerPage
 11. ✅ 审批引擎 POC 跑通顺序、会签、或签、驳回、撤回、重提。
 12. ✅ availableActions 由后端返回（已含转办/加签按钮）。
 13. ✅ taskVersion 和 idempotencyKey 验证通过。
-14. 🔲 合同提交审批与审批回调（Week 4，CT-008/CT-009）。
-15. 🔲 WorkflowBusinessHandler 支持合同审批回调（Week 4，已定义接口）。
-16. 🔲 成本生成幂等机制实现（Week 4+，COST-001~005）。
+14. ✅ 安全审计全部高危项修复完成（方法级RBAC、Refresh Token、文件安全、输入校验、密钥脱敏、幂等修复）[2026-06-11]
+15. 🔲 合同提交审批与审批回调（Week 4，CT-008/CT-009）。
+16. 🔲 WorkflowBusinessHandler 支持合同审批回调（Week 4，已定义接口）。
+17. 🔲 成本生成幂等机制实现（Week 4+，COST-001~005）。
 ```
 
 ---

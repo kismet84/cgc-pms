@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -19,8 +20,10 @@ public class MdPartner extends BaseEntity {
 
     private String partnerCode;
 
+    @NotBlank
     private String partnerName;
 
+    @NotBlank
     private String partnerType;
 
     private String creditCode;

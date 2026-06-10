@@ -26,21 +26,10 @@ async function handleSubmit() {
   loading.value = true
   try {
     // 接入真实后端登录接口
-    const { token, userInfo } = await login(formState)
+    const { token, refreshToken, userInfo } = await login(formState)
     userStore.setToken(token)
+    userStore.setRefreshToken(refreshToken)
     userStore.setUserInfo(userInfo)
-
-    // --- Mock 登录占位逻辑（仅作参考，后端不可用时可临时启用）---
-    // await new Promise((resolve) => setTimeout(resolve, 600))
-    // userStore.setToken('mock-token-' + Date.now())
-    // userStore.setUserInfo({
-    //   userId: '1',
-    //   username: formState.username,
-    //   realName: '张三',
-    //   roles: ['admin'],
-    //   permissions: [],
-    //   roleName: '项目经理',
-    // })
 
     message.success('登录成功')
     const redirect = (route.query.redirect as string) || '/'

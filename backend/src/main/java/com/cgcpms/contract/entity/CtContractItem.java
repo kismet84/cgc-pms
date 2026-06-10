@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -25,15 +27,18 @@ public class CtContractItem extends BaseEntity {
 
     private String itemCode;
 
+    @NotBlank
     private String itemName;
 
     private String itemSpec;
 
     private String unit;
 
+    @PositiveOrZero
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal quantity;
 
+    @PositiveOrZero
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal unitPrice;
 

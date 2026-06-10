@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -17,10 +19,13 @@ public class SysUser extends BaseEntity {
 
     private Long tenantId;
 
+    @NotBlank
+    @Size(max = 50)
     private String username;
 
     private String password;
 
+    @Size(max = 50)
     private String realName;
 
     private String phone;

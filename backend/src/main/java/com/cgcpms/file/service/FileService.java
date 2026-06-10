@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -32,6 +33,12 @@ public class FileService {
 
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int PRESIGNED_URL_EXPIRE_DAYS = 7;
+    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024L; // 50 MB
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
+            ".zip", ".rar", ".7z", ".txt", ".csv"
+    );
 
     private final SysFileMapper sysFileMapper;
     private final MinioClient minioClient;
@@ -45,16 +52,26 @@ public class FileService {
         if (file.isEmpty()) {
             throw new BusinessException("FILE_EMPTY", "上传文件不能为空");
         }
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new BusinessException("FILE_TOO_LARGE", "文件大小不能超过 50MB");
+        }
+        String ext = getExtension(file.getOriginalFilename()).toLowerCase();
+        if (!ALLOWED_EXTENSIONS.contains(ext)) {
+            throw new BusinessException("FILE_TYPE_NOT_ALLOWED", "不支持的文件类型: " + ext);
+        }
         if (businessType == null || businessType.isBlank()) {
             throw new BusinessException("FILE_PARAM_MISSING", "业务类型不能为空");
         }
         if (businessId == null) {
             throw new BusinessException("FILE_PARAM_MISSING", "业务ID不能为空");
         }
+        // Sanitize businessType to prevent path traversal
+        if (!businessType.matches("[A-Za-z0-9_-]+")) {
+            throw new BusinessException("FILE_PARAM_INVALID", "业务类型格式非法");
+        }
 
         try {
             String originalName = file.getOriginalFilename();
-            String ext = getExtension(originalName);
             String fileName = UUID.randomUUID().toString().replace("-", "") + ext;
             String storagePath = businessType + "/" + businessId + "/" + fileName;
             String bucketName = minioConfig.getBucket();
@@ -87,7 +104,7 @@ public class FileService {
             throw e;
         } catch (Exception e) {
             log.error("File upload failed: businessType={}, businessId={}", businessType, businessId, e);
-            throw new BusinessException("FILE_UPLOAD_FAILED", "文件上传失败: " + e.getMessage());
+            throw new BusinessException("FILE_UPLOAD_FAILED", "文件上传失败，请稍后重试");
         }
     }
 
@@ -103,7 +120,7 @@ public class FileService {
             return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath());
         } catch (Exception e) {
             log.error("Failed to generate presigned URL for file: {}", fileId, e);
-            throw new BusinessException("FILE_URL_ERROR", "获取下载链接失败: " + e.getMessage());
+            throw new BusinessException("FILE_URL_ERROR", "获取下载链接失败，请稍后重试");
         }
     }
 
@@ -126,7 +143,7 @@ public class FileService {
         } catch (Exception e) {
             log.error("Failed to remove file from MinIO: fileId={}, storagePath={}",
                     fileId, sysFile.getStoragePath(), e);
-            throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败: " + e.getMessage());
+            throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败，请稍后重试");
         }
 
         // Logical delete in DB

@@ -15,6 +15,7 @@ import com.cgcpms.workflow.vo.WfInstanceVO;
 import com.cgcpms.workflow.vo.WfTaskVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -25,8 +26,8 @@ public class WorkflowController {
     private final WorkflowEngine workflowEngine;
     private final WorkflowQueryService workflowQueryService;
 
-    /** Submit a new approval */
     @PostMapping("/submit")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<String> submit(@Valid @RequestBody WorkflowSubmitRequest request) {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -39,8 +40,8 @@ public class WorkflowController {
         return ApiResponse.success(String.valueOf(instance.getId()));
     }
 
-    /** Approve a task */
     @PostMapping("/tasks/{taskId}/approve")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> approve(@PathVariable Long taskId,
                                       @Valid @RequestBody WorkflowActionRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -50,8 +51,8 @@ public class WorkflowController {
         return ApiResponse.success();
     }
 
-    /** Reject a task */
     @PostMapping("/tasks/{taskId}/reject")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> reject(@PathVariable Long taskId,
                                      @Valid @RequestBody WorkflowActionRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -61,8 +62,8 @@ public class WorkflowController {
         return ApiResponse.success();
     }
 
-    /** Withdraw an instance */
     @PostMapping("/instances/{instanceId}/withdraw")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> withdraw(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -70,8 +71,8 @@ public class WorkflowController {
         return ApiResponse.success();
     }
 
-    /** Resubmit a rejected/withdrawn instance */
     @PostMapping("/instances/{instanceId}/resubmit")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> resubmit(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -79,8 +80,8 @@ public class WorkflowController {
         return ApiResponse.success();
     }
 
-    /** Transfer task to another user */
     @PostMapping("/tasks/{taskId}/transfer")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> transfer(@PathVariable Long taskId,
                                        @Valid @RequestBody WorkflowTransferRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -90,8 +91,8 @@ public class WorkflowController {
         return ApiResponse.success();
     }
 
-    /** Add signers to current node */
     @PostMapping("/tasks/{taskId}/add-sign")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> addSign(@PathVariable Long taskId,
                                       @Valid @RequestBody WorkflowAddSignRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -101,8 +102,8 @@ public class WorkflowController {
         return ApiResponse.success();
     }
 
-    /** My pending tasks */
     @GetMapping("/tasks/todo")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<PageResult<WfTaskVO>> myTodos(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize) {
@@ -111,8 +112,8 @@ public class WorkflowController {
         return ApiResponse.success(PageResult.of(page));
     }
 
-    /** Instance detail */
     @GetMapping("/instances/{instanceId}")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<WfInstanceVO> instanceDetail(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
         WfInstanceVO detail = workflowQueryService.getInstanceDetail(instanceId, userId);

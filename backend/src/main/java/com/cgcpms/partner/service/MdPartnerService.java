@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.partner.vo.MdPartnerVO;
@@ -21,6 +23,7 @@ public class MdPartnerService {
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final MdPartnerMapper mdPartnerMapper;
+    private final CtContractMapper ctContractMapper;
 
     public IPage<MdPartnerVO> getPage(long pageNo, long pageSize, String partnerCode, String partnerName, String partnerType, String status) {
         LambdaQueryWrapper<MdPartner> wrapper = new LambdaQueryWrapper<>();
@@ -61,6 +64,11 @@ public class MdPartnerService {
 
     @Transactional
     public void delete(Long id) {
+        long contractCount = ctContractMapper.selectCount(
+                new LambdaQueryWrapper<CtContract>().eq(CtContract::getPartnerId, id));
+        if (contractCount > 0) {
+            throw new BusinessException("PARTNER_HAS_CONTRACTS", "该合作方存在关联合同，无法删除");
+        }
         mdPartnerMapper.deleteById(id);
     }
 

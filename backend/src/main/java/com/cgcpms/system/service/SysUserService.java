@@ -113,6 +113,8 @@ public class SysUserService {
 
     @Transactional
     public void delete(Long id) {
+        sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getUserId, id));
         sysUserMapper.deleteById(id);
     }
 

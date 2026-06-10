@@ -4,6 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.entity.CtContractPaymentTerm;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
+import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.vo.PmProjectVO;
@@ -11,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import java.util.List;
 
 import java.time.format.DateTimeFormatter;
 
@@ -21,6 +31,10 @@ public class PmProjectService {
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final PmProjectMapper pmProjectMapper;
+    private final CtContractMapper ctContractMapper;
+    private final CtContractItemMapper ctContractItemMapper;
+    private final CtContractPaymentTermMapper ctContractPaymentTermMapper;
+    private final SysFileMapper sysFileMapper;
 
     public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String projectCode, String projectName, String projectType, String status) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
@@ -55,6 +69,28 @@ public class PmProjectService {
 
     @Transactional
     public void delete(Long id) {
+        // Cascade: logical-delete associated files
+        sysFileMapper.delete(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getBusinessType, "PROJECT")
+                .eq(SysFile::getBusinessId, id));
+
+        // Cascade: logical-delete contracts and their children
+        List<CtContract> contracts = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>().eq(CtContract::getProjectId, id));
+        for (CtContract c : contracts) {
+            ctContractItemMapper.delete(new LambdaQueryWrapper<CtContractItem>()
+                    .eq(CtContractItem::getContractId, c.getId()));
+            ctContractPaymentTermMapper.delete(new LambdaQueryWrapper<CtContractPaymentTerm>()
+                    .eq(CtContractPaymentTerm::getContractId, c.getId()));
+            sysFileMapper.delete(new LambdaQueryWrapper<SysFile>()
+                    .eq(SysFile::getBusinessType, "CONTRACT")
+                    .eq(SysFile::getBusinessId, c.getId()));
+        }
+        if (!contracts.isEmpty()) {
+            ctContractMapper.delete(new LambdaQueryWrapper<CtContract>()
+                    .eq(CtContract::getProjectId, id));
+        }
+
         pmProjectMapper.deleteById(id);
     }
 

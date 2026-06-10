@@ -8,6 +8,7 @@ import com.cgcpms.contract.service.CtContractService;
 import com.cgcpms.contract.vo.CtContractVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,6 +19,7 @@ public class CtContractController {
     private final CtContractService ctContractService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:query')")
     public ApiResponse<PageResult<CtContractVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -34,16 +36,19 @@ public class CtContractController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:query')")
     public ApiResponse<CtContractVO> getById(@PathVariable Long id) {
         return ApiResponse.success(ctContractService.getById(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:add')")
     public ApiResponse<Long> create(@Valid @RequestBody CtContract contract) {
         return ApiResponse.success(ctContractService.create(contract));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CtContract contract) {
         contract.setId(id);
         ctContractService.update(contract);

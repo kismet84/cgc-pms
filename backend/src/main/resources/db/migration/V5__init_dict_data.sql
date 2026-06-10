@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS sys_dict_data (
 -- ============================================================
 -- 字典类型种子数据
 -- ============================================================
-INSERT INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) VALUES
+INSERT IGNORE INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) VALUES
 (1001, 0, 'project_status',  '项目状态', 'ENABLE'),
 (1002, 0, 'contract_type',   '合同类型', 'ENABLE'),
 (1003, 0, 'contract_status', '合同状态', 'ENABLE'),
@@ -61,7 +61,7 @@ INSERT INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) VALUES
 -- ============================================================
 
 -- 项目状态 project_status
-INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
+INSERT IGNORE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
 (100101, 0, 1001, '草稿',   'DRAFT',       'info',    1, 'ENABLE'),
 (100102, 0, 1001, '在建',   'ONGOING',     'primary', 2, 'ENABLE'),
 (100103, 0, 1001, '已竣工', 'COMPLETED',   'success', 3, 'ENABLE'),
@@ -69,7 +69,7 @@ INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, 
 (100105, 0, 1001, '已关闭', 'CLOSED',      'danger',  5, 'ENABLE');
 
 -- 合同类型 contract_type
-INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
+INSERT IGNORE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
 (100201, 0, 1002, '总包合同', 'MAIN',       'primary', 1, 'ENABLE'),
 (100202, 0, 1002, '分包合同', 'SUB',        'success', 2, 'ENABLE'),
 (100203, 0, 1002, '采购合同', 'PURCHASE',   'info',    3, 'ENABLE'),
@@ -77,14 +77,14 @@ INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, 
 (100205, 0, 1002, '服务合同', 'SERVICE',    'default', 5, 'ENABLE');
 
 -- 合同状态 contract_status
-INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
+INSERT IGNORE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
 (100301, 0, 1003, '草稿',   'DRAFT',       'info',    1, 'ENABLE'),
 (100302, 0, 1003, '履约中', 'PERFORMING',  'primary', 2, 'ENABLE'),
 (100303, 0, 1003, '已结算', 'SETTLED',     'success', 3, 'ENABLE'),
 (100304, 0, 1003, '已终止', 'TERMINATED',  'danger',  4, 'ENABLE');
 
 -- 审批状态 approval_status
-INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
+INSERT IGNORE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
 (100401, 0, 1004, '草稿',   'DRAFT',       'info',    1, 'ENABLE'),
 (100402, 0, 1004, '审批中', 'APPROVING',   'warning', 2, 'ENABLE'),
 (100403, 0, 1004, '已通过', 'APPROVED',    'success', 3, 'ENABLE'),
@@ -92,21 +92,21 @@ INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, 
 (100405, 0, 1004, '已撤回', 'WITHDRAWN',   'default', 5, 'ENABLE');
 
 -- 合作方类型 partner_type
-INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
+INSERT IGNORE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
 (100501, 0, 1005, '供应商', 'SUPPLIER',     'primary', 1, 'ENABLE'),
 (100502, 0, 1005, '分包商', 'SUBCONTRACTOR','success', 2, 'ENABLE'),
 (100503, 0, 1005, '租赁商', 'LESSOR',       'info',    3, 'ENABLE'),
 (100504, 0, 1005, '服务商', 'SERVICE_PROVIDER','warning', 4, 'ENABLE');
 
 -- 付款类型 pay_type
-INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
+INSERT IGNORE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
 (100601, 0, 1006, '预付款', 'ADVANCE',     'primary', 1, 'ENABLE'),
 (100602, 0, 1006, '进度款', 'PROGRESS',    'success', 2, 'ENABLE'),
 (100603, 0, 1006, '结算款', 'SETTLEMENT',  'info',    3, 'ENABLE'),
 (100604, 0, 1006, '质保金', 'WARRANTY',    'warning', 4, 'ENABLE');
 
 -- 成本类型 cost_type
-INSERT INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
+INSERT IGNORE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) VALUES
 (100701, 0, 1007, '材料费',   'MATERIAL',   'primary', 1, 'ENABLE'),
 (100702, 0, 1007, '分包费',   'SUBCONTRACT','success', 2, 'ENABLE'),
 (100703, 0, 1007, '机械费',   'MACHINERY',  'info',    3, 'ENABLE'),

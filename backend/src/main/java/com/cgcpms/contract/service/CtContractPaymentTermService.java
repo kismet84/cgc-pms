@@ -1,6 +1,7 @@
 package com.cgcpms.contract.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.toolkit.Db;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
@@ -34,8 +35,9 @@ public class CtContractPaymentTermService {
         LambdaQueryWrapper<CtContractPaymentTerm> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(CtContractPaymentTerm::getContractId, contractId);
         ctContractPaymentTermMapper.delete(deleteWrapper);
-        for (CtContractPaymentTerm term : newTerms) {
-            ctContractPaymentTermMapper.insert(term);
+        if (!newTerms.isEmpty()) {
+            newTerms.forEach(t -> t.setContractId(contractId));
+            Db.saveBatch(newTerms);
         }
     }
 

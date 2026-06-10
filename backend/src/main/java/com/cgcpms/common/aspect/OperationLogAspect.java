@@ -64,7 +64,14 @@ public class OperationLogAspect {
             return "[]";
         }
         try {
-            return Arrays.toString(args);
+            return Arrays.stream(args)
+                    .map(arg -> {
+                        if (arg == null) return "null";
+                        String s = arg.toString();
+                        // Mask password/token/secret fields that may appear in toString()
+                        return s.replaceAll("(?i)(password|secret|token|accessKey|secretKey)=[^,}\\]]+", "$1=***");
+                    })
+                    .collect(java.util.stream.Collectors.joining(", ", "[", "]"));
         } catch (Exception e) {
             return "<unprintable>";
         }

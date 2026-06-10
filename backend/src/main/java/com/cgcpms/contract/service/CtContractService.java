@@ -18,6 +18,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,7 +48,26 @@ public class CtContractService {
         wrapper.orderByDesc(CtContract::getCreatedAt);
 
         Page<CtContract> page = ctContractMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-        return page.convert(this::toVO);
+
+        // Batch-prefetch related project/partner names to avoid N+1 queries.
+        List<CtContract> records = page.getRecords();
+        Set<Long> projectIds = records.stream()
+                .map(CtContract::getProjectId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> partnerIds = records.stream()
+                .map(CtContract::getPartnerId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
+                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                        .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
+        Map<Long, String> partnerNames = partnerIds.isEmpty() ? Map.of()
+                : mdPartnerMapper.selectBatchIds(partnerIds).stream()
+                        .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
+
+        return page.convert(c -> toVO(c, projectNames, partnerNames));
     }
 
     public CtContractVO getById(Long id) {
@@ -87,6 +110,32 @@ public class CtContractService {
     }
 
     private CtContractVO toVO(CtContract c) {
+        // Single-record variant: fetch project/partner individually (for getById).
+        CtContractVO vo = buildBaseVO(c);
+        if (c.getProjectId() != null) {
+            PmProject project = pmProjectMapper.selectById(c.getProjectId());
+            if (project != null) vo.setProjectName(project.getProjectName());
+        }
+        if (c.getPartnerId() != null) {
+            MdPartner partner = mdPartnerMapper.selectById(c.getPartnerId());
+            if (partner != null) vo.setPartnerName(partner.getPartnerName());
+        }
+        return vo;
+    }
+
+    private CtContractVO toVO(CtContract c, Map<Long, String> projectNames, Map<Long, String> partnerNames) {
+        // Batch-friendly variant: use pre-fetched maps to avoid N+1.
+        CtContractVO vo = buildBaseVO(c);
+        if (c.getProjectId() != null) {
+            vo.setProjectName(projectNames.get(c.getProjectId()));
+        }
+        if (c.getPartnerId() != null) {
+            vo.setPartnerName(partnerNames.get(c.getPartnerId()));
+        }
+        return vo;
+    }
+
+    private CtContractVO buildBaseVO(CtContract c) {
         CtContractVO vo = new CtContractVO();
         vo.setId(c.getId() != null ? c.getId().toString() : null);
         vo.setTenantId(c.getTenantId() != null ? c.getTenantId().toString() : null);
@@ -116,15 +165,6 @@ public class CtContractService {
         vo.setCreatedAt(c.getCreatedAt() != null ? DTF.format(c.getCreatedAt()) : null);
         vo.setUpdatedAt(c.getUpdatedAt() != null ? DTF.format(c.getUpdatedAt()) : null);
         vo.setRemark(c.getRemark());
-
-        if (c.getProjectId() != null) {
-            PmProject project = pmProjectMapper.selectById(c.getProjectId());
-            if (project != null) vo.setProjectName(project.getProjectName());
-        }
-        if (c.getPartnerId() != null) {
-            MdPartner partner = mdPartnerMapper.selectById(c.getPartnerId());
-            if (partner != null) vo.setPartnerName(partner.getPartnerName());
-        }
         return vo;
     }
 }

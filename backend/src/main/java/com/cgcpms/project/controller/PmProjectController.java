@@ -6,7 +6,9 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.service.PmProjectService;
 import com.cgcpms.project.vo.PmProjectVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -17,6 +19,7 @@ public class PmProjectController {
     private final PmProjectService pmProjectService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:query')")
     public ApiResponse<PageResult<PmProjectVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -29,23 +32,27 @@ public class PmProjectController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:query')")
     public ApiResponse<PmProjectVO> getById(@PathVariable Long id) {
         return ApiResponse.success(pmProjectService.getById(id));
     }
 
     @PostMapping
-    public ApiResponse<Long> create(@RequestBody PmProject project) {
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:add')")
+    public ApiResponse<Long> create(@Valid @RequestBody PmProject project) {
         return ApiResponse.success(pmProjectService.create(project));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Void> update(@PathVariable Long id, @RequestBody PmProject project) {
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:edit')")
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PmProject project) {
         project.setId(id);
         pmProjectService.update(project);
         return ApiResponse.success();
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         pmProjectService.delete(id);
         return ApiResponse.success();

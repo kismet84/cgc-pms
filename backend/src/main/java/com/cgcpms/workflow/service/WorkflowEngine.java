@@ -9,6 +9,7 @@ import com.cgcpms.workflow.handler.WorkflowContext;
 import com.cgcpms.workflow.mapper.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -566,20 +567,21 @@ public class WorkflowEngine {
     }
 
     private void checkIdempotency(Long userId, String idempotencyKey, String actionType) {
-        long count = wfIdempotencyMapper.selectCount(new LambdaQueryWrapper<WfIdempotency>()
-                .eq(WfIdempotency::getUserId, userId)
-                .eq(WfIdempotency::getIdempotencyKey, idempotencyKey));
-        if (count > 0) {
-            throw new BusinessException("DUPLICATE_REQUEST", "重复请求，操作已执行过，请勿重复提交");
-        }
-        // Insert idempotency record
+        // Insert-first strategy: rely on the unique constraint
+        // uk_wf_idempotency(tenant_id, user_id, idempotency_key) to atomically
+        // detect duplicates and avoid the check-then-insert (TOCTOU) race.
         WfIdempotency idem = new WfIdempotency();
         idem.setTenantId(0L);
         idem.setUserId(userId);
         idem.setIdempotencyKey(idempotencyKey);
         idem.setCreatedAt(LocalDateTime.now());
         idem.setExpiredAt(LocalDateTime.now().plusHours(WorkflowConstants.IDEMPOTENCY_EXPIRE_HOURS));
-        wfIdempotencyMapper.insert(idem);
+        try {
+            wfIdempotencyMapper.insert(idem);
+        } catch (DuplicateKeyException e) {
+            // Another concurrent request with the same key already inserted the record.
+            throw new BusinessException("DUPLICATE_REQUEST", "重复请求，操作已执行过，请勿重复提交");
+        }
     }
 
     private void notifyHandler(String businessType, WfInstance instance,

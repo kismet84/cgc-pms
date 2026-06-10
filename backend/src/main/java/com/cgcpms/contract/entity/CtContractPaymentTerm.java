@@ -7,6 +7,8 @@ import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -25,8 +27,10 @@ public class CtContractPaymentTerm extends BaseEntity {
 
     private Long contractId;
 
+    @NotBlank
     private String termName;
 
+    @PositiveOrZero
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal paymentRatio;
 

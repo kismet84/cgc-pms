@@ -46,7 +46,8 @@ public class AuthService {
         List<String> roleCodes = getRoleCodes(user.getId());
         List<String> permCodes = getPermissionCodes(user.getId());
 
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId());
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes);
+        String refreshToken = jwtUtils.generateRefreshToken(user.getId());
         UserInfo userInfo = UserInfo.builder()
                 .userId(String.valueOf(user.getId()))
                 .username(user.getUsername())
@@ -59,7 +60,30 @@ public class AuthService {
                 .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
                 .build();
 
-        return new LoginResponse(token, userInfo);
+        return new LoginResponse(token, refreshToken, userInfo);
+    }
+
+    public LoginResponse loginById(Long userId) {
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        }
+        List<String> roleCodes = getRoleCodes(userId);
+        List<String> permCodes = getPermissionCodes(userId);
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes);
+        String refreshToken = jwtUtils.generateRefreshToken(user.getId());
+        UserInfo userInfo = UserInfo.builder()
+                .userId(String.valueOf(user.getId()))
+                .username(user.getUsername())
+                .realName(user.getRealName())
+                .avatar(user.getAvatar())
+                .phone(user.getPhone())
+                .email(user.getEmail())
+                .roles(roleCodes)
+                .permissions(permCodes)
+                .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
+                .build();
+        return new LoginResponse(token, refreshToken, userInfo);
     }
 
     public UserInfo getUserInfo(Long userId) {

@@ -3,7 +3,9 @@ package com.cgcpms.contract.controller;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.service.CtContractPaymentTermService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,24 +18,30 @@ public class CtContractPaymentTermController {
     private final CtContractPaymentTermService ctContractPaymentTermService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:query')")
     public ApiResponse<List<CtContractPaymentTerm>> getByContractId(@PathVariable Long contractId) {
         return ApiResponse.success(ctContractPaymentTermService.getByContractId(contractId));
     }
 
     @PostMapping
-    public ApiResponse<Long> create(@PathVariable Long contractId, @RequestBody CtContractPaymentTerm term) {
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:add')")
+    public ApiResponse<Long> create(@PathVariable Long contractId, @Valid @RequestBody CtContractPaymentTerm term) {
         term.setContractId(contractId);
         return ApiResponse.success(ctContractPaymentTermService.create(term));
     }
 
     @PostMapping("/batch")
-    public ApiResponse<Void> batchSave(@PathVariable Long contractId, @RequestBody List<CtContractPaymentTerm> terms) {
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:add')")
+    public ApiResponse<Void> batchSave(@PathVariable Long contractId,
+                                       @RequestBody @Valid List<@Valid CtContractPaymentTerm> terms) {
         ctContractPaymentTermService.batchSave(contractId, terms);
         return ApiResponse.success();
     }
 
     @PutMapping("/{termId}")
-    public ApiResponse<Void> update(@PathVariable Long contractId, @PathVariable Long termId, @RequestBody CtContractPaymentTerm term) {
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:edit')")
+    public ApiResponse<Void> update(@PathVariable Long contractId, @PathVariable Long termId,
+                                    @Valid @RequestBody CtContractPaymentTerm term) {
         term.setId(termId);
         term.setContractId(contractId);
         ctContractPaymentTermService.update(term);
@@ -41,6 +49,7 @@ public class CtContractPaymentTermController {
     }
 
     @DeleteMapping("/{termId}")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:delete')")
     public ApiResponse<Void> delete(@PathVariable Long contractId, @PathVariable Long termId) {
         ctContractPaymentTermService.delete(termId);
         return ApiResponse.success();

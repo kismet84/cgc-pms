@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import { getMyTodos, type WfTaskVO } from '@/api/modules/workflow'
 import type { PageResult } from '@/types/api'
 
@@ -12,32 +13,6 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const MOCK_RECORDS: WfTaskVO[] = [
-  {
-    id: '1', instanceId: '101', nodeInstanceId: '1001',
-    businessType: 'CONTRACT_APPROVAL', businessId: '2001',
-    approverId: '1', approverName: '张三',
-    taskStatus: 'PENDING', roundNo: 1, taskVersion: 1,
-    receivedAt: '2024-05-10 09:00:00',
-    title: '滨江大道项目-主合同审批', instanceStatus: 'RUNNING',
-  },
-  {
-    id: '2', instanceId: '102', nodeInstanceId: '1002',
-    businessType: 'PAY_REQUEST', businessId: '3001',
-    approverId: '1', approverName: '张三',
-    taskStatus: 'PENDING', roundNo: 2, taskVersion: 1,
-    receivedAt: '2024-05-09 14:30:00',
-    title: '材料采购付款申请-2024年5月', instanceStatus: 'RUNNING',
-  },
-  {
-    id: '3', instanceId: '103', nodeInstanceId: '1003',
-    businessType: 'VAR_ORDER', businessId: '4001',
-    approverId: '1', approverName: '张三',
-    taskStatus: 'PENDING', roundNo: 1, taskVersion: 2,
-    receivedAt: '2024-05-08 16:00:00',
-    title: '签证变更审批-围挡工程增加', instanceStatus: 'RUNNING',
-  },
-]
 
 const businessTypeMap: Record<string, string> = {
   CONTRACT_APPROVAL: '合同审批',
@@ -56,8 +31,9 @@ async function fetchData() {
     tableData.value = res.records
     total.value = res.total
   } catch {
-    tableData.value = MOCK_RECORDS
-    total.value = MOCK_RECORDS.length
+    tableData.value = []
+    total.value = 0
+    message.error('加载待办列表失败，请稍后重试')
   } finally {
     loading.value = false
   }

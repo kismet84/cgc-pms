@@ -7,6 +7,8 @@ import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -27,6 +29,7 @@ public class PmProject extends BaseEntity {
 
     private String projectCode;
 
+    @NotBlank
     private String projectName;
 
     private String projectType;
@@ -39,9 +42,11 @@ public class PmProject extends BaseEntity {
 
     private String designUnit;
 
+    @PositiveOrZero
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal contractAmount;
 
+    @PositiveOrZero
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal targetCost;
 

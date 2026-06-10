@@ -13,6 +13,7 @@ import {
   SettingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
 import { getContractLedger, getContractKpi } from '@/api/modules/contract'
 import type { ContractVO, ContractQueryParams, ContractKpiVO, ContractType, ContractStatus } from '@/types/contract'
 import type { PageResult } from '@/types/api'
@@ -69,26 +70,6 @@ function toggleCol(key: string) {
   localStorage.setItem(COLS_KEY, JSON.stringify(colVisible))
 }
 
-// ---- Mock data fallback ----
-const MOCK_RECORDS: ContractVO[] = [
-  { id: '1', tenantId: '', orgId: '', projectId: '', partnerId: '', contractCode: 'HT-ZB-2024-001', contractName: '滨江大道综合体项目总包合同', contractType: 'MAIN', partyA: '', partyB: '', contractAmount: '45680.00', currentAmount: '45680.00', taxRate: 9, taxAmount: '0', amountWithoutTax: '0', signedDate: '2024-01-15', startDate: '2024-01-15', endDate: '2025-01-15', paymentMethod: '', settlementMethod: '', warrantyRate: 0, warrantyAmount: '0', contractStatus: 'EXECUTING', approvalStatus: 'APPROVED', projectName: '滨江大道项目', partnerName: '滨江建设投资集团', createdBy: '', createdAt: '', updatedBy: '', updatedAt: '' },
-  { id: '2', tenantId: '', orgId: '', projectId: '', partnerId: '', contractCode: 'HT-FB-2024-008', contractName: '主体施工专业分包合同', contractType: 'SUB', partyA: '', partyB: '', contractAmount: '8560.00', currentAmount: '8560.00', taxRate: 9, taxAmount: '0', amountWithoutTax: '0', signedDate: '2024-02-01', startDate: '2024-02-01', endDate: '2025-02-01', paymentMethod: '', settlementMethod: '', warrantyRate: 0, warrantyAmount: '0', contractStatus: 'EXECUTING', approvalStatus: 'APPROVED', projectName: '滨江大道项目', partnerName: '宏远建筑工程有限公司', createdBy: '', createdAt: '', updatedBy: '', updatedAt: '' },
-  { id: '3', tenantId: '', orgId: '', projectId: '', partnerId: '', contractCode: 'HT-FB-2024-009', contractName: '机电安装专业分包合同', contractType: 'SUB', partyA: '', partyB: '', contractAmount: '6320.00', currentAmount: '6320.00', taxRate: 9, taxAmount: '0', amountWithoutTax: '0', signedDate: '2024-02-10', startDate: '2024-02-10', endDate: '2025-02-10', paymentMethod: '', settlementMethod: '', warrantyRate: 0, warrantyAmount: '0', contractStatus: 'EXECUTING', approvalStatus: 'APPROVED', projectName: '滨江大道项目', partnerName: '正大机电安装有限公司', createdBy: '', createdAt: '', updatedBy: '', updatedAt: '' },
-  { id: '4', tenantId: '', orgId: '', projectId: '', partnerId: '', contractCode: 'HT-CG-2024-015', contractName: '钢筋采购合同', contractType: 'PURCHASE', partyA: '', partyB: '', contractAmount: '2860.00', currentAmount: '2860.00', taxRate: 9, taxAmount: '0', amountWithoutTax: '0', signedDate: '2024-02-18', startDate: '2024-02-18', endDate: '2024-12-18', paymentMethod: '', settlementMethod: '', warrantyRate: 0, warrantyAmount: '0', contractStatus: 'EXECUTING', approvalStatus: 'APPROVED', projectName: '滨江大道项目', partnerName: '华东钢材有限公司', createdBy: '', createdAt: '', updatedBy: '', updatedAt: '' },
-  { id: '5', tenantId: '', orgId: '', projectId: '', partnerId: '', contractCode: 'HT-CG-2024-016', contractName: '水泥采购合同', contractType: 'PURCHASE', partyA: '', partyB: '', contractAmount: '1250.00', currentAmount: '1250.00', taxRate: 9, taxAmount: '0', amountWithoutTax: '0', signedDate: '2024-02-20', startDate: '2024-02-20', endDate: '2024-08-20', paymentMethod: '', settlementMethod: '', warrantyRate: 0, warrantyAmount: '0', contractStatus: 'COMPLETED', approvalStatus: 'APPROVED', projectName: '滨江大道项目', partnerName: '海螺水泥股份有限公司', createdBy: '', createdAt: '', updatedBy: '', updatedAt: '' },
-  { id: '6', tenantId: '', orgId: '', projectId: '', partnerId: '', contractCode: 'HT-ZL-2024-020', contractName: '塔吊租赁合同', contractType: 'LEASE', partyA: '', partyB: '', contractAmount: '980.00', currentAmount: '980.00', taxRate: 9, taxAmount: '0', amountWithoutTax: '0', signedDate: '2024-03-05', startDate: '2024-03-05', endDate: '2025-03-05', paymentMethod: '', settlementMethod: '', warrantyRate: 0, warrantyAmount: '0', contractStatus: 'EXECUTING', approvalStatus: 'APPROVED', projectName: '滨江大道项目', partnerName: '中联机械设备租赁公司', createdBy: '', createdAt: '', updatedBy: '', updatedAt: '' },
-  { id: '7', tenantId: '', orgId: '', projectId: '', partnerId: '', contractCode: 'HT-CG-2024-021', contractName: '模板采购合同', contractType: 'PURCHASE', partyA: '', partyB: '', contractAmount: '1560.00', currentAmount: '1560.00', taxRate: 9, taxAmount: '0', amountWithoutTax: '0', signedDate: '2024-03-08', startDate: '2024-03-08', endDate: '2024-12-08', paymentMethod: '', settlementMethod: '', warrantyRate: 0, warrantyAmount: '0', contractStatus: 'EXECUTING', approvalStatus: 'APPROVED', projectName: '滨江大道项目', partnerName: '方圆模板有限公司', createdBy: '', createdAt: '', updatedBy: '', updatedAt: '' },
-  { id: '8', tenantId: '', orgId: '', projectId: '', partnerId: '', contractCode: 'HT-FW-2024-022', contractName: '施工临时用电服务合同', contractType: 'SERVICE', partyA: '', partyB: '', contractAmount: '320.35', currentAmount: '320.35', taxRate: 9, taxAmount: '0', amountWithoutTax: '0', signedDate: '2024-03-12', startDate: '2024-03-12', endDate: '2025-03-12', paymentMethod: '', settlementMethod: '', warrantyRate: 0, warrantyAmount: '0', contractStatus: 'EXECUTING', approvalStatus: 'APPROVED', projectName: '滨江大道项目', partnerName: '国家电网供电公司', createdBy: '', createdAt: '', updatedBy: '', updatedAt: '' },
-]
-
-const MOCK_KPI: ContractKpiVO = {
-  totalCount: 128,
-  totalAmount: '1256803500',
-  paidAmount: '684302000',
-  unpaidAmount: '572501500',
-  overdueCount: 6,
-}
-
 // ---- Fetch ----
 async function fetchData() {
   loading.value = true
@@ -108,8 +89,9 @@ async function fetchData() {
     tableData.value = res.records
     total.value = res.total
   } catch {
-    tableData.value = MOCK_RECORDS
-    total.value = 128
+    tableData.value = []
+    total.value = 0
+    message.error('加载合同台账失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -119,7 +101,8 @@ async function fetchKpi() {
   try {
     kpi.value = await getContractKpi()
   } catch {
-    kpi.value = MOCK_KPI
+    kpi.value = { totalCount: 0, totalAmount: '0', paidAmount: '0', unpaidAmount: '0', overdueCount: 0 }
+    message.error('加载合同指标失败，请稍后重试')
   }
 }
 

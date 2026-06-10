@@ -21,4 +21,7 @@ public class JwtProperties {
 
     /** Prefix preceding the token value, e.g. {@code "Bearer "}. */
     private String tokenPrefix;
+
+    /** Refresh token time-to-live in milliseconds (default 7 days). */
+    private long refreshExpiration = 604800000L;
 }

@@ -2,8 +2,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: cgc
-    password: cgc123
+    username: ${DB_USERNAME:cgc}
+    password: ${DB_PASSWORD:cgc123}
     hikari:
       pool-name: CgcPmsHikariPool
       minimum-idle: 5
@@ -38,13 +38,17 @@ spring:
 # MinIO object storage
 minio:
   endpoint: http://localhost:9000
-  access-key: minioadmin
-  secret-key: minioadmin123
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin123}
   bucket: cgc-pms
 
 # JWT
 jwt:
-  secret: dev-only-change-me-cgc-pms-jwt-secret-key-256bit-minimum-length
+  secret: ${JWT_SECRET:dev-only-change-me-cgc-pms-jwt-secret-key-256bit-minimum-length}
   expiration: 86400000
+  refresh-expiration: 604800000
   header: Authorization
   token-prefix: "Bearer "
+
+cors:
+  allowed-origins: "http://localhost:5173"

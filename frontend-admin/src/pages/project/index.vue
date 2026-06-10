@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { message } from 'ant-design-vue'
 import { getProjectList } from '@/api/modules/project'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
@@ -17,13 +18,6 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const MOCK_RECORDS: ProjectVO[] = [
-  { id: '1', projectCode: 'PRJ-2024-001', projectName: '滨江大道综合体建设项目', projectType: '施工总承包', projectAddress: '上海市浦东新区', ownerUnit: '滨江投资集团', supervisorUnit: '华东监理公司', designUnit: '建筑设计院', contractAmount: '45680000', targetCost: '42000000', plannedStartDate: '2024-01-15', plannedEndDate: '2025-06-30', projectManagerId: '1', status: '进行中', approvalStatus: '已批准', createdBy: 'admin', createdAt: '2024-01-10', updatedAt: '2024-01-10' },
-  { id: '2', projectCode: 'PRJ-2024-002', projectName: '城北污水处理厂改造工程', projectType: '专业分包', projectAddress: '北京市朝阳区', ownerUnit: '市政建设局', supervisorUnit: '北京监理所', designUnit: '市政设计院', contractAmount: '8560000', targetCost: '8000000', plannedStartDate: '2024-03-01', plannedEndDate: '2024-12-31', projectManagerId: '2', status: '进行中', approvalStatus: '已批准', createdBy: 'admin', createdAt: '2024-02-20', updatedAt: '2024-02-20' },
-  { id: '3', projectCode: 'PRJ-2023-015', projectName: '东区住宅小区劳务工程', projectType: '劳务分包', projectAddress: '广州市天河区', ownerUnit: '恒大置业', supervisorUnit: '广州监理公司', designUnit: '城市设计院', contractAmount: '2300000', targetCost: '2100000', plannedStartDate: '2023-06-01', plannedEndDate: '2024-05-31', projectManagerId: '3', status: '已完工', approvalStatus: '已批准', createdBy: 'admin', createdAt: '2023-05-15', updatedAt: '2024-06-01' },
-  { id: '4', projectCode: 'PRJ-2024-008', projectName: '工业园区钢结构材料采购', projectType: '材料采购', projectAddress: '深圳市宝安区', ownerUnit: '深圳工业园', supervisorUnit: '', designUnit: '', contractAmount: '5600000', targetCost: '5600000', plannedStartDate: '2024-02-01', plannedEndDate: '2024-08-31', projectManagerId: '4', status: '暂停', approvalStatus: '审批中', createdBy: 'admin', createdAt: '2024-01-25', updatedAt: '2024-04-10' },
-  { id: '5', projectCode: 'PRJ-2024-010', projectName: '高新技术园区基础设施项目', projectType: '施工总承包', projectAddress: '成都市高新区', ownerUnit: '高新开发公司', supervisorUnit: '川建监理', designUnit: '西南设计院', contractAmount: '32000000', targetCost: '30000000', plannedStartDate: '2024-04-01', plannedEndDate: '2026-03-31', projectManagerId: '5', status: '前期', approvalStatus: '待审批', createdBy: 'admin', createdAt: '2024-03-15', updatedAt: '2024-03-15' },
-]
 
 async function fetchData() {
   loading.value = true
@@ -39,8 +33,9 @@ async function fetchData() {
     tableData.value = res.records
     total.value = res.total
   } catch {
-    tableData.value = MOCK_RECORDS
-    total.value = MOCK_RECORDS.length
+    tableData.value = []
+    total.value = 0
+    message.error('加载项目列表失败，请稍后重试')
   } finally {
     loading.value = false
   }

@@ -38,9 +38,9 @@ cgc-pms/
 │           ├── partner/      #   合作方列表页
 │           └── approval/     #   我的待办 + 审批详情
 ├── mobile/               # uni-app 移动端（预留）
-├── database/             # Flyway 迁移脚本 (V1~V7)
-├── deploy/               # Docker Compose (MySQL + Redis + MinIO)
-├── doc/                  # 开发文档 + Backlog + 测试报告
+├── database/             # Flyway 迁移脚本 (V1~V8)
+├── deploy/               # Docker Compose (MySQL + Redis + MinIO) + .env.example
+├── doc/                  # 开发文档 + Backlog + 测试报告 + 审计修复报告
 ├── scripts/              # 辅助脚本
 └── README.md
 ```
@@ -61,10 +61,14 @@ cgc-pms/
 **方式 A：Docker Compose（推荐）**
 
 ```bash
+# 先复制环境变量模板并填入真实值
 cd deploy
+copy .env.example .env
+# 编辑 .env 填入安全密码
+
 docker compose up -d
-# MySQL: localhost:3306 (root/root123, cgc_pms)
-# Redis: localhost:6379
+# MySQL: localhost:3306
+# Redis: localhost:6379（已启用密码认证）
 # MinIO: http://localhost:9001
 ```
 
@@ -120,16 +124,19 @@ pnpm dev
 | 第 1 周 | 骨架 | ✅ | Spring Boot / Vue3 脚手架、Flyway、登录鉴权、RBAC、合同台账页 |
 | 第 2 周 | 审批+基础数据 | ✅ | 审批引擎 POC、项目/合作方 CRUD、审批页面、11 集成测试 |
 | 第 3 周 | 合同中心 | ✅ | 新建合同、合同清单、付款条件、附件上传 (2026-06-10) |
+| 安全加固 | — | ✅ | 方法级RBAC、Refresh Token、文件上传安全、输入校验、密钥脱敏、幂等修复 (2026-06-11) |
 | 第 4 周 | 审批闭环 | 🔲 | 合同提交审批、审批回调、成本生成 |
 
 ### 已完成功能
 
 ```
-✅ 登录鉴权 (JWT + BCrypt + RBAC)
-✅ 用户管理 / 角色管理 / 菜单管理
-✅ 项目管理 CRUD（分页/新建/编辑/详情）
-✅ 合作方管理 CRUD（分页/新建/编辑/黑名单标识）
-✅ 合同台账查询（8 维筛选 + 详情 + 项目/合作方关联）
+✅ 登录鉴权 (JWT + BCrypt + RBAC + Refresh Token + Redis 黑名单)
+✅ 方法级权限控制 (@PreAuthorize，10 个 Controller 全覆盖)
+✅ 输入校验 (@Valid + Jakarta Validation，7 个实体类)
+✅ 用户管理 / 角色管理 / 菜单管理（RBAC 权限码已定义到菜单）
+✅ 项目管理 CRUD（分页/新建/编辑/详情/级联删除）
+✅ 合作方管理 CRUD（分页/新建/编辑/黑名单标识/防误删）
+✅ 合同台账查询（8 维筛选 + 详情 + 项目/合作方关联，N+1 已优化为批量查询）
 ✅ 合同中心
    ├── 新建合同（4 步分步表单：基本信息→清单→付款条件→提交审核）
    ├── 合同清单 CRUD（批量保存，自动金额计算）
@@ -139,23 +146,30 @@ pnpm dev
 ✅ 文件上传系统
    ├── MinIO 对象存储 + 预签名 URL（7 天有效）
    ├── 通用业务附件关联（businessType + businessId 模式）
+   ├── 文件大小限制 (50MB) + 扩展名白名单（20 种）
+   ├── businessType 路径注入防护
    └── sys_file 表 (V7 Flyway 迁移)
 ✅ 审批引擎 POC
    ├── 提交审批 / 我的待办 / 审批详情
    ├── 同意 / 驳回 / 撤回 / 重新提交
    ├── 转办 / 加签 / 会签 (COUNTERSIGN) / 或签 (OR_SIGN)
-   ├── 乐观锁 (taskVersion) + 幂等 (idempotencyKey)
+   ├── 乐观锁 (taskVersion) + 幂等 (idempotencyKey，已修复 TOCTOU 竞态)
    └── availableActions 动态权限
 ✅ 前端：登录页 / 首页 / 合同台账 / 合同新建 / 合同详情 / 项目列表 / 合作方列表 / 待办列表 / 审批详情
-✅ Flyway 数据库迁移 (V1~V7：系统表/业务表/审批表/字典/演示数据/文件表)
+✅ 前端：API 错误不再静默回退 Mock 数据，统一弹窗提示
+✅ 前端：401 响应自动静默刷新 token（request.ts 拦截器）
+✅ Flyway 数据库迁移 (V1~V8：系统表/业务表/审批表/字典/演示数据/文件表/排序索引)
 ✅ 集成测试 11 用例全部通过 (H2 + MySQL 双环境)
+✅ CORS 配置支持多环境（dev/test/local/prod 各自配置 allowed-origins）
+✅ OperationLog 切面敏感字段脱敏（password/token/secret 自动替换为 ***）
+✅ Docker Compose 密钥使用 .env 文件 + Redis 密码认证 + MinIO 版本锁定
 ```
 
 ## 合同中心 API
 
 | 端点 | 方法 | 功能 |
 |------|------|------|
-| `/contracts` | GET | 合同台账分页查询（8 维筛选） |
+| `/contracts` | GET | 合同台账分页查询（8 维筛选，N+1 已优化） |
 | `/contracts` | POST | 新建合同（自动生成编号） |
 | `/contracts/{id}` | GET | 合同详情 |
 | `/contracts/{id}` | PUT | 编辑合同 |
@@ -172,7 +186,7 @@ pnpm dev
 
 | 端点 | 方法 | 功能 |
 |------|------|------|
-| `/files/upload` | POST | 上传文件（multipart, businessType + businessId） |
+| `/files/upload` | POST | 上传文件（≤50MB，扩展名白名单） |
 | `/files/{id}/url` | GET | 获取预签名下载 URL（7 天有效） |
 | `/files` | GET | 按业务类型查询文件列表 |
 | `/files/{id}` | DELETE | 删除文件 |
@@ -191,12 +205,23 @@ pnpm dev
 | `/workflow/tasks/{id}/transfer` | POST | 转办 |
 | `/workflow/tasks/{id}/add-sign` | POST | 加签 |
 
+## 认证 API
+
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `/auth/login` | POST | 登录（返回 access + refresh token） |
+| `/auth/userinfo` | GET | 获取当前用户信息（含角色/权限） |
+| `/auth/refresh` | POST | Token 轮换（refresh token 换新 access token，旧 refresh token 自动失效） |
+| `/auth/logout` | POST | 退出（access token 加入 Redis 黑名单） |
+
 ## 开发规范
 
 - 分支模型：`main` / `develop` / `feature/*` / `hotfix/*`
 - 提交信息：`feat:` / `fix:` / `docs:` / `refactor:` / `test:` / `chore:`
 - 代码规范：ESLint + Prettier (前端)
-- 后端遵循 `SysUserController` → `SysUserService` 分层模式
+- 后端遵循 `SysUserController` → `SysUserService` 分层模式，权限使用 `@PreAuthorize("hasRole('ADMIN') or hasAuthority('xxx:action')")` 声明式鉴权
+- 敏感配置使用 `${ENV_VAR:default}` 形式（环境变量优先），切勿将密钥硬编码提交
+- 迁移数据使用 `INSERT IGNORE INTO` 确保幂等，新表索引在专用 V8+ 迁移中添加
 
 ## 文档
 
@@ -204,4 +229,5 @@ pnpm dev
 |------|------|
 | 开发任务拆解与 Backlog | `doc/第1阶段开发任务拆解与Backlog.md` |
 | 审批引擎 POC 测试报告 | `doc/审批引擎POC测试报告.md` |
+| 审计修复报告 (2026-06-11) | `doc/审计修复报告_2026-06-11.md` |
 | 开发文档 | `doc/开发文档_v2.3/` |
