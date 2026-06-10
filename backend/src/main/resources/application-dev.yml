@@ -1,0 +1,50 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: cgc
+    password: cgc123
+    hikari:
+      pool-name: CgcPmsHikariPool
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 3000ms
+
+  # Flyway database migration
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    table: flyway_schema_history
+    encoding: UTF-8
+    validate-on-migrate: true
+
+# MinIO object storage
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin123
+  bucket: cgc-pms
+
+# JWT
+jwt:
+  secret: dev-only-change-me-cgc-pms-jwt-secret-key-256bit-minimum-length
+  expiration: 86400000
+  header: Authorization
+  token-prefix: "Bearer "

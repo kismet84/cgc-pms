@@ -1,0 +1,124 @@
+package com.cgcpms.auth.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.auth.dto.LoginRequest;
+import com.cgcpms.auth.dto.LoginResponse;
+import com.cgcpms.auth.dto.UserInfo;
+import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.system.entity.SysMenu;
+import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final SysUserMapper sysUserMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
+    private final SysRoleMapper sysRoleMapper;
+    private final SysRoleMenuMapper sysRoleMenuMapper;
+    private final SysMenuMapper sysMenuMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
+
+    public LoginResponse login(LoginRequest request) {
+        SysUser user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUsername, request.getUsername()));
+        if (user == null) {
+            throw new BusinessException("AUTH_FAILED", "用户名或密码错误");
+        }
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new BusinessException("AUTH_FAILED", "用户名或密码错误");
+        }
+        if (!"ENABLE".equals(user.getStatus())) {
+            throw new BusinessException("AUTH_DISABLED", "账号已被禁用");
+        }
+
+        List<String> roleCodes = getRoleCodes(user.getId());
+        List<String> permCodes = getPermissionCodes(user.getId());
+
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId());
+        UserInfo userInfo = UserInfo.builder()
+                .userId(String.valueOf(user.getId()))
+                .username(user.getUsername())
+                .realName(user.getRealName())
+                .avatar(user.getAvatar())
+                .phone(user.getPhone())
+                .email(user.getEmail())
+                .roles(roleCodes)
+                .permissions(permCodes)
+                .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
+                .build();
+
+        return new LoginResponse(token, userInfo);
+    }
+
+    public UserInfo getUserInfo(Long userId) {
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        }
+        List<String> roleCodes = getRoleCodes(userId);
+        List<String> permCodes = getPermissionCodes(userId);
+        return UserInfo.builder()
+                .userId(String.valueOf(user.getId()))
+                .username(user.getUsername())
+                .realName(user.getRealName())
+                .avatar(user.getAvatar())
+                .phone(user.getPhone())
+                .email(user.getEmail())
+                .roles(roleCodes)
+                .permissions(permCodes)
+                .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
+                .build();
+    }
+
+    private List<String> getRoleCodes(Long userId) {
+        var userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
+                .eq(com.cgcpms.system.entity.SysUserRole::getUserId, userId));
+        if (userRoles.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> roleIds = userRoles.stream()
+                .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
+                .toList();
+        return sysRoleMapper.selectBatchIds(roleIds).stream()
+                .map(SysRole::getRoleCode)
+                .collect(Collectors.toList());
+    }
+
+    private List<String> getPermissionCodes(Long userId) {
+        var userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
+                .eq(com.cgcpms.system.entity.SysUserRole::getUserId, userId));
+        if (userRoles.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> roleIds = userRoles.stream()
+                .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
+                .toList();
+
+        var roleMenus = sysRoleMenuMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysRoleMenu>()
+                .in(com.cgcpms.system.entity.SysRoleMenu::getRoleId, roleIds));
+        if (roleMenus.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> menuIds = roleMenus.stream()
+                .map(com.cgcpms.system.entity.SysRoleMenu::getMenuId)
+                .distinct()
+                .toList();
+
+        return sysMenuMapper.selectBatchIds(menuIds).stream()
+                .map(SysMenu::getPerms)
+                .filter(p -> p != null && !p.isBlank())
+                .collect(Collectors.toList());
+    }
+}

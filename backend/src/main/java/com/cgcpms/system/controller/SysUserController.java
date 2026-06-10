@@ -1,0 +1,67 @@
+package com.cgcpms.system.controller;
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.common.result.PageResult;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.service.SysUserService;
+import com.cgcpms.system.vo.SysUserVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/system/users")
+@RequiredArgsConstructor
+public class SysUserController {
+
+    private final SysUserService sysUserService;
+
+    @GetMapping
+    public ApiResponse<PageResult<SysUserVO>> list(
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String realName,
+            @RequestParam(required = false) String status) {
+        IPage<SysUserVO> page = sysUserService.getPage(pageNo, pageSize, username, realName, status);
+        return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<SysUserVO> getById(@PathVariable Long id) {
+        return ApiResponse.success(sysUserService.getById(id));
+    }
+
+    @PostMapping
+    public ApiResponse<Long> create(@RequestBody SysUser user) {
+        return ApiResponse.success(sysUserService.create(user));
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<Void> update(@PathVariable Long id, @RequestBody SysUser user) {
+        user.setId(id);
+        sysUserService.update(user);
+        return ApiResponse.success();
+    }
+
+    @PatchMapping("/{id}/status")
+    public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        sysUserService.updateStatus(id, body.get("status"));
+        return ApiResponse.success();
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        sysUserService.delete(id);
+        return ApiResponse.success();
+    }
+
+    @PutMapping("/{id}/roles")
+    public ApiResponse<Void> assignRoles(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
+        sysUserService.assignRoles(id, body.get("roleIds"));
+        return ApiResponse.success();
+    }
+}

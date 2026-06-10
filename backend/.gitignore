@@ -1,0 +1,25 @@
+# Maven build artifacts
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application
+application-local.yml

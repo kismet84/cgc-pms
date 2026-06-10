@@ -1,0 +1,45 @@
+# Maven
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+!backend/.mvn/wrapper/maven-wrapper.properties
+
+# Gradle
+.gradle/
+build/
+
+# Node
+node_modules/
+frontend-admin/dist/
+frontend-admin/.vite/
+mobile/node_modules/
+mobile/dist/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Docker volumes
+deploy/mysql/data/
+deploy/redis/data/
+deploy/minio/data/
+
+# Temp
+*.tmp
+temp/

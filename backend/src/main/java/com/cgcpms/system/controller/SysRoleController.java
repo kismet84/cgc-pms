@@ -1,0 +1,53 @@
+package com.cgcpms.system.controller;
+
+import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.service.SysRoleService;
+import com.cgcpms.system.vo.SysRoleVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/system/roles")
+@RequiredArgsConstructor
+public class SysRoleController {
+
+    private final SysRoleService sysRoleService;
+
+    @GetMapping
+    public ApiResponse<List<SysRoleVO>> list() {
+        return ApiResponse.success(sysRoleService.getList());
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<SysRoleVO> getById(@PathVariable Long id) {
+        return ApiResponse.success(sysRoleService.getById(id));
+    }
+
+    @PostMapping
+    public ApiResponse<Long> create(@RequestBody SysRole role) {
+        return ApiResponse.success(sysRoleService.create(role));
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<Void> update(@PathVariable Long id, @RequestBody SysRole role) {
+        role.setId(id);
+        sysRoleService.update(role);
+        return ApiResponse.success();
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        sysRoleService.delete(id);
+        return ApiResponse.success();
+    }
+
+    @PutMapping("/{id}/menus")
+    public ApiResponse<Void> assignMenus(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
+        sysRoleService.assignMenus(id, body.get("menuIds"));
+        return ApiResponse.success();
+    }
+}

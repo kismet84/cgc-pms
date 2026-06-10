@@ -1,0 +1,42 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: cgc-pms-backend
+  profiles:
+    active: dev
+
+# MyBatis-Plus
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: assign_id
+      logic-delete-field: deletedFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.cgcpms.**.entity
+
+# SpringDoc OpenAPI / Swagger UI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.cgcpms: DEBUG
