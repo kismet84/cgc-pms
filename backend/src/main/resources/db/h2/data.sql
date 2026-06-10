@@ -33,3 +33,29 @@ INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES (2, 1, 2);
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES (3, 1, 3);
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES (4, 1, 31);
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES (5, 1, 4);
+
+-- Test project
+INSERT INTO pm_project (id, tenant_id, project_code, project_name, project_type, status, approval_status)
+VALUES (100, 0, 'PRJ-TEST-001', '测试项目', '施工总承包', '进行中', '已批准');
+
+-- Test partner
+INSERT INTO md_partner (id, tenant_id, partner_code, partner_name, partner_type, status)
+VALUES (100, 0, 'PTN-TEST-001', '测试供应商', '供应商', 'ENABLE');
+
+-- Test contract
+INSERT INTO ct_contract (id, tenant_id, project_id, partner_id, contract_code, contract_name, contract_type, contract_amount, contract_status, approval_status)
+VALUES (100, 0, 100, 100, 'CT-TEST-001', '测试合同', 'MAIN', 1000000.00, 'DRAFT', 'DRAFT');
+
+-- ====== Workflow Test Data ======
+
+-- Approval template for contract approval
+INSERT INTO wf_template (id, tenant_id, template_code, template_name, business_type, enabled)
+VALUES (200, 0, 'TPL-CONTRACT-001', '合同审批流程', 'CONTRACT_APPROVAL', 1);
+
+-- Template nodes: 发起人提交 → 项目经理审批(顺序) → 商务+成本会签 → 总经理审批
+INSERT INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config)
+VALUES (201, 0, 200, 'NODE_MANAGER', '项目经理审批', 1, 'APPROVAL', 'SEQUENTIAL', '{"role":"PROJECT_MANAGER"}');
+INSERT INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config)
+VALUES (202, 0, 200, 'NODE_COUNTERSIGN', '商务成本会签', 2, 'APPROVAL', 'COUNTERSIGN', '{"role":"BUSINESS_MANAGER"}');
+INSERT INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config)
+VALUES (203, 0, 200, 'NODE_GM', '总经理审批', 3, 'APPROVAL', 'SEQUENTIAL', '{"role":"GM"}');

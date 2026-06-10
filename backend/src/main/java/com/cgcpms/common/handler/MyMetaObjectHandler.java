@@ -12,14 +12,17 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
 
     @Override
     public void insertFill(MetaObject metaObject) {
-        this.strictInsertFill(metaObject, "createdAt", LocalDateTime.class, LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        this.strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
+        this.strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
         Long userId = UserContext.getCurrentUserId();
         if (userId != null) {
-            this.strictInsertFill(metaObject, "createdBy", Long.class, userId);
+            this.setFieldValByName("createdBy", userId, metaObject);
+            this.setFieldValByName("updatedBy", userId, metaObject);
         }
         Long tenantId = UserContext.getCurrentTenantId();
         if (tenantId != null) {
-            this.strictInsertFill(metaObject, "tenantId", Long.class, tenantId);
+            this.setFieldValByName("tenantId", tenantId, metaObject);
         }
     }
 

@@ -165,3 +165,169 @@ CREATE TABLE IF NOT EXISTS ct_contract (
     PRIMARY KEY (id),
     UNIQUE (tenant_id, contract_code)
 );
+
+-- ====== Workflow Tables ======
+
+CREATE TABLE IF NOT EXISTS wf_template (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    template_code VARCHAR(64) NOT NULL,
+    template_name VARCHAR(200) NOT NULL,
+    business_type VARCHAR(50) NOT NULL,
+    enabled SMALLINT NOT NULL DEFAULT 1,
+    amount_min DECIMAL(18,2),
+    amount_max DECIMAL(18,2),
+    condition_rule VARCHAR(2000),
+    form_schema VARCHAR(2000),
+    created_by BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS wf_template_node (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    template_id BIGINT NOT NULL,
+    node_code VARCHAR(64) NOT NULL,
+    node_name VARCHAR(200) NOT NULL,
+    node_order INT NOT NULL,
+    node_type VARCHAR(50) NOT NULL DEFAULT 'APPROVAL',
+    approve_mode VARCHAR(50) NOT NULL DEFAULT 'SEQUENTIAL',
+    approver_config VARCHAR(2000) NOT NULL DEFAULT '{}',
+    pass_rule_json VARCHAR(2000),
+    reject_rule_json VARCHAR(2000),
+    condition_rule VARCHAR(2000),
+    node_config VARCHAR(2000),
+    allow_transfer SMALLINT NOT NULL DEFAULT 1,
+    allow_add_sign SMALLINT NOT NULL DEFAULT 1,
+    timeout_hours INT,
+    created_by BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS wf_instance (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    template_id BIGINT NOT NULL,
+    business_type VARCHAR(50) NOT NULL,
+    business_id BIGINT NOT NULL,
+    project_id BIGINT,
+    contract_id BIGINT,
+    title VARCHAR(300) NOT NULL,
+    amount DECIMAL(18,2),
+    instance_status VARCHAR(50) NOT NULL DEFAULT 'RUNNING',
+    current_round INT NOT NULL DEFAULT 1,
+    resubmit_count INT NOT NULL DEFAULT 0,
+    business_revision INT NOT NULL DEFAULT 1,
+    initiator_id BIGINT NOT NULL,
+    business_summary VARCHAR(2000),
+    variables VARCHAR(2000),
+    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    created_by BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS wf_node_instance (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    instance_id BIGINT NOT NULL,
+    template_node_id BIGINT,
+    node_code VARCHAR(64) NOT NULL,
+    node_name VARCHAR(200) NOT NULL,
+    node_order INT NOT NULL,
+    approve_mode VARCHAR(50) NOT NULL,
+    node_status VARCHAR(50) NOT NULL DEFAULT 'WAITING',
+    round_no INT NOT NULL DEFAULT 1,
+    pass_rule_json VARCHAR(2000),
+    reject_rule_json VARCHAR(2000),
+    started_at TIMESTAMP,
+    ended_at TIMESTAMP,
+    created_by BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS wf_task (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    instance_id BIGINT NOT NULL,
+    node_instance_id BIGINT NOT NULL,
+    business_type VARCHAR(50) NOT NULL,
+    business_id BIGINT NOT NULL,
+    approver_id BIGINT NOT NULL,
+    approver_name VARCHAR(100),
+    task_status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    round_no INT NOT NULL DEFAULT 1,
+    task_version INT NOT NULL DEFAULT 1,
+    received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    handled_at TIMESTAMP,
+    action_type VARCHAR(50),
+    comment VARCHAR(1000),
+    created_by BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS wf_record (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    instance_id BIGINT NOT NULL,
+    node_instance_id BIGINT,
+    task_id BIGINT,
+    round_no INT NOT NULL DEFAULT 1,
+    business_type VARCHAR(50) NOT NULL,
+    business_id BIGINT NOT NULL,
+    node_code VARCHAR(64),
+    node_name VARCHAR(200),
+    action_type VARCHAR(50) NOT NULL,
+    action_name VARCHAR(100) NOT NULL,
+    operator_id BIGINT NOT NULL,
+    operator_name VARCHAR(100),
+    comment VARCHAR(1000),
+    record_status VARCHAR(50) NOT NULL DEFAULT 'EFFECTIVE',
+    created_by BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS wf_idempotency (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    user_id BIGINT NOT NULL,
+    idempotency_key VARCHAR(128) NOT NULL,
+    business_type VARCHAR(50),
+    business_id BIGINT,
+    request_hash VARCHAR(128),
+    response_json VARCHAR(2000),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expired_at TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
