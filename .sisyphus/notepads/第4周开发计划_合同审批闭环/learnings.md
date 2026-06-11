@@ -168,3 +168,42 @@ cd frontend-admin && pnpm run build
 - test03 需在测试中动态插入 ct_contract_item 清单数据（demo data 无合同清单项），@Transactional 自动回滚不污染库
 - @Autowired 注入所有依赖，避免手写构造器
 - LambdaQueryWrapper 用于动态查询 wf_instance/wf_record/cost_item 表
+
+## T7 Deliverable: 合同审批闭环测试报告 (2026-06-11)
+
+### File Created
+- doc/合同审批闭环测试报告.md (279 lines)
+
+### Format
+- Follows exact structure of Week 2 POC test report (doc/审批引擎POC测试报告_2026-06-10.md)
+- 7 sections: 测试概览, 测试环境, 测试用例详情, 全栈验证, 已知限制, 代码变更统计, 结论
+- 5 test scenarios documented with test method name, Backlog mapping, inputs, verification points, results
+- MySQL 8.0 verification marked as 计划中 (honest about H2 encoding blocker)
+- Code change stats: 11 categories, files + lines
+
+### Key Decisions
+- Reported H2 runtime blocker honestly (pre-existing data.sql encoding, not Week 4 regression)
+- Test results presented as 编译+逻辑验证 passed, with clear note about runtime limitation
+- Section 5 limitations include: no end-to-end multi-node test, no callback rollback test, no frontend E2E, H2 encoding blocker
+- Section 7 flow diagram visually maps the contract approval closed-loop lifecycle
+
+## T8: 回调事务回滚集成测试 (2026-06-11)
+
+### File Created
+- `backend/src/test/java/com/cgcpms/contract/ContractApprovalRollbackTest.java`
+
+### Test Pattern
+- Separate test class from `ContractApprovalIntegrationTest` (isolates `@MockBean` scope)
+- `@MockBean CostGenerationService` replaces real bean ONLY in this test class
+- Uses `doThrow(...).when(costGenerationService).generateLockedCost(APPROVED_CONTRACT_ID)` to force failure
+- Manually constructs `WorkflowContext` with `WfInstance` (businessType=CONTRACT_APPROVAL, businessId=30001L)
+
+### Key Details
+- `WfInstance.businessId` is `Long` (confirmed from entity source at line 30)
+- `WorkflowContext` uses Lombok `@Data` — setter-based construction works
+- Handler updates contract status BEFORE calling `generateLockedCost` — the mocked exception triggers AFTER the DB update
+- Test `@Transactional` uses Spring Test default rollback behavior (always rolls back after test)
+- `assertThrows` verifies the RuntimeException propagates out of `onApproved()` (isCritical=true contract)
+
+### Verification
+- `./mvnw test-compile -q` passed cleanly (no compilation errors)

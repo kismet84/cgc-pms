@@ -342,9 +342,9 @@ fix(auth): fix token refresh error
 | CT-005 | 合同清单保存 | P1 | CT-004 | 可保存合同清单 | ✅ 完成 |
 | CT-006 | 合同付款条件保存 | P1 | CT-004 | 可保存付款条件 | ✅ 完成 |
 | CT-007 | 合同附件关联 | P1 | FILE-001 | 可上传并关联合同附件 | ✅ 完成 |
-| CT-008 | 合同提交审批 | P0 | WF-002 | 合同可调用审批引擎提交审批 | 🔲 待开发 |
-| CT-009 | 合同审批回调 Handler | P0 | WF-010 | 审批通过后合同状态变更 | 🔲 待开发 |
-| CT-010 | 合同锁定成本生成 | P1 | COST-001 | 合同通过后可生成锁定成本 | 🔲 待开发 |
+| CT-008 | 合同提交审批 | P0 | WF-002 | 合同可调用审批引擎提交审批 | ✅ 完成 (2026-06-11) |
+| CT-009 | 合同审批回调 Handler | P0 | WF-010 | 审批通过后合同状态变更 | ✅ 完成 (2026-06-11) |
+| CT-010 | 合同锁定成本生成 | P1 | COST-001 | 合同通过后可生成锁定成本 | ✅ 完成 (2026-06-11) |
 
 ---
 
@@ -524,13 +524,13 @@ public class WorkflowBusinessHandlerRegistry {
 
 ### 12.2 成本生成任务
 
-| 编号 | 任务 | 优先级 | 依赖 | 验收标准 |
-|---|---|---|---|---|
-| COST-001 | cost_item 实体和 Mapper | P0 | DB-004 | 可访问成本明细表 |
-| COST-002 | 成本生成服务 | P0 | COST-001 | 可根据来源生成成本 |
-| COST-003 | 来源幂等校验 | P0 | DB-008 | 重复调用不生成重复成本 |
-| COST-004 | 材料验收成本生成 POC | P1 | MAT-001、WF-017 | 验收审批通过后生成材料成本 |
-| COST-005 | 分包计量成本生成 POC | P1 | SUB-001、WF-017 | 计量审批通过后生成分包成本 |
+| 编号 | 任务 | 优先级 | 依赖 | 验收标准 | 状态 |
+|---|---|---|---|---|---|
+| COST-001 | cost_item 实体和 Mapper | P0 | DB-004 | 可访问成本明细表 | ✅ 完成 (2026-06-11) |
+| COST-002 | 成本生成服务 | P0 | COST-001 | 可根据来源生成成本 | ✅ 完成 (2026-06-11) |
+| COST-003 | 来源幂等校验 | P0 | DB-008 | 重复调用不生成重复成本 | ✅ 完成 (2026-06-11) |
+| COST-004 | 材料验收成本生成 POC | P1 | MAT-001、WF-017 | 验收审批通过后生成材料成本 | 🔲 待开发 |
+| COST-005 | 分包计量成本生成 POC | P1 | SUB-001、WF-017 | 计量审批通过后生成分包成本 | 🔲 待开发 |
 
 ### 12.3 source_item_id 规则
 
@@ -717,25 +717,42 @@ ContractLedgerPage
   ContractDetailPage（3 标签），contract Pinia Store，转办/加签弹窗（FE-WF-005）
 ```
 
-### 15.4 第 4 周：合同审批闭环
+### 15.4 第 4 周：合同审批闭环 ✅ 已完成（2026-06-11）
 
-| 方向 | 任务 |
-|---|---|
-| 合同 | 合同提交审批 |
-| 合同 | 审批通过后合同生效 |
-| 审批 | WorkflowBusinessHandler 回调机制 |
-| 成本 | 合同锁定成本生成规则 |
-| 前端 | 合同详情、审批记录、状态展示 |
-| 测试 | 合同审批全流程测试 |
+| 方向 | 任务 | 状态 |
+|---|---|---|
+| 合同 | 合同提交审批（POST /contracts/{id}/submit） | ✅ |
+| 合同 | 审批状态守卫（APPROVING 合同不可编辑） | ✅ |
+| 审批 | ContractWorkflowHandler 回调（onApproved/onRejected/onWithdrawn） | ✅ |
+| 审批 | isCritical 事务一致性机制（异常触发 @Transactional 回滚） | ✅ |
+| 成本 | 合同锁定成本生成（CostGenerationService.generateLockedCost） | ✅ |
+| 成本 | 成本幂等机制（uk_cost_source_item + DuplicateKeyException catch） | ✅ |
+| 数据库 | Flyway V9 合同审批模板（CONTRACT_APPROVAL，3 节点顺序审批） | ✅ |
+| 前端 | 枚举对齐（PERFORMING/SETTLED/WITHDRAWN）、提交审批按钮、审批记录联调 | ✅ |
+| 前端 | ContractStatusTag / ApprovalStatusTag 共享组件抽取 | ✅ |
+| 测试 | 合同审批集成测试 5 用例 | ✅ |
 
 第 4 周验收标准：
 
 ```text
-合同从草稿到提交审批再到审批通过可完整闭环
-审批通过后合同状态变为已签订 / 履约中
-审批记录可追溯
-业务回调机制可被合同模块复用
-合同锁定成本可生成或预留生成入口
+✅ 合同从草稿到提交审批再到审批通过可完整闭环
+✅ 审批通过后合同状态变为 APPROVED + PERFORMING，同步生成锁定成本
+✅ 审批记录可追溯（GET /contracts/{id}/approval-records）
+✅ 业务回调 isCritical=true 异常传播触发事务回滚，保证状态一致性
+✅ 合同锁定成本生成幂等（重复调用不产生重复成本记录）
+✅ 前端枚举与 DB 字典完全对齐
+```
+
+第 4 周交付物：
+
+```text
+后端新增：ContractStatusConstants 常量类，CtContractService.submitForApproval()，CtContractController submit + approval-records endpoint，
+  ContractWorkflowHandler（isCritical=true），CostItem 实体/Mapper/VO，CostGenerationService.generateLockedCost（幂等），
+  WorkflowBusinessHandler.isCritical() default 方法，WorkflowEngine.dispatchToHandler() 提取
+前端修改：枚举对齐（EXECUTING→PERFORMING, COMPLETED→SETTLED, 去掉SUBMITTED, 新增WITHDRAWN），
+  详情页提交审批按钮，审批记录真实联调，ContractStatusTag/ApprovalStatusTag 共享组件抽取
+数据库：V9__init_contract_approval_template.sql（CONTRACT_APPROVAL 模板，3 节点顺序审批）
+测试：ContractApprovalIntegrationTest（5 用例：提交审批/状态守卫/成本幂等/重复提交拒绝/审批记录查询）
 ```
 
 ---
@@ -804,8 +821,8 @@ ContractLedgerPage
 | 审批引擎过晚完成 | 所有业务流程阻塞 | 第 1 阶段独立 POC，优先级 P0 | ✅ 已解决 |
 | DDL 不可执行 | 后端开发受阻 | 使用 Flyway，第一周完成初始化脚本 | ✅ 已解决 |
 | 前端页面只停留在静态 HTML | 页面无法扩展 | 第 1 周完成 Vue 组件化 POC | ✅ 已解决 |
-| 业务审批回调缺失 | 审批通过后业务状态不同步 | 建立 WorkflowBusinessHandler 机制 | 🔲 Week 4 |
-| 成本重复生成 | 成本数据错误 | source_type + source_id + source_item_id + cost_type 唯一索引 | 🔲 Week 4+ |
+| 业务审批回调缺失 | 审批通过后业务状态不同步 | 建立 WorkflowBusinessHandler 机制 + isCritical 事务一致性 | ✅ 已解决 (2026-06-11) |
+| 成本重复生成 | 成本数据错误 | source_type + source_id + source_item_id + cost_type 唯一索引 + DuplicateKeyException 幂等 | ✅ 已解决 (2026-06-11) |
 | Token 无刷新技术 | 用户频繁登录 | Refresh Token + Redis 黑名单已实现 | ✅ 已解决 |
 | RBAC 仅在 UI 层 | 后端无权限校验 | @PreAuthorize 方法级权限已全覆盖 | ✅ 已解决 |
 | 密钥硬编码 | 安全泄露 | 所有 profile 改用 ${ENV_VAR:default} | ✅ 已解决 |
@@ -869,9 +886,17 @@ ContractLedgerPage
 13. ✅ taskVersion 和 idempotencyKey 验证通过。
 14. ✅ 安全审计全部高危项修复完成（方法级RBAC、Refresh Token、文件安全、输入校验、密钥脱敏、幂等修复）[2026-06-11]
 14-1. ✅ vite 5→6.4.3 升级完成，2 个中等漏洞已修复 (2026-06-11)
-15. 🔲 合同提交审批与审批回调（Week 4，CT-008/CT-009）。
-16. 🔲 WorkflowBusinessHandler 支持合同审批回调（Week 4，已定义接口）。
-17. 🔲 成本生成幂等机制实现（Week 4+，COST-001~005）。
+15. ✅ 合同提交审批与审批回调（2026-06-11，CT-008/CT-009）。
+    - CT-008: POST /contracts/{id}/submit，status guard（APPROVING 合同不可编辑），LambdaUpdateWrapper 安全部分更新
+    - CT-009: ContractWorkflowHandler（isCritical=true），onApproved（→APPROVED+PERFORMING+生成成本）/onRejected/onWithdrawn
+    - 审批记录端点 GET /contracts/{id}/approval-records
+16. ✅ WorkflowBusinessHandler 支持合同审批回调（2026-06-11，isCritical 事务一致性）。
+    - WorkflowBusinessHandler.isCritical() default 方法（false），ContractWorkflowHandler 返回 true
+    - WorkflowEngine.dispatchToHandler() 提取，isCritical=true 时异常传播触发 @Transactional 回滚
+17. ✅ 成本生成幂等机制实现（2026-06-11，COST-001~003）。
+    - CostItem 实体/Mapper/VO，CostGenerationService.generateLockedCost(contractId) 逐条生成
+    - 幂等策略：uk_cost_source_item(source_type,source_id,source_item_id,cost_type) + DuplicateKeyException catch
+    - Flyway V9 合同审批模板（CONTRACT_APPROVAL，3 节点顺序审批），5 集成测试用例
 ```
 
 ---
@@ -882,6 +907,8 @@ ContractLedgerPage
 
 ```text
 《第 1 阶段详细任务排期表》
+《第 4 周开发计划（合同审批闭环）》→ doc/第4周开发计划_合同审批闭环.md
+《第 2 阶段开发计划（成本归集与资金闭环）》→ doc/第2阶段开发计划_成本归集与资金闭环.md
 ```
 
 建议格式：

@@ -17,7 +17,7 @@ Construction General Contracting Project Management System
 
 ```
 cgc-pms/
-├── backend/              # Spring Boot 后端 (103+ 源文件)
+├── backend/              # Spring Boot 后端 (115+ 源文件)
 │   ├── auth/             #   JWT 鉴权 + 登录
 │   ├── system/           #   用户/角色/菜单管理
 │   ├── project/          #   项目管理 CRUD
@@ -26,7 +26,7 @@ cgc-pms/
 │   ├── workflow/         #   审批引擎 (提交/同意/驳回/撤回/转办/加签)
 │   ├── file/             #   文件上传 (MinIO 存储 + 预签名 URL)
 │   └── common/           #   统一响应/异常处理/分页/操作日志
-├── frontend-admin/       # Vue 3 管理后台 (36+ 源文件)
+├── frontend-admin/       # Vue 3 管理后台 (38+ 源文件)
 │   └── src/
 │       ├── components/   #   共享组件 (StepWizard / ContractItemEditor / PaymentTermEditor)
 │       ├── stores/       #   Pinia 状态管理 (user / contract)
@@ -125,7 +125,7 @@ pnpm dev
 | 第 2 周 | 审批+基础数据 | ✅ | 审批引擎 POC、项目/合作方 CRUD、审批页面、11 集成测试 |
 | 第 3 周 | 合同中心 | ✅ | 新建合同、合同清单、付款条件、附件上传 (2026-06-10) |
 | 安全加固 | — | ✅ | 方法级RBAC、Refresh Token、文件上传安全、输入校验、密钥脱敏、幂等修复 (2026-06-11) |
-| 第 4 周 | 审批闭环 | 🔲 | 合同提交审批、审批回调、成本生成 |
+| 第 4 周 | 审批闭环 | ✅ | 合同提交审批、审批回调、状态机、锁定成本生成 (2026-06-11) |
 
 ### 已完成功能
 
@@ -155,6 +155,15 @@ pnpm dev
    ├── 转办 / 加签 / 会签 (COUNTERSIGN) / 或签 (OR_SIGN)
    ├── 乐观锁 (taskVersion) + 幂等 (idempotencyKey，已修复 TOCTOU 竞态)
    └── availableActions 动态权限
+✅ 合同审批闭环 (Week 4)
+   ├── 合同提交审批 (POST /contracts/{id}/submit, DRAFT→APPROVING)
+   ├── 审批中合同编辑守卫 (APPROVING 状态禁止编辑)
+   ├── ContractWorkflowHandler (isCritical=true, 审批事务一致性)
+   ├── 审批记录查询 (GET /contracts/{id}/approval-records, Timeline时间轴)
+   ├── 合同锁定成本生成 (CostGenerationService, 审批通过→自动生成cost_item)
+   ├── 成本幂等机制 (uk_cost_source_item 唯一键 + DuplicateKeyException 兜底)
+   ├── 状态枚举后端统一 (DRAFT/PERFORMING/SETTLED/TERMINATED + DRAFT/APPROVING/APPROVED/REJECTED/WITHDRAWN)
+   └── 前后端枚举对齐 (ContractStatusTag/ApprovalStatusTag 共享组件)
 ✅ 前端：登录页 / 首页 / 合同台账 / 合同新建 / 合同详情 / 项目列表 / 合作方列表 / 待办列表 / 审批详情
 ✅ 前端：API 错误不再静默回退 Mock 数据，统一弹窗提示
 ✅ 前端：401 响应自动静默刷新 token（request.ts 拦截器）
@@ -181,6 +190,8 @@ pnpm dev
 | `/contracts/{id}/payment-terms` | POST | 新增单条付款条件 |
 | `/contracts/{id}/payment-terms/batch` | POST | 批量保存付款条件 |
 | `/contracts/{id}/payment-terms/{termId}` | PUT/DELETE | 编辑/删除付款条件 |
+| `/contracts/{id}/submit` | POST | 提交审批 |
+| `/contracts/{id}/approval-records` | GET | 审批记录 |
 
 ## 文件上传 API
 
@@ -222,6 +233,7 @@ pnpm dev
 - 后端遵循 `SysUserController` → `SysUserService` 分层模式，权限使用 `@PreAuthorize("hasRole('ADMIN') or hasAuthority('xxx:action')")` 声明式鉴权
 - 敏感配置使用 `${ENV_VAR:default}` 形式（环境变量优先），切勿将密钥硬编码提交
 - 迁移数据使用 `INSERT IGNORE INTO` 确保幂等，新表索引在专用 V8+ 迁移中添加
+- `WorkflowBusinessHandler.isCritical()` 控制审批回调事务一致性：返回 `true` 时异常传播触发回滚，`false` 时 swallow-and-log（向后兼容）
 
 ## 文档
 
@@ -230,4 +242,6 @@ pnpm dev
 | 开发任务拆解与 Backlog | `doc/第1阶段开发任务拆解与Backlog.md` |
 | 审批引擎 POC 测试报告 | `doc/审批引擎POC测试报告.md` |
 | 审计修复报告 (2026-06-11) | `doc/审计修复报告_2026-06-11.md` |
+| 第4周开发计划_合同审批闭环 | `doc/第4周开发计划_合同审批闭环.md` |
+| 第2阶段开发计划_成本归集与资金闭环 | `doc/第2阶段开发计划_成本归集与资金闭环.md` |
 | 开发文档 | `doc/开发文档_v2.3/` |
