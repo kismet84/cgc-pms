@@ -3,12 +3,14 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostSummary;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
+import com.cgcpms.cost.vo.CostProjectSummaryVO;
 import com.cgcpms.cost.vo.CostSummaryVO;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
@@ -41,18 +43,20 @@ public class CostSummaryService {
     private final PayRecordMapper payRecordMapper;
 
     @Transactional
-    public void refreshSummary(Long projectId) {
-        Long tenantId = UserContext.getCurrentTenantId();
+    public CostProjectSummaryVO refreshSummary(Long projectId) {
+        return refreshSummary(UserContext.getCurrentTenantId(), projectId);
+    }
+
+    @Transactional
+    public CostProjectSummaryVO refreshSummary(Long tenantId, Long projectId) {
         log.info("Refreshing cost summary for projectId={}, tenantId={}", projectId, tenantId);
 
-        // 1. Delete existing summaries for this project
-        LambdaQueryWrapper<CostSummary> deleteWrapper = new LambdaQueryWrapper<>();
-        deleteWrapper.eq(CostSummary::getTenantId, tenantId);
-        deleteWrapper.eq(CostSummary::getProjectId, projectId);
-        costSummaryMapper.delete(deleteWrapper);
+        PmProject project = requireProjectInTenant(tenantId, projectId);
+
+        // 1. Physically replace generated snapshot rows; logical deletes keep the same unique key occupied.
+        costSummaryMapper.physicalDeleteByTenantAndProject(tenantId, projectId);
 
         // 2. Get project targetCost
-        PmProject project = projectMapper.selectById(projectId);
         BigDecimal targetCost = (project != null && project.getTargetCost() != null)
                 ? project.getTargetCost() : BigDecimal.ZERO;
         log.debug("Project targetCost={}", targetCost);
@@ -65,7 +69,7 @@ public class CostSummaryService {
 
         if (CollectionUtils.isEmpty(allItems)) {
             log.info("No cost items found for projectId={}, summary cleared", projectId);
-            return;
+            return getProjectSummary(tenantId, projectId);
         }
 
         // Group cost items by costSubjectId
@@ -134,10 +138,14 @@ public class CostSummaryService {
         }
 
         log.info("Cost summary refreshed for projectId={}: {} subject(s) updated", projectId, summaries.size());
+        return getProjectSummary(tenantId, projectId);
     }
 
     public List<CostSummaryVO> getSummary(Long projectId) {
-        Long tenantId = UserContext.getCurrentTenantId();
+        return getSummary(UserContext.getCurrentTenantId(), projectId);
+    }
+
+    public List<CostSummaryVO> getSummary(Long tenantId, Long projectId) {
 
         // Find the latest summary_date for this project
         LambdaQueryWrapper<CostSummary> dateWrapper = new LambdaQueryWrapper<>();
@@ -160,6 +168,43 @@ public class CostSummaryService {
 
         List<CostSummary> summaries = costSummaryMapper.selectList(wrapper);
         return toVOList(summaries);
+    }
+
+    public CostProjectSummaryVO getProjectSummary(Long projectId) {
+        return getProjectSummary(UserContext.getCurrentTenantId(), projectId);
+    }
+
+    public CostProjectSummaryVO getProjectSummary(Long tenantId, Long projectId) {
+        PmProject project = requireProjectInTenant(tenantId, projectId);
+        List<CostSummaryVO> subjects = getSummary(tenantId, projectId);
+
+        String projectName = project.getProjectName();
+        BigDecimal targetCost = (project.getTargetCost() != null)
+                ? project.getTargetCost() : BigDecimal.ZERO;
+
+        BigDecimal contractLockedCost = subjects.stream()
+                .map(s -> new BigDecimal(s.getContractLockedCost()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal actualCost = subjects.stream()
+                .map(s -> new BigDecimal(s.getActualCost()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal paidAmount = subjects.stream()
+                .map(s -> new BigDecimal(s.getPaidAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal dynamicCost = contractLockedCost.add(actualCost);
+        BigDecimal costDeviation = dynamicCost.subtract(targetCost);
+
+        CostProjectSummaryVO vo = new CostProjectSummaryVO();
+        vo.setProjectId(projectId.toString());
+        vo.setProjectName(projectName);
+        vo.setTargetCost(targetCost.toPlainString());
+        vo.setContractLockedCost(contractLockedCost.toPlainString());
+        vo.setActualCost(actualCost.toPlainString());
+        vo.setPaidAmount(paidAmount.toPlainString());
+        vo.setDynamicCost(dynamicCost.toPlainString());
+        vo.setCostDeviation(costDeviation.toPlainString());
+        vo.setSubjects(subjects);
+        return vo;
     }
 
     public List<CostSummaryVO> getSummaryHistory(Long projectId) {
@@ -189,7 +234,7 @@ public class CostSummaryService {
             log.info("Found {} active projects for cost summary refresh", activeProjects.size());
             for (PmProject project : activeProjects) {
                 try {
-                    refreshSummary(project.getId());
+                    refreshSummary(project.getTenantId(), project.getId());
                 } catch (Exception e) {
                     log.error("Failed to refresh summary for project {}", project.getId(), e);
                 }
@@ -206,8 +251,14 @@ public class CostSummaryService {
      */
     @Transactional
     public void updatePaidAmount(Long projectId) {
+        updatePaidAmount(UserContext.getCurrentTenantId(), projectId);
+    }
+
+    @Transactional
+    public void updatePaidAmount(Long tenantId, Long projectId) {
         List<PayRecord> records = payRecordMapper.selectList(
                 new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getTenantId, tenantId)
                         .eq(PayRecord::getProjectId, projectId)
                         .eq(PayRecord::getPayStatus, "SUCCESS"));
         BigDecimal totalPaid = records.stream()
@@ -215,6 +266,7 @@ public class CostSummaryService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         costSummaryMapper.update(null, new LambdaUpdateWrapper<CostSummary>()
+                .eq(CostSummary::getTenantId, tenantId)
                 .eq(CostSummary::getProjectId, projectId)
                 .set(CostSummary::getPaidAmount, totalPaid));
     }
@@ -273,5 +325,16 @@ public class CostSummaryService {
             vo.setRemark(s.getRemark());
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    private PmProject requireProjectInTenant(Long tenantId, Long projectId) {
+        if (tenantId == null || projectId == null) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        PmProject project = projectMapper.selectById(projectId);
+        if (project == null || !Objects.equals(project.getTenantId(), tenantId)) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        return project;
     }
 }
