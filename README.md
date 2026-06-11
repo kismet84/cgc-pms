@@ -127,6 +127,8 @@ pnpm dev
 | 安全加固 | — | ✅ | 方法级RBAC、Refresh Token、文件上传安全、输入校验、密钥脱敏、幂等修复 (2026-06-11) |
 | 第 4 周 | 审批闭环 | ✅ | 合同提交审批、审批回调、状态机、锁定成本生成 (2026-06-11) |
 | 安全加固 2 | — | ✅ | 多租户数据隔离、子资源归属校验、文件 IDOR 修复、N+1 优化、前端缺陷修复 (2026-06-11) |
+| 第 5-8 周 | 成本归集 | ✅ | 采购/验收/分包/计量/付款/签证 六条业务链路, 成本自动归集, 资金闭环 (2026-06-11) |
+| 审计修复 3 | — | ✅ | 14 项遗留问题修复：合同余额校验/悲观锁/边界测试/M2/M3/Rule2/两阶段校验/实体统一/冗余flag/nvl/常量 (2026-06-11) |
 
 ### 已完成功能
 
@@ -180,6 +182,28 @@ pnpm dev
 ✅ 审批实例查看权限 (仅发起人/审批人可查看)
 ✅ 前端 N+1 优化 (用户角色 / 审批任务批量预取)
 ✅ 前端缺陷修复 (API 路径对齐, 401 刷新队列修复, Promise.await, JSON 容错)
+✅ 采购订单 CRUD + 审批闭环 (PURCHASE_ORDER, PurchaseOrderWorkflowHandler, Flyway V13)
+✅ 物料字典 CRUD (md_material, 启用/禁用)
+✅ 成本科目树形管理 (cost_subject, 递归树, level 自动计算, 唯一码校验)
+✅ 材料验收 CRUD + 审批 + 自动成本生成 (MAT_RECEIPT, MaterialReceiptWorkflowHandler)
+✅ 分包任务 CRUD (sub_task, 编号自动生成 SUB-yyyyMMdd-XXX, 进度条)
+✅ 分包计量 CRUD + 审批 + 自动成本生成 (SUB_MEASURE, SubMeasureWorkflowHandler)
+✅ 成本台账 (cost_ledger, 来源追溯 + 科目/项目/类型筛选)
+✅ 通用 CostGenerationService 策略模式 (4 种 source_type: CT_CONTRACT/MAT_RECEIPT/SUB_MEASURE/VAR_ORDER, Spring 自动注册)
+✅ 动态成本汇总 (cost_summary, project_id+subject_id 维度, 定时刷新)
+✅ 付款申请 CRUD + 金额校验 (PAY_REQUEST, PayApplicationWorkflowHandler, basis 批量保存)
+✅ 财务回写 pay_record + 合同联动 + cost_summary 联动 (PayRecordWorkflowHandler)
+✅ 签证变更 CRUD + 审批 + 成本调整 (VAR_ORDER, COST direction 过滤)
+✅ 全链路集成测试 (7 tests, 采购→验收→成本→付款→回写, H2 local profile)
+✅ Flyway 迁移 (V12~V17 业务表, V19 修复, V20 ct_contract.cost_generated_flag, 共 8 个迁移脚本)
+✅ Phase 2 审计修复 (14 项)
+   ├── 采购订单合同余额校验 (PurchaseOrderWorkflowHandler)
+   ├── 悲观锁 + 两阶段校验 (SELECT FOR UPDATE, submit+approve)
+   ├── 付款校验增强 (M2 重复依据, M3 合同匹配, Rule 2 付款比例)
+   ├── 边界测试 (恰好等于余额/超余额1分, 7→9 PASS)
+   ├── 架构清理 (双实体统一, 冗余flag移除, CtContract.costGeneratedFlag)
+   ├── 代码规范 (nvl() 提取公共工具, businessType 常量统一)
+   └── V20 Flyway 迁移 (ct_contract.cost_generated_flag)
 ```
 
 ## 合同中心 API
@@ -261,4 +285,5 @@ pnpm dev
 | 全量代码审查报告 (2026-06-11) | `doc/全量代码审查报告_2026-06-11.md` |
 | 第4周开发计划_合同审批闭环 | `doc/第4周开发计划_合同审批闭环.md` |
 | 第2阶段开发计划_成本归集与资金闭环 | `doc/第2阶段开发计划_成本归集与资金闭环.md` |
+| 第2阶段成本归集与资金闭环测试报告 | `doc/第2阶段成本归集与资金闭环测试报告.md` |
 | 开发文档 | `doc/开发文档_v2.3/` |
