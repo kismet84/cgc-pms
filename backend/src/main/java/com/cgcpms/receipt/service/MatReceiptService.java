@@ -152,6 +152,11 @@ public class MatReceiptService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
 
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
+            throw new BusinessException("RECEIPT_IN_APPROVAL", "验收单审批中或已审批，不可编辑");
+        if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
+
         // Prevent overwriting generated flags
         receipt.setApprovalStatus(existing.getApprovalStatus());
         receipt.setCostGeneratedFlag(existing.getCostGeneratedFlag());
@@ -165,6 +170,11 @@ public class MatReceiptService {
         MatReceipt receipt = matReceiptMapper.selectById(id);
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
+
+        if (!"DRAFT".equals(receipt.getApprovalStatus()))
+            throw new BusinessException("RECEIPT_IN_APPROVAL", "验收单审批中或已审批，不可删除");
+        if (receipt.getCostGeneratedFlag() != null && receipt.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可删除");
 
         LambdaUpdateWrapper<MatReceipt> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(MatReceipt::getId, id)
@@ -279,7 +289,32 @@ public class MatReceiptService {
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
 
+        if (!"DRAFT".equals(receipt.getApprovalStatus()))
+            throw new BusinessException("RECEIPT_IN_APPROVAL", "验收单审批中或已审批，不可编辑");
+        if (receipt.getCostGeneratedFlag() != null && receipt.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
+
         Long tenantId = UserContext.getCurrentTenantId();
+
+        // Subtract old item quantities from order items before deletion
+        LambdaQueryWrapper<MatReceiptItem> oldItemWrapper = new LambdaQueryWrapper<>();
+        oldItemWrapper.eq(MatReceiptItem::getReceiptId, receiptId)
+                .eq(MatReceiptItem::getTenantId, tenantId);
+        List<MatReceiptItem> oldItems = matReceiptItemMapper.selectList(oldItemWrapper);
+        for (MatReceiptItem oldItem : oldItems) {
+            if (oldItem.getOrderItemId() != null) {
+                MatPurchaseOrderItem orderItem = matPurchaseOrderItemMapper.selectById(oldItem.getOrderItemId());
+                if (orderItem != null) {
+                    BigDecimal oldQty = oldItem.getActualQuantity() != null ? oldItem.getActualQuantity() : BigDecimal.ZERO;
+                    BigDecimal currentReceived = orderItem.getReceivedQuantity() != null
+                            ? orderItem.getReceivedQuantity() : BigDecimal.ZERO;
+                    BigDecimal newReceived = currentReceived.subtract(oldQty);
+                    if (newReceived.compareTo(BigDecimal.ZERO) < 0) newReceived = BigDecimal.ZERO;
+                    orderItem.setReceivedQuantity(newReceived);
+                    matPurchaseOrderItemMapper.updateById(orderItem);
+                }
+            }
+        }
 
         // Delete old items
         LambdaQueryWrapper<MatReceiptItem> deleteWrapper = new LambdaQueryWrapper<>();
