@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:cgc}
+    password: ${DB_PASSWORD:cgc123}
+    hikari:
+      pool-name: CgcPmsHikariPool
+      minimum-idle: 2
+      maximum-pool-size: 10
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+minio:
+  enabled: false
+
+jwt:
+  secret: "test-only-change-me-cgc-pms-jwt-secret-key-256bit-minimum-length"
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+cors:
+  allowed-origins: "http://localhost:5173"
+
+logging:
+  level:
+    root: WARN
+    com.cgcpms: INFO

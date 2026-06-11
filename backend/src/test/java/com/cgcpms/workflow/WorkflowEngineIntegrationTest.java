@@ -8,6 +8,7 @@ import com.cgcpms.workflow.service.WorkflowQueryService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -21,8 +22,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@ActiveProfiles("local")
+@ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WorkflowEngineIntegrationTest {
 
     private static final long USER_ADMIN = 1L;
@@ -31,12 +33,15 @@ class WorkflowEngineIntegrationTest {
     private static final long USER_BIZ = 4L;
     private static final long USER_COST = 5L;
 
+    private static final long RUN_ID = System.currentTimeMillis();
+
     @Autowired private WorkflowEngine workflowEngine;
     @Autowired private WorkflowQueryService queryService;
     @Autowired private WfInstanceMapper instanceMapper;
     @Autowired private WfTaskMapper taskMapper;
     @Autowired private WfRecordMapper recordMapper;
     @Autowired private WfNodeInstanceMapper nodeInstanceMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private static Long testInstanceId;
 
@@ -60,7 +65,7 @@ class WorkflowEngineIntegrationTest {
     void test01_submitCreatesFullChain() {
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 100L,
+                "CONTRACT_APPROVAL", RUN_ID + 1,
                 "集成测试-合同审批", new BigDecimal("1000000.00"),
                 100L, 100L,
                 "{\"summary\":\"test\"}", "{}");
@@ -222,7 +227,7 @@ class WorkflowEngineIntegrationTest {
             System.out.println("⚠️ 场景5: 创建新实例测试重提流程");
             WfInstance newInstance = workflowEngine.submit(
                     USER_ADMIN, "admin", 0L,
-                    "CONTRACT_APPROVAL", 200L,
+                    "CONTRACT_APPROVAL", RUN_ID + 2,
                     "重提测试合同", new BigDecimal("500000.00"),
                     100L, 100L, "{}", "{}");
 
@@ -263,7 +268,7 @@ class WorkflowEngineIntegrationTest {
         // 新实例
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 300L,
+                "CONTRACT_APPROVAL", RUN_ID + 3,
                 "撤回测试合同", new BigDecimal("300000.00"),
                 100L, 100L, "{}", "{}");
 
@@ -293,7 +298,7 @@ class WorkflowEngineIntegrationTest {
     void test07_transferCreatesNewTask() {
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 400L,
+                "CONTRACT_APPROVAL", RUN_ID + 4,
                 "转办测试合同", new BigDecimal("400000.00"),
                 100L, 100L, "{}", "{}");
 
@@ -326,7 +331,7 @@ class WorkflowEngineIntegrationTest {
     void test08_concurrentApproveOnlyOneSucceeds() throws Exception {
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 500L,
+                "CONTRACT_APPROVAL", RUN_ID + 5,
                 "并发测试合同", new BigDecimal("500000.00"),
                 100L, 100L, "{}", "{}");
 
@@ -372,7 +377,7 @@ class WorkflowEngineIntegrationTest {
     void test09_idempotencyBlocksDuplicate() {
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 600L,
+                "CONTRACT_APPROVAL", RUN_ID + 6,
                 "幂等测试合同", new BigDecimal("600000.00"),
                 100L, 100L, "{}", "{}");
 
@@ -393,7 +398,7 @@ class WorkflowEngineIntegrationTest {
         // 幂等性测试需要一个新task
         WfInstance instance2 = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 601L,
+                "CONTRACT_APPROVAL", RUN_ID + 7,
                 "幂等测试合同2", new BigDecimal("700000.00"),
                 100L, 100L, "{}", "{}");
 
@@ -409,7 +414,7 @@ class WorkflowEngineIntegrationTest {
         // 用同一个idempotencyKey对另一个task（仍然PENDING）发起请求
         WfInstance instance3 = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 602L,
+                "CONTRACT_APPROVAL", RUN_ID + 8,
                 "幂等测试合同3", new BigDecimal("800000.00"),
                 100L, 100L, "{}", "{}");
 
@@ -432,7 +437,7 @@ class WorkflowEngineIntegrationTest {
     void test10_availableActionsByStatus() {
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 700L,
+                "CONTRACT_APPROVAL", RUN_ID + 9,
                 "操作测试合同", new BigDecimal("900000.00"),
                 100L, 100L, "{}", "{}");
 
@@ -455,7 +460,7 @@ class WorkflowEngineIntegrationTest {
     void test11_rejectAndResubmitKeepsRecords() {
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                "CONTRACT_APPROVAL", 800L,
+                "CONTRACT_APPROVAL", RUN_ID + 10,
                 "驳回重提记录测试合同", new BigDecimal("100000.00"),
                 100L, 100L, "{}", "{}");
 
@@ -484,5 +489,16 @@ class WorkflowEngineIntegrationTest {
         assertTrue(recordsAfterResubmit >= recordsAfterReject, "旧记录应保留");
 
         System.out.println("✅ 场景11 通过: 驳回后" + recordsAfterReject + "条记录, 重提后" + recordsAfterResubmit + "条, currentRound=" + instance.getCurrentRound());
+    }
+
+    @AfterAll
+    void cleanupTestData() {
+        long startBid = RUN_ID + 1;
+        long endBid = RUN_ID + 10;
+        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE business_id BETWEEN ? AND ?", startBid, endBid);
+        jdbcTemplate.update("DELETE FROM wf_record WHERE business_id BETWEEN ? AND ?", startBid, endBid);
+        jdbcTemplate.update("DELETE FROM wf_task WHERE business_id BETWEEN ? AND ?", startBid, endBid);
+        jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)", startBid, endBid);
+        jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id BETWEEN ? AND ?", startBid, endBid);
     }
 }
