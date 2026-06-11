@@ -149,10 +149,10 @@ const TYPE_COLOR: Record<ContractType, string> = {
   MAIN: 'blue', SUB: 'green', PURCHASE: 'orange', LEASE: 'purple', SERVICE: 'cyan',
 }
 const STATUS_LABEL: Record<ContractStatus, string> = {
-  EXECUTING: '履约中', COMPLETED: '已完成', TERMINATED: '已终止', DRAFT: '草稿',
+  PERFORMING: '履约中', SETTLED: '已结算', TERMINATED: '已终止', DRAFT: '草稿',
 }
 const STATUS_COLOR: Record<ContractStatus, string> = {
-  EXECUTING: 'success', COMPLETED: 'default', TERMINATED: 'warning', DRAFT: 'processing',
+  PERFORMING: 'success', SETTLED: 'default', TERMINATED: 'warning', DRAFT: 'processing',
 }
 
 // ---- ECharts donut option ----
@@ -236,8 +236,8 @@ const gridColumns = computed(() => [
             <div class="cl-field">
               <label>合同状态：</label>
               <a-select v-model:value="filter.contractStatus" placeholder="全部" allow-clear style="width:140px">
-                <a-select-option value="EXECUTING">履约中</a-select-option>
-                <a-select-option value="COMPLETED">已完成</a-select-option>
+                <a-select-option value="PERFORMING">履约中</a-select-option>
+                <a-select-option value="SETTLED">已结算</a-select-option>
                 <a-select-option value="TERMINATED">已终止</a-select-option>
                 <a-select-option value="DRAFT">草稿</a-select-option>
               </a-select>

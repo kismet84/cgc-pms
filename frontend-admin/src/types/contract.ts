@@ -1,6 +1,6 @@
 export type ContractType = 'MAIN' | 'SUB' | 'PURCHASE' | 'LEASE' | 'SERVICE'
-export type ContractStatus = 'DRAFT' | 'EXECUTING' | 'COMPLETED' | 'TERMINATED'
-export type ApprovalStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVING' | 'APPROVED' | 'REJECTED'
+export type ContractStatus = 'DRAFT' | 'PERFORMING' | 'SETTLED' | 'TERMINATED'
+export type ApprovalStatus = 'DRAFT' | 'APPROVING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN'
 
 export interface ContractItem {
   id: string

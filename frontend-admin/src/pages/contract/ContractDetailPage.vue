@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { message, Modal } from 'ant-design-vue'
 import { useContractStore } from '@/stores/contract'
+import { submitForApproval } from '@/api/modules/contract'
 import type { ContractType, ContractStatus, ApprovalStatus } from '@/types/contract'
 
 const route = useRoute()
@@ -10,6 +12,7 @@ const contractStore = useContractStore()
 
 const contractId = route.params.id as string
 const activeTab = ref('items')
+const submitting = ref(false)
 
 const TYPE_LABEL: Record<ContractType, string> = {
   MAIN: '总包合同',
@@ -28,33 +31,33 @@ const TYPE_COLOR: Record<ContractType, string> = {
 }
 
 const STATUS_LABEL: Record<ContractStatus, string> = {
-  EXECUTING: '履约中',
-  COMPLETED: '已完成',
+  PERFORMING: '履约中',
+  SETTLED: '已结算',
   TERMINATED: '已终止',
   DRAFT: '草稿',
 }
 
 const STATUS_COLOR: Record<ContractStatus, string> = {
-  EXECUTING: 'success',
-  COMPLETED: 'default',
+  PERFORMING: 'success',
+  SETTLED: 'default',
   TERMINATED: 'warning',
   DRAFT: 'processing',
 }
 
 const APPROVAL_STATUS_LABEL: Record<ApprovalStatus, string> = {
   DRAFT: '草稿',
-  SUBMITTED: '已提交',
   APPROVING: '审批中',
   APPROVED: '已通过',
   REJECTED: '已驳回',
+  WITHDRAWN: '已撤回',
 }
 
 const APPROVAL_STATUS_COLOR: Record<ApprovalStatus, string> = {
   DRAFT: 'default',
-  SUBMITTED: 'processing',
   APPROVING: 'processing',
   APPROVED: 'success',
   REJECTED: 'error',
+  WITHDRAWN: 'warning',
 }
 
 const itemColumns = [
@@ -110,6 +113,27 @@ async function loadData() {
   ])
 }
 
+function handleSubmitApproval() {
+  Modal.confirm({
+    title: '确认提交审批？',
+    content: '提交后将进入审批流程，无法编辑合同内容。',
+    okText: '确认提交',
+    cancelText: '取消',
+    onOk: async () => {
+      submitting.value = true
+      try {
+        await submitForApproval(contractId)
+        message.success('已提交审批')
+        await loadData()
+      } catch {
+        message.error('提交失败，请稍后重试')
+      } finally {
+        submitting.value = false
+      }
+    },
+  })
+}
+
 onMounted(() => {
   loadData()
 })
@@ -136,6 +160,14 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
         </a-tag>
       </template>
       <template #extra>
+        <a-button
+          v-if="contract && contract.approvalStatus === 'DRAFT'"
+          type="primary"
+          :loading="submitting"
+          @click="handleSubmitApproval"
+        >
+          提交审批
+        </a-button>
         <a-button @click="() => router.push(`/contract/${contractId}/edit`)">编辑</a-button>
       </template>
     </a-page-header>
