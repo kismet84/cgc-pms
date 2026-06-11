@@ -51,7 +51,7 @@ public class CtContractItemController {
     @DeleteMapping("/{itemId}")
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:item:delete')")
     public ApiResponse<Void> delete(@PathVariable Long contractId, @PathVariable Long itemId) {
-        ctContractItemService.delete(itemId);
+        ctContractItemService.delete(contractId, itemId);
         return ApiResponse.success();
     }
 }

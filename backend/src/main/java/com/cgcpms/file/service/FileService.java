@@ -1,6 +1,7 @@
 package com.cgcpms.file.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.config.MinioConfig;
 import com.cgcpms.file.entity.SysFile;
@@ -118,6 +119,9 @@ public class FileService {
         if (sysFile == null) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
         }
+        if (!sysFile.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
+        }
         try {
             return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath());
         } catch (Exception e) {
@@ -133,6 +137,9 @@ public class FileService {
     public void delete(Long fileId) {
         SysFile sysFile = sysFileMapper.selectById(fileId);
         if (sysFile == null) {
+            throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
+        }
+        if (!sysFile.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
         }
 
@@ -166,6 +173,7 @@ public class FileService {
         LambdaQueryWrapper<SysFile> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysFile::getBusinessType, businessType)
                 .eq(SysFile::getBusinessId, businessId)
+                .eq(SysFile::getTenantId, UserContext.getCurrentTenantId())
                 .orderByDesc(SysFile::getCreatedAt);
 
         List<SysFile> files = sysFileMapper.selectList(wrapper);

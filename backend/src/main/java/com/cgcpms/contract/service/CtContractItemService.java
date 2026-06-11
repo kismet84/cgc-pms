@@ -2,6 +2,7 @@ package com.cgcpms.contract.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import lombok.RequiredArgsConstructor;
@@ -41,11 +42,19 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
 
     @Transactional
     public void update(CtContractItem item) {
+        CtContractItem existing = mapper.selectById(item.getId());
+        if (existing == null || !existing.getContractId().equals(item.getContractId())) {
+            throw new BusinessException("ITEM_NOT_FOUND", "合同清单项不存在");
+        }
         mapper.updateById(item);
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long contractId, Long id) {
+        CtContractItem existing = mapper.selectById(id);
+        if (existing == null || !existing.getContractId().equals(contractId)) {
+            throw new BusinessException("ITEM_NOT_FOUND", "合同清单项不存在");
+        }
         mapper.deleteById(id);
     }
 }

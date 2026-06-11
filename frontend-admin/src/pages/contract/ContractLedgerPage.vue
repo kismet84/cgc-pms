@@ -63,9 +63,14 @@ const defaultCols: Record<string, boolean> = {
   contractStatus: true,
   ops: true,
 }
-const colVisible = reactive<Record<string, boolean>>(
-  JSON.parse(localStorage.getItem(COLS_KEY) || JSON.stringify(defaultCols))
-)
+let saved: Record<string, boolean> = defaultCols
+try {
+  const raw = localStorage.getItem(COLS_KEY)
+  if (raw) saved = JSON.parse(raw)
+} catch {
+  localStorage.removeItem(COLS_KEY)
+}
+const colVisible = reactive<Record<string, boolean>>({ ...defaultCols, ...saved })
 function toggleCol(key: string) {
   colVisible[key] = !colVisible[key]
   localStorage.setItem(COLS_KEY, JSON.stringify(colVisible))

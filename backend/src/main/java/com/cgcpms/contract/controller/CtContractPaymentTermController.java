@@ -51,7 +51,7 @@ public class CtContractPaymentTermController {
     @DeleteMapping("/{termId}")
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:delete')")
     public ApiResponse<Void> delete(@PathVariable Long contractId, @PathVariable Long termId) {
-        ctContractPaymentTermService.delete(termId);
+        ctContractPaymentTermService.delete(contractId, termId);
         return ApiResponse.success();
     }
 }

@@ -3,6 +3,7 @@ package com.cgcpms.partner.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -31,6 +32,7 @@ public class MdPartnerService {
         if (StringUtils.hasText(partnerName)) wrapper.like(MdPartner::getPartnerName, partnerName);
         if (StringUtils.hasText(partnerType)) wrapper.eq(MdPartner::getPartnerType, partnerType);
         if (StringUtils.hasText(status)) wrapper.eq(MdPartner::getStatus, status);
+        wrapper.eq(MdPartner::getTenantId, UserContext.getCurrentTenantId());
         wrapper.orderByDesc(MdPartner::getCreatedAt);
 
         Page<MdPartner> page = mdPartnerMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -40,6 +42,9 @@ public class MdPartnerService {
     public MdPartnerVO getById(Long id) {
         MdPartner partner = mdPartnerMapper.selectById(id);
         if (partner == null) throw new BusinessException("PARTNER_NOT_FOUND", "合作伙伴不存在");
+        if (!partner.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PARTNER_NOT_FOUND", "合作方不存在");
+        }
         return toVO(partner);
     }
 
@@ -47,7 +52,8 @@ public class MdPartnerService {
     public Long create(MdPartner partner) {
         if (StringUtils.hasText(partner.getPartnerCode()) &&
                 mdPartnerMapper.selectCount(new LambdaQueryWrapper<MdPartner>()
-                        .eq(MdPartner::getPartnerCode, partner.getPartnerCode())) > 0) {
+                        .eq(MdPartner::getPartnerCode, partner.getPartnerCode())
+                        .eq(MdPartner::getTenantId, UserContext.getCurrentTenantId())) > 0) {
             throw new BusinessException("PARTNER_CODE_EXISTS", "合作伙伴编码已存在");
         }
         if (partner.getStatus() == null) partner.setStatus("ENABLE");
@@ -57,13 +63,23 @@ public class MdPartnerService {
 
     @Transactional
     public void update(MdPartner partner) {
-        if (mdPartnerMapper.selectById(partner.getId()) == null)
+        MdPartner existing = mdPartnerMapper.selectById(partner.getId());
+        if (existing == null)
             throw new BusinessException("PARTNER_NOT_FOUND", "合作伙伴不存在");
+        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PARTNER_NOT_FOUND", "合作方不存在");
+        }
         mdPartnerMapper.updateById(partner);
     }
 
     @Transactional
     public void delete(Long id) {
+        MdPartner existing = mdPartnerMapper.selectById(id);
+        if (existing == null)
+            throw new BusinessException("PARTNER_NOT_FOUND", "合作伙伴不存在");
+        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PARTNER_NOT_FOUND", "合作方不存在");
+        }
         long contractCount = ctContractMapper.selectCount(
                 new LambdaQueryWrapper<CtContract>().eq(CtContract::getPartnerId, id));
         if (contractCount > 0) {

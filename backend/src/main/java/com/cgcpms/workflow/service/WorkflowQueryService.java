@@ -12,8 +12,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +39,16 @@ public class WorkflowQueryService {
 
         Page<WfTask> page = wfTaskMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
 
+        // Batch-fetch instances to avoid N+1
+        List<Long> instanceIds = page.getRecords().stream().map(WfTask::getInstanceId).distinct().toList();
+        final Map<Long, WfInstance> instanceMap;
+        if (!instanceIds.isEmpty()) {
+            instanceMap = wfInstanceMapper.selectBatchIds(instanceIds).stream()
+                    .collect(Collectors.toMap(WfInstance::getId, Function.identity()));
+        } else {
+            instanceMap = Collections.emptyMap();
+        }
+
         return page.convert(task -> {
             WfTaskVO vo = new WfTaskVO();
             vo.setId(String.valueOf(task.getId()));
@@ -55,7 +67,7 @@ public class WorkflowQueryService {
             vo.setComment(task.getComment());
 
             // Enrich with instance info
-            WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
+            WfInstance instance = instanceMap.get(task.getInstanceId());
             if (instance != null) {
                 vo.setTitle(instance.getTitle());
                 vo.setInstanceStatus(instance.getInstanceStatus());
@@ -67,6 +79,19 @@ public class WorkflowQueryService {
     public WfInstanceVO getInstanceDetail(Long instanceId, Long currentUserId) {
         WfInstance instance = wfInstanceMapper.selectById(instanceId);
         if (instance == null) return null;
+
+        // Authorization: only initiator, approvers, or admin can view
+        boolean authorized = instance.getInitiatorId().equals(currentUserId);
+        if (!authorized) {
+            Long count = wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
+                    .eq(WfTask::getInstanceId, instanceId)
+                    .eq(WfTask::getApproverId, currentUserId));
+            authorized = count > 0;
+        }
+        // TODO: add admin role check
+        if (!authorized) {
+            return null;
+        }
 
         WfInstanceVO vo = new WfInstanceVO();
         vo.setId(String.valueOf(instance.getId()));
@@ -99,6 +124,16 @@ public class WorkflowQueryService {
                 new LambdaQueryWrapper<WfNodeInstance>()
                         .eq(WfNodeInstance::getInstanceId, instanceId)
                         .orderByAsc(WfNodeInstance::getNodeOrder));
+
+        // Batch-fetch all tasks for all nodes to avoid N+1
+        List<Long> nodeIds = nodes.stream().map(WfNodeInstance::getId).toList();
+        Map<Long, List<WfTask>> tasksByNode = Collections.emptyMap();
+        if (!nodeIds.isEmpty()) {
+            List<WfTask> allTasks = wfTaskMapper.selectList(
+                    new LambdaQueryWrapper<WfTask>().in(WfTask::getNodeInstanceId, nodeIds));
+            tasksByNode = allTasks.stream().collect(Collectors.groupingBy(WfTask::getNodeInstanceId));
+        }
+
         List<WfNodeVO> nodeVOs = new ArrayList<>();
         for (WfNodeInstance n : nodes) {
             WfNodeVO nvo = new WfNodeVO();
@@ -114,10 +149,7 @@ public class WorkflowQueryService {
             if (n.getEndedAt() != null) nvo.setEndedAt(DTF.format(n.getEndedAt()));
 
             // Tasks for this node
-            List<WfTask> tasks = wfTaskMapper.selectList(
-                    new LambdaQueryWrapper<WfTask>()
-                            .eq(WfTask::getNodeInstanceId, n.getId())
-                            .orderByDesc(WfTask::getReceivedAt));
+            List<WfTask> tasks = tasksByNode.getOrDefault(n.getId(), Collections.emptyList());
             List<WfTaskVO> taskVOs = tasks.stream().map(t -> {
                 WfTaskVO tvo = new WfTaskVO();
                 tvo.setId(String.valueOf(t.getId()));

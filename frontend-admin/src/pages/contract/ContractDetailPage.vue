@@ -78,7 +78,7 @@ function goBack() {
 async function loadData() {
   await contractStore.fetchContract(contractId)
   // Load items and payment terms in parallel
-  Promise.all([
+  await Promise.all([
     contractStore.fetchItems(contractId),
     contractStore.fetchPaymentTerms(contractId),
     contractStore.fetchApprovalRecords(contractId),

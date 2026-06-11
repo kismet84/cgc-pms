@@ -68,6 +68,9 @@ public class AuthService {
         if (user == null) {
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         }
+        if (!"ENABLE".equals(user.getStatus())) {
+            throw new BusinessException("AUTH_DISABLED", "账号已被禁用");
+        }
         List<String> roleCodes = getRoleCodes(userId);
         List<String> permCodes = getPermissionCodes(userId);
         String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes);

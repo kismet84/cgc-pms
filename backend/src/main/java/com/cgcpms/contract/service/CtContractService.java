@@ -57,6 +57,7 @@ public class CtContractService {
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(CtContract::getApprovalStatus, approvalStatus);
         if (projectId != null) wrapper.eq(CtContract::getProjectId, projectId);
         if (partnerId != null) wrapper.eq(CtContract::getPartnerId, partnerId);
+        wrapper.eq(CtContract::getTenantId, UserContext.getCurrentTenantId());
         wrapper.orderByDesc(CtContract::getCreatedAt);
 
         Page<CtContract> page = ctContractMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -84,7 +85,8 @@ public class CtContractService {
 
     public CtContractVO getById(Long id) {
         CtContract c = ctContractMapper.selectById(id);
-        if (c == null) throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        if (c == null || !c.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
         return toVO(c);
     }
 
@@ -117,7 +119,7 @@ public class CtContractService {
     @Transactional
     public void update(CtContract contract) {
         CtContract existing = ctContractMapper.selectById(contract.getId());
-        if (existing == null)
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
 
         // 审批中守卫：禁止编辑
@@ -136,7 +138,7 @@ public class CtContractService {
     @Transactional
     public void submitForApproval(Long contractId) {
         CtContract contract = ctContractMapper.selectById(contractId);
-        if (contract == null)
+        if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
 
         // 只允许草稿状态提交
@@ -169,6 +171,8 @@ public class CtContractService {
 
     /**
      * 查询合同审批记录。
+     * 注：wf_instance 的租户隔离由 WorkflowQueryService 的提交/查询入口统一处理，
+     * 此处通过 businessType + businessId 定位实例，实例级权限已在调用方校验。
      */
     public List<ContractApprovalRecordVO> getApprovalRecords(Long contractId) {
         // 1. 查 wf_instance WHERE businessType=CONTRACT_APPROVAL AND businessId=contractId

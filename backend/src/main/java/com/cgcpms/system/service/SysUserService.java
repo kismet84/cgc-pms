@@ -16,6 +16,8 @@ import org.springframework.util.StringUtils;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,6 +46,9 @@ public class SysUserService {
 
         Page<SysUser> page = sysUserMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
 
+        List<Long> userIds = page.getRecords().stream().map(SysUser::getId).toList();
+        Map<Long, List<String>> roleNamesMap = bulkLoadRoleNames(userIds);
+
         return page.convert(user -> {
             SysUserVO vo = new SysUserVO();
             vo.setId(user.getId());
@@ -54,7 +59,7 @@ public class SysUserService {
             vo.setAvatar(user.getAvatar());
             vo.setStatus(user.getStatus());
             vo.setIsAdmin(user.getIsAdmin());
-            vo.setRoleNames(getRoleNames(user.getId()));
+            vo.setRoleNames(roleNamesMap.getOrDefault(user.getId(), Collections.emptyList()));
             if (user.getCreatedAt() != null) vo.setCreatedAt(DTF.format(user.getCreatedAt()));
             if (user.getUpdatedAt() != null) vo.setUpdatedAt(DTF.format(user.getUpdatedAt()));
             return vo;
@@ -130,6 +135,19 @@ public class SysUserService {
                 sysUserRoleMapper.insert(ur);
             }
         }
+    }
+
+    private Map<Long, List<String>> bulkLoadRoleNames(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) return Collections.emptyMap();
+        var userRoles = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId, userIds));
+        if (userRoles.isEmpty()) return Collections.emptyMap();
+        List<Long> roleIds = userRoles.stream().map(SysUserRole::getRoleId).distinct().toList();
+        var roleMap = sysRoleMapper.selectBatchIds(roleIds).stream()
+                .collect(Collectors.toMap(SysRole::getId, SysRole::getRoleName));
+        return userRoles.stream().collect(Collectors.groupingBy(
+                SysUserRole::getUserId,
+                Collectors.mapping(ur -> roleMap.get(ur.getRoleId()), Collectors.toList())));
     }
 
     private List<String> getRoleNames(Long userId) {

@@ -18,6 +18,7 @@ import com.cgcpms.project.vo.PmProjectVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.cgcpms.auth.context.UserContext;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -38,6 +39,7 @@ public class PmProjectService {
 
     public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String projectCode, String projectName, String projectType, String status) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PmProject::getTenantId, UserContext.getCurrentTenantId());
         if (StringUtils.hasText(projectCode)) wrapper.like(PmProject::getProjectCode, projectCode);
         if (StringUtils.hasText(projectName)) wrapper.like(PmProject::getProjectName, projectName);
         if (StringUtils.hasText(projectType)) wrapper.eq(PmProject::getProjectType, projectType);
@@ -51,6 +53,9 @@ public class PmProjectService {
     public PmProjectVO getById(Long id) {
         PmProject project = pmProjectMapper.selectById(id);
         if (project == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        if (!project.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
         return toVO(project);
     }
 
@@ -62,13 +67,23 @@ public class PmProjectService {
 
     @Transactional
     public void update(PmProject project) {
-        if (pmProjectMapper.selectById(project.getId()) == null)
+        PmProject existing = pmProjectMapper.selectById(project.getId());
+        if (existing == null)
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
         pmProjectMapper.updateById(project);
     }
 
     @Transactional
     public void delete(Long id) {
+        PmProject existing = pmProjectMapper.selectById(id);
+        if (existing == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+
         // Cascade: logical-delete associated files
         sysFileMapper.delete(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getBusinessType, "PROJECT")

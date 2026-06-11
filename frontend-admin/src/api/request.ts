@@ -31,10 +31,10 @@ service.interceptors.request.use(
 // 是否正在刷新中，防止并发多次刷新
 let isRefreshing = false
 // 刷新期间排队的请求
-let pendingQueue: Array<(token: string) => void> = []
+let pendingQueue: Array<{ resolve: (v: string) => void; reject: (e: Error) => void }> = []
 
 function processQueue(newToken: string) {
-  pendingQueue.forEach((resolve) => resolve(newToken))
+  pendingQueue.forEach((entry) => entry.resolve(newToken))
   pendingQueue = []
 }
 
@@ -69,8 +69,8 @@ service.interceptors.response.use(
 
       if (isRefreshing) {
         // Queue up while another refresh is in flight
-        return new Promise<string>((resolve) => {
-          pendingQueue.push(resolve)
+        return new Promise<string>((resolve, reject) => {
+          pendingQueue.push({ resolve, reject })
         }).then((newToken) => {
           originalRequest.headers.Authorization = `Bearer ${newToken}`
           return service(originalRequest)
@@ -88,7 +88,9 @@ service.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${result.token}`
         return service(originalRequest)
       } catch {
-        // Refresh failed — logout
+        // Refresh failed — reject all queued requests, then logout
+        pendingQueue.forEach((entry) => entry.reject(new Error('Token refresh failed')))
+        pendingQueue = []
         userStore.logout()
         message.error('登录已过期，请重新登录')
         if (window.location.pathname !== '/login') window.location.href = '/login'

@@ -43,13 +43,19 @@ public class CtContractPaymentTermService {
 
     @Transactional
     public void update(CtContractPaymentTerm term) {
-        if (ctContractPaymentTermMapper.selectById(term.getId()) == null)
+        CtContractPaymentTerm existing = ctContractPaymentTermMapper.selectById(term.getId());
+        if (existing == null)
+            throw new BusinessException("PAYMENT_TERM_NOT_FOUND", "付款条款不存在");
+        if (!existing.getContractId().equals(term.getContractId()))
             throw new BusinessException("PAYMENT_TERM_NOT_FOUND", "付款条款不存在");
         ctContractPaymentTermMapper.updateById(term);
     }
 
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long contractId, Long id) {
+        CtContractPaymentTerm existing = ctContractPaymentTermMapper.selectById(id);
+        if (existing == null || !existing.getContractId().equals(contractId))
+            throw new BusinessException("PAYMENT_TERM_NOT_FOUND", "付款条款不存在");
         ctContractPaymentTermMapper.deleteById(id);
     }
 }
