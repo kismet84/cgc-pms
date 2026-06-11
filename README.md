@@ -126,6 +126,7 @@ pnpm dev
 | 第 3 周 | 合同中心 | ✅ | 新建合同、合同清单、付款条件、附件上传 (2026-06-10) |
 | 安全加固 | — | ✅ | 方法级RBAC、Refresh Token、文件上传安全、输入校验、密钥脱敏、幂等修复 (2026-06-11) |
 | 第 4 周 | 审批闭环 | ✅ | 合同提交审批、审批回调、状态机、锁定成本生成 (2026-06-11) |
+| 安全加固 2 | — | ✅ | 多租户数据隔离、子资源归属校验、文件 IDOR 修复、N+1 优化、前端缺陷修复 (2026-06-11) |
 
 ### 已完成功能
 
@@ -172,6 +173,13 @@ pnpm dev
 ✅ CORS 配置支持多环境（dev/test/local/prod 各自配置 allowed-origins）
 ✅ OperationLog 切面敏感字段脱敏（password/token/secret 自动替换为 ***）
 ✅ Docker Compose 密钥使用 .env 文件 + Redis 密码认证 + MinIO 版本锁定
+✅ 多租户数据隔离 (tenantId 全链路过滤, Contract/Project/Partner/File 模块)
+✅ 子资源归属校验 (合同清单/付款条款按 contractId 校验)
+✅ 文件访问权限 (预签名URL/删除按 tenantId 鉴权)
+✅ Refresh Token 禁用账号拦截 (loginById 增加状态校验)
+✅ 审批实例查看权限 (仅发起人/审批人可查看)
+✅ 前端 N+1 优化 (用户角色 / 审批任务批量预取)
+✅ 前端缺陷修复 (API 路径对齐, 401 刷新队列修复, Promise.await, JSON 容错)
 ```
 
 ## 合同中心 API
@@ -231,6 +239,7 @@ pnpm dev
 - 提交信息：`feat:` / `fix:` / `docs:` / `refactor:` / `test:` / `chore:`
 - 代码规范：ESLint + Prettier (前端)
 - 后端遵循 `SysUserController` → `SysUserService` 分层模式，权限使用 `@PreAuthorize("hasRole('ADMIN') or hasAuthority('xxx:action')")` 声明式鉴权
+- 多租户数据隔离：Service 层 LambdaQueryWrapper 统一追加 `.eq(Entity::getTenantId, UserContext.getCurrentTenantId())`，单条操作 `selectById` 后校验 `tenantId` 一致性
 - 敏感配置使用 `${ENV_VAR:default}` 形式（环境变量优先），切勿将密钥硬编码提交
 - 迁移数据使用 `INSERT IGNORE INTO` 确保幂等，新表索引在专用 V8+ 迁移中添加
 - `WorkflowBusinessHandler.isCritical()` 控制审批回调事务一致性：返回 `true` 时异常传播触发回滚，`false` 时 swallow-and-log（向后兼容）
@@ -242,6 +251,7 @@ pnpm dev
 | 开发任务拆解与 Backlog | `doc/第1阶段开发任务拆解与Backlog.md` |
 | 审批引擎 POC 测试报告 | `doc/审批引擎POC测试报告.md` |
 | 审计修复报告 (2026-06-11) | `doc/审计修复报告_2026-06-11.md` |
+| 全量代码审查报告 (2026-06-11) | `doc/全量代码审查报告_2026-06-11.md` |
 | 第4周开发计划_合同审批闭环 | `doc/第4周开发计划_合同审批闭环.md` |
 | 第2阶段开发计划_成本归集与资金闭环 | `doc/第2阶段开发计划_成本归集与资金闭环.md` |
 | 开发文档 | `doc/开发文档_v2.3/` |
