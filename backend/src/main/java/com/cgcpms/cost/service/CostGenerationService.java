@@ -1,25 +1,19 @@
 package com.cgcpms.cost.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cgcpms.contract.entity.CtContract;
-import com.cgcpms.contract.entity.CtContractItem;
-import com.cgcpms.contract.mapper.CtContractItemMapper;
-import com.cgcpms.contract.mapper.CtContractMapper;
-import com.cgcpms.cost.entity.CostItem;
-import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.strategy.CostGenerationStrategy;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
- * Generates locked cost records (cost_item) from an approved contract's items.
- * Idempotent: relies on the unique key uk_cost_source_item to skip duplicates.
+ * Cost generation service using strategy pattern.
+ * Dispatches cost generation to appropriate strategy based on source_type.
  */
 @Slf4j
 @Service
@@ -35,65 +29,42 @@ public class CostGenerationService {
     /** Cost status once locked from an approved contract. */
     public static final String COST_STATUS_CONFIRMED = "CONFIRMED";
 
-    private final CtContractMapper contractMapper;
-    private final CtContractItemMapper contractItemMapper;
-    private final CostItemMapper costItemMapper;
+    private final List<CostGenerationStrategy> strategies;
+    private Map<String, CostGenerationStrategy> strategyMap;
+
+    @PostConstruct
+    public void init() {
+        strategyMap = strategies.stream()
+                .collect(Collectors.toMap(
+                        CostGenerationStrategy::supportSourceType,
+                        Function.identity()
+                ));
+        log.info("成本生成策略已注册: {}", strategyMap.keySet());
+    }
+
+    /**
+     * Generate cost records for the given source.
+     *
+     * @param sourceType the source type (e.g., "CT_CONTRACT", "MAT_RECEIPT")
+     * @param sourceId the source entity ID
+     */
+    public void generateCost(String sourceType, Long sourceId) {
+        CostGenerationStrategy strategy = strategyMap.get(sourceType);
+        if (strategy == null) {
+            log.error("未找到成本生成策略: sourceType={}", sourceType);
+            throw new IllegalArgumentException("Unsupported source type: " + sourceType);
+        }
+        strategy.generateCost(sourceId);
+    }
 
     /**
      * Generate locked cost records for every line item of the given contract.
+     * Convenience method for backward compatibility.
      * Idempotent — re-running on the same contract skips already-generated rows.
      *
      * @param contractId the approved contract id
      */
-    @Transactional(rollbackFor = Exception.class)
     public void generateLockedCost(Long contractId) {
-        CtContract contract = contractMapper.selectById(contractId);
-        if (contract == null) {
-            log.warn("生成锁定成本：合同不存在 contractId={}", contractId);
-            return;
-        }
-
-        List<CtContractItem> items = contractItemMapper.selectList(
-                new LambdaQueryWrapper<CtContractItem>()
-                        .eq(CtContractItem::getContractId, contractId));
-
-        if (items.isEmpty()) {
-            log.info("生成锁定成本：合同无清单明细，跳过 contractId={}", contractId);
-            return;
-        }
-
-        LocalDate today = LocalDate.now();
-        int generated = 0;
-        for (CtContractItem item : items) {
-            CostItem cost = new CostItem();
-            cost.setTenantId(contract.getTenantId());
-            cost.setOrgId(contract.getOrgId());
-            cost.setProjectId(contract.getProjectId());
-            cost.setContractId(contractId);
-            cost.setPartnerId(contract.getPartnerId());
-            cost.setCostType(DEFAULT_COST_TYPE);
-            cost.setAmount(nvl(item.getAmount()));
-            cost.setTaxAmount(nvl(item.getTaxAmount()));
-            cost.setAmountWithoutTax(nvl(item.getAmountWithoutTax()));
-            cost.setSourceType(SOURCE_TYPE_CONTRACT);
-            cost.setSourceId(contractId);
-            cost.setSourceItemId(item.getId());
-            cost.setCostDate(today);
-            cost.setCostStatus(COST_STATUS_CONFIRMED);
-            cost.setGeneratedFlag(1);
-
-            try {
-                costItemMapper.insert(cost);
-                generated++;
-            } catch (DuplicateKeyException e) {
-                // uk_cost_source_item already present — idempotent skip.
-                log.info("成本已存在，跳过 contractId={}, itemId={}", contractId, item.getId());
-            }
-        }
-        log.info("生成锁定成本完成 contractId={}, 明细数={}, 新增={}", contractId, items.size(), generated);
-    }
-
-    private BigDecimal nvl(BigDecimal value) {
-        return value == null ? BigDecimal.ZERO : value;
+        generateCost(SOURCE_TYPE_CONTRACT, contractId);
     }
 }
