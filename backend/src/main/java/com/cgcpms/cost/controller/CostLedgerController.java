@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/api/cost-ledger")
+@RequestMapping("/cost-ledger")
 @RequiredArgsConstructor
 public class CostLedgerController {
 
