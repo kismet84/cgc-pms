@@ -5,6 +5,7 @@ import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowContext;
@@ -26,7 +27,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
 
     @Override
     public String supportBusinessType() {
-        return ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL;
+        return WorkflowBusinessTypes.CONTRACT_APPROVAL;
     }
 
     @Override

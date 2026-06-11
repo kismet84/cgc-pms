@@ -53,6 +53,9 @@ public class CtContract extends BaseEntity {
     private BigDecimal currentAmount;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal paidAmount;
+
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal taxRate;
 
     @JsonSerialize(using = ToStringSerializer.class)
@@ -83,4 +86,6 @@ public class CtContract extends BaseEntity {
     private String contractStatus;
 
     private String approvalStatus;
+
+    private Integer costGeneratedFlag;
 }
