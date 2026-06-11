@@ -14,8 +14,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Business handler for payment request approval workflows.
- * Non-critical handler: payment approval failure does NOT rollback
- * (payment ≠ cost, no critical cost generation).
+ * Critical handler: payment approval failure triggers transaction rollback.
  */
 @Slf4j
 @Component
@@ -32,7 +31,7 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
 
     @Override
     public boolean isCritical() {
-        return false;
+        return true;
     }
 
     @Override

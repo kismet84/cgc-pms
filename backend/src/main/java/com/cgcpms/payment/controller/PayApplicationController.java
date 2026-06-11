@@ -6,6 +6,7 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayApplicationBasis;
 import com.cgcpms.payment.service.PayApplicationService;
+import com.cgcpms.payment.vo.PayApplicationBasisVO;
 import com.cgcpms.payment.vo.PayApplicationVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -65,8 +66,8 @@ public class PayApplicationController {
 
     @GetMapping("/{id}/basis")
     @PreAuthorize("hasAuthority('payment:app:query') or hasRole('ADMIN')")
-    public ApiResponse<PayApplicationVO> listBasis(@PathVariable Long id) {
-        return ApiResponse.success(payApplicationService.getById(id));
+    public ApiResponse<List<PayApplicationBasisVO>> listBasis(@PathVariable Long id) {
+        return ApiResponse.success(payApplicationService.getBasisList(id));
     }
 
     @PostMapping("/{id}/basis/batch")

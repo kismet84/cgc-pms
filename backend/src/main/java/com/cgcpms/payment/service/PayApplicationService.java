@@ -154,6 +154,14 @@ public class PayApplicationService {
         return vo;
     }
 
+    public List<PayApplicationBasisVO> getBasisList(Long applicationId) {
+        List<PayApplicationBasis> basisList = payApplicationBasisMapper.selectList(
+                new LambdaQueryWrapper<PayApplicationBasis>()
+                        .eq(PayApplicationBasis::getTenantId, UserContext.getCurrentTenantId())
+                        .eq(PayApplicationBasis::getPayApplicationId, applicationId));
+        return basisList.stream().map(this::toBasisVO).collect(Collectors.toList());
+    }
+
     // ---- CRUD ----
 
     @Transactional
@@ -196,6 +204,11 @@ public class PayApplicationService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
 
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
+            throw new BusinessException("PAY_APP_IN_APPROVAL", "付款申请审批中或已审批，不可编辑");
+
+        app.setApprovalStatus(existing.getApprovalStatus());
+        app.setPayStatus(existing.getPayStatus());
         payApplicationMapper.updateById(app);
     }
 
@@ -204,6 +217,9 @@ public class PayApplicationService {
         PayApplication existing = payApplicationMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
+            throw new BusinessException("PAY_APP_IN_APPROVAL", "付款申请审批中或已审批，不可删除");
 
         // Delete basis records first
         payApplicationBasisMapper.delete(new LambdaQueryWrapper<PayApplicationBasis>()
@@ -249,6 +265,9 @@ public class PayApplicationService {
         PayApplication app = payApplicationMapper.selectById(applicationId);
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+
+        if (!"DRAFT".equals(app.getApprovalStatus()))
+            throw new BusinessException("PAY_APP_IN_APPROVAL", "付款申请审批中或已审批，不可编辑付款依据");
 
         // Validate header amount == SUM(basis amount)
         BigDecimal headerAmount = app.getApplyAmount() != null ? app.getApplyAmount() : BigDecimal.ZERO;
