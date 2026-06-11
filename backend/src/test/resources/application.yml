@@ -3,12 +3,13 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
   flyway:
-    enabled: false
+    enabled: true
   sql:
     init:
-      mode: always
-      schema-locations: classpath:db/h2/schema.sql
-      data-locations: classpath:db/h2/data.sql
+      mode: never
+
+minio:
+  enabled: false
 
 logging:
   level:

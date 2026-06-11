@@ -4,6 +4,7 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.file.service.FileService;
 import com.cgcpms.file.vo.SysFileVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/files")
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "minio.enabled", havingValue = "true", matchIfMissing = true)
 public class FileController {
 
     private final FileService fileService;
