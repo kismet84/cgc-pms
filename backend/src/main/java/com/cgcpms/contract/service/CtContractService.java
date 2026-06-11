@@ -1,16 +1,25 @@
 package com.cgcpms.contract.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.contract.vo.ContractApprovalRecordVO;
 import com.cgcpms.contract.vo.CtContractVO;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.entity.WfRecord;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
+import com.cgcpms.workflow.mapper.WfRecordMapper;
+import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +42,9 @@ public class CtContractService {
     private final CtContractMapper ctContractMapper;
     private final PmProjectMapper pmProjectMapper;
     private final MdPartnerMapper mdPartnerMapper;
+    private final WorkflowEngine workflowEngine;
+    private final WfInstanceMapper wfInstanceMapper;
+    private final WfRecordMapper wfRecordMapper;
 
     public IPage<CtContractVO> getPage(long pageNo, long pageSize, String contractCode, String contractName,
                                        String contractType, String contractStatus, String approvalStatus,
@@ -104,9 +116,86 @@ public class CtContractService {
 
     @Transactional
     public void update(CtContract contract) {
-        if (ctContractMapper.selectById(contract.getId()) == null)
+        CtContract existing = ctContractMapper.selectById(contract.getId());
+        if (existing == null)
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+
+        // 审批中守卫：禁止编辑
+        if (ContractStatusConstants.APPROVAL_APPROVING.equals(existing.getApprovalStatus()))
+            throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中，不可编辑");
+
+        // 禁止通过 update 接口覆盖审批状态
+        contract.setApprovalStatus(existing.getApprovalStatus());
+
         ctContractMapper.updateById(contract);
+    }
+
+    /**
+     * 提交合同审批。
+     */
+    @Transactional
+    public void submitForApproval(Long contractId) {
+        CtContract contract = ctContractMapper.selectById(contractId);
+        if (contract == null)
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+
+        // 只允许草稿状态提交
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus()))
+            throw new BusinessException("CONTRACT_ALREADY_SUBMITTED", "合同已提交审批，不可重复提交");
+
+        // 必须有合同编号
+        if (contract.getContractCode() == null || contract.getContractCode().isBlank())
+            throw new BusinessException("CONTRACT_NO_CODE", "合同编号不能为空，无法提交审批");
+
+        // 更新审批状态为审批中
+        LambdaUpdateWrapper<CtContract> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(CtContract::getId, contractId)
+                .set(CtContract::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING);
+        ctContractMapper.update(null, updateWrapper);
+
+        // 调用审批引擎
+        Long userId = UserContext.getCurrentUserId();
+        String username = UserContext.getCurrentUsername();
+        Long tenantId = UserContext.getCurrentTenantId();
+        workflowEngine.submit(userId, username, tenantId,
+                ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL,
+                contractId,
+                contract.getContractName(),
+                contract.getContractAmount(),
+                contract.getProjectId(),
+                contractId,
+                null, null);
+    }
+
+    /**
+     * 查询合同审批记录。
+     */
+    public List<ContractApprovalRecordVO> getApprovalRecords(Long contractId) {
+        // 1. 查 wf_instance WHERE businessType=CONTRACT_APPROVAL AND businessId=contractId
+        LambdaQueryWrapper<WfInstance> instQw = new LambdaQueryWrapper<>();
+        instQw.eq(WfInstance::getBusinessType, ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL)
+                .eq(WfInstance::getBusinessId, contractId);
+        WfInstance instance = wfInstanceMapper.selectOne(instQw);
+        if (instance == null) return List.of();
+
+        // 2. 查 wf_record WHERE instanceId=instance.id ORDER BY createdAt ASC
+        LambdaQueryWrapper<WfRecord> recQw = new LambdaQueryWrapper<>();
+        recQw.eq(WfRecord::getInstanceId, instance.getId())
+                .orderByAsc(WfRecord::getCreatedAt);
+        List<WfRecord> records = wfRecordMapper.selectList(recQw);
+
+        // 3. 转 VO
+        return records.stream().map(r -> {
+            ContractApprovalRecordVO vo = new ContractApprovalRecordVO();
+            vo.setId(r.getId() != null ? r.getId().toString() : null);
+            vo.setNodeName(r.getNodeName());
+            vo.setOperatorName(r.getOperatorName());
+            vo.setActionType(r.getActionType());
+            vo.setActionName(r.getActionName());
+            vo.setComment(r.getComment());
+            vo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().format(DTF) : null);
+            return vo;
+        }).toList();
     }
 
     private CtContractVO toVO(CtContract c) {

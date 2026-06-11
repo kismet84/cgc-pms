@@ -5,11 +5,14 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.service.CtContractService;
+import com.cgcpms.contract.vo.ContractApprovalRecordVO;
 import com.cgcpms.contract.vo.CtContractVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/contracts")
@@ -53,5 +56,18 @@ public class CtContractController {
         contract.setId(id);
         ctContractService.update(contract);
         return ApiResponse.success();
+    }
+
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('contract:submit') or hasRole('ADMIN')")
+    public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
+        ctContractService.submitForApproval(id);
+        return ApiResponse.success();
+    }
+
+    @GetMapping("/{id}/approval-records")
+    @PreAuthorize("hasAuthority('contract:query') or hasRole('ADMIN')")
+    public ApiResponse<List<ContractApprovalRecordVO>> getApprovalRecords(@PathVariable Long id) {
+        return ApiResponse.success(ctContractService.getApprovalRecords(id));
     }
 }
