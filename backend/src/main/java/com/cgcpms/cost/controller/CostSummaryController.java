@@ -2,6 +2,7 @@ package com.cgcpms.cost.controller;
 
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.cost.service.CostSummaryService;
+import com.cgcpms.cost.vo.CostProjectSummaryVO;
 import com.cgcpms.cost.vo.CostSummaryVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,15 +19,14 @@ public class CostSummaryController {
 
     @GetMapping("/{projectId}")
     @PreAuthorize("hasAuthority('cost:summary:view') or hasRole('ADMIN')")
-    public ApiResponse<List<CostSummaryVO>> getLatest(@PathVariable Long projectId) {
-        return ApiResponse.success(costSummaryService.getSummary(projectId));
+    public ApiResponse<CostProjectSummaryVO> getLatest(@PathVariable Long projectId) {
+        return ApiResponse.success(costSummaryService.getProjectSummary(projectId));
     }
 
     @PostMapping("/{projectId}/refresh")
     @PreAuthorize("hasAuthority('cost:summary:view') or hasRole('ADMIN')")
-    public ApiResponse<Void> refresh(@PathVariable Long projectId) {
-        costSummaryService.refreshSummary(projectId);
-        return ApiResponse.success();
+    public ApiResponse<CostProjectSummaryVO> refresh(@PathVariable Long projectId) {
+        return ApiResponse.success(costSummaryService.refreshSummary(projectId));
     }
 
     @GetMapping("/{projectId}/history")
