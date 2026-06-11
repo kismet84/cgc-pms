@@ -4,7 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { useContractStore } from '@/stores/contract'
 import { submitForApproval } from '@/api/modules/contract'
-import type { ContractType, ContractStatus, ApprovalStatus } from '@/types/contract'
+import ContractStatusTag from '@/components/ContractStatusTag.vue'
+import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
+import type { ContractType } from '@/types/contract'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,36 +30,6 @@ const TYPE_COLOR: Record<ContractType, string> = {
   PURCHASE: 'orange',
   LEASE: 'purple',
   SERVICE: 'cyan',
-}
-
-const STATUS_LABEL: Record<ContractStatus, string> = {
-  PERFORMING: '履约中',
-  SETTLED: '已结算',
-  TERMINATED: '已终止',
-  DRAFT: '草稿',
-}
-
-const STATUS_COLOR: Record<ContractStatus, string> = {
-  PERFORMING: 'success',
-  SETTLED: 'default',
-  TERMINATED: 'warning',
-  DRAFT: 'processing',
-}
-
-const APPROVAL_STATUS_LABEL: Record<ApprovalStatus, string> = {
-  DRAFT: '草稿',
-  APPROVING: '审批中',
-  APPROVED: '已通过',
-  REJECTED: '已驳回',
-  WITHDRAWN: '已撤回',
-}
-
-const APPROVAL_STATUS_COLOR: Record<ApprovalStatus, string> = {
-  DRAFT: 'default',
-  APPROVING: 'processing',
-  APPROVED: 'success',
-  REJECTED: 'error',
-  WITHDRAWN: 'warning',
 }
 
 const itemColumns = [
@@ -152,12 +124,8 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
   <div class="contract-detail-page">
     <a-page-header title="合同详情" @back="goBack">
       <template #tags>
-        <a-tag v-if="contract" :color="STATUS_COLOR[contract.contractStatus]">
-          {{ STATUS_LABEL[contract.contractStatus] }}
-        </a-tag>
-        <a-tag v-if="contract" :color="APPROVAL_STATUS_COLOR[contract.approvalStatus]">
-          {{ APPROVAL_STATUS_LABEL[contract.approvalStatus] }}
-        </a-tag>
+        <ContractStatusTag v-if="contract" :status="contract.contractStatus" />
+        <ApprovalStatusTag v-if="contract" :status="contract.approvalStatus" />
       </template>
       <template #extra>
         <a-button

@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { getContractLedger, getContractKpi } from '@/api/modules/contract'
+import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import type { ContractVO, ContractQueryParams, ContractKpiVO, ContractType, ContractStatus } from '@/types/contract'
 import type { PageResult } from '@/types/api'
 
@@ -147,12 +148,6 @@ const TYPE_LABEL: Record<ContractType, string> = {
 }
 const TYPE_COLOR: Record<ContractType, string> = {
   MAIN: 'blue', SUB: 'green', PURCHASE: 'orange', LEASE: 'purple', SERVICE: 'cyan',
-}
-const STATUS_LABEL: Record<ContractStatus, string> = {
-  PERFORMING: '履约中', SETTLED: '已结算', TERMINATED: '已终止', DRAFT: '草稿',
-}
-const STATUS_COLOR: Record<ContractStatus, string> = {
-  PERFORMING: 'success', SETTLED: 'default', TERMINATED: 'warning', DRAFT: 'processing',
 }
 
 // ---- ECharts donut option ----
@@ -354,9 +349,7 @@ const gridColumns = computed(() => [
               <span class="cl-money">{{ parseFloat(row.contractAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
             </template>
             <template #status="{ row }">
-              <a-tag :color="STATUS_COLOR[row.contractStatus as ContractStatus]">
-                {{ STATUS_LABEL[row.contractStatus as ContractStatus] }}
-              </a-tag>
+              <ContractStatusTag :status="row.contractStatus as ContractStatus" />
             </template>
             <template #ops="{ row }">
               <div class="cl-ops">
