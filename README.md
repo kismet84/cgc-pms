@@ -244,6 +244,13 @@ pnpm dev
 - 迁移数据使用 `INSERT IGNORE INTO` 确保幂等，新表索引在专用 V8+ 迁移中添加
 - `WorkflowBusinessHandler.isCritical()` 控制审批回调事务一致性：返回 `true` 时异常传播触发回滚，`false` 时 swallow-and-log（向后兼容）
 
+## 已知暂缓问题
+
+| # | 严重度 | 问题 | 暂缓原因 |
+|---|--------|------|----------|
+| H2 | High | `/workflow/submit` 仅需 `isAuthenticated()`，任意认证用户可提交任意业务类型审批 | 需业务方明确审批提交权限规则后统一设计 |
+| M4 | Medium | Access token 存 `localStorage`，refresh token 存 `sessionStorage`，均 JS 可读 | 改为 HttpOnly Cookie 需前后端联动 + CSRF 方案 + 移动端兼容评估 |
+
 ## 文档
 
 | 文档 | 路径 |
