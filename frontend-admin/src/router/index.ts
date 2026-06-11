@@ -59,6 +59,40 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'cost',
+        name: 'Cost',
+        redirect: '/cost/ledger',
+        meta: { title: '成本管理', icon: 'DollarOutlined' },
+        children: [
+          {
+            path: 'ledger',
+            name: 'CostLedger',
+            component: () => import('@/pages/cost/ledger.vue'),
+            meta: { title: '成本台账' },
+          },
+          {
+            path: 'summary',
+            name: 'CostSummary',
+            component: () => import('@/pages/cost/summary.vue'),
+            meta: { title: '动态成本汇总', icon: 'FundOutlined' },
+          },
+        ],
+      },
+      {
+        path: 'variation',
+        name: 'Variation',
+        redirect: '/variation/order',
+        meta: { title: '变更签证', icon: 'SwapOutlined' },
+        children: [
+          {
+            path: 'order',
+            name: 'VariationOrder',
+            component: () => import('@/pages/variation/order.vue'),
+            meta: { title: '变更签证' },
+          },
+        ],
+      },
+      {
         path: 'project',
         name: 'Project',
         component: () => import('@/pages/project/index.vue'),
@@ -69,6 +103,74 @@ export const routes: RouteRecordRaw[] = [
         name: 'Partner',
         component: () => import('@/pages/partner/index.vue'),
         meta: { title: '合作方管理', icon: 'TeamOutlined' },
+      },
+      {
+        path: 'subcontract',
+        name: 'Subcontract',
+        redirect: '/subcontract/task',
+        meta: { title: '分包管理', icon: 'BranchesOutlined' },
+        children: [
+          {
+            path: 'task',
+            name: 'SubcontractTask',
+            component: () => import('@/pages/subcontract/task.vue'),
+            meta: { title: '分包任务' },
+          },
+          {
+            path: 'measure',
+            name: 'SubcontractMeasure',
+            component: () => import('@/pages/subcontract/measure.vue'),
+            meta: { title: '分包计量' },
+          },
+        ],
+      },
+      {
+        path: 'purchase',
+        name: 'Purchase',
+        redirect: '/purchase/order',
+        meta: { title: '采购管理', icon: 'ShoppingCartOutlined' },
+        children: [
+          {
+            path: 'order',
+            name: 'PurchaseOrder',
+            component: () => import('@/pages/purchase/order.vue'),
+            meta: { title: '采购订单' },
+          },
+          {
+            path: 'receipt',
+            name: 'PurchaseReceipt',
+            component: () => import('@/pages/receipt/index.vue'),
+            meta: { title: '材料验收' },
+          },
+        ],
+      },
+      {
+        path: 'payment',
+        name: 'Payment',
+        redirect: '/payment/application',
+        meta: { title: '付款管理', icon: 'DollarOutlined' },
+        children: [
+          {
+            path: 'application',
+            name: 'PaymentApplication',
+            component: () => import('@/pages/payment/index.vue'),
+            meta: { title: '付款申请' },
+          },
+        ],
+      },
+      {
+        path: 'material',
+        name: 'Material',
+        redirect: '/material/dictionary',
+        meta: { title: '基础数据', icon: 'DatabaseOutlined' },
+        children: [
+          {
+            path: 'dictionary',
+            name: 'MaterialDictionary',
+            component: () => import('@/pages/material/dictionary.vue'),
+            meta: { title: '材料字典' },
+          },
+        ],
       },
       {
         path: 'approval',
