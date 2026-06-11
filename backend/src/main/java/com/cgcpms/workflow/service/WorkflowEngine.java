@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
+import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandlerRegistry;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import com.cgcpms.workflow.mapper.*;
@@ -590,27 +591,39 @@ public class WorkflowEngine {
             log.debug("No business handler registered for type: {}", businessType);
             return;
         }
-        try {
-            WorkflowContext ctx = new WorkflowContext();
-            ctx.setInstance(instance);
-            ctx.setActionType(actionType);
-            ctx.setOperatorName(operatorName);
-            ctx.setComment(comment);
-            var handler = handlerRegistry.get(businessType);
-            switch (actionType) {
-                case WorkflowConstants.ACTION_SUBMIT -> handler.beforeSubmit(ctx);
-                case WorkflowConstants.ACTION_APPROVE -> {
-                    if (WorkflowConstants.INSTANCE_APPROVED.equals(instance.getInstanceStatus())) {
-                        handler.onApproved(ctx);
-                    } else {
-                        handler.onRunning(ctx);
-                    }
-                }
-                case WorkflowConstants.ACTION_REJECT -> handler.onRejected(ctx);
-                case WorkflowConstants.ACTION_WITHDRAW -> handler.onWithdrawn(ctx);
+        WorkflowContext ctx = new WorkflowContext();
+        ctx.setInstance(instance);
+        ctx.setActionType(actionType);
+        ctx.setOperatorName(operatorName);
+        ctx.setComment(comment);
+        var handler = handlerRegistry.get(businessType);
+
+        if (handler.isCritical()) {
+            // Critical handler: let exceptions propagate to trigger @Transactional rollback.
+            dispatchToHandler(handler, ctx, instance, actionType);
+        } else {
+            // Non-critical handler: swallow and log to avoid breaking the approval flow.
+            try {
+                dispatchToHandler(handler, ctx, instance, actionType);
+            } catch (Exception e) {
+                log.error("Business handler error for type={}, action={}", businessType, actionType, e);
             }
-        } catch (Exception e) {
-            log.error("Business handler error for type={}, action={}", businessType, actionType, e);
+        }
+    }
+
+    private void dispatchToHandler(WorkflowBusinessHandler handler, WorkflowContext ctx,
+                                   WfInstance instance, String actionType) {
+        switch (actionType) {
+            case WorkflowConstants.ACTION_SUBMIT -> handler.beforeSubmit(ctx);
+            case WorkflowConstants.ACTION_APPROVE -> {
+                if (WorkflowConstants.INSTANCE_APPROVED.equals(instance.getInstanceStatus())) {
+                    handler.onApproved(ctx);
+                } else {
+                    handler.onRunning(ctx);
+                }
+            }
+            case WorkflowConstants.ACTION_REJECT -> handler.onRejected(ctx);
+            case WorkflowConstants.ACTION_WITHDRAW -> handler.onWithdrawn(ctx);
         }
     }
 

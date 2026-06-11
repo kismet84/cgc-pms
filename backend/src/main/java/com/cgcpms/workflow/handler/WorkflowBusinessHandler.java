@@ -25,4 +25,13 @@ public interface WorkflowBusinessHandler {
 
     default void onVoided(WorkflowContext context) {
     }
+
+    /**
+     * Whether this handler's callbacks are critical for transactional consistency.
+     * If true, exceptions from callbacks will propagate and trigger rollback.
+     * If false (default), exceptions are logged but swallowed.
+     */
+    default boolean isCritical() {
+        return false;
+    }
 }
