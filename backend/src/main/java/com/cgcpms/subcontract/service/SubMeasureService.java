@@ -145,7 +145,11 @@ public class SubMeasureService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
 
-        // Auto-calculate net amount
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
+            throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可编辑");
+        if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
+
         calcNetAmount(measure);
 
         subMeasureMapper.updateById(measure);
@@ -157,6 +161,11 @@ public class SubMeasureService {
         SubMeasure measure = subMeasureMapper.selectById(measureId);
         if (measure == null || !measure.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
+
+        if (!"DRAFT".equals(measure.getApprovalStatus()))
+            throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可编辑");
+        if (measure.getCostGeneratedFlag() != null && measure.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
         // Delete old items
         subMeasureItemMapper.delete(new LambdaQueryWrapper<SubMeasureItem>()
@@ -184,6 +193,11 @@ public class SubMeasureService {
         SubMeasure existing = subMeasureMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
+
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
+            throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可删除");
+        if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
 
         subMeasureMapper.deleteById(id);
     }

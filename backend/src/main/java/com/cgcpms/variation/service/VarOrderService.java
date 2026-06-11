@@ -157,6 +157,11 @@ public class VarOrderService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
 
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
+            throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可编辑");
+        if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
+
         varOrderMapper.updateById(order);
     }
 
@@ -166,6 +171,11 @@ public class VarOrderService {
         VarOrder order = varOrderMapper.selectById(varOrderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
+
+        if (!"DRAFT".equals(order.getApprovalStatus()))
+            throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可编辑");
+        if (order.getCostGeneratedFlag() != null && order.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
         // Delete old items
         varOrderItemMapper.delete(new LambdaQueryWrapper<VarOrderItem>()
@@ -193,6 +203,11 @@ public class VarOrderService {
         VarOrder existing = varOrderMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
+
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
+            throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可删除");
+        if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
+            throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
 
         varOrderMapper.deleteById(id);
     }

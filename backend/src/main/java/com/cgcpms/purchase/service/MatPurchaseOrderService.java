@@ -174,9 +174,9 @@ public class MatPurchaseOrderService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
 
-        // Guard: cannot edit if APPROVED status
-        if ("APPROVED".equals(existing.getApprovalStatus()))
-            throw new BusinessException("PURCHASE_ORDER_APPROVED", "采购订单已审批，不可编辑");
+        // Guard: cannot edit if approving or approved
+        if ("APPROVED".equals(existing.getApprovalStatus()) || "APPROVING".equals(existing.getApprovalStatus()))
+            throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可编辑");
 
         // Contract validation
         if (order.getContractId() != null) {
@@ -236,6 +236,9 @@ public class MatPurchaseOrderService {
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
 
+        if (!"DRAFT".equals(order.getApprovalStatus()))
+            throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可删除");
+
         // Soft delete
         LambdaUpdateWrapper<MatPurchaseOrder> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(MatPurchaseOrder::getId, id)
@@ -248,6 +251,9 @@ public class MatPurchaseOrderService {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(orderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
+
+        if (!"DRAFT".equals(order.getApprovalStatus()))
+            throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可编辑明细");
 
         // Delete old items (tenant isolation)
         LambdaQueryWrapper<MatPurchaseOrderItem> deleteWrapper = new LambdaQueryWrapper<>();
