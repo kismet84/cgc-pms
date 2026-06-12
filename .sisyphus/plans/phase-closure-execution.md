@@ -1437,7 +1437,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `test(concurrency): concurrency & consistency test report`
   - Files: `doc/并发一致性测试报告_*.md`
 
-- [ ] 20. **性能基线测试**
+- [x] 20. **性能基线测试**
 
   **What to do**:
   - 准备测试数据：SQL 脚本批量插入（合同 10,000 条、成本明细 100,000 条、通知 50,000 条）

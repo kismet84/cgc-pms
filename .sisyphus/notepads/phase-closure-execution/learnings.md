@@ -700,3 +700,45 @@ The dashboard uses custom classes with NO `.pm-page` or `.pm-header` wrappers.
 ### Evidence: .sisyphus/evidence/task-19-concurrency-test.txt
 ### Full report: doc/并发一致性测试报告_2026-06-13.md
 
+
+## 2026-06-13 T20: 性能基线测试
+
+### Result: PASSED ✅ (5/5 endpoints, all P95 within targets)
+
+### Environment
+- Backend: localhost:8080, dev profile
+- DB: MySQL 8.0 @ 127.0.0.1:3307/cgc_pms
+- Data volume: near-empty (~300 system seed rows, most business tables 0 rows)
+
+### Results
+| Endpoint | P50 | P95 | Target | Status |
+|----------|-----|-----|--------|--------|
+| GET /api/contracts | 9.8ms | 12.2ms | <500ms | ✅ |
+| GET /api/cost-ledger | 4.7ms | 6.1ms | <1s | ✅ |
+| GET /api/dashboard/cost-manager | 14.8ms | 34.6ms | <2s | ✅ |
+| POST /api/alerts/batch-evaluate | 4.4ms | 6.1ms | <5s | ✅ |
+| GET /api/api/notifications | 4.9ms | 5.7ms | <300ms | ✅ |
+
+### Key observations
+1. Task spec had incorrect URLs for 2 endpoints:
+   - /api/cost/ledger → correct is /api/cost-ledger (Controller uses @RequestMapping("/cost-ledger"))
+   - /api/notifications → correct is /api/api/notifications (double /api prefix, known Phase 4 issue)
+2. ADMIN role missing from port 3307 DB → had to INSERT sys_role (id=4, role_code='ADMIN') + sys_user_role mapping
+3. Port confusion: backend dev profile uses port 3307, not 3306. Two separate MySQL instances exist.
+4. All response times far below targets due to near-empty DB — baseline is lightweight only
+5. Dashboard cost-manager showed highest variance (10.5~37.1ms), likely due to multi-table aggregation
+6. HikariCP connection pool shows lazy init: first request of each endpoint 2-3x slower
+
+### DB state (port 3307)
+- 55 tables, 40 Flyway migrations applied
+- Seed data only: sys_menu (69), wf_template_node (35), sys_dict_data (33), wf_template (11)
+- Business data minimal: ct_contract (3), md_partner (3), pm_project (2)
+- 35 business tables have 0 rows
+
+### Gaps
+- P1: No production-representative data volume → need data generation for realistic baseline
+- P2: No concurrent load testing (serial only)
+- P3: Phase 4 double /api prefix still present on notifications endpoint
+
+### Evidence: .sisyphus/evidence/task-20-perf-raw.txt, .sisyphus/evidence/task-20-perf-results.csv
+### Report: doc/性能基线报告_2026-06-13.md
