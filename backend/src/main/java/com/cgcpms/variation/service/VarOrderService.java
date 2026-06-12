@@ -239,7 +239,7 @@ public class VarOrderService {
                 order.getReportedAmount(),
                 order.getProjectId(),
                 order.getContractId(),
-                null, null);
+                null, null, null);
     }
 
     // ---- VO conversion helpers ----

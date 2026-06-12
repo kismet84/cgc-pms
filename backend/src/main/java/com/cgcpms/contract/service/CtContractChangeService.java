@@ -153,6 +153,6 @@ public class CtContractChangeService {
                 existing.getChangeAmount(),
                 existing.getProjectId(),
                 existing.getContractId(),
-                null, null);
+                null, null, null);
     }
 }

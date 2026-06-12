@@ -228,7 +228,7 @@ public class SubMeasureService {
                 measure.getNetAmount(),
                 measure.getProjectId(),
                 measure.getContractId(),
-                null, null);
+                null, null, null);
     }
 
     // ---- VO conversion helpers ----

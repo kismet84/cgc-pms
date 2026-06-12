@@ -227,7 +227,7 @@ public class MatPurchaseOrderService {
                 order.getTotalAmount(),
                 order.getProjectId(),
                 order.getContractId(),
-                null, null);
+                null, null, null);
     }
 
     @Transactional

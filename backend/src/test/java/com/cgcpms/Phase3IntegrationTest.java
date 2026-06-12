@@ -20,6 +20,10 @@ import com.cgcpms.cost.mapper.CostTargetItemMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.cost.service.CostTargetService;
+import com.cgcpms.notification.entity.SysNotification;
+import com.cgcpms.notification.mapper.SysNotificationMapper;
+import com.cgcpms.project.entity.PmProjectMember;
+import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.StlSettlementService;
@@ -105,6 +109,12 @@ class Phase3IntegrationTest {
     // ── ALERT ──
     @Autowired private AlertEvaluationService alertEvaluationService;
     @Autowired private AlertLogMapper alertLogMapper;
+
+    // ── NOTIFICATION ──
+    @Autowired private SysNotificationMapper notificationMapper;
+
+    // ── PROJECT MEMBER ──
+    @Autowired private PmProjectMemberMapper projectMemberMapper;
 
     // ── WORKFLOW ──
     @Autowired private WorkflowEngine workflowEngine;
@@ -286,7 +296,7 @@ class Phase3IntegrationTest {
                 "结算审批-" + saved.getSettlementCode(),
                 settlement.getFinalAmount(),
                 PROJECT_ID, CONTRACT_ID,
-                "Phase3集成测试-结算审批", null),
+                "Phase3集成测试-结算审批", null, null),
                 "提交结算审批不应抛异常");
 
         // 4. 查找审批实例并全部通过
@@ -426,7 +436,7 @@ class Phase3IntegrationTest {
                 "目标成本审批-" + saved.getVersionNo(),
                 saved.getTotalTargetAmount(),
                 PROJECT_ID, null,
-                "Phase3集成测试-目标成本审批", null),
+                "Phase3集成测试-目标成本审批", null, null),
                 "提交目标成本审批不应抛异常");
 
         // 4. 查找审批实例并全部通过
@@ -618,6 +628,88 @@ class Phase3IntegrationTest {
                 + "条(金额=" + varCosts.get(0).getAmount() + ")"
                 + ", 合同总成本记录=" + totalCostForContract + "条"
                 + ", 无重复计费✓");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 场景7: 预警 → 通知 — evaluateProject 触发通知，显式 tenantId
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Order(7)
+    @Transactional
+    @DisplayName("场景7: 预警→通知 → 插入项目成员→触发预警→验证通知生成，tenantId来自project而非UserContext")
+    void test07_alertToNotification() {
+        // 1. 插入项目成员（admin 作为项目经理 PM）
+        PmProjectMember member = new PmProjectMember();
+        member.setId(System.currentTimeMillis()); // 雪花ID模拟
+        member.setTenantId(0L);
+        member.setProjectId(PROJECT_ID);
+        member.setUserId(USER_ADMIN);
+        member.setRoleCode("PM");
+        member.setStatus("ACTIVE");
+        member.setCreatedBy(USER_ADMIN);
+        member.setCreatedTime(LocalDateTime.now());
+        member.setUpdatedBy(USER_ADMIN);
+        member.setUpdatedTime(LocalDateTime.now());
+        member.setDeletedFlag(0);
+        projectMemberMapper.insert(member);
+
+        // 2. 设置触发条件：将合同结束日期改为15天后（触发 CONTRACT_EXPIRING 预警）
+        CtContract contract = contractMapper.selectById(CONTRACT_ID);
+        LocalDate originalEndDate = contract.getEndDate();
+        contract.setEndDate(LocalDate.now().plusDays(15));
+        contractMapper.updateById(contract);
+
+        // 3. 记录评估前通知数量
+        long beforeNotificationCount = notificationMapper.selectCount(null);
+
+        // 4. 执行预警评估（tenantId=0 来自 project，NOT UserContext）
+        assertDoesNotThrow(() -> alertEvaluationService.evaluateProject(0L, PROJECT_ID),
+                "预警评估不应抛异常");
+
+        // 5. ★核心断言：验证 sys_notification 已生成
+        List<SysNotification> notifications = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getTenantId, 0L)
+                        .eq(SysNotification::getBizType, "ALERT")
+                        .orderByDesc(SysNotification::getCreatedTime));
+
+        assertFalse(notifications.isEmpty(),
+                "预警评估应生成至少一条通知记录（bizType=ALERT）");
+
+        // 6. 验证通知字段完整性
+        SysNotification notification = notifications.get(0);
+        assertEquals(0L, notification.getTenantId().longValue(),
+                "通知tenantId应为0（来自project，非UserContext）");
+        assertEquals(USER_ADMIN, notification.getUserId(),
+                "通知userId应为项目成员（admin PM）");
+        assertEquals("ALERT", notification.getBizType(),
+                "通知bizType应为ALERT");
+        assertNotNull(notification.getBizId(), "通知bizId（alert id）不应为空");
+        assertNotNull(notification.getTitle(), "通知title不应为空");
+        assertTrue(notification.getTitle().contains("预警"),
+                "通知title应包含'预警'");
+        assertNotNull(notification.getContent(), "通知content不应为空");
+        assertEquals("INFO", notification.getNotifyType(),
+                "通知notifyType应为INFO");
+        assertEquals(0, notification.getIsRead().intValue(),
+                "通知isRead应为0（未读）");
+
+        // 7. 验证通知关联的 alert_log 存在
+        AlertLog alert = alertLogMapper.selectById(notification.getBizId());
+        assertNotNull(alert, "通知关联的alert_log应存在");
+        assertEquals(PROJECT_ID, alert.getProjectId().longValue(),
+                "alert_log的projectId应匹配");
+        assertEquals("CONTRACT_EXPIRING", alert.getRuleType(),
+                "alert_log的ruleType应为CONTRACT_EXPIRING");
+
+        long afterNotificationCount = notificationMapper.selectCount(null);
+
+        System.out.println("✅ 场景7 通过: notificationCount="
+                + (afterNotificationCount - beforeNotificationCount)
+                + "（新增）, title=" + notification.getTitle()
+                + ", userId=" + notification.getUserId()
+                + ", tenantId=" + notification.getTenantId()
+                + "（来自project显式查询）");
     }
 
     // ═══════════════════════════════════════════════════════════

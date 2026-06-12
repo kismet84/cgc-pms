@@ -212,7 +212,7 @@ public class MatReceiptService {
                 receipt.getTotalAmount(),
                 receipt.getProjectId(),
                 receipt.getContractId(),
-                null, null);
+                null, null, null);
     }
 
     public List<MatReceiptItemVO> getItems(Long receiptId) {

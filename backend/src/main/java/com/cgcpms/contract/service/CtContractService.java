@@ -166,7 +166,7 @@ public class CtContractService {
                 contract.getContractAmount(),
                 contract.getProjectId(),
                 contractId,
-                null, null);
+                null, null, null);
     }
 
     /**

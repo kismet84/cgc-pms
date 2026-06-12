@@ -347,7 +347,7 @@ public class PayApplicationService {
                 payApp.getProjectId(),
                 payApp.getContractId(),
                 payApp.getApplyReason(),
-                null);
+                null, null);
     }
 
     public void validatePaymentAmount(PayApplication payApp) {
