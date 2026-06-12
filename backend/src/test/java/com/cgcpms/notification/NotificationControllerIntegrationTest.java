@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.List;
@@ -54,7 +55,7 @@ class NotificationControllerIntegrationTest {
 
         Cookie cookie = new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
 
-        MvcResult result = mockMvc.perform(get("/api/notifications/stream")
+        MvcResult result = mockMvc.perform(getWithApiContext("/notifications/stream")
                         .cookie(cookie)
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(request().asyncStarted())
@@ -76,7 +77,7 @@ class NotificationControllerIntegrationTest {
     @Test
     @DisplayName("GET /api/notifications/stream without JWT returns 401")
     void streamWithoutJwt() throws Exception {
-        mockMvc.perform(get("/api/notifications/stream")
+        mockMvc.perform(getWithApiContext("/notifications/stream")
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(status().isUnauthorized());
     }
@@ -89,9 +90,52 @@ class NotificationControllerIntegrationTest {
     void streamWithInvalidJwt() throws Exception {
         Cookie cookie = new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, "not.a.valid.jwt");
 
-        mockMvc.perform(get("/api/notifications/stream")
+        mockMvc.perform(getWithApiContext("/notifications/stream")
                         .cookie(cookie)
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /api/notifications/unread-count with valid JWT returns count payload")
+    void unreadCountWithValidJwt() throws Exception {
+        String token = jwtUtils.generateToken(
+                1L,
+                "admin",
+                0L,
+                List.of("ADMIN"),
+                List.of("notification:view"));
+
+        Cookie cookie = new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+
+        mockMvc.perform(getWithApiContext("/notifications/unread-count")
+                        .cookie(cookie)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.count").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/notifications/unread-count without notification:view returns 403 envelope")
+    void unreadCountWithoutViewPermission() throws Exception {
+        String token = jwtUtils.generateToken(
+                2L,
+                "limited",
+                0L,
+                List.of("USER"),
+                List.of());
+
+        Cookie cookie = new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+
+        mockMvc.perform(getWithApiContext("/notifications/unread-count")
+                        .cookie(cookie)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    private static MockHttpServletRequestBuilder getWithApiContext(String pathWithinContext) {
+        return get("/api" + pathWithinContext).contextPath("/api");
     }
 }

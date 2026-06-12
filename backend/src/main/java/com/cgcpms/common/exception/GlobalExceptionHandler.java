@@ -5,6 +5,8 @@ import com.cgcpms.common.result.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -30,6 +32,20 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleBusinessException(BusinessException e) {
         log.warn("Business exception: code={}, message={}", e.getCode(), e.getMessage());
         return ApiResponse.fail(e);
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResponse<Void> handleAuthorizationDeniedException(AuthorizationDeniedException e) {
+        log.warn("Authorization denied: {}", e.getMessage());
+        return forbiddenResponse();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResponse<Void> handleAccessDeniedException(AccessDeniedException e) {
+        log.warn("Access denied: {}", e.getMessage());
+        return forbiddenResponse();
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -65,5 +81,9 @@ public class GlobalExceptionHandler {
 
     private static String formatFieldError(FieldError error) {
         return error.getField() + ": " + error.getDefaultMessage();
+    }
+
+    private static ApiResponse<Void> forbiddenResponse() {
+        return ApiResponse.fail("AUTH_FORBIDDEN", "权限不足");
     }
 }
