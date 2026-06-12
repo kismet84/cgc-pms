@@ -41,8 +41,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/swagger-ui/**",
             "/v3/api-docs/**",
             "/doc.html",
-            "/webjars/**",
-            "/notifications/stream"
+            "/webjars/**"
     );
 
     private final JwtUtils jwtUtils;
@@ -68,6 +67,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
         return SKIP_PATHS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path));
+    }
+
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
     }
 
     @Override
