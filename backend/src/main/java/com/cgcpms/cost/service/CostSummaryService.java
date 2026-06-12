@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostSummary;
@@ -16,6 +18,12 @@ import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.mapper.VarOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -41,6 +49,10 @@ public class CostSummaryService {
     private final PmProjectMapper projectMapper;
     private final CostSubjectMapper costSubjectMapper;
     private final PayRecordMapper payRecordMapper;
+    private final CtContractMapper ctContractMapper;
+    private final SubMeasureMapper subMeasureMapper;
+    private final MatReceiptMapper matReceiptMapper;
+    private final VarOrderMapper varOrderMapper;
 
     @Transactional
     public CostProjectSummaryVO refreshSummary(Long projectId) {
@@ -86,7 +98,11 @@ public class CostSummaryService {
                     .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
         }
 
-        // 5. For each cost subject, calculate and insert summary
+        // 5. Compute project-level values (same for all subjects)
+        BigDecimal projectEstimatedRemainingCost = computeProjectEstimatedRemainingCost(tenantId, projectId);
+        BigDecimal projectContractIncome = computeProjectContractIncome(tenantId, projectId);
+
+        // 6. For each cost subject, calculate and insert summary
         LocalDate today = LocalDate.now();
         List<CostSummary> summaries = new ArrayList<>();
 
@@ -108,11 +124,11 @@ public class CostSummaryService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             BigDecimal paidAmount = BigDecimal.ZERO;
-            BigDecimal estimatedRemainingCost = BigDecimal.ZERO;
-            BigDecimal dynamicCost = contractLockedCost.add(actualCost).add(estimatedRemainingCost);
+            BigDecimal estimatedRemainingCost = projectEstimatedRemainingCost;
+            BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal costDeviation = dynamicCost.subtract(targetCost);
-            BigDecimal contractIncome = BigDecimal.ZERO;
-            BigDecimal expectedProfit = BigDecimal.ZERO;
+            BigDecimal contractIncome = projectContractIncome;
+            BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
 
             CostSummary summary = new CostSummary();
             summary.setTenantId(tenantId);
@@ -191,7 +207,12 @@ public class CostSummaryService {
         BigDecimal paidAmount = subjects.stream()
                 .map(s -> new BigDecimal(s.getPaidAmount()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal dynamicCost = contractLockedCost.add(actualCost);
+
+        // Project-level fields: compute directly (not aggregated from subjects, to avoid N× duplication)
+        BigDecimal estimatedRemainingCost = computeProjectEstimatedRemainingCost(tenantId, projectId);
+        BigDecimal contractIncome = computeProjectContractIncome(tenantId, projectId);
+        BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
+        BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
         BigDecimal costDeviation = dynamicCost.subtract(targetCost);
 
         CostProjectSummaryVO vo = new CostProjectSummaryVO();
@@ -201,7 +222,10 @@ public class CostSummaryService {
         vo.setContractLockedCost(contractLockedCost.toPlainString());
         vo.setActualCost(actualCost.toPlainString());
         vo.setPaidAmount(paidAmount.toPlainString());
+        vo.setEstimatedRemainingCost(estimatedRemainingCost.toPlainString());
         vo.setDynamicCost(dynamicCost.toPlainString());
+        vo.setContractIncome(contractIncome.toPlainString());
+        vo.setExpectedProfit(expectedProfit.toPlainString());
         vo.setCostDeviation(costDeviation.toPlainString());
         vo.setSubjects(subjects);
         return vo;
@@ -325,6 +349,67 @@ public class CostSummaryService {
             vo.setRemark(s.getRemark());
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * Compute project-level estimatedRemainingCost:
+     * SUM(ct_contract.currentAmount) - SUM(sub_measure.approvedAmount WHERE approved)
+     *                                 - SUM(mat_receipt.totalAmount WHERE approved)
+     */
+    private BigDecimal computeProjectEstimatedRemainingCost(Long tenantId, Long projectId) {
+        BigDecimal totalCurrentAmount = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .eq(CtContract::getProjectId, projectId))
+                .stream()
+                .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal confirmedMeasureAmount = subMeasureMapper.selectList(
+                new LambdaQueryWrapper<SubMeasure>()
+                        .eq(SubMeasure::getTenantId, tenantId)
+                        .eq(SubMeasure::getProjectId, projectId)
+                        .eq(SubMeasure::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(m -> m.getApprovedAmount() != null ? m.getApprovedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal confirmedReceiptAmount = matReceiptMapper.selectList(
+                new LambdaQueryWrapper<MatReceipt>()
+                        .eq(MatReceipt::getTenantId, tenantId)
+                        .eq(MatReceipt::getProjectId, projectId)
+                        .eq(MatReceipt::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(r -> r.getTotalAmount() != null ? r.getTotalAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return totalCurrentAmount.subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
+    }
+
+    /**
+     * Compute project-level contractIncome:
+     * SUM(ct_contract.contractAmount) + SUM(var_order.approvedAmount WHERE direction='INCOME' AND approved)
+     */
+    private BigDecimal computeProjectContractIncome(Long tenantId, Long projectId) {
+        BigDecimal totalContractAmount = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .eq(CtContract::getProjectId, projectId))
+                .stream()
+                .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal incomeVarAmount = varOrderMapper.selectList(
+                new LambdaQueryWrapper<VarOrder>()
+                        .eq(VarOrder::getTenantId, tenantId)
+                        .eq(VarOrder::getProjectId, projectId)
+                        .eq(VarOrder::getDirection, "INCOME")
+                        .eq(VarOrder::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return totalContractAmount.add(incomeVarAmount);
     }
 
     private PmProject requireProjectInTenant(Long tenantId, Long projectId) {
