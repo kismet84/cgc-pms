@@ -264,8 +264,9 @@ public class StlSettlementService {
         // finalAmount
         BigDecimal finalAmount = contractAmount.add(changeAmount).add(measuredAmount).subtract(deductionAmount);
 
-        // warrantyRate from contract, default 5%
-        BigDecimal warrantyRate = contract.getWarrantyRate() != null ? contract.getWarrantyRate() : DEFAULT_WARRANTY_RATE;
+        // warrantyRate from contract (stored as percentage, e.g. 5.00 = 5%), convert to decimal
+        BigDecimal warrantyRate = contract.getWarrantyRate() != null
+                ? contract.getWarrantyRate().movePointLeft(2) : DEFAULT_WARRANTY_RATE;
         BigDecimal warrantyAmount = finalAmount.multiply(warrantyRate).setScale(2, RoundingMode.HALF_UP);
 
         // unpaidAmount = finalAmount - paidAmount - warrantyAmount
@@ -353,8 +354,9 @@ public class StlSettlementService {
         BigDecimal finalAmount = contractAmount.add(changeAmount).add(measuredAmount).subtract(deductionAmount);
         settlement.setFinalAmount(finalAmount);
 
-        // warrantyAmount = finalAmount × warrantyRate (default 5%)
-        BigDecimal warrantyRate = contract.getWarrantyRate() != null ? contract.getWarrantyRate() : DEFAULT_WARRANTY_RATE;
+        // warrantyAmount = finalAmount × warrantyRate (converted from percentage to decimal)
+        BigDecimal warrantyRate = contract.getWarrantyRate() != null
+                ? contract.getWarrantyRate().movePointLeft(2) : DEFAULT_WARRANTY_RATE;
         BigDecimal warrantyAmount = finalAmount.multiply(warrantyRate).setScale(2, RoundingMode.HALF_UP);
         settlement.setWarrantyAmount(warrantyAmount);
 
