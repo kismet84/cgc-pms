@@ -34,17 +34,46 @@ INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES (3, 1, 3);
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES (4, 1, 31);
 INSERT INTO sys_role_menu (id, role_id, menu_id) VALUES (5, 1, 4);
 
--- Test project
+-- Test project (Phase 1)
 INSERT INTO pm_project (id, tenant_id, project_code, project_name, project_type, status, approval_status)
 VALUES (100, 0, 'PRJ-TEST-001', '测试项目', '施工总承包', '进行中', '已批准');
 
--- Test partner
+-- Test partner (Phase 1)
 INSERT INTO md_partner (id, tenant_id, partner_code, partner_name, partner_type, status)
 VALUES (100, 0, 'PTN-TEST-001', '测试供应商', '供应商', 'ENABLE');
 
--- Test contract
+-- Test contract (Phase 1)
 INSERT INTO ct_contract (id, tenant_id, project_id, partner_id, contract_code, contract_name, contract_type, contract_amount, contract_status, approval_status)
 VALUES (100, 0, 100, 100, 'CT-TEST-001', '测试合同', 'MAIN', 1000000.00, 'DRAFT', 'DRAFT');
+
+-- ====== V6 Demo Data (Phase 2+3 test IDs) ======
+
+-- Demo projects (PRJ-2026-001 ONGOING, PRJ-2026-002 DRAFT)
+INSERT INTO pm_project (id, tenant_id, project_code, project_name, project_type, contract_amount, target_cost, planned_start_date, planned_end_date, status, approval_status)
+VALUES (10001, 0, 'PRJ-2026-001', '城市中心商业综合体总承包工程', '房建工程', 580000000.00, 520000000.00, '2026-03-01', '2028-06-30', 'ONGOING', 'APPROVED');
+
+INSERT INTO pm_project (id, tenant_id, project_code, project_name, project_type, contract_amount, target_cost, planned_start_date, planned_end_date, status, approval_status)
+VALUES (10002, 0, 'PRJ-2026-002', '滨江路市政道路改造工程', '市政工程', 128000000.00, 115000000.00, '2026-05-01', '2027-04-30', 'DRAFT', 'DRAFT');
+
+-- Demo partners
+INSERT INTO md_partner (id, tenant_id, partner_code, partner_name, partner_type, qualification_level, blacklist_flag, risk_level, status)
+VALUES (20001, 0, 'PTN-S-001', '中建商砼材料供应有限公司', 'SUPPLIER', '一级', 0, 'LOW', 'ENABLE');
+
+INSERT INTO md_partner (id, tenant_id, partner_code, partner_name, partner_type, qualification_level, blacklist_flag, risk_level, status)
+VALUES (20002, 0, 'PTN-C-001', '宏远建筑劳务分包有限公司', 'SUBCONTRACTOR', '专业承包二级', 0, 'MEDIUM', 'ENABLE');
+
+INSERT INTO md_partner (id, tenant_id, partner_code, partner_name, partner_type, qualification_level, blacklist_flag, risk_level, status)
+VALUES (20003, 0, 'PTN-V-001', '智联工程咨询服务有限公司', 'SERVICE_PROVIDER', '甲级', 0, 'LOW', 'ENABLE');
+
+-- Demo contracts (PERFORMING+APPROVED for testing)
+INSERT INTO ct_contract (id, tenant_id, project_id, partner_id, contract_code, contract_name, contract_type, contract_amount, current_amount, tax_rate, tax_amount, amount_without_tax, signed_date, start_date, end_date, payment_method, settlement_method, warranty_rate, warranty_amount, contract_status, approval_status)
+VALUES (30001, 0, 10001, 20001, 'CT-2026-001', '商砼及钢材采购合同', 'PURCHASE', 45000000.00, 45000000.00, 13.00, 5176991.15, 39823008.85, '2026-03-10', '2026-03-15', '2027-12-31', '按月结算', '验收结算', 3.00, 1350000.00, 'PERFORMING', 'APPROVED');
+
+INSERT INTO ct_contract (id, tenant_id, project_id, partner_id, contract_code, contract_name, contract_type, contract_amount, current_amount, tax_rate, tax_amount, amount_without_tax, signed_date, start_date, end_date, payment_method, settlement_method, warranty_rate, warranty_amount, contract_status, approval_status)
+VALUES (30002, 0, 10001, 20002, 'CT-2026-002', '主体结构劳务分包合同', 'SUB', 86000000.00, 86000000.00, 9.00, 7100917.43, 78899082.57, '2026-03-20', '2026-04-01', '2028-03-31', '按进度付款', '竣工结算', 5.00, 4300000.00, 'PERFORMING', 'APPROVED');
+
+INSERT INTO ct_contract (id, tenant_id, project_id, partner_id, contract_code, contract_name, contract_type, contract_amount, current_amount, tax_rate, tax_amount, amount_without_tax, signed_date, start_date, end_date, payment_method, settlement_method, warranty_rate, warranty_amount, contract_status, approval_status)
+VALUES (30003, 0, 10001, 20003, 'CT-2026-003', '工程造价咨询服务合同', 'SERVICE', 1200000.00, 1200000.00, 6.00, 67924.53, 1132075.47, '2026-03-25', '2026-04-01', '2028-06-30', '分阶段付款', '一次性结算', 0.00, 0.00, 'DRAFT', 'DRAFT');
 
 -- ====== Workflow Test Data ======
 

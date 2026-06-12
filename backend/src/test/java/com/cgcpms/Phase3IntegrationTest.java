@@ -468,6 +468,12 @@ class Phase3IntegrationTest {
     @Transactional
     @DisplayName("场景5: 预警触发 → 执行评估→验证alert_log有记录")
     void test05_alertTrigger() {
+        // 0. 设置触发条件：将合同结束日期改为15天后（触发 CONTRACT_EXPIRING 预警）
+        CtContract contract = contractMapper.selectById(CONTRACT_ID);
+        LocalDate originalEndDate = contract.getEndDate();
+        contract.setEndDate(LocalDate.now().plusDays(15));
+        contractMapper.updateById(contract);
+
         // 1. 查询评估前预警数量
         long beforeCount = alertLogMapper.selectCount(
                 new LambdaQueryWrapper<AlertLog>().eq(AlertLog::getProjectId, PROJECT_ID));
@@ -482,17 +488,22 @@ class Phase3IntegrationTest {
                         .eq(AlertLog::getProjectId, PROJECT_ID)
                         .orderByDesc(AlertLog::getTriggeredAt));
 
-        // ★核心断言：评估后应有预警记录（至少触发合同即将到期等低优先级预警）
+        // ★核心断言：评估后应有预警记录（触发了合同即将到期预警 CONTRACT_EXPIRING）
         assertFalse(alerts.isEmpty(), "预警评估应生成至少一条alert_log记录");
 
         // 4. 验证预警字段完整性
+        boolean hasExpiringAlert = false;
         for (AlertLog alert : alerts) {
             assertNotNull(alert.getRuleType(), "预警规则类型不应为空");
             assertNotNull(alert.getSeverity(), "预警严重程度不应为空");
             assertNotNull(alert.getMessage(), "预警消息不应为空");
             assertNotNull(alert.getTriggeredAt(), "触发时间不应为空");
             assertEquals(0, alert.getIsRead(), "初始isRead应为0（未读）");
+            if ("CONTRACT_EXPIRING".equals(alert.getRuleType())) {
+                hasExpiringAlert = true;
+            }
         }
+        assertTrue(hasExpiringAlert, "应包含CONTRACT_EXPIRING预警");
 
         long afterCount = alertLogMapper.selectCount(
                 new LambdaQueryWrapper<AlertLog>().eq(AlertLog::getProjectId, PROJECT_ID));
