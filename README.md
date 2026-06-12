@@ -53,8 +53,8 @@ cgc-pms/
 │           ├── org/          #   组织架构 (公司/部门/岗位)
 │           └── alert/        #   预警列表 + 批量评估
 ├── mobile/               # uni-app 移动端（预留）
-├── database/             # Flyway 迁移脚本 (V1~V40)
-├── deploy/               # Docker Compose (MySQL + Redis + MinIO) + .env.example
+├── database/             # Flyway 迁移脚本 (V1~V41)
+├── deploy/               # Docker Compose (MySQL + Redis + MinIO) + .env.example + docker-compose.prod.yml
 ├── doc/                  # 开发文档 + Backlog + 测试报告 + 审计修复报告
 ├── scripts/              # 辅助脚本
 └── README.md
@@ -192,7 +192,7 @@ pnpm dev
 ✅ 前端：登录页 / 首页 / 合同台账 / 合同新建 / 合同详情 / 项目列表 / 合作方列表 / 待办列表 / 审批详情
 ✅ 前端：API 错误不再静默回退 Mock 数据，统一弹窗提示
 ✅ 前端：401 响应自动静默刷新 token（request.ts 拦截器）
-✅ Flyway 数据库迁移 (V1~V40：系统表/业务表/审批表/字典/演示数据/文件表/排序索引/成本归集/目标成本/变更/结算/驾驶舱/预警/组织架构/库存/发票/消息/抄送/权限补全)
+✅ Flyway 数据库迁移 (V1~V41：系统表/业务表/审批表/字典/演示数据/文件表/排序索引/成本归集/目标成本/变更/结算/驾驶舱/预警/组织架构/库存/发票/消息/抄送/权限补全)
 ✅ 集成测试 11 用例全部通过 (H2 + MySQL 双环境)
 ✅ CORS 配置支持多环境（dev/test/local/prod 各自配置 allowed-origins）
 ✅ OperationLog 切面敏感字段脱敏（password/token/secret 自动替换为 ***）
@@ -263,7 +263,21 @@ pnpm dev
     ├── H2 schema Flyway 自动生成 (V1~V40 migration-h2, 消除手工维护漂移)
     ├── 通知 bizId 语义统一 (TRANSFER/ADD_SIGN 改为 instance ID)
     └── 测试数据隔离强化 (BID_FIRST/LAST 常量 + cleanup 文档化)
-```
+✅ P0 修复 (2026-06-13)
+    ├── P0-01: 重复结算 guard 缺失修复（StlSettlementService.create() 添加 contractId 唯一性校验）
+    ├── P0-02: SUPER_ADMIN vs ADMIN 角色匹配修复（207 处 @PreAuthorize hasRole→hasAnyRole + UserContext.hasAnyRole）
+    ├── P0-03: 权限码对齐 V41 迁移（13 个缺失 query/view 权限码，MySQL + H2 双版本）
+    └── 全量测试 174/174 通过（H2 + MySQL 双环境）
+✅ 验收收口 (2026-06-13)
+    ├── 6 条业务闭环 + 合同变更 + 审批异常路径全量验收（83 场景，77.1% 通过率）
+    ├── 权限矩阵 / 多租户 / 安全基线验收通过
+    ├── E2E Playwright 测试（9 specs, 36 tests, 12 业务模块覆盖）
+    ├── 性能基线 + 并发一致性测试
+    ├── 生产 Docker 化（backend + frontend Dockerfiles, Nginx HTTPS, docker-compose.prod.yml）
+    ├── CI/CD Pipeline（.github/workflows/ci.yml, 3 jobs）
+    ├── 备份恢复方案 + 监控告警清单
+    ├── 部署与回滚手册 + 二期 Backlog（移动端 + 财务/设备/劳务/BI/审计）
+    └── 上线就绪检查清单（20 条门禁：16 通过 / 4 有条件通过）
 
 ## 合同中心 API
 
@@ -372,7 +386,7 @@ pnpm dev
 - 分支模型：`main` / `develop` / `feature/*` / `hotfix/*`
 - 提交信息：`feat:` / `fix:` / `docs:` / `refactor:` / `test:` / `chore:`
 - 代码规范：ESLint + Prettier (前端)
-- 后端遵循 `SysUserController` → `SysUserService` 分层模式，权限使用 `@PreAuthorize("hasRole('ADMIN') or hasAuthority('xxx:action')")` 声明式鉴权
+- 后端遵循 `SysUserController` → `SysUserService` 分层模式，权限使用 `@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('xxx:action')")` 声明式鉴权
 - 多租户数据隔离：Service 层 LambdaQueryWrapper 统一追加 `.eq(Entity::getTenantId, UserContext.getCurrentTenantId())`，单条操作 `selectById` 后校验 `tenantId` 一致性
 - 敏感配置使用 `${ENV_VAR:default}` 形式（环境变量优先），切勿将密钥硬编码提交
 - 迁移数据使用 `INSERT IGNORE INTO` 确保幂等，新表索引在专用 V8+ 迁移中添加
@@ -380,7 +394,7 @@ pnpm dev
 
 ## 已知暂缓问题
 
-（无 — 此前 2 个 H2 暂缓用例已于 2026-06-12 修复，全量 162/162 通过）
+3 项 P0 问题已于 2026-06-13 修复（重复结算 guard / 角色匹配 / 权限码对齐），全量 174/174 测试通过。上线建议：🟡 有条件上线（详见 `doc/上线就绪检查清单_2026-06-13.md`）。
 
 ## 文档
 
@@ -400,3 +414,17 @@ pnpm dev
 | P3 中期改进实施方案 | `doc/P3中期改进实施方案_2026-06-12.md` |
 | H2 暂缓问题分析报告 | `doc/WorkflowEngineIntegrationTest_H2暂缓问题分析报告_2026-06-12.md` |
 | 开发文档 | `doc/开发文档_v2.3/` |
+| 验收复验报告 | `doc/验收复验报告_2026-06-12.md` |
+| 业务验收签字表 | `doc/业务验收签字表_2026-06-13.md` |
+| 验收总结报告 | `doc/验收总结报告_2026-06-13.md` |
+| E2E 测试报告 | `doc/E2E测试报告_2026-06-13.md` |
+| 权限矩阵验收表 | `doc/权限矩阵验收表_2026-06-12.md` |
+| 多租户数据隔离验收报告 | `doc/多租户数据隔离验收报告_2026-06-12.md` |
+| 安全基线复核清单 | `doc/安全基线复核清单_2026-06-12.md` |
+| 性能基线报告 | `doc/性能基线报告_2026-06-13.md` |
+| 并发一致性测试报告 | `doc/并发一致性测试报告_2026-06-13.md` |
+| 部署与回滚手册 | `doc/部署与回滚手册_2026-06-13.md` |
+| 备份恢复方案 | `doc/备份恢复方案_2026-06-13.md` |
+| 监控告警清单 | `doc/监控告警清单_2026-06-13.md` |
+| 二期 Backlog 与范围说明 | `doc/二期Backlog与范围说明_2026-06-13.md` |
+| 上线就绪检查清单 | `doc/上线就绪检查清单_2026-06-13.md` |

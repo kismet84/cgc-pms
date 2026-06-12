@@ -3,12 +3,14 @@
   "started_at": "2026-06-12T14:29:37.975Z",
   "session_ids": [
     "ses_1441a4988ffekrXu3m1CCttQwT",
-    "ses_1436ddffeffe4FLqPbkMU9WRvx"
+    "ses_1436ddffeffe4FLqPbkMU9WRvx",
+    "ses_142eefea8ffeFq3Y5YXl2x5P8h"
   ],
   "plan_name": "phase-closure-execution",
   "worktree_path": null,
   "session_origins": {
-    "ses_1441a4988ffekrXu3m1CCttQwT": "direct"
+    "ses_1441a4988ffekrXu3m1CCttQwT": "direct",
+    "ses_142eefea8ffeFq3Y5YXl2x5P8h": "direct"
   },
   "task_sessions": {
     "todo:1": {
@@ -64,6 +66,68 @@
       "agent": "Sisyphus-Junior",
       "category": "visual-engineering",
       "updated_at": "2026-06-12T16:28:12.668Z"
+    },
+    "todo:21": {
+      "task_key": "todo:21",
+      "task_label": "21",
+      "task_title": "**业务方验收签字协调**",
+      "session_id": "ses_142eaf796ffeRaesj4AmraOIcm",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-06-12T18:27:49.167Z"
+    },
+    "todo:22": {
+      "task_key": "todo:22",
+      "task_label": "22",
+      "task_title": "**验收报告汇总**",
+      "session_id": "ses_142e87255ffeX52FH4vq6IDyeN",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-06-12T18:30:56.477Z"
+    },
+    "todo:23": {
+      "task_key": "todo:23",
+      "task_label": "23",
+      "task_title": "**后端 Dockerfile + 镜像构建**",
+      "session_id": "ses_142e5a581ffeldMFcckEHykChu",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-12T18:33:35.980Z"
+    },
+    "todo:25": {
+      "task_key": "todo:25",
+      "task_label": "25",
+      "task_title": "**集成生产 docker-compose.yml**",
+      "session_id": "ses_142ca5337ffed7j4VwFHM3ivRN",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-12T19:02:49.224Z"
+    },
+    "todo:30": {
+      "task_key": "todo:30",
+      "task_label": "30",
+      "task_title": "**部署与回滚手册**",
+      "session_id": "ses_142c8a5b2ffeEmN2VzhiWXDQHW",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-06-12T19:05:36.655Z"
+    },
+    "todo:33": {
+      "task_key": "todo:33",
+      "task_label": "33",
+      "task_title": "**上线就绪检查清单**",
+      "session_id": "ses_142c29612ffemU2bqrLs71ZoYk",
+      "agent": "Sisyphus-Junior",
+      "category": "writing",
+      "updated_at": "2026-06-12T19:12:07.139Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_142c025caffePAlbFOVCYmIylT",
+      "agent": "oracle",
+      "updated_at": "2026-06-12T19:13:46.295Z"
     }
   },
   "agent": "atlas"
