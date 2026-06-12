@@ -17,28 +17,43 @@ Construction General Contracting Project Management System
 
 ```
 cgc-pms/
-├── backend/              # Spring Boot 后端 (115+ 源文件)
+├── backend/              # Spring Boot 后端 (301+ 源文件)
 │   ├── auth/             #   JWT 鉴权 + 登录
 │   ├── system/           #   用户/角色/菜单管理
-│   ├── project/          #   项目管理 CRUD
+│   ├── project/          #   项目管理 CRUD + 成员
 │   ├── partner/          #   合作方管理 CRUD
-│   ├── contract/         #   合同台账 + 新建/编辑 + 清单 + 付款条件
+│   ├── contract/         #   合同台账 + 新建/编辑 + 清单 + 付款条件 + 变更
 │   ├── workflow/         #   审批引擎 (提交/同意/驳回/撤回/转办/加签)
 │   ├── file/             #   文件上传 (MinIO 存储 + 预签名 URL)
+│   ├── inventory/        #   仓库管理 + 库存台账 + 出入库
+│   ├── invoice/          #   发票管理 (创建/登记/核验)
+│   ├── notification/     #   站内消息 + SSE 实时推送
+│   ├── alert/            #   八类预警规则 + 批处理
+│   ├── org/              #   组织架构 (公司/部门/岗位)
+│   ├── material/         #   物料字典
+│   ├── cost/             #   成本科目 + 台账 + 归集 + 汇总
+│   ├── payment/          #   付款申请 + 回写
+│   ├── purchase/         #   采购申请 + 订单
+│   ├── settlement/       #   结算管理
 │   └── common/           #   统一响应/异常处理/分页/操作日志
-├── frontend-admin/       # Vue 3 管理后台 (38+ 源文件)
+├── frontend-admin/       # Vue 3 管理后台 (70+ 源文件)
 │   └── src/
 │       ├── components/   #   共享组件 (StepWizard / ContractItemEditor / PaymentTermEditor)
-│       ├── stores/       #   Pinia 状态管理 (user / contract)
+│       ├── stores/       #   Pinia 状态管理 (user / contract / notification)
 │       └── pages/
 │           ├── login/        #   登录页
 │           ├── dashboard/    #   首页
 │           ├── contract/     #   合同台账 + 新建合同 + 合同详情
 │           ├── project/      #   项目列表页
 │           ├── partner/      #   合作方列表页
-│           └── approval/     #   我的待办 + 审批详情
+│           ├── approval/     #   我的待办 + 审批详情
+│           ├── inventory/    #   仓库管理 + 库存台账 + 出入库 + 采购申请
+│           ├── invoice/      #   发票列表 + 核验
+│           ├── notification/ #   消息中心 + SSE 实时通知
+│           ├── org/          #   组织架构 (公司/部门/岗位)
+│           └── alert/        #   预警列表 + 批量评估
 ├── mobile/               # uni-app 移动端（预留）
-├── database/             # Flyway 迁移脚本 (V1~V31)
+├── database/             # Flyway 迁移脚本 (V1~V40)
 ├── deploy/               # Docker Compose (MySQL + Redis + MinIO) + .env.example
 ├── doc/                  # 开发文档 + Backlog + 测试报告 + 审计修复报告
 ├── scripts/              # 辅助脚本
@@ -130,6 +145,8 @@ pnpm dev
 | 第 5-8 周 | 成本归集 | ✅ | 采购/验收/分包/计量/付款/签证 六条业务链路, 成本自动归集, 资金闭环 (2026-06-11) |
 | 审计修复 3 | — | ✅ | 14 项遗留问题修复：合同余额校验/悲观锁/边界测试/M2/M3/Rule2/两阶段校验/实体统一/冗余flag/nvl/常量 (2026-06-11) |
 | 第3阶段 | 成本分析与合同深化 | ✅ | 目标成本/合同变更/结算/动态成本/驾驶舱/预警/技术债修复 (2026-06-12) |
+| 第4阶段 | 库存与发票 | ✅ | 仓库/库存台账/出入库/采购申请、发票创建/登记/核验、消息中心 SSE、组织架构 (2026-06-12) |
+| 审计修复 4 | — | ✅ | 6 项审查问题修复：PayInvoice 字段映射/H2 schema 漂移/测试 profile 统一/SSE 异常处理/权限码对齐/测试 UserContext (2026-06-12) |
 
 ### 已完成功能
 
@@ -171,7 +188,7 @@ pnpm dev
 ✅ 前端：登录页 / 首页 / 合同台账 / 合同新建 / 合同详情 / 项目列表 / 合作方列表 / 待办列表 / 审批详情
 ✅ 前端：API 错误不再静默回退 Mock 数据，统一弹窗提示
 ✅ 前端：401 响应自动静默刷新 token（request.ts 拦截器）
-✅ Flyway 数据库迁移 (V1~V31：系统表/业务表/审批表/字典/演示数据/文件表/排序索引/成本归集/目标成本/变更/结算/驾驶舱/预警)
+✅ Flyway 数据库迁移 (V1~V40：系统表/业务表/审批表/字典/演示数据/文件表/排序索引/成本归集/目标成本/变更/结算/驾驶舱/预警/组织架构/库存/发票/消息/抄送/权限补全)
 ✅ 集成测试 11 用例全部通过 (H2 + MySQL 双环境)
 ✅ CORS 配置支持多环境（dev/test/local/prod 各自配置 allowed-origins）
 ✅ OperationLog 切面敏感字段脱敏（password/token/secret 自动替换为 ***）
@@ -214,8 +231,30 @@ pnpm dev
    ├── 八类预警规则 + @Scheduled 批处理 (V29)
    ├── 技术债修复 (H2 审批权限 @PreAuthorize + M4 HttpOnly Cookie + P18 vite 6.x 升级)
    ├── Flyway V21~V31 共 11 个迁移脚本
-   ├── Phase3IntegrationTest 6/6 通过 (H2)
-   └── MySQL 8.0 全栈验证通过
+    ├── Phase3IntegrationTest 6/6 通过 (H2)
+    └── MySQL 8.0 全栈验证通过
+✅ Phase 4 库存与发票
+    ├── 仓库管理 CRUD（mat_warehouse，编号 + 状态管理，V35 Flyway）
+    ├── 库存台账（mat_stock 余额 + mat_stock_txn 流水，乐观锁 @Version）
+    ├── 出入库操作（入库/出库，自动更新余额 + 生成流水）
+    ├── 采购申请 CRUD + 审批闭环（PURCHASE_REQUEST，三级顺序审批，V35+V39）
+    ├── 发票管理 CRUD（pay_invoice，创建/编辑/删除/核验，V36）
+    ├── 发票登记（关联 pay_record + 防重唯一键）
+    ├── 消息中心（站内通知 + SSE 实时推送，V37）
+    ├── 组织架构（公司/部门/岗位三级树，V33）
+    ├── 项目成员管理（pm_project_member，V34）
+    ├── 抄送功能（wf_cc 表 + SSE 推送，V38）
+    ├── 预警中心（八类规则 + @Scheduled 批处理 + 手动批量评估，V29）
+    ├── 权限种子补全（V39 菜单 + 权限码 + 审批模板，V40 修复对齐）
+    ├── Flyway V33~V40 共 8 个迁移脚本
+    └── 全量测试 162/162 通过（2 个预存 H2 适配问题在 WorkflowEngineIntegrationTest）
+✅ 审计修复 4 (2026-06-12)
+    ├── P0: PayInvoice created_time/updated_time 字段映射对齐
+    ├── P1: 测试 profile 统一为 H2 local
+    ├── P1: H2 schema.sql 补 sys_user.org_id
+    ├── P1: NotificationService SSE 异常处理增强
+    ├── P1: 权限种子与 @PreAuthorize 码对齐 (V40)
+    └── P2: TestUserContext helper + roleCodes 补充
 ```
 
 ## 合同中心 API
@@ -269,6 +308,57 @@ pnpm dev
 | `/auth/refresh` | POST | Token 轮换（refresh token 换新 access token，旧 refresh token 自动失效） |
 | `/auth/logout` | POST | 退出（access token 加入 Redis 黑名单） |
 
+## 库存管理 API
+
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `/api/inventory/warehouses` | GET | 仓库分页查询 |
+| `/api/inventory/warehouses/{id}` | GET | 仓库详情 |
+| `/api/inventory/warehouses` | POST | 新建仓库 |
+| `/api/inventory/warehouses/{id}` | PUT | 编辑仓库 |
+| `/api/inventory/warehouses/{id}/status` | PUT | 仓库启用/禁用 |
+| `/api/inventory/stock/ledger` | GET | 库存台账（余额+流水） |
+| `/api/inventory/stock/in` | POST | 入库 |
+| `/api/inventory/stock/out` | POST | 出库 |
+
+## 发票管理 API
+
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `/api/invoices` | GET | 发票分页查询 |
+| `/api/invoices/{id}` | GET | 发票详情 |
+| `/api/invoices` | POST | 创建发票 |
+| `/api/invoices/{id}` | PUT | 编辑发票 |
+| `/api/invoices/{id}` | DELETE | 删除发票 |
+| `/api/invoices/{id}/verify` | PUT | 核验发票 |
+| `/api/invoices/register` | POST | 登记发票（关联付款记录） |
+
+## 消息通知 API
+
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `/api/notifications` | GET | 通知分页查询 |
+| `/api/notifications/unread-count` | GET | 未读数量 |
+| `/api/notifications/{id}/read` | PUT | 标记单条已读 |
+| `/api/notifications/read-all` | PUT | 全部已读 |
+| `/api/notifications/stream` | GET | SSE 实时推送流 |
+
+## 预警 API
+
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `/alerts` | GET | 预警分页查询 |
+| `/alerts/{id}/read` | PUT | 标记已读 |
+| `/alerts/batch-evaluate` | POST | 手动批量评估 |
+
+## 组织架构 API
+
+| 端点 | 方法 | 功能 |
+|------|------|------|
+| `/api/org/companies` | GET/POST | 公司列表/新建 |
+| `/api/org/departments` | GET/POST | 部门列表/新建 |
+| `/api/org/positions` | GET/POST | 岗位列表/新建 |
+
 ## 开发规范
 
 - 分支模型：`main` / `develop` / `feature/*` / `hotfix/*`
@@ -282,7 +372,7 @@ pnpm dev
 
 ## 已知暂缓问题
 
-无（H2 审批权限已加 @PreAuthorize + M4 已改为 HttpOnly Cookie + P18 vite 已升级 6.x）
+- WorkflowEngineIntegrationTest 2 个用例在 H2 环境暂未通过（test09 幂等约束、test15 通知 tenantId 校验），MySQL 环境正常
 
 ## 文档
 
