@@ -38,7 +38,7 @@ cgc-pms/
 │           ├── partner/      #   合作方列表页
 │           └── approval/     #   我的待办 + 审批详情
 ├── mobile/               # uni-app 移动端（预留）
-├── database/             # Flyway 迁移脚本 (V1~V8)
+├── database/             # Flyway 迁移脚本 (V1~V31)
 ├── deploy/               # Docker Compose (MySQL + Redis + MinIO) + .env.example
 ├── doc/                  # 开发文档 + Backlog + 测试报告 + 审计修复报告
 ├── scripts/              # 辅助脚本
@@ -129,6 +129,7 @@ pnpm dev
 | 安全加固 2 | — | ✅ | 多租户数据隔离、子资源归属校验、文件 IDOR 修复、N+1 优化、前端缺陷修复 (2026-06-11) |
 | 第 5-8 周 | 成本归集 | ✅ | 采购/验收/分包/计量/付款/签证 六条业务链路, 成本自动归集, 资金闭环 (2026-06-11) |
 | 审计修复 3 | — | ✅ | 14 项遗留问题修复：合同余额校验/悲观锁/边界测试/M2/M3/Rule2/两阶段校验/实体统一/冗余flag/nvl/常量 (2026-06-11) |
+| 第3阶段 | 成本分析与合同深化 | ✅ | 目标成本/合同变更/结算/动态成本/驾驶舱/预警/技术债修复 (2026-06-12) |
 
 ### 已完成功能
 
@@ -170,7 +171,7 @@ pnpm dev
 ✅ 前端：登录页 / 首页 / 合同台账 / 合同新建 / 合同详情 / 项目列表 / 合作方列表 / 待办列表 / 审批详情
 ✅ 前端：API 错误不再静默回退 Mock 数据，统一弹窗提示
 ✅ 前端：401 响应自动静默刷新 token（request.ts 拦截器）
-✅ Flyway 数据库迁移 (V1~V8：系统表/业务表/审批表/字典/演示数据/文件表/排序索引)
+✅ Flyway 数据库迁移 (V1~V31：系统表/业务表/审批表/字典/演示数据/文件表/排序索引/成本归集/目标成本/变更/结算/驾驶舱/预警)
 ✅ 集成测试 11 用例全部通过 (H2 + MySQL 双环境)
 ✅ CORS 配置支持多环境（dev/test/local/prod 各自配置 allowed-origins）
 ✅ OperationLog 切面敏感字段脱敏（password/token/secret 自动替换为 ***）
@@ -204,6 +205,17 @@ pnpm dev
    ├── 架构清理 (双实体统一, 冗余flag移除, CtContract.costGeneratedFlag)
    ├── 代码规范 (nvl() 提取公共工具, businessType 常量统一)
    └── V20 Flyway 迁移 (ct_contract.cost_generated_flag)
+✅ Phase 3 成本分析与合同深化
+   ├── 目标成本管理 (cost_target 多版本 + 审批闭环, Flyway V21~V22)
+   ├── 合同变更 CT_CHANGE (更新 currentAmount + 成本联动 + 审批闭环, V23~V24)
+   ├── 结算管理 (总包/分包/采购结算, 纯只读汇总 + 不可变锁定, V25~V26)
+   ├── 动态成本公式修正 + 利润测算 + backfill 接口 (V27)
+   ├── 五角色经营驾驶舱 (ECharts 图表下钻, V28)
+   ├── 八类预警规则 + @Scheduled 批处理 (V29)
+   ├── 技术债修复 (H2 审批权限 @PreAuthorize + M4 HttpOnly Cookie + P18 vite 6.x 升级)
+   ├── Flyway V21~V31 共 11 个迁移脚本
+   ├── Phase3IntegrationTest 6/6 通过 (H2)
+   └── MySQL 8.0 全栈验证通过
 ```
 
 ## 合同中心 API
@@ -270,10 +282,7 @@ pnpm dev
 
 ## 已知暂缓问题
 
-| # | 严重度 | 问题 | 暂缓原因 |
-|---|--------|------|----------|
-| H2 | High | `/workflow/submit` 仅需 `isAuthenticated()`，任意认证用户可提交任意业务类型审批 | 需业务方明确审批提交权限规则后统一设计 |
-| M4 | Medium | Access token 存 `localStorage`，refresh token 存 `sessionStorage`，均 JS 可读 | 改为 HttpOnly Cookie 需前后端联动 + CSRF 方案 + 移动端兼容评估 |
+无（H2 审批权限已加 @PreAuthorize + M4 已改为 HttpOnly Cookie + P18 vite 已升级 6.x）
 
 ## 文档
 
@@ -286,4 +295,5 @@ pnpm dev
 | 第4周开发计划_合同审批闭环 | `doc/第4周开发计划_合同审批闭环.md` |
 | 第2阶段开发计划_成本归集与资金闭环 | `doc/第2阶段开发计划_成本归集与资金闭环.md` |
 | 第2阶段成本归集与资金闭环测试报告 | `doc/第2阶段成本归集与资金闭环测试报告.md` |
+| 第3阶段成本分析与合同深化测试报告 | `doc/第3阶段成本分析与合同深化测试报告.md` |
 | 开发文档 | `doc/开发文档_v2.3/` |
