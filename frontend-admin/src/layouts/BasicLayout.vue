@@ -2,8 +2,9 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { BellOutlined, QuestionCircleOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
+import { QuestionCircleOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
 import SidebarMenu from './components/SidebarMenu.vue'
+import NotificationBell from '@/components/NotificationBell.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -36,10 +37,8 @@ function handleLogout() {
         <MenuFoldOutlined class="hamburger" @click="collapsed = !collapsed" />
         <div class="flex-1"></div>
         <div class="top-actions">
+          <NotificationBell />
           <QuestionCircleOutlined style="font-size: 18px; cursor: pointer" />
-          <a-badge :count="8" :offset="[-5, 5]">
-            <BellOutlined style="font-size: 18px; cursor: pointer" />
-          </a-badge>
           <a-dropdown>
             <div class="user-info">
               <a-avatar

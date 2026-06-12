@@ -49,6 +49,22 @@ export interface WfRecordVO {
   comment?: string
   recordStatus: string
   createdAt: string
+  businessType?: string
+  title?: string
+  instanceStatus?: string
+}
+
+export interface WfCcVO {
+  id: string
+  instanceId: string
+  ccUserId: string
+  ccUserName: string
+  businessType: string
+  businessId?: string
+  title: string
+  isRead: number
+  createdTime: string
+  instanceStatus?: string
 }
 
 export interface WfInstanceVO {
@@ -166,5 +182,23 @@ export function addSignTask(taskId: string, additionalUserIds: string[], comment
     url: `/workflow/tasks/${taskId}/add-sign`,
     method: 'post',
     data: { additionalUserIds, comment },
+  })
+}
+
+/** 我的已办列表 */
+export function getMyDone(params: PageParams) {
+  return request<PageResult<WfRecordVO>>({
+    url: '/workflow/tasks/done',
+    method: 'get',
+    params,
+  })
+}
+
+/** 抄送我的列表 */
+export function getMyCc(params: PageParams) {
+  return request<PageResult<WfCcVO>>({
+    url: '/workflow/tasks/cc',
+    method: 'get',
+    params,
   })
 }

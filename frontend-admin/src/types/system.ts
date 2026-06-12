@@ -4,7 +4,8 @@ export interface SysUserVO {
   realName: string
   email: string
   phone: string
-  orgId: string
+  /** @see V34 — org_id on sys_user, nullable */
+  orgId?: number | null
   status: string
   createdAt: string
 }

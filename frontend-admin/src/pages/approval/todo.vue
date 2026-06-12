@@ -1,18 +1,29 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { getMyTodos, type WfTaskVO } from '@/api/modules/workflow'
+import {
+  getMyTodos,
+  getMyDone,
+  getMyCc,
+  type WfTaskVO,
+  type WfRecordVO,
+  type WfCcVO,
+} from '@/api/modules/workflow'
 import type { PageResult } from '@/types/api'
 
 const router = useRouter()
 
+const activeTab = ref('todo')
+
 const loading = ref(false)
-const tableData = ref<WfTaskVO[]>([])
-const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const total = ref(0)
 
+const todoData = ref<WfTaskVO[]>([])
+const doneData = ref<WfRecordVO[]>([])
+const ccData = ref<WfCcVO[]>([])
 
 const businessTypeMap: Record<string, string> = {
   CONTRACT_APPROVAL: '合同审批',
@@ -24,27 +35,33 @@ const businessTypeMap: Record<string, string> = {
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<WfTaskVO> = await getMyTodos({
-      pageNum: pageNo.value,
-      pageSize: pageSize.value,
-    })
-    tableData.value = res.records
-    total.value = res.total
+    const params = { pageNum: pageNo.value, pageSize: pageSize.value }
+
+    if (activeTab.value === 'todo') {
+      const res: PageResult<WfTaskVO> = await getMyTodos(params)
+      todoData.value = res.records
+      total.value = res.total
+    } else if (activeTab.value === 'done') {
+      const res: PageResult<WfRecordVO> = await getMyDone(params)
+      doneData.value = res.records
+      total.value = res.total
+    } else {
+      const res: PageResult<WfCcVO> = await getMyCc(params)
+      ccData.value = res.records
+      total.value = res.total
+    }
   } catch {
-    tableData.value = []
+    if (activeTab.value === 'todo') todoData.value = []
+    else if (activeTab.value === 'done') doneData.value = []
+    else ccData.value = []
     total.value = 0
-    message.error('加载待办列表失败，请稍后重试')
+    message.error('加载列表失败，请稍后重试')
   } finally {
     loading.value = false
   }
 }
 
-function handleSearch() {
-  pageNo.value = 1
-  fetchData()
-}
-
-function handleReset() {
+function handleTabChange(_key: string) {
   pageNo.value = 1
   fetchData()
 }
@@ -55,18 +72,50 @@ function handlePageChange(pno: number, psize: number) {
   fetchData()
 }
 
-function handleDetail(task: WfTaskVO) {
-  router.push(`/approval/${task.instanceId}`)
+function handleDetail(record: { instanceId: string }) {
+  router.push(`/approval/${record.instanceId}`)
 }
 
 const columns = [
   { title: '审批标题', dataIndex: 'title', key: 'title', ellipsis: true },
   { title: '业务类型', dataIndex: 'businessType', key: 'businessType', width: 120 },
-  { title: '接收时间', dataIndex: 'receivedAt', key: 'receivedAt', width: 160 },
-  { title: '当前轮次', dataIndex: 'roundNo', key: 'roundNo', width: 80 },
+  { title: '时间', dataIndex: 'timeCol', key: 'timeCol', width: 160 },
   { title: '状态', dataIndex: 'instanceStatus', key: 'instanceStatus', width: 100 },
   { title: '操作', key: 'action', width: 120 },
 ]
+
+const tabs = [
+  { key: 'todo', label: '我的待办' },
+  { key: 'done', label: '我的已办' },
+  { key: 'cc', label: '抄送我' },
+]
+
+const tableData = computed<Record<string, unknown>[]>(() => {
+  if (activeTab.value === 'todo') return todoData.value as unknown as Record<string, unknown>[]
+  if (activeTab.value === 'done') return doneData.value as unknown as Record<string, unknown>[]
+  return ccData.value as unknown as Record<string, unknown>[]
+})
+
+function getTimeCol(record: Record<string, unknown>): string {
+  if (activeTab.value === 'todo') return (record.receivedAt as string) ?? ''
+  if (activeTab.value === 'done') return (record.createdAt as string) ?? ''
+  return (record.createdTime as string) ?? ''
+}
+
+function getActionLabel(): string {
+  return activeTab.value === 'todo' ? '处理' : '查看'
+}
+
+function pageHeaderTitle(): string {
+  const t = tabs.find((t) => t.key === activeTab.value)
+  return t?.label ?? '我的待办'
+}
+
+function pageHeaderSubtitle(): string {
+  if (activeTab.value === 'todo') return '处理需要您审批的业务单据'
+  if (activeTab.value === 'done') return '查看您已处理的审批记录'
+  return '查看抄送给您的业务单据'
+}
 
 onMounted(() => {
   fetchData()
@@ -75,7 +124,11 @@ onMounted(() => {
 
 <template>
   <div class="wf-todo-page">
-    <a-page-header title="我的待办" sub-title="处理需要您审批的业务单据" />
+    <a-page-header :title="pageHeaderTitle()" :sub-title="pageHeaderSubtitle()" />
+
+    <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
+      <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label" />
+    </a-tabs>
 
     <div class="wf-card">
       <a-table
@@ -94,10 +147,15 @@ onMounted(() => {
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'title'">
-            <a @click="handleDetail(record)">{{ record.title }}</a>
+            <a @click="handleDetail(record as { instanceId: string })">{{ record.title }}</a>
           </template>
           <template v-else-if="column.key === 'businessType'">
-            <a-tag>{{ businessTypeMap[record.businessType] || record.businessType }}</a-tag>
+            <a-tag>{{
+              businessTypeMap[record.businessType as string] || (record.businessType as string) || '—'
+            }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'timeCol'">
+            {{ getTimeCol(record) }}
           </template>
           <template v-else-if="column.key === 'instanceStatus'">
             <a-tag v-if="record.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>
@@ -106,7 +164,9 @@ onMounted(() => {
             <a-tag v-else>{{ record.instanceStatus }}</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="handleDetail(record)">处理</a-button>
+            <a-button type="link" size="small" @click="handleDetail(record as { instanceId: string })">
+              {{ getActionLabel() }}
+            </a-button>
           </template>
         </template>
       </a-table>

@@ -1,0 +1,168 @@
+import { request } from '@/api/request'
+import type { PageResult } from '@/types/api'
+import type {
+  WarehouseVO,
+  MatStockTxnVO,
+  StockLedgerVO,
+  PurchaseRequestVO,
+  PurchaseRequestItemVO,
+  WarehouseQuery,
+  StockTransactionParams,
+  StockLedgerQuery,
+  PurchaseRequestQuery,
+} from '@/types/inventory'
+
+// ── 仓库 CRUD ──
+
+/** 仓库分页列表 */
+export function getWarehouseList(params: WarehouseQuery) {
+  return request<PageResult<WarehouseVO>>({
+    url: '/inventory/warehouses',
+    method: 'get',
+    params,
+  })
+}
+
+/** 仓库详情 */
+export function getWarehouseDetail(id: string) {
+  return request<WarehouseVO>({
+    url: `/inventory/warehouses/${id}`,
+    method: 'get',
+  })
+}
+
+/** 新建仓库 */
+export function createWarehouse(data: Partial<WarehouseVO>) {
+  return request<string>({
+    url: '/inventory/warehouses',
+    method: 'post',
+    data,
+  })
+}
+
+/** 更新仓库 */
+export function updateWarehouse(id: string, data: Partial<WarehouseVO>) {
+  return request<void>({
+    url: `/inventory/warehouses/${id}`,
+    method: 'put',
+    data,
+  })
+}
+
+/** 更新仓库状态 */
+export function updateWarehouseStatus(id: string, status: string) {
+  return request<void>({
+    url: `/inventory/warehouses/${id}/status`,
+    method: 'put',
+    params: { status },
+  })
+}
+
+/** 删除仓库 */
+export function deleteWarehouse(id: string) {
+  return request<void>({
+    url: `/inventory/warehouses/${id}`,
+    method: 'delete',
+  })
+}
+
+// ── 出入库操作 ──
+
+/** 入库 */
+export function stockIn(params: StockTransactionParams) {
+  return request<void>({
+    url: '/inventory/stock/in',
+    method: 'post',
+    data: params,
+  })
+}
+
+/** 出库 */
+export function stockOut(params: StockTransactionParams) {
+  return request<void>({
+    url: '/inventory/stock/out',
+    method: 'post',
+    data: params,
+  })
+}
+
+// ── 库存台账 ──
+
+/** 库存台账（当前库存 + 分页流水） */
+export function getStockLedger(params: StockLedgerQuery) {
+  return request<StockLedgerVO>({
+    url: '/inventory/stock/ledger',
+    method: 'get',
+    params,
+  })
+}
+
+// ── 采购申请 ──
+
+/** 采购申请分页列表 */
+export function getPurchaseRequestList(params: PurchaseRequestQuery) {
+  return request<PageResult<PurchaseRequestVO>>({
+    url: '/purchase-requests',
+    method: 'get',
+    params,
+  })
+}
+
+/** 采购申请详情 */
+export function getPurchaseRequestDetail(id: string) {
+  return request<PurchaseRequestVO>({
+    url: `/purchase-requests/${id}`,
+    method: 'get',
+  })
+}
+
+/** 新建采购申请 */
+export function createPurchaseRequest(data: Partial<PurchaseRequestVO>) {
+  return request<string>({
+    url: '/purchase-requests',
+    method: 'post',
+    data,
+  })
+}
+
+/** 更新采购申请 */
+export function updatePurchaseRequest(id: string, data: Partial<PurchaseRequestVO>) {
+  return request<void>({
+    url: `/purchase-requests/${id}`,
+    method: 'put',
+    data,
+  })
+}
+
+/** 删除采购申请 */
+export function deletePurchaseRequest(id: string) {
+  return request<void>({
+    url: `/purchase-requests/${id}`,
+    method: 'delete',
+  })
+}
+
+/** 提交采购申请审批 */
+export function submitPurchaseRequest(id: string) {
+  return request<void>({
+    url: `/purchase-requests/${id}/submit`,
+    method: 'post',
+  })
+}
+
+/** 采购申请明细列表 */
+export function getPurchaseRequestItems(id: string) {
+  return request<PurchaseRequestItemVO[]>({
+    url: `/purchase-requests/${id}/items`,
+    method: 'get',
+  })
+}
+
+/** 批量保存采购申请明细 */
+export function savePurchaseRequestItems(id: string, items: PurchaseRequestItemVO[]) {
+  return request<void>({
+    url: `/purchase-requests/${id}/items/batch`,
+    method: 'post',
+    data: items,
+  })
+}

@@ -1,0 +1,73 @@
+import { request } from '@/api/request'
+import type { PageResult } from '@/types/api'
+import type { InvoiceVO, PayRecordBrief } from '@/types/invoice'
+
+/** 发票列表分页查询 */
+export function getInvoiceList(params: Record<string, unknown>) {
+  return request<PageResult<InvoiceVO>>({
+    url: '/invoices',
+    method: 'get',
+    params,
+  })
+}
+
+/** 发票详情 */
+export function getInvoiceDetail(id: string) {
+  return request<InvoiceVO>({
+    url: `/invoices/${id}`,
+    method: 'get',
+  })
+}
+
+/** 新建发票 */
+export function createInvoice(data: Partial<InvoiceVO>) {
+  return request<string>({
+    url: '/invoices',
+    method: 'post',
+    data,
+  })
+}
+
+/** 登记发票（关联付款记录） */
+export function registerInvoice(data: Partial<InvoiceVO>) {
+  return request<string>({
+    url: '/invoices/register',
+    method: 'post',
+    data,
+  })
+}
+
+/** 更新发票 */
+export function updateInvoice(id: string, data: Partial<InvoiceVO>) {
+  return request<void>({
+    url: `/invoices/${id}`,
+    method: 'put',
+    data,
+  })
+}
+
+/** 删除发票 */
+export function deleteInvoice(id: string) {
+  return request<void>({
+    url: `/invoices/${id}`,
+    method: 'delete',
+  })
+}
+
+/** 核验发票（状态切换：PENDING → VERIFIED / ABNORMAL） */
+export function verifyInvoice(id: string, verifyStatus: string) {
+  return request<void>({
+    url: `/invoices/${id}/verify`,
+    method: 'put',
+    data: { verifyStatus },
+  })
+}
+
+/** 付款记录列表（用于关联下拉） */
+export function getPayRecordList(params?: Record<string, unknown>) {
+  return request<PageResult<PayRecordBrief>>({
+    url: '/pay-records',
+    method: 'get',
+    params: { pageNo: 1, pageSize: 200, ...params },
+  })
+}

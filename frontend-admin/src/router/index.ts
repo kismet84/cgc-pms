@@ -141,14 +141,34 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'project',
         name: 'Project',
-        component: () => import('@/pages/project/index.vue'),
+        redirect: '/project/list',
         meta: { title: '项目管理', icon: 'ProjectOutlined' },
+        children: [
+          {
+            path: 'list',
+            name: 'ProjectList',
+            component: () => import('@/pages/project/index.vue'),
+            meta: { title: '项目列表' },
+          },
+          {
+            path: ':projectId/overview',
+            name: 'ProjectOverview',
+            component: () => import('@/pages/project/overview.vue'),
+            meta: { title: '项目总览', hidden: true },
+          },
+          {
+            path: ':projectId/members',
+            name: 'ProjectMembers',
+            component: () => import('@/pages/project/members.vue'),
+            meta: { title: '项目成员', hidden: true },
+          },
+        ],
       },
       {
-        path: 'partner',
-        name: 'Partner',
-        component: () => import('@/pages/partner/index.vue'),
-        meta: { title: '合作方管理', icon: 'TeamOutlined' },
+        path: 'org',
+        name: 'Org',
+        component: () => import('@/pages/org/index.vue'),
+        meta: { title: '组织架构', icon: 'ApartmentOutlined' },
       },
       {
         path: 'subcontract',
@@ -205,6 +225,44 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'inventory',
+        name: 'Inventory',
+        redirect: '/inventory/warehouse',
+        meta: { title: '库存管理', icon: 'InboxOutlined' },
+        children: [
+          {
+            path: 'warehouse',
+            name: 'InventoryWarehouse',
+            component: () => import('@/pages/inventory/warehouse.vue'),
+            meta: { title: '仓库管理' },
+          },
+          {
+            path: 'stock',
+            name: 'InventoryStock',
+            component: () => import('@/pages/inventory/stock.vue'),
+            meta: { title: '库存台账' },
+          },
+          {
+            path: 'transaction',
+            name: 'InventoryTransaction',
+            component: () => import('@/pages/inventory/transaction.vue'),
+            meta: { title: '出入库' },
+          },
+          {
+            path: 'purchase-request',
+            name: 'InventoryPurchaseRequest',
+            component: () => import('@/pages/inventory/purchase-request.vue'),
+            meta: { title: '采购申请' },
+          },
+        ],
+      },
+      {
+        path: 'invoice',
+        name: 'Invoice',
+        component: () => import('@/pages/invoice/index.vue'),
+        meta: { title: '发票管理', icon: 'FileTextOutlined' },
+      },
+      {
         path: 'material',
         name: 'Material',
         redirect: '/material/dictionary',
@@ -247,8 +305,16 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'system',
         name: 'System',
-        component: () => import('@/pages/dashboard/index.vue'),
+        redirect: '/system/dict',
         meta: { title: '系统设置', icon: 'SettingOutlined' },
+        children: [
+          {
+            path: 'dict',
+            name: 'SystemDict',
+            component: () => import('@/pages/system/dict/index.vue'),
+            meta: { title: '字典管理' },
+          },
+        ],
       },
     ],
   },
