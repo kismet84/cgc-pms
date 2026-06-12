@@ -78,6 +78,7 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
             cost.setContractId(varOrder.getContractId());
             cost.setPartnerId(varOrder.getPartnerId());
             cost.setCostType(COST_TYPE);
+            cost.setCostSubjectId(item.getCostSubjectId());
             cost.setAmount(nvl(item.getAmount()));
             cost.setSourceType(SOURCE_TYPE);
             cost.setSourceId(varOrderId);
