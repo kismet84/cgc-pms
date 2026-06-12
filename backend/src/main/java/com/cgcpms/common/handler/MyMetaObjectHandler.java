@@ -24,7 +24,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
             this.setFieldValByName("updatedBy", userId, metaObject);
         }
         Long tenantId = UserContext.getCurrentTenantId();
-        if (tenantId != null) {
+        if (tenantId != null && this.getFieldValByName("tenantId", metaObject) == null) {
             this.setFieldValByName("tenantId", tenantId, metaObject);
         }
     }
