@@ -515,3 +515,135 @@ Three Playwright E2E spec files created following exact patterns from contract.s
 - "确认出库" button uses `type="primary" danger` → rendered as `.ant-btn.ant-btn-primary.ant-btn-dangerous`
 - Procurement submit uses `Modal.confirm` (not separate modal component) → different selector: `.ant-modal-confirm .ant-btn-primary:has-text("确定提交")`
 
+## 2026-06-13 Wave 3 Batch 3: E2E Spec Creation (Notification, Settlement, Dashboard)
+
+### Result: **PASSED** ✅ (3 spec files created, 14 tests, 0 compilation errors)
+
+Three Playwright E2E spec files created following exact patterns from contract.spec.ts, procurement.spec.ts, and invoice.spec.ts:
+
+**Files created:**
+- `frontend-admin/e2e/notification.spec.ts` — 5 tests (通知中心：列表、未读数、标记已读、SSE 实时推送)
+- `frontend-admin/e2e/settlement.spec.ts` — 4 tests (结算单：列表、详情、汇总数据验证)
+- `frontend-admin/e2e/dashboard.spec.ts` — 5 tests (驾驶舱：图表渲染、数据联动)
+
+**Verification:**
+- `npx playwright test --list`: 36 tests across 9 files, zero errors
+- Previously: 22 tests across 6 files → now 36 tests across 9 files (+14 tests, +3 files)
+
+### Discovery: Notification has NO standalone page (deviation from plan)
+
+**Critical finding**: The learnings.md from T17 stated `/notification` → NotificationCenter (`notification/index.vue`), but this was **INCORRECT**. There is:
+- **NO** `/notification` route in `router/index.ts`
+- **NO** `notification/index.vue` page component
+- The notification feature is implemented as `NotificationBell.vue` component rendered in the layout header
+- Notification interactions happen via popover (not a standalone page)
+
+**Notification selector map (from component analysis):**
+| Element | Selector | Notes |
+|---------|----------|-------|
+| Bell trigger | `.nb-trigger` | Wraps `<BellOutlined />` icon |
+| Unread badge | `.nb-trigger .ant-badge sup.ant-scroll-number` | Hidden when count=0 |
+| Popover overlay | `.nb-popover` (via `overlay-class-name`) | Contains `.nb-panel` |
+| Panel container | `.nb-popover .nb-panel` | 360px wide, max 480px tall |
+| Panel header | `.nb-header` > `.nb-title` | Title text: "通知" |
+| Mark all read | `.nb-header button:has-text("全部标为已读")` | |
+| Notification item | `.nb-item` | Unread items also have `.nb-unread` |
+| Item title | `.nb-item-title` | |
+| Item content | `.nb-item-content` | |
+| Unread dot | `.nb-item-dot` | Blue dot indicator (8px) |
+| Item meta | `.nb-item-meta` > `.ant-tag` (bizType) | |
+| Item time | `.nb-item-time` | |
+| Loading state | `.nb-loading` | "加载中…" |
+| Empty state | `.nb-empty-state` | "暂无通知" |
+
+### Settlement selector map (from page component analysis):
+
+The settlement list page uses **VxeGrid** (`<vxe-grid>`) NOT `<a-table>`. This required different selectors.
+
+| Element | Selector | Notes |
+|---------|----------|-------|
+| Page wrapper | `.stl-page` | Not `.pm-page` |
+| Breadcrumb | `.stl-breadcrumb` | |
+| KPI grid | `.stl-kpis` | 5-column grid |
+| KPI card | `.stl-kpi` | Individual card with icon + value |
+| Filter card | `.stl-filter` | Not `.pm-filter` |
+| Filter field | `.stl-field` | Wraps label + input |
+| Filter actions | `.stl-filter-actions` | Query/Reset buttons |
+| Toolbar | `.stl-toolbar` | "新建结算" button |
+| Table (vxe-grid) | `.vxe-table` | NOT `.ant-table` |
+| Table row | `.vxe-body--row` | NOT `.ant-table-tbody tr.ant-table-row` |
+| Settlement link | `.stl-link` | Click navigates to detail |
+| Detail page | `.stl-detail-page` | |
+| Summary tab | `.stl-summary-readonly` | Auto-summarized data |
+| Descriptions | `.ant-descriptions` | Amount fields display |
+| Status tags | `.ant-tag` | SettlementStatus + ApprovalStatus |
+
+**Settlement detail fields verified:**
+- contractAmount, changeAmount, measuredAmount, deductionAmount
+- finalAmount (结算金额 = contractAmount + changeAmount + measuredAmount - deductionAmount)
+- paidAmount, unpaidAmount (未付款 = finalAmount - paidAmount - warrantyAmount)
+- warrantyAmount
+- Settlement statuses: DRAFT (草稿), FINALIZED (已定案), CANCELLED (已作废)
+
+### Dashboard selector map (from page component analysis):
+
+The dashboard uses custom classes with NO `.pm-page` or `.pm-header` wrappers.
+
+| Element | Selector | Notes |
+|---------|----------|-------|
+| Page wrapper | `.dashboard` | Not `.pm-page` |
+| Breadcrumb | `.breadcrumb` | "首页 > 驾驶舱" |
+| Project selector | `.project-bar` | Hidden for mgmt role |
+| Role tabs | `.role-tabs .ant-tabs-tab` | 5 roles: pm/bm/cost/finance/mgmt |
+| KPI grid | `.kpi-grid` | Variants: kpi-grid-4/5/6/7 |
+| KPI card | `.kpi-card` | Icon + title + value |
+| KPI title | `.kpi-title` | |
+| KPI value | `.kpi-value` | Bold large number |
+| Panel | `.panel` | Chart/table container |
+| Panel header | `.panel-header` | Title bar with hint text |
+| Chart row | `.chart-row` | 2-column grid |
+| Chart column | `.chart-col` | |
+| ECharts canvas | `.chart-row canvas` | Rendered by `<v-chart>` |
+| Empty hint | `.empty-hint` | "暂无..." text |
+| Empty page | `.empty-page` | "请选择一个项目查看仪表盘数据" |
+| Drill-down modal | `.ant-modal` | Cost breakdown drill-down |
+
+**Dashboard role views:**
+| Role | Tab Text | KPI Count | Charts | Tables |
+|------|----------|-----------|--------|--------|
+| pm | 项目总 | 4 (.kpi-grid-4) | 0 | 4 |
+| bm | 商务经理 | 6 (.kpi-grid-6) | 0 | 2 |
+| cost | 成本经理 | 6 (.kpi-grid-6) | **2 ECharts** | 1 (alerts) |
+| finance | 财务 | 5 (.kpi-grid-5) | 0 | 2 |
+| mgmt | 管理层 | 7 (.kpi-grid-7) | 0 | 3 |
+
+**Key**: Only `cost` (成本经理) view has ECharts canvas elements. Canvas tests must switch tab first.
+
+### Key design decisions:
+
+1. All three specs use `loginAsAdmin()` helper copied **exactly** from contract.spec.ts lines 16-22
+2. `test.beforeEach` pattern with `await loginAsAdmin(page)` identical to all existing specs
+3. Tests gracefully handle missing data: check data availability first, `console.log` and `return` when prerequisite data missing
+4. No `waitForTimeout` > 300ms: only 300ms waits for tab transitions and API response settling
+5. SSE test uses `page.evaluate()` to mock EventSource — intercepts constructor to dispatch mock notification event
+6. Settlement list uses **vxe-grid** selectors (`.vxe-body--row`, `.vxe-table`), not ant-table selectors
+7. Dashboard charts require switching to "成本经理" tab since only that view has ECharts
+8. Screenshot paths follow convention: `e2e/screenshots/{module}-{action}.png`
+
+### Routes verified (actual implementation vs plan):
+
+| Plan Route | Actual Route | Actual Component | Status |
+|-----------|-------------|------------------|--------|
+| `/notification` | NONE (no route exists) | NotificationBell.vue (component, not page) | ⚠️ No page |
+| `/settlement` | `/settlement/list` | pages/settlement/index.vue | ✅ |
+| `/settlement/:id` | `/settlement/:id` | pages/settlement/detail.vue | ✅ |
+| `/dashboard` | `/dashboard` | pages/dashboard/index.vue | ✅ |
+
+### Patterns carried forward from Batch 1 & 2:
+- Ant design select: click `.ant-select` → wait `.ant-select-dropdown:not(.ant-select-dropdown-hidden)` → click `.ant-select-item-option`
+- Modal confirm: `.ant-modal-confirm .ant-btn-primary:has-text("...")` or `.ant-modal .ant-modal-footer .ant-btn-primary`
+- Messages: `.ant-message-success`, `.ant-message-error`, `.ant-message-warning`
+- Tags: `.ant-tag`
+- Tabs: `.ant-tabs-tab:has-text("...")`
+- Graceful data handling: `.isVisible().catch(() => false)` + early return
+

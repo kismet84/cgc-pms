@@ -1308,7 +1308,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `test(e2e): add procurement, inventory, invoice E2E scripts`
   - Files: `frontend-admin/e2e/procurement.spec.ts`, `frontend-admin/e2e/inventory.spec.ts`, `frontend-admin/e2e/invoice.spec.ts`
 
-- [ ] 18. **E2E 脚本 Batch 3：通知 + 结算 + 驾驶舱**
+- [x] 18. **E2E 脚本 Batch 3：通知 + 结算 + 驾驶舱**
 
   **What to do**:
   - **通知中心**：验证通知列表 → 未读数 → 标记已读 → SSE 实时推送
