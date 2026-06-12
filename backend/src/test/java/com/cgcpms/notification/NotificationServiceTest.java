@@ -327,4 +327,80 @@ class NotificationServiceTest {
         emitter.complete();
         System.out.println("✅ TC11 通过: SSE push triggered on create, notificationId=" + notification.getId());
     }
+
+    // ═══════════════════════════════════════════════════════════
+    // Unread Count — Unit tests (Task 8)
+    // ═══════════════════════════════════════════════════════════
+
+    @Test
+    @Order(12)
+    @Transactional
+    @DisplayName("unreadCount: 无通知时返回 0")
+    void test12_unreadCount_zero() {
+        long count = notificationService.getUnreadCount(USER_1, TENANT_0);
+        assertEquals(0, count, "无通知时未读数应为 0");
+        System.out.println("✅ TC12 通过: unreadCount=0");
+    }
+
+    @Test
+    @Order(13)
+    @Transactional
+    @DisplayName("unreadCount: 创建 3 条未读通知后返回 3")
+    void test13_unreadCount_three() {
+        notificationService.create(TENANT_0, USER_1, "T1", "C1", "SYSTEM", null);
+        notificationService.create(TENANT_0, USER_1, "T2", "C2", "SYSTEM", null);
+        notificationService.create(TENANT_0, USER_1, "T3", "C3", "SYSTEM", null);
+
+        long count = notificationService.getUnreadCount(USER_1, TENANT_0);
+        assertEquals(3, count, "3 条未读通知时 count 应为 3");
+        System.out.println("✅ TC13 通过: unreadCount=3");
+    }
+
+    @Test
+    @Order(14)
+    @Transactional
+    @DisplayName("unreadCount: 标记 1 条已读后减 1")
+    void test14_unreadCount_afterMarkRead() {
+        SysNotification n1 = notificationService.create(TENANT_0, USER_1, "R1", "C1", "SYSTEM", null);
+        SysNotification n2 = notificationService.create(TENANT_0, USER_1, "R2", "C2", "SYSTEM", null);
+
+        assertEquals(2, notificationService.getUnreadCount(USER_1, TENANT_0));
+
+        notificationService.markAsRead(n1.getId(), USER_1, TENANT_0);
+        assertEquals(1, notificationService.getUnreadCount(USER_1, TENANT_0),
+                "标记 1 条已读后 count 应减 1");
+        System.out.println("✅ TC14 通过: unreadCount 2→1 after markAsRead");
+    }
+
+    @Test
+    @Order(15)
+    @Transactional
+    @DisplayName("unreadCount: 跨租户隔离 → 租户 A 的通知不影响租户 B 的计数")
+    void test15_unreadCount_crossTenant() {
+        notificationService.create(TENANT_0, USER_1, "TA", "CA", "SYSTEM", null);
+        notificationService.create(TENANT_0, USER_1, "TB", "CB", "SYSTEM", null);
+
+        long countForTenantA = notificationService.getUnreadCount(USER_1, TENANT_0);
+        assertEquals(2, countForTenantA, "租户 0 应有 2 条未读");
+
+        long countForTenantB = notificationService.getUnreadCount(USER_1, TENANT_999);
+        assertEquals(0, countForTenantB, "租户 999 不应看到租户 0 的通知");
+        System.out.println("✅ TC15 通过: cross-tenant count isolation");
+    }
+
+    @Test
+    @Order(16)
+    @Transactional
+    @DisplayName("unreadCount: 跨用户隔离 → 用户 A 的通知不影响用户 B 的计数")
+    void test16_unreadCount_crossUser() {
+        notificationService.create(TENANT_0, USER_1, "UA1", "CA1", "SYSTEM", null);
+        notificationService.create(TENANT_0, USER_1, "UA2", "CA2", "SYSTEM", null);
+
+        long countForUser1 = notificationService.getUnreadCount(USER_1, TENANT_0);
+        assertEquals(2, countForUser1, "USER_1 应有 2 条未读");
+
+        long countForUser2 = notificationService.getUnreadCount(USER_2, TENANT_0);
+        assertEquals(0, countForUser2, "USER_2 不应看到 USER_1 的通知");
+        System.out.println("✅ TC16 通过: cross-user count isolation");
+    }
 }
