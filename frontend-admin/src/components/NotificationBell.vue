@@ -167,7 +167,7 @@ onUnmounted(() => {
     placement="bottomRight"
     :arrow-point-at-center="true"
     overlay-class-name="nb-popover"
-    @visible-change="handlePopoverChange"
+    @open-change="handlePopoverChange"
   >
     <span class="nb-trigger">
       <a-badge :count="unreadCount" :offset="[-2, 6]" :overflow-count="99" :number-style="{ fontSize: '11px' }">
