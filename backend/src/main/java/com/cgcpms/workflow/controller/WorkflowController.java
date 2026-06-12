@@ -12,7 +12,9 @@ import com.cgcpms.workflow.dto.WorkflowTransferRequest;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.service.WorkflowQueryService;
+import com.cgcpms.workflow.vo.WfCcVO;
 import com.cgcpms.workflow.vo.WfInstanceVO;
+import com.cgcpms.workflow.vo.WfRecordVO;
 import com.cgcpms.workflow.vo.WfTaskVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +44,8 @@ public class WorkflowController {
                 request.getBusinessType(), request.getBusinessId(),
                 request.getTitle(), request.getAmount(),
                 request.getProjectId(), request.getContractId(),
-                request.getBusinessSummary(), request.getVariables());
+                request.getBusinessSummary(), request.getVariables(),
+                request.getCcUserIds());
         return ApiResponse.success(String.valueOf(instance.getId()));
     }
 
@@ -153,6 +156,28 @@ public class WorkflowController {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();
         IPage<WfTaskVO> page = workflowQueryService.getMyTodos(tenantId, userId, pageNo, pageSize);
+        return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/tasks/done")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<PageResult<WfRecordVO>> myDone(
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize) {
+        Long userId = UserContext.getCurrentUserId();
+        Long tenantId = UserContext.getCurrentTenantId();
+        IPage<WfRecordVO> page = workflowQueryService.getMyDone(userId, tenantId, pageNo, pageSize);
+        return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/tasks/cc")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<PageResult<WfCcVO>> myCc(
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize) {
+        Long userId = UserContext.getCurrentUserId();
+        Long tenantId = UserContext.getCurrentTenantId();
+        IPage<WfCcVO> page = workflowQueryService.getMyCc(userId, tenantId, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
     }
 

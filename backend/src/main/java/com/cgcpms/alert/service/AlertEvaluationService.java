@@ -7,10 +7,13 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostSummary;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
+import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
@@ -57,6 +60,8 @@ public class AlertEvaluationService {
     private final MatReceiptMapper matReceiptMapper;
     private final VarOrderMapper varOrderMapper;
     private final StlSettlementMapper stlSettlementMapper;
+    private final PmProjectMemberMapper projectMemberMapper;
+    private final NotificationService notificationService;
 
     // ──────────────────────────────────────────────
     // Scheduled entry point
@@ -138,6 +143,14 @@ public class AlertEvaluationService {
         // Persist
         for (AlertLog alert : alerts) {
             alertLogMapper.insert(alert);
+            // Create notification for each alert — uses explicit tenantId from project,
+            // NOT from UserContext (safe in @Scheduled threads)
+            try {
+                createAlertNotification(tenantId, projectId, alert);
+            } catch (Exception e) {
+                log.warn("Failed to create notification for alert id={}, ruleType={}: {}",
+                        alert.getId(), alert.getRuleType(), e.getMessage());
+            }
         }
         if (!alerts.isEmpty()) {
             log.info("Project {}: {} alert(s) generated", projectId, alerts.size());
@@ -437,6 +450,65 @@ public class AlertEvaluationService {
         alert.setIsRead(0);
         alert.setDeletedFlag(0);
         return alert;
+    }
+
+    /**
+     * Create a notification for the given alert. Queries pm_project_member for a
+     * target user (project manager preferred, otherwise first active member).
+     * Silently skips if no project member exists.
+     */
+    private void createAlertNotification(Long tenantId, Long projectId, AlertLog alert) {
+        Long userId = getNotificationTargetUserId(tenantId, projectId);
+        if (userId == null) {
+            log.debug("No project member found for projectId={}, skipping alert notification", projectId);
+            return;
+        }
+        String title = getAlertTitle(alert.getRuleType());
+        notificationService.create(tenantId, userId, title, alert.getMessage(),
+                "ALERT", alert.getId());
+    }
+
+    /**
+     * Find a target user for notification from project members.
+     * Prefers project manager (role_code = 'PM'), falls back to first active member.
+     *
+     * @return userId or null if no members exist
+     */
+    private Long getNotificationTargetUserId(Long tenantId, Long projectId) {
+        List<PmProjectMember> members = projectMemberMapper.selectList(
+                new LambdaQueryWrapper<PmProjectMember>()
+                        .eq(PmProjectMember::getTenantId, tenantId)
+                        .eq(PmProjectMember::getProjectId, projectId)
+                        .eq(PmProjectMember::getStatus, "ACTIVE")
+                        .orderByAsc(PmProjectMember::getId));
+        if (members.isEmpty()) {
+            return null;
+        }
+        // Prefer project manager
+        for (PmProjectMember m : members) {
+            if ("PM".equals(m.getRoleCode())) {
+                return m.getUserId();
+            }
+        }
+        // Fallback to first active member
+        return members.get(0).getUserId();
+    }
+
+    /**
+     * Map alert rule type to human-readable Chinese title.
+     */
+    private String getAlertTitle(String ruleType) {
+        return switch (ruleType) {
+            case "DYNAMIC_COST_EXCEEDS_TARGET" -> "动态成本超目标预警";
+            case "MATERIAL_EXCEEDS_BUDGET" -> "材料超预算预警";
+            case "SUBCONTRACT_EXCEEDS_CONTRACT" -> "分包超合同预警";
+            case "CONTRACT_OVERDUE" -> "合同超期预警";
+            case "PAYMENT_EXCEEDS_RATIO" -> "付款超比例预警";
+            case "WARRANTY_EARLY_RELEASE" -> "质保金提前释放预警";
+            case "CONTRACT_EXPIRING" -> "合同到期预警";
+            case "VARIATION_UNCONFIRMED" -> "变更未确认预警";
+            default -> "项目预警";
+        };
     }
 
     private static BigDecimal nvl(BigDecimal value) {

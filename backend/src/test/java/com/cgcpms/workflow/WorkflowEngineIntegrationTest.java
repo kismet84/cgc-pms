@@ -1,15 +1,21 @@
 package com.cgcpms.workflow;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.notification.entity.SysNotification;
+import com.cgcpms.notification.mapper.SysNotificationMapper;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.service.WorkflowQueryService;
+import com.cgcpms.workflow.vo.WfRecordVO;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -43,6 +49,8 @@ class WorkflowEngineIntegrationTest {
     @Autowired private WfRecordMapper recordMapper;
     @Autowired private WfNodeInstanceMapper nodeInstanceMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private SysNotificationMapper notificationMapper;
+    @Autowired private WfCcMapper wfCcMapper;
 
     private static Long testInstanceId;
 
@@ -69,7 +77,7 @@ class WorkflowEngineIntegrationTest {
                 "CONTRACT_APPROVAL", RUN_ID + 1,
                 "集成测试-合同审批", new BigDecimal("1000000.00"),
                 100L, 100L,
-                "{\"summary\":\"test\"}", "{}");
+                "{\"summary\":\"test\"}", "{}", null);
 
         testInstanceId = instance.getId();
         assertNotNull(testInstanceId, "实例 ID 不能为空");
@@ -230,7 +238,7 @@ class WorkflowEngineIntegrationTest {
                     USER_ADMIN, "admin", 0L,
                     "CONTRACT_APPROVAL", RUN_ID + 2,
                     "重提测试合同", new BigDecimal("500000.00"),
-                    100L, 100L, "{}", "{}");
+                    100L, 100L, "{}", "{}", null);
 
             // 获取任务并驳回
             WfTask task = taskMapper.selectList(
@@ -271,7 +279,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 3,
                 "撤回测试合同", new BigDecimal("300000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         long pendingBefore = taskMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -301,7 +309,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 4,
                 "转办测试合同", new BigDecimal("400000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         WfTask originalTask = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -334,7 +342,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 5,
                 "并发测试合同", new BigDecimal("500000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         WfTask task = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -380,7 +388,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 6,
                 "幂等测试合同", new BigDecimal("600000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         WfTask task = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -401,7 +409,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 7,
                 "幂等测试合同2", new BigDecimal("700000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         WfTask task2 = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -417,7 +425,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 8,
                 "幂等测试合同3", new BigDecimal("800000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         WfTask task3 = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -440,7 +448,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 9,
                 "操作测试合同", new BigDecimal("900000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         // 运行中 + 发起人 → 可撤回。POC模式下审批人=提交者，所以同时有审批权限
         List<String> actions = workflowEngine.getAvailableActions(instance.getId(), USER_ADMIN);
@@ -463,7 +471,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 10,
                 "驳回重提记录测试合同", new BigDecimal("100000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         WfTask task = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -501,7 +509,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 11,
                 "租户隔离测试合同", new BigDecimal("110000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         WfRecord submitRecord = recordMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfRecord>()
@@ -534,7 +542,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 12,
                 "已处理任务加签测试合同", new BigDecimal("120000.00"),
-                100L, 100L, "{}", "{}");
+                100L, 100L, "{}", "{}", null);
 
         WfTask task = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -552,11 +560,285 @@ class WorkflowEngineIntegrationTest {
         System.out.println("✅ 场景13 通过: 已处理任务加签被拒绝");
     }
 
+    @Test
+    @Order(14)
+    @DisplayName("场景14: getMyDone 返回用户已处理记录，租户隔离")
+    void test14_getMyDoneReturnsHandledRecordsWithTenantIsolation() {
+        long tenantA = 991L;
+        long tenantB = 992L;
+
+        // 租户A：提交并审批一个实例
+        WfInstance instanceA = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantA,
+                "CONTRACT_APPROVAL", RUN_ID + 13,
+                "租户A-我的已办测试", new BigDecimal("130000.00"),
+                100L, 100L, "{}", "{}", null);
+        WfTask taskA = taskMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instanceA.getId())
+                        .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+        workflowEngine.approve(taskA.getId(), USER_ADMIN, "admin",
+                "同意", "test14-tenantA-" + UUID.randomUUID());
+
+        // 租户B：提交并审批一个实例（不同用户）
+        WfInstance instanceB = workflowEngine.submit(
+                USER_MANAGER, "manager", tenantB,
+                "CONTRACT_APPROVAL", RUN_ID + 14,
+                "租户B-我的已办测试", new BigDecimal("140000.00"),
+                100L, 100L, "{}", "{}", null);
+        WfTask taskB = taskMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instanceB.getId())
+                        .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+        workflowEngine.approve(taskB.getId(), USER_MANAGER, "manager",
+                "同意", "test14-tenantB-" + UUID.randomUUID());
+
+        // 查询租户A中 USER_ADMIN 的已办记录
+        IPage<WfRecordVO> pageA = queryService.getMyDone(USER_ADMIN, tenantA, 1, 20);
+        assertTrue(pageA.getTotal() >= 1, "租户A中USER_ADMIN应有已办记录");
+        // 验证所有记录都属于租户A
+        pageA.getRecords().forEach(vo -> {
+            assertEquals(String.valueOf(USER_ADMIN), vo.getOperatorId(),
+                    "操作人应为USER_ADMIN");
+        });
+
+        // 查询租户A中 USER_MANAGER 的已办记录 → 应为空（USER_MANAGER在租户A无操作）
+        IPage<WfRecordVO> pageA2 = queryService.getMyDone(USER_MANAGER, tenantA, 1, 20);
+        assertEquals(0, pageA2.getTotal(), "USER_MANAGER在租户A应无已办");
+
+        // 查询租户B中 USER_MANAGER 的已办记录 → 应有
+        IPage<WfRecordVO> pageB = queryService.getMyDone(USER_MANAGER, tenantB, 1, 20);
+        assertTrue(pageB.getTotal() >= 1, "租户B中USER_MANAGER应有已办记录");
+
+        // 验证 instance 信息已富化加载
+        WfRecordVO firstRecord = pageA.getRecords().get(0);
+        assertNotNull(firstRecord.getTitle(), "应富化了实例标题");
+        assertNotNull(firstRecord.getInstanceStatus(), "应富化了实例状态");
+        assertEquals(String.valueOf(instanceA.getId()), firstRecord.getInstanceId(),
+                "记录应关联正确的审批实例");
+
+        System.out.println("✅ 场景14 通过: getMyDone 租户隔离验证通过，"
+                + "租户A(USER_ADMIN)=" + pageA.getTotal()
+                + ", 租户A(USER_MANAGER)=" + pageA2.getTotal()
+                + ", 租户B(USER_MANAGER)=" + pageB.getTotal());
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("场景15: 生命周期通知 → submit/approve/reject/withdraw/transfer/addSign 创建通知记录")
+    void test15_lifecycleNotifications() {
+        long tenantId = 777L;
+
+        // ── SUBMIT ──
+        WfInstance instance = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", RUN_ID + 15,
+                "通知测试-合同审批", new BigDecimal("150000.00"),
+                100L, 100L, "{}", "{}", null);
+        assertNotNull(instance.getId());
+
+        // Verify submit notification → approver (POC: admin = approver)
+        List<SysNotification> submitNotifs = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getBizId, instance.getId())
+                        .eq(SysNotification::getBizType, "WORKFLOW"));
+        assertTrue(submitNotifs.size() >= 1, "提交应产生通知");
+        SysNotification submitN = submitNotifs.get(0);
+        assertEquals(tenantId, submitN.getTenantId(), "通知租户ID应正确");
+        assertEquals(USER_ADMIN, submitN.getUserId(), "通知应发给审批人");
+        assertTrue(submitN.getTitle().contains("提交了审批"), "标题应包含提交了审批");
+        assertTrue(submitN.getContent().contains("通知测试-合同审批"), "内容应包含合同标题");
+
+        // ── APPROVE ──
+        WfTask task = taskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instance.getId())
+                        .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+        workflowEngine.approve(task.getId(), USER_ADMIN, "admin",
+                "同意", "test15-approve-" + UUID.randomUUID());
+
+        // Verify approve notification → submitter (USER_ADMIN)
+        List<SysNotification> approveNotifs = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getBizId, instance.getId())
+                        .eq(SysNotification::getBizType, "WORKFLOW")
+                        .like(SysNotification::getTitle, "同意了你的申请"));
+        assertTrue(approveNotifs.size() >= 1, "同意应产生通知");
+        SysNotification approveN = approveNotifs.get(0);
+        assertEquals(tenantId, approveN.getTenantId());
+        assertEquals(USER_ADMIN, approveN.getUserId(), "通知应发给发起人");
+
+        // ── REJECT ──
+        WfInstance instance2 = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", RUN_ID + 16,
+                "通知测试-驳回合同", new BigDecimal("160000.00"),
+                100L, 100L, "{}", "{}", null);
+        WfTask task2 = taskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instance2.getId())
+                        .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+        workflowEngine.reject(task2.getId(), USER_ADMIN, "admin",
+                "测试驳回", "test15-reject-" + UUID.randomUUID());
+
+        List<SysNotification> rejectNotifs = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getBizId, instance2.getId())
+                        .eq(SysNotification::getBizType, "WORKFLOW")
+                        .like(SysNotification::getTitle, "驳回了你的申请"));
+        assertTrue(rejectNotifs.size() >= 1, "驳回应产生通知");
+        SysNotification rejectN = rejectNotifs.get(0);
+        assertEquals(tenantId, rejectN.getTenantId());
+        assertEquals(USER_ADMIN, rejectN.getUserId());
+
+        // ── WITHDRAW ──
+        WfInstance instance3 = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", RUN_ID + 17,
+                "通知测试-撤回合同", new BigDecimal("170000.00"),
+                100L, 100L, "{}", "{}", null);
+        workflowEngine.withdraw(instance3.getId(), USER_ADMIN, "admin");
+
+        List<SysNotification> withdrawNotifs = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getBizId, instance3.getId())
+                        .eq(SysNotification::getBizType, "WORKFLOW")
+                        .like(SysNotification::getTitle, "撤回了审批"));
+        assertTrue(withdrawNotifs.size() >= 1, "撤回应产生通知");
+        SysNotification withdrawN = withdrawNotifs.get(0);
+        assertEquals(tenantId, withdrawN.getTenantId());
+
+        // ── TRANSFER ──
+        WfInstance instance4 = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", RUN_ID + 18,
+                "通知测试-转办合同", new BigDecimal("180000.00"),
+                100L, 100L, "{}", "{}", null);
+        WfTask task4 = taskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instance4.getId())
+                        .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+        workflowEngine.transfer(task4.getId(), USER_MANAGER,
+                USER_ADMIN, "admin", "转给项目经理");
+
+        List<SysNotification> transferNotifs = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getBizType, "WORKFLOW")
+                        .eq(SysNotification::getUserId, USER_MANAGER)
+                        .like(SysNotification::getTitle, "转办了一个审批给你"));
+        assertTrue(transferNotifs.size() >= 1, "转办应产生通知");
+        SysNotification transferN = transferNotifs.get(0);
+        assertEquals(tenantId, transferN.getTenantId());
+        assertEquals(USER_MANAGER, transferN.getUserId(), "通知应发给转办目标人");
+
+        // ── ADD SIGN ──
+        WfInstance instance5 = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", RUN_ID + 19,
+                "通知测试-加签合同", new BigDecimal("190000.00"),
+                100L, 100L, "{}", "{}", null);
+        WfTask task5 = taskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instance5.getId())
+                        .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+        workflowEngine.addSign(task5.getId(), List.of(USER_BIZ, USER_COST),
+                USER_ADMIN, "admin", "加签测试");
+
+        List<SysNotification> addSignNotifs = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getBizType, "WORKFLOW")
+                        .like(SysNotification::getTitle, "邀请你加签审批"));
+        assertTrue(addSignNotifs.size() >= 2, "加签应产生至少2条通知");
+        for (SysNotification n : addSignNotifs) {
+            assertEquals(tenantId, n.getTenantId());
+            assertTrue(n.getUserId().equals(USER_BIZ) || n.getUserId().equals(USER_COST),
+                    "通知应发给加签对象");
+        }
+
+        System.out.println("✅ 场景15 通过: submit=" + submitNotifs.size()
+                + ", approve=" + approveNotifs.size()
+                + ", reject=" + rejectNotifs.size()
+                + ", withdraw=" + withdrawNotifs.size()
+                + ", transfer=" + transferNotifs.size()
+                + ", addSign=" + addSignNotifs.size());
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("场景16: 抄送 → submit带ccUserIds创建wf_cc记录和通知")
+    void test16_submitWithCcCreatesRecordsAndNotifications() {
+        long tenantId = 888L;
+        List<Long> ccUserIds = List.of(USER_BIZ, USER_COST);
+
+        WfInstance instance = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", RUN_ID + 20,
+                "抄送测试-合同审批", new BigDecimal("200000.00"),
+                100L, 100L, "{}", "{}", ccUserIds);
+        assertNotNull(instance.getId());
+
+        // 验证 wf_cc 记录已创建
+        List<WfCc> ccRecords = wfCcMapper.selectList(
+                new LambdaQueryWrapper<WfCc>()
+                        .eq(WfCc::getInstanceId, instance.getId()));
+        assertEquals(2, ccRecords.size(), "应为2个抄送用户创建记录");
+
+        for (WfCc cc : ccRecords) {
+            assertEquals(tenantId, cc.getTenantId(), "抄送记录的租户ID应来自审批实例");
+            assertEquals(instance.getId(), cc.getInstanceId());
+            assertTrue(ccUserIds.contains(cc.getCcUserId()), "抄送人应在ccUserIds列表中");
+            assertEquals(0, cc.getIsRead(), "初始应为未读");
+            assertNotNull(cc.getCreatedTime(), "应有创建时间");
+            assertEquals("抄送测试-合同审批", cc.getTitle(), "标题应与审批实例一致");
+        }
+
+        // 验证通知已发送给抄送用户
+        List<SysNotification> ccNotifications = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getTenantId, tenantId)
+                        .eq(SysNotification::getBizType, "CONTRACT_APPROVAL")
+                        .eq(SysNotification::getBizId, instance.getBusinessId())
+                        .like(SysNotification::getTitle, "审批抄送"));
+        assertEquals(2, ccNotifications.size(), "应为每个抄送用户创建通知");
+
+        for (SysNotification notif : ccNotifications) {
+            assertEquals(tenantId, notif.getTenantId());
+            assertTrue(ccUserIds.contains(notif.getUserId()), "通知应发给抄送用户");
+            assertTrue(notif.getTitle().contains("审批抄送"), "标题应包含审批抄送");
+            assertTrue(notif.getContent().contains("抄送测试-合同审批"), "内容应包含合同标题");
+        }
+
+        // 验证无ccUserIds时不创建记录
+        WfInstance instance2 = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", RUN_ID + 21,
+                "无抄送测试", new BigDecimal("210000.00"),
+                100L, 100L, "{}", "{}", null);
+        List<WfCc> emptyCc = wfCcMapper.selectList(
+                new LambdaQueryWrapper<WfCc>()
+                        .eq(WfCc::getInstanceId, instance2.getId()));
+        assertEquals(0, emptyCc.size(), "无ccUserIds时不应创建抄送记录");
+
+        // 验证getMyCc查询（分页）
+        IPage<com.cgcpms.workflow.vo.WfCcVO> page = queryService.getMyCc(USER_BIZ, tenantId, 1, 20);
+        assertTrue(page.getTotal() >= 1, "抄送用户应能看到自己的抄送记录");
+        com.cgcpms.workflow.vo.WfCcVO vo = page.getRecords().get(0);
+        assertNotNull(vo.getTitle(), "应富化了标题");
+        assertNotNull(vo.getCcUserName(), "应有抄送人名称");
+
+        System.out.println("✅ 场景16 通过: cc记录数=" + ccRecords.size()
+                + ", 通知数=" + ccNotifications.size()
+                + ", 空cc=" + emptyCc.size()
+                + ", getMyCc总数=" + page.getTotal());
+    }
+
     @AfterAll
     void cleanupTestData() {
         long startBid = RUN_ID + 1;
-        long endBid = RUN_ID + 12;
-        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key LIKE 'tenant-idem-%' OR idempotency_key LIKE 'test13-%'");
+        long endBid = RUN_ID + 21;
+        jdbcTemplate.update("DELETE FROM wf_cc WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)", startBid, endBid);
+        jdbcTemplate.update("DELETE FROM sys_notification WHERE biz_id BETWEEN ? AND ?", startBid, endBid);
+        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key LIKE 'tenant-idem-%' OR idempotency_key LIKE 'test13-%' OR idempotency_key LIKE 'test14-%' OR idempotency_key LIKE 'test15-%'");
         jdbcTemplate.update("DELETE FROM wf_idempotency WHERE business_id BETWEEN ? AND ?", startBid, endBid);
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_id BETWEEN ? AND ?", startBid, endBid);
         jdbcTemplate.update("DELETE FROM wf_task WHERE business_id BETWEEN ? AND ?", startBid, endBid);

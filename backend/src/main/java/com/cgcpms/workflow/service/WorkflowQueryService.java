@@ -3,11 +3,15 @@ package com.cgcpms.workflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
 import com.cgcpms.workflow.vo.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -29,6 +33,8 @@ public class WorkflowQueryService {
     private final WfNodeInstanceMapper wfNodeInstanceMapper;
     private final WfRecordMapper wfRecordMapper;
     private final WfTemplateMapper wfTemplateMapper;
+    private final WfCcMapper wfCcMapper;
+    private final SysUserMapper sysUserMapper;
     private final WorkflowEngine workflowEngine;
 
     public IPage<WfTaskVO> getMyTodos(Long tenantId, Long userId, long pageNo, long pageSize) {
@@ -79,6 +85,56 @@ public class WorkflowQueryService {
         });
     }
 
+    public IPage<WfRecordVO> getMyDone(Long userId, Long tenantId, long pageNo, long pageSize) {
+        LambdaQueryWrapper<WfRecord> wrapper = new LambdaQueryWrapper<WfRecord>()
+                .eq(WfRecord::getTenantId, tenantId)
+                .eq(WfRecord::getOperatorId, userId)
+                .orderByDesc(WfRecord::getCreatedAt);
+
+        Page<WfRecord> page = wfRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+
+        // Batch-fetch instances to avoid N+1
+        List<Long> instanceIds = page.getRecords().stream().map(WfRecord::getInstanceId).distinct().toList();
+        final Map<Long, WfInstance> instanceMap;
+        if (!instanceIds.isEmpty()) {
+            instanceMap = wfInstanceMapper.selectList(new LambdaQueryWrapper<WfInstance>()
+                            .eq(WfInstance::getTenantId, tenantId)
+                            .in(WfInstance::getId, instanceIds)).stream()
+                    .collect(Collectors.toMap(WfInstance::getId, Function.identity()));
+        } else {
+            instanceMap = Collections.emptyMap();
+        }
+
+        return page.convert(record -> {
+            WfRecordVO vo = new WfRecordVO();
+            vo.setId(String.valueOf(record.getId()));
+            vo.setInstanceId(String.valueOf(record.getInstanceId()));
+            if (record.getNodeInstanceId() != null) vo.setNodeInstanceId(String.valueOf(record.getNodeInstanceId()));
+            if (record.getTaskId() != null) vo.setTaskId(String.valueOf(record.getTaskId()));
+            vo.setRoundNo(record.getRoundNo());
+            vo.setNodeCode(record.getNodeCode());
+            vo.setNodeName(record.getNodeName());
+            vo.setActionType(record.getActionType());
+            vo.setActionName(record.getActionName());
+            vo.setOperatorId(String.valueOf(record.getOperatorId()));
+            vo.setOperatorName(record.getOperatorName());
+            vo.setComment(record.getComment());
+            vo.setRecordStatus(record.getRecordStatus());
+            if (record.getCreatedAt() != null) vo.setCreatedAt(DTF.format(record.getCreatedAt()));
+
+            // Include businessType from record entity
+            vo.setBusinessType(record.getBusinessType());
+
+            // Enrich with instance info
+            WfInstance instance = instanceMap.get(record.getInstanceId());
+            if (instance != null) {
+                vo.setTitle(instance.getTitle());
+                vo.setInstanceStatus(instance.getInstanceStatus());
+            }
+            return vo;
+        });
+    }
+
     public WfInstanceVO getInstanceDetail(Long tenantId, Long instanceId, Long currentUserId) {
         WfInstance instance = wfInstanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
                 .eq(WfInstance::getTenantId, tenantId)
@@ -94,7 +150,10 @@ public class WorkflowQueryService {
                     .eq(WfTask::getApproverId, currentUserId));
             authorized = count > 0;
         }
-        // TODO: add admin role check
+        // Admin role bypass: admins can view any instance
+        if (!authorized && UserContext.hasRole("ADMIN")) {
+            authorized = true;
+        }
         if (!authorized) {
             return null;
         }
@@ -112,7 +171,10 @@ public class WorkflowQueryService {
         vo.setCurrentRound(instance.getCurrentRound());
         vo.setResubmitCount(instance.getResubmitCount());
         vo.setInitiatorId(String.valueOf(instance.getInitiatorId()));
-        vo.setInitiatorName("U" + instance.getInitiatorId());
+        SysUser initiator = sysUserMapper.selectById(instance.getInitiatorId());
+        vo.setInitiatorName(initiator != null
+                ? (initiator.getRealName() != null ? initiator.getRealName() : initiator.getUsername())
+                : "");
         vo.setBusinessSummary(instance.getBusinessSummary());
         if (instance.getStartedAt() != null) vo.setStartedAt(DTF.format(instance.getStartedAt()));
         if (instance.getEndedAt() != null) vo.setEndedAt(DTF.format(instance.getEndedAt()));
@@ -208,5 +270,49 @@ public class WorkflowQueryService {
         vo.setRecords(recordVOs);
 
         return vo;
+    }
+
+    /**
+     * 我的抄送列表（分页）。
+     */
+    public IPage<WfCcVO> getMyCc(Long userId, Long tenantId, long pageNo, long pageSize) {
+        LambdaQueryWrapper<WfCc> wrapper = new LambdaQueryWrapper<WfCc>()
+                .eq(WfCc::getTenantId, tenantId)
+                .eq(WfCc::getCcUserId, userId)
+                .orderByDesc(WfCc::getCreatedTime);
+
+        Page<WfCc> page = wfCcMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+
+        // Batch-fetch instances to avoid N+1
+        List<Long> instanceIds = page.getRecords().stream().map(WfCc::getInstanceId).distinct().toList();
+        final Map<Long, WfInstance> instanceMap;
+        if (!instanceIds.isEmpty()) {
+            instanceMap = wfInstanceMapper.selectList(new LambdaQueryWrapper<WfInstance>()
+                            .eq(WfInstance::getTenantId, tenantId)
+                            .in(WfInstance::getId, instanceIds)).stream()
+                    .collect(Collectors.toMap(WfInstance::getId, Function.identity()));
+        } else {
+            instanceMap = Collections.emptyMap();
+        }
+
+        return page.convert(cc -> {
+            WfCcVO vo = new WfCcVO();
+            vo.setId(String.valueOf(cc.getId()));
+            vo.setInstanceId(String.valueOf(cc.getInstanceId()));
+            vo.setCcUserId(String.valueOf(cc.getCcUserId()));
+            vo.setCcUserName(cc.getCcUserName());
+            vo.setBusinessType(cc.getBusinessType());
+            if (cc.getBusinessId() != null) vo.setBusinessId(String.valueOf(cc.getBusinessId()));
+            vo.setTitle(cc.getTitle());
+            vo.setIsRead(cc.getIsRead());
+            if (cc.getCreatedTime() != null) vo.setCreatedTime(DTF.format(cc.getCreatedTime()));
+
+            // Enrich with instance info
+            WfInstance instance = instanceMap.get(cc.getInstanceId());
+            if (instance != null) {
+                vo.setInstanceStatus(instance.getInstanceStatus());
+            }
+            return vo;
+        });
     }
 }

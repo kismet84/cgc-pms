@@ -2,6 +2,9 @@ package com.cgcpms.workflow.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.notification.service.NotificationService;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -34,7 +37,10 @@ public class WorkflowEngine {
     private final WfTaskMapper wfTaskMapper;
     private final WfRecordMapper wfRecordMapper;
     private final WfIdempotencyMapper wfIdempotencyMapper;
+    private final WfCcService wfCcService;
+    private final SysUserMapper sysUserMapper;
     private final WorkflowBusinessHandlerRegistry handlerRegistry;
+    private final NotificationService notificationService;
 
     // ───────────────────── SUBMIT ─────────────────────
 
@@ -43,7 +49,8 @@ public class WorkflowEngine {
                              String businessType, Long businessId,
                              String title, java.math.BigDecimal amount,
                              Long projectId, Long contractId,
-                             String businessSummary, String variables) {
+                             String businessSummary, String variables,
+                             List<Long> ccUserIds) {
 
         WfTemplate template = findTemplate(businessType);
         List<WfTemplateNode> templateNodes = findTemplateNodes(template.getId());
@@ -102,6 +109,27 @@ public class WorkflowEngine {
         // Notify business handler
         notifyHandler(businessType, instance, WorkflowConstants.ACTION_SUBMIT, username, null);
 
+        // Create cc records and notifications (if ccUserIds provided)
+        if (ccUserIds != null && !ccUserIds.isEmpty()) {
+            wfCcService.createCc(instance.getId(), ccUserIds, tenantId);
+        }
+
+        // Notify approvers
+        List<WfTask> pendingTasks = wfTaskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instance.getId())
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+        for (WfTask t : pendingTasks) {
+            try {
+                notificationService.create(tenantId, t.getApproverId(),
+                        username + "提交了审批",
+                        username + "提交了审批：" + instance.getTitle(),
+                        "WORKFLOW", instance.getId());
+            } catch (Exception e) {
+                log.warn("Failed to create submit notification for approver {}: {}", t.getApproverId(), e.getMessage());
+            }
+        }
+
         return instance;
     }
 
@@ -140,6 +168,19 @@ public class WorkflowEngine {
                 nodeInstance != null ? nodeInstance.getNodeName() : null,
                 WorkflowConstants.ACTION_APPROVE, "同意",
                 userId, username, comment);
+
+        // Notify submitter
+        try {
+            WfInstance instanceForNotify = wfInstanceMapper.selectById(task.getInstanceId());
+            if (instanceForNotify != null) {
+                notificationService.create(instanceForNotify.getTenantId(), instanceForNotify.getInitiatorId(),
+                        username + "同意了你的申请",
+                        username + "同意了你的申请：" + instanceForNotify.getTitle(),
+                        "WORKFLOW", instanceForNotify.getId());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to create approve notification: {}", e.getMessage());
+        }
 
         // Check if node is complete
         String approveMode = nodeInstance != null ? nodeInstance.getApproveMode() : WorkflowConstants.MODE_SEQUENTIAL;
@@ -225,6 +266,16 @@ public class WorkflowEngine {
 
         notifyHandler(instance.getBusinessType(), instance,
                 WorkflowConstants.ACTION_REJECT, username, comment);
+
+        // Notify submitter
+        try {
+            notificationService.create(instance.getTenantId(), instance.getInitiatorId(),
+                    username + "驳回了你的申请",
+                    username + "驳回了你的申请：" + instance.getTitle(),
+                    "WORKFLOW", instance.getId());
+        } catch (Exception e) {
+            log.warn("Failed to create reject notification: {}", e.getMessage());
+        }
     }
 
     // ───────────────────── WITHDRAW ─────────────────────
@@ -241,6 +292,22 @@ public class WorkflowEngine {
         }
         if (!instance.getInitiatorId().equals(userId)) {
             throw new BusinessException("NOT_INITIATOR", "只有发起人可以撤回");
+        }
+
+        // Notify pending approvers before cancelling tasks
+        List<WfTask> pendingTasks = wfTaskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instanceId)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+        for (WfTask t : pendingTasks) {
+            try {
+                notificationService.create(instance.getTenantId(), t.getApproverId(),
+                        username + "撤回了审批",
+                        username + "撤回了审批：" + instance.getTitle(),
+                        "WORKFLOW", instanceId);
+            } catch (Exception e) {
+                log.warn("Failed to create withdraw notification for approver {}: {}", t.getApproverId(), e.getMessage());
+            }
         }
 
         cancelAllPendingTasks(instanceId);
@@ -331,11 +398,29 @@ public class WorkflowEngine {
         newTask.setBusinessType(task.getBusinessType());
         newTask.setBusinessId(task.getBusinessId());
         newTask.setApproverId(targetUserId);
-        newTask.setApproverName("U" + targetUserId);
+        SysUser targetUser = sysUserMapper.selectById(targetUserId);
+        newTask.setApproverName(targetUser != null
+                ? (targetUser.getRealName() != null ? targetUser.getRealName() : targetUser.getUsername())
+                : "");
         newTask.setTaskStatus(WorkflowConstants.TASK_PENDING);
         newTask.setRoundNo(task.getRoundNo());
         newTask.setReceivedAt(LocalDateTime.now());
         wfTaskMapper.insert(newTask);
+
+        // Notify transferee — use instance tenantId, reload if needed
+        try {
+            Long notifyTenantId = instance.getTenantId();
+            if (notifyTenantId == null || notifyTenantId == 0L) {
+                WfInstance reloaded = wfInstanceMapper.selectById(task.getInstanceId());
+                notifyTenantId = reloaded != null ? reloaded.getTenantId() : 0L;
+            }
+            notificationService.create(notifyTenantId, targetUserId,
+                    username + "转办了一个审批给你",
+                    username + "转办了一个审批给你：" + instance.getTitle(),
+                    "WORKFLOW", task.getBusinessId());
+        } catch (Exception e) {
+            log.warn("Failed to create transfer notification for user {}: {}", targetUserId, e.getMessage());
+        }
 
         writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),
                 task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
@@ -371,6 +456,14 @@ public class WorkflowEngine {
         if (node == null || !WorkflowConstants.NODE_ACTIVE.equals(node.getNodeStatus())) {
             throw new BusinessException("NODE_NOT_ACTIVE", "只能对当前活动节点加签");
         }
+        // Batch-fetch user names for all signees
+        java.util.Map<Long, SysUser> signUserMap = java.util.Collections.emptyMap();
+        if (!additionalUserIds.isEmpty()) {
+            java.util.List<SysUser> signUsers = sysUserMapper.selectBatchIds(
+                    new java.util.HashSet<>(additionalUserIds));
+            signUserMap = signUsers.stream()
+                    .collect(java.util.stream.Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
+        }
         for (Long auid : additionalUserIds) {
             // Check not already exists
             long exists = wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
@@ -386,11 +479,27 @@ public class WorkflowEngine {
             addTask.setBusinessType(task.getBusinessType());
             addTask.setBusinessId(task.getBusinessId());
             addTask.setApproverId(auid);
-            addTask.setApproverName("U" + auid);
+            SysUser signUser = signUserMap.get(auid);
+            addTask.setApproverName(signUser != null
+                    ? (signUser.getRealName() != null ? signUser.getRealName() : signUser.getUsername())
+                    : "");
             addTask.setTaskStatus(WorkflowConstants.TASK_PENDING);
             addTask.setRoundNo(task.getRoundNo());
             addTask.setReceivedAt(LocalDateTime.now());
             wfTaskMapper.insert(addTask);
+
+            // Notify signee — re-query instance to ensure fresh tenantId
+            try {
+                WfInstance instanceForNotify = wfInstanceMapper.selectById(task.getInstanceId());
+                Long notifyTenantId = instanceForNotify != null ? instanceForNotify.getTenantId() : instance.getTenantId();
+                String notifyTitle = instanceForNotify != null ? instanceForNotify.getTitle() : instance.getTitle();
+                notificationService.create(notifyTenantId, auid,
+                        username + "邀请你加签审批",
+                        username + "邀请你加签审批：" + notifyTitle,
+                        "WORKFLOW", task.getBusinessId());
+            } catch (Exception e) {
+                log.warn("Failed to create add-sign notification for user {}: {}", auid, e.getMessage());
+            }
         }
 
         writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),

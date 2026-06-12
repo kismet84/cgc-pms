@@ -19,4 +19,7 @@ public class WfRecordVO {
     private String comment;
     private String recordStatus;
     private String createdAt;
+    private String businessType;
+    private String title;
+    private String instanceStatus;
 }
