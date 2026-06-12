@@ -43,3 +43,6 @@ deploy/minio/data/
 # Temp
 *.tmp
 temp/
+.playwright-mcp/
+*-snapshot.yml
+login-snapshot.yml
