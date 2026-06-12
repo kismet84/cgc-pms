@@ -181,6 +181,32 @@ CREATE TABLE IF NOT EXISTS pay_record (
     KEY idx_pay_rec_date (pay_date)
 );
 
+-- pay_invoice with V36 definitions
+CREATE TABLE IF NOT EXISTS pay_invoice (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    pay_application_id BIGINT,
+    pay_record_id BIGINT,
+    invoice_no VARCHAR(100) NOT NULL,
+    invoice_type VARCHAR(50) NOT NULL DEFAULT 'VAT_SPECIAL',
+    invoice_amount DECIMAL(18,2) NOT NULL,
+    tax_rate DECIMAL(5,2),
+    tax_amount DECIMAL(18,2),
+    invoice_date DATE,
+    verify_status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    created_by BIGINT,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    PRIMARY KEY (id),
+    UNIQUE (tenant_id, invoice_no),
+    KEY idx_pi_tenant (tenant_id),
+    KEY idx_pi_pay_app (pay_application_id),
+    KEY idx_pi_pay_record (pay_record_id)
+);
+
 -- ====== V12: Phase 2 Business Tables ======
 CREATE TABLE IF NOT EXISTS md_material (
     id BIGINT NOT NULL,
@@ -663,6 +689,103 @@ CREATE TABLE IF NOT EXISTS sys_dict_item (
     KEY idx_sdi_dict (dict_id)
 );
 
+-- ====== V38: Workflow CC Table ======
+CREATE TABLE IF NOT EXISTS wf_cc (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    instance_id BIGINT NOT NULL,
+    cc_user_id BIGINT NOT NULL,
+    cc_user_name VARCHAR(100) NOT NULL,
+    business_type VARCHAR(100) NULL,
+    business_id BIGINT NULL,
+    title VARCHAR(500) NULL,
+    is_read SMALLINT NOT NULL DEFAULT 0,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_wc_tenant_ccuser (tenant_id, cc_user_id),
+    KEY idx_wc_instance (instance_id)
+);
+
+-- ====== V37: Notification Table ======
+CREATE TABLE IF NOT EXISTS sys_notification (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    content TEXT,
+    biz_type VARCHAR(100),
+    biz_id BIGINT,
+    notify_type VARCHAR(50) NOT NULL DEFAULT 'INFO',
+    is_read SMALLINT NOT NULL DEFAULT 0,
+    read_time TIMESTAMP,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_sn_tenant_user_read ON sys_notification (tenant_id, user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_sn_biz ON sys_notification (biz_type, biz_id);
+
+-- ====== V35: Inventory Tables ======
+CREATE TABLE IF NOT EXISTS mat_warehouse (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    project_id BIGINT NOT NULL,
+    warehouse_code VARCHAR(50) NOT NULL,
+    warehouse_name VARCHAR(200) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'ENABLE',
+    created_by BIGINT,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(2000),
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_mw_tenant ON mat_warehouse (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mw_project ON mat_warehouse (project_id);
+
+-- ====== V35: Inventory Stock Tables ======
+CREATE TABLE IF NOT EXISTS mat_stock (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    warehouse_id BIGINT NOT NULL,
+    material_id BIGINT NOT NULL,
+    available_qty DECIMAL(18,4) NOT NULL DEFAULT 0,
+    version INT NOT NULL DEFAULT 0,
+    created_by BIGINT,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(2000),
+    PRIMARY KEY (id),
+    UNIQUE (warehouse_id, material_id)
+);
+CREATE INDEX IF NOT EXISTS idx_ms_tenant ON mat_stock (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_ms_warehouse ON mat_stock (warehouse_id);
+CREATE INDEX IF NOT EXISTS idx_ms_material ON mat_stock (material_id);
+
+CREATE TABLE IF NOT EXISTS mat_stock_txn (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    warehouse_id BIGINT NOT NULL,
+    material_id BIGINT NOT NULL,
+    txn_type VARCHAR(20) NOT NULL,
+    quantity DECIMAL(18,4) NOT NULL,
+    available_after DECIMAL(18,4) NOT NULL DEFAULT 0,
+    source_type VARCHAR(50),
+    source_id BIGINT,
+    created_by BIGINT,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(2000),
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_mst_tenant ON mat_stock_txn (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mst_warehouse_material ON mat_stock_txn (warehouse_id, material_id);
+CREATE INDEX IF NOT EXISTS idx_mst_source ON mat_stock_txn (source_type, source_id);
+
 -- ====== Alterations from later migrations (added directly to H2 DDL above) ======
 -- ct_contract already has: paid_amount (V18), cost_generated_flag (V20), settlement_amount (V29)
 -- These columns are defined in the H2 schema.sql ct_contract table definition
@@ -725,3 +848,132 @@ MERGE INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, n
 (51102, 0, 50011, 'N2', '部门经理审批', 2, 'APPROVAL', 'SEQUENTIAL', '{"type":"USER","userId":1}', NULL, 1, 1, 48);
 MERGE INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config, condition_rule, allow_transfer, allow_add_sign, timeout_hours) KEY(id) VALUES
 (51103, 0, 50011, 'N3', '总经理审批', 3, 'APPROVAL', 'SEQUENTIAL', '{"type":"USER","userId":1}', NULL, 1, 1, 72);
+
+-- ====== V33: Organization Tables ======
+CREATE TABLE IF NOT EXISTS org_company (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    company_code VARCHAR(50) NOT NULL,
+    company_name VARCHAR(200) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'ENABLE',
+    created_by BIGINT NULL,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NULL,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark TEXT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_oc_tenant ON org_company(tenant_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_oc_tenant_code ON org_company(tenant_id, company_code);
+
+CREATE TABLE IF NOT EXISTS org_department (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    company_id BIGINT NOT NULL,
+    parent_id BIGINT NULL DEFAULT NULL,
+    dept_code VARCHAR(50) NOT NULL,
+    dept_name VARCHAR(200) NOT NULL,
+    order_num INT NOT NULL DEFAULT 0,
+    status VARCHAR(50) NOT NULL DEFAULT 'ENABLE',
+    created_by BIGINT NULL,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NULL,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark TEXT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_od_tenant ON org_department(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_od_company ON org_department(company_id);
+CREATE INDEX IF NOT EXISTS idx_od_parent ON org_department(parent_id);
+
+CREATE TABLE IF NOT EXISTS org_position (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    position_code VARCHAR(50) NOT NULL,
+    position_name VARCHAR(200) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'ENABLE',
+    created_by BIGINT NULL,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT NULL,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark TEXT NULL,
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_op_tenant ON org_position(tenant_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_op_tenant_code ON org_position(tenant_id, position_code);
+
+-- ====== V34: Project Member Table ======
+CREATE TABLE IF NOT EXISTS pm_project_member (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    project_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    role_code VARCHAR(50) NOT NULL,
+    position_name VARCHAR(200),
+    start_date DATE,
+    end_date DATE,
+    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+    created_by BIGINT,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(2000),
+    PRIMARY KEY (id),
+    UNIQUE (project_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_ppm_tenant ON pm_project_member(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_ppm_project ON pm_project_member(project_id);
+CREATE INDEX IF NOT EXISTS idx_ppm_user ON pm_project_member(user_id);
+
+-- ====== V35: Purchase Request Tables (mat_purchase_request + mat_purchase_request_item) ======
+CREATE TABLE IF NOT EXISTS mat_purchase_request (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    project_id BIGINT NOT NULL,
+    request_code VARCHAR(50) NOT NULL,
+    approval_status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+    status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
+    created_by BIGINT,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(2000),
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_mpr_tenant ON mat_purchase_request (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mpr_project ON mat_purchase_request (project_id);
+
+CREATE TABLE IF NOT EXISTS mat_purchase_request_item (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    request_id BIGINT NOT NULL,
+    material_id BIGINT NOT NULL,
+    quantity DECIMAL(18,4) NOT NULL,
+    unit VARCHAR(20),
+    planned_date DATE,
+    created_by BIGINT,
+    created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by BIGINT,
+    updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_flag SMALLINT NOT NULL DEFAULT 0,
+    remark VARCHAR(2000),
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS idx_mpi_request ON mat_purchase_request_item (request_id);
+CREATE INDEX IF NOT EXISTS idx_mpi_material ON mat_purchase_request_item (material_id);
+
+-- ====== V39: Purchase Request Approval Template (PURCHASE_REQUEST, template_id=50012) ======
+MERGE INTO wf_template (id, tenant_id, template_code, template_name, business_type, enabled, amount_min, amount_max, condition_rule, form_schema, created_by, remark) KEY(id) VALUES
+(50012, 0, 'TPL-PURCHASE-REQUEST-001', '采购申请审批', 'PURCHASE_REQUEST', 1, 0.00, 999999999.99, NULL, NULL, 1, '第4阶段：采购申请三级顺序审批');
+
+MERGE INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config, condition_rule, allow_transfer, allow_add_sign, timeout_hours) KEY(id) VALUES
+(51201, 0, 50012, 'NODE_PR_001', '项目经理', 1, 'APPROVAL', 'SEQUENTIAL', '{"type":"USER","userId":1}', NULL, 1, 1, 48);
+MERGE INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config, condition_rule, allow_transfer, allow_add_sign, timeout_hours) KEY(id) VALUES
+(51202, 0, 50012, 'NODE_PR_002', '商务经理', 2, 'APPROVAL', 'SEQUENTIAL', '{"type":"USER","userId":1}', NULL, 1, 1, 48);
+MERGE INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config, condition_rule, allow_transfer, allow_add_sign, timeout_hours) KEY(id) VALUES
+(51203, 0, 50012, 'NODE_PR_003', '成本/采购', 3, 'APPROVAL', 'SEQUENTIAL', '{"type":"USER","userId":1}', NULL, 1, 1, 48);

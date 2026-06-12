@@ -98,3 +98,101 @@ MERGE INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, n
 VALUES (50302, 0, 50003, 'N2', '部门经理审批', 2, 'APPROVAL', 'SEQUENTIAL', '{"type":"USER","userId":1}', 1, 1, 48);
 MERGE INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config, allow_transfer, allow_add_sign, timeout_hours) KEY(id)
 VALUES (50303, 0, 50003, 'N3', '总经理审批', 3, 'APPROVAL', 'SEQUENTIAL', '{"type":"USER","userId":1}', 1, 1, 72);
+
+-- ====== Dict Seed Data (matches MySQL V5 seed IDs) ======
+
+-- Dict types
+MERGE INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) KEY(id)
+VALUES (1001, 0, 'project_status',  '项目状态', 'ENABLE');
+MERGE INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) KEY(id)
+VALUES (1002, 0, 'contract_type',   '合同类型', 'ENABLE');
+MERGE INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) KEY(id)
+VALUES (1003, 0, 'contract_status', '合同状态', 'ENABLE');
+MERGE INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) KEY(id)
+VALUES (1004, 0, 'approval_status', '审批状态', 'ENABLE');
+MERGE INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) KEY(id)
+VALUES (1005, 0, 'partner_type',    '合作方类型', 'ENABLE');
+MERGE INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) KEY(id)
+VALUES (1006, 0, 'pay_type',        '付款类型', 'ENABLE');
+MERGE INTO sys_dict_type (id, tenant_id, dict_code, dict_name, status) KEY(id)
+VALUES (1007, 0, 'cost_type',       '成本类型', 'ENABLE');
+
+-- Dict data: project_status (dict_type_id=1001)
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100101, 0, 1001, '草稿',   'DRAFT',       'info',    1, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100102, 0, 1001, '在建',   'ONGOING',     'primary', 2, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100103, 0, 1001, '已竣工', 'COMPLETED',   'success', 3, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100104, 0, 1001, '已暂停', 'SUSPENDED',   'warning', 4, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100105, 0, 1001, '已关闭', 'CLOSED',      'danger',  5, 'ENABLE');
+
+-- Dict data: contract_type (dict_type_id=1002)
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100201, 0, 1002, '总包合同', 'MAIN',       'primary', 1, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100202, 0, 1002, '分包合同', 'SUB',        'success', 2, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100203, 0, 1002, '采购合同', 'PURCHASE',   'info',    3, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100204, 0, 1002, '租赁合同', 'LEASE',      'warning', 4, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100205, 0, 1002, '服务合同', 'SERVICE',    'default', 5, 'ENABLE');
+
+-- Dict data: contract_status (dict_type_id=1003)
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100301, 0, 1003, '草稿',   'DRAFT',       'info',    1, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100302, 0, 1003, '履约中', 'PERFORMING',  'primary', 2, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100303, 0, 1003, '已结算', 'SETTLED',     'success', 3, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100304, 0, 1003, '已终止', 'TERMINATED',  'danger',  4, 'ENABLE');
+
+-- Dict data: approval_status (dict_type_id=1004)
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100401, 0, 1004, '草稿',   'DRAFT',       'info',    1, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100402, 0, 1004, '审批中', 'APPROVING',   'warning', 2, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100403, 0, 1004, '已通过', 'APPROVED',    'success', 3, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100404, 0, 1004, '已驳回', 'REJECTED',    'danger',  4, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100405, 0, 1004, '已撤回', 'WITHDRAWN',   'default', 5, 'ENABLE');
+
+-- Dict data: partner_type (dict_type_id=1005)
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100501, 0, 1005, '供应商', 'SUPPLIER',     'primary', 1, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100502, 0, 1005, '分包商', 'SUBCONTRACTOR','success', 2, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100503, 0, 1005, '租赁商', 'LESSOR',       'info',    3, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100504, 0, 1005, '服务商', 'SERVICE_PROVIDER','warning', 4, 'ENABLE');
+
+-- Dict data: pay_type (dict_type_id=1006)
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100601, 0, 1006, '预付款', 'ADVANCE',     'primary', 1, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100602, 0, 1006, '进度款', 'PROGRESS',    'success', 2, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100603, 0, 1006, '结算款', 'SETTLEMENT',  'info',    3, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100604, 0, 1006, '质保金', 'WARRANTY',    'warning', 4, 'ENABLE');
+
+-- Dict data: cost_type (dict_type_id=1007)
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100701, 0, 1007, '材料费',   'MATERIAL',   'primary', 1, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100702, 0, 1007, '分包费',   'SUBCONTRACT','success', 2, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100703, 0, 1007, '机械费',   'MACHINERY',  'info',    3, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100704, 0, 1007, '人工费',   'LABOR',      'warning', 4, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100705, 0, 1007, '签证费',   'VISA',       'default', 5, 'ENABLE');
+MERGE INTO sys_dict_data (id, tenant_id, dict_type_id, dict_label, dict_value, list_class, order_num, status) KEY(id)
+VALUES (100706, 0, 1007, '管理费',   'MANAGEMENT', 'default', 6, 'ENABLE');

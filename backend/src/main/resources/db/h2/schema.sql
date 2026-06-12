@@ -334,6 +334,35 @@ CREATE TABLE IF NOT EXISTS wf_idempotency (
     PRIMARY KEY (id)
 );
 
+-- sys_dict_type table (matches MySQL V5 migration — sys_dict_type, not sys_dict)
+CREATE TABLE IF NOT EXISTS sys_dict_type (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    dict_code VARCHAR(100) NOT NULL,
+    dict_name VARCHAR(200) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'ENABLE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE (tenant_id, dict_code)
+);
+
+-- sys_dict_data table (matches MySQL V5 migration — sys_dict_data, not sys_dict_item)
+CREATE TABLE IF NOT EXISTS sys_dict_data (
+    id BIGINT NOT NULL,
+    tenant_id BIGINT NOT NULL DEFAULT 0,
+    dict_type_id BIGINT NOT NULL,
+    dict_label VARCHAR(200) NOT NULL,
+    dict_value VARCHAR(200) NOT NULL,
+    css_class VARCHAR(100),
+    list_class VARCHAR(100),
+    order_num INT NOT NULL DEFAULT 0,
+    status VARCHAR(50) NOT NULL DEFAULT 'ENABLE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE (dict_type_id, dict_value)
+);
 -- ====== File Management Tables ======
 
 CREATE TABLE IF NOT EXISTS sys_file (
