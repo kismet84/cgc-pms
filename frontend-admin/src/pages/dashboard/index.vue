@@ -147,10 +147,10 @@ function fmtWan(val: string | undefined): string {
 }
 
 function fmtDeviation(val: string | undefined): string {
-  if (!val) return '0.00%'
+  if (!val) return '0.00'
   const n = parseFloat(val)
-  if (isNaN(n)) return '0.00%'
-  return (Math.abs(n) * 100).toFixed(2) + '%'
+  if (isNaN(n)) return '0.00'
+  return (Math.abs(n) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function fmtNum(val: number | undefined): string {
@@ -337,7 +337,7 @@ const mgmtRankCols = [
   { title: '合同收入(万元)', dataIndex: 'contractIncome', width: 140, align: 'right' as const },
   { title: '动态成本(万元)', dataIndex: 'dynamicCost', width: 140, align: 'right' as const },
   { title: '预计利润(万元)', dataIndex: 'expectedProfit', width: 140, align: 'right' as const },
-  { title: '偏差率', dataIndex: 'costDeviation', width: 100, align: 'right' as const },
+  { title: '成本偏差(万元)', dataIndex: 'costDeviation', width: 140, align: 'right' as const },
   { title: '已付款(万元)', dataIndex: 'paidAmount', width: 130, align: 'right' as const },
   { title: '待办', dataIndex: 'pendingTaskCount', width: 70, align: 'center' as const },
   { title: '风险', dataIndex: 'riskCount', width: 70, align: 'center' as const },
@@ -348,7 +348,7 @@ const drillCols = [
   { title: '锁定成本(万元)', dataIndex: 'contractLockedCost', width: 130, align: 'right' as const },
   { title: '实际成本(万元)', dataIndex: 'actualCost', width: 130, align: 'right' as const },
   { title: '动态成本(万元)', dataIndex: 'dynamicCost', width: 130, align: 'right' as const },
-  { title: '偏差率', dataIndex: 'costDeviation', width: 100, align: 'right' as const },
+  { title: '成本偏差(万元)', dataIndex: 'costDeviation', width: 140, align: 'right' as const },
 ]
 
 onMounted(() => {
@@ -532,7 +532,7 @@ onMounted(() => {
           <div class="kpi-body">
             <div class="kpi-title">成本偏差</div>
             <div class="kpi-value" :style="{ color: devColor(costData.costDeviation) }">
-              {{ devSign(costData.costDeviation) }}{{ fmtDeviation(costData.costDeviation) }}
+              {{ devSign(costData.costDeviation) }}{{ fmtDeviation(costData.costDeviation) }} <small>万元</small>
             </div>
           </div>
         </div>
@@ -737,8 +737,8 @@ onMounted(() => {
           <span>实际成本：<b>{{ fmtWan(drillSubject.actualCost) }}</b> 万元</span>
           <span>动态成本：<b>{{ fmtWan(drillSubject.dynamicCost) }}</b> 万元</span>
           <span>
-            偏差率：<b :style="{ color: devColor(drillSubject.costDeviation) }">
-              {{ devSign(drillSubject.costDeviation) }}{{ fmtDeviation(drillSubject.costDeviation) }}
+            成本偏差：<b :style="{ color: devColor(drillSubject.costDeviation) }">
+              {{ devSign(drillSubject.costDeviation) }}{{ fmtDeviation(drillSubject.costDeviation) }} 万元
             </b>
           </span>
         </div>

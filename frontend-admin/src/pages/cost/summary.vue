@@ -73,10 +73,10 @@ function fmtAmount(val: string | undefined): string {
 }
 
 function fmtDeviation(val: string | undefined): string {
-  if (!val) return '0.00%'
+  if (!val) return '0.00'
   const n = parseFloat(val)
-  if (isNaN(n)) return '0.00%'
-  return (n * 100).toFixed(2) + '%'
+  if (isNaN(n)) return '0.00'
+  return (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function getDeviationColor(val: string | undefined): string {
@@ -94,7 +94,7 @@ const subjectColumns = [
   { title: '实际成本(万元)', dataIndex: 'actualCost', width: 140, align: 'right' as const, key: 'actualCost' },
   { title: '已付款(万元)', dataIndex: 'paidAmount', width: 130, align: 'right' as const, key: 'paidAmount' },
   { title: '动态成本(万元)', dataIndex: 'dynamicCost', width: 140, align: 'right' as const, key: 'dynamicCost' },
-  { title: '偏差率', dataIndex: 'costDeviation', width: 100, align: 'right' as const, key: 'costDeviation' },
+  { title: '成本偏差(万元)', dataIndex: 'costDeviation', width: 140, align: 'right' as const, key: 'costDeviation' },
 ]
 
 onMounted(() => {
@@ -181,8 +181,8 @@ onMounted(() => {
         <div class="cl-kpi">
           <div class="cl-kpi-icon" :style="{ background: getDeviationColor(summary.costDeviation) }"><LineChartOutlined /></div>
           <div>
-            <div class="cl-kpi-title">成本偏差率</div>
-            <div class="cl-kpi-value">{{ fmtDeviation(summary.costDeviation) }}</div>
+            <div class="cl-kpi-title">成本偏差</div>
+            <div class="cl-kpi-value">{{ fmtDeviation(summary.costDeviation) }} <small>万元</small></div>
           </div>
         </div>
       </div>
