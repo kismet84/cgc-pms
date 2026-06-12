@@ -14,15 +14,12 @@ const SUCCESS_CODE = '0'
 const service: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
   timeout: 15000,
+  withCredentials: true, // send HttpOnly cookies automatically
 })
 
-// 请求拦截器：附加 token
+// 请求拦截器：无需手动附加 Authorization header — HttpOnly Cookie 自动携带
 service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const userStore = useUserStore()
-    if (userStore.token) {
-      config.headers.Authorization = `Bearer ${userStore.token}`
-    }
     return config
   },
   (error) => Promise.reject(error),
@@ -31,10 +28,10 @@ service.interceptors.request.use(
 // 是否正在刷新中，防止并发多次刷新
 let isRefreshing = false
 // 刷新期间排队的请求
-let pendingQueue: Array<{ resolve: (v: string) => void; reject: (e: Error) => void }> = []
+let pendingQueue: Array<{ resolve: (v: void) => void; reject: (e: Error) => void }> = []
 
-function processQueue(newToken: string) {
-  pendingQueue.forEach((entry) => entry.resolve(newToken))
+function processQueue() {
+  pendingQueue.forEach((entry) => entry.resolve())
   pendingQueue = []
 }
 
@@ -56,23 +53,11 @@ service.interceptors.response.use(
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
     if (status === 401 && !originalRequest._retry) {
-      const userStore = useUserStore()
-      const rt = userStore.refreshToken
-
-      if (!rt) {
-        // No refresh token — force logout
-        userStore.logout()
-        message.error('登录已过期，请重新登录')
-        if (window.location.pathname !== '/login') window.location.href = '/login'
-        return Promise.reject(error)
-      }
-
       if (isRefreshing) {
         // Queue up while another refresh is in flight
-        return new Promise<string>((resolve, reject) => {
+        return new Promise<void>((resolve, reject) => {
           pendingQueue.push({ resolve, reject })
-        }).then((newToken) => {
-          originalRequest.headers.Authorization = `Bearer ${newToken}`
+        }).then(() => {
           return service(originalRequest)
         })
       }
@@ -81,16 +66,15 @@ service.interceptors.response.use(
       isRefreshing = true
 
       try {
-        const result = await refreshTokenApi(rt)
-        userStore.setToken(result.token)
-        userStore.setRefreshToken(result.refreshToken)
-        processQueue(result.token)
-        originalRequest.headers.Authorization = `Bearer ${result.token}`
+        // Refresh token is sent via HttpOnly cookie — no manual token needed
+        await refreshTokenApi()
+        processQueue()
         return service(originalRequest)
       } catch {
         // Refresh failed — reject all queued requests, then logout
         pendingQueue.forEach((entry) => entry.reject(new Error('Token refresh failed')))
         pendingQueue = []
+        const userStore = useUserStore()
         userStore.logout()
         message.error('登录已过期，请重新登录')
         if (window.location.pathname !== '/login') window.location.href = '/login'

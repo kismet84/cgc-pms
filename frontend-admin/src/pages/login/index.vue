@@ -26,10 +26,9 @@ async function handleSubmit() {
   loading.value = true
   try {
     // 接入真实后端登录接口
-    const { token, refreshToken, userInfo } = await login(formState)
-    userStore.setToken(token)
-    userStore.setRefreshToken(refreshToken)
-    userStore.setUserInfo(userInfo)
+    // tokens are now HttpOnly cookies set by the backend — frontend only stores userInfo
+    const result = await login(formState)
+    userStore.setUserInfo(result.userInfo)
 
     message.success('登录成功')
     const redirect = (route.query.redirect as string) || '/'

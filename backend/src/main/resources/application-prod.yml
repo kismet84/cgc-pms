@@ -39,6 +39,10 @@ minio:
   secret-key: ${MINIO_SECRET_KEY}
   bucket: ${MINIO_BUCKET:cgc-pms}
 
+# Cookie security — enable Secure flag for HTTPS-only environments
+cookie:
+  secure: true
+
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}

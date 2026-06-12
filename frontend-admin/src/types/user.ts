@@ -5,10 +5,10 @@ export interface LoginParams {
   remember?: boolean
 }
 
-/** 登录响应 */
+/** 登录响应 — tokens are delivered via HttpOnly cookies; JSON body carries userInfo only */
 export interface LoginResult {
-  token: string
-  refreshToken: string
+  token?: string
+  refreshToken?: string
   userInfo: UserInfo
 }
 

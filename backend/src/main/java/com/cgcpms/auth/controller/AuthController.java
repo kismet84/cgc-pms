@@ -7,9 +7,12 @@ import com.cgcpms.auth.dto.LoginResponse;
 import com.cgcpms.auth.dto.UserInfo;
 import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.auth.service.TokenBlacklistService;
+import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.result.ApiResponse;
 import io.jsonwebtoken.Claims;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.*;
@@ -21,19 +24,28 @@ public class AuthController {
     private final AuthService authService;
     private final JwtUtils jwtUtils;
     private final JwtProperties jwtProperties;
+    private final CookieUtils cookieUtils;
     private final ObjectProvider<TokenBlacklistService> blacklistProvider;
 
     public AuthController(AuthService authService, JwtUtils jwtUtils, JwtProperties jwtProperties,
+                          CookieUtils cookieUtils,
                           ObjectProvider<TokenBlacklistService> blacklistProvider) {
         this.authService = authService;
         this.jwtUtils = jwtUtils;
         this.jwtProperties = jwtProperties;
+        this.cookieUtils = cookieUtils;
         this.blacklistProvider = blacklistProvider;
     }
 
     @PostMapping("/login")
-    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.success(authService.login(request));
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                             HttpServletResponse response) {
+        LoginResponse result = authService.login(request);
+        setTokenCookies(response, result.getToken(), result.getRefreshToken());
+        // Strip tokens from JSON body — they are now HttpOnly cookies only
+        result.setToken(null);
+        result.setRefreshToken(null);
+        return ApiResponse.success(result);
     }
 
     @GetMapping("/userinfo")
@@ -42,18 +54,30 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(@RequestHeader("Authorization") String authHeader) {
-        String token = extractToken(authHeader);
+    public ApiResponse<Void> logout(HttpServletRequest request,
+                                     HttpServletResponse response) {
+        String token = resolveAccessToken(request);
         if (token != null && jwtUtils.validateToken(token)) {
             TokenBlacklistService svc = blacklistProvider.getIfAvailable();
             if (svc != null) svc.blacklist(token, jwtUtils.getRemainingTtlMillis(token));
         }
+        cookieUtils.clearAuthCookies(response);
         UserContext.clear();
         return ApiResponse.success();
     }
 
     @PostMapping("/refresh")
-    public ApiResponse<LoginResponse> refresh(@RequestHeader("X-Refresh-Token") String refreshToken) {
+    public ApiResponse<LoginResponse> refresh(HttpServletRequest request,
+                                                HttpServletResponse response,
+                                                @RequestHeader(value = "X-Refresh-Token", required = false) String headerRefreshToken) {
+        // Read refresh token: cookie first, then X-Refresh-Token header (backward compat)
+        String refreshToken = cookieUtils.getCookieValue(request, CookieUtils.REFRESH_TOKEN_COOKIE);
+        if (refreshToken == null || refreshToken.isBlank()) {
+            refreshToken = headerRefreshToken;
+        }
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return ApiResponse.fail("AUTH_TOKEN_INVALID", "Refresh token缺失");
+        }
         if (!jwtUtils.validateToken(refreshToken) || !jwtUtils.isRefreshToken(refreshToken)) {
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Refresh token无效");
         }
@@ -64,7 +88,36 @@ public class AuthController {
         Claims claims = jwtUtils.parseToken(refreshToken);
         Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
         if (svc != null) svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken));
-        return ApiResponse.success(authService.loginById(userId));
+        LoginResponse result = authService.loginById(userId);
+        setTokenCookies(response, result.getToken(), result.getRefreshToken());
+        // Strip tokens from JSON body — they are now HttpOnly cookies only
+        result.setToken(null);
+        result.setRefreshToken(null);
+        return ApiResponse.success(result);
+    }
+
+    // ---- private helpers ----
+
+    /**
+     * Set access and refresh tokens as HttpOnly, SameSite=Strict cookies.
+     */
+    private void setTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
+        long accessMaxAge = jwtProperties.getExpiration() / 1000;
+        long refreshMaxAge = jwtProperties.getRefreshExpiration() / 1000;
+        cookieUtils.setAccessTokenCookie(response, accessToken, accessMaxAge);
+        cookieUtils.setRefreshTokenCookie(response, refreshToken, refreshMaxAge);
+    }
+
+    /**
+     * Resolve access token: cookie first, then Authorization header (backward compat).
+     */
+    private String resolveAccessToken(HttpServletRequest request) {
+        String cookieToken = cookieUtils.getCookieValue(request, CookieUtils.ACCESS_TOKEN_COOKIE);
+        if (cookieToken != null && !cookieToken.isBlank()) {
+            return cookieToken;
+        }
+        String authHeader = request.getHeader(jwtProperties.getHeader());
+        return extractToken(authHeader);
     }
 
     private String extractToken(String authHeader) {

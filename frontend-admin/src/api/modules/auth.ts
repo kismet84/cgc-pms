@@ -13,10 +13,10 @@ export function logout() {
   return request<void>({ url: '/auth/logout', method: 'post' })
 }
 
-export function refreshTokenApi(refreshToken: string) {
+/** Refresh tokens via HttpOnly cookie — no manual token needed. */
+export function refreshTokenApi() {
   return request<LoginResult>({
     url: '/auth/refresh',
     method: 'post',
-    headers: { 'X-Refresh-Token': refreshToken },
   })
 }

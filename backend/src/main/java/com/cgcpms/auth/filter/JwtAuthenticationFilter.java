@@ -3,6 +3,7 @@ package com.cgcpms.auth.filter;
 import com.cgcpms.auth.config.JwtProperties;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.service.TokenBlacklistService;
+import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.result.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,16 +46,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final JwtProperties jwtProperties;
+    private final CookieUtils cookieUtils;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public JwtAuthenticationFilter(JwtUtils jwtUtils,
                                    JwtProperties jwtProperties,
+                                   CookieUtils cookieUtils,
                                    ObjectMapper objectMapper,
                                    ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider) {
         this.jwtUtils = jwtUtils;
         this.jwtProperties = jwtProperties;
+        this.cookieUtils = cookieUtils;
         this.objectMapper = objectMapper;
         this.tokenBlacklistServiceProvider = tokenBlacklistServiceProvider;
     }
@@ -109,6 +113,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private String resolveToken(HttpServletRequest request) {
+        // Cookie takes precedence (HttpOnly mode)
+        String cookieToken = cookieUtils.getCookieValue(request, CookieUtils.ACCESS_TOKEN_COOKIE);
+        if (cookieToken != null && !cookieToken.isBlank()) {
+            return cookieToken;
+        }
+        // Fall back to Authorization header (backward compat)
         String headerValue = request.getHeader(jwtProperties.getHeader());
         if (headerValue == null || headerValue.isBlank()) {
             return null;

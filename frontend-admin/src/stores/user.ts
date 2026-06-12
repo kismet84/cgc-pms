@@ -2,47 +2,40 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UserInfo } from '@/types/user'
 
-const TOKEN_KEY = 'cgc_pms_token'
-const REFRESH_TOKEN_KEY = 'cgc_pms_refresh_token'
+const USER_INFO_KEY = 'cgc_pms_userinfo'
 
 export const useUserStore = defineStore('user', () => {
-  const token = ref<string>(localStorage.getItem(TOKEN_KEY) || '')
-  const refreshToken = ref<string>(sessionStorage.getItem(REFRESH_TOKEN_KEY) || '')
-  const userInfo = ref<UserInfo | null>(null)
+  const userInfo = ref<UserInfo | null>(loadUserInfo())
 
   const roles = computed<string[]>(() => userInfo.value?.roles ?? [])
   const permissions = computed<string[]>(() => userInfo.value?.permissions ?? [])
-  const isLogin = computed<boolean>(() => !!token.value)
-
-  function setToken(value: string) {
-    token.value = value
-    localStorage.setItem(TOKEN_KEY, value)
-  }
-
-  function setRefreshToken(value: string) {
-    refreshToken.value = value
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, value)
-  }
+  const isLogin = computed<boolean>(() => !!userInfo.value)
 
   function setUserInfo(info: UserInfo) {
     userInfo.value = info
+    persistUserInfo(info)
   }
 
   function hasPermission(code: string): boolean {
     return permissions.value.includes(code)
   }
 
-  function logout() {
-    token.value = ''
-    refreshToken.value = ''
+  async function logout() {
     userInfo.value = null
-    localStorage.removeItem(TOKEN_KEY)
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+    clearUserInfo()
+  }
+
+  // Backward-compat stubs — tokens are now HttpOnly cookies, JS never sees them.
+  // These are kept so existing code calling setToken/setRefreshToken doesn't break.
+  function setToken(_value: string) {
+    // no-op: tokens are set via Set-Cookie by the backend
+  }
+
+  function setRefreshToken(_value: string) {
+    // no-op: tokens are set via Set-Cookie by the backend
   }
 
   return {
-    token,
-    refreshToken,
     userInfo,
     roles,
     permissions,
@@ -54,3 +47,29 @@ export const useUserStore = defineStore('user', () => {
     logout,
   }
 })
+
+function loadUserInfo(): UserInfo | null {
+  try {
+    const raw = localStorage.getItem(USER_INFO_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as UserInfo
+  } catch {
+    return null
+  }
+}
+
+function persistUserInfo(info: UserInfo) {
+  try {
+    localStorage.setItem(USER_INFO_KEY, JSON.stringify(info))
+  } catch {
+    // localStorage full or unavailable — userInfo lives only in memory
+  }
+}
+
+function clearUserInfo() {
+  try {
+    localStorage.removeItem(USER_INFO_KEY)
+  } catch {
+    // ignore
+  }
+}
