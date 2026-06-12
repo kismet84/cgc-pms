@@ -1,0 +1,29 @@
+# Build artifacts
+target/
+
+# Version control
+.git/
+.gitignore
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Node (not used by backend, but keep context clean)
+node_modules/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Documentation (not needed for build)
+doc/
+
+# Maven wrapper (Dockerfile uses the Maven image directly)
+.mvn/
+mvnw
+mvnw.cmd
