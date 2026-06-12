@@ -32,6 +32,9 @@ public class SysUser extends BaseEntity {
 
     private String email;
 
+    /** @see V34__add_project_member_and_user_org.sql — org_id added to sys_user */
+    private Long orgId;
+
     private String avatar;
 
     private String status;

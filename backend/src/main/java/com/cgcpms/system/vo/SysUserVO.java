@@ -13,6 +13,7 @@ public class SysUserVO {
     private String phone;
     private String email;
     private String avatar;
+    private Long orgId;
     private String status;
     private Integer isAdmin;
     private List<String> roleNames;

@@ -57,6 +57,7 @@ public class SysUserService {
             vo.setPhone(user.getPhone());
             vo.setEmail(user.getEmail());
             vo.setAvatar(user.getAvatar());
+            vo.setOrgId(user.getOrgId());
             vo.setStatus(user.getStatus());
             vo.setIsAdmin(user.getIsAdmin());
             vo.setRoleNames(roleNamesMap.getOrDefault(user.getId(), Collections.emptyList()));
@@ -76,6 +77,7 @@ public class SysUserService {
         vo.setPhone(user.getPhone());
         vo.setEmail(user.getEmail());
         vo.setAvatar(user.getAvatar());
+        vo.setOrgId(user.getOrgId());
         vo.setStatus(user.getStatus());
         vo.setIsAdmin(user.getIsAdmin());
         vo.setRoleNames(getRoleNames(user.getId()));

@@ -5,7 +5,9 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.service.PmProjectService;
+import com.cgcpms.project.service.ProjectOverviewService;
 import com.cgcpms.project.vo.PmProjectVO;
+import com.cgcpms.project.vo.ProjectOverviewVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +19,13 @@ import org.springframework.web.bind.annotation.*;
 public class PmProjectController {
 
     private final PmProjectService pmProjectService;
+    private final ProjectOverviewService projectOverviewService;
+
+    @GetMapping("/{projectId}/overview")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:query')")
+    public ApiResponse<ProjectOverviewVO> overview(@PathVariable Long projectId) {
+        return ApiResponse.success(projectOverviewService.getOverview(projectId));
+    }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:query')")
