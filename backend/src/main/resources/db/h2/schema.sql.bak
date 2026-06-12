@@ -332,8 +332,10 @@ CREATE TABLE IF NOT EXISTS wf_idempotency (
     response_json VARCHAR(2000),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expired_at TIMESTAMP,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    UNIQUE (tenant_id, user_id, idempotency_key)
 );
+CREATE INDEX IF NOT EXISTS idx_wf_idempotency_expired ON wf_idempotency (expired_at);
 
 -- sys_dict_type table (matches MySQL V5 migration — sys_dict_type, not sys_dict)
 CREATE TABLE IF NOT EXISTS sys_dict_type (
