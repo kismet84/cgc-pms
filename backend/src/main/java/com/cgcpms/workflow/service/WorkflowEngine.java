@@ -94,7 +94,8 @@ public class WorkflowEngine {
         }
 
         // Write submit record
-        writeRecord(instance.getId(), null, null, 1, null, null,
+        writeRecord(instance.getTenantId(), instance.getBusinessType(), instance.getBusinessId(),
+                instance.getId(), null, null, 1, null, null,
                 WorkflowConstants.ACTION_SUBMIT, "提交审批",
                 userId, username, null);
 
@@ -109,9 +110,6 @@ public class WorkflowEngine {
     @Transactional
     public void approve(Long taskId, Long userId, String username,
                         String comment, String idempotencyKey) {
-
-        checkIdempotency(userId, idempotencyKey, WorkflowConstants.ACTION_APPROVE);
-
         WfTask task = wfTaskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
@@ -122,6 +120,7 @@ public class WorkflowEngine {
         if (!task.getApproverId().equals(userId)) {
             throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
         }
+        checkIdempotency(task.getTenantId(), userId, idempotencyKey, WorkflowConstants.ACTION_APPROVE);
 
         // Update task
         task.setTaskStatus(WorkflowConstants.TASK_APPROVED);
@@ -135,7 +134,8 @@ public class WorkflowEngine {
 
         // Write record
         WfNodeInstance nodeInstance = wfNodeInstanceMapper.selectById(task.getNodeInstanceId());
-        writeRecord(task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
+        writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),
+                task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
                 nodeInstance != null ? nodeInstance.getNodeCode() : null,
                 nodeInstance != null ? nodeInstance.getNodeName() : null,
                 WorkflowConstants.ACTION_APPROVE, "同意",
@@ -162,7 +162,8 @@ public class WorkflowEngine {
                 instance.setEndedAt(LocalDateTime.now());
                 wfInstanceMapper.updateById(instance);
 
-                writeRecord(instance.getId(), null, null, instance.getCurrentRound(),
+                writeRecord(instance.getTenantId(), instance.getBusinessType(), instance.getBusinessId(),
+                        instance.getId(), null, null, instance.getCurrentRound(),
                         null, null, WorkflowConstants.ACTION_APPROVE, "审批通过",
                         userId, username, "所有节点审批通过");
 
@@ -177,9 +178,6 @@ public class WorkflowEngine {
     @Transactional
     public void reject(Long taskId, Long userId, String username,
                        String comment, String idempotencyKey) {
-
-        checkIdempotency(userId, idempotencyKey, WorkflowConstants.ACTION_REJECT);
-
         WfTask task = wfTaskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
@@ -190,6 +188,7 @@ public class WorkflowEngine {
         if (!task.getApproverId().equals(userId)) {
             throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
         }
+        checkIdempotency(task.getTenantId(), userId, idempotencyKey, WorkflowConstants.ACTION_REJECT);
 
         task.setTaskStatus(WorkflowConstants.TASK_REJECTED);
         task.setActionType(WorkflowConstants.ACTION_REJECT);
@@ -217,7 +216,8 @@ public class WorkflowEngine {
         instance.setEndedAt(LocalDateTime.now());
         wfInstanceMapper.updateById(instance);
 
-        writeRecord(task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
+        writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),
+                task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
                 nodeInstance != null ? nodeInstance.getNodeCode() : null,
                 nodeInstance != null ? nodeInstance.getNodeName() : null,
                 WorkflowConstants.ACTION_REJECT, "驳回",
@@ -250,7 +250,8 @@ public class WorkflowEngine {
         instance.setEndedAt(LocalDateTime.now());
         wfInstanceMapper.updateById(instance);
 
-        writeRecord(instanceId, null, null, instance.getCurrentRound(),
+        writeRecord(instance.getTenantId(), instance.getBusinessType(), instance.getBusinessId(),
+                instanceId, null, null, instance.getCurrentRound(),
                 null, null, WorkflowConstants.ACTION_WITHDRAW, "撤回",
                 userId, username, null);
 
@@ -289,7 +290,8 @@ public class WorkflowEngine {
             reactivateNode(rejectedNode, tplNode, userId, username, instance.getTenantId(), newRound);
         }
 
-        writeRecord(instanceId, null, null, newRound,
+        writeRecord(instance.getTenantId(), instance.getBusinessType(), instance.getBusinessId(),
+                instanceId, null, null, newRound,
                 null, null, WorkflowConstants.ACTION_RESUBMIT, "重新提交",
                 userId, username, null);
 
@@ -335,7 +337,8 @@ public class WorkflowEngine {
         newTask.setReceivedAt(LocalDateTime.now());
         wfTaskMapper.insert(newTask);
 
-        writeRecord(task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
+        writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),
+                task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
                 null, null, WorkflowConstants.ACTION_TRANSFER, "转办",
                 userId, username, comment);
     }
@@ -350,11 +353,24 @@ public class WorkflowEngine {
         if (task == null) {
             throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
         }
+        if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())) {
+            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
+        }
         if (!task.getApproverId().equals(userId)) {
             throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人，无法加签");
         }
 
         WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
+        if (instance == null) {
+            throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
+        }
+        if (!WorkflowConstants.INSTANCE_RUNNING.equals(instance.getInstanceStatus())) {
+            throw new BusinessException("INSTANCE_NOT_RUNNING", "只能对运行中的审批加签");
+        }
+        WfNodeInstance node = wfNodeInstanceMapper.selectById(task.getNodeInstanceId());
+        if (node == null || !WorkflowConstants.NODE_ACTIVE.equals(node.getNodeStatus())) {
+            throw new BusinessException("NODE_NOT_ACTIVE", "只能对当前活动节点加签");
+        }
         for (Long auid : additionalUserIds) {
             // Check not already exists
             long exists = wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
@@ -377,7 +393,8 @@ public class WorkflowEngine {
             wfTaskMapper.insert(addTask);
         }
 
-        writeRecord(task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
+        writeRecord(task.getTenantId(), task.getBusinessType(), task.getBusinessId(),
+                task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
                 null, null, WorkflowConstants.ACTION_ADD_SIGN, "加签",
                 userId, username, comment);
     }
@@ -538,22 +555,39 @@ public class WorkflowEngine {
                              int roundNo, String nodeCode, String nodeName,
                              String actionType, String actionName,
                              Long operatorId, String operatorName, String comment) {
+        writeRecord(null, null, null, instanceId, nodeInstanceId, taskId, roundNo,
+                nodeCode, nodeName, actionType, actionName, operatorId, operatorName, comment);
+    }
+
+    private void writeRecord(Long tenantIdOverride, String businessTypeOverride, Long businessIdOverride,
+                             Long instanceId, Long nodeInstanceId, Long taskId,
+                             int roundNo, String nodeCode, String nodeName,
+                             String actionType, String actionName,
+                             Long operatorId, String operatorName, String comment) {
         WfRecord record = new WfRecord();
-        record.setTenantId(0L);
+        Long tenantId = tenantIdOverride != null ? tenantIdOverride : 0L;
         record.setInstanceId(instanceId);
         record.setNodeInstanceId(nodeInstanceId);
         record.setTaskId(taskId);
         record.setRoundNo(roundNo);
-        String businessType = null;
-        Long businessId = null;
+        String businessType = businessTypeOverride;
+        Long businessId = businessIdOverride;
         try {
             WfInstance inst = wfInstanceMapper.selectById(instanceId);
             if (inst != null) {
-                businessType = inst.getBusinessType();
-                businessId = inst.getBusinessId();
+                if (tenantIdOverride == null) {
+                    tenantId = inst.getTenantId();
+                }
+                if (businessType == null) {
+                    businessType = inst.getBusinessType();
+                }
+                if (businessId == null) {
+                    businessId = inst.getBusinessId();
+                }
             }
         } catch (Exception ignored) {
         }
+        record.setTenantId(tenantId);
         record.setBusinessType(businessType);
         record.setBusinessId(businessId);
         record.setNodeCode(nodeCode);
@@ -567,12 +601,12 @@ public class WorkflowEngine {
         wfRecordMapper.insert(record);
     }
 
-    private void checkIdempotency(Long userId, String idempotencyKey, String actionType) {
+    private void checkIdempotency(Long tenantId, Long userId, String idempotencyKey, String actionType) {
         // Insert-first strategy: rely on the unique constraint
         // uk_wf_idempotency(tenant_id, user_id, idempotency_key) to atomically
         // detect duplicates and avoid the check-then-insert (TOCTOU) race.
         WfIdempotency idem = new WfIdempotency();
-        idem.setTenantId(0L);
+        idem.setTenantId(tenantId != null ? tenantId : 0L);
         idem.setUserId(userId);
         idem.setIdempotencyKey(idempotencyKey);
         idem.setCreatedAt(LocalDateTime.now());
@@ -630,7 +664,16 @@ public class WorkflowEngine {
     // ───────────────────── QUERY METHODS ─────────────────────
 
     public List<String> getAvailableActions(Long instanceId, Long userId) {
-        WfInstance instance = wfInstanceMapper.selectById(instanceId);
+        return getAvailableActions(null, instanceId, userId);
+    }
+
+    public List<String> getAvailableActions(Long tenantId, Long instanceId, Long userId) {
+        LambdaQueryWrapper<WfInstance> instanceWrapper = new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getId, instanceId);
+        if (tenantId != null) {
+            instanceWrapper.eq(WfInstance::getTenantId, tenantId);
+        }
+        WfInstance instance = wfInstanceMapper.selectOne(instanceWrapper);
         if (instance == null) return List.of();
 
         List<String> actions = new ArrayList<>();
@@ -640,10 +683,14 @@ public class WorkflowEngine {
                 actions.add(WorkflowConstants.UI_WITHDRAW);
             }
             // Check if user has pending tasks
-            long pendingCount = wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
+            LambdaQueryWrapper<WfTask> pendingWrapper = new LambdaQueryWrapper<WfTask>()
                     .eq(WfTask::getInstanceId, instanceId)
                     .eq(WfTask::getApproverId, userId)
-                    .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+                    .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING);
+            if (tenantId != null) {
+                pendingWrapper.eq(WfTask::getTenantId, tenantId);
+            }
+            long pendingCount = wfTaskMapper.selectCount(pendingWrapper);
             if (pendingCount > 0) {
                 actions.add(WorkflowConstants.UI_APPROVE);
                 actions.add(WorkflowConstants.UI_REJECT);

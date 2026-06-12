@@ -1,6 +1,7 @@
 package com.cgcpms.workflow;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -491,10 +492,71 @@ class WorkflowEngineIntegrationTest {
         System.out.println("✅ 场景11 通过: 驳回后" + recordsAfterReject + "条记录, 重提后" + recordsAfterResubmit + "条, currentRound=" + instance.getCurrentRound());
     }
 
+    @Test
+    @Order(12)
+    @DisplayName("场景12: 审批记录和幂等键保留实例租户")
+    void test12_recordsAndIdempotencyKeepTenant() {
+        long tenantId = 889L;
+        WfInstance instance = workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", RUN_ID + 11,
+                "租户隔离测试合同", new BigDecimal("110000.00"),
+                100L, 100L, "{}", "{}");
+
+        WfRecord submitRecord = recordMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfRecord>()
+                        .eq(WfRecord::getInstanceId, instance.getId())
+                        .eq(WfRecord::getActionType, "SUBMIT")).get(0);
+        assertEquals(tenantId, submitRecord.getTenantId());
+
+        WfTask task = taskMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instance.getId())
+                        .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+
+        String idempotencyKey = "tenant-idem-" + UUID.randomUUID();
+        workflowEngine.approve(task.getId(), USER_ADMIN, "admin",
+                "租户字段测试", idempotencyKey);
+
+        Long actualTenantId = jdbcTemplate.queryForObject(
+                "SELECT tenant_id FROM wf_idempotency WHERE user_id = ? AND idempotency_key = ?",
+                Long.class, USER_ADMIN, idempotencyKey);
+        assertEquals(tenantId, actualTenantId);
+
+        System.out.println("✅ 场景12 通过: 记录和幂等键租户ID=" + tenantId);
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("场景13: 已处理任务禁止加签")
+    void test13_addSignRejectsHandledTask() {
+        WfInstance instance = workflowEngine.submit(
+                USER_ADMIN, "admin", 0L,
+                "CONTRACT_APPROVAL", RUN_ID + 12,
+                "已处理任务加签测试合同", new BigDecimal("120000.00"),
+                100L, 100L, "{}", "{}");
+
+        WfTask task = taskMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instance.getId())
+                        .eq(WfTask::getTaskStatus, "PENDING")).get(0);
+
+        workflowEngine.approve(task.getId(), USER_ADMIN, "admin",
+                "先处理任务", "test13-approve-" + UUID.randomUUID());
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                workflowEngine.addSign(task.getId(), List.of(USER_BIZ),
+                        USER_ADMIN, "admin", "已处理后加签"));
+        assertEquals("TASK_ALREADY_HANDLED", ex.getCode());
+
+        System.out.println("✅ 场景13 通过: 已处理任务加签被拒绝");
+    }
+
     @AfterAll
     void cleanupTestData() {
         long startBid = RUN_ID + 1;
-        long endBid = RUN_ID + 10;
+        long endBid = RUN_ID + 12;
+        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key LIKE 'tenant-idem-%' OR idempotency_key LIKE 'test13-%'");
         jdbcTemplate.update("DELETE FROM wf_idempotency WHERE business_id BETWEEN ? AND ?", startBid, endBid);
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_id BETWEEN ? AND ?", startBid, endBid);
         jdbcTemplate.update("DELETE FROM wf_task WHERE business_id BETWEEN ? AND ?", startBid, endBid);

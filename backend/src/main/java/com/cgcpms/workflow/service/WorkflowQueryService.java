@@ -31,8 +31,9 @@ public class WorkflowQueryService {
     private final WfTemplateMapper wfTemplateMapper;
     private final WorkflowEngine workflowEngine;
 
-    public IPage<WfTaskVO> getMyTodos(Long userId, long pageNo, long pageSize) {
+    public IPage<WfTaskVO> getMyTodos(Long tenantId, Long userId, long pageNo, long pageSize) {
         LambdaQueryWrapper<WfTask> wrapper = new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getTenantId, tenantId)
                 .eq(WfTask::getApproverId, userId)
                 .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
                 .orderByDesc(WfTask::getReceivedAt);
@@ -43,7 +44,9 @@ public class WorkflowQueryService {
         List<Long> instanceIds = page.getRecords().stream().map(WfTask::getInstanceId).distinct().toList();
         final Map<Long, WfInstance> instanceMap;
         if (!instanceIds.isEmpty()) {
-            instanceMap = wfInstanceMapper.selectBatchIds(instanceIds).stream()
+            instanceMap = wfInstanceMapper.selectList(new LambdaQueryWrapper<WfInstance>()
+                            .eq(WfInstance::getTenantId, tenantId)
+                            .in(WfInstance::getId, instanceIds)).stream()
                     .collect(Collectors.toMap(WfInstance::getId, Function.identity()));
         } else {
             instanceMap = Collections.emptyMap();
@@ -76,14 +79,17 @@ public class WorkflowQueryService {
         });
     }
 
-    public WfInstanceVO getInstanceDetail(Long instanceId, Long currentUserId) {
-        WfInstance instance = wfInstanceMapper.selectById(instanceId);
+    public WfInstanceVO getInstanceDetail(Long tenantId, Long instanceId, Long currentUserId) {
+        WfInstance instance = wfInstanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getTenantId, tenantId)
+                .eq(WfInstance::getId, instanceId));
         if (instance == null) return null;
 
         // Authorization: only initiator, approvers, or admin can view
         boolean authorized = instance.getInitiatorId().equals(currentUserId);
         if (!authorized) {
             Long count = wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
+                    .eq(WfTask::getTenantId, tenantId)
                     .eq(WfTask::getInstanceId, instanceId)
                     .eq(WfTask::getApproverId, currentUserId));
             authorized = count > 0;
@@ -117,11 +123,12 @@ public class WorkflowQueryService {
         }
 
         // Available actions
-        vo.setAvailableActions(workflowEngine.getAvailableActions(instanceId, currentUserId));
+        vo.setAvailableActions(workflowEngine.getAvailableActions(tenantId, instanceId, currentUserId));
 
         // Nodes with tasks
         List<WfNodeInstance> nodes = wfNodeInstanceMapper.selectList(
                 new LambdaQueryWrapper<WfNodeInstance>()
+                        .eq(WfNodeInstance::getTenantId, tenantId)
                         .eq(WfNodeInstance::getInstanceId, instanceId)
                         .orderByAsc(WfNodeInstance::getNodeOrder));
 
@@ -130,7 +137,9 @@ public class WorkflowQueryService {
         Map<Long, List<WfTask>> tasksByNode = Collections.emptyMap();
         if (!nodeIds.isEmpty()) {
             List<WfTask> allTasks = wfTaskMapper.selectList(
-                    new LambdaQueryWrapper<WfTask>().in(WfTask::getNodeInstanceId, nodeIds));
+                    new LambdaQueryWrapper<WfTask>()
+                            .eq(WfTask::getTenantId, tenantId)
+                            .in(WfTask::getNodeInstanceId, nodeIds));
             tasksByNode = allTasks.stream().collect(Collectors.groupingBy(WfTask::getNodeInstanceId));
         }
 
@@ -174,6 +183,7 @@ public class WorkflowQueryService {
         // Records
         List<WfRecord> records = wfRecordMapper.selectList(
                 new LambdaQueryWrapper<WfRecord>()
+                        .eq(WfRecord::getTenantId, tenantId)
                         .eq(WfRecord::getInstanceId, instanceId)
                         .orderByAsc(WfRecord::getRoundNo)
                         .orderByAsc(WfRecord::getCreatedAt));

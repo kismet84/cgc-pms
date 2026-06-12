@@ -151,7 +151,8 @@ public class WorkflowController {
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize) {
         Long userId = UserContext.getCurrentUserId();
-        IPage<WfTaskVO> page = workflowQueryService.getMyTodos(userId, pageNo, pageSize);
+        Long tenantId = UserContext.getCurrentTenantId();
+        IPage<WfTaskVO> page = workflowQueryService.getMyTodos(tenantId, userId, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -159,7 +160,8 @@ public class WorkflowController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<WfInstanceVO> instanceDetail(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
-        WfInstanceVO detail = workflowQueryService.getInstanceDetail(instanceId, userId);
+        Long tenantId = UserContext.getCurrentTenantId();
+        WfInstanceVO detail = workflowQueryService.getInstanceDetail(tenantId, instanceId, userId);
         return ApiResponse.success(detail);
     }
 }
