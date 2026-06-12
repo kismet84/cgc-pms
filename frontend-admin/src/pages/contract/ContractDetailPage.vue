@@ -6,6 +6,7 @@ import { useContractStore } from '@/stores/contract'
 import { submitForApproval } from '@/api/modules/contract'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
+import ContractChangeList from '@/components/ContractChangeList.vue'
 import type { ContractType } from '@/types/contract'
 
 const route = useRoute()
@@ -265,6 +266,11 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
                 </a-timeline>
                 <a-empty v-else description="暂无审批记录" />
               </a-spin>
+            </a-tab-pane>
+
+            <!-- Contract Changes Tab -->
+            <a-tab-pane key="contract-changes" tab="合同变更">
+              <ContractChangeList :contract-id="contractId" @refresh="loadData" />
             </a-tab-pane>
           </a-tabs>
         </a-card>

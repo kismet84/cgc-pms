@@ -79,6 +79,32 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'cost-target',
+        name: 'CostTarget',
+        redirect: '/cost-target/index',
+        meta: { title: '目标成本管理', icon: 'AimOutlined' },
+        children: [
+          {
+            path: 'index',
+            name: 'CostTargetList',
+            component: () => import('@/pages/cost-target/index.vue'),
+            meta: { title: '目标成本管理' },
+          },
+          {
+            path: 'create',
+            name: 'CostTargetCreate',
+            component: () => import('@/pages/cost-target/edit.vue'),
+            meta: { title: '新建目标成本', hidden: true },
+          },
+          {
+            path: ':id/edit',
+            name: 'CostTargetEdit',
+            component: () => import('@/pages/cost-target/edit.vue'),
+            meta: { title: '编辑目标成本', hidden: true },
+          },
+        ],
+      },
+      {
         path: 'variation',
         name: 'Variation',
         redirect: '/variation/order',
@@ -89,6 +115,26 @@ export const routes: RouteRecordRaw[] = [
             name: 'VariationOrder',
             component: () => import('@/pages/variation/order.vue'),
             meta: { title: '变更签证' },
+          },
+        ],
+      },
+      {
+        path: 'settlement',
+        name: 'Settlement',
+        redirect: '/settlement/list',
+        meta: { title: '结算管理', icon: 'AccountBookOutlined' },
+        children: [
+          {
+            path: 'list',
+            name: 'SettlementList',
+            component: () => import('@/pages/settlement/index.vue'),
+            meta: { title: '结算列表' },
+          },
+          {
+            path: ':id',
+            name: 'SettlementDetail',
+            component: () => import('@/pages/settlement/detail.vue'),
+            meta: { title: '结算详情', hidden: true },
           },
         ],
       },
@@ -171,6 +217,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '材料字典' },
           },
         ],
+      },
+      {
+        path: 'alert',
+        name: 'Alert',
+        component: () => import('@/pages/alert/index.vue'),
+        meta: { title: '预警中心', icon: 'AlertOutlined' },
       },
       {
         path: 'approval',
