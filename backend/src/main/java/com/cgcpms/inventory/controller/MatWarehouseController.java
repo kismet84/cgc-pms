@@ -18,7 +18,7 @@ public class MatWarehouseController {
     private final MatWarehouseService matWarehouseService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:*')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:list')")
     public ApiResponse<PageResult<MatWarehouseVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -31,19 +31,19 @@ public class MatWarehouseController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:*')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:list')")
     public ApiResponse<MatWarehouseVO> getById(@PathVariable Long id) {
         return ApiResponse.success(matWarehouseService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:*')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:add')")
     public ApiResponse<Long> create(@Valid @RequestBody MatWarehouse warehouse) {
         return ApiResponse.success(matWarehouseService.create(warehouse));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:*')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MatWarehouse warehouse) {
         warehouse.setId(id);
         matWarehouseService.update(warehouse);
@@ -51,7 +51,7 @@ public class MatWarehouseController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:*')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:edit')")
     public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestParam String status) {
         matWarehouseService.updateStatus(id, status);
         return ApiResponse.success();

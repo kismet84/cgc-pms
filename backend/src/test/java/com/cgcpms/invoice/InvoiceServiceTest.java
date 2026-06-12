@@ -41,6 +41,7 @@ class InvoiceServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_ID)
+                .add("roleCodes", java.util.List.of("ADMIN"))
                 .build();
         UserContext.set(claims);
     }
@@ -193,6 +194,7 @@ class InvoiceServiceTest {
                 .add("userId", 2L)
                 .add("username", "other")
                 .add("tenantId", 999L)
+                .add("roleCodes", java.util.List.of())
                 .build();
         UserContext.set(otherClaims);
 

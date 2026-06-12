@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS sys_user (
     real_name VARCHAR(100),
     phone VARCHAR(50),
     email VARCHAR(100),
+    org_id BIGINT,
     avatar VARCHAR(500),
     status VARCHAR(50) NOT NULL DEFAULT 'ENABLE',
     is_admin SMALLINT DEFAULT 0,

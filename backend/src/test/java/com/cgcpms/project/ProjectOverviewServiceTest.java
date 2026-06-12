@@ -18,6 +18,8 @@ import com.cgcpms.project.service.ProjectOverviewService;
 import com.cgcpms.project.vo.ProjectOverviewVO;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysUserMapper;
+
+import java.util.List;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +81,7 @@ class ProjectOverviewServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
     }
 

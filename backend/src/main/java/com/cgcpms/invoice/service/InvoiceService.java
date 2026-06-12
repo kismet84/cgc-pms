@@ -32,7 +32,7 @@ public class InvoiceService {
         wrapper.eq(PayInvoice::getTenantId, UserContext.getCurrentTenantId());
         if (payRecordId != null) wrapper.eq(PayInvoice::getPayRecordId, payRecordId);
         if (payApplicationId != null) wrapper.eq(PayInvoice::getPayApplicationId, payApplicationId);
-        wrapper.orderByDesc(PayInvoice::getCreatedAt);
+        wrapper.orderByDesc(PayInvoice::getCreatedTime);
 
         Page<PayInvoice> page = payInvoiceMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
         return page.convert(this::toVO);
@@ -151,8 +151,8 @@ public class InvoiceService {
         vo.setInvoiceDate(invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().toString() : null);
         vo.setVerifyStatus(invoice.getVerifyStatus());
         vo.setCreatedBy(invoice.getCreatedBy() != null ? invoice.getCreatedBy().toString() : null);
-        vo.setCreatedAt(invoice.getCreatedAt() != null ? invoice.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(invoice.getUpdatedAt() != null ? invoice.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(invoice.getCreatedTime() != null ? invoice.getCreatedTime().format(DTF) : null);
+        vo.setUpdatedAt(invoice.getUpdatedTime() != null ? invoice.getUpdatedTime().format(DTF) : null);
         vo.setRemark(invoice.getRemark());
         return vo;
     }

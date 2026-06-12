@@ -98,6 +98,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 0L)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
     }
 
@@ -428,6 +429,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 1L)
+                .add("roleCodes", List.of())
                 .build());
         PageResult<MatWarehouseVO> t1Warehouses = matWarehouseService.getPage(
                 1, 100, null, null, null, null);
@@ -445,6 +447,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 0L)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
         MatWarehouseVO t0Back = matWarehouseService.getById(whId);
         assertNotNull(t0Back, "切回tenant 0应能查到仓库");
@@ -465,6 +468,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 1L)
+                .add("roleCodes", List.of())
                 .build());
         assertThrows(Exception.class, () -> mdMaterialService.getById(matId),
                 "tenant 1查询tenant 0物料应抛异常");
@@ -481,6 +485,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 0L)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
 
         System.out.println("✅ 场景5 通过: 仓库隔离(whId=" + whId
@@ -520,6 +525,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 1L)
+                .add("roleCodes", List.of())
                 .build());
         MatStockLedgerVO t1Ledger = matStockService.getLedger(whId, matId, 1, 20);
         assertNull(t1Ledger.getStock(), "tenant 1查库存应为null（不存在tenant 1的库存记录）");
@@ -535,6 +541,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 0L)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
         MatStockLedgerVO t0Ledger = matStockService.getLedger(whId, matId, 1, 20);
         assertNotNull(t0Ledger.getStock(), "切回tenant 0库存应存在");
@@ -594,6 +601,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 1L)
+                .add("roleCodes", List.of())
                 .build());
         var t1InvoicePage = invoiceService.getPage(1, 20, null, null);
         boolean t1HasInvoice = t1InvoicePage.getRecords().stream()
@@ -613,6 +621,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 0L)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
 
         System.out.println("✅ 场景6 通过: 库存隔离(t1台账stock=null, txnTotal=0) "
@@ -699,6 +708,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 1L)
+                .add("roleCodes", List.of())
                 .build());
 
         // ★核心断言：tenant 1 查不到 tenant 0 的 CC 记录
@@ -733,6 +743,7 @@ class Phase4IntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 0L)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
 
         System.out.println("✅ 场景8 通过: CC隔离(tenant 0有CC, tenant 1查不到) "

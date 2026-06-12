@@ -209,10 +209,10 @@ public class NotificationService {
             emitter.send(SseEmitter.event()
                     .name("notification")
                     .data(NotificationVO.fromEntity(notification), MediaType.APPLICATION_JSON));
-        } catch (IOException e) {
-            // Remove dead emitter
+        } catch (IOException | IllegalStateException e) {
+            // Remove dead or already-completed emitter
             emitters.remove(userId);
-            log.debug("Failed to push SSE to userId={}, removed dead emitter", userId);
+            log.debug("Failed to push SSE to userId={}, removed dead emitter: {}", userId, e.getMessage());
         }
     }
 }

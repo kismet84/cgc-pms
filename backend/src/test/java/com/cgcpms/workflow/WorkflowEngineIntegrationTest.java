@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@ActiveProfiles("test")
+@ActiveProfiles("local")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WorkflowEngineIntegrationTest {
@@ -60,6 +60,7 @@ class WorkflowEngineIntegrationTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 0L)
+                .add("roleCodes", java.util.List.of("ADMIN"))
                 .build());
     }
 

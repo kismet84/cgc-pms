@@ -1,6 +1,8 @@
 package com.cgcpms.invoice.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
@@ -12,6 +14,7 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -44,4 +47,22 @@ public class PayInvoice extends BaseEntity {
     private LocalDate invoiceDate;
 
     private String verifyStatus;
+
+    // ── V36 使用 created_time / updated_time 列名 ──
+
+    @TableField(value = "created_time", fill = FieldFill.INSERT)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime createdTime;
+
+    @TableField(value = "updated_time", fill = FieldFill.INSERT_UPDATE)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime updatedTime;
+
+    /** 屏蔽 BaseEntity.createdAt（V36 表无 created_at 列） */
+    @TableField(exist = false)
+    private LocalDateTime createdAt;
+
+    /** 屏蔽 BaseEntity.updatedAt（V36 表无 updated_at 列） */
+    @TableField(exist = false)
+    private LocalDateTime updatedAt;
 }
