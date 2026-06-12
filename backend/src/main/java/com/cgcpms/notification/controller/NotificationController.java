@@ -7,6 +7,7 @@ import com.cgcpms.notification.entity.SysNotification;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.notification.vo.NotificationVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,7 @@ import java.util.Map;
  * (JwtAuthenticationFilter applies on the servlet path) and pushes new
  * notifications to the authenticated user in real time.</p>
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor
@@ -54,10 +56,15 @@ public class NotificationController {
     @GetMapping("/unread-count")
     @PreAuthorize("hasAuthority('notification:view') or hasRole('ADMIN')")
     public ApiResponse<Map<String, Long>> unreadCount() {
-        Long userId = UserContext.getCurrentUserId();
-        Long tenantId = UserContext.getCurrentTenantId();
-        long count = notificationService.getUnreadCount(userId, tenantId);
-        return ApiResponse.success(Map.of("count", count));
+        try {
+            Long userId = UserContext.getCurrentUserId();
+            Long tenantId = UserContext.getCurrentTenantId();
+            long count = notificationService.getUnreadCount(userId, tenantId);
+            return ApiResponse.success(Map.of("count", count));
+        } catch (Exception e) {
+            log.error("unreadCount failed: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     /**

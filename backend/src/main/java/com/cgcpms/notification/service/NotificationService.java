@@ -97,6 +97,7 @@ public class NotificationService {
      * Get unread notification count for a specific user in a tenant.
      */
     public long getUnreadCount(Long userId, Long tenantId) {
+        log.debug("getUnreadCount called: userId={}, tenantId={}", userId, tenantId);
         LambdaQueryWrapper<SysNotification> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysNotification::getTenantId, tenantId);
         wrapper.eq(SysNotification::getUserId, userId);
