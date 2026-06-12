@@ -1,6 +1,7 @@
 package com.cgcpms.common.aspect;
 
 import com.cgcpms.common.annotation.OperationLog;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.context.TraceIdContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -78,8 +79,8 @@ public class OperationLogAspect {
     }
 
     private String resolveOperator() {
-        // Authentication is out of scope here; placeholder until security layer wires it in.
-        return "anonymous";
+        String username = UserContext.getCurrentUsername();
+        return username != null ? username : "anonymous";
     }
 
     private String resolveClientIp() {
