@@ -1,66 +1,23 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\phase4-org-inventory-invoice-integration.md",
-  "started_at": "2026-06-12T08:23:51.020Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\phase-closure-execution.md",
+  "started_at": "2026-06-12T14:29:37.975Z",
   "session_ids": [
-    "ses_14538ce40ffe5DMuYut8EA4MyI",
-    "ses_144fb0e19ffe9hoOF7Au3y74Vc",
-    "ses_144fad871ffeTHLNDihuLxmS1k",
-    "ses_144faa86dffedt1BxlhIJSSx2Q",
-    "ses_144fa7a05ffeq62Upffl64OXC7",
-    "ses_144efe51cffe03d1OhfFAQ4yM7",
-    "ses_144eaec17ffeY9XDVGmuJuRzZJ",
-    "ses_144eac904fferzdQVTflC2HY9Z",
-    "ses_144eab0f1ffewfqIIWR69wche4",
-    "ses_144ea92e9ffe5LeuD4NbETwfGW",
-    "ses_144d3f835ffeNPc2Hs8npDL5i3",
-    "ses_144d3dcf8ffe3y0bLw4fhGTWK7",
-    "ses_144d3c256ffe6U0BcQDU2KdelS",
-    "ses_144d3adb5ffe2VMRnISdT5FbSm",
-    "ses_144d39667ffepOVczN2I4ih8md",
-    "ses_144ac6142fferckFFwhsTfYgHH",
-    "ses_144ac520effe1PTNwh78zCYMvB",
-    "ses_144ac4382ffevMxUnD4kynnYdO",
-    "ses_144ac3782ffeJiYLsKg1crJSQq",
-    "ses_144a5e8e5ffeyBvUAx3oZQgpV2",
-    "ses_144a5d448ffe6pGyde45lShv4R",
-    "ses_1449db4ddffeyMzxsc27aLChut",
-    "ses_1449da3abffeEZu0VW6QzgCFxu"
+    "ses_1441a4988ffekrXu3m1CCttQwT"
   ],
-  "plan_name": "phase4-org-inventory-invoice-integration",
+  "plan_name": "phase-closure-execution",
   "worktree_path": null,
   "session_origins": {
-    "ses_14538ce40ffe5DMuYut8EA4MyI": "direct",
-    "ses_144fb0e19ffe9hoOF7Au3y74Vc": "appended",
-    "ses_144fad871ffeTHLNDihuLxmS1k": "appended",
-    "ses_144faa86dffedt1BxlhIJSSx2Q": "appended",
-    "ses_144fa7a05ffeq62Upffl64OXC7": "appended",
-    "ses_144efe51cffe03d1OhfFAQ4yM7": "appended",
-    "ses_144eaec17ffeY9XDVGmuJuRzZJ": "appended",
-    "ses_144eac904fferzdQVTflC2HY9Z": "appended",
-    "ses_144eab0f1ffewfqIIWR69wche4": "appended",
-    "ses_144ea92e9ffe5LeuD4NbETwfGW": "appended",
-    "ses_144d3f835ffeNPc2Hs8npDL5i3": "appended",
-    "ses_144d3dcf8ffe3y0bLw4fhGTWK7": "appended",
-    "ses_144d3c256ffe6U0BcQDU2KdelS": "appended",
-    "ses_144d3adb5ffe2VMRnISdT5FbSm": "appended",
-    "ses_144d39667ffepOVczN2I4ih8md": "appended",
-    "ses_144ac6142fferckFFwhsTfYgHH": "appended",
-    "ses_144ac520effe1PTNwh78zCYMvB": "appended",
-    "ses_144ac4382ffevMxUnD4kynnYdO": "appended",
-    "ses_144ac3782ffeJiYLsKg1crJSQq": "appended",
-    "ses_144a5e8e5ffeyBvUAx3oZQgpV2": "appended",
-    "ses_144a5d448ffe6pGyde45lShv4R": "appended",
-    "ses_1449db4ddffeyMzxsc27aLChut": "appended",
-    "ses_1449da3abffeEZu0VW6QzgCFxu": "appended"
+    "ses_1441a4988ffekrXu3m1CCttQwT": "direct"
   },
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "Flyway V33：组织架构三表（org_company / org_department / org_position）",
-      "session_id": "ses_144a3d1b4ffeC5TiKP96c4fpHy",
-      "agent": "oracle",
-      "updated_at": "2026-06-12T10:24:41.801Z"
+      "task_title": "**Backend MySQL 全量测试复验**",
+      "session_id": "ses_143c1e7d0ffeR062xda8awDe6b",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-12T14:33:10.600Z"
     }
   }
 }
