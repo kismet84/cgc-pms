@@ -1,0 +1,28 @@
+=== Task 10: orgId Backfill Service — Evidence ===
+Date: 2026-06-12
+
+Files created:
+  1. backend/src/main/java/com/cgcpms/org/service/OrgInitService.java
+  2. backend/src/test/java/com/cgcpms/org/OrgInitServiceTest.java
+
+Test results:
+  OrgInitServiceTest: 3/3 PASSED
+  OrgServiceTest: 18/18 PASSED (no regression)
+  Full suite: Org* tests all passing; pre-existing failures in MatStockServiceTest (unrelated)
+
+OrgInitService behavior:
+  - For each tenant with NULL orgId in pm_project or ct_contract:
+    1. Creates root OrgCompany (code="ROOT", name="默认公司") if not exists
+    2. Creates root OrgDepartment (code="ROOT_DEPT", name="默认部门", parentId=null) if not exists
+    3. Updates pm_project SET org_id=rootCompanyId WHERE tenant_id=? AND org_id IS NULL
+    4. Updates ct_contract SET org_id=rootCompanyId WHERE tenant_id=? AND org_id IS NULL
+  - Existing non-null orgId values are NOT overwritten (isNull condition)
+  - Idempotent: safe to call multiple times
+  - Wrapped in @Transactional
+
+Test TC1: Creates ROOT company+dept, backfills NULL orgId on project & contract,
+           verifies already-set orgId is NOT overwritten
+Test TC2: Second call is idempotent — no duplicate companies/departments created
+Test TC3: No-op when all orgId values are already set
+
+Build: ./mvnw.cmd test SUCCESS (108 tests: 99 pass, 7 pre-existing failures, 2 pre-existing errors)

@@ -1,0 +1,51 @@
+=== Task 16: Invoice Module Backend ===
+Completed: 2026-06-12 16:42:06
+
+=== Files Created/Modified ===
+
+1. [MODIFIED] backend/src/main/resources/db/migration/V36__init_invoice_table.sql
+   - Fixed: created_time → created_at, updated_time → updated_at (consistent with BaseEntity & all other tables)
+
+2. [NEW] backend/src/main/java/com/cgcpms/invoice/entity/PayInvoice.java
+   - extends BaseEntity, @TableName("pay_invoice"), @TableId(ASSIGN_ID)
+   - Fields: id, tenantId, payRecordId, payApplicationId, invoiceNo, invoiceType, invoiceAmount,
+     taxRate, taxAmount, invoiceDate, verifyStatus (PENDING/VERIFIED/ABNORMAL)
+   - @JsonSerialize(ToStringSerializer) on BigDecimal fields
+
+3. [NEW] backend/src/main/java/com/cgcpms/invoice/vo/InvoiceVO.java
+   - DTO with String representations of Long/BigDecimal/LocalDate fields
+
+4. [NEW] backend/src/main/java/com/cgcpms/invoice/mapper/PayInvoiceMapper.java
+   - extends BaseMapper<PayInvoice>, @Mapper
+
+5. [NEW] backend/src/main/java/com/cgcpms/invoice/service/InvoiceService.java
+   - getPage(pageNo, pageSize, payRecordId, payApplicationId): tenant-filtered pagination
+   - getById(id): tenant-scoped single lookup
+   - create(invoice): sets tenantId/defaults, catches DuplicateKeyException for uk_tenant_invoice_no
+   - update(invoice): tenant check + duplicate invoice_no check on rename
+   - delete(id): tenant-scoped soft delete
+   - verify(id, targetStatus): PENDING→VERIFIED or PENDING→ABNORMAL only
+   - register(invoice): create with mandatory payRecordId linkage
+
+6. [NEW] backend/src/main/java/com/cgcpms/invoice/controller/InvoiceController.java
+   - @RequestMapping("/api/invoices")
+   - GET /api/invoices → list (invoice:query)
+   - GET /api/invoices/{id} → getById (invoice:query)
+   - POST /api/invoices → create (invoice:add)
+   - PUT /api/invoices/{id} → update (invoice:edit)
+   - DELETE /api/invoices/{id} → delete (invoice:delete)
+   - PUT /api/invoices/{id}/verify → verify (invoice:verify)
+   - POST /api/invoices/register → register (invoice:add)
+   - All endpoints @PreAuthorize with hasAuthority or hasRole('ADMIN')
+
+7. [NEW] backend/src/test/java/com/cgcpms/invoice/InvoiceServiceTest.java
+   - 11 tests, all PASS: CREATE, DUPLICATE rejection, VERIFY PENDING→VERIFIED,
+     VERIFY PENDING→ABNORMAL, VERIFY non-PENDING rejection, invalid status rejection,
+     tenant isolation, UPDATE, DELETE, REGISTER with payRecordId, REGISTER missing payRecordId
+
+8. [MODIFIED] backend/src/main/resources/db/h2/schema-phase23.sql
+   - Added H2-compatible pay_invoice table definition (for @ActiveProfiles("local") test profile)
+
+=== Verification ===
+- mvnw test -Dtest=com.cgcpms.invoice.InvoiceServiceTest: 11/11 PASS, BUILD SUCCESS
+- Full mvnw test: pre-existing failures (org_company table, DictServiceTest, WorkflowEngineIntegrationTest) unrelated to invoice module

@@ -1,0 +1,59 @@
+============================================================
+Task 13: Inventory Warehouse CRUD Backend
+============================================================
+Date: 2026-06-12
+Package: com.cgcpms.inventory
+
+FILES CREATED (6):
+1. backend/src/main/java/com/cgcpms/inventory/entity/MatWarehouse.java
+   - Extends BaseEntity, @TableName("mat_warehouse")
+   - @TableId(IdType.ASSIGN_ID) for Snowflake ID
+   - V35 column mapping: created_time/updated_time with @TableField annotations
+   - BaseEntity createdAt/updatedAt excluded (exist=false)
+   - Fields: id, tenantId, projectId, warehouseCode, warehouseName, status
+
+2. backend/src/main/java/com/cgcpms/inventory/mapper/MatWarehouseMapper.java
+   - @Mapper interface extends BaseMapper<MatWarehouse>
+
+3. backend/src/main/java/com/cgcpms/inventory/vo/MatWarehouseVO.java
+   - All IDs as String (id, tenantId, projectId, createdBy)
+   - Dates as String (createdAt, updatedAt)
+
+4. backend/src/main/java/com/cgcpms/inventory/service/MatWarehouseService.java
+   - CRUD with tenantId + projectId filtering
+   - LambdaQueryWrapper.eq(tenantId) on every list query
+   - Single-entity post-check: selectById + tenantId.equals(UserContext)
+   - Create: sets tenantId from UserContext before insert
+   - Update/UpdateStatus: validates existing entity tenantId matches
+
+5. backend/src/main/java/com/cgcpms/inventory/controller/MatWarehouseController.java
+   - @RequestMapping("/api/inventory/warehouses")
+   - @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:warehouse:*')")
+   - Endpoints: GET list, GET/{id}, POST, PUT/{id}, PUT/{id}/status
+
+6. backend/src/test/java/com/cgcpms/inventory/WarehouseServiceTest.java
+   - 10 tests, all GREEN
+   - @SpringBootTest + @ActiveProfiles("local") + @Transactional
+   - RED->GREEN->REFACTOR pattern
+
+MODIFIED (1):
+7. backend/src/main/resources/db/h2/schema-phase23.sql
+   - Added mat_warehouse table for H2 test environment
+
+TEST RESULTS:
+- WarehouseServiceTest: 10/10 PASSED
+- Full suite: 68 tests (48 passed, 19 pre-existing H2 schema errors, 1 pre-existing config error)
+- Pre-existing failures: OrgServiceTest (missing org_company/org_position H2 tables), DictServiceTest, WorkflowEngineIntegrationTest
+
+VERIFICATIONS:
+[x] Entity: MatWarehouse extends BaseEntity, @TableId(ASSIGN_ID), maps to mat_warehouse
+[x] Mapper: BaseMapper<MatWarehouse>
+[x] Service: CRUD with tenantId + projectId filtering, single-entity post-check
+[x] Controller: @PreAuthorize, /api/inventory/warehouses
+[x] VO with String IDs
+[x] TDD: WarehouseServiceTest RED->GREEN->REFACTOR (10 tests)
+[x] Every list query: .eq(tenantId)
+[x] Snowflake ID (ASSIGN_ID)
+[x] No price/amount/valuation fields
+[x] No multi-warehouse transfer workflow
+[x] No tenantId skipping

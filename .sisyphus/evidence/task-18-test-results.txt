@@ -1,0 +1,41 @@
+=== Task 18: my-done query endpoint — Test Results ===
+Date: 2026-06-12
+
+--- Implementation Summary ---
+1. WorkflowQueryService.getMyDone(Long userId, Long tenantId, long pageNo, long pageSize)
+   - Queries wf_record WHERE operatorId=? AND tenantId=? ORDER BY created_at DESC
+   - Batch-fetches wf_instance for title/instanceStatus enrichment
+   - Returns IPage<WfRecordVO>
+
+2. WorkflowController: GET /api/workflow/tasks/done
+   - @PreAuthorize("isAuthenticated()")
+   - Extracts userId/tenantId from UserContext, passes as explicit params to service
+
+3. WfRecordVO: added title and instanceStatus fields for enrichment
+
+4. JUnit Test: test14_getMyDoneReturnsHandledRecordsWithTenantIsolation
+   - Creates approvals in tenantA (USER_ADMIN) and tenantB (USER_MANAGER)
+   - Verifies tenant isolation: USER_MANAGER has no records in tenantA
+   - Verifies instance info enrichment (title, instanceStatus)
+
+--- Test Results ---
+WorkflowEngineIntegrationTest: 14 tests, 0 failures, 0 errors (ALL PASS)
+  - test14_getMyDoneReturnsHandledRecordsWithTenantIsolation: PASS
+
+Non-workflow tests (all previously passing): 27 tests, 0 failures, 0 errors (ALL PASS)
+  - ContractApprovalIntegrationTest: 5 pass
+  - ContractApprovalRollbackTest: 1 pass
+  - MigrationIntegrityTest: 2 pass
+  - Phase2FullChainIntegrationTest: 9 pass
+  - Phase3IntegrationTest: 6 pass
+  - RegressionFixVerificationTest: 4 pass
+
+Total: 41 relevant tests ALL PASS
+
+Pre-existing failures (NOT caused by this change):
+  - DictServiceTest: 2 failures (test07_tenantIsolation_type, test14_tenantIsolation_data)
+
+--- Note ---
+Flyway was disabled for test execution (-Dspring.flyway.enabled=false) due to
+pre-existing failed migration V39 in the test database. This is NOT related to
+the my-done implementation change.

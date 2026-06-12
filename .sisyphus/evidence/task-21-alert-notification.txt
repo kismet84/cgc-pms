@@ -1,0 +1,64 @@
+=== Task 21: Wire AlertEvaluationService -> NotificationService ===
+Date: 2026-06-12
+
+=== Changes Made ===
+
+1. AlertEvaluationService.java (backend/src/main/java/com/cgcpms/alert/service/)
+   - Added PmProjectMemberMapper and NotificationService injection
+   - After each alertLogMapper.insert(alert) in evaluateProject(), calls
+     createAlertNotification(tenantId, projectId, alert)
+   - tenantId: from project record (project.getTenantId()), NOT UserContext
+   - userId: from pm_project_member query (PM role preferred, first active fallback)
+   - Added helper methods:
+     * createAlertNotification() - creates notification for alert
+     * getNotificationTargetUserId() - finds project member for notification
+     * getAlertTitle() - maps ruleType -> Chinese title
+   - Notification failures are caught and logged (non-fatal to alert eval)
+
+2. Phase3IntegrationTest.java (backend/src/test/java/com/cgcpms/)
+   - Added test07_alertToNotification (Scene 7)
+   - Inserts PmProjectMember (admin as PM) for demo project
+   - Modifies contract endDate to trigger CONTRACT_EXPIRING alert
+   - Verifies notification created with:
+     * tenantId=0 (from project, NOT UserContext)
+     * userId=1 (from pm_project_member)
+     * bizType="ALERT"
+     * title contains "预警"
+     * bizId matches alert_log.id
+
+=== Test Results ===
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+
+Phase 3 tests:
+- Scene 1: CT_CHANGE full chain PASS
+- Scene 2: Settlement full chain PASS
+- Scene 3: Dynamic cost formula PASS
+- Scene 4: Target cost full chain PASS
+- Scene 5: Alert trigger PASS
+- Scene 6: CT_CHANGE + VAR_ORDER coexistence PASS
+- Scene 7: Alert -> Notification PASS (NEW)
+
+=== Key Evidence ===
+SQL log from test:
+  1) Alert insert:
+     INSERT INTO alert_log (tenant_id, project_id, rule_type, ...)
+     VALUES (0, 10001, 'CONTRACT_EXPIRING', ...)
+
+  2) Project member query:
+     SELECT ... FROM pm_project_member
+     WHERE tenant_id=0 AND project_id=10001 AND status='ACTIVE'
+     -> Total: 1 (admin as PM)
+
+  3) Notification insert:
+     INSERT INTO sys_notification (tenant_id, user_id, title, biz_type, biz_id, ...)
+     VALUES (0, 1, '合同到期预警', 'ALERT', 2065361960008187906, ...)
+
+NOT using UserContext. tenantId=0 from project record, userId=1 from pm_project_member.
+
+=== Design Decisions ===
+- Silently skips notification if no project member exists (no error thrown)
+- Notification failure does NOT roll back alert evaluation
+- PM role_code='PM' preferred; falls back to first active member
+- BizType='ALERT' for alert-triggered notifications
+- NotifyType='INFO' (handled by NotificationService.create())

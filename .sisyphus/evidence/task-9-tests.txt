@@ -1,0 +1,49 @@
+Task 9 - Org Module Test Evidence
+===================================
+
+Test file: backend/src/test/java/com/cgcpms/org/OrgServiceTest.java
+
+TDD Methodology: RED → GREEN → REFACTOR
+
+18 test cases implemented:
+
+OrgCompany (TC1-TC6 + TC17-TC18):
+  TC1: createCompany — validates snowflake ID generation + audit field auto-fill
+  TC2: companyCodeDuplicate — same tenant code uniqueness enforcement
+  TC3: companyList — pagination, tenantId filter, fuzzy search by name/code
+  TC4: companyUpdate — tenantId check before update (name/status change)
+  TC5: companyDelete — logic delete via @TableLogic + post-delete not-found
+  TC6: crossTenantIsolation — tenant 999 cannot access tenant 0 data
+  TC17: defaultStatus — status defaults to ENABLE when not specified
+  TC18: notFound — non-existent IDs throw BusinessException uniformly
+
+OrgDepartment (TC7-TC12):
+  TC7: createRootDepartment — parentId=null creates root node
+  TC8: createChildDeptAndTree — 2 children under root, tree structure verified
+  TC9: deepTreeStructure — 3-level nested tree (L1→L2→L3) with children verification
+  TC10: deleteDeptWithChildren — deletion blocked when children exist
+  TC11: deptPagedList — pagination with companyId filter
+  TC12: deptCrossTenantIsolation — department cross-tenant access denied
+
+OrgPosition (TC13-TC16):
+  TC13: createPosition — HR title creation, no permission semantics
+  TC14: positionCodeDuplicate — same-tenant code uniqueness
+  TC15: positionListUpdateDelete — full CRUD lifecycle (create/read/update/delete)
+  TC16: positionCrossTenantIsolation — position cross-tenant access denied
+
+Test configuration:
+- @SpringBootTest with H2 (local profile via test resources)
+- @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+- @BeforeEach: UserContext.set(Jwts.claims()...)
+- @AfterEach: UserContext.clear()
+- @Transactional on each test method
+
+Results:
+  ✅ 18/18 tests PASS (OrgServiceTest)
+  ✅ All 62 existing non-org tests unaffected
+  ⚠️ 3 pre-existing failures unrelated to org module (DictServiceTest x2, WorkflowEngineIntegrationTest x1)
+
+H2 Schema:
+  Added org_company, org_department, org_position tables to:
+  backend/src/main/resources/db/h2/schema-phase23.sql
+  (using created_time/updated_time column names matching V33 migration)

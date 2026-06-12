@@ -1,0 +1,66 @@
+Task 33: Phase 4 User Manual + Admin Manual
+=============================================
+Date: 2026-06-12
+
+Generated Files:
+  - doc/第4阶段用户操作手册.md (10 chapters, 418 lines)
+  - doc/第4阶段管理员手册.md (8 chapters, 403 lines)
+
+Chapter Verification (用户操作手册):
+  [x] 1. 概述
+  [x] 2. 组织架构 (公司/部门/岗位)
+  [x] 3. 项目成员管理 (role codes: PM/CM/CSTM/MAT/SUBC/FIN/OTH)
+  [x] 4. 字典管理 (system:dict:add/edit/delete)
+  [x] 5. 库存管理
+  [x]   5.1 仓库管理 (inventory:warehouse:*)
+  [x]   5.2 库存台账 (inventory:stock:list)
+  [x]   5.3 出入库管理 (inventory:transaction:add)
+  [x]   5.4 采购申请 (purchase:request:*)
+  [x] 6. 发票管理 (invoice:*)
+  [x] 7. 消息中心 (notification:*)
+  [x] 8. 待办中心 (todo/done/cc)
+  [x] 9. 附录：权限码速查表
+  [x] 10. 快捷路径映射
+
+Chapter Verification (管理员手册):
+  [x] 1. 概述
+  [x] 2. 部署步骤 (Docker Compose + MySQL + mvnw + pnpm)
+  [x] 3. Flyway 迁移清单 (V33~V39, 7 scripts)
+  [x]   3.1 V33 组织架构表
+  [x]   3.2 V34 项目成员 + 用户关联
+  [x]   3.3 V35 库存与采购申请表
+  [x]   3.4 V36 发票表
+  [x]   3.5 V37 消息通知表
+  [x]   3.6 V38 审批抄送表
+  [x]   3.7 V39 菜单权限种子数据
+  [x] 4. 权限配置 (menu tree + 权限码清单 + allocation guide)
+  [x] 5. 审批模板配置 (TPL-PURCHASE-REQUEST-001, template_id=50010)
+  [x] 6. 常见运维操作 (通知清理/仓库恢复/Flyway检查)
+  [x] 7. 后端 API 路径速查
+  [x] 8. 故障排查 (菜单不显示/提交失败/SSE/Flyway冲突)
+
+Permission codes referenced (from V39 migration):
+  org:list org:add org:edit org:delete
+  project:member:list project:member:add project:member:edit project:member:delete
+  system:dict:add system:dict:edit system:dict:delete
+  inventory:warehouse:list inventory:warehouse:add inventory:warehouse:edit inventory:warehouse:delete
+  inventory:stock:list
+  inventory:transaction:list inventory:transaction:add
+  purchase:request:list purchase:request:add purchase:request:submit
+  invoice:list invoice:add invoice:edit invoice:delete invoice:verify
+  notification:list notification:view notification:edit
+
+Flyway migration IDs:
+  V33__init_org_tables
+  V34__add_project_member_and_user_org
+  V35__init_inventory_tables
+  V36__init_invoice_table
+  V37__init_notification_table
+  V38__init_workflow_cc_table
+  V39__init_phase4_menu_perms
+
+Template verified against V39 SQL:
+  template_id=50010 (TPL-PURCHASE-REQUEST-001)
+  3 nodes: PROJECT_MANAGER -> COMMERCIAL_MANAGER -> COST_MANAGER
+
+Both manuals in Chinese, no fictional features, all referenced codes from actual migrations.

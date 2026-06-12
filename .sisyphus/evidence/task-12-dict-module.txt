@@ -1,0 +1,87 @@
+=== Task 12: Dict Module Backend Evidence ===
+Date: 2026-06-12
+Context: Build dict module backend (DictType/DictData CRUD) in system package
+
+=== Files Created (10 Java + 1 Test) ===
+
+Entities (NOT extending BaseEntity — tables lack created_by/updated_by/deleted_flag/remark):
+  backend/src/main/java/com/cgcpms/system/dict/entity/SysDictType.java
+    - Maps to sys_dict_type (V5 migration columns: id, tenant_id, dict_code, dict_name, status, created_at, updated_at)
+    - @TableId(type=IdType.ASSIGN_ID), @TableName("sys_dict_type"), implements Serializable
+  backend/src/main/java/com/cgcpms/system/dict/entity/SysDictData.java
+    - Maps to sys_dict_data (V5 migration columns: id, tenant_id, dict_type_id, dict_label, dict_value, css_class, list_class, order_num, status, created_at, updated_at)
+    - @TableId(type=IdType.ASSIGN_ID), @TableName("sys_dict_data"), implements Serializable
+
+Mappers:
+  backend/src/main/java/com/cgcpms/system/dict/mapper/SysDictTypeMapper.java — extends BaseMapper<SysDictType>
+  backend/src/main/java/com/cgcpms/system/dict/mapper/SysDictDataMapper.java — extends BaseMapper<SysDictData>
+
+Services (tenantId filtering on every query + post-check on getById):
+  backend/src/main/java/com/cgcpms/system/dict/service/SysDictTypeService.java
+  backend/src/main/java/com/cgcpms/system/dict/service/SysDictDataService.java
+
+Controllers (@PreAuthorize with system:dict:list/add/edit/delete):
+  backend/src/main/java/com/cgcpms/system/dict/controller/SysDictTypeController.java
+    - GET    /api/system/dict/types          — system:dict:list
+    - GET    /api/system/dict/types/{id}     — system:dict:list
+    - POST   /api/system/dict/types          — system:dict:add
+    - PUT    /api/system/dict/types/{id}     — system:dict:edit
+    - DELETE /api/system/dict/types/{id}     — system:dict:delete
+  backend/src/main/java/com/cgcpms/system/dict/controller/SysDictDataController.java
+    - GET    /api/system/dict/data?typeId=    — system:dict:list
+    - GET    /api/system/dict/data/{id}      — system:dict:list
+    - POST   /api/system/dict/data           — system:dict:add
+    - PUT    /api/system/dict/data/{id}      — system:dict:edit
+    - DELETE /api/system/dict/data/{id}      — system:dict:delete
+
+VOs:
+  backend/src/main/java/com/cgcpms/system/dict/vo/SysDictTypeVO.java
+  backend/src/main/java/com/cgcpms/system/dict/vo/SysDictDataVO.java
+
+Test (TDD: RED→GREEN→REFACTOR, 16 tests, all passing):
+  backend/src/test/java/com/cgcpms/system/dict/DictServiceTest.java
+
+H2 Schema updated:
+  backend/src/main/resources/db/h2/schema.sql — added sys_dict_type + sys_dict_data tables
+  backend/src/main/resources/db/h2/data.sql — added dict seed data (matching V5 seed IDs)
+
+=== Key Design Decisions ===
+
+1. NOT extending BaseEntity: sys_dict_type and sys_dict_data tables (V5 migration) do NOT have
+   created_by, updated_by, deleted_flag, or remark columns. Extending BaseEntity would cause
+   MyBatis-Plus @TableLogic (deleted_flag WHERE clause) and MetaObjectHandler (createdBy/updatedBy
+   fill) to generate SQL referencing non-existent columns.
+
+2. Explicit tenantId set in create(): MetaObjectHandler auto-fill requires @TableField annotations
+   present on BaseEntity. Since entities don't extend BaseEntity, tenantId is set explicitly via
+   entity.setTenantId(UserContext.getCurrentTenantId()) before insert.
+
+3. NO caching: No @Cacheable or @EnableCaching anywhere in dict package — direct DB queries only.
+
+4. Permission codes: system:dict:list (menu 504 in V6), system:dict:add/edit/delete (buttons
+   721/722/723 in V39). Controllers use @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:dict:xxx')").
+
+5. Tenant isolation: Every LambdaQueryWrapper includes .eq(TenantId, UserContext.getCurrentTenantId()).
+   Every getById/update/delete does post-check on entity.getTenantId().
+
+=== Test Summary ===
+Tests run: 16, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS
+
+T1:  listDictTypes_seedData — seed data (7 types) visible
+T2:  getDictTypeById — project_status (id=1001) retrievable
+T3:  createDictType_success — new type created with ENABLE default
+T4:  createDictType_duplicateCode — BusinessException on duplicate code
+T5:  updateDictType — contract_type renamed + disabled
+T6:  deleteDictType — delete then getById throws BusinessException
+T7:  tenantIsolation_type — other tenant's type invisible to system tenant
+T8:  listDictData_byDictType — 5 seed items for project_status
+T9:  getDictDataById — 草稿 (id=100101) retrievable
+T10: createDictData_success — new item created with default orderNum=0
+T11: createDictData_duplicateValue — BusinessException on duplicate key
+T12: updateDictData — label renamed + disabled
+T13: deleteDictData — delete then getById throws BusinessException
+T14: tenantIsolation_data — other tenant's data invisible to system tenant
+T15: searchDictTypeByName — fuzzy search "合同" returns 2 types
+T16: filterDictTypeByStatus — status=ENABLE returns 7 types
+
+Full test suite: 83 tests, 0 failures, 1 pre-existing error (WorkflowEngineIntegrationTest — Flyway validation issue on 'test' profile, unrelated to dict module)

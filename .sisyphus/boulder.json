@@ -1,103 +1,66 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\phase3-cost-analysis-contract-deepening.md",
-  "started_at": "2026-06-12T01:17:55.613Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\phase4-org-inventory-invoice-integration.md",
+  "started_at": "2026-06-12T08:23:51.020Z",
   "session_ids": [
-    "ses_148aa5879ffepRk1bk3ENnKKsg"
+    "ses_14538ce40ffe5DMuYut8EA4MyI",
+    "ses_144fb0e19ffe9hoOF7Au3y74Vc",
+    "ses_144fad871ffeTHLNDihuLxmS1k",
+    "ses_144faa86dffedt1BxlhIJSSx2Q",
+    "ses_144fa7a05ffeq62Upffl64OXC7",
+    "ses_144efe51cffe03d1OhfFAQ4yM7",
+    "ses_144eaec17ffeY9XDVGmuJuRzZJ",
+    "ses_144eac904fferzdQVTflC2HY9Z",
+    "ses_144eab0f1ffewfqIIWR69wche4",
+    "ses_144ea92e9ffe5LeuD4NbETwfGW",
+    "ses_144d3f835ffeNPc2Hs8npDL5i3",
+    "ses_144d3dcf8ffe3y0bLw4fhGTWK7",
+    "ses_144d3c256ffe6U0BcQDU2KdelS",
+    "ses_144d3adb5ffe2VMRnISdT5FbSm",
+    "ses_144d39667ffepOVczN2I4ih8md",
+    "ses_144ac6142fferckFFwhsTfYgHH",
+    "ses_144ac520effe1PTNwh78zCYMvB",
+    "ses_144ac4382ffevMxUnD4kynnYdO",
+    "ses_144ac3782ffeJiYLsKg1crJSQq",
+    "ses_144a5e8e5ffeyBvUAx3oZQgpV2",
+    "ses_144a5d448ffe6pGyde45lShv4R",
+    "ses_1449db4ddffeyMzxsc27aLChut",
+    "ses_1449da3abffeEZu0VW6QzgCFxu"
   ],
-  "plan_name": "phase3-cost-analysis-contract-deepening",
+  "plan_name": "phase4-org-inventory-invoice-integration",
   "worktree_path": null,
   "session_origins": {
-    "ses_148aa5879ffepRk1bk3ENnKKsg": "direct"
+    "ses_14538ce40ffe5DMuYut8EA4MyI": "direct",
+    "ses_144fb0e19ffe9hoOF7Au3y74Vc": "appended",
+    "ses_144fad871ffeTHLNDihuLxmS1k": "appended",
+    "ses_144faa86dffedt1BxlhIJSSx2Q": "appended",
+    "ses_144fa7a05ffeq62Upffl64OXC7": "appended",
+    "ses_144efe51cffe03d1OhfFAQ4yM7": "appended",
+    "ses_144eaec17ffeY9XDVGmuJuRzZJ": "appended",
+    "ses_144eac904fferzdQVTflC2HY9Z": "appended",
+    "ses_144eab0f1ffewfqIIWR69wche4": "appended",
+    "ses_144ea92e9ffe5LeuD4NbETwfGW": "appended",
+    "ses_144d3f835ffeNPc2Hs8npDL5i3": "appended",
+    "ses_144d3dcf8ffe3y0bLw4fhGTWK7": "appended",
+    "ses_144d3c256ffe6U0BcQDU2KdelS": "appended",
+    "ses_144d3adb5ffe2VMRnISdT5FbSm": "appended",
+    "ses_144d39667ffepOVczN2I4ih8md": "appended",
+    "ses_144ac6142fferckFFwhsTfYgHH": "appended",
+    "ses_144ac520effe1PTNwh78zCYMvB": "appended",
+    "ses_144ac4382ffevMxUnD4kynnYdO": "appended",
+    "ses_144ac3782ffeJiYLsKg1crJSQq": "appended",
+    "ses_144a5e8e5ffeyBvUAx3oZQgpV2": "appended",
+    "ses_144a5d448ffe6pGyde45lShv4R": "appended",
+    "ses_1449db4ddffeyMzxsc27aLChut": "appended",
+    "ses_1449da3abffeEZu0VW6QzgCFxu": "appended"
   },
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "技术债务修复：H2 审批提交权限收紧",
-      "session_id": "ses_146963ba7ffeKgJmpDTNwHXshB",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-12T01:36:38.991Z"
-    },
-    "todo:2": {
-      "task_key": "todo:2",
-      "task_label": "2",
-      "task_title": "Flyway V22：cost_target + cost_target_item 表",
-      "session_id": "ses_146834bd5ffeMeDHIfLKK1HV6b",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-12T01:44:31.473Z"
-    },
-    "todo:3": {
-      "task_key": "todo:3",
-      "task_label": "3",
-      "task_title": "Flyway V23：ct_contract_change 合同变更表",
-      "session_id": "ses_1467c9737ffewICKZ0cg9b1C8w",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-12T01:48:47.553Z"
-    },
-    "todo:6": {
-      "task_key": "todo:6",
-      "task_label": "6",
-      "task_title": "cost_target 实体/Mapper/Service/Controller（多版本+is_active）",
-      "session_id": "ses_146762968ffefMr5SZSMfjTSjR",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-06-12T02:00:21.950Z"
-    },
-    "todo:9": {
-      "task_key": "todo:9",
-      "task_label": "9",
-      "task_title": "动态成本公式修正 + backfill 迁移（双公式统一）",
-      "session_id": "ses_1466fedaeffeiR5NP5hAeMV31U",
-      "agent": "Sisyphus-Junior",
-      "category": "ultrabrain",
-      "updated_at": "2026-06-12T02:06:59.427Z"
-    },
-    "todo:11": {
-      "task_key": "todo:11",
-      "task_label": "11",
-      "task_title": "CT_CHANGE WorkflowHandler + 审批模板 + 成本联动",
-      "session_id": "ses_1466a3e48ffenuJeK51QzGUnv8",
-      "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-06-12T02:11:39.970Z"
-    },
-    "todo:16": {
-      "task_key": "todo:16",
-      "task_label": "16",
-      "task_title": "目标成本管理前端页",
-      "session_id": "ses_14662b5e0ffeNtuI3vUKLepBR5",
-      "agent": "Sisyphus-Junior",
-      "category": "visual-engineering",
-      "updated_at": "2026-06-12T02:22:30.171Z"
-    },
-    "todo:22": {
-      "task_key": "todo:22",
-      "task_label": "22",
-      "task_title": "技术债务 M4：token HttpOnly Cookie 改造",
-      "session_id": "ses_14653dd47ffexVqQs4rKKb0UCn",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-06-12T02:36:45.937Z"
-    },
-    "todo:25": {
-      "task_key": "todo:25",
-      "task_label": "25",
-      "task_title": "MySQL 8.0 全栈验证 + 测试报告",
-      "session_id": "ses_145b9a487ffeJEhynPtnFInK8M",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-06-12T05:27:11.112Z"
-    },
-    "final-wave:f1": {
-      "task_key": "final-wave:f1",
-      "task_label": "F1",
-      "task_title": "**计划合规审计** — `oracle`",
-      "session_id": "ses_145b33adeffeuXHf5RxyDnBriH",
+      "task_title": "Flyway V33：组织架构三表（org_company / org_department / org_position）",
+      "session_id": "ses_144a3d1b4ffeC5TiKP96c4fpHy",
       "agent": "oracle",
-      "updated_at": "2026-06-12T05:31:11.467Z"
+      "updated_at": "2026-06-12T10:24:41.801Z"
     }
   }
 }
