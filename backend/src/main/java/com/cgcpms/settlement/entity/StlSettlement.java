@@ -1,4 +1,4 @@
-package com.cgcpms.cost.entity;
+package com.cgcpms.settlement.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -7,56 +7,65 @@ import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("cost_summary")
-public class CostSummary extends BaseEntity {
+@TableName("stl_settlement")
+public class StlSettlement extends BaseEntity {
 
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private Long tenantId;
 
+    @NotNull
     private Long projectId;
 
-    @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate summaryDate;
+    private Long contractId;
 
-    private Long costSubjectId;
+    private Long partnerId;
 
-    /** 关联 cost_target.id，用于目标成本版本追溯 */
-    private Long costTargetId;
+    private String settlementCode;
 
-    @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal targetCost;
+    private String settlementType;
 
     @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal contractLockedCost;
+    private BigDecimal contractAmount;
 
     @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal actualCost;
+    private BigDecimal changeAmount;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal measuredAmount;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal deductionAmount;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal paidAmount;
 
     @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal estimatedRemainingCost;
+    private BigDecimal finalAmount;
+
+    private String approvalStatus;
+
+    private String status;
+
+    // V24 enhanced fields
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal unpaidAmount;
 
     @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal dynamicCost;
+    private BigDecimal warrantyAmount;
 
-    @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal contractIncome;
+    private String settlementStatus;
 
-    @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal expectedProfit;
-
-    @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal costDeviation;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime finalizedAt;
 }
