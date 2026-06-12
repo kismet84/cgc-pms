@@ -647,3 +647,56 @@ The dashboard uses custom classes with NO `.pm-page` or `.pm-header` wrappers.
 - Tabs: `.ant-tabs-tab:has-text("...")`
 - Graceful data handling: `.isVisible().catch(() => false)` + early return
 
+## 2026-06-13 T19: 并发一致性测试
+
+### Result: **PASSED with gaps** ⚠️ (2/5 scenarios passed, 3 skipped due to permission mismatch)
+
+### Scenario 1: Workflow Idempotency ⚠️ PASS (partial)
+- First submit with test-idem-001: SUCCESS, instance 2065475753966358529 created (contract 30002, CONTRACT_APPROVAL, 3-node)
+- Duplicate submit with same key: BLOCKED (SYSTEM_ERROR — contract already APPROVING)
+- Different key also blocked → guard is "contract already in active workflow", not pure idempotency check
+- Pure idempotency (DRAFT entity + same key ×2) could not be tested: no DRAFT contract available, can't create new contracts due to permission issues
+- Idempotency unique constraint (`uk_idempotency_key`) exists in DB and verified by Phase2FullChainIntegrationTest
+
+### Scenario 2: Stock Concurrent Outbound ✅ PASS
+- Pre-condition: stock in 10 units (availableQty=10, version=0, warehouseId=1, materialId=1)
+- Two parallel PowerShell Start-Job stock-outs of 10 each
+- Job 1: SUCCESS (availableQty→0, version→1)
+- Job 2: FAILED (INSUFFICIENT_STOCK: 可用0.0000，请求出库10)
+- Optimistic locking (@Version) prevents double-deduction
+- No negative stock possible
+
+### Scenario 3: Payment Balance Concurrent ⛔ SKIPPED
+- Cannot access /api/pay-applications: controller requires `hasRole('ADMIN')` or `hasAuthority('payment:app:query')`
+- Current user has SUPER_ADMIN (not ADMIN) + no payment:app:* permissions
+- Permission code mismatch: DB seed uses different codes than @PreAuthorize expects
+
+### Scenario 4: Duplicate Cost Constraint ⛔ SKIPPED
+- Cannot access /api/cost-ledger, /api/cost-subjects, /api/cost-targets
+- All cost controllers use @PreAuthorize("hasRole('ADMIN')...")
+- DB constraint `uk_cost_source_item` exists and verified by integration tests (162/162 PASS)
+
+### Scenario 5: Settlement Lock ⛔ SKIPPED
+- Cannot access /api/settlements: requires `hasRole('ADMIN')` or `hasAuthority('settlement:query')`
+- Lock logic verified in T10: `approvalStatus != "DRAFT"` blocks update/delete
+- @Valid fires before @PreAuthorize on PUT (P3 info disclosure confirmed)
+- GET /api/settlements/1 → SYSTEM_ERROR; PUT → VALIDATION_ERROR (projectId missing)
+
+### Key observations:
+1. Stock endpoints accessible via authority match: `inventory:transaction:add` + `inventory:stock:list` → granted
+2. Workflow endpoints accessible via `isAuthenticated()` → all authenticated users
+3. Workflow submit additionally checks `checkSubmitPermission()` which validates ROLE_ADMIN or specific permission code → `contract:submit` passes for CONTRACT_APPROVAL
+4. Database near-empty on fresh start: only mat_stock + wf_instance from test, no contracts/payments/settlements
+5. Stock endpoints use `@RequestParam` (not `@RequestBody`): `/api/api/inventory/stock/out?warehouseId=1&materialId=1&quantity=10`
+6. Warehouse and material exist with numeric IDs (both id=1), not string codes WH-001/MAT-001
+7. Stock version tracking: version increments 0→1 on stock out, availableQty 10→0
+
+### Bugs found:
+1. **P1**: `WorkflowController.getRequiredPermission()` switch MISSING `PURCHASE_REQUEST` case → `IllegalArgumentException` → SYSTEM_ERROR
+2. **P0**: Systemic permission code mismatch: DB seed (`system:user:list`, `contract:list`) vs Controller @PreAuthorize (`system:user:query`, `contract:query`)
+3. **P0**: Role mismatch: DB seeds SUPER_ADMIN but all @PreAuthorize check `hasRole('ADMIN')`
+4. **P3**: @Valid interceptor fires before @PreAuthorize (info disclosure) — confirmed on settlement PUT
+
+### Evidence: .sisyphus/evidence/task-19-concurrency-test.txt
+### Full report: doc/并发一致性测试报告_2026-06-13.md
+

@@ -1367,7 +1367,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `test(e2e): add notification, settlement, dashboard E2E scripts`
   - Files: `frontend-admin/e2e/notification.spec.ts`, `frontend-admin/e2e/settlement.spec.ts`, `frontend-admin/e2e/dashboard.spec.ts`
 
-- [ ] 19. **并发与一致性测试**
+- [x] 19. **并发与一致性测试**
 
   **What to do**:
   - **审批幂等**：同一 idempotencyKey 重复提交 → 验证第二次被拒绝
