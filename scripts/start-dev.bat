@@ -21,6 +21,11 @@ if %ERRORLEVEL% NEQ 0 (
 REM 2. Start backend
 echo.
 echo [2/3] Starting backend...
+echo [PRE] Checking port 8080...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080 " ^| findstr "LISTENING"') do (
+    echo [PRE] Port 8080 occupied by PID %%a, stopping...
+    taskkill /PID %%a /F >nul 2>&1
+)
 cd /d "%~dp0..\backend"
 start "CGC-PMS Backend" cmd /c "mvnw spring-boot:run -Dspring-boot.run.profiles=dev"
 echo [OK] Backend starting on http://localhost:8080/api
