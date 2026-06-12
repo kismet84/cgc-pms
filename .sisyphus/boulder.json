@@ -18,6 +18,33 @@
       "agent": "Sisyphus-Junior",
       "category": "quick",
       "updated_at": "2026-06-12T14:33:10.600Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "**项目→合同闭环验收（含合同变更）**",
+      "session_id": "ses_143a48f6affeiB9O0Xxthdlnak",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-06-12T15:21:34.757Z"
+    },
+    "todo:10": {
+      "task_key": "todo:10",
+      "task_label": "10",
+      "task_title": "**结算→归档闭环验收**",
+      "session_id": "ses_14390bd59ffeORb4kMyJZ9wTbz",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-06-12T15:31:49.561Z"
+    },
+    "todo:13": {
+      "task_key": "todo:13",
+      "task_label": "13",
+      "task_title": "**权限矩阵验收**",
+      "session_id": "ses_14389b7e0ffeS2YZaa9oU1hlZV",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-12T15:40:25.530Z"
     }
   }
 }

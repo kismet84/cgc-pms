@@ -518,7 +518,7 @@ Wave FINAL (After ALL - 4 并行审查):
 
 ### Wave 2 — 业务闭环验收 + 安全验收 + E2E 起步（最大并行）
 
-- [ ] 6. **项目→合同闭环验收（含合同变更）**
+- [x] 6. **项目→合同闭环验收（含合同变更）**
 
   **What to do**:
   - 新建项目（含基本信息、工期、预算）
@@ -593,7 +593,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): contract closed-loop acceptance record`
   - Files: `doc/业务主闭环验收报告_*.md`（合同闭环章节）
 
-- [ ] 7. **采购→材料闭环验收**
+- [x] 7. **采购→材料闭环验收**
 
   **What to do**:
   - 基于采购合同创建采购申请，提交审批
@@ -660,7 +660,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): procurement & materials closed-loop acceptance record`
   - Files: `doc/业务主闭环验收报告_*.md`
 
-- [ ] 8. **分包→计量闭环验收**
+- [x] 8. **分包→计量闭环验收**
 
   **What to do**:
   - 基于分包合同创建分包任务
@@ -722,7 +722,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): subcontract & measurement closed-loop acceptance record`
   - Files: `doc/业务主闭环验收报告_*.md`
 
-- [ ] 9. **付款→发票闭环验收**
+- [x] 9. **付款→发票闭环验收**
 
   **What to do**:
   - 基于合同 + 验收/计量数据发起付款申请
@@ -787,7 +787,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): payment & invoice closed-loop acceptance record`
   - Files: `doc/业务主闭环验收报告_*.md`
 
-- [ ] 10. **结算→归档闭环验收**
+- [x] 10. **结算→归档闭环验收**
 
   **What to do**:
   - 基于已履约合同创建结算单
@@ -851,7 +851,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): settlement & archive closed-loop acceptance record`
   - Files: `doc/业务主闭环验收报告_*.md`
 
-- [ ] 11. **经营分析→预警闭环验收**
+- [x] 11. **经营分析→预警闭环验收**
 
   **What to do**:
   - 查看项目驾驶舱，验证合同金额、动态成本、利润测算数据正确
@@ -917,7 +917,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): analytics & alert closed-loop acceptance record`
   - Files: `doc/业务主闭环验收报告_*.md`
 
-- [ ] 12. **审批异常路径验收**
+- [x] 12. **审批异常路径验收**
 
   **What to do**:
   - **驳回→重编→重提**：合同审批驳回后，验证 DRAFT 状态恢复、可编辑、重新提交进入 APPROVING
@@ -1006,7 +1006,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): approval exception paths acceptance record`
   - Files: `doc/业务主闭环验收报告_*.md`
 
-- [ ] 13. **权限矩阵验收**
+- [x] 13. **权限矩阵验收**
 
   **What to do**:
   - 整理角色清单：管理员、项目经理、商务经理、成本经理、合同管理员、材料员、设备管理员、分包管理员、财务人员、资料员、审计人员（11 个角色）
@@ -1059,7 +1059,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): permission matrix acceptance record`
   - Files: `doc/权限矩阵验收表_*.md`
 
-- [ ] 14. **多租户数据隔离验收**
+- [x] 14. **多租户数据隔离验收**
 
   **What to do**:
   - 准备两个租户/项目隔离的数据
@@ -1124,7 +1124,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): multi-tenant data isolation acceptance record`
   - Files: `doc/多租户数据隔离验收报告_*.md`
 
-- [ ] 15. **安全基线复核**
+- [x] 15. **安全基线复核**
 
   **What to do**:
   - 复核 JWT/Refresh Token/Redis 黑名单机制
@@ -1194,7 +1194,7 @@ Wave FINAL (After ALL - 4 并行审查):
   - Message: `docs(acceptance): security baseline review record`
   - Files: `doc/安全基线复核清单_*.md`
 
-- [ ] 16. **E2E 脚本 Batch 1：登录 + 合同 + 审批**
+- [x] 16. **E2E 脚本 Batch 1：登录 + 合同 + 审批**
 
   **What to do**:
   - 基于 T5 搭建的 Playwright 框架，编写 3 个核心场景的 E2E 脚本
