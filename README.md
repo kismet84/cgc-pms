@@ -147,6 +147,7 @@ pnpm dev
 | 第3阶段 | 成本分析与合同深化 | ✅ | 目标成本/合同变更/结算/动态成本/驾驶舱/预警/技术债修复 (2026-06-12) |
 | 第4阶段 | 库存与发票 | ✅ | 仓库/库存台账/出入库/采购申请、发票创建/登记/核验、消息中心 SSE、组织架构 (2026-06-12) |
 | 审计修复 4 | — | ✅ | 6 项审查问题修复：PayInvoice 字段映射/H2 schema 漂移/测试 profile 统一/SSE 异常处理/权限码对齐/测试 UserContext (2026-06-12) |
+| P3 中期改进 | — | ✅ | H2 Flyway 自动生成 / 通知 bizId 统一 / 测试隔离强化 (2026-06-12) |
 
 ### 已完成功能
 
@@ -247,7 +248,7 @@ pnpm dev
     ├── 预警中心（八类规则 + @Scheduled 批处理 + 手动批量评估，V29）
     ├── 权限种子补全（V39 菜单 + 权限码 + 审批模板，V40 修复对齐）
     ├── Flyway V33~V40 共 8 个迁移脚本
-    └── 全量测试 162/162 通过（2 个预存 H2 适配问题在 WorkflowEngineIntegrationTest）
+    └── 全量测试 162/162 通过（H2 + MySQL 双环境）
 ✅ 审计修复 4 (2026-06-12)
     ├── P0: PayInvoice created_time/updated_time 字段映射对齐
     ├── P1: 测试 profile 统一为 H2 local
@@ -255,6 +256,10 @@ pnpm dev
     ├── P1: NotificationService SSE 异常处理增强
     ├── P1: 权限种子与 @PreAuthorize 码对齐 (V40)
     └── P2: TestUserContext helper + roleCodes 补充
+✅ P3 中期改进 (2026-06-12)
+    ├── H2 schema Flyway 自动生成 (V1~V40 migration-h2, 消除手工维护漂移)
+    ├── 通知 bizId 语义统一 (TRANSFER/ADD_SIGN 改为 instance ID)
+    └── 测试数据隔离强化 (BID_FIRST/LAST 常量 + cleanup 文档化)
 ```
 
 ## 合同中心 API
@@ -372,7 +377,7 @@ pnpm dev
 
 ## 已知暂缓问题
 
-- WorkflowEngineIntegrationTest 2 个用例在 H2 环境暂未通过（test09 幂等约束、test15 通知 tenantId 校验），MySQL 环境正常
+（无 — 此前 2 个 H2 暂缓用例已于 2026-06-12 修复，全量 162/162 通过）
 
 ## 文档
 
@@ -389,4 +394,6 @@ pnpm dev
 | 第2阶段开发计划_成本归集与资金闭环 | `doc/第2阶段开发计划_成本归集与资金闭环.md` |
 | 第2阶段成本归集与资金闭环测试报告 | `doc/第2阶段成本归集与资金闭环测试报告.md` |
 | 第3阶段成本分析与合同深化测试报告 | `doc/第3阶段成本分析与合同深化测试报告.md` |
+| P3 中期改进实施方案 | `doc/P3中期改进实施方案_2026-06-12.md` |
+| H2 暂缓问题分析报告 | `doc/WorkflowEngineIntegrationTest_H2暂缓问题分析报告_2026-06-12.md` |
 | 开发文档 | `doc/开发文档_v2.3/` |
