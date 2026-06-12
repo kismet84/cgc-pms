@@ -184,8 +184,9 @@ class RegressionFixVerificationTest {
             // Create purchase order with guaranteed-unique code via raw JDBC
             orderId = System.currentTimeMillis();
             String uniqueCode = "PO-REG-" + System.nanoTime();
-            jdbcTemplate.update("INSERT INTO mat_purchase_order (id, tenant_id, project_id, contract_id, partner_id, order_code, order_type, order_date, delivery_date, approval_status, order_status, created_by, created_at, updated_by, updated_at, remark, deleted_flag) VALUES (?, 0, ?, ?, ?, ?, 'NORMAL', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'DRAFT', 'DRAFT', 1, NOW(), 1, NOW(), ?, 0)",
-                    orderId, PROJECT_ID, CONTRACT_ID, PARTNER_ID, uniqueCode, "Regression-F17-采购订单");
+            jdbcTemplate.update("INSERT INTO mat_purchase_order (id, tenant_id, project_id, contract_id, partner_id, order_code, order_type, order_date, delivery_date, approval_status, order_status, created_by, created_at, updated_by, updated_at, remark, deleted_flag) VALUES (?, 0, ?, ?, ?, ?, 'NORMAL', ?, ?, 'DRAFT', 'DRAFT', 1, NOW(), 1, NOW(), ?, 0)",
+                    orderId, PROJECT_ID, CONTRACT_ID, PARTNER_ID, uniqueCode,
+                    LocalDate.now(), LocalDate.now().plusDays(30), "Regression-F17-采购订单");
             assertNotNull(orderId);
 
             // Set approvalStatus to APPROVED via mapper
@@ -222,8 +223,9 @@ class RegressionFixVerificationTest {
             // Create helper order with guaranteed-unique code via raw JDBC
             helperOrderId = System.currentTimeMillis() + 1;
             String helperCode = "PO-REG-" + (System.nanoTime() + 1);
-            jdbcTemplate.update("INSERT INTO mat_purchase_order (id, tenant_id, project_id, contract_id, partner_id, order_code, order_type, order_date, delivery_date, approval_status, order_status, created_by, created_at, updated_by, updated_at, remark, deleted_flag) VALUES (?, 0, ?, ?, ?, ?, 'NORMAL', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'DRAFT', 'DRAFT', 1, NOW(), 1, NOW(), ?, 0)",
-                    helperOrderId, PROJECT_ID, CONTRACT_ID, PARTNER_ID, helperCode, "Regression-F17-辅助订单");
+            jdbcTemplate.update("INSERT INTO mat_purchase_order (id, tenant_id, project_id, contract_id, partner_id, order_code, order_type, order_date, delivery_date, approval_status, order_status, created_by, created_at, updated_by, updated_at, remark, deleted_flag) VALUES (?, 0, ?, ?, ?, ?, 'NORMAL', ?, ?, 'DRAFT', 'DRAFT', 1, NOW(), 1, NOW(), ?, 0)",
+                    helperOrderId, PROJECT_ID, CONTRACT_ID, PARTNER_ID, helperCode,
+                    LocalDate.now(), LocalDate.now().plusDays(30), "Regression-F17-辅助订单");
 
             // Create receipt
             MatReceipt receipt = new MatReceipt();
