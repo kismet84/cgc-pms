@@ -1,0 +1,147 @@
+================================================================================
+Task 9: 动态成本公式修正 + backfill 迁移 — Diff Report
+Generated: 2026-06-12
+================================================================================
+
+1. FORMULA CHANGES
+================================================================================
+
+1.1 dynamicCost (CostSummaryService.refreshSummary, line 112 → line 128)
+--------------------------------------------------------------------------------
+  BEFORE: dynamicCost = contractLockedCost + actualCost + estimatedRemainingCost
+          (BUG: double-counts contractLockedCost when added to actualCost;
+           estimatedRemainingCost was hardcoded 0, so effect was:
+           dynamicCost = contractLockedCost + actualCost + 0)
+
+  AFTER:  dynamicCost = actualCost + estimatedRemainingCost
+          (correct: actual spent + remaining estimate)
+
+  IMPACT: For projects with contractLockedCost > 0:
+          dynamicCost DECREASES by contractLockedCost (removes double-count)
+          Example: contractLockedCost=100, actualCost=0, estimatedRemaining=0
+            BEFORE: dynamicCost = 100
+            AFTER:  dynamicCost = 0
+
+1.2 dynamicCost (CostSummaryService.getProjectSummary, line 194 → line 214)
+--------------------------------------------------------------------------------
+  BEFORE: dynamicCost = contractLockedCost + actualCost
+          (BUG: different formula from refreshSummary, excludes estimatedRemainingCost)
+
+  AFTER:  dynamicCost = actualCost + estimatedRemainingCost
+          (unified with refreshSummary; estimatedRemainingCost computed via helper)
+
+  IMPACT: Same formula change as above. Now project-level and subject-level
+          dynamicCost are computed identically.
+
+2. NEW FIELD IMPLEMENTATIONS
+================================================================================
+
+2.1 estimatedRemainingCost
+--------------------------------------------------------------------------------
+  BEFORE: Hardcoded BigDecimal.ZERO
+  AFTER:  SUM(ct_contract.currentAmount WHERE project_id=X)
+          - SUM(sub_measure.approvedAmount WHERE project_id=X AND approval_status='APPROVED')
+          - SUM(mat_receipt.totalAmount WHERE project_id=X AND approval_status='APPROVED')
+
+  Data sources:
+    - ct_contract.currentAmount  (current contract amount, reflecting variations)
+    - sub_measure.approvedAmount (confirmed subcontract measurements, approved only)
+    - mat_receipt.totalAmount    (confirmed material receipts, approved only)
+
+  Note: This is a project-level value, same for all cost subjects within a project.
+
+2.2 contractIncome
+--------------------------------------------------------------------------------
+  BEFORE: Hardcoded BigDecimal.ZERO
+  AFTER:  SUM(ct_contract.contractAmount WHERE project_id=X)
+          + SUM(var_order.approvedAmount WHERE project_id=X AND direction='INCOME' AND approval_status='APPROVED')
+
+  Data sources:
+    - ct_contract.contractAmount   (original contract amounts)
+    - var_order.approvedAmount     (income-direction variation orders, approved only)
+
+  Note: Project-level value, same for all cost subjects.
+
+2.3 expectedProfit
+--------------------------------------------------------------------------------
+  BEFORE: Hardcoded BigDecimal.ZERO
+  AFTER:  contractIncome - dynamicCost
+          = (SUM(contractAmount) + SUM(income vars)) - (actualCost + estimatedRemainingCost)
+
+  This is per-subject since dynamicCost varies per subject.
+
+3. VO CHANGES
+================================================================================
+
+3.1 CostProjectSummaryVO
+--------------------------------------------------------------------------------
+  ADDED fields:
+    - estimatedRemainingCost (String)
+    - contractIncome (String)
+    - expectedProfit (String)
+
+  These were already present in CostSummaryVO but missing from the project-level
+  aggregation VO. Now properly populated in getProjectSummary().
+
+4. FILES CHANGED
+================================================================================
+
+  MODIFIED:
+    backend/src/main/java/com/cgcpms/cost/service/CostSummaryService.java
+      - Added imports: CtContract, CtContractMapper, SubMeasure, SubMeasureMapper,
+                       MatReceipt, MatReceiptMapper, VarOrder, VarOrderMapper
+      - Added 4 mapper dependencies
+      - Added computeProjectEstimatedRemainingCost() helper
+      - Added computeProjectContractIncome() helper
+      - Fixed refreshSummary(): removed contractLockedCost from dynamicCost formula,
+        uses computed project-level values for estimatedRemainingCost/contractIncome
+      - Fixed getProjectSummary(): unified dynamicCost formula, added
+        estimatedRemainingCost/contractIncome/expectedProfit to VO response
+
+    backend/src/main/java/com/cgcpms/cost/vo/CostProjectSummaryVO.java
+      - Added estimatedRemainingCost, contractIncome, expectedProfit fields
+
+  CREATED:
+    backend/src/main/resources/db/migration/V27__fix_dynamic_cost_formula_backfill.sql
+      - Single UPDATE with JOIN against derived tables to backfill:
+        * estimated_remaining_cost
+        * contract_income
+        * dynamic_cost (recalculated with new formula)
+        * expected_profit (recalculated)
+        * cost_deviation (recalculated)
+
+5. BACKFILL MIGRATION (V27) DETAILS
+================================================================================
+
+  Strategy: Single UPDATE with JOIN using 6 derived subqueries.
+
+  Derived tables:
+    1. ct_contract.contractAmount aggregated by (tenant_id, project_id)
+    2. ct_contract.currentAmount aggregated by (tenant_id, project_id)
+    3. var_order.approvedAmount WHERE direction='INCOME' AND approved
+    4. sub_measure.approvedAmount WHERE approved
+    5. mat_receipt.totalAmount WHERE approved
+    6. Distinct (tenant_id, project_id) from cost_summary as the driver
+
+  Updated columns per row:
+    estimated_remaining_cost = calc.calc_estimated_remaining
+    contract_income          = calc.calc_contract_income
+    dynamic_cost             = COALESCE(actual_cost, 0) + calc.calc_estimated_remaining
+    expected_profit          = calc.calc_contract_income - dynamic_cost
+    cost_deviation           = dynamic_cost - COALESCE(target_cost, 0)
+
+  WHERE clause: cs.deleted_flag = 0 (only non-deleted rows)
+
+6. EDGE CASES HANDLED
+================================================================================
+  - NULL handling: COALESCE used throughout for all amount fields
+  - Zero contracts: contractAmount/currentAmount default to 0
+  - No income vars: income_vars LEFT JOIN, defaults to 0
+  - No approved measures/receipts: LEFT JOINs default to 0
+  - No cost items: refreshSummary returns getProjectSummary (which now
+    computes project-level fields independently)
+  - Multiple subjects per project: project-level fields set identically
+    on each subject row (computed once, reused in loop)
+
+================================================================================
+END OF REPORT
