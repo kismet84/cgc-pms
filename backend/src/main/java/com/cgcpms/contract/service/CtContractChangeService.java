@@ -1,6 +1,7 @@
 package com.cgcpms.contract.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
@@ -10,6 +11,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class CtContractChangeService {
 
     private final CtContractChangeMapper ctContractChangeMapper;
     private final CtContractMapper ctContractMapper;
+    private final WorkflowEngine workflowEngine;
 
     public IPage<CtContractChange> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                            String changeType, String approvalStatus, String changeCode) {
@@ -125,7 +128,7 @@ public class CtContractChangeService {
     }
 
     /**
-     * 提交合同变更审批（留空实现，审批逻辑在 Task 11）。
+     * 提交合同变更审批。
      */
     @Transactional
     public void submitForApproval(Long id) {
@@ -133,7 +136,23 @@ public class CtContractChangeService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CT_CHANGE_NOT_FOUND", "合同变更不存在");
 
-        // TODO: Task 11 实现完整审批提交逻辑
-        throw new BusinessException("NOT_IMPLEMENTED", "合同变更审批功能将在后续版本实现");
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
+            throw new BusinessException("CT_CHANGE_ALREADY_SUBMITTED", "合同变更已提交审批，不可重复提交");
+
+        ctContractChangeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()
+                .eq(CtContractChange::getId, id)
+                .set(CtContractChange::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING));
+
+        Long userId = UserContext.getCurrentUserId();
+        String username = UserContext.getCurrentUsername();
+        Long tenantId = UserContext.getCurrentTenantId();
+        workflowEngine.submit(userId, username, tenantId,
+                "CT_CHANGE",
+                id,
+                existing.getChangeCode(),
+                existing.getChangeAmount(),
+                existing.getProjectId(),
+                existing.getContractId(),
+                null, null);
     }
 }

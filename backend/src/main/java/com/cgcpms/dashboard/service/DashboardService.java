@@ -1,0 +1,529 @@
+package com.cgcpms.dashboard.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.entity.CostSummary;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
+import com.cgcpms.cost.mapper.CostSummaryMapper;
+import com.cgcpms.cost.service.CostSummaryService;
+import com.cgcpms.cost.vo.CostProjectSummaryVO;
+import com.cgcpms.cost.vo.CostSummaryVO;
+import com.cgcpms.dashboard.vo.*;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.settlement.entity.StlSettlement;
+import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.entity.WfTask;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
+import com.cgcpms.workflow.mapper.WfTaskMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class DashboardService {
+
+    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    private final CostSummaryService costSummaryService;
+    private final CostSummaryMapper costSummaryMapper;
+    private final CostSubjectMapper costSubjectMapper;
+    private final PmProjectMapper projectMapper;
+    private final CtContractMapper ctContractMapper;
+    private final WfTaskMapper wfTaskMapper;
+    private final WfInstanceMapper wfInstanceMapper;
+    private final PayRecordMapper payRecordMapper;
+    private final StlSettlementMapper stlSettlementMapper;
+
+    // ========================================================================
+    // 1. Project Manager Dashboard
+    // ========================================================================
+    public ProjectManagerDashboardVO getProjectManagerView(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        PmProject project = requireProject(tenantId, projectId);
+
+        ProjectManagerDashboardVO vo = new ProjectManagerDashboardVO();
+        vo.setProjectId(projectId.toString());
+        vo.setProjectName(project.getProjectName());
+
+        // Pending tasks for current user
+        Long currentUserId = UserContext.getCurrentUserId();
+        List<WfTask> pendingTasks = wfTaskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getTenantId, tenantId)
+                        .eq(WfTask::getApproverId, currentUserId)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                        .orderByDesc(WfTask::getReceivedAt));
+
+        // Enrich with instance info (batch to avoid N+1)
+        Map<Long, WfInstance> instanceMap = batchLoadInstances(pendingTasks);
+
+        List<DashboardTaskItemVO> taskItems = pendingTasks.stream().map(t -> {
+            DashboardTaskItemVO item = new DashboardTaskItemVO();
+            item.setTaskId(String.valueOf(t.getId()));
+            item.setInstanceId(String.valueOf(t.getInstanceId()));
+            item.setBusinessType(t.getBusinessType());
+            item.setBusinessId(String.valueOf(t.getBusinessId()));
+            item.setTaskStatus(t.getTaskStatus());
+            if (t.getReceivedAt() != null) item.setReceivedAt(DTF.format(t.getReceivedAt()));
+            WfInstance inst = instanceMap.get(t.getInstanceId());
+            if (inst != null) {
+                item.setTitle(inst.getTitle());
+                item.setProjectId(inst.getProjectId() != null ? String.valueOf(inst.getProjectId()) : null);
+            }
+            return item;
+        }).collect(Collectors.toList());
+
+        vo.setPendingTasks(taskItems);
+        vo.setPendingTaskCount((long) taskItems.size());
+
+        // Lagging projects: planned end date in the past, not completed
+        List<PmProject> tenantProjects = projectMapper.selectList(
+                new LambdaQueryWrapper<PmProject>()
+                        .eq(PmProject::getTenantId, tenantId)
+                        .eq(PmProject::getStatus, "ACTIVE"));
+        List<DashboardProjectSummaryVO> lagging = tenantProjects.stream()
+                .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(LocalDate.now())
+                        && !"COMPLETED".equals(p.getStatus()))
+                .map(this::toProjectSummary)
+                .collect(Collectors.toList());
+        vo.setLaggingProjects(lagging);
+        vo.setLaggingProjectCount((long) lagging.size());
+
+        // Pending approvals: wf_task count for the project (via wf_instance.projectId)
+        List<WfInstance> projectInstances = wfInstanceMapper.selectList(
+                new LambdaQueryWrapper<WfInstance>()
+                        .eq(WfInstance::getTenantId, tenantId)
+                        .eq(WfInstance::getProjectId, projectId));
+        Set<Long> instanceIds = projectInstances.stream().map(WfInstance::getId).collect(Collectors.toSet());
+        List<DashboardTaskItemVO> pendingApprovals = Collections.emptyList();
+        long pendingApprovalCount = 0;
+        if (!instanceIds.isEmpty()) {
+            List<WfTask> projectPendingTasks = wfTaskMapper.selectList(
+                    new LambdaQueryWrapper<WfTask>()
+                            .eq(WfTask::getTenantId, tenantId)
+                            .in(WfTask::getInstanceId, instanceIds)
+                            .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                            .orderByDesc(WfTask::getReceivedAt));
+            pendingApprovalCount = projectPendingTasks.size();
+            pendingApprovals = projectPendingTasks.stream().limit(10).map(t -> {
+                DashboardTaskItemVO item = new DashboardTaskItemVO();
+                item.setTaskId(String.valueOf(t.getId()));
+                item.setInstanceId(String.valueOf(t.getInstanceId()));
+                item.setBusinessType(t.getBusinessType());
+                item.setTaskStatus(t.getTaskStatus());
+                if (t.getReceivedAt() != null) item.setReceivedAt(DTF.format(t.getReceivedAt()));
+                WfInstance inst = instanceMap.get(t.getInstanceId());
+                if (inst != null) {
+                    item.setTitle(inst.getTitle());
+                    item.setProjectId(inst.getProjectId() != null ? String.valueOf(inst.getProjectId()) : null);
+                }
+                return item;
+            }).collect(Collectors.toList());
+        }
+        vo.setPendingApprovals(pendingApprovals);
+        vo.setPendingApprovalCount(pendingApprovalCount);
+
+        // Expiring contracts (end date within 30 days)
+        LocalDate cutoff = LocalDate.now().plusDays(30);
+        List<CtContract> expiringContracts = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .eq(CtContract::getProjectId, projectId)
+                        .le(CtContract::getEndDate, cutoff)
+                        .ge(CtContract::getEndDate, LocalDate.now())
+                        .eq(CtContract::getContractStatus, "PERFORMING"));
+        vo.setExpiringContracts(expiringContracts.stream().map(this::toContractItem).collect(Collectors.toList()));
+        vo.setExpiringContractCount((long) expiringContracts.size());
+
+        return vo;
+    }
+
+    // ========================================================================
+    // 2. Business Manager Dashboard
+    // ========================================================================
+    public BusinessManagerDashboardVO getBusinessManagerView(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        PmProject project = requireProject(tenantId, projectId);
+
+        BusinessManagerDashboardVO vo = new BusinessManagerDashboardVO();
+        vo.setProjectId(projectId.toString());
+        vo.setProjectName(project.getProjectName());
+
+        // Contract totals
+        List<CtContract> contracts = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .eq(CtContract::getProjectId, projectId));
+        BigDecimal totalContractAmount = contracts.stream()
+                .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalCurrentAmount = contracts.stream()
+                .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPaidAmount = contracts.stream()
+                .map(c -> c.getPaidAmount() != null ? c.getPaidAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        vo.setTotalContractAmount(totalContractAmount.toPlainString());
+
+        // Contract change amount = current - original
+        BigDecimal changeAmount = totalCurrentAmount.subtract(totalContractAmount);
+        vo.setContractChangeAmount(changeAmount.toPlainString());
+
+        // Payment ratio
+        if (totalContractAmount.compareTo(BigDecimal.ZERO) > 0) {
+            vo.setPaidRatio(totalPaidAmount.divide(totalContractAmount, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP).toPlainString() + "%");
+        } else {
+            vo.setPaidRatio("0%");
+        }
+
+        // Settlement progress
+        List<StlSettlement> settlements = stlSettlementMapper.selectList(
+                new LambdaQueryWrapper<StlSettlement>()
+                        .eq(StlSettlement::getTenantId, tenantId)
+                        .eq(StlSettlement::getProjectId, projectId));
+        long finalizedCount = settlements.stream().filter(s -> "FINALIZED".equals(s.getSettlementStatus())).count();
+        vo.setSettlementProgress(settlements.isEmpty() ? "0/0" : finalizedCount + "/" + settlements.size());
+
+        // Var order amount placeholder (query var_order table not directly available here)
+        vo.setVarOrderAmount("0");
+        vo.setSubMeasureAmount("0");
+
+        // Recent changes (top 5 contracts by currentAmount)
+        vo.setRecentChanges(contracts.stream()
+                .sorted(Comparator.comparing(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO,
+                        Comparator.reverseOrder()))
+                .limit(5)
+                .map(this::toContractItem)
+                .collect(Collectors.toList()));
+
+        // Settlement items
+        vo.setSettlementItems(settlements.stream().map(s -> {
+            DashboardProjectSummaryVO item = new DashboardProjectSummaryVO();
+            item.setProjectId(String.valueOf(s.getProjectId()));
+            item.setProjectName(project.getProjectName());
+            item.setStatus(s.getSettlementStatus());
+            return item;
+        }).collect(Collectors.toList()));
+
+        return vo;
+    }
+
+    // ========================================================================
+    // 3. Cost Manager Dashboard
+    // ========================================================================
+    public CostManagerDashboardVO getCostManagerView(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        PmProject project = requireProject(tenantId, projectId);
+
+        // Use pre-aggregated cost_summary via existing service
+        CostProjectSummaryVO summary = costSummaryService.getProjectSummary(tenantId, projectId);
+
+        CostManagerDashboardVO vo = new CostManagerDashboardVO();
+        vo.setProjectId(projectId.toString());
+        vo.setProjectName(project.getProjectName());
+        vo.setTargetCost(summary.getTargetCost());
+        vo.setDynamicCost(summary.getDynamicCost());
+        vo.setCostDeviation(summary.getCostDeviation());
+        vo.setContractLockedCost(summary.getContractLockedCost());
+        vo.setActualCost(summary.getActualCost());
+        vo.setEstimatedRemainingCost(summary.getEstimatedRemainingCost());
+        vo.setExpectedProfit(summary.getExpectedProfit());
+        vo.setContractIncome(summary.getContractIncome());
+
+        // Over-budget alerts placeholder (alert_log not yet implemented)
+        vo.setOverBudgetAlerts(Collections.emptyList());
+
+        return vo;
+    }
+
+    // ========================================================================
+    // 4. Finance Dashboard
+    // ========================================================================
+    public FinanceDashboardVO getFinanceView(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        PmProject project = requireProject(tenantId, projectId);
+
+        FinanceDashboardVO vo = new FinanceDashboardVO();
+        vo.setProjectId(projectId.toString());
+        vo.setProjectName(project.getProjectName());
+
+        // Pay records
+        List<PayRecord> payRecords = payRecordMapper.selectList(
+                new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getTenantId, tenantId)
+                        .eq(PayRecord::getProjectId, projectId));
+
+        // Pending payments
+        List<PayRecord> pendingPayments = payRecords.stream()
+                .filter(p -> !"SUCCESS".equals(p.getPayStatus()))
+                .collect(Collectors.toList());
+        BigDecimal pendingAmount = pendingPayments.stream()
+                .map(p -> p.getPayAmount() != null ? p.getPayAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setPendingPaymentAmount(pendingAmount.toPlainString());
+        vo.setPendingPaymentCount((long) pendingPayments.size());
+
+        // Approved unpaid (SUCCESS status = paid, so approved unpaid = non-SUCCESS)
+        vo.setApprovedUnpaidAmount(pendingAmount.toPlainString());
+
+        // Over-ratio payments placeholder
+        vo.setOverRatioAmount("0");
+
+        // Warranty expiring placeholder
+        vo.setWarrantyExpiringAmount("0");
+
+        // Detail lists
+        vo.setPendingPayments(pendingPayments.stream().limit(20).map(p -> {
+            DashboardPaymentItemVO item = new DashboardPaymentItemVO();
+            item.setPayRecordId(String.valueOf(p.getId()));
+            item.setContractId(p.getContractId() != null ? String.valueOf(p.getContractId()) : null);
+            item.setPayAmount(p.getPayAmount() != null ? p.getPayAmount().toPlainString() : "0");
+            item.setPayDate(p.getPayDate() != null ? p.getPayDate().toString() : null);
+            item.setPayStatus(p.getPayStatus());
+            item.setProjectId(String.valueOf(p.getProjectId()));
+            item.setProjectName(project.getProjectName());
+            return item;
+        }).collect(Collectors.toList()));
+
+        vo.setOverRatioPayments(Collections.emptyList());
+
+        return vo;
+    }
+
+    // ========================================================================
+    // 5. Management Dashboard (tenant-wide)
+    // ========================================================================
+    public ManagementDashboardVO getManagementView() {
+        Long tenantId = UserContext.getCurrentTenantId();
+
+        ManagementDashboardVO vo = new ManagementDashboardVO();
+
+        // Active projects
+        List<PmProject> activeProjects = projectMapper.selectList(
+                new LambdaQueryWrapper<PmProject>()
+                        .eq(PmProject::getTenantId, tenantId)
+                        .eq(PmProject::getStatus, "ACTIVE"));
+        vo.setActiveProjectCount((long) activeProjects.size());
+
+        // Aggregate totals across all active projects
+        BigDecimal totalContractAmount = BigDecimal.ZERO;
+        BigDecimal totalDynamicCost = BigDecimal.ZERO;
+        BigDecimal totalExpectedProfit = BigDecimal.ZERO;
+        BigDecimal totalPaidAmount = BigDecimal.ZERO;
+
+        List<DashboardProjectSummaryVO> rankings = new ArrayList<>();
+
+        for (PmProject project : activeProjects) {
+            try {
+                CostProjectSummaryVO summary = costSummaryService.getProjectSummary(tenantId, project.getId());
+                DashboardProjectSummaryVO rank = new DashboardProjectSummaryVO();
+                rank.setProjectId(String.valueOf(project.getId()));
+                rank.setProjectName(project.getProjectName());
+                rank.setProjectCode(project.getProjectCode());
+                rank.setStatus(project.getStatus());
+                rank.setTargetCost(summary.getTargetCost());
+                rank.setDynamicCost(summary.getDynamicCost());
+                rank.setContractIncome(summary.getContractIncome());
+                rank.setExpectedProfit(summary.getExpectedProfit());
+                rank.setCostDeviation(summary.getCostDeviation());
+                rank.setPaidAmount(summary.getPaidAmount());
+                rank.setContractAmount(summary.getContractIncome());
+
+                rankings.add(rank);
+
+                totalContractAmount = totalContractAmount.add(
+                        summary.getContractIncome() != null ? new BigDecimal(summary.getContractIncome()) : BigDecimal.ZERO);
+                totalDynamicCost = totalDynamicCost.add(
+                        summary.getDynamicCost() != null ? new BigDecimal(summary.getDynamicCost()) : BigDecimal.ZERO);
+                totalExpectedProfit = totalExpectedProfit.add(
+                        summary.getExpectedProfit() != null ? new BigDecimal(summary.getExpectedProfit()) : BigDecimal.ZERO);
+                totalPaidAmount = totalPaidAmount.add(
+                        summary.getPaidAmount() != null ? new BigDecimal(summary.getPaidAmount()) : BigDecimal.ZERO);
+            } catch (Exception e) {
+                log.warn("Failed to load summary for project {}: {}", project.getId(), e.getMessage());
+            }
+        }
+
+        vo.setTotalContractAmount(totalContractAmount.toPlainString());
+        vo.setTotalDynamicCost(totalDynamicCost.toPlainString());
+        vo.setTotalExpectedProfit(totalExpectedProfit.toPlainString());
+        vo.setTotalPaidAmount(totalPaidAmount.toPlainString());
+
+        // Rank by expected profit descending
+        rankings.sort(Comparator.comparing(
+                r -> new BigDecimal(r.getExpectedProfit() != null ? r.getExpectedProfit() : "0"),
+                Comparator.reverseOrder()));
+        vo.setProjectRankings(rankings);
+
+        // Pending tasks count (tenant-wide)
+        Long currentUserId = UserContext.getCurrentUserId();
+        List<WfTask> allPending = wfTaskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getTenantId, tenantId)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                        .orderByDesc(WfTask::getReceivedAt));
+        vo.setTotalPendingTaskCount((long) allPending.size());
+
+        // Overdue items: pending tasks older than 7 days
+        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+        List<DashboardTaskItemVO> overdueItems = allPending.stream()
+                .filter(t -> t.getReceivedAt() != null && t.getReceivedAt().isBefore(sevenDaysAgo))
+                .limit(20)
+                .map(t -> {
+                    DashboardTaskItemVO item = new DashboardTaskItemVO();
+                    item.setTaskId(String.valueOf(t.getId()));
+                    item.setInstanceId(String.valueOf(t.getInstanceId()));
+                    item.setBusinessType(t.getBusinessType());
+                    item.setTaskStatus(t.getTaskStatus());
+                    if (t.getReceivedAt() != null) item.setReceivedAt(DTF.format(t.getReceivedAt()));
+                    return item;
+                }).collect(Collectors.toList());
+        vo.setOverdueItems(overdueItems);
+
+        // Risks placeholder
+        vo.setTotalRiskCount(0L);
+        vo.setMajorRisks(Collections.emptyList());
+
+        return vo;
+    }
+
+    // ========================================================================
+    // 6. Cost Breakdown Drill-down (by cost subject, max 2 levels)
+    // ========================================================================
+    public CostBreakdownVO getCostBreakdown(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        PmProject project = requireProject(tenantId, projectId);
+
+        // Get project-level summary
+        CostProjectSummaryVO projectSummary = costSummaryService.getProjectSummary(tenantId, projectId);
+
+        CostBreakdownVO vo = new CostBreakdownVO();
+        vo.setProjectId(projectId.toString());
+        vo.setProjectName(project.getProjectName());
+        vo.setTargetCost(projectSummary.getTargetCost());
+        vo.setDynamicCost(projectSummary.getDynamicCost());
+        vo.setExpectedProfit(projectSummary.getExpectedProfit());
+
+        // Drill-down: group cost_summary by cost_subject_id (level 1 only)
+        List<CostSummary> summaries = costSummaryMapper.selectList(
+                new LambdaQueryWrapper<CostSummary>()
+                        .eq(CostSummary::getTenantId, tenantId)
+                        .eq(CostSummary::getProjectId, projectId)
+                        .isNotNull(CostSummary::getCostSubjectId));
+
+        if (CollectionUtils.isEmpty(summaries)) {
+            vo.setSubjectBreakdowns(Collections.emptyList());
+            return vo;
+        }
+
+        // Load cost subjects
+        Set<Long> subjectIds = summaries.stream()
+                .map(CostSummary::getCostSubjectId)
+                .collect(Collectors.toSet());
+        Map<Long, CostSubject> subjectMap = Collections.emptyMap();
+        if (!subjectIds.isEmpty()) {
+            List<CostSubject> subjects = costSubjectMapper.selectBatchIds(subjectIds);
+            subjectMap = subjects.stream().collect(Collectors.toMap(CostSubject::getId, s -> s, (a, b) -> a));
+        }
+
+        // Build subject breakdowns (max level 2 from the tree)
+        List<CostBreakdownVO.SubjectBreakdown> breakdowns = new ArrayList<>();
+        for (CostSummary s : summaries) {
+            CostBreakdownVO.SubjectBreakdown bd = new CostBreakdownVO.SubjectBreakdown();
+            bd.setCostSubjectId(s.getCostSubjectId() != null ? String.valueOf(s.getCostSubjectId()) : null);
+            CostSubject subject = subjectMap.get(s.getCostSubjectId());
+            bd.setCostSubjectName(subject != null ? subject.getSubjectName() : "");
+            bd.setLevel(subject != null ? subject.getLevel() : 1);
+            bd.setParentSubjectId(subject != null && subject.getParentId() != null
+                    ? String.valueOf(subject.getParentId()) : null);
+            bd.setTargetCost(s.getTargetCost() != null ? s.getTargetCost().toPlainString() : "0");
+            bd.setContractLockedCost(s.getContractLockedCost() != null ? s.getContractLockedCost().toPlainString() : "0");
+            bd.setActualCost(s.getActualCost() != null ? s.getActualCost().toPlainString() : "0");
+            bd.setDynamicCost(s.getDynamicCost() != null ? s.getDynamicCost().toPlainString() : "0");
+            bd.setCostDeviation(s.getCostDeviation() != null ? s.getCostDeviation().toPlainString() : "0");
+            breakdowns.add(bd);
+        }
+
+        // Enforce max 2 levels: only include level <= 2
+        breakdowns = breakdowns.stream()
+                .filter(bd -> bd.getLevel() != null && bd.getLevel() <= 2)
+                .sorted(Comparator.comparingInt(bd -> bd.getLevel() != null ? bd.getLevel() : 99))
+                .collect(Collectors.toList());
+
+        vo.setSubjectBreakdowns(breakdowns);
+        return vo;
+    }
+
+    // ========================================================================
+    // Private helpers
+    // ========================================================================
+
+    private PmProject requireProject(Long tenantId, Long projectId) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "请指定项目");
+        }
+        PmProject project = projectMapper.selectById(projectId);
+        if (project == null || !Objects.equals(project.getTenantId(), tenantId)) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        return project;
+    }
+
+    private Map<Long, WfInstance> batchLoadInstances(List<WfTask> tasks) {
+        if (CollectionUtils.isEmpty(tasks)) {
+            return Collections.emptyMap();
+        }
+        Set<Long> instanceIds = tasks.stream()
+                .map(WfTask::getInstanceId)
+                .collect(Collectors.toSet());
+        List<WfInstance> instances = wfInstanceMapper.selectBatchIds(instanceIds);
+        return instances.stream().collect(Collectors.toMap(WfInstance::getId, i -> i, (a, b) -> a));
+    }
+
+    private DashboardProjectSummaryVO toProjectSummary(PmProject project) {
+        DashboardProjectSummaryVO vo = new DashboardProjectSummaryVO();
+        vo.setProjectId(String.valueOf(project.getId()));
+        vo.setProjectName(project.getProjectName());
+        vo.setProjectCode(project.getProjectCode());
+        vo.setStatus(project.getStatus());
+        vo.setTargetCost(project.getTargetCost() != null ? project.getTargetCost().toPlainString() : "0");
+        return vo;
+    }
+
+    private DashboardContractItemVO toContractItem(CtContract contract) {
+        DashboardContractItemVO vo = new DashboardContractItemVO();
+        vo.setContractId(String.valueOf(contract.getId()));
+        vo.setContractCode(contract.getContractCode());
+        vo.setContractName(contract.getContractName());
+        vo.setContractType(contract.getContractType());
+        vo.setContractAmount(contract.getContractAmount() != null ? contract.getContractAmount().toPlainString() : "0");
+        vo.setCurrentAmount(contract.getCurrentAmount() != null ? contract.getCurrentAmount().toPlainString() : "0");
+        vo.setPaidAmount(contract.getPaidAmount() != null ? contract.getPaidAmount().toPlainString() : "0");
+        vo.setEndDate(contract.getEndDate() != null ? contract.getEndDate().toString() : null);
+        vo.setProjectId(contract.getProjectId() != null ? String.valueOf(contract.getProjectId()) : null);
+        vo.setContractStatus(contract.getContractStatus());
+        return vo;
+    }
+}

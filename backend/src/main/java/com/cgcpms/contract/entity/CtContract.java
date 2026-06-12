@@ -87,5 +87,8 @@ public class CtContract extends BaseEntity {
 
     private String approvalStatus;
 
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal settlementAmount;
+
     private Integer costGeneratedFlag;
 }
