@@ -55,6 +55,15 @@
       "agent": "Sisyphus-Junior",
       "category": "visual-engineering",
       "updated_at": "2026-06-12T16:23:18.444Z"
+    },
+    "todo:18": {
+      "task_key": "todo:18",
+      "task_label": "18",
+      "task_title": "**E2E 脚本 Batch 3：通知 + 结算 + 驾驶舱**",
+      "session_id": "ses_14359873bffei4NvE4OxKcdHkY",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-06-12T16:28:12.668Z"
     }
   },
   "agent": "atlas"
