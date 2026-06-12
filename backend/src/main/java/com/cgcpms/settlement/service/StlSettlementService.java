@@ -113,6 +113,16 @@ public class StlSettlementService {
         // Validate contract exists and belongs to same tenant + same project
         CtContract contract = validateAndGetContract(settlement.getContractId(), tenantId, settlement.getProjectId());
 
+        // P0-01: Prevent duplicate settlements for the same contract
+        Long existingCount = stlSettlementMapper.selectCount(
+            new LambdaQueryWrapper<StlSettlement>()
+                .eq(StlSettlement::getTenantId, tenantId)
+                .eq(StlSettlement::getContractId, settlement.getContractId()));
+        if (existingCount > 0) {
+            throw new BusinessException("STL_DUPLICATE_SETTLEMENT",
+                    "该合同已存在结算单，不允许重复创建");
+        }
+
         // Auto-generate settlement code: STL-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String prefix = "STL-" + today + "-";
