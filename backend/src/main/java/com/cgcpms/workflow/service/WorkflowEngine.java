@@ -417,7 +417,7 @@ public class WorkflowEngine {
             notificationService.create(notifyTenantId, targetUserId,
                     username + "转办了一个审批给你",
                     username + "转办了一个审批给你：" + instance.getTitle(),
-                    "WORKFLOW", task.getBusinessId());
+                    "WORKFLOW", instance.getId());
         } catch (Exception e) {
             log.warn("Failed to create transfer notification for user {}: {}", targetUserId, e.getMessage());
         }
@@ -496,7 +496,7 @@ public class WorkflowEngine {
                 notificationService.create(notifyTenantId, auid,
                         username + "邀请你加签审批",
                         username + "邀请你加签审批：" + notifyTitle,
-                        "WORKFLOW", task.getBusinessId());
+                        "WORKFLOW", task.getInstanceId());
             } catch (Exception e) {
                 log.warn("Failed to create add-sign notification for user {}: {}", auid, e.getMessage());
             }
