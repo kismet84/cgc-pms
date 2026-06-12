@@ -75,6 +75,7 @@ public class WorkflowController {
         return switch (businessType) {
             case WorkflowBusinessTypes.CONTRACT_APPROVAL -> "contract:submit";
             case WorkflowBusinessTypes.PURCHASE_ORDER -> "purchase:order:submit";
+            case WorkflowBusinessTypes.PURCHASE_REQUEST -> "purchase:request:submit";
             case WorkflowBusinessTypes.MATERIAL_RECEIPT -> "receipt:submit";
             case WorkflowBusinessTypes.SUB_MEASURE -> "subcontract:measure:submit";
             case WorkflowBusinessTypes.PAY_REQUEST -> "payment:app:submit";
