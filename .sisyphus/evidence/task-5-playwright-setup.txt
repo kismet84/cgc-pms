@@ -1,0 +1,56 @@
+================================================================================
+TASK 5: Playwright E2E Framework Setup
+================================================================================
+Date: 2026-06-12
+Project: CGC-PMS
+================================================================================
+
+FRAMEWORK INSTALLATION:
+================================================================================
+- @playwright/test: v1.48.0 (confirmed in package.json)
+- Chromium browsers: INSTALLED (chromium-1124, chromium-1140, chromium-1208)
+- Firefox: INSTALLED (firefox-1454, firefox-1509)
+- WebKit: INSTALLED (webkit-2035, webkit-2248)
+
+PROJECT CONFIGURATION:
+================================================================================
+- playwright.config.ts: CREATED
+  - testDir: ./e2e
+  - baseURL: http://localhost:5173
+  - webServer: pnpm dev (auto-start)
+  - reporter: html + list
+  - screenshot: only-on-failure
+  - trace: on-first-retry
+  - timeout: 30s
+
+E2E SPEC FILES CREATED:
+================================================================================
+1. e2e/login.spec.ts (41 lines)
+   - should login with valid credentials
+   - should show error for invalid credentials
+
+2. e2e/contract.spec.ts (201 lines)
+   - Full 4-step contract wizard flow
+   - Fill basic info → items → payment terms → submit
+   - Assert success toast and redirect
+
+3. e2e/approval.spec.ts (175 lines)
+   - View pending tasks (todo list)
+   - Open approval detail
+   - Approve / reject with confirmation modal
+   - Verify task disappears from todo list
+
+ACCEPTANCE CRITERIA:
+================================================================================
+[x] @playwright/test added to package.json (v1.48.0)
+[x] Chromium browser installed
+[x] playwright.config.ts created with proper configuration
+[x] e2e/ directory created with 3 spec files
+[x] Login smoke test with valid + invalid credentials
+[x] Contract creation E2E with 4-step wizard
+[x] Approval E2E with approve + reject flows
+[x] Screenshot on failure configured
+[x] Trace on first retry configured
+
+VERDICT: PASSED - Playwright E2E framework is ready for Batch 1-3 execution
+================================================================================
