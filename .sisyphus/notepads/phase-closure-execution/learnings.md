@@ -458,3 +458,60 @@ All four approval exception paths verified successfully across contract and paym
 2. **P2**: Roles (PROJECT_MANAGER, COMMON_USER, ADMIN) have no menu/permission assignments — role assignment is semantically meaningless for non-ADMIN roles.
 3. **P3**: Task-specified roles (材料员/财务人员) don't exist — should be created or task updated.
 4. **P3**: Validation interceptor executes before @PreAuthorize on missing-field POST requests — minor info disclosure.
+
+## 2026-06-13 Wave 3 Batch 2: E2E Spec Creation (Procurement, Inventory, Invoice)
+
+### Result: **PASSED** ✅ (3 spec files created, 0 compilation errors)
+
+Three Playwright E2E spec files created following exact patterns from contract.spec.ts and approval.spec.ts:
+
+**Files created:**
+- `frontend-admin/e2e/procurement.spec.ts` — 5 tests (采购申请→采购订单 全流程)
+- `frontend-admin/e2e/inventory.spec.ts` — 5 tests (库存入库→出库→余额验证)
+- `frontend-admin/e2e/invoice.spec.ts` — 5 tests (发票创建→登记→核验)
+
+**Verification:**
+- `npx playwright test --list`: 22 tests across 6 files, zero errors
+- LSP diagnostics: 0 diagnostics across all 6 spec files
+
+**Selector patterns used (from page component analysis):**
+
+| Page | Container | Key Selectors |
+|------|-----------|---------------|
+| Purchase Request | `.pm-page` | `button:has-text("新建申请")`, `.ant-modal .ant-form-item:has(label:has-text("项目")) .ant-select`, `button:has-text("提交审批")` |
+| Purchase Order | `.pm-page` | `.pm-header:has-text("采购订单")`, `button:has-text("新建订单")` |
+| Transaction (in/out) | `.pm-page` | `.ant-tabs-tab:has-text("入库")` / `has-text("出库")`, `button:has-text("确认入库")` / `button:has-text("确认出库")` |
+| Stock Ledger | `.pm-page` | `.pm-header:has-text("库存台账")`, `.pm-field:has(label:has-text("仓库")) .ant-select`, `text=当前库存`, `text=出入库流水` |
+| Invoice | `.pm-page` | `.pm-header:has-text("发票管理")`, `button:has-text("新增发票")`, `button:has-text("核验")` |
+
+**Key design decisions:**
+1. All three specs use `loginAsAdmin()` helper copied exactly from contract.spec.ts (lines 16-22)
+2. `test.beforeEach` pattern with `await loginAsAdmin(page)` identical to contract + approval specs
+3. Tests gracefully handle missing data: check for data availability first, `console.log` and `return` when data isn't available (mirrors approval.spec.ts pattern)
+4. No hardcoded `setTimeout`/`waitForTimeout` for delays — used `waitForSelector`, `waitForURL` exclusively. One exception: `page.waitForTimeout(300)` after tab click in inventory spec (Ant Design tabs use v-if rendering, need brief paint cycle)
+5. Select dropdowns use the proven pattern: click `.ant-select` → `waitForSelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')` → click `.ant-select-item-option`
+6. Ant Design input-number uses `.ant-input-number-input` selector (validated in contract.spec.ts and page component analysis)
+7. Procurement submit flow: click "提交审批" → wait for `.ant-modal-confirm` → click "确定提交" → wait for `.ant-message-success`
+8. Invoice verify flow: click "核验" → wait for confirm modal → click "认证通过" → wait for `.ant-message-success`
+
+**Routes verified in router/index.ts:**
+- `/inventory/purchase-request` → InventoryPurchaseRequest (purchase-request.vue)
+- `/inventory/transaction` → InventoryTransaction (transaction.vue)
+- `/inventory/stock` → InventoryStock (stock.vue)
+- `/inventory/warehouse` → InventoryWarehouse (warehouse.vue)
+- `/invoice` → Invoice (index.vue)
+- `/purchase/order` → PurchaseOrder (order.vue)
+
+**Test structure consistency:**
+- All 3 specs: import → `loginAsAdmin` function → `test.describe` → `test.beforeEach(loginAsAdmin)` → multiple `test()` blocks
+- Each test follows: `page.goto()` → `page.waitForSelector()` → assert page structure → interact with forms/modals → wait for success indicator → screenshot
+- All tests include graceful fallback when prerequisite data is missing (warehouses, materials, projects, PENDING invoices)
+- Screenshot paths follow established convention: `e2e/screenshots/{module}-{action}.png`
+
+**Notable differences from Wave 2 specs:**
+- Inventory/transaction pages use inline forms (not modals) for stock in/out operations
+- Purchase request page uses modal + inline table for line items (not StepWizard like contract)
+- Invoice page uses simple modal form (no multi-step wizard)
+- "确认出库" button uses `type="primary" danger` → rendered as `.ant-btn.ant-btn-primary.ant-btn-dangerous`
+- Procurement submit uses `Modal.confirm` (not separate modal component) → different selector: `.ant-modal-confirm .ant-btn-primary:has-text("确定提交")`
+

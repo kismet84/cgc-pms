@@ -2,7 +2,8 @@
   "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\phase-closure-execution.md",
   "started_at": "2026-06-12T14:29:37.975Z",
   "session_ids": [
-    "ses_1441a4988ffekrXu3m1CCttQwT"
+    "ses_1441a4988ffekrXu3m1CCttQwT",
+    "ses_1436ddffeffe4FLqPbkMU9WRvx"
   ],
   "plan_name": "phase-closure-execution",
   "worktree_path": null,
@@ -45,6 +46,16 @@
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
       "updated_at": "2026-06-12T15:40:25.530Z"
+    },
+    "todo:17": {
+      "task_key": "todo:17",
+      "task_label": "17",
+      "task_title": "**E2E 脚本 Batch 2：采购 + 库存 + 发票**",
+      "session_id": "ses_1435e048effeebDcEvo1K2sKsM",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-06-12T16:23:18.444Z"
     }
-  }
+  },
+  "agent": "atlas"
 }
