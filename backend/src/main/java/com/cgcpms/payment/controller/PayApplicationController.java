@@ -22,7 +22,7 @@ public class PayApplicationController {
     private final PayApplicationService payApplicationService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('payment:app:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:app:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PageResult<PayApplicationVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -38,19 +38,19 @@ public class PayApplicationController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('payment:app:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:app:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PayApplicationVO> getById(@PathVariable Long id) {
         return ApiResponse.success(payApplicationService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('payment:app:add') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:app:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> create(@RequestBody PayApplication app) {
         return ApiResponse.success(payApplicationService.create(app));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('payment:app:edit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:app:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> update(@PathVariable Long id, @RequestBody PayApplication app) {
         app.setId(id);
         payApplicationService.update(app);
@@ -58,27 +58,27 @@ public class PayApplicationController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('payment:app:delete') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:app:delete') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         payApplicationService.delete(id);
         return ApiResponse.success();
     }
 
     @GetMapping("/{id}/basis")
-    @PreAuthorize("hasAuthority('payment:app:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:app:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<PayApplicationBasisVO>> listBasis(@PathVariable Long id) {
         return ApiResponse.success(payApplicationService.getBasisList(id));
     }
 
     @PostMapping("/{id}/basis/batch")
-    @PreAuthorize("hasAuthority('payment:app:edit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:app:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> batchSaveBasis(@PathVariable Long id, @RequestBody List<PayApplicationBasis> basisList) {
         payApplicationService.saveBasis(id, basisList);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('payment:app:submit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:app:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         payApplicationService.submitForApproval(id);
         return ApiResponse.success();

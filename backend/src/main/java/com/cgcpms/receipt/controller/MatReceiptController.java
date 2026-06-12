@@ -23,7 +23,7 @@ public class MatReceiptController {
     private final MatReceiptService matReceiptService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('receipt:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:query')")
     public ApiResponse<PageResult<MatReceiptVO>> list(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -39,19 +39,19 @@ public class MatReceiptController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('receipt:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:query')")
     public ApiResponse<MatReceiptVO> getById(@PathVariable Long id) {
         return ApiResponse.success(matReceiptService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('receipt:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:add')")
     public ApiResponse<Long> create(@Valid @RequestBody MatReceipt receipt) {
         return ApiResponse.success(matReceiptService.create(receipt));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('receipt:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MatReceipt receipt) {
         receipt.setId(id);
         matReceiptService.update(receipt);
@@ -59,27 +59,27 @@ public class MatReceiptController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('receipt:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         matReceiptService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('receipt:submit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('receipt:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         matReceiptService.submitForApproval(id);
         return ApiResponse.success();
     }
 
     @GetMapping("/{id}/items")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('receipt:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:query')")
     public ApiResponse<List<MatReceiptItemVO>> getItems(@PathVariable Long id) {
         return ApiResponse.success(matReceiptService.getItems(id));
     }
 
     @PostMapping("/{id}/items/batch")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('receipt:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:edit')")
     public ApiResponse<Void> saveItemsBatch(@PathVariable Long id,
                                              @Valid @RequestBody List<MatReceiptItem> items) {
         matReceiptService.saveItemsBatch(id, items);
@@ -87,7 +87,7 @@ public class MatReceiptController {
     }
 
     @GetMapping("/orders/{orderId}/items")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('receipt:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:query')")
     public ApiResponse<List<MatReceiptItemVO>> getOrderItemsForReceipt(@PathVariable Long orderId) {
         return ApiResponse.success(matReceiptService.getOrderItemsForReceipt(orderId));
     }

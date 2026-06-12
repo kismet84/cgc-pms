@@ -151,7 +151,7 @@ public class WorkflowQueryService {
             authorized = count > 0;
         }
         // Admin role bypass: admins can view any instance
-        if (!authorized && UserContext.hasRole("ADMIN")) {
+        if (!authorized && UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN")) {
             authorized = true;
         }
         if (!authorized) {

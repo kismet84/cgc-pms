@@ -21,7 +21,7 @@ public class CostLedgerController {
     private final CostLedgerService costLedgerService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('cost:ledger:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('cost:ledger:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PageResult<CostLedgerVO>> getPage(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -43,7 +43,7 @@ public class CostLedgerController {
     }
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAuthority('cost:ledger:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('cost:ledger:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CostLedgerSummaryVO> getSummary(
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) Long contractId,
@@ -63,7 +63,7 @@ public class CostLedgerController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('cost:ledger:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('cost:ledger:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CostLedgerVO> getById(@PathVariable Long id) {
         return ApiResponse.success(costLedgerService.getById(id));
     }

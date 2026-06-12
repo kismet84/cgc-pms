@@ -22,7 +22,7 @@ public class SubMeasureController {
     private final SubMeasureService subMeasureService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subcontract:measure:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:query')")
     public ApiResponse<PageResult<SubMeasureVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -37,19 +37,19 @@ public class SubMeasureController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subcontract:measure:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:query')")
     public ApiResponse<SubMeasureVO> getById(@PathVariable Long id) {
         return ApiResponse.success(subMeasureService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subcontract:measure:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:add')")
     public ApiResponse<Long> create(@Valid @RequestBody SubMeasure measure) {
         return ApiResponse.success(subMeasureService.create(measure));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subcontract:measure:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SubMeasure measure) {
         measure.setId(id);
         subMeasureService.update(measure);
@@ -57,27 +57,27 @@ public class SubMeasureController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subcontract:measure:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         subMeasureService.delete(id);
         return ApiResponse.success();
     }
 
     @GetMapping("/{id}/items")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subcontract:measure:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:query')")
     public ApiResponse<SubMeasureVO> listItems(@PathVariable Long id) {
         return ApiResponse.success(subMeasureService.getById(id));
     }
 
     @PostMapping("/{id}/items/batch")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subcontract:measure:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:edit')")
     public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @RequestBody List<SubMeasureItem> items) {
         subMeasureService.saveItems(id, items);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subcontract:measure:submit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:submit')")
     public ApiResponse<Void> submit(@PathVariable Long id) {
         subMeasureService.submitForApproval(id);
         return ApiResponse.success();

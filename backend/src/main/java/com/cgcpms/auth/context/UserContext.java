@@ -58,4 +58,15 @@ public final class UserContext {
     public static boolean hasRole(String roleCode) {
         return getCurrentRoles().contains(roleCode);
     }
+
+    /**
+     * Check if current user has any of the specified roles.
+     */
+    public static boolean hasAnyRole(String... roleCodes) {
+        List<String> currentRoles = getCurrentRoles();
+        if (currentRoles == null || currentRoles.isEmpty()) {
+            return false;
+        }
+        return java.util.Arrays.stream(roleCodes).anyMatch(currentRoles::contains);
+    }
 }

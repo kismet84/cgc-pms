@@ -18,19 +18,19 @@ public class CostSummaryController {
     private final CostSummaryService costSummaryService;
 
     @GetMapping("/{projectId}")
-    @PreAuthorize("hasAuthority('cost:summary:view') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('cost:summary:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CostProjectSummaryVO> getLatest(@PathVariable Long projectId) {
         return ApiResponse.success(costSummaryService.getProjectSummary(projectId));
     }
 
     @PostMapping("/{projectId}/refresh")
-    @PreAuthorize("hasAuthority('cost:summary:view') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('cost:summary:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CostProjectSummaryVO> refresh(@PathVariable Long projectId) {
         return ApiResponse.success(costSummaryService.refreshSummary(projectId));
     }
 
     @GetMapping("/{projectId}/history")
-    @PreAuthorize("hasAuthority('cost:summary:view') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('cost:summary:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<CostSummaryVO>> getHistory(@PathVariable Long projectId) {
         return ApiResponse.success(costSummaryService.getSummaryHistory(projectId));
     }

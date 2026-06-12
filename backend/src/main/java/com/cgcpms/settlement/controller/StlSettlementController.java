@@ -22,7 +22,7 @@ public class StlSettlementController {
     private final StlSettlementService stlSettlementService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('settlement:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<PageResult<StlSettlementVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -37,19 +37,19 @@ public class StlSettlementController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('settlement:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<StlSettlementVO> getById(@PathVariable Long id) {
         return ApiResponse.success(stlSettlementService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('settlement:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:add')")
     public ApiResponse<Long> create(@Valid @RequestBody StlSettlement settlement) {
         return ApiResponse.success(stlSettlementService.create(settlement));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('settlement:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody StlSettlement settlement) {
         settlement.setId(id);
         stlSettlementService.update(settlement);
@@ -57,7 +57,7 @@ public class StlSettlementController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('settlement:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         stlSettlementService.delete(id);
         return ApiResponse.success();
@@ -66,13 +66,13 @@ public class StlSettlementController {
     // ---- Items ----
 
     @GetMapping("/{id}/items")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('settlement:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<StlSettlementVO> listItems(@PathVariable Long id) {
         return ApiResponse.success(stlSettlementService.getById(id));
     }
 
     @PostMapping("/{id}/items/batch")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('settlement:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:edit')")
     public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @RequestBody List<StlSettlementItem> items) {
         stlSettlementService.saveItems(id, items);
         return ApiResponse.success();
@@ -81,7 +81,7 @@ public class StlSettlementController {
     // ---- Compute (read-only) ----
 
     @GetMapping("/compute/{contractId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('settlement:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<StlSettlementVO> computeSettlementAmount(@PathVariable Long contractId) {
         return ApiResponse.success(stlSettlementService.computeSettlementAmount(contractId));
     }

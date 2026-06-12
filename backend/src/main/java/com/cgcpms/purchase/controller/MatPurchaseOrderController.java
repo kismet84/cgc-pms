@@ -23,7 +23,7 @@ public class MatPurchaseOrderController {
     private final MatPurchaseOrderService matPurchaseOrderService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('purchase:order:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:query')")
     public ApiResponse<PageResult<MatPurchaseOrderVO>> list(
             @RequestParam(defaultValue = "1") long pageNum,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -39,19 +39,19 @@ public class MatPurchaseOrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('purchase:order:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:query')")
     public ApiResponse<MatPurchaseOrderVO> getById(@PathVariable Long id) {
         return ApiResponse.success(matPurchaseOrderService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('purchase:order:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:add')")
     public ApiResponse<Long> create(@Valid @RequestBody MatPurchaseOrder order) {
         return ApiResponse.success(matPurchaseOrderService.create(order));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('purchase:order:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MatPurchaseOrder order) {
         order.setId(id);
         matPurchaseOrderService.update(order);
@@ -59,27 +59,27 @@ public class MatPurchaseOrderController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('purchase:order:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         matPurchaseOrderService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('purchase:order:submit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('purchase:order:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         matPurchaseOrderService.submitForApproval(id);
         return ApiResponse.success();
     }
 
     @GetMapping("/{id}/items")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('purchase:order:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:query')")
     public ApiResponse<List<MatPurchaseOrderItemVO>> getItems(@PathVariable Long id) {
         return ApiResponse.success(matPurchaseOrderService.getItems(id));
     }
 
     @PostMapping("/{id}/items/batch")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('purchase:order:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:edit')")
     public ApiResponse<Void> saveItemsBatch(@PathVariable Long id,
                                              @Valid @RequestBody List<MatPurchaseOrderItem> items) {
         matPurchaseOrderService.saveItemsBatch(id, items);

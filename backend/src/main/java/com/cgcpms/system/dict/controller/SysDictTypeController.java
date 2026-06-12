@@ -19,7 +19,7 @@ public class SysDictTypeController {
     private final SysDictTypeService sysDictTypeService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:dict:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:list')")
     public ApiResponse<PageResult<SysDictTypeVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -31,19 +31,19 @@ public class SysDictTypeController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:dict:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:list')")
     public ApiResponse<SysDictTypeVO> getById(@PathVariable Long id) {
         return ApiResponse.success(sysDictTypeService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:dict:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:add')")
     public ApiResponse<Long> create(@Valid @RequestBody SysDictType entity) {
         return ApiResponse.success(sysDictTypeService.create(entity));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:dict:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SysDictType entity) {
         entity.setId(id);
         sysDictTypeService.update(entity);
@@ -51,7 +51,7 @@ public class SysDictTypeController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:dict:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         sysDictTypeService.delete(id);
         return ApiResponse.success();

@@ -18,7 +18,7 @@ public class MdMaterialController {
     private final MdMaterialService mdMaterialService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('material:dict:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:list')")
     public ApiResponse<PageResult<MdMaterialVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -31,19 +31,19 @@ public class MdMaterialController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('material:dict:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:query')")
     public ApiResponse<MdMaterialVO> getById(@PathVariable Long id) {
         return ApiResponse.success(mdMaterialService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('material:dict:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:add')")
     public ApiResponse<Long> create(@Valid @RequestBody MdMaterial material) {
         return ApiResponse.success(mdMaterialService.create(material));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('material:dict:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MdMaterial material) {
         material.setId(id);
         mdMaterialService.update(material);
@@ -51,7 +51,7 @@ public class MdMaterialController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('material:dict:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:edit')")
     public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestParam String status) {
         mdMaterialService.updateStatus(id, status);
         return ApiResponse.success();

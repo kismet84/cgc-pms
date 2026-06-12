@@ -19,7 +19,7 @@ public class SubTaskController {
     private final SubTaskService subTaskService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subtask:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subtask:query')")
     public ApiResponse<PageResult<SubTaskVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -35,19 +35,19 @@ public class SubTaskController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subtask:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subtask:query')")
     public ApiResponse<SubTaskVO> getById(@PathVariable Long id) {
         return ApiResponse.success(subTaskService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subtask:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subtask:add')")
     public ApiResponse<Long> create(@Valid @RequestBody SubTask task) {
         return ApiResponse.success(subTaskService.create(task));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subtask:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subtask:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SubTask task) {
         task.setId(id);
         subTaskService.update(task);
@@ -55,7 +55,7 @@ public class SubTaskController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('subtask:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subtask:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         subTaskService.delete(id);
         return ApiResponse.success();

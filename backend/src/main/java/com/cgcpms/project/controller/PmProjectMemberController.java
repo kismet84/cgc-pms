@@ -19,7 +19,7 @@ public class PmProjectMemberController {
     private final PmProjectMemberService memberService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:member:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:member:list')")
     public ApiResponse<PageResult<PmProjectMemberVO>> list(
             @PathVariable Long projectId,
             @RequestParam(defaultValue = "1") long pageNo,
@@ -31,19 +31,19 @@ public class PmProjectMemberController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:member:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:member:list')")
     public ApiResponse<PmProjectMemberVO> getById(@PathVariable Long projectId, @PathVariable Long id) {
         return ApiResponse.success(memberService.getById(projectId, id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:member:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:member:add')")
     public ApiResponse<Long> create(@PathVariable Long projectId, @Valid @RequestBody PmProjectMember member) {
         return ApiResponse.success(memberService.create(projectId, member));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:member:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:member:edit')")
     public ApiResponse<Void> update(@PathVariable Long projectId, @PathVariable Long id,
                                     @Valid @RequestBody PmProjectMember member) {
         memberService.update(projectId, id, member);
@@ -51,7 +51,7 @@ public class PmProjectMemberController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:member:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:member:delete')")
     public ApiResponse<Void> delete(@PathVariable Long projectId, @PathVariable Long id) {
         memberService.delete(projectId, id);
         return ApiResponse.success();

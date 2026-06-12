@@ -18,20 +18,20 @@ public class CtContractPaymentTermController {
     private final CtContractPaymentTermService ctContractPaymentTermService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:term:query')")
     public ApiResponse<List<CtContractPaymentTerm>> getByContractId(@PathVariable Long contractId) {
         return ApiResponse.success(ctContractPaymentTermService.getByContractId(contractId));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:term:add')")
     public ApiResponse<Long> create(@PathVariable Long contractId, @Valid @RequestBody CtContractPaymentTerm term) {
         term.setContractId(contractId);
         return ApiResponse.success(ctContractPaymentTermService.create(term));
     }
 
     @PostMapping("/batch")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:term:add')")
     public ApiResponse<Void> batchSave(@PathVariable Long contractId,
                                        @RequestBody @Valid List<@Valid CtContractPaymentTerm> terms) {
         ctContractPaymentTermService.batchSave(contractId, terms);
@@ -39,7 +39,7 @@ public class CtContractPaymentTermController {
     }
 
     @PutMapping("/{termId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:term:edit')")
     public ApiResponse<Void> update(@PathVariable Long contractId, @PathVariable Long termId,
                                     @Valid @RequestBody CtContractPaymentTerm term) {
         term.setId(termId);
@@ -49,7 +49,7 @@ public class CtContractPaymentTermController {
     }
 
     @DeleteMapping("/{termId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:term:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:term:delete')")
     public ApiResponse<Void> delete(@PathVariable Long contractId, @PathVariable Long termId) {
         ctContractPaymentTermService.delete(contractId, termId);
         return ApiResponse.success();

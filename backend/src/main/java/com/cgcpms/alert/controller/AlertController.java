@@ -23,7 +23,7 @@ public class AlertController {
      * List alerts for the current tenant, optionally filtered by project / severity / read status.
      */
     @GetMapping
-    @PreAuthorize("hasAuthority('alert:view') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<AlertLog>> list(
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) String severity,
@@ -36,7 +36,7 @@ public class AlertController {
      * Mark a single alert as read.
      */
     @PutMapping("/{id}/read")
-    @PreAuthorize("hasAuthority('alert:edit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> markRead(@PathVariable Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
         boolean ok = alertEvaluationService.markRead(tenantId, id);
@@ -50,7 +50,7 @@ public class AlertController {
      * Manually trigger batch evaluation for all active projects in the current tenant.
      */
     @PostMapping("/batch-evaluate")
-    @PreAuthorize("hasAuthority('alert:edit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> batchEvaluate() {
         Long tenantId = UserContext.getCurrentTenantId();
         int count = alertEvaluationService.batchEvaluate(tenantId);

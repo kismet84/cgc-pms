@@ -18,20 +18,20 @@ public class CtContractItemController {
     private final CtContractItemService ctContractItemService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:item:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:item:query')")
     public ApiResponse<List<CtContractItem>> getByContractId(@PathVariable Long contractId) {
         return ApiResponse.success(ctContractItemService.getByContractId(contractId));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:item:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:item:add')")
     public ApiResponse<Long> create(@PathVariable Long contractId, @Valid @RequestBody CtContractItem item) {
         item.setContractId(contractId);
         return ApiResponse.success(ctContractItemService.create(item));
     }
 
     @PostMapping("/batch")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:item:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:item:add')")
     public ApiResponse<Void> batchSave(@PathVariable Long contractId,
                                        @RequestBody @Valid List<@Valid CtContractItem> items) {
         ctContractItemService.batchSave(contractId, items);
@@ -39,7 +39,7 @@ public class CtContractItemController {
     }
 
     @PutMapping("/{itemId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:item:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:item:edit')")
     public ApiResponse<Void> update(@PathVariable Long contractId, @PathVariable Long itemId,
                                     @Valid @RequestBody CtContractItem item) {
         item.setId(itemId);
@@ -49,7 +49,7 @@ public class CtContractItemController {
     }
 
     @DeleteMapping("/{itemId}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:item:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:item:delete')")
     public ApiResponse<Void> delete(@PathVariable Long contractId, @PathVariable Long itemId) {
         ctContractItemService.delete(contractId, itemId);
         return ApiResponse.success();

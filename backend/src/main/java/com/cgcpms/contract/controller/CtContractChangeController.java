@@ -18,7 +18,7 @@ public class CtContractChangeController {
     private final CtContractChangeService ctContractChangeService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:change:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:query')")
     public ApiResponse<PageResult<CtContractChange>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -33,19 +33,19 @@ public class CtContractChangeController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:change:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:query')")
     public ApiResponse<CtContractChange> getById(@PathVariable Long id) {
         return ApiResponse.success(ctContractChangeService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:change:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:add')")
     public ApiResponse<Long> create(@Valid @RequestBody CtContractChange change) {
         return ApiResponse.success(ctContractChangeService.create(change));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:change:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CtContractChange change) {
         change.setId(id);
         ctContractChangeService.update(change);
@@ -53,14 +53,14 @@ public class CtContractChangeController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:change:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         ctContractChangeService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('contract:change:submit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('contract:change:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         ctContractChangeService.submitForApproval(id);
         return ApiResponse.success();

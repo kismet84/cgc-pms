@@ -20,7 +20,7 @@ public class FileController {
     private final FileService fileService;
 
     @PostMapping("/upload")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('file:upload')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:upload')")
     public ApiResponse<SysFileVO> upload(
             @RequestParam MultipartFile file,
             @RequestParam String businessType,
@@ -29,20 +29,20 @@ public class FileController {
     }
 
     @GetMapping("/{id}/url")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('file:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')")
     public ApiResponse<String> getUrl(@PathVariable Long id) {
         return ApiResponse.success(fileService.getPresignedUrl(id));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('file:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         fileService.delete(id);
         return ApiResponse.success();
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('file:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')")
     public ApiResponse<List<SysFileVO>> listByBusiness(
             @RequestParam String businessType,
             @RequestParam Long businessId) {

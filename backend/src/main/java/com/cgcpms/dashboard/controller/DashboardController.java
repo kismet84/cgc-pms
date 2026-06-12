@@ -18,7 +18,7 @@ public class DashboardController {
      * Project Manager View: pending tasks, lagging projects, expiring contracts, pending approvals.
      */
     @GetMapping("/project-manager")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('dashboard:project-manager:view')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:project-manager:view')")
     public ApiResponse<ProjectManagerDashboardVO> getProjectManagerView(
             @RequestParam(required = false) Long projectId) {
         return ApiResponse.success(dashboardService.getProjectManagerView(projectId));
@@ -28,7 +28,7 @@ public class DashboardController {
      * Business Manager View: contract totals, changes, var orders, sub-measures, payment ratio, settlement.
      */
     @GetMapping("/business-manager")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('dashboard:business-manager:view')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:business-manager:view')")
     public ApiResponse<BusinessManagerDashboardVO> getBusinessManagerView(
             @RequestParam(required = false) Long projectId) {
         return ApiResponse.success(dashboardService.getBusinessManagerView(projectId));
@@ -39,7 +39,7 @@ public class DashboardController {
      * Data exclusively from pre-aggregated cost_summary (never raw cost_item).
      */
     @GetMapping("/cost-manager")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('dashboard:cost-manager:view')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:cost-manager:view')")
     public ApiResponse<CostManagerDashboardVO> getCostManagerView(
             @RequestParam(required = false) Long projectId) {
         return ApiResponse.success(dashboardService.getCostManagerView(projectId));
@@ -49,7 +49,7 @@ public class DashboardController {
      * Finance View: pending payments, approved unpaid, over-ratio payments, warranty expiry.
      */
     @GetMapping("/finance")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('dashboard:finance:view')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:finance:view')")
     public ApiResponse<FinanceDashboardVO> getFinanceView(
             @RequestParam(required = false) Long projectId) {
         return ApiResponse.success(dashboardService.getFinanceView(projectId));
@@ -59,7 +59,7 @@ public class DashboardController {
      * Management View (tenant-wide): project rankings, aggregated totals, major risks.
      */
     @GetMapping("/management")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('dashboard:management:view')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:management:view')")
     public ApiResponse<ManagementDashboardVO> getManagementView() {
         return ApiResponse.success(dashboardService.getManagementView());
     }
@@ -68,7 +68,7 @@ public class DashboardController {
      * Cost Breakdown Drill-down: by cost subject (max 2 levels).
      */
     @GetMapping("/project/{id}/cost-breakdown")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('dashboard:cost-breakdown:view')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:cost-breakdown:view')")
     public ApiResponse<CostBreakdownVO> getCostBreakdown(@PathVariable("id") Long projectId) {
         return ApiResponse.success(dashboardService.getCostBreakdown(projectId));
     }

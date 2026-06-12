@@ -22,13 +22,13 @@ public class OrgDepartmentController {
     private final OrgDepartmentService orgDepartmentService;
 
     @GetMapping("/tree")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:list')")
     public ApiResponse<List<OrgDepartmentTreeNodeVO>> getTree() {
         return ApiResponse.success(orgDepartmentService.getTree());
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:list')")
     public ApiResponse<PageResult<OrgDepartmentVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -41,19 +41,19 @@ public class OrgDepartmentController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:query')")
     public ApiResponse<OrgDepartmentVO> getById(@PathVariable Long id) {
         return ApiResponse.success(orgDepartmentService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:add')")
     public ApiResponse<Long> create(@Valid @RequestBody OrgDepartment dept) {
         return ApiResponse.success(orgDepartmentService.create(dept));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody OrgDepartment dept) {
         dept.setId(id);
         orgDepartmentService.update(dept);
@@ -61,7 +61,7 @@ public class OrgDepartmentController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         orgDepartmentService.delete(id);
         return ApiResponse.success();

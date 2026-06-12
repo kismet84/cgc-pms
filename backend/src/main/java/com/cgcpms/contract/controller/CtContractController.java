@@ -22,7 +22,7 @@ public class CtContractController {
     private final CtContractService ctContractService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:query')")
     public ApiResponse<PageResult<CtContractVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -39,19 +39,19 @@ public class CtContractController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:query')")
     public ApiResponse<CtContractVO> getById(@PathVariable Long id) {
         return ApiResponse.success(ctContractService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
     public ApiResponse<Long> create(@Valid @RequestBody CtContract contract) {
         return ApiResponse.success(ctContractService.create(contract));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('contract:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CtContract contract) {
         contract.setId(id);
         ctContractService.update(contract);
@@ -59,14 +59,14 @@ public class CtContractController {
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('contract:submit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('contract:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         ctContractService.submitForApproval(id);
         return ApiResponse.success();
     }
 
     @GetMapping("/{id}/approval-records")
-    @PreAuthorize("hasAuthority('contract:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('contract:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<ContractApprovalRecordVO>> getApprovalRecords(@PathVariable Long id) {
         return ApiResponse.success(ctContractService.getApprovalRecords(id));
     }

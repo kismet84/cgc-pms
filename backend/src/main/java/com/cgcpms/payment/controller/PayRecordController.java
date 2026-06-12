@@ -18,7 +18,7 @@ public class PayRecordController {
     private final PayRecordService payRecordService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('payment:record:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:record:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PageResult<PayRecordVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -29,19 +29,19 @@ public class PayRecordController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('payment:record:query') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:record:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PayRecordVO> getById(@PathVariable Long id) {
         return ApiResponse.success(payRecordService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('payment:record:add') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:record:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> create(@RequestBody PayRecord record) {
         return ApiResponse.success(payRecordService.create(record));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('payment:record:edit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:record:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> update(@PathVariable Long id, @RequestBody PayRecord record) {
         record.setId(id);
         payRecordService.update(record);
@@ -49,14 +49,14 @@ public class PayRecordController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('payment:record:delete') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:record:delete') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         payRecordService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/writeback")
-    @PreAuthorize("hasAuthority('payment:record:writeback') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('payment:record:writeback') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PayRecordVO> writeback(@RequestBody PayRecord input) {
         return ApiResponse.success(payRecordService.writeback(input));
     }

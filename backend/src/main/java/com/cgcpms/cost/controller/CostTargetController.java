@@ -18,7 +18,7 @@ public class CostTargetController {
     private final CostTargetService costTargetService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('cost:target:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:query')")
     public ApiResponse<PageResult<CostTarget>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -32,19 +32,19 @@ public class CostTargetController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('cost:target:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:query')")
     public ApiResponse<CostTarget> getById(@PathVariable Long id) {
         return ApiResponse.success(costTargetService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('cost:target:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:add')")
     public ApiResponse<Long> create(@Valid @RequestBody CostTarget target) {
         return ApiResponse.success(costTargetService.create(target));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('cost:target:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CostTarget target) {
         target.setId(id);
         costTargetService.update(target);
@@ -52,14 +52,14 @@ public class CostTargetController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('cost:target:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         costTargetService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/activate")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('cost:target:activate')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:activate')")
     public ApiResponse<Void> activate(@PathVariable Long id) {
         costTargetService.activate(id);
         return ApiResponse.success();

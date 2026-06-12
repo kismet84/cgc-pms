@@ -22,7 +22,7 @@ public class SysUserController {
     private final SysUserService sysUserService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:user:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:query')")
     public ApiResponse<PageResult<SysUserVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -34,19 +34,19 @@ public class SysUserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:user:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:query')")
     public ApiResponse<SysUserVO> getById(@PathVariable Long id) {
         return ApiResponse.success(sysUserService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:user:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:add')")
     public ApiResponse<Long> create(@Valid @RequestBody SysUser user) {
         return ApiResponse.success(sysUserService.create(user));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:user:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SysUser user) {
         user.setId(id);
         sysUserService.update(user);
@@ -54,21 +54,21 @@ public class SysUserController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:user:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:edit')")
     public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
         sysUserService.updateStatus(id, body.get("status"));
         return ApiResponse.success();
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:user:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         sysUserService.delete(id);
         return ApiResponse.success();
     }
 
     @PutMapping("/{id}/roles")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:user:assign')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:assign')")
     public ApiResponse<Void> assignRoles(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
         sysUserService.assignRoles(id, body.get("roleIds"));
         return ApiResponse.success();

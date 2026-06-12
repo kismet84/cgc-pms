@@ -22,13 +22,13 @@ public class PmProjectController {
     private final ProjectOverviewService projectOverviewService;
 
     @GetMapping("/{projectId}/overview")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:query')")
     public ApiResponse<ProjectOverviewVO> overview(@PathVariable Long projectId) {
         return ApiResponse.success(projectOverviewService.getOverview(projectId));
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:query')")
     public ApiResponse<PageResult<PmProjectVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -41,19 +41,19 @@ public class PmProjectController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:query')")
     public ApiResponse<PmProjectVO> getById(@PathVariable Long id) {
         return ApiResponse.success(pmProjectService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:add')")
     public ApiResponse<Long> create(@Valid @RequestBody PmProject project) {
         return ApiResponse.success(pmProjectService.create(project));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PmProject project) {
         project.setId(id);
         pmProjectService.update(project);
@@ -61,7 +61,7 @@ public class PmProjectController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('project:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         pmProjectService.delete(id);
         return ApiResponse.success();

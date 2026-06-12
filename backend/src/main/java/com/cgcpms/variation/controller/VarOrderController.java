@@ -22,7 +22,7 @@ public class VarOrderController {
     private final VarOrderService varOrderService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('variation:order:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:query')")
     public ApiResponse<PageResult<VarOrderVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -38,19 +38,19 @@ public class VarOrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('variation:order:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:query')")
     public ApiResponse<VarOrderVO> getById(@PathVariable Long id) {
         return ApiResponse.success(varOrderService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('variation:order:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:add')")
     public ApiResponse<Long> create(@Valid @RequestBody VarOrder order) {
         return ApiResponse.success(varOrderService.create(order));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('variation:order:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody VarOrder order) {
         order.setId(id);
         varOrderService.update(order);
@@ -58,27 +58,27 @@ public class VarOrderController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('variation:order:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         varOrderService.delete(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAuthority('variation:order:submit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('variation:order:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         varOrderService.submitForApproval(id);
         return ApiResponse.success();
     }
 
     @GetMapping("/{id}/items")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('variation:order:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:query')")
     public ApiResponse<VarOrderVO> listItems(@PathVariable Long id) {
         return ApiResponse.success(varOrderService.getById(id));
     }
 
     @PostMapping("/{id}/items/batch")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('variation:order:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:edit')")
     public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @RequestBody List<VarOrderItem> items) {
         varOrderService.saveItems(id, items);
         return ApiResponse.success();

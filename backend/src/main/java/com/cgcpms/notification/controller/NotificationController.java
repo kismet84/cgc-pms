@@ -38,7 +38,7 @@ public class NotificationController {
      * List notifications for the current user, paginated.
      */
     @GetMapping
-    @PreAuthorize("hasAuthority('notification:view') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('notification:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PageResult<NotificationVO>> list(
             @RequestParam(defaultValue = "1") int pageNo,
             @RequestParam(defaultValue = "20") int pageSize,
@@ -54,7 +54,7 @@ public class NotificationController {
      * Get unread notification count for the current user.
      */
     @GetMapping("/unread-count")
-    @PreAuthorize("hasAuthority('notification:view') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('notification:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Long>> unreadCount() {
         try {
             Long userId = UserContext.getCurrentUserId();
@@ -71,7 +71,7 @@ public class NotificationController {
      * Mark a single notification as read.
      */
     @PutMapping("/{id}/read")
-    @PreAuthorize("hasAuthority('notification:edit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('notification:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> markAsRead(@PathVariable Long id) {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();
@@ -83,7 +83,7 @@ public class NotificationController {
      * Mark all unread notifications as read for the current user.
      */
     @PutMapping("/read-all")
-    @PreAuthorize("hasAuthority('notification:edit') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('notification:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> markAllAsRead() {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();

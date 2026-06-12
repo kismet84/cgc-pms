@@ -18,7 +18,7 @@ public class MatStockController {
     private final MatStockService matStockService;
 
     @PostMapping("/in")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:transaction:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
     public ApiResponse<MatStock> stockIn(@RequestParam Long warehouseId,
                                           @RequestParam Long materialId,
                                           @RequestParam BigDecimal quantity) {
@@ -26,7 +26,7 @@ public class MatStockController {
     }
 
     @PostMapping("/out")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:transaction:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
     public ApiResponse<MatStock> stockOut(@RequestParam Long warehouseId,
                                            @RequestParam Long materialId,
                                            @RequestParam BigDecimal quantity) {
@@ -34,7 +34,7 @@ public class MatStockController {
     }
 
     @GetMapping("/ledger")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('inventory:stock:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:stock:list')")
     public ApiResponse<MatStockLedgerVO> getLedger(@RequestParam Long warehouseId,
                                                     @RequestParam Long materialId,
                                                     @RequestParam(defaultValue = "1") long pageNo,

@@ -19,7 +19,7 @@ public class OrgCompanyController {
     private final OrgCompanyService orgCompanyService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:list')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:list')")
     public ApiResponse<PageResult<OrgCompanyVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
@@ -31,19 +31,19 @@ public class OrgCompanyController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:query')")
     public ApiResponse<OrgCompanyVO> getById(@PathVariable Long id) {
         return ApiResponse.success(orgCompanyService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:add')")
     public ApiResponse<Long> create(@Valid @RequestBody OrgCompany company) {
         return ApiResponse.success(orgCompanyService.create(company));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody OrgCompany company) {
         company.setId(id);
         orgCompanyService.update(company);
@@ -51,7 +51,7 @@ public class OrgCompanyController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('org:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         orgCompanyService.delete(id);
         return ApiResponse.success();

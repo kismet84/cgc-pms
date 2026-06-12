@@ -19,31 +19,31 @@ public class SysMenuController {
     private final SysMenuService sysMenuService;
 
     @GetMapping("/tree")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:menu:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:menu:query')")
     public ApiResponse<List<MenuTreeVO>> tree() {
         return ApiResponse.success(sysMenuService.getTree());
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:menu:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:menu:query')")
     public ApiResponse<List<SysMenu>> flatList() {
         return ApiResponse.success(sysMenuService.getFlatList());
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:menu:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:menu:query')")
     public ApiResponse<SysMenu> getById(@PathVariable Long id) {
         return ApiResponse.success(sysMenuService.getById(id));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:menu:add')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:menu:add')")
     public ApiResponse<Long> create(@Valid @RequestBody SysMenu menu) {
         return ApiResponse.success(sysMenuService.create(menu));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:menu:edit')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:menu:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SysMenu menu) {
         menu.setId(id);
         sysMenuService.update(menu);
@@ -51,7 +51,7 @@ public class SysMenuController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('system:menu:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:menu:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         sysMenuService.delete(id);
         return ApiResponse.success();
