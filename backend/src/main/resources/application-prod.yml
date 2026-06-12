@@ -57,6 +57,22 @@ springdoc:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:https://your-production-domain.com}
 
+# Actuator health checks
+# DB (DataSourceHealthIndicator) and Redis (RedisHealthIndicator) are auto-configured by default
+# when the respective dependencies are on the classpath.
+# MinIO health requires a custom HealthIndicator bean — add if needed.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+
 logging:
   level:
     root: WARN

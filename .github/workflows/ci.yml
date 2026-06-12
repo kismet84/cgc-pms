@@ -1,0 +1,176 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-test:
+    name: Backend Tests (Java 21 + MySQL)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: cgc_pms
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Wait for MySQL
+        run: |
+          echo "Waiting for MySQL..."
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -u root -ptest --silent; then
+              echo "MySQL is ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: test
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
+        run: ./mvnw clean test -B
+
+  frontend-build:
+    name: Frontend Type Check + Build (pnpm)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm@11
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('frontend-admin/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install dependencies
+        working-directory: frontend-admin
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check + Build (vue-tsc --noEmit && vite build)
+        working-directory: frontend-admin
+        run: pnpm build
+
+  flyway-check:
+    name: Flyway Migration Check
+    needs: backend-test
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: cgc_pms
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Wait for MySQL
+        run: |
+          echo "Waiting for MySQL..."
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -u root -ptest --silent; then
+              echo "MySQL is ready"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Flyway migration check (startup triggers auto-migration)
+        working-directory: backend
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: test
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
+        run: |
+          echo "Starting Spring Boot to trigger Flyway migrations..."
+          timeout 60 ./mvnw spring-boot:run -B > /tmp/app.log 2>&1 &
+          APP_PID=$!
+          # Wait for Flyway migrations to complete and app to start
+          PASSED=false
+          for i in $(seq 1 25); do
+            if grep -q "Started CgcPmsBackendApplication\|Started .*Application" /tmp/app.log 2>/dev/null; then
+              echo "✅ Flyway migrations applied successfully — app started"
+              PASSED=true
+              break
+            fi
+            if grep -qiE "Flyway.*(failed|error|exception)|Caused by.*FlywayException|Migration.*failed" /tmp/app.log 2>/dev/null; then
+              echo "❌ Flyway migration failed"
+              cat /tmp/app.log
+              kill $APP_PID 2>/dev/null
+              exit 1
+            fi
+            sleep 2
+          done
+          kill $APP_PID 2>/dev/null
+          if [ "$PASSED" = true ]; then
+            exit 0
+          else
+            echo "❌ Flyway check timed out"
+            cat /tmp/app.log
+            exit 1
+          fi

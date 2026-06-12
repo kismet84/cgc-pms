@@ -1,0 +1,204 @@
+# =============================================================================
+# CGC-PMS Production Docker Compose
+# =============================================================================
+# Usage:
+#   1. Copy .env.example to .env and fill in ALL values (including JWT_SECRET)
+#   2. Generate SSL certificates (or use volume mount):
+#        mkdir -p ssl
+#        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#          -keyout ssl/server.key -out ssl/server.crt \
+#          -subj "/CN=your-domain.com"
+#   3. Start:  docker compose -f docker-compose.prod.yml up -d
+#   4. Stop:   docker compose -f docker-compose.prod.yml down
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ===========================================================================
+  # MySQL 8.0 — database server
+  # ===========================================================================
+  mysql:
+    image: mysql:8.0
+    container_name: cgc-pms-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-cgc_pms}
+      MYSQL_USER: ${MYSQL_USER:-cgc}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    # NOTE: In production, MySQL listens on the internal Docker network only.
+    # Uncomment the ports line below if host access is needed (e.g. for DBA tools).
+    # ports:
+    #   - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/conf.d:/etc/mysql/conf.d
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cgc-pms-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # Redis 7 — cache + session store + token blacklist
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: cgc-pms-redis
+    restart: unless-stopped
+    # NOTE: In production, Redis listens on the internal Docker network only.
+    # Uncomment the ports line below if host access is needed.
+    # ports:
+    #   - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - cgc-pms-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ===========================================================================
+  # MinIO — S3-compatible object storage
+  # ===========================================================================
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    container_name: cgc-pms-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    # NOTE: In production, MinIO is accessed through the backend proxy.
+    # Uncomment the ports line below if direct host access is needed.
+    # ports:
+    #   - "9000:9000"
+    #   - "9001:9001"
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cgc-pms-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ===========================================================================
+  # Backend — Spring Boot 3.3 Java 21 REST API (:8080)
+  # ===========================================================================
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: cgc-pms-backend:latest
+    container_name: cgc-pms-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      # ---- Spring profile ----
+      SPRING_PROFILES_ACTIVE: prod
+      # ---- Database (service names resolve via Docker network) ----
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_USERNAME: ${MYSQL_USER:-cgc}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      # ---- Redis ----
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # ---- MinIO ----
+      MINIO_ENDPOINT: "http://minio:9000"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # ---- JWT (MUST be set in .env for production) ----
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - cgc-pms-net
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ===========================================================================
+  # Frontend — Nginx serving Vue 3 SPA + reverse proxy to backend (:80/:443)
+  # ===========================================================================
+  frontend:
+    build:
+      context: ../frontend-admin
+      dockerfile: Dockerfile
+    image: cgc-pms-frontend:latest
+    container_name: cgc-pms-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # SSL certificates — place server.crt and server.key here before starting
+      - ./ssl:/etc/nginx/ssl:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cgc-pms-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+# ===========================================================================
+# Networks
+# ===========================================================================
+networks:
+  cgc-pms-net:
+    driver: bridge
+
+# ===========================================================================
+# Volumes
+# ===========================================================================
+volumes:
+  mysql-data:
+  redis-data:
+  minio-data:
