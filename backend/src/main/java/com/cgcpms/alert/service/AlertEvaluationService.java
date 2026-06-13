@@ -176,7 +176,7 @@ public class AlertEvaluationService {
             if (target.compareTo(BigDecimal.ZERO) <= 0) continue;
             if (dynamic.compareTo(target) > 0) {
                 BigDecimal deviation = dynamic.subtract(target);
-                return List.of(buildAlert(tenantId, projectId,
+                return List.of(buildAlert(tenantId, projectId, null,
                         "DYNAMIC_COST_EXCEEDS_TARGET", "HIGH",
                         String.format("动态成本 %s 超出目标成本 %s，偏差 %s",
                                 dynamic.toPlainString(), target.toPlainString(),
@@ -212,7 +212,7 @@ public class AlertEvaluationService {
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
             if (entry.getValue().compareTo(contractAmount) > 0) {
-                return List.of(buildAlert(tenantId, projectId,
+                return List.of(buildAlert(tenantId, projectId, entry.getKey(),
                         "MATERIAL_EXCEEDS_BUDGET", "MEDIUM",
                         String.format("材料验收金额 %s 超出合同 %s(%s) 金额 %s",
                                 entry.getValue().toPlainString(),
@@ -249,7 +249,7 @@ public class AlertEvaluationService {
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
             if (entry.getValue().compareTo(contractAmount) > 0) {
-                return List.of(buildAlert(tenantId, projectId,
+                return List.of(buildAlert(tenantId, projectId, entry.getKey(),
                         "SUBCONTRACT_EXCEEDS_CONTRACT", "HIGH",
                         String.format("分包计量累计金额 %s 超出合同 %s(%s) 金额 %s",
                                 entry.getValue().toPlainString(),
@@ -280,7 +280,7 @@ public class AlertEvaluationService {
             List<String> names = contracts.stream()
                     .map(c -> c.getContractCode() + "(" + c.getContractName() + ") 截止 " + c.getEndDate())
                     .toList();
-            return List.of(buildAlert(tenantId, projectId,
+            return List.of(buildAlert(tenantId, projectId, null,
                     "CONTRACT_OVERDUE", "HIGH",
                     String.format("以下合同已超期：%s", String.join("；", names))));
         }
@@ -314,7 +314,7 @@ public class AlertEvaluationService {
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
             BigDecimal ratio = entry.getValue().divide(contractAmount, 4, RoundingMode.HALF_UP);
             if (ratio.compareTo(BigDecimal.ONE) > 0) {
-                return List.of(buildAlert(tenantId, projectId,
+                return List.of(buildAlert(tenantId, projectId, entry.getKey(),
                         "PAYMENT_EXCEEDS_RATIO", "HIGH",
                         String.format("合同 %s(%s) 累计付款 %s 超过合同金额 %s（比例 %.0f%%）",
                                 contract.getContractCode(),
@@ -348,7 +348,7 @@ public class AlertEvaluationService {
             // Warranty is "early-released" if finalised but contract warranty period
             // (endDate) hasn't passed yet, or no endDate is set
             if (contract.getEndDate() != null && contract.getEndDate().isAfter(LocalDate.now())) {
-                return List.of(buildAlert(tenantId, projectId,
+                return List.of(buildAlert(tenantId, projectId, stl.getContractId(),
                         "WARRANTY_EARLY_RELEASE", "MEDIUM",
                         String.format("合同 %s(%s) 质保金 %.2f 已于 %s 定案，但保修期至 %s 尚未届满",
                                 contract.getContractCode(),
@@ -382,7 +382,7 @@ public class AlertEvaluationService {
             List<String> names = contracts.stream()
                     .map(c -> c.getContractCode() + "(" + c.getContractName() + ") " + c.getEndDate())
                     .toList();
-            return List.of(buildAlert(tenantId, projectId,
+            return List.of(buildAlert(tenantId, projectId, null,
                     "CONTRACT_EXPIRING", "LOW",
                     String.format("以下合同即将到期（%d天内）：%s",
                             EXPIRING_DAYS, String.join("；", names))));
@@ -410,7 +410,7 @@ public class AlertEvaluationService {
             List<String> names = vars.stream()
                     .map(v -> v.getVarCode() + "(" + v.getVarName() + ")")
                     .toList();
-            return List.of(buildAlert(tenantId, projectId,
+            return List.of(buildAlert(tenantId, projectId, null,
                     "VARIATION_UNCONFIRMED", "MEDIUM",
                     String.format("以下变更签证已审批超%d天仍未获甲方确认：%s",
                             VARIATION_STALE_DAYS, String.join("；", names))));
@@ -438,11 +438,12 @@ public class AlertEvaluationService {
         return count != null && count > 0;
     }
 
-    private AlertLog buildAlert(Long tenantId, Long projectId,
+    private AlertLog buildAlert(Long tenantId, Long projectId, Long contractId,
                                  String ruleType, String severity, String message) {
         AlertLog alert = new AlertLog();
         alert.setTenantId(tenantId);
         alert.setProjectId(projectId);
+        alert.setContractId(contractId);
         alert.setRuleType(ruleType);
         alert.setSeverity(severity);
         alert.setMessage(message);

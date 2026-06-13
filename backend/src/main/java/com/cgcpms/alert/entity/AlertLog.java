@@ -25,6 +25,12 @@ public class AlertLog implements Serializable {
 
     private Long projectId;
 
+    /**
+     * 关联合同ID（允许为空，因部分规则如动态成本超标仅按项目维度预警）
+     */
+    @TableField("contract_id")
+    private Long contractId;
+
     /** Rule type identifier, e.g. {@code DYNAMIC_COST_EXCEEDS_TARGET}. */
     private String ruleType;
 
