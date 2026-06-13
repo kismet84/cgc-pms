@@ -42,7 +42,7 @@ function handleLogout() {
         <div class="flex-1"></div>
         <div class="top-actions">
           <span aria-label="通知"><NotificationBell /></span>
-          <QuestionCircleOutlined aria-label="帮助" style="font-size: 18px; cursor: pointer" />
+          <QuestionCircleOutlined aria-label="帮助" style="font-size: 18px; cursor: pointer" @click="router.push('/help')" />
           <a-dropdown>
             <div class="user-info">
               <a-avatar
@@ -58,8 +58,8 @@ function handleLogout() {
             </div>
             <template #overlay>
               <a-menu>
-                <a-menu-item key="profile">个人中心</a-menu-item>
-                <a-menu-item key="settings">设置</a-menu-item>
+                <a-menu-item key="profile" @click="router.push('/profile')">个人中心</a-menu-item>
+                <a-menu-item key="settings" @click="router.push('/settings')">设置</a-menu-item>
                 <a-menu-divider />
                 <a-menu-item key="logout" @click="handleLogout">退出登录</a-menu-item>
               </a-menu>
