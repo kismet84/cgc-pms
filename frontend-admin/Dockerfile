@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Install pnpm (version pinned from packageManager)
 RUN npm install -g pnpm@11.0.9
@@ -8,7 +8,9 @@ WORKDIR /app
 
 # Copy package manifests for layer caching
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+
+# --ignore-scripts: pnpm v10+ requires explicit build approval per package; skip scripts for speed
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source and configs
 COPY vite.config.ts tsconfig*.json index.html ./

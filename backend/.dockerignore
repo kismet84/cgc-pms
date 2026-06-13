@@ -23,7 +23,7 @@ Thumbs.db
 # Documentation (not needed for build)
 doc/
 
-# Maven wrapper (Dockerfile uses the Maven image directly)
-.mvn/
-mvnw
-mvnw.cmd
+# Maven wrapper — Dockerfile copies and uses ./mvnw for dependency resolution
+# .mvn/
+# mvnw
+# mvnw.cmd

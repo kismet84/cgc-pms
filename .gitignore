@@ -40,6 +40,9 @@ deploy/mysql/data/
 deploy/redis/data/
 deploy/minio/data/
 
+# SSL certificates (contains private keys, generate locally)
+deploy/ssl/
+
 # Temp
 *.tmp
 temp/

@@ -8,11 +8,11 @@ WORKDIR /build
 # --- Dependency cache layer: copy pom.xml + wrapper first ---
 COPY pom.xml mvnw ./
 COPY .mvn/ .mvn/
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -B -q
+RUN chmod +x mvnw && MAVEN_CONFIG="" ./mvnw dependency:go-offline -DskipTests -B
 
 # --- Source compile + package (skip tests in CI; run separately in dev) ---
 COPY src/ src/
-RUN ./mvnw clean package -DskipTests -B -q
+RUN MAVEN_CONFIG="" ./mvnw clean package -DskipTests -B
 
 # =============================================================================
 # Stage 2: Runtime — Eclipse Temurin JRE 21 (minimal image)

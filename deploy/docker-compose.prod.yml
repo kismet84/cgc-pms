@@ -143,6 +143,8 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       # ---- JWT (MUST be set in .env for production) ----
       JWT_SECRET: ${JWT_SECRET}
+      # ---- CORS ----
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://localhost}
     ports:
       - "8080:8080"
     healthcheck:
