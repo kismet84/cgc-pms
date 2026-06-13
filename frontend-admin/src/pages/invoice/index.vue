@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { UploadOutlined } from '@ant-design/icons-vue'
 import {
   getInvoiceList,
   createInvoice,
@@ -9,7 +10,7 @@ import {
   verifyInvoice,
   getPayRecordList,
 } from '@/api/modules/invoice'
-import type { InvoiceVO, PayRecordBrief } from '@/types/invoice'
+import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO } from '@/types/invoice'
 import {
   INVOICE_TYPE_LABEL,
   INVOICE_TYPE_COLOR,
@@ -44,6 +45,10 @@ const formData = reactive<Partial<InvoiceVO>>({
   invoiceDate: undefined,
   remark: '',
 })
+
+const uploadFileList = ref<any[]>([])
+const recognizing = ref(false)
+const recognizeResult = ref<InvoiceRecognizeResultVO | null>(null)
 
 const columns = [
   { title: '发票号码', dataIndex: 'invoiceNo', width: 160 },
@@ -123,8 +128,13 @@ function handleAdd() {
     taxRate: undefined,
     taxAmount: undefined,
     invoiceDate: undefined,
+    sellerName: undefined,
+    buyerName: undefined,
+    buyerTaxNo: undefined,
     remark: '',
   })
+  uploadFileList.value = []
+  recognizeResult.value = null
   modalVisible.value = true
 }
 
@@ -139,6 +149,9 @@ function handleEdit(record: InvoiceVO) {
     taxRate: record.taxRate,
     taxAmount: record.taxAmount,
     invoiceDate: record.invoiceDate,
+    sellerName: record.sellerName,
+    buyerName: record.buyerName,
+    buyerTaxNo: record.buyerTaxNo,
     remark: record.remark,
   })
   modalVisible.value = true
@@ -221,7 +234,27 @@ async function handleModalOk() {
 }
 
 function handleModalCancel() {
+  uploadFileList.value = []
+  recognizeResult.value = null
   modalVisible.value = false
+}
+
+function handleBeforeUpload(file: File) {
+  const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf')
+  if (!isPdf) {
+    message.error('仅支持PDF格式')
+    return false
+  }
+  const isLt50M = file.size / 1024 / 1024 < 50
+  if (!isLt50M) {
+    message.error('文件大小不能超过50MB')
+    return false
+  }
+  return false // prevent auto-upload
+}
+
+function handleRecognize() {
+  // Implementation in T10
 }
 
 function fmtAmount(val: string | undefined): string {
@@ -377,11 +410,34 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="600"
+      :width="680"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+        <a-form-item label="发票附件">
+          <a-upload
+            v-model:file-list="uploadFileList"
+            accept=".pdf"
+            :max-count="1"
+            :before-upload="handleBeforeUpload"
+            :show-upload-list="true"
+          >
+            <a-button>
+              <upload-outlined />
+              点击或拖拽上传PDF发票
+            </a-button>
+          </a-upload>
+          <a-button
+            type="primary"
+            style="margin-top: 8px"
+            :disabled="!uploadFileList.length"
+            :loading="recognizing"
+            @click="handleRecognize"
+          >
+            识别发票
+          </a-button>
+        </a-form-item>
         <a-form-item label="付款记录">
           <a-select
             v-model:value="formData.payRecordId"
@@ -433,6 +489,15 @@ onMounted(() => {
         </a-form-item>
         <a-form-item label="开票日期">
           <a-date-picker v-model:value="formData.invoiceDate" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="卖方名称">
+          <a-input v-model:value="formData.sellerName" placeholder="请输入卖方名称" />
+        </a-form-item>
+        <a-form-item label="买方名称">
+          <a-input v-model:value="formData.buyerName" placeholder="请输入买方名称" />
+        </a-form-item>
+        <a-form-item label="买方税号">
+          <a-input v-model:value="formData.buyerTaxNo" placeholder="请输入买方纳税人识别号" />
         </a-form-item>
         <a-form-item label="备注">
           <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
