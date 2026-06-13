@@ -101,7 +101,11 @@ defineExpose({ addRow })
           />
         </template>
         <template v-else-if="column.dataIndex === 'paymentCondition'">
-          <a-input v-model:value="record.paymentCondition" placeholder="付款触发条件" size="small" />
+          <a-input
+            v-model:value="record.paymentCondition"
+            placeholder="付款触发条件"
+            size="small"
+          />
         </template>
         <template v-else-if="column.dataIndex === 'plannedDate'">
           <a-date-picker
@@ -131,7 +135,11 @@ defineExpose({ addRow })
       </template>
     </a-table>
 
-    <a-empty v-if="terms.length === 0" description="暂无付款条款，点击上方按钮新增" class="te-empty" />
+    <a-empty
+      v-if="terms.length === 0"
+      description="暂无付款条款，点击上方按钮新增"
+      class="te-empty"
+    />
   </div>
 </template>
 

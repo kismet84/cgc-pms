@@ -86,18 +86,13 @@ function handleForgotPassword() {
               tabindex="0"
               @click="handleForgotPassword"
               @keydown.enter="handleForgotPassword"
-            >忘记密码？</a>
+              >忘记密码？</a
+            >
           </div>
         </a-form-item>
 
         <a-form-item>
-          <a-button
-            type="primary"
-            size="large"
-            block
-            html-type="submit"
-            :loading="loading"
-          >
+          <a-button type="primary" size="large" block html-type="submit" :loading="loading">
             登 录
           </a-button>
         </a-form-item>

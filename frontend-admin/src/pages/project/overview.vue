@@ -82,7 +82,7 @@ const pieOption = computed(() => {
     { name: '已付金额', value: paidAmount },
     { name: '未付金额', value: remaining },
     { name: '动态成本', value: dynamicCost },
-  ].filter(d => d.value > 0)
+  ].filter((d) => d.value > 0)
 
   return {
     tooltip: {
@@ -140,16 +140,18 @@ onMounted(() => {
         <!-- ═══ KPI Cards ═══ -->
         <div class="kpi-grid kpi-grid-4">
           <div class="kpi-card">
-            <div class="kpi-icon" style="background:#3b82f6">
+            <div class="kpi-icon" style="background: #3b82f6">
               <FileTextOutlined />
             </div>
             <div class="kpi-body">
               <div class="kpi-title">合同总额</div>
-              <div class="kpi-value">{{ fmtWan(data.totalContractAmount) }} <small>万元</small></div>
+              <div class="kpi-value">
+                {{ fmtWan(data.totalContractAmount) }} <small>万元</small>
+              </div>
             </div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-icon" style="background:#f59e0b">
+            <div class="kpi-icon" style="background: #f59e0b">
               <LineChartOutlined />
             </div>
             <div class="kpi-body">
@@ -158,7 +160,7 @@ onMounted(() => {
             </div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-icon" style="background:#22c55e">
+            <div class="kpi-icon" style="background: #22c55e">
               <PayCircleOutlined />
             </div>
             <div class="kpi-body">
@@ -167,7 +169,7 @@ onMounted(() => {
             </div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-icon" style="background:#ef4444">
+            <div class="kpi-icon" style="background: #ef4444">
               <WarningOutlined />
             </div>
             <div class="kpi-body">
@@ -182,7 +184,7 @@ onMounted(() => {
           <div class="chart-col">
             <div class="panel">
               <div class="panel-header">成本构成分布</div>
-              <v-chart :option="pieOption" autoresize style="height:360px" />
+              <v-chart :option="pieOption" autoresize style="height: 360px" />
             </div>
           </div>
           <div class="chart-col">
@@ -230,7 +232,18 @@ onMounted(() => {
               <div class="summary-item">
                 <span class="summary-label">未付金额</span>
                 <span class="summary-value">
-                  {{ fmtWan(String(Math.max(0, (parseFloat(data.totalContractAmount) || 0) - (parseFloat(data.paidAmount) || 0)))) }} 万元
+                  {{
+                    fmtWan(
+                      String(
+                        Math.max(
+                          0,
+                          (parseFloat(data.totalContractAmount) || 0) -
+                            (parseFloat(data.paidAmount) || 0),
+                        ),
+                      ),
+                    )
+                  }}
+                  万元
                 </span>
               </div>
             </div>
@@ -240,7 +253,7 @@ onMounted(() => {
 
       <!-- Empty state -->
       <div v-if="!loading && !data" class="empty-page">
-        <FileTextOutlined style="font-size:48px;color:#d1d5db;margin-bottom:16px" />
+        <FileTextOutlined style="font-size: 48px; color: #d1d5db; margin-bottom: 16px" />
         <div>暂未加载项目总览数据</div>
       </div>
     </a-spin>

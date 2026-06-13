@@ -70,11 +70,35 @@ const columns = [
   { title: '变更编号', dataIndex: 'changeCode', key: 'changeCode', width: 160 },
   { title: '变更名称', dataIndex: 'changeName', key: 'changeName', width: 160 },
   { title: '变更类型', dataIndex: 'changeType', key: 'changeType', width: 100 },
-  { title: '变更前金额', dataIndex: 'beforeAmount', key: 'beforeAmount', width: 130, align: 'right' as const },
-  { title: '变更金额', dataIndex: 'changeAmount', key: 'changeAmount', width: 130, align: 'right' as const },
-  { title: '变更后金额', dataIndex: 'afterAmount', key: 'afterAmount', width: 130, align: 'right' as const },
+  {
+    title: '变更前金额',
+    dataIndex: 'beforeAmount',
+    key: 'beforeAmount',
+    width: 130,
+    align: 'right' as const,
+  },
+  {
+    title: '变更金额',
+    dataIndex: 'changeAmount',
+    key: 'changeAmount',
+    width: 130,
+    align: 'right' as const,
+  },
+  {
+    title: '变更后金额',
+    dataIndex: 'afterAmount',
+    key: 'afterAmount',
+    width: 130,
+    align: 'right' as const,
+  },
   { title: '审批状态', dataIndex: 'approvalStatus', key: 'approvalStatus', width: 100 },
-  { title: '是否生效', dataIndex: 'effectiveFlag', key: 'effectiveFlag', width: 80, align: 'center' as const },
+  {
+    title: '是否生效',
+    dataIndex: 'effectiveFlag',
+    key: 'effectiveFlag',
+    width: 80,
+    align: 'center' as const,
+  },
   { title: '操作', key: 'action', width: 220, fixed: 'right' as const },
 ]
 
@@ -90,7 +114,9 @@ async function fetchData() {
     tableData.value = res.records
     total.value = res.total
   } catch (err) {
-    console.error('ContractChangeList: 加载合同变更列表失败', err);
+    if (import.meta.env.DEV) {
+      console.error('ContractChangeList: 加载合同变更列表失败', err)
+    }
     tableData.value = []
     total.value = 0
     message.error('加载合同变更列表失败')
@@ -152,7 +178,9 @@ function handleDelete(record: ContractChangeVO) {
         message.success('删除成功')
         fetchData()
       } catch (err) {
-        console.error('ContractChangeList: 删除失败', err);
+        if (import.meta.env.DEV) {
+          console.error('ContractChangeList: 删除失败', err)
+        }
         message.error('删除失败')
       }
     },
@@ -175,7 +203,9 @@ function handleSubmitApproval(record: ContractChangeVO) {
         message.success('已提交审批')
         fetchData()
       } catch (err) {
-        console.error('ContractChangeList: 提交审批失败', err);
+        if (import.meta.env.DEV) {
+          console.error('ContractChangeList: 提交审批失败', err)
+        }
         message.error('提交审批失败')
       }
     },
@@ -222,7 +252,9 @@ async function handleModalOk() {
     fetchData()
     emit('refresh')
   } catch (err) {
-    console.error('ContractChangeList: 操作失败', err);
+    if (import.meta.env.DEV) {
+      console.error('ContractChangeList: 操作失败', err)
+    }
     message.error('操作失败，请稍后重试')
   } finally {
     formSubmitting.value = false
@@ -309,12 +341,20 @@ onMounted(() => {
             <span :style="{ color: '#6b7280' }">¥{{ formatAmount(record.beforeAmount) }}</span>
           </template>
           <template v-else-if="column.key === 'changeAmount'">
-            <span :style="{ color: parseFloat(record.changeAmount) >= 0 ? '#1677ff' : '#ef4444', fontWeight: 600 }">
-              {{ parseFloat(record.changeAmount) >= 0 ? '+' : '' }}{{ formatAmount(record.changeAmount) }}
+            <span
+              :style="{
+                color: parseFloat(record.changeAmount) >= 0 ? '#1677ff' : '#ef4444',
+                fontWeight: 600,
+              }"
+            >
+              {{ parseFloat(record.changeAmount) >= 0 ? '+' : ''
+              }}{{ formatAmount(record.changeAmount) }}
             </span>
           </template>
           <template v-else-if="column.key === 'afterAmount'">
-            <span style="font-weight: 600; color: #15803d">¥{{ formatAmount(record.afterAmount) }}</span>
+            <span style="font-weight: 600; color: #15803d"
+              >¥{{ formatAmount(record.afterAmount) }}</span
+            >
           </template>
           <template v-else-if="column.key === 'approvalStatus'">
             <a-tag
@@ -403,11 +443,7 @@ onMounted(() => {
         </a-form-item>
         <a-form-item label="变更类型" required>
           <a-select v-model:value="formData.changeType" placeholder="请选择变更类型">
-            <a-select-option
-              v-for="opt in CHANGE_TYPE_OPTIONS"
-              :key="opt.value"
-              :value="opt.value"
-            >
+            <a-select-option v-for="opt in CHANGE_TYPE_OPTIONS" :key="opt.value" :value="opt.value">
               {{ opt.label }}
             </a-select-option>
           </a-select>
@@ -436,7 +472,8 @@ onMounted(() => {
               class="cc-amount-change"
               :style="{ color: parseFloat(formData.changeAmount) >= 0 ? '#ef4444' : '#1677ff' }"
             >
-              {{ parseFloat(formData.changeAmount) >= 0 ? '+' : '' }}{{ formatAmount(formData.changeAmount) }}
+              {{ parseFloat(formData.changeAmount) >= 0 ? '+' : ''
+              }}{{ formatAmount(formData.changeAmount) }}
             </span>
             <span class="cc-amount-arrow">→</span>
             <span class="cc-amount-after">¥{{ formatAmount(computedAfterAmount()) }}</span>
@@ -452,12 +489,7 @@ onMounted(() => {
     </a-modal>
 
     <!-- Detail Modal with Approval Timeline -->
-    <a-modal
-      v-model:open="detailVisible"
-      title="变更详情"
-      :width="700"
-      :footer="null"
-    >
+    <a-modal v-model:open="detailVisible" title="变更详情" :width="700" :footer="null">
       <template v-if="detailRecord">
         <a-descriptions :column="2" size="small" bordered>
           <a-descriptions-item label="变更编号">{{ detailRecord.changeCode }}</a-descriptions-item>
@@ -481,19 +513,29 @@ onMounted(() => {
                         : 'default'
               "
             >
-              {{ CHANGE_APPROVAL_LABEL[detailRecord.approvalStatus] || detailRecord.approvalStatus }}
+              {{
+                CHANGE_APPROVAL_LABEL[detailRecord.approvalStatus] || detailRecord.approvalStatus
+              }}
             </a-tag>
           </a-descriptions-item>
           <a-descriptions-item label="变更前金额">
             ¥{{ formatAmount(detailRecord.beforeAmount) }}
           </a-descriptions-item>
           <a-descriptions-item label="变更金额">
-            <span :style="{ color: parseFloat(detailRecord.changeAmount) >= 0 ? '#ef4444' : '#1677ff', fontWeight: 600 }">
-              {{ parseFloat(detailRecord.changeAmount) >= 0 ? '+' : '' }}{{ formatAmount(detailRecord.changeAmount) }}
+            <span
+              :style="{
+                color: parseFloat(detailRecord.changeAmount) >= 0 ? '#ef4444' : '#1677ff',
+                fontWeight: 600,
+              }"
+            >
+              {{ parseFloat(detailRecord.changeAmount) >= 0 ? '+' : ''
+              }}{{ formatAmount(detailRecord.changeAmount) }}
             </span>
           </a-descriptions-item>
           <a-descriptions-item label="变更后金额">
-            <span style="font-weight: 600; color: #15803d">¥{{ formatAmount(detailRecord.afterAmount) }}</span>
+            <span style="font-weight: 600; color: #15803d"
+              >¥{{ formatAmount(detailRecord.afterAmount) }}</span
+            >
           </a-descriptions-item>
           <a-descriptions-item label="是否生效">
             <a-tag :color="detailRecord.effectiveFlag === 1 ? 'green' : 'default'">
@@ -506,8 +548,12 @@ onMounted(() => {
           <a-descriptions-item v-if="detailRecord.remark" label="备注" :span="2">
             {{ detailRecord.remark }}
           </a-descriptions-item>
-          <a-descriptions-item label="创建时间">{{ detailRecord.createdTime || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="更新时间">{{ detailRecord.updatedTime || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="创建时间">{{
+            detailRecord.createdTime || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="更新时间">{{
+            detailRecord.updatedTime || '-'
+          }}</a-descriptions-item>
         </a-descriptions>
 
         <!-- Amount Impact Visualization -->
@@ -519,21 +565,31 @@ onMounted(() => {
               <div class="cc-impact-card-value">¥{{ formatAmount(detailRecord.beforeAmount) }}</div>
             </div>
             <div class="cc-impact-arrow">→</div>
-            <div class="cc-impact-card" :style="{ borderColor: parseFloat(detailRecord.changeAmount) >= 0 ? '#ef4444' : '#1677ff' }">
+            <div
+              class="cc-impact-card"
+              :style="{
+                borderColor: parseFloat(detailRecord.changeAmount) >= 0 ? '#ef4444' : '#1677ff',
+              }"
+            >
               <div class="cc-impact-card-label">
                 {{ parseFloat(detailRecord.changeAmount) >= 0 ? '增加' : '减少' }}
               </div>
               <div
                 class="cc-impact-card-value"
-                :style="{ color: parseFloat(detailRecord.changeAmount) >= 0 ? '#ef4444' : '#1677ff' }"
+                :style="{
+                  color: parseFloat(detailRecord.changeAmount) >= 0 ? '#ef4444' : '#1677ff',
+                }"
               >
-                {{ parseFloat(detailRecord.changeAmount) >= 0 ? '+' : '' }}{{ formatAmount(detailRecord.changeAmount) }}
+                {{ parseFloat(detailRecord.changeAmount) >= 0 ? '+' : ''
+                }}{{ formatAmount(detailRecord.changeAmount) }}
               </div>
             </div>
             <div class="cc-impact-arrow">→</div>
             <div class="cc-impact-card" style="border-color: #15803d">
               <div class="cc-impact-card-label">变更后</div>
-              <div class="cc-impact-card-value" style="color: #15803d">¥{{ formatAmount(detailRecord.afterAmount) }}</div>
+              <div class="cc-impact-card-value" style="color: #15803d">
+                ¥{{ formatAmount(detailRecord.afterAmount) }}
+              </div>
             </div>
           </div>
         </div>

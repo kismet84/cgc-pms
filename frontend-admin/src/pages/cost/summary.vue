@@ -89,12 +89,48 @@ function getDeviationColor(val: string | undefined): string {
 
 const subjectColumns = [
   { title: '成本科目', dataIndex: 'costSubjectName', width: 180 },
-  { title: '目标成本(万元)', dataIndex: 'targetCost', width: 140, align: 'right' as const, key: 'targetCost' },
-  { title: '合同锁定成本(万元)', dataIndex: 'contractLockedCost', width: 160, align: 'right' as const, key: 'contractLockedCost' },
-  { title: '实际成本(万元)', dataIndex: 'actualCost', width: 140, align: 'right' as const, key: 'actualCost' },
-  { title: '已付款(万元)', dataIndex: 'paidAmount', width: 130, align: 'right' as const, key: 'paidAmount' },
-  { title: '动态成本(万元)', dataIndex: 'dynamicCost', width: 140, align: 'right' as const, key: 'dynamicCost' },
-  { title: '成本偏差(万元)', dataIndex: 'costDeviation', width: 140, align: 'right' as const, key: 'costDeviation' },
+  {
+    title: '目标成本(万元)',
+    dataIndex: 'targetCost',
+    width: 140,
+    align: 'right' as const,
+    key: 'targetCost',
+  },
+  {
+    title: '合同锁定成本(万元)',
+    dataIndex: 'contractLockedCost',
+    width: 160,
+    align: 'right' as const,
+    key: 'contractLockedCost',
+  },
+  {
+    title: '实际成本(万元)',
+    dataIndex: 'actualCost',
+    width: 140,
+    align: 'right' as const,
+    key: 'actualCost',
+  },
+  {
+    title: '已付款(万元)',
+    dataIndex: 'paidAmount',
+    width: 130,
+    align: 'right' as const,
+    key: 'paidAmount',
+  },
+  {
+    title: '动态成本(万元)',
+    dataIndex: 'dynamicCost',
+    width: 140,
+    align: 'right' as const,
+    key: 'dynamicCost',
+  },
+  {
+    title: '成本偏差(万元)',
+    dataIndex: 'costDeviation',
+    width: 140,
+    align: 'right' as const,
+    key: 'costDeviation',
+  },
 ]
 
 onMounted(() => {
@@ -110,7 +146,7 @@ onMounted(() => {
     </a-breadcrumb>
 
     <!-- Project selector bar -->
-    <div class="cl-card cl-filter" style="margin-bottom:14px">
+    <div class="cl-card cl-filter" style="margin-bottom: 14px">
       <div class="cl-filter-row cl-filter-row--last">
         <div class="cl-field">
           <label>选择项目：</label>
@@ -118,7 +154,7 @@ onMounted(() => {
             v-model:value="selectedProjectId"
             placeholder="请选择项目查看成本汇总"
             allow-clear
-            style="width:280px"
+            style="width: 280px"
             @change="handleProjectChange"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -135,8 +171,12 @@ onMounted(() => {
     </div>
 
     <!-- No project selected placeholder -->
-    <div v-if="!selectedProjectId" class="cl-card" style="padding: 80px 20px; text-align: center; color: #9ca3af; font-size: 14px;">
-      <AimOutlined style="font-size: 48px; margin-bottom: 16px; color: #d1d5db;" />
+    <div
+      v-if="!selectedProjectId"
+      class="cl-card"
+      style="padding: 80px 20px; text-align: center; color: #9ca3af; font-size: 14px"
+    >
+      <AimOutlined style="font-size: 48px; margin-bottom: 16px; color: #d1d5db" />
       <div>请选择一个项目查看动态成本汇总</div>
     </div>
 
@@ -144,52 +184,69 @@ onMounted(() => {
       <!-- KPI cards -->
       <div class="cl-kpis">
         <div class="cl-kpi">
-          <div class="cl-kpi-icon" style="background:#3b82f6"><AimOutlined /></div>
+          <div class="cl-kpi-icon" style="background: #3b82f6"><AimOutlined /></div>
           <div>
             <div class="cl-kpi-title">目标成本</div>
             <div class="cl-kpi-value">{{ fmtAmount(summary.targetCost) }} <small>万元</small></div>
           </div>
         </div>
         <div class="cl-kpi">
-          <div class="cl-kpi-icon" style="background:#f59e0b"><LockOutlined /></div>
+          <div class="cl-kpi-icon" style="background: #f59e0b"><LockOutlined /></div>
           <div>
             <div class="cl-kpi-title">合同锁定成本</div>
-            <div class="cl-kpi-value">{{ fmtAmount(summary.contractLockedCost) }} <small>万元</small></div>
+            <div class="cl-kpi-value">
+              {{ fmtAmount(summary.contractLockedCost) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="cl-kpi">
-          <div class="cl-kpi-icon" style="background:#22c55e"><DollarOutlined /></div>
+          <div class="cl-kpi-icon" style="background: #22c55e"><DollarOutlined /></div>
           <div>
             <div class="cl-kpi-title">实际成本</div>
             <div class="cl-kpi-value">{{ fmtAmount(summary.actualCost) }} <small>万元</small></div>
           </div>
         </div>
         <div class="cl-kpi">
-          <div class="cl-kpi-icon" style="background:#8b5cf6"><LineChartOutlined /></div>
+          <div class="cl-kpi-icon" style="background: #8b5cf6"><LineChartOutlined /></div>
           <div>
             <div class="cl-kpi-title">已付款</div>
             <div class="cl-kpi-value">{{ fmtAmount(summary.paidAmount) }} <small>万元</small></div>
           </div>
         </div>
         <div class="cl-kpi">
-          <div class="cl-kpi-icon" style="background:#14b8c7"><LineChartOutlined /></div>
+          <div class="cl-kpi-icon" style="background: #14b8c7"><LineChartOutlined /></div>
           <div>
             <div class="cl-kpi-title">动态成本</div>
             <div class="cl-kpi-value">{{ fmtAmount(summary.dynamicCost) }} <small>万元</small></div>
           </div>
         </div>
         <div class="cl-kpi">
-          <div class="cl-kpi-icon" :style="{ background: getDeviationColor(summary.costDeviation) }"><LineChartOutlined /></div>
+          <div
+            class="cl-kpi-icon"
+            :style="{ background: getDeviationColor(summary.costDeviation) }"
+          >
+            <LineChartOutlined />
+          </div>
           <div>
             <div class="cl-kpi-title">成本偏差</div>
-            <div class="cl-kpi-value">{{ fmtDeviation(summary.costDeviation) }} <small>万元</small></div>
+            <div class="cl-kpi-value">
+              {{ fmtDeviation(summary.costDeviation) }} <small>万元</small>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Subject detail table -->
       <div class="cl-card cl-table-wrap">
-        <div style="padding: 16px 20px; font-size: 15px; font-weight: 700; color: #111827; border-bottom: 1px solid #f0f0f0;">
+        <div
+          style="
+            padding: 16px 20px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #111827;
+            border-bottom: 1px solid #f0f0f0;
+          "
+        >
           科目明细
         </div>
         <a-table

@@ -16,7 +16,13 @@ import {
 import { message } from 'ant-design-vue'
 import { getContractLedger, getContractKpi } from '@/api/modules/contract'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
-import type { ContractVO, ContractQueryParams, ContractKpiVO, ContractType, ContractStatus } from '@/types/contract'
+import type {
+  ContractVO,
+  ContractQueryParams,
+  ContractKpiVO,
+  ContractType,
+  ContractStatus,
+} from '@/types/contract'
 import type { PageResult } from '@/types/api'
 
 const router = useRouter()
@@ -107,7 +113,13 @@ async function fetchKpi() {
   try {
     kpi.value = await getContractKpi()
   } catch {
-    kpi.value = { totalCount: 0, totalAmount: '0', paidAmount: '0', unpaidAmount: '0', overdueCount: 0 }
+    kpi.value = {
+      totalCount: 0,
+      totalAmount: '0',
+      paidAmount: '0',
+      unpaidAmount: '0',
+      overdueCount: 0,
+    }
     message.error('加载合同指标失败，请稍后重试')
   }
 }
@@ -149,10 +161,18 @@ function fmtAmount(val: string): string {
 }
 
 const TYPE_LABEL: Record<ContractType, string> = {
-  MAIN: '总包合同', SUB: '分包合同', PURCHASE: '采购合同', LEASE: '租赁合同', SERVICE: '服务合同',
+  MAIN: '总包合同',
+  SUB: '分包合同',
+  PURCHASE: '采购合同',
+  LEASE: '租赁合同',
+  SERVICE: '服务合同',
 }
 const TYPE_COLOR: Record<ContractType, string> = {
-  MAIN: 'blue', SUB: 'green', PURCHASE: 'orange', LEASE: 'purple', SERVICE: 'cyan',
+  MAIN: 'blue',
+  SUB: 'green',
+  PURCHASE: 'orange',
+  LEASE: 'purple',
+  SERVICE: 'cyan',
 }
 
 // ---- ECharts donut option ----
@@ -162,26 +182,28 @@ const donutOption = computed(() => ({
   color: CHART_COLORS,
   tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
   legend: { show: false },
-  series: [{
-    type: 'pie',
-    radius: ['50%', '72%'],
-    label: { show: false },
-    data: [
-      { name: '总包合同', value: 12 },
-      { name: '分包合同', value: 45 },
-      { name: '采购合同', value: 50 },
-      { name: '租赁合同', value: 15 },
-      { name: '服务合同', value: 6 },
-    ],
-  }],
+  series: [
+    {
+      type: 'pie',
+      radius: ['50%', '72%'],
+      label: { show: false },
+      data: [
+        { name: '总包合同', value: 12 },
+        { name: '分包合同', value: 45 },
+        { name: '采购合同', value: 50 },
+        { name: '租赁合同', value: 15 },
+        { name: '服务合同', value: 6 },
+      ],
+    },
+  ],
 }))
 
 // ---- Status stats (mock) ----
 const statusStats = [
   { label: '履约中', count: 98, pct: 76.56, color: '#22c55e' },
   { label: '已完成', count: 20, pct: 15.63, color: '#14b8c7' },
-  { label: '已终止', count: 6,  pct: 4.69,  color: '#f59e0b' },
-  { label: '草稿',   count: 4,  pct: 3.12,  color: '#8b5cf6' },
+  { label: '已终止', count: 6, pct: 4.69, color: '#f59e0b' },
+  { label: '草稿', count: 4, pct: 3.12, color: '#8b5cf6' },
 ]
 
 // ---- Overdue warnings (mock) ----
@@ -194,14 +216,32 @@ const overdueList = [
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
   { type: 'checkbox', width: 46, fixed: 'left' as const },
-  ...(colVisible.contractCode ? [{ field: 'contractCode', title: '合同编号', width: 160, slots: { default: 'contractCode' } }] : []),
+  ...(colVisible.contractCode
+    ? [{ field: 'contractCode', title: '合同编号', width: 160, slots: { default: 'contractCode' } }]
+    : []),
   ...(colVisible.contractName ? [{ field: 'contractName', title: '合同名称', minWidth: 160 }] : []),
-  ...(colVisible.contractType ? [{ field: 'contractType', title: '合同类型', width: 110, slots: { default: 'contractType' } }] : []),
+  ...(colVisible.contractType
+    ? [{ field: 'contractType', title: '合同类型', width: 110, slots: { default: 'contractType' } }]
+    : []),
   ...(colVisible.partnerName ? [{ field: 'partnerName', title: '合作方', width: 160 }] : []),
-  ...(colVisible.contractAmount ? [{ field: 'contractAmount', title: '合同金额(含税)', width: 140, align: 'right' as const, slots: { default: 'amount' } }] : []),
+  ...(colVisible.contractAmount
+    ? [
+        {
+          field: 'contractAmount',
+          title: '合同金额(含税)',
+          width: 140,
+          align: 'right' as const,
+          slots: { default: 'amount' },
+        },
+      ]
+    : []),
   ...(colVisible.signedDate ? [{ field: 'signedDate', title: '签订日期', width: 110 }] : []),
-  ...(colVisible.contractStatus ? [{ field: 'contractStatus', title: '合同状态', width: 100, slots: { default: 'status' } }] : []),
-  ...(colVisible.ops ? [{ title: '操作', width: 140, fixed: 'right' as const, slots: { default: 'ops' } }] : []),
+  ...(colVisible.contractStatus
+    ? [{ field: 'contractStatus', title: '合同状态', width: 100, slots: { default: 'status' } }]
+    : []),
+  ...(colVisible.ops
+    ? [{ title: '操作', width: 140, fixed: 'right' as const, slots: { default: 'ops' } }]
+    : []),
 ])
 </script>
 
@@ -221,11 +261,21 @@ const gridColumns = computed(() => [
           <div class="cl-filter-row">
             <div class="cl-field">
               <label>项目名称：</label>
-              <a-select v-model:value="filter.projectId" placeholder="请选择项目" allow-clear style="width:160px" />
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="请选择项目"
+                allow-clear
+                style="width: 160px"
+              />
             </div>
             <div class="cl-field">
               <label>合同类型：</label>
-              <a-select v-model:value="filter.contractType" placeholder="全部" allow-clear style="width:140px">
+              <a-select
+                v-model:value="filter.contractType"
+                placeholder="全部"
+                allow-clear
+                style="width: 140px"
+              >
                 <a-select-option value="MAIN">总包</a-select-option>
                 <a-select-option value="SUB">分包</a-select-option>
                 <a-select-option value="PURCHASE">采购</a-select-option>
@@ -235,7 +285,12 @@ const gridColumns = computed(() => [
             </div>
             <div class="cl-field">
               <label>合同状态：</label>
-              <a-select v-model:value="filter.contractStatus" placeholder="全部" allow-clear style="width:140px">
+              <a-select
+                v-model:value="filter.contractStatus"
+                placeholder="全部"
+                allow-clear
+                style="width: 140px"
+              >
                 <a-select-option value="PERFORMING">履约中</a-select-option>
                 <a-select-option value="SETTLED">已结算</a-select-option>
                 <a-select-option value="TERMINATED">已终止</a-select-option>
@@ -246,15 +301,24 @@ const gridColumns = computed(() => [
           <div class="cl-filter-row cl-filter-row--last">
             <div class="cl-field">
               <label>合作方：</label>
-              <a-select v-model:value="filter.partnerId" placeholder="请选择合作方" allow-clear style="width:160px" />
+              <a-select
+                v-model:value="filter.partnerId"
+                placeholder="请选择合作方"
+                allow-clear
+                style="width: 160px"
+              />
             </div>
             <div class="cl-field">
               <label>合同编号：</label>
-              <a-input v-model:value="filter.contractCode" placeholder="请输入合同编号" style="width:160px" />
+              <a-input
+                v-model:value="filter.contractCode"
+                placeholder="请输入合同编号"
+                style="width: 160px"
+              />
             </div>
             <div class="cl-field">
               <label>签订日期：</label>
-              <a-range-picker v-model:value="filter.dateRange" style="width:220px" />
+              <a-range-picker v-model:value="filter.dateRange" style="width: 220px" />
             </div>
             <div class="cl-filter-actions">
               <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -267,7 +331,7 @@ const gridColumns = computed(() => [
         <!-- KPI cards -->
         <div class="cl-kpis">
           <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background:#3b82f6"><FileTextOutlined /></div>
+            <div class="cl-kpi-icon" style="background: #3b82f6"><FileTextOutlined /></div>
             <div>
               <div class="cl-kpi-title">合同总数</div>
               <div class="cl-kpi-value">{{ kpi.totalCount }} <small>份</small></div>
@@ -275,7 +339,7 @@ const gridColumns = computed(() => [
             </div>
           </div>
           <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background:#36c267"><DollarOutlined /></div>
+            <div class="cl-kpi-icon" style="background: #36c267"><DollarOutlined /></div>
             <div>
               <div class="cl-kpi-title">合同总金额(含税)</div>
               <div class="cl-kpi-value">{{ fmtAmount(kpi.totalAmount) }} <small>万元</small></div>
@@ -283,7 +347,7 @@ const gridColumns = computed(() => [
             </div>
           </div>
           <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background:#f59e0b"><PayCircleOutlined /></div>
+            <div class="cl-kpi-icon" style="background: #f59e0b"><PayCircleOutlined /></div>
             <div>
               <div class="cl-kpi-title">已付款金额</div>
               <div class="cl-kpi-value">{{ fmtAmount(kpi.paidAmount) }} <small>万元</small></div>
@@ -291,7 +355,7 @@ const gridColumns = computed(() => [
             </div>
           </div>
           <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background:#7c3aed"><WalletOutlined /></div>
+            <div class="cl-kpi-icon" style="background: #7c3aed"><WalletOutlined /></div>
             <div>
               <div class="cl-kpi-title">未付款金额</div>
               <div class="cl-kpi-value">{{ fmtAmount(kpi.unpaidAmount) }} <small>万元</small></div>
@@ -299,7 +363,7 @@ const gridColumns = computed(() => [
             </div>
           </div>
           <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background:#31c7cf"><ClockCircleOutlined /></div>
+            <div class="cl-kpi-icon" style="background: #31c7cf"><ClockCircleOutlined /></div>
             <div>
               <div class="cl-kpi-title">逾期合同数</div>
               <div class="cl-kpi-value">{{ kpi.overdueCount }} <small>份</small></div>
@@ -311,21 +375,40 @@ const gridColumns = computed(() => [
         <!-- Toolbar -->
         <div class="cl-toolbar">
           <div class="cl-toolbar-left">
-            <a-button type="primary" @click="handleCreate"><template #icon><PlusOutlined /></template>新建合同</a-button>
-            <a-button><template #icon><DownloadOutlined /></template>导出</a-button>
+            <a-button type="primary" @click="handleCreate"
+              ><template #icon><PlusOutlined /></template>新建合同</a-button
+            >
+            <a-button
+              ><template #icon><DownloadOutlined /></template>导出</a-button
+            >
             <a-dropdown>
-              <a-button><template #icon><SettingOutlined /></template>列设置</a-button>
+              <a-button
+                ><template #icon><SettingOutlined /></template>列设置</a-button
+              >
               <template #overlay>
                 <a-menu>
                   <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
                     <a-checkbox :checked="colVisible[key]">
-                      {{ { contractCode: '合同编号', contractName: '合同名称', contractType: '合同类型', partnerName: '合作方', contractAmount: '合同金额', signedDate: '签订日期', contractStatus: '合同状态', ops: '操作' }[key] }}
+                      {{
+                        {
+                          contractCode: '合同编号',
+                          contractName: '合同名称',
+                          contractType: '合同类型',
+                          partnerName: '合作方',
+                          contractAmount: '合同金额',
+                          signedDate: '签订日期',
+                          contractStatus: '合同状态',
+                          ops: '操作',
+                        }[key]
+                      }}
                     </a-checkbox>
                   </a-menu-item>
                 </a-menu>
               </template>
             </a-dropdown>
-            <a-button @click="fetchData"><template #icon><ReloadOutlined /></template></a-button>
+            <a-button @click="fetchData"
+              ><template #icon><ReloadOutlined /></template
+            ></a-button>
           </div>
         </div>
 
@@ -351,7 +434,9 @@ const gridColumns = computed(() => [
               </a-tag>
             </template>
             <template #amount="{ row }">
-              <span class="cl-money">{{ parseFloat(row.contractAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+              <span class="cl-money">{{
+                parseFloat(row.contractAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+              }}</span>
             </template>
             <template #status="{ row }">
               <ContractStatusTag :status="row.contractStatus as ContractStatus" />
@@ -388,13 +473,15 @@ const gridColumns = computed(() => [
         <div class="cl-card cl-panel">
           <div class="cl-panel-title">合同类型分布</div>
           <div class="cl-chart-row">
-            <VChart :option="donutOption" style="width:132px;height:132px" autoresize />
+            <VChart :option="donutOption" style="width: 132px; height: 132px" autoresize />
             <div class="cl-legend">
               <div v-for="(name, i) in TYPE_NAMES" :key="name" class="cl-legend-item">
                 <span class="cl-legend-left">
                   <i class="cl-dot" :style="{ background: CHART_COLORS[i] }"></i>{{ name }}
                 </span>
-                <span>{{ [12, 45, 50, 15, 6][i] }} ({{ [9.38, 35.16, 39.06, 11.72, 4.68][i] }}%)</span>
+                <span
+                  >{{ [12, 45, 50, 15, 6][i] }} ({{ [9.38, 35.16, 39.06, 11.72, 4.68][i] }}%)</span
+                >
               </div>
             </div>
           </div>
@@ -418,8 +505,8 @@ const gridColumns = computed(() => [
         <!-- Overdue warnings -->
         <div class="cl-card cl-panel">
           <div class="cl-warning-head">
-            <div class="cl-panel-title" style="margin:0">逾期预警</div>
-            <a class="cl-link" style="font-size:12px">全部预警 ›</a>
+            <div class="cl-panel-title" style="margin: 0">逾期预警</div>
+            <a class="cl-link" style="font-size: 12px">全部预警 ›</a>
           </div>
           <div class="cl-warning-list">
             <div v-for="w in overdueList" :key="w.code" class="cl-warning-item">
@@ -543,8 +630,12 @@ const gridColumns = computed(() => [
   color: #6b7280;
   margin-top: 5px;
 }
-.up { color: #ef4444; }
-.down { color: #16a34a; }
+.up {
+  color: #ef4444;
+}
+.down {
+  color: #16a34a;
+}
 
 /* Toolbar */
 .cl-toolbar {

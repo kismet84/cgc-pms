@@ -131,7 +131,11 @@ onMounted(() => {
         <div v-if="activeTab === 'in'">
           <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
             <a-form-item label="仓库" required>
-              <a-select v-model:value="inForm.warehouseId" placeholder="请选择仓库" style="width: 300px">
+              <a-select
+                v-model:value="inForm.warehouseId"
+                placeholder="请选择仓库"
+                style="width: 300px"
+              >
                 <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
                   {{ w.warehouseName }}
                 </a-select-option>
@@ -143,7 +147,10 @@ onMounted(() => {
                 placeholder="请选择物料"
                 style="width: 300px"
                 show-search
-                :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
               >
                 <a-select-option
                   v-for="m in materialList"
@@ -153,7 +160,9 @@ onMounted(() => {
                 >
                   <div>
                     <span>{{ m.materialName }}</span>
-                    <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{ m.materialCode }}</span>
+                    <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{
+                      m.materialCode
+                    }}</span>
                   </div>
                 </a-select-option>
               </a-select>
@@ -175,7 +184,12 @@ onMounted(() => {
               </a-input-number>
             </a-form-item>
             <a-form-item :wrapper-col="{ offset: 4 }">
-              <a-button type="primary" :loading="inSubmitting" @click="handleStockIn" style="width: 120px">
+              <a-button
+                type="primary"
+                :loading="inSubmitting"
+                @click="handleStockIn"
+                style="width: 120px"
+              >
                 确认入库
               </a-button>
             </a-form-item>
@@ -186,7 +200,11 @@ onMounted(() => {
         <div v-else>
           <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
             <a-form-item label="仓库" required>
-              <a-select v-model:value="outForm.warehouseId" placeholder="请选择仓库" style="width: 300px">
+              <a-select
+                v-model:value="outForm.warehouseId"
+                placeholder="请选择仓库"
+                style="width: 300px"
+              >
                 <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
                   {{ w.warehouseName }}
                 </a-select-option>
@@ -198,7 +216,10 @@ onMounted(() => {
                 placeholder="请选择物料"
                 style="width: 300px"
                 show-search
-                :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
               >
                 <a-select-option
                   v-for="m in materialList"
@@ -208,7 +229,9 @@ onMounted(() => {
                 >
                   <div>
                     <span>{{ m.materialName }}</span>
-                    <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{ m.materialCode }}</span>
+                    <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{
+                      m.materialCode
+                    }}</span>
                   </div>
                 </a-select-option>
               </a-select>
@@ -229,7 +252,13 @@ onMounted(() => {
               </a-input-number>
             </a-form-item>
             <a-form-item :wrapper-col="{ offset: 4 }">
-              <a-button type="primary" danger :loading="outSubmitting" @click="handleStockOut" style="width: 120px">
+              <a-button
+                type="primary"
+                danger
+                :loading="outSubmitting"
+                @click="handleStockOut"
+                style="width: 120px"
+              >
                 确认出库
               </a-button>
             </a-form-item>

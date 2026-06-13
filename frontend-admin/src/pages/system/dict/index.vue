@@ -343,11 +343,7 @@ onMounted(() => {
   <div class="dict-page">
     <a-layout class="dict-layout">
       <!-- 左侧：字典类型列表 -->
-      <a-layout-sider
-        class="dict-sider"
-        width="280"
-        theme="light"
-      >
+      <a-layout-sider class="dict-sider" width="280" theme="light">
         <div class="dict-sider-header">
           <span class="dict-sider-title">字典类型</span>
           <a-button type="primary" size="small" @click="handleAddType">新增</a-button>
@@ -379,7 +375,9 @@ onMounted(() => {
             </div>
             <div class="dict-type-actions">
               <a-button type="link" size="small" @click.stop="handleEditType(item)">编辑</a-button>
-              <a-button type="link" size="small" danger @click.stop="handleDeleteType(item)">删除</a-button>
+              <a-button type="link" size="small" danger @click.stop="handleDeleteType(item)"
+                >删除</a-button
+              >
             </div>
           </div>
         </div>
@@ -398,11 +396,21 @@ onMounted(() => {
             <div class="dict-filter-row">
               <div class="dict-field">
                 <label>字典标签：</label>
-                <a-input v-model:value="dataFilter.dictLabel" placeholder="请输入标签" style="width:160px" allow-clear />
+                <a-input
+                  v-model:value="dataFilter.dictLabel"
+                  placeholder="请输入标签"
+                  style="width: 160px"
+                  allow-clear
+                />
               </div>
               <div class="dict-field">
                 <label>状态：</label>
-                <a-select v-model:value="dataFilter.status" placeholder="全部" allow-clear style="width:110px">
+                <a-select
+                  v-model:value="dataFilter.status"
+                  placeholder="全部"
+                  allow-clear
+                  style="width: 110px"
+                >
                   <a-select-option value="ENABLED">启用</a-select-option>
                   <a-select-option value="DISABLED">禁用</a-select-option>
                 </a-select>
@@ -477,13 +485,17 @@ onMounted(() => {
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
         <a-form-item label="字典编码" required>
-          <a-input v-model:value="typeForm.dictCode" placeholder="请输入字典编码" :disabled="typeIsEdit" />
+          <a-input
+            v-model:value="typeForm.dictCode"
+            placeholder="请输入字典编码"
+            :disabled="typeIsEdit"
+          />
         </a-form-item>
         <a-form-item label="字典名称" required>
           <a-input v-model:value="typeForm.dictName" placeholder="请输入字典名称" />
         </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="typeForm.status" style="width:120px">
+          <a-select v-model:value="typeForm.status" style="width: 120px">
             <a-select-option value="ENABLED">启用</a-select-option>
             <a-select-option value="DISABLED">禁用</a-select-option>
           </a-select>
@@ -508,7 +520,7 @@ onMounted(() => {
           <a-input v-model:value="dataForm.dictValue" placeholder="请输入字典键值" />
         </a-form-item>
         <a-form-item label="排序号">
-          <a-input-number v-model:value="dataForm.orderNum" :min="0" style="width:100%" />
+          <a-input-number v-model:value="dataForm.orderNum" :min="0" style="width: 100%" />
         </a-form-item>
         <a-form-item label="CSS类名">
           <a-input v-model:value="dataForm.cssClass" placeholder="如：text-danger bg-warning" />
@@ -517,7 +529,7 @@ onMounted(() => {
           <a-input v-model:value="dataForm.listClass" placeholder="如：default primary success" />
         </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="dataForm.status" style="width:120px">
+          <a-select v-model:value="dataForm.status" style="width: 120px">
             <a-select-option value="ENABLED">启用</a-select-option>
             <a-select-option value="DISABLED">禁用</a-select-option>
           </a-select>
@@ -588,7 +600,9 @@ onMounted(() => {
   padding: 10px 16px;
   cursor: pointer;
   border-left: 3px solid transparent;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
   gap: 8px;
 }
 

@@ -64,6 +64,12 @@ public class AuthController {
             TokenBlacklistService svc = blacklistProvider.getIfAvailable();
             if (svc != null) svc.blacklist(token, jwtUtils.getRemainingTtlMillis(token));
         }
+        // M-008: Also blacklist refresh token on logout
+        String refreshToken = cookieUtils.getCookieValue(request, CookieUtils.REFRESH_TOKEN_COOKIE);
+        if (refreshToken != null && !refreshToken.isBlank() && jwtUtils.validateToken(refreshToken)) {
+            TokenBlacklistService svc = blacklistProvider.getIfAvailable();
+            if (svc != null) svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken));
+        }
         cookieUtils.clearAuthCookies(response);
         UserContext.clear();
         return ApiResponse.success();

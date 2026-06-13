@@ -35,7 +35,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'approval',
             name: 'ContractApproval',
-            component: () => import('@/pages/dashboard/index.vue'),
+            redirect: '/approval/todo',
             meta: { title: '合同审批' },
           },
           {

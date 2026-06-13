@@ -74,11 +74,7 @@ async function loadUsers() {
 }
 
 onMounted(async () => {
-  await Promise.all([
-    store.fetchProject(projectId),
-    store.fetchMembers(projectId),
-    loadUsers(),
-  ])
+  await Promise.all([store.fetchProject(projectId), store.fetchMembers(projectId), loadUsers()])
 })
 
 // ── Handlers ──
@@ -208,7 +204,7 @@ const columns = [
           <!-- 状态 -->
           <template v-else-if="column.dataIndex === 'status'">
             <a-tag :color="record.status === 'ACTIVE' ? 'success' : 'default'">
-              {{ record.status === 'ACTIVE' ? '在岗' : record.status ?? '-' }}
+              {{ record.status === 'ACTIVE' ? '在岗' : (record.status ?? '-') }}
             </a-tag>
           </template>
 
@@ -253,9 +249,16 @@ const columns = [
             v-model:value="addForm.userId"
             placeholder="请搜索并选择用户"
             show-search
-            :filter-option="(input: string, option: any) =>
-              (option.label ?? '').toLowerCase().includes(input.toLowerCase())"
-            :options="userList.map(u => ({ value: u.id, label: `${u.realName || u.username} (${u.username})` }))"
+            :filter-option="
+              (input: string, option: any) =>
+                (option.label ?? '').toLowerCase().includes(input.toLowerCase())
+            "
+            :options="
+              userList.map((u) => ({
+                value: u.id,
+                label: `${u.realName || u.username} (${u.username})`,
+              }))
+            "
             style="width: 100%"
             :dropdown-match-select-width="false"
           />
@@ -275,7 +278,12 @@ const columns = [
         </a-form-item>
 
         <a-form-item label="开始日期">
-          <a-date-picker v-model:value="addForm.startDate" value-format="YYYY-MM-DD" style="width: 100%" placeholder="选择开始日期" />
+          <a-date-picker
+            v-model:value="addForm.startDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+            placeholder="选择开始日期"
+          />
         </a-form-item>
       </a-form>
     </a-modal>

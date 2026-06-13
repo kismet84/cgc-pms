@@ -45,20 +45,12 @@ export function updateContract(id: string, data: Partial<ContractVO>) {
 }
 
 /** 合同 KPI 统计 */
-/* TODO: Backend KPI endpoint not yet implemented. Returns stub with default values. */
-export function getContractKpi(_params?: Partial<ContractQueryParams>) {
-  // return request<ContractKpiVO>({
-  //   url: '/contracts/kpi',
-  //   method: 'get',
-  //   params,
-  // })
-  return Promise.resolve({
-    totalCount: 0,
-    totalAmount: '0',
-    paidAmount: '0',
-    unpaidAmount: '0',
-    overdueCount: 0,
-  } as ContractKpiVO)
+export function getContractKpi(params?: Partial<ContractQueryParams>) {
+  return request<ContractKpiVO>({
+    url: '/contracts/kpi',
+    method: 'get',
+    params,
+  })
 }
 
 /** 提交审批 */

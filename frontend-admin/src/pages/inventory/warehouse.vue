@@ -199,7 +199,12 @@ onMounted(() => {
       <div class="pm-filter-row">
         <div class="pm-field">
           <label>所属项目：</label>
-          <a-select v-model:value="filter.projectId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.projectId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
@@ -207,15 +212,30 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>仓库编号：</label>
-          <a-input v-model:value="filter.warehouseCode" placeholder="请输入编号" style="width:140px" allow-clear />
+          <a-input
+            v-model:value="filter.warehouseCode"
+            placeholder="请输入编号"
+            style="width: 140px"
+            allow-clear
+          />
         </div>
         <div class="pm-field">
           <label>仓库名称：</label>
-          <a-input v-model:value="filter.warehouseName" placeholder="请输入名称" style="width:140px" allow-clear />
+          <a-input
+            v-model:value="filter.warehouseName"
+            placeholder="请输入名称"
+            style="width: 140px"
+            allow-clear
+          />
         </div>
         <div class="pm-field">
           <label>状态：</label>
-          <a-select v-model:value="filter.status" placeholder="全部" allow-clear style="width:100px">
+          <a-select
+            v-model:value="filter.status"
+            placeholder="全部"
+            allow-clear
+            style="width: 100px"
+          >
             <a-select-option value="ENABLE">启用</a-select-option>
             <a-select-option value="DISABLE">停用</a-select-option>
           </a-select>
@@ -285,7 +305,11 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="仓库编号">
-          <a-input v-model:value="formData.warehouseCode" placeholder="留空自动生成" :disabled="!!editingId" />
+          <a-input
+            v-model:value="formData.warehouseCode"
+            placeholder="留空自动生成"
+            :disabled="!!editingId"
+          />
         </a-form-item>
         <a-form-item label="仓库名称" required>
           <a-input v-model:value="formData.warehouseName" placeholder="请输入仓库名称" />

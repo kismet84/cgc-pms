@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  PlusOutlined,
-  ReloadOutlined,
-  CheckCircleOutlined,
-} from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { getCostTargetList, activateCostTarget, deleteCostTarget } from '@/api/modules/costTarget'
 import { getProjectList } from '@/api/modules/project'
@@ -164,7 +160,13 @@ const columns = [
   { field: 'versionNo', title: '版本号', width: 130 },
   { field: 'versionName', title: '版本名称', minWidth: 160 },
   { field: 'projectName', title: '所属项目', width: 150 },
-  { field: 'totalTargetAmount', title: '目标成本合计(万元)', width: 150, align: 'right' as const, slots: { default: 'amount' } },
+  {
+    field: 'totalTargetAmount',
+    title: '目标成本合计(万元)',
+    width: 150,
+    align: 'right' as const,
+    slots: { default: 'amount' },
+  },
   { field: 'effectiveDate', title: '生效日期', width: 110 },
   { field: 'approvalStatus', title: '审批状态', width: 100, slots: { default: 'approvalStatus' } },
   { field: 'status', title: '业务状态', width: 100, slots: { default: 'status' } },
@@ -194,22 +196,29 @@ onMounted(() => {
             v-model:value="filter.projectId"
             placeholder="请选择项目"
             allow-clear
-            style="width:180px"
+            style="width: 180px"
           >
-            <a-select-option
-              v-for="p in projectList"
-              :key="p.id"
-              :value="p.id"
-            >{{ p.projectName }}</a-select-option>
+            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
+              p.projectName
+            }}</a-select-option>
           </a-select>
         </div>
         <div class="ct-field">
           <label>版本号：</label>
-          <a-input v-model:value="filter.versionNo" placeholder="请输入版本号" style="width:160px" />
+          <a-input
+            v-model:value="filter.versionNo"
+            placeholder="请输入版本号"
+            style="width: 160px"
+          />
         </div>
         <div class="ct-field">
           <label>审批状态：</label>
-          <a-select v-model:value="filter.approvalStatus" placeholder="全部" allow-clear style="width:130px">
+          <a-select
+            v-model:value="filter.approvalStatus"
+            placeholder="全部"
+            allow-clear
+            style="width: 130px"
+          >
             <a-select-option value="DRAFT">草稿</a-select-option>
             <a-select-option value="APPROVING">审批中</a-select-option>
             <a-select-option value="APPROVED">已通过</a-select-option>
@@ -218,7 +227,12 @@ onMounted(() => {
         </div>
         <div class="ct-field">
           <label>版本标识：</label>
-          <a-select v-model:value="filter.isActive" placeholder="全部" allow-clear style="width:130px">
+          <a-select
+            v-model:value="filter.isActive"
+            placeholder="全部"
+            allow-clear
+            style="width: 130px"
+          >
             <a-select-option :value="1">当前版本</a-select-option>
             <a-select-option :value="0">历史版本</a-select-option>
           </a-select>
@@ -281,13 +295,14 @@ onMounted(() => {
               :class="{ 'ct-link--disabled': activating }"
               @click="handleActivate(row)"
             >
-              <CheckCircleOutlined style="margin-right:4px" />切换版本
+              <CheckCircleOutlined style="margin-right: 4px" />切换版本
             </a>
             <a
               v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
               class="ct-link ct-del"
               @click="handleDelete(row)"
-            >删除</a>
+              >删除</a
+            >
           </div>
         </template>
       </vxe-grid>

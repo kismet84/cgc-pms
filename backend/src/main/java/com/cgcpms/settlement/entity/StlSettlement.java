@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 @TableName("stl_settlement")
 public class StlSettlement extends BaseEntity {
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 

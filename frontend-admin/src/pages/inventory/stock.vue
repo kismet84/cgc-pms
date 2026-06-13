@@ -141,7 +141,12 @@ onMounted(() => {
       <div class="pm-filter-row">
         <div class="pm-field">
           <label>仓库：</label>
-          <a-select v-model:value="filter.warehouseId" placeholder="请选择仓库" allow-clear style="width:200px">
+          <a-select
+            v-model:value="filter.warehouseId"
+            placeholder="请选择仓库"
+            allow-clear
+            style="width: 200px"
+          >
             <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
               {{ w.warehouseName }}
             </a-select-option>
@@ -149,9 +154,14 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>物料：</label>
-          <a-select v-model:value="filter.materialId" placeholder="全部物料" allow-clear style="width:200px">
+          <a-select
+            v-model:value="filter.materialId"
+            placeholder="全部物料"
+            allow-clear
+            style="width: 200px"
+          >
             <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
-              {{ m.materialName }} <span style="color:#9ca3af">({{ m.materialCode }})</span>
+              {{ m.materialName }} <span style="color: #9ca3af">({{ m.materialCode }})</span>
             </a-select-option>
           </a-select>
         </div>
@@ -182,7 +192,11 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    <div v-else-if="filter.warehouseId" class="pm-card" style="padding: 20px 22px; margin-bottom: 14px; color: #9ca3af">
+    <div
+      v-else-if="filter.warehouseId"
+      class="pm-card"
+      style="padding: 20px 22px; margin-bottom: 14px; color: #9ca3af"
+    >
       该仓库暂无选中物料库存记录
     </div>
 
@@ -208,13 +222,18 @@ onMounted(() => {
             </a-tag>
           </template>
           <template v-else-if="column.key === 'quantity'">
-            <span :style="{ color: record.txnType === 'OUT' ? '#ef4444' : '#16a34a', fontWeight: 600 }">
-              {{ record.txnType === 'OUT' ? '-' : '+' }}{{ Number(record.quantity).toLocaleString('zh-CN', { minimumFractionDigits: 4 }) }}
+            <span
+              :style="{ color: record.txnType === 'OUT' ? '#ef4444' : '#16a34a', fontWeight: 600 }"
+            >
+              {{ record.txnType === 'OUT' ? '-' : '+'
+              }}{{ Number(record.quantity).toLocaleString('zh-CN', { minimumFractionDigits: 4 }) }}
             </span>
           </template>
           <template v-else-if="column.key === 'availableAfter'">
             <span style="font-weight: 600">
-              {{ Number(record.availableAfter).toLocaleString('zh-CN', { minimumFractionDigits: 4 }) }}
+              {{
+                Number(record.availableAfter).toLocaleString('zh-CN', { minimumFractionDigits: 4 })
+              }}
             </span>
           </template>
           <template v-else-if="column.dataIndex === 'sourceType'">

@@ -115,7 +115,10 @@ function onSubjectChange(val: string | number | undefined, record: EditableItem)
     return
   }
   const valStr = String(val)
-  const findNode = (nodes: TreeSelectProps['treeData'], targetVal: string): { title: string } | null => {
+  const findNode = (
+    nodes: TreeSelectProps['treeData'],
+    targetVal: string,
+  ): { title: string } | null => {
     for (const node of nodes || []) {
       if (String(node.value) === targetVal) return node as { title: string }
       if (node.children) {
@@ -204,14 +207,18 @@ async function validateForm(): Promise<boolean> {
     return false
   }
 
-  const emptyAmount = items.value.some((r) => !r.costSubjectId || !r.targetAmount || Number(r.targetAmount) <= 0)
+  const emptyAmount = items.value.some(
+    (r) => !r.costSubjectId || !r.targetAmount || Number(r.targetAmount) <= 0,
+  )
   if (emptyAmount) {
     message.warning('存在未选择科目或未填写金额的明细项')
     return false
   }
 
   if (!totalMatch.value) {
-    message.warning(`科目金额合计（${itemsTotal.value.toFixed(2)}）与目标成本总额（${Number(formData.totalTargetAmount || 0).toFixed(2)}）不一致`)
+    message.warning(
+      `科目金额合计（${itemsTotal.value.toFixed(2)}）与目标成本总额（${Number(formData.totalTargetAmount || 0).toFixed(2)}）不一致`,
+    )
     return false
   }
 
@@ -308,7 +315,10 @@ const itemColumns = [
 
 // ---- Helpers ----
 function fmtMoney(val: number | undefined): string {
-  return (Number(val) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return (Number(val) || 0).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 onMounted(() => {
@@ -333,12 +343,7 @@ onMounted(() => {
         <!-- Basic info -->
         <div class="cte-section">
           <div class="cte-section-title">基本信息</div>
-          <a-form
-            ref="formRef"
-            :model="formData"
-            :rules="formRules"
-            layout="vertical"
-          >
+          <a-form ref="formRef" :model="formData" :rules="formRules" layout="vertical">
             <a-row :gutter="24">
               <a-col :span="8">
                 <a-form-item label="所属项目" name="projectId">
@@ -400,11 +405,7 @@ onMounted(() => {
               </a-col>
               <a-col :span="8">
                 <a-form-item label="备注" name="remark">
-                  <a-input
-                    v-model:value="formData.remark"
-                    placeholder="备注信息"
-                    allow-clear
-                  />
+                  <a-input v-model:value="formData.remark" placeholder="备注信息" allow-clear />
                 </a-form-item>
               </a-col>
             </a-row>
@@ -492,19 +493,10 @@ onMounted(() => {
         <!-- Actions -->
         <div class="cte-actions">
           <a-space>
-            <a-button
-              type="primary"
-              :loading="saving && !submitting"
-              @click="handleSubmit"
-            >
+            <a-button type="primary" :loading="saving && !submitting" @click="handleSubmit">
               提交审批
             </a-button>
-            <a-button
-              :loading="saving"
-              @click="handleSave"
-            >
-              保存
-            </a-button>
+            <a-button :loading="saving" @click="handleSave"> 保存 </a-button>
             <a-button :disabled="saving" @click="handleCancel">取消</a-button>
           </a-space>
         </div>

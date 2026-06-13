@@ -113,35 +113,45 @@ async function fetchProjects() {
   try {
     const res = await getProjectList({ pageNum: 1, pageSize: 500 })
     projectList.value = res.records
-  } catch { projectList.value = [] }
+  } catch {
+    projectList.value = []
+  }
 }
 
 async function fetchContracts() {
   try {
     const res = await getContractLedger({ pageNo: 1, pageSize: 500 })
     contractList.value = res.records
-  } catch { contractList.value = [] }
+  } catch {
+    contractList.value = []
+  }
 }
 
 async function fetchPartners() {
   try {
     const res = await getPartnerList({ pageNum: 1, pageSize: 500 })
     partnerList.value = res.records
-  } catch { partnerList.value = [] }
+  } catch {
+    partnerList.value = []
+  }
 }
 
 async function fetchReceipts() {
   try {
     const res = await getReceiptList({ pageNum: 1, pageSize: 500 })
     receiptList.value = res.records
-  } catch { receiptList.value = [] }
+  } catch {
+    receiptList.value = []
+  }
 }
 
 async function fetchMeasures() {
   try {
     const res = await getMeasureList({ pageNum: 1, pageSize: 500 })
     measureList.value = res.records
-  } catch { measureList.value = [] }
+  } catch {
+    measureList.value = []
+  }
 }
 
 function handleSearch() {
@@ -400,7 +410,12 @@ onMounted(() => {
       <div class="pm-filter-row">
         <div class="pm-field">
           <label>项目：</label>
-          <a-select v-model:value="filter.projectId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.projectId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
@@ -408,7 +423,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>合同：</label>
-          <a-select v-model:value="filter.contractId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.contractId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
@@ -416,7 +436,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>合作方：</label>
-          <a-select v-model:value="filter.partnerId" placeholder="全部" allow-clear style="width:160px">
+          <a-select
+            v-model:value="filter.partnerId"
+            placeholder="全部"
+            allow-clear
+            style="width: 160px"
+          >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>
@@ -424,7 +449,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>付款类型：</label>
-          <a-select v-model:value="filter.payType" placeholder="全部" allow-clear style="width:110px">
+          <a-select
+            v-model:value="filter.payType"
+            placeholder="全部"
+            allow-clear
+            style="width: 110px"
+          >
             <a-select-option value="ADVANCE">预付款</a-select-option>
             <a-select-option value="PROGRESS">进度款</a-select-option>
             <a-select-option value="FINAL">结算款</a-select-option>
@@ -433,7 +463,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>支付状态：</label>
-          <a-select v-model:value="filter.payStatus" placeholder="全部" allow-clear style="width:110px">
+          <a-select
+            v-model:value="filter.payStatus"
+            placeholder="全部"
+            allow-clear
+            style="width: 110px"
+          >
             <a-select-option value="UNPAID">未支付</a-select-option>
             <a-select-option value="PARTIAL">部分支付</a-select-option>
             <a-select-option value="PAID">已支付</a-select-option>
@@ -441,7 +476,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>审批状态：</label>
-          <a-select v-model:value="filter.approvalStatus" placeholder="全部" allow-clear style="width:110px">
+          <a-select
+            v-model:value="filter.approvalStatus"
+            placeholder="全部"
+            allow-clear
+            style="width: 110px"
+          >
             <a-select-option value="DRAFT">草稿</a-select-option>
             <a-select-option value="APPROVING">审批中</a-select-option>
             <a-select-option value="APPROVED">已通过</a-select-option>
@@ -479,13 +519,22 @@ onMounted(() => {
             <span>{{ fmtAmount(record.actualPayAmount) }}</span>
           </template>
           <template v-else-if="column.key === 'payType'">
-            <a-tag :color="PAY_TYPE_COLOR[record.payType as keyof typeof PAY_TYPE_COLOR] || 'default'">
+            <a-tag
+              :color="PAY_TYPE_COLOR[record.payType as keyof typeof PAY_TYPE_COLOR] || 'default'"
+            >
               {{ PAY_TYPE_LABEL[record.payType as keyof typeof PAY_TYPE_LABEL] || record.payType }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'payStatus'">
-            <a-tag :color="PAY_STATUS_COLOR[record.payStatus as keyof typeof PAY_STATUS_COLOR] || 'default'">
-              {{ PAY_STATUS_LABEL[record.payStatus as keyof typeof PAY_STATUS_LABEL] || record.payStatus }}
+            <a-tag
+              :color="
+                PAY_STATUS_COLOR[record.payStatus as keyof typeof PAY_STATUS_COLOR] || 'default'
+              "
+            >
+              {{
+                PAY_STATUS_LABEL[record.payStatus as keyof typeof PAY_STATUS_LABEL] ||
+                record.payStatus
+              }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'approvalStatus'">
@@ -499,13 +548,15 @@ onMounted(() => {
               type="link"
               size="small"
               @click="handleSubmitApproval(record)"
-            >提交审批</a-button>
+              >提交审批</a-button
+            >
             <a-button
               v-if="record.approvalStatus === 'APPROVED'"
               type="link"
               size="small"
               @click="handleOpenWriteback(record)"
-            >回写</a-button>
+              >回写</a-button
+            >
           </template>
         </template>
       </a-table>
@@ -534,7 +585,7 @@ onMounted(() => {
       @ok="handleModalOk"
       @cancel="handleModalCancel"
     >
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom:8px">
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
         <a-form-item label="项目" required>
           <a-select v-model:value="formData.projectId" placeholder="请选择项目">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -580,7 +631,14 @@ onMounted(() => {
 
       <!-- Basis Items Section -->
       <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          "
+        >
           <span style="font-weight: 600; font-size: 14px">付款依据</span>
           <a-button size="small" @click="handleAddBasis">添加依据行</a-button>
         </div>
@@ -638,7 +696,9 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="操作" width="60">
             <template #default="{ index }">
-              <a-button type="link" size="small" danger @click="handleRemoveBasis(index)">删除</a-button>
+              <a-button type="link" size="small" danger @click="handleRemoveBasis(index)"
+                >删除</a-button
+              >
             </template>
           </a-table-column>
         </a-table>

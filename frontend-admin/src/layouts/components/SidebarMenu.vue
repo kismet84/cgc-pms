@@ -15,7 +15,14 @@ import {
 const route = useRoute()
 const router = useRouter()
 
-const iconMap: Record<string, any> = {
+interface MenuItem {
+  key: string
+  label: string
+  icon?: () => ReturnType<typeof h>
+  children?: MenuItem[]
+}
+
+const iconMap: Record<string, MenuItem['icon']> = {
   HomeOutlined,
   FileTextOutlined,
   ProjectOutlined,
@@ -31,8 +38,8 @@ const menuItems = computed(() => {
     .map((r) => buildMenuItem(r))
 })
 
-function buildMenuItem(route: RouteRecordRaw): any {
-  const item: any = {
+function buildMenuItem(route: RouteRecordRaw): MenuItem {
+  const item: MenuItem = {
     key: route.path,
     label: route.meta?.title as string,
   }

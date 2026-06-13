@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { ContractVO, ContractItem, ContractPaymentTerm, ContractApprovalRecord } from '@/types/contract'
+import type {
+  ContractVO,
+  ContractItem,
+  ContractPaymentTerm,
+  ContractApprovalRecord,
+} from '@/types/contract'
 import {
   getContractDetail,
   createContract as createContractApi,
@@ -27,6 +32,11 @@ export const useContractStore = defineStore('contract', () => {
     loading.value = true
     try {
       currentContract.value = await getContractDetail(id)
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error('Contract store error:', e)
+      }
+      throw e
     } finally {
       loading.value = false
     }
@@ -36,6 +46,11 @@ export const useContractStore = defineStore('contract', () => {
     saving.value = true
     try {
       await createContractApi(data)
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error('Contract store error:', e)
+      }
+      throw e
     } finally {
       saving.value = false
     }
@@ -45,6 +60,11 @@ export const useContractStore = defineStore('contract', () => {
     saving.value = true
     try {
       await updateContractApi(id, data)
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error('Contract store error:', e)
+      }
+      throw e
     } finally {
       saving.value = false
     }
@@ -54,6 +74,11 @@ export const useContractStore = defineStore('contract', () => {
     itemsLoading.value = true
     try {
       items.value = await getContractItems(contractId)
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error('Contract store error:', e)
+      }
+      throw e
     } finally {
       itemsLoading.value = false
     }
@@ -64,6 +89,11 @@ export const useContractStore = defineStore('contract', () => {
     try {
       await saveContractItems(contractId, itemsList)
       items.value = itemsList
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error('Contract store error:', e)
+      }
+      throw e
     } finally {
       saving.value = false
     }
@@ -73,6 +103,11 @@ export const useContractStore = defineStore('contract', () => {
     termsLoading.value = true
     try {
       paymentTerms.value = await getContractPaymentTerms(contractId)
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error('Contract store error:', e)
+      }
+      throw e
     } finally {
       termsLoading.value = false
     }
@@ -83,6 +118,11 @@ export const useContractStore = defineStore('contract', () => {
     try {
       await saveContractPaymentTerms(contractId, termsList)
       paymentTerms.value = termsList
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error('Contract store error:', e)
+      }
+      throw e
     } finally {
       saving.value = false
     }
@@ -92,6 +132,11 @@ export const useContractStore = defineStore('contract', () => {
     recordsLoading.value = true
     try {
       approvalRecords.value = await getContractApprovalRecords(contractId)
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error('Contract store error:', e)
+      }
+      throw e
     } finally {
       recordsLoading.value = false
     }

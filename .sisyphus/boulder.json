@@ -1,46 +1,78 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\audit-fixes.md",
-  "started_at": "2026-06-13T01:32:00.980Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\pre-release-review.md",
+  "started_at": "2026-06-13T03:24:03.408Z",
   "session_ids": [
-    "ses_1416486e6ffeClYQpAyVEEqjtU",
-    "ses_141278f13ffezOX53PVpxxRX7l",
-    "ses_141278313ffefYO2eMrenguKcD",
-    "ses_1412774e4ffeaxV1t2uLX1XAos"
+    "ses_1410ca0c0ffehXzvbdqzEodKk6",
+    "ses_140f962dbffe6R6Ct2iCTXKw1L",
+    "ses_140f92184ffe7oqMntbpit6aY8",
+    "ses_140f8ea24ffeJgKAKS4yj92SjO",
+    "ses_140f8bc9fffe0xfotAUSH4E3kZ",
+    "ses_140f88757ffeT3nlL56MAUfseE"
   ],
   "session_origins": {
-    "ses_1416486e6ffeClYQpAyVEEqjtU": "direct",
-    "ses_141278f13ffezOX53PVpxxRX7l": "appended",
-    "ses_141278313ffefYO2eMrenguKcD": "appended",
-    "ses_1412774e4ffeaxV1t2uLX1XAos": "appended"
+    "ses_1410ca0c0ffehXzvbdqzEodKk6": "direct",
+    "ses_140f962dbffe6R6Ct2iCTXKw1L": "appended",
+    "ses_140f92184ffe7oqMntbpit6aY8": "appended",
+    "ses_140f8ea24ffeJgKAKS4yj92SjO": "appended",
+    "ses_140f8bc9fffe0xfotAUSH4E3kZ": "appended",
+    "ses_140f88757ffeT3nlL56MAUfseE": "appended"
   },
-  "plan_name": "audit-fixes",
+  "plan_name": "pre-release-review",
   "agent": "atlas",
   "task_sessions": {
-    "todo:14": {
-      "task_key": "todo:14",
-      "task_label": "14",
-      "task_title": "**NotificationBell 空 catch 修复**",
-      "session_id": "ses_1415f4f37ffei9FQ4scKiDtg6W",
+    "todo:0": {
+      "task_key": "todo:0",
+      "task_label": "0",
+      "task_title": "**预检 — 环境健康检查**",
+      "session_id": "ses_140fd48eeffeAn77T6J60l5tMZ",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-06-13T01:41:40.956Z"
+      "updated_at": "2026-06-13T03:27:55.758Z"
     },
-    "todo:21": {
-      "task_key": "todo:21",
-      "task_label": "21",
-      "task_title": "**JWT access token TTL 缩减**",
-      "session_id": "ses_141537994ffeuxYBemYqadflWZ",
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "**审查维度 1 — 安全与配置审查**",
+      "session_id": "ses_140f48714ffejShkXG3Pxv0UHl",
       "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-13T01:53:50.515Z"
+      "category": "deep",
+      "updated_at": "2026-06-13T03:38:48.008Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "**综合分析 — 去重、分级、依赖映射**",
+      "session_id": "ses_140ef5ae3ffed3JeWOt7XYFQuc",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-06-13T03:43:23.326Z"
     },
     "final-wave:f1": {
       "task_key": "final-wave:f1",
       "task_label": "F1",
-      "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "ses_1414c5643ffehoyXiMCSNRlIlV",
-      "agent": "oracle",
-      "updated_at": "2026-06-13T02:01:07.476Z"
+      "task_title": "**后端回归测试** — `oracle`",
+      "session_id": "ses_140ea3c88ffed4HcyBgIKZwcSr",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-13T03:47:11.959Z"
+    },
+    "final-wave:f2": {
+      "task_key": "final-wave:f2",
+      "task_label": "F2",
+      "task_title": "**前端构建与 ESLint** — `unspecified-high`",
+      "session_id": "ses_140e88eadffe7Vfw2O0iDAhhNg",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-13T03:49:00.581Z"
+    },
+    "final-wave:f3": {
+      "task_key": "final-wave:f3",
+      "task_label": "F3",
+      "task_title": "**E2E 冒烟测试** — `unspecified-high`（+ `playwright` skill）",
+      "session_id": "ses_140e61c8affeSSQ80fqrC08Drs",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-13T04:00:14.501Z"
     }
   }
 }

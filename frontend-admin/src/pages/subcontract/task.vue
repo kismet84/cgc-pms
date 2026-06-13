@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { getSubTaskList, createSubTask, updateSubTask, deleteSubTask } from '@/api/modules/subcontract'
+import {
+  getSubTaskList,
+  createSubTask,
+  updateSubTask,
+  deleteSubTask,
+} from '@/api/modules/subcontract'
 import { getProjectList } from '@/api/modules/project'
 import { getContractLedger } from '@/api/modules/contract'
 import { getPartnerList } from '@/api/modules/partner'
@@ -256,7 +261,12 @@ onMounted(() => {
       <div class="pm-filter-row">
         <div class="pm-field">
           <label>项目：</label>
-          <a-select v-model:value="filter.projectId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.projectId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
@@ -264,7 +274,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>合同：</label>
-          <a-select v-model:value="filter.contractId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.contractId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
@@ -272,7 +287,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>分包商：</label>
-          <a-select v-model:value="filter.partnerId" placeholder="全部" allow-clear style="width:160px">
+          <a-select
+            v-model:value="filter.partnerId"
+            placeholder="全部"
+            allow-clear
+            style="width: 160px"
+          >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>
@@ -280,7 +300,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>状态：</label>
-          <a-select v-model:value="filter.status" placeholder="全部" allow-clear style="width:110px">
+          <a-select
+            v-model:value="filter.status"
+            placeholder="全部"
+            allow-clear
+            style="width: 110px"
+          >
             <a-select-option value="NOT_STARTED">未开始</a-select-option>
             <a-select-option value="IN_PROGRESS">进行中</a-select-option>
             <a-select-option value="COMPLETED">已完成</a-select-option>
@@ -289,11 +314,21 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>任务编号：</label>
-          <a-input v-model:value="filter.taskCode" placeholder="请输入编号" style="width:140px" allow-clear />
+          <a-input
+            v-model:value="filter.taskCode"
+            placeholder="请输入编号"
+            style="width: 140px"
+            allow-clear
+          />
         </div>
         <div class="pm-field">
           <label>任务名称：</label>
-          <a-input v-model:value="filter.taskName" placeholder="请输入名称" style="width:140px" allow-clear />
+          <a-input
+            v-model:value="filter.taskName"
+            placeholder="请输入名称"
+            style="width: 140px"
+            allow-clear
+          />
         </div>
         <div class="pm-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>

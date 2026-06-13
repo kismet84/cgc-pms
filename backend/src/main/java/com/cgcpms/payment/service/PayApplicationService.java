@@ -365,10 +365,11 @@ public class PayApplicationService {
         if (contract == null) {
             throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
         }
-        BigDecimal contractAmount = contract.getContractAmount() != null ? contract.getContractAmount() : BigDecimal.ZERO;
+        // M-023: Use currentAmount (post-change-order) instead of contractAmount (original)
+        BigDecimal currentAmount = contract.getCurrentAmount() != null ? contract.getCurrentAmount() : BigDecimal.ZERO;
 
         BigDecimal alreadyApprovedSum = getApprovedSumForContract(contractId, payApp.getId());
-        BigDecimal availableBalance = contractAmount.subtract(alreadyApprovedSum);
+        BigDecimal availableBalance = currentAmount.subtract(alreadyApprovedSum);
         if (applyAmount.compareTo(availableBalance) > 0) {
             throw new BusinessException("EXCEED_CONTRACT_BALANCE",
                     "本次申请金额(" + applyAmount + ")超过合同可用余额(" + availableBalance + ")");
@@ -382,7 +383,7 @@ public class PayApplicationService {
                 .map(t -> t.getPaymentRatio() != null ? t.getPaymentRatio() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (totalRatio.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal maxByRatio = contractAmount
+            BigDecimal maxByRatio = currentAmount
                     .multiply(totalRatio.divide(new BigDecimal("100")))
                     .subtract(alreadyApprovedSum);
             if (applyAmount.compareTo(maxByRatio) > 0) {

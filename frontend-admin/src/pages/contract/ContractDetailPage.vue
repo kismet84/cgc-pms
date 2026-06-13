@@ -43,13 +43,31 @@ const itemColumns = [
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 140, align: 'right' as const },
   { title: '税率(%)', dataIndex: 'taxRate', key: 'taxRate', width: 100, align: 'right' as const },
   { title: '税额', dataIndex: 'taxAmount', key: 'taxAmount', width: 120, align: 'right' as const },
-  { title: '不含税金额', dataIndex: 'amountWithoutTax', key: 'amountWithoutTax', width: 140, align: 'right' as const },
+  {
+    title: '不含税金额',
+    dataIndex: 'amountWithoutTax',
+    key: 'amountWithoutTax',
+    width: 140,
+    align: 'right' as const,
+  },
 ]
 
 const termColumns = [
   { title: '条款名称', dataIndex: 'termName', key: 'termName', width: 180 },
-  { title: '付款比例(%)', dataIndex: 'paymentRatio', key: 'paymentRatio', width: 120, align: 'right' as const },
-  { title: '付款金额', dataIndex: 'paymentAmount', key: 'paymentAmount', width: 140, align: 'right' as const },
+  {
+    title: '付款比例(%)',
+    dataIndex: 'paymentRatio',
+    key: 'paymentRatio',
+    width: 120,
+    align: 'right' as const,
+  },
+  {
+    title: '付款金额',
+    dataIndex: 'paymentAmount',
+    key: 'paymentAmount',
+    width: 140,
+    align: 'right' as const,
+  },
   { title: '付款条件', dataIndex: 'paymentCondition', key: 'paymentCondition', width: 200 },
   { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 120 },
   { title: '实际日期', dataIndex: 'actualDate', key: 'actualDate', width: 120 },
@@ -146,7 +164,9 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
         <!-- Basic Info Card -->
         <a-card title="基本信息" :bordered="false" class="info-card">
           <a-descriptions :column="3" size="small" bordered>
-            <a-descriptions-item label="合同名称" :span="3">{{ contract.contractName }}</a-descriptions-item>
+            <a-descriptions-item label="合同名称" :span="3">{{
+              contract.contractName
+            }}</a-descriptions-item>
             <a-descriptions-item label="合同编号">{{ contract.contractCode }}</a-descriptions-item>
             <a-descriptions-item label="合同类型">
               <a-tag :color="TYPE_COLOR[contract.contractType]">
@@ -158,24 +178,42 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
             <a-descriptions-item label="甲方">{{ contract.partyA }}</a-descriptions-item>
             <a-descriptions-item label="乙方">{{ contract.partyB }}</a-descriptions-item>
             <a-descriptions-item label="合同金额(含税)">
-              <span style="font-weight: 600; color: #1890ff">{{ formatAmount(contract.contractAmount) }} 元</span>
+              <span style="font-weight: 600; color: #1890ff"
+                >{{ formatAmount(contract.contractAmount) }} 元</span
+              >
             </a-descriptions-item>
-            <a-descriptions-item label="当前金额">{{ formatAmount(contract.currentAmount) }} 元</a-descriptions-item>
+            <a-descriptions-item label="当前金额"
+              >{{ formatAmount(contract.currentAmount) }} 元</a-descriptions-item
+            >
             <a-descriptions-item label="税率">{{ contract.taxRate }}%</a-descriptions-item>
-            <a-descriptions-item label="税额">{{ formatAmount(contract.taxAmount) }} 元</a-descriptions-item>
-            <a-descriptions-item label="不含税金额">{{ formatAmount(contract.amountWithoutTax) }} 元</a-descriptions-item>
+            <a-descriptions-item label="税额"
+              >{{ formatAmount(contract.taxAmount) }} 元</a-descriptions-item
+            >
+            <a-descriptions-item label="不含税金额"
+              >{{ formatAmount(contract.amountWithoutTax) }} 元</a-descriptions-item
+            >
             <a-descriptions-item label="质保比例">{{ contract.warrantyRate }}%</a-descriptions-item>
-            <a-descriptions-item label="质保金额">{{ formatAmount(contract.warrantyAmount) }} 元</a-descriptions-item>
+            <a-descriptions-item label="质保金额"
+              >{{ formatAmount(contract.warrantyAmount) }} 元</a-descriptions-item
+            >
             <a-descriptions-item label="签订日期">{{ contract.signedDate }}</a-descriptions-item>
             <a-descriptions-item label="开始日期">{{ contract.startDate }}</a-descriptions-item>
             <a-descriptions-item label="结束日期">{{ contract.endDate }}</a-descriptions-item>
             <a-descriptions-item label="付款方式">{{ contract.paymentMethod }}</a-descriptions-item>
-            <a-descriptions-item label="结算方式">{{ contract.settlementMethod }}</a-descriptions-item>
+            <a-descriptions-item label="结算方式">{{
+              contract.settlementMethod
+            }}</a-descriptions-item>
             <a-descriptions-item label="创建人">{{ contract.createdBy }}</a-descriptions-item>
-            <a-descriptions-item label="创建时间" :span="2">{{ contract.createdAt }}</a-descriptions-item>
+            <a-descriptions-item label="创建时间" :span="2">{{
+              contract.createdAt
+            }}</a-descriptions-item>
             <a-descriptions-item label="更新人">{{ contract.updatedBy }}</a-descriptions-item>
-            <a-descriptions-item label="更新时间" :span="2">{{ contract.updatedAt }}</a-descriptions-item>
-            <a-descriptions-item v-if="contract.remark" label="备注" :span="3">{{ contract.remark }}</a-descriptions-item>
+            <a-descriptions-item label="更新时间" :span="2">{{
+              contract.updatedAt
+            }}</a-descriptions-item>
+            <a-descriptions-item v-if="contract.remark" label="备注" :span="3">{{
+              contract.remark
+            }}</a-descriptions-item>
           </a-descriptions>
         </a-card>
 
@@ -252,11 +290,17 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
                       <a-tag style="margin-left: 8px">
                         {{ actionNameMap[record.actionType] || record.actionName }}
                       </a-tag>
-                      <span v-if="record.nodeName" style="margin-left: 8px; color: #999; font-size: 13px">
+                      <span
+                        v-if="record.nodeName"
+                        style="margin-left: 8px; color: #999; font-size: 13px"
+                      >
                         {{ record.nodeName }}
                       </span>
                     </div>
-                    <div v-if="record.comment" style="color: #666; font-size: 13px; margin-top: 4px">
+                    <div
+                      v-if="record.comment"
+                      style="color: #666; font-size: 13px; margin-top: 4px"
+                    >
                       {{ record.comment }}
                     </div>
                     <div style="color: #999; font-size: 12px; margin-top: 2px">

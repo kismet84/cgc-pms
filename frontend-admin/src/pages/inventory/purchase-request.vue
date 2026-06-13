@@ -304,7 +304,12 @@ onMounted(() => {
       <div class="pm-filter-row">
         <div class="pm-field">
           <label>项目：</label>
-          <a-select v-model:value="filter.projectId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.projectId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
@@ -312,7 +317,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>审批状态：</label>
-          <a-select v-model:value="filter.approvalStatus" placeholder="全部" allow-clear style="width:110px">
+          <a-select
+            v-model:value="filter.approvalStatus"
+            placeholder="全部"
+            allow-clear
+            style="width: 110px"
+          >
             <a-select-option value="DRAFT">草稿</a-select-option>
             <a-select-option value="APPROVING">审批中</a-select-option>
             <a-select-option value="APPROVED">已通过</a-select-option>
@@ -322,14 +332,24 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>业务状态：</label>
-          <a-select v-model:value="filter.status" placeholder="全部" allow-clear style="width:110px">
+          <a-select
+            v-model:value="filter.status"
+            placeholder="全部"
+            allow-clear
+            style="width: 110px"
+          >
             <a-select-option value="DRAFT">草稿</a-select-option>
             <a-select-option value="CONVERTED">已转PO</a-select-option>
           </a-select>
         </div>
         <div class="pm-field">
           <label>申请编号：</label>
-          <a-input v-model:value="filter.requestCode" placeholder="请输入编号" style="width:150px" allow-clear />
+          <a-input
+            v-model:value="filter.requestCode"
+            placeholder="请输入编号"
+            style="width: 150px"
+            allow-clear
+          />
         </div>
         <div class="pm-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -371,7 +391,9 @@ onMounted(() => {
               >
                 提交审批
               </a-button>
-              <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
+              <a-button type="link" size="small" danger @click="handleDelete(record)"
+                >删除</a-button
+              >
             </a-space>
           </template>
         </template>
@@ -402,7 +424,7 @@ onMounted(() => {
       @cancel="handleModalCancel"
     >
       <!-- Header Form -->
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom:8px">
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
         <a-form-item label="项目" required>
           <a-select v-model:value="formData.projectId" placeholder="请选择项目">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -417,7 +439,14 @@ onMounted(() => {
 
       <!-- Line Items Section -->
       <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          "
+        >
           <span style="font-weight: 600; font-size: 14px">
             申请明细
             <span style="color: #9ca3af; font-weight: 400; font-size: 12px; margin-left: 6px">
@@ -476,7 +505,9 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="操作" width="60">
             <template #default="{ record: _item, index }">
-              <a-button type="link" size="small" danger @click="handleRemoveItem(index)">删除</a-button>
+              <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
+                >删除</a-button
+              >
             </template>
           </a-table-column>
         </a-table>

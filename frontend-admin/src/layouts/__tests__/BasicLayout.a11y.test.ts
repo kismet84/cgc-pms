@@ -31,14 +31,23 @@ vi.mock('@/layouts/components/SidebarMenu.vue', () => ({
 
 // ── Mock Ant Design Vue components we don't need to fully render ──
 const antdStubs = [
-  'a-layout', 'a-layout-sider', 'a-layout-header', 'a-layout-content',
-  'a-avatar', 'a-dropdown', 'a-menu', 'a-menu-item', 'a-menu-divider',
+  'a-layout',
+  'a-layout-sider',
+  'a-layout-header',
+  'a-layout-content',
+  'a-avatar',
+  'a-dropdown',
+  'a-menu',
+  'a-menu-item',
+  'a-menu-divider',
   'a-badge',
 ]
 
 // Helper: create a stub object from names
 function makeStubs(names: string[]) {
-  return Object.fromEntries(names.map(n => [n, { template: `<div class="stub-${n}"><slot /></div>` }]))
+  return Object.fromEntries(
+    names.map((n) => [n, { template: `<div class="stub-${n}"><slot /></div>` }]),
+  )
 }
 
 describe('BasicLayout accessibility', () => {

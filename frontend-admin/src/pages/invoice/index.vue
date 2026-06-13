@@ -261,11 +261,7 @@ onMounted(() => {
             allow-clear
             style="width: 200px"
           >
-            <a-select-option
-              v-for="pr in payRecordList"
-              :key="pr.id"
-              :value="pr.id"
-            >
+            <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
               {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
             </a-select-option>
           </a-select>
@@ -313,8 +309,16 @@ onMounted(() => {
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'invoiceType'">
-            <a-tag :color="INVOICE_TYPE_COLOR[record.invoiceType as keyof typeof INVOICE_TYPE_COLOR] || 'default'">
-              {{ INVOICE_TYPE_LABEL[record.invoiceType as keyof typeof INVOICE_TYPE_LABEL] || record.invoiceType }}
+            <a-tag
+              :color="
+                INVOICE_TYPE_COLOR[record.invoiceType as keyof typeof INVOICE_TYPE_COLOR] ||
+                'default'
+              "
+            >
+              {{
+                INVOICE_TYPE_LABEL[record.invoiceType as keyof typeof INVOICE_TYPE_LABEL] ||
+                record.invoiceType
+              }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'invoiceAmount'">
@@ -327,8 +331,16 @@ onMounted(() => {
             <span>{{ fmtAmount(record.taxAmount) }}</span>
           </template>
           <template v-else-if="column.key === 'verifyStatus'">
-            <a-tag :color="VERIFY_STATUS_COLOR[record.verifyStatus as keyof typeof VERIFY_STATUS_COLOR] || 'default'">
-              {{ VERIFY_STATUS_LABEL[record.verifyStatus as keyof typeof VERIFY_STATUS_LABEL] || record.verifyStatus }}
+            <a-tag
+              :color="
+                VERIFY_STATUS_COLOR[record.verifyStatus as keyof typeof VERIFY_STATUS_COLOR] ||
+                'default'
+              "
+            >
+              {{
+                VERIFY_STATUS_LABEL[record.verifyStatus as keyof typeof VERIFY_STATUS_LABEL] ||
+                record.verifyStatus
+              }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
@@ -339,7 +351,8 @@ onMounted(() => {
               type="link"
               size="small"
               @click="handleVerify(record)"
-            >核验</a-button>
+              >核验</a-button
+            >
           </template>
         </template>
       </a-table>
@@ -375,26 +388,16 @@ onMounted(() => {
             placeholder="请选择关联的付款记录（可选）"
             allow-clear
           >
-            <a-select-option
-              v-for="pr in payRecordList"
-              :key="pr.id"
-              :value="pr.id"
-            >
+            <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
               {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="发票号码" required>
-          <a-input
-            v-model:value="formData.invoiceNo"
-            placeholder="请输入发票号码"
-          />
+          <a-input v-model:value="formData.invoiceNo" placeholder="请输入发票号码" />
         </a-form-item>
         <a-form-item label="发票类型" required>
-          <a-select
-            v-model:value="formData.invoiceType"
-            placeholder="请选择发票类型"
-          >
+          <a-select v-model:value="formData.invoiceType" placeholder="请选择发票类型">
             <a-select-option value="VAT_SPECIAL">增值税专票</a-select-option>
             <a-select-option value="VAT_NORMAL">增值税普票</a-select-option>
             <a-select-option value="OTHER">其他</a-select-option>

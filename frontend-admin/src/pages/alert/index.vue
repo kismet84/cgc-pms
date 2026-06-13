@@ -104,11 +104,35 @@ async function handleBatchEvaluate() {
 // ── Columns ──
 const columns = [
   { title: '预警内容', dataIndex: 'message', key: 'message', ellipsis: true, width: 320 },
-  { title: '项目', dataIndex: 'projectId', key: 'projectId', width: 140, slots: { customRender: 'projectId' } },
-  { title: '严重度', dataIndex: 'severity', key: 'severity', width: 90, slots: { customRender: 'severity' } },
-  { title: '规则类型', dataIndex: 'ruleType', key: 'ruleType', width: 130, slots: { customRender: 'ruleType' } },
+  {
+    title: '项目',
+    dataIndex: 'projectId',
+    key: 'projectId',
+    width: 140,
+    slots: { customRender: 'projectId' },
+  },
+  {
+    title: '严重度',
+    dataIndex: 'severity',
+    key: 'severity',
+    width: 90,
+    slots: { customRender: 'severity' },
+  },
+  {
+    title: '规则类型',
+    dataIndex: 'ruleType',
+    key: 'ruleType',
+    width: 130,
+    slots: { customRender: 'ruleType' },
+  },
   { title: '触发时间', dataIndex: 'triggeredAt', key: 'triggeredAt', width: 170 },
-  { title: '状态', dataIndex: 'isRead', key: 'isRead', width: 80, slots: { customRender: 'isRead' } },
+  {
+    title: '状态',
+    dataIndex: 'isRead',
+    key: 'isRead',
+    width: 80,
+    slots: { customRender: 'isRead' },
+  },
   { title: '操作', key: 'action', width: 100, fixed: 'right', slots: { customRender: 'action' } },
 ]
 
@@ -128,12 +152,7 @@ onMounted(async () => {
   <div class="al-page">
     <a-page-header title="预警中心" class="al-header">
       <template #extra>
-        <a-button
-          type="primary"
-          danger
-          :loading="store.evaluating"
-          @click="handleBatchEvaluate"
-        >
+        <a-button type="primary" danger :loading="store.evaluating" @click="handleBatchEvaluate">
           触发评估
         </a-button>
       </template>
@@ -151,8 +170,10 @@ onMounted(async () => {
             style="width: 220px"
             :loading="projectsLoading"
             show-search
-            :filter-option="(input: string, option: any) =>
-              (option.label ?? '').toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                (option.label ?? '').toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option
               v-for="p in projectOptions"
@@ -220,11 +241,7 @@ onMounted(async () => {
             <a-tag>{{ RULE_TYPE_LABELS[record.ruleType] || record.ruleType }}</a-tag>
           </template>
           <template v-else-if="column.key === 'isRead'">
-            <a-badge
-              v-if="record.isRead === 0"
-              status="processing"
-              text="未读"
-            />
+            <a-badge v-if="record.isRead === 0" status="processing" text="未读" />
             <span v-else class="al-muted">已读</span>
           </template>
           <template v-else-if="column.key === 'action'">

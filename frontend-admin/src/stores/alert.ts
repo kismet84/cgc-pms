@@ -19,7 +19,9 @@ export const useAlertStore = defineStore('alert', () => {
     try {
       alerts.value = await getAlertList(params)
     } catch (err) {
-      console.error('AlertStore: 加载预警列表失败', err);
+      if (import.meta.env.DEV) {
+        console.error('AlertStore: 加载预警列表失败', err)
+      }
       alerts.value = []
       throw new Error('加载预警列表失败')
     } finally {

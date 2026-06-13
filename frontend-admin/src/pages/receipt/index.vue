@@ -112,28 +112,36 @@ async function fetchProjects() {
   try {
     const res = await getProjectList({ pageNum: 1, pageSize: 500 })
     projectList.value = res.records
-  } catch { projectList.value = [] }
+  } catch {
+    projectList.value = []
+  }
 }
 
 async function fetchContracts() {
   try {
     const res = await getContractLedger({ pageNo: 1, pageSize: 500, contractType: 'PURCHASE' })
     contractList.value = res.records
-  } catch { contractList.value = [] }
+  } catch {
+    contractList.value = []
+  }
 }
 
 async function fetchPartners() {
   try {
     const res = await getPartnerList({ pageNum: 1, pageSize: 500, partnerType: 'SUPPLIER' })
     partnerList.value = res.records
-  } catch { partnerList.value = [] }
+  } catch {
+    partnerList.value = []
+  }
 }
 
 async function fetchOrders() {
   try {
     const res = await getOrderList({ pageNum: 1, pageSize: 500 })
     orderList.value = res.records
-  } catch { orderList.value = [] }
+  } catch {
+    orderList.value = []
+  }
 }
 
 function handleSearch() {
@@ -366,7 +374,12 @@ onMounted(() => {
       <div class="pm-filter-row">
         <div class="pm-field">
           <label>项目：</label>
-          <a-select v-model:value="filter.projectId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.projectId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
@@ -374,7 +387,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>采购订单：</label>
-          <a-select v-model:value="filter.orderId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.orderId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="o in orderList" :key="o.id" :value="o.id">
               {{ o.orderCode }}
             </a-select-option>
@@ -382,7 +400,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>采购合同：</label>
-          <a-select v-model:value="filter.contractId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.contractId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
@@ -390,7 +413,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>供应商：</label>
-          <a-select v-model:value="filter.partnerId" placeholder="全部" allow-clear style="width:160px">
+          <a-select
+            v-model:value="filter.partnerId"
+            placeholder="全部"
+            allow-clear
+            style="width: 160px"
+          >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>
@@ -398,7 +426,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>质量状态：</label>
-          <a-select v-model:value="filter.qualityStatus" placeholder="全部" allow-clear style="width:130px">
+          <a-select
+            v-model:value="filter.qualityStatus"
+            placeholder="全部"
+            allow-clear
+            style="width: 130px"
+          >
             <a-select-option value="QUALIFIED">合格</a-select-option>
             <a-select-option value="PARTIAL">部分合格</a-select-option>
             <a-select-option value="UNQUALIFIED">不合格</a-select-option>
@@ -407,7 +440,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>验收单号：</label>
-          <a-input v-model:value="filter.receiptCode" placeholder="请输入单号" style="width:150px" allow-clear />
+          <a-input
+            v-model:value="filter.receiptCode"
+            placeholder="请输入单号"
+            style="width: 150px"
+            allow-clear
+          />
         </div>
         <div class="pm-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -430,7 +468,11 @@ onMounted(() => {
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'totalAmount'">
-            <span v-if="record.totalAmount">¥{{ Number(record.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+            <span v-if="record.totalAmount"
+              >¥{{
+                Number(record.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+              }}</span
+            >
             <span v-else class="pm-none">-</span>
           </template>
           <template v-else-if="column.key === 'qualityStatus'">
@@ -473,7 +515,7 @@ onMounted(() => {
       @cancel="handleModalCancel"
     >
       <!-- Header Form -->
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom:8px">
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
         <a-form-item label="项目" required>
           <a-select v-model:value="formData.projectId" placeholder="请选择项目">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -525,7 +567,14 @@ onMounted(() => {
 
       <!-- Line Items Section -->
       <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          "
+        >
           <span style="font-weight: 600; font-size: 14px">验收明细</span>
           <span style="font-size: 12px; color: #9ca3af">（选择采购订单后自动加载订单明细）</span>
         </div>
@@ -574,7 +623,11 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="剩余" width="80">
             <template #default="{ record: item }">
-              <span :style="{ color: parseFloat(item.remainingQuantity || '0') < 0 ? '#ff4d4f' : undefined }">
+              <span
+                :style="{
+                  color: parseFloat(item.remainingQuantity || '0') < 0 ? '#ff4d4f' : undefined,
+                }"
+              >
                 {{ item.remainingQuantity || '0' }}
               </span>
             </template>
@@ -585,7 +638,7 @@ onMounted(() => {
                 v-model:value="item.actualQuantity"
                 :min="0"
                 :precision="2"
-                style="width: 100%;"
+                style="width: 100%"
                 :status="item.warning ? 'warning' : undefined"
                 @change="handleItemQtyChange(index)"
               />
@@ -615,7 +668,9 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="金额(元)" width="120">
             <template #default="{ record: item }">
-              <span>{{ Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+              <span>{{
+                Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+              }}</span>
             </template>
           </a-table-column>
           <a-table-column title="使用部位" width="120">
@@ -631,7 +686,11 @@ onMounted(() => {
         </a-table>
 
         <div style="text-align: right; margin-top: 8px; font-size: 14px">
-          合计：<span style="font-weight: 600; color: #1677ff">¥{{ Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+          合计：<span style="font-weight: 600; color: #1677ff"
+            >¥{{
+              Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+            }}</span
+          >
         </div>
       </div>
     </a-modal>

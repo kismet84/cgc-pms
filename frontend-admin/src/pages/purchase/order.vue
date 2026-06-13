@@ -360,7 +360,12 @@ onMounted(() => {
       <div class="pm-filter-row">
         <div class="pm-field">
           <label>项目：</label>
-          <a-select v-model:value="filter.projectId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.projectId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
@@ -368,7 +373,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>采购合同：</label>
-          <a-select v-model:value="filter.contractId" placeholder="全部" allow-clear style="width:180px">
+          <a-select
+            v-model:value="filter.contractId"
+            placeholder="全部"
+            allow-clear
+            style="width: 180px"
+          >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
@@ -376,7 +386,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>供应商：</label>
-          <a-select v-model:value="filter.partnerId" placeholder="全部" allow-clear style="width:160px">
+          <a-select
+            v-model:value="filter.partnerId"
+            placeholder="全部"
+            allow-clear
+            style="width: 160px"
+          >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>
@@ -384,7 +399,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>订单类型：</label>
-          <a-select v-model:value="filter.orderType" placeholder="全部" allow-clear style="width:130px">
+          <a-select
+            v-model:value="filter.orderType"
+            placeholder="全部"
+            allow-clear
+            style="width: 130px"
+          >
             <a-select-option value="MATERIAL">材料采购</a-select-option>
             <a-select-option value="EQUIPMENT">设备采购</a-select-option>
             <a-select-option value="SERVICE">服务采购</a-select-option>
@@ -393,7 +413,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>订单状态：</label>
-          <a-select v-model:value="filter.orderStatus" placeholder="全部" allow-clear style="width:120px">
+          <a-select
+            v-model:value="filter.orderStatus"
+            placeholder="全部"
+            allow-clear
+            style="width: 120px"
+          >
             <a-select-option value="DRAFT">草稿</a-select-option>
             <a-select-option value="APPROVING">审批中</a-select-option>
             <a-select-option value="PERFORMING">履行中</a-select-option>
@@ -403,7 +428,12 @@ onMounted(() => {
         </div>
         <div class="pm-field">
           <label>订单编号：</label>
-          <a-input v-model:value="filter.orderCode" placeholder="请输入编号" style="width:150px" allow-clear />
+          <a-input
+            v-model:value="filter.orderCode"
+            placeholder="请输入编号"
+            style="width: 150px"
+            allow-clear
+          />
         </div>
         <div class="pm-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -431,7 +461,11 @@ onMounted(() => {
             </a-tag>
           </template>
           <template v-else-if="column.key === 'totalAmount'">
-            <span v-if="record.totalAmount">¥{{ Number(record.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+            <span v-if="record.totalAmount"
+              >¥{{
+                Number(record.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+              }}</span
+            >
             <span v-else class="pm-none">-</span>
           </template>
           <template v-else-if="column.key === 'orderStatus'">
@@ -474,7 +508,7 @@ onMounted(() => {
       @cancel="handleModalCancel"
     >
       <!-- Header Form -->
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom:8px">
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
         <a-form-item label="项目" required>
           <a-select v-model:value="formData.projectId" placeholder="请选择项目">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -517,7 +551,14 @@ onMounted(() => {
 
       <!-- Line Items Section -->
       <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          "
+        >
           <span style="font-weight: 600; font-size: 14px">订单明细</span>
           <a-button type="dashed" size="small" @click="handleAddItem">+ 添加明细</a-button>
         </div>
@@ -578,18 +619,26 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="金额(元)" width="130">
             <template #default="{ record: item }">
-              <span>{{ Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+              <span>{{
+                Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+              }}</span>
             </template>
           </a-table-column>
           <a-table-column title="操作" width="60">
             <template #default="{ record: _item, index }">
-              <a-button type="link" size="small" danger @click="handleRemoveItem(index)">删除</a-button>
+              <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
+                >删除</a-button
+              >
             </template>
           </a-table-column>
         </a-table>
 
         <div style="text-align: right; margin-top: 8px; font-size: 14px">
-          合计：<span style="font-weight: 600; color: #1677ff">¥{{ Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+          合计：<span style="font-weight: 600; color: #1677ff"
+            >¥{{
+              Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+            }}</span
+          >
         </div>
       </div>
     </a-modal>

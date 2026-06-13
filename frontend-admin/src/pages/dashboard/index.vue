@@ -103,8 +103,12 @@ function needsProject(role: DashboardRole) {
 async function fetchViewData() {
   const pid = selectedProjectId.value
   if (needsProject(activeRole.value) && !pid) {
-    pmData.value = null; bmData.value = null; costData.value = null
-    financeData.value = null; mgmtData.value = null; costBreakdown.value = null
+    pmData.value = null
+    bmData.value = null
+    costData.value = null
+    financeData.value = null
+    mgmtData.value = null
+    costBreakdown.value = null
     return
   }
   loading.value = true
@@ -150,7 +154,10 @@ function fmtDeviation(val: string | undefined): string {
   if (!val) return '0.00'
   const n = parseFloat(val)
   if (isNaN(n)) return '0.00'
-  return (Math.abs(n) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return (Math.abs(n) / 10000).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 }
 
 function fmtNum(val: number | undefined): string {
@@ -188,7 +195,7 @@ const costBarOption = computed(() => {
     grid: { left: 12, right: 24, top: 20, bottom: 40 },
     xAxis: {
       type: 'category' as const,
-      data: subs.map(s => s.costSubjectName),
+      data: subs.map((s) => s.costSubjectName),
       axisLabel: { rotate: 20, fontSize: 11 },
     },
     yAxis: {
@@ -198,19 +205,28 @@ const costBarOption = computed(() => {
     },
     series: [
       {
-        name: '目标成本', type: 'bar', stack: 'cost',
-        data: subs.map(s => parseFloat(s.targetCost) || 0),
-        itemStyle: { color: '#3b82f6' }, barMaxWidth: 36,
+        name: '目标成本',
+        type: 'bar',
+        stack: 'cost',
+        data: subs.map((s) => parseFloat(s.targetCost) || 0),
+        itemStyle: { color: '#3b82f6' },
+        barMaxWidth: 36,
       },
       {
-        name: '合同锁定成本', type: 'bar', stack: 'cost',
-        data: subs.map(s => parseFloat(s.contractLockedCost) || 0),
-        itemStyle: { color: '#f59e0b' }, barMaxWidth: 36,
+        name: '合同锁定成本',
+        type: 'bar',
+        stack: 'cost',
+        data: subs.map((s) => parseFloat(s.contractLockedCost) || 0),
+        itemStyle: { color: '#f59e0b' },
+        barMaxWidth: 36,
       },
       {
-        name: '实际成本', type: 'bar', stack: 'cost',
-        data: subs.map(s => parseFloat(s.actualCost) || 0),
-        itemStyle: { color: '#ef4444', borderRadius: [6, 6, 0, 0] }, barMaxWidth: 36,
+        name: '实际成本',
+        type: 'bar',
+        stack: 'cost',
+        data: subs.map((s) => parseFloat(s.actualCost) || 0),
+        itemStyle: { color: '#ef4444', borderRadius: [6, 6, 0, 0] },
+        barMaxWidth: 36,
       },
     ],
   }
@@ -230,7 +246,7 @@ const costLineOption = computed(() => {
     grid: { left: 12, right: 24, top: 20, bottom: 40 },
     xAxis: {
       type: 'category' as const,
-      data: subs.map(s => s.costSubjectName),
+      data: subs.map((s) => s.costSubjectName),
       axisLabel: { rotate: 20, fontSize: 11 },
     },
     yAxis: {
@@ -240,7 +256,8 @@ const costLineOption = computed(() => {
     },
     series: [
       {
-        name: '合同收入(产值)', type: 'line',
+        name: '合同收入(产值)',
+        type: 'line',
         data: subs.map(() => {
           const income = parseFloat(costData.value?.contractIncome ?? '0')
           const totalSubjects = subs.length || 1
@@ -249,23 +266,28 @@ const costLineOption = computed(() => {
         smooth: true,
         lineStyle: { color: '#3b82f6', width: 2 },
         itemStyle: { color: '#3b82f6' },
-        symbol: 'circle', symbolSize: 6,
+        symbol: 'circle',
+        symbolSize: 6,
       },
       {
-        name: '动态成本', type: 'line',
-        data: subs.map(s => parseFloat(s.dynamicCost) || 0),
+        name: '动态成本',
+        type: 'line',
+        data: subs.map((s) => parseFloat(s.dynamicCost) || 0),
         smooth: true,
         lineStyle: { color: '#f59e0b', width: 2 },
         itemStyle: { color: '#f59e0b' },
-        symbol: 'circle', symbolSize: 6,
+        symbol: 'circle',
+        symbolSize: 6,
       },
       {
-        name: '目标成本', type: 'line',
-        data: subs.map(s => parseFloat(s.targetCost) || 0),
+        name: '目标成本',
+        type: 'line',
+        data: subs.map((s) => parseFloat(s.targetCost) || 0),
         smooth: true,
         lineStyle: { color: '#22c55e', width: 2, type: 'dashed' as const },
         itemStyle: { color: '#22c55e' },
-        symbol: 'diamond', symbolSize: 6,
+        symbol: 'diamond',
+        symbolSize: 6,
       },
     ],
   }
@@ -275,11 +297,11 @@ const costLineOption = computed(() => {
 function handleBarClick(params: { name?: string }) {
   if (!params.name || !costBreakdown.value) return
   const subs = costBreakdown.value.subjectBreakdowns
-  const clicked = subs.find(s => s.costSubjectName === params.name)
+  const clicked = subs.find((s) => s.costSubjectName === params.name)
   if (!clicked) return
   drillSubject.value = clicked
   drillChildren.value = subs.filter(
-    s => s.parentSubjectId === clicked.costSubjectId && s.level === 2,
+    (s) => s.parentSubjectId === clicked.costSubjectId && s.level === 2,
   )
   drillVisible.value = true
 }
@@ -367,11 +389,7 @@ onMounted(() => {
     <div v-if="activeRole !== 'mgmt'" class="project-bar">
       <div class="project-field">
         <label>选择项目：</label>
-        <a-select
-          v-model:value="selectedProjectId"
-          placeholder="请选择项目"
-          style="width: 260px"
-        >
+        <a-select v-model:value="selectedProjectId" placeholder="请选择项目" style="width: 260px">
           <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
             {{ p.projectName }}
           </a-select-option>
@@ -388,31 +406,33 @@ onMounted(() => {
     <template v-if="activeRole === 'pm' && pmData">
       <div class="kpi-grid kpi-grid-4">
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#3b82f6"><AuditOutlined /></div>
+          <div class="kpi-icon" style="background: #3b82f6"><AuditOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待办任务</div>
             <div class="kpi-value">{{ fmtNum(pmData.pendingTaskCount) }} <small>项</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#ef4444"><WarningOutlined /></div>
+          <div class="kpi-icon" style="background: #ef4444"><WarningOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">滞后项目</div>
             <div class="kpi-value">{{ fmtNum(pmData.laggingProjectCount) }} <small>个</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#f59e0b"><ClockCircleOutlined /></div>
+          <div class="kpi-icon" style="background: #f59e0b"><ClockCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待审批</div>
             <div class="kpi-value">{{ fmtNum(pmData.pendingApprovalCount) }} <small>项</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#8b5cf6"><FileTextOutlined /></div>
+          <div class="kpi-icon" style="background: #8b5cf6"><FileTextOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">临期合同</div>
-            <div class="kpi-value">{{ fmtNum(pmData.expiringContractCount) }} <small>份</small></div>
+            <div class="kpi-value">
+              {{ fmtNum(pmData.expiringContractCount) }} <small>份</small>
+            </div>
           </div>
         </div>
       </div>
@@ -421,24 +441,52 @@ onMounted(() => {
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">待办任务</div>
-            <a-table :columns="pmTaskCols" :data-source="pmData.pendingTasks" :loading="loading" :pagination="false" size="small" row-key="taskId" />
+            <a-table
+              :columns="pmTaskCols"
+              :data-source="pmData.pendingTasks"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="taskId"
+            />
             <div v-if="!pmData.pendingTasks.length" class="empty-hint">暂无待办任务</div>
           </div>
-          <div class="panel" style="margin-top:14px">
+          <div class="panel" style="margin-top: 14px">
             <div class="panel-header">待审批</div>
-            <a-table :columns="pmTaskCols" :data-source="pmData.pendingApprovals" :loading="loading" :pagination="false" size="small" row-key="taskId" />
+            <a-table
+              :columns="pmTaskCols"
+              :data-source="pmData.pendingApprovals"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="taskId"
+            />
             <div v-if="!pmData.pendingApprovals.length" class="empty-hint">暂无待审批事项</div>
           </div>
         </div>
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">滞后项目</div>
-            <a-table :columns="pmProjectCols" :data-source="pmData.laggingProjects" :loading="loading" :pagination="false" size="small" row-key="projectId" />
+            <a-table
+              :columns="pmProjectCols"
+              :data-source="pmData.laggingProjects"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="projectId"
+            />
             <div v-if="!pmData.laggingProjects.length" class="empty-hint">暂无滞后项目</div>
           </div>
-          <div class="panel" style="margin-top:14px">
+          <div class="panel" style="margin-top: 14px">
             <div class="panel-header">临期合同（30天内到期）</div>
-            <a-table :columns="pmContractCols" :data-source="pmData.expiringContracts" :loading="loading" :pagination="false" size="small" row-key="contractId" />
+            <a-table
+              :columns="pmContractCols"
+              :data-source="pmData.expiringContracts"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="contractId"
+            />
             <div v-if="!pmData.expiringContracts.length" class="empty-hint">暂无临期合同</div>
           </div>
         </div>
@@ -449,42 +497,46 @@ onMounted(() => {
     <template v-if="activeRole === 'bm' && bmData">
       <div class="kpi-grid kpi-grid-6">
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#3b82f6"><DollarOutlined /></div>
+          <div class="kpi-icon" style="background: #3b82f6"><DollarOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">合同总额</div>
-            <div class="kpi-value">{{ fmtWan(bmData.totalContractAmount) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(bmData.totalContractAmount) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#f59e0b"><SwapOutlined /></div>
+          <div class="kpi-icon" style="background: #f59e0b"><SwapOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">合同变更</div>
-            <div class="kpi-value">{{ fmtWan(bmData.contractChangeAmount) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(bmData.contractChangeAmount) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#8b5cf6"><FileTextOutlined /></div>
+          <div class="kpi-icon" style="background: #8b5cf6"><FileTextOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">签证变更</div>
             <div class="kpi-value">{{ fmtWan(bmData.varOrderAmount) }} <small>万元</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#14b8c7"><ProjectOutlined /></div>
+          <div class="kpi-icon" style="background: #14b8c7"><ProjectOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">分包计量</div>
             <div class="kpi-value">{{ fmtWan(bmData.subMeasureAmount) }} <small>万元</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#22c55e"><PayCircleOutlined /></div>
+          <div class="kpi-icon" style="background: #22c55e"><PayCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">付款比例</div>
             <div class="kpi-value">{{ bmData.paidRatio }}</div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#ef4444"><FundOutlined /></div>
+          <div class="kpi-icon" style="background: #ef4444"><FundOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">结算进度</div>
             <div class="kpi-value">{{ bmData.settlementProgress }}</div>
@@ -496,14 +548,28 @@ onMounted(() => {
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">近期合同变更</div>
-            <a-table :columns="bmChangeCols" :data-source="bmData.recentChanges" :loading="loading" :pagination="false" size="small" row-key="contractId" />
+            <a-table
+              :columns="bmChangeCols"
+              :data-source="bmData.recentChanges"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="contractId"
+            />
             <div v-if="!bmData.recentChanges.length" class="empty-hint">暂无变更记录</div>
           </div>
         </div>
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">结算事项</div>
-            <a-table :columns="bmSettleCols" :data-source="bmData.settlementItems" :loading="loading" :pagination="false" size="small" row-key="projectId" />
+            <a-table
+              :columns="bmSettleCols"
+              :data-source="bmData.settlementItems"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="projectId"
+            />
             <div v-if="!bmData.settlementItems.length" class="empty-hint">暂无结算事项</div>
           </div>
         </div>
@@ -514,44 +580,49 @@ onMounted(() => {
     <template v-if="activeRole === 'cost' && costData">
       <div class="kpi-grid kpi-grid-6">
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#3b82f6"><AimOutlined /></div>
+          <div class="kpi-icon" style="background: #3b82f6"><AimOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">目标成本</div>
             <div class="kpi-value">{{ fmtWan(costData.targetCost) }} <small>万元</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#f59e0b"><LineChartOutlined /></div>
+          <div class="kpi-icon" style="background: #f59e0b"><LineChartOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">动态成本</div>
             <div class="kpi-value">{{ fmtWan(costData.dynamicCost) }} <small>万元</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" :style="{ background: devColor(costData.costDeviation) }"><RiseOutlined /></div>
+          <div class="kpi-icon" :style="{ background: devColor(costData.costDeviation) }">
+            <RiseOutlined />
+          </div>
           <div class="kpi-body">
             <div class="kpi-title">成本偏差</div>
             <div class="kpi-value" :style="{ color: devColor(costData.costDeviation) }">
-              {{ devSign(costData.costDeviation) }}{{ fmtDeviation(costData.costDeviation) }} <small>万元</small>
+              {{ devSign(costData.costDeviation) }}{{ fmtDeviation(costData.costDeviation) }}
+              <small>万元</small>
             </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#22c55e"><DollarOutlined /></div>
+          <div class="kpi-icon" style="background: #22c55e"><DollarOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">预计利润</div>
             <div class="kpi-value">{{ fmtWan(costData.expectedProfit) }} <small>万元</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#8b5cf6"><LockOutlined /></div>
+          <div class="kpi-icon" style="background: #8b5cf6"><LockOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">合同锁定成本</div>
-            <div class="kpi-value">{{ fmtWan(costData.contractLockedCost) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(costData.contractLockedCost) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#ef4444"><WalletOutlined /></div>
+          <div class="kpi-icon" style="background: #ef4444"><WalletOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">实际成本</div>
             <div class="kpi-value">{{ fmtWan(costData.actualCost) }} <small>万元</small></div>
@@ -563,21 +634,34 @@ onMounted(() => {
       <div class="chart-row">
         <div class="chart-col">
           <div class="panel">
-            <div class="panel-header">成本构成（按科目） <span class="panel-hint">点击柱体可下钻</span></div>
-            <v-chart :option="costBarOption" autoresize style="height:340px" @click="handleBarClick" />
+            <div class="panel-header">
+              成本构成（按科目） <span class="panel-hint">点击柱体可下钻</span>
+            </div>
+            <v-chart
+              :option="costBarOption"
+              autoresize
+              style="height: 340px"
+              @click="handleBarClick"
+            />
           </div>
         </div>
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">产值趋势</div>
-            <v-chart :option="costLineOption" autoresize style="height:340px" />
+            <v-chart :option="costLineOption" autoresize style="height: 340px" />
           </div>
         </div>
       </div>
 
-      <div v-if="costData.overBudgetAlerts.length" class="panel" style="margin-top:14px">
+      <div v-if="costData.overBudgetAlerts.length" class="panel" style="margin-top: 14px">
         <div class="panel-header">超预算预警</div>
-        <a-table :columns="alertCols" :data-source="costData.overBudgetAlerts" :pagination="false" size="small" row-key="message" />
+        <a-table
+          :columns="alertCols"
+          :data-source="costData.overBudgetAlerts"
+          :pagination="false"
+          size="small"
+          row-key="message"
+        />
       </div>
     </template>
 
@@ -585,38 +669,48 @@ onMounted(() => {
     <template v-if="activeRole === 'finance' && financeData">
       <div class="kpi-grid kpi-grid-5">
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#ef4444"><PayCircleOutlined /></div>
+          <div class="kpi-icon" style="background: #ef4444"><PayCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待付款金额</div>
-            <div class="kpi-value">{{ fmtWan(financeData.pendingPaymentAmount) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(financeData.pendingPaymentAmount) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#f59e0b"><ClockCircleOutlined /></div>
+          <div class="kpi-icon" style="background: #f59e0b"><ClockCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待付款笔数</div>
-            <div class="kpi-value">{{ fmtNum(financeData.pendingPaymentCount) }} <small>笔</small></div>
+            <div class="kpi-value">
+              {{ fmtNum(financeData.pendingPaymentCount) }} <small>笔</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#3b82f6"><AuditOutlined /></div>
+          <div class="kpi-icon" style="background: #3b82f6"><AuditOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">已审批未支付</div>
-            <div class="kpi-value">{{ fmtWan(financeData.approvedUnpaidAmount) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(financeData.approvedUnpaidAmount) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#8b5cf6"><ExclamationCircleOutlined /></div>
+          <div class="kpi-icon" style="background: #8b5cf6"><ExclamationCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">超比例付款</div>
-            <div class="kpi-value">{{ fmtWan(financeData.overRatioAmount) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(financeData.overRatioAmount) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#14b8c7"><WarningOutlined /></div>
+          <div class="kpi-icon" style="background: #14b8c7"><WarningOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">质保金到期</div>
-            <div class="kpi-value">{{ fmtWan(financeData.warrantyExpiringAmount) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(financeData.warrantyExpiringAmount) }} <small>万元</small>
+            </div>
           </div>
         </div>
       </div>
@@ -625,15 +719,31 @@ onMounted(() => {
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">待付款明细</div>
-            <a-table :columns="financePayCols" :data-source="financeData.pendingPayments" :loading="loading" :pagination="false" size="small" row-key="payRecordId" />
+            <a-table
+              :columns="financePayCols"
+              :data-source="financeData.pendingPayments"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="payRecordId"
+            />
             <div v-if="!financeData.pendingPayments.length" class="empty-hint">暂无待付款</div>
           </div>
         </div>
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">超比例付款</div>
-            <a-table :columns="financePayCols" :data-source="financeData.overRatioPayments" :loading="loading" :pagination="false" size="small" row-key="payRecordId" />
-            <div v-if="!financeData.overRatioPayments.length" class="empty-hint">暂无超比例付款</div>
+            <a-table
+              :columns="financePayCols"
+              :data-source="financeData.overRatioPayments"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="payRecordId"
+            />
+            <div v-if="!financeData.overRatioPayments.length" class="empty-hint">
+              暂无超比例付款
+            </div>
           </div>
         </div>
       </div>
@@ -643,49 +753,55 @@ onMounted(() => {
     <template v-if="activeRole === 'mgmt' && mgmtData">
       <div class="kpi-grid kpi-grid-7">
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#3b82f6"><ProjectOutlined /></div>
+          <div class="kpi-icon" style="background: #3b82f6"><ProjectOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">在建项目</div>
             <div class="kpi-value">{{ fmtNum(mgmtData.activeProjectCount) }} <small>个</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#22c55e"><DollarOutlined /></div>
+          <div class="kpi-icon" style="background: #22c55e"><DollarOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">合同总额</div>
-            <div class="kpi-value">{{ fmtWan(mgmtData.totalContractAmount) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(mgmtData.totalContractAmount) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#f59e0b"><LineChartOutlined /></div>
+          <div class="kpi-icon" style="background: #f59e0b"><LineChartOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">动态成本</div>
             <div class="kpi-value">{{ fmtWan(mgmtData.totalDynamicCost) }} <small>万元</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#8b5cf6"><TrophyOutlined /></div>
+          <div class="kpi-icon" style="background: #8b5cf6"><TrophyOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">预计利润</div>
-            <div class="kpi-value">{{ fmtWan(mgmtData.totalExpectedProfit) }} <small>万元</small></div>
+            <div class="kpi-value">
+              {{ fmtWan(mgmtData.totalExpectedProfit) }} <small>万元</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#14b8c7"><PayCircleOutlined /></div>
+          <div class="kpi-icon" style="background: #14b8c7"><PayCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">已付款</div>
             <div class="kpi-value">{{ fmtWan(mgmtData.totalPaidAmount) }} <small>万元</small></div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#ef4444"><ClockCircleOutlined /></div>
+          <div class="kpi-icon" style="background: #ef4444"><ClockCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待办任务</div>
-            <div class="kpi-value">{{ fmtNum(mgmtData.totalPendingTaskCount) }} <small>项</small></div>
+            <div class="kpi-value">
+              {{ fmtNum(mgmtData.totalPendingTaskCount) }} <small>项</small>
+            </div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background:#ef4444"><WarningOutlined /></div>
+          <div class="kpi-icon" style="background: #ef4444"><WarningOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">风险预警</div>
             <div class="kpi-value">{{ fmtNum(mgmtData.totalRiskCount) }} <small>项</small></div>
@@ -695,22 +811,44 @@ onMounted(() => {
 
       <div class="panel">
         <div class="panel-header">项目经营排名</div>
-        <a-table :columns="mgmtRankCols" :data-source="mgmtData.projectRankings" :loading="loading" :pagination="false" size="small" row-key="projectId" :scroll="{ y: 400 }" />
+        <a-table
+          :columns="mgmtRankCols"
+          :data-source="mgmtData.projectRankings"
+          :loading="loading"
+          :pagination="false"
+          size="small"
+          row-key="projectId"
+          :scroll="{ y: 400 }"
+        />
       </div>
 
-      <div class="chart-row" style="margin-top:14px">
+      <div class="chart-row" style="margin-top: 14px">
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">重大风险</div>
             <div v-if="!mgmtData.majorRisks.length" class="empty-hint">暂无风险预警</div>
-            <a-table v-else :columns="alertCols" :data-source="mgmtData.majorRisks" :pagination="false" size="small" row-key="message" />
+            <a-table
+              v-else
+              :columns="alertCols"
+              :data-source="mgmtData.majorRisks"
+              :pagination="false"
+              size="small"
+              row-key="message"
+            />
           </div>
         </div>
         <div class="chart-col">
           <div class="panel">
             <div class="panel-header">逾期事项（>7天）</div>
             <div v-if="!mgmtData.overdueItems.length" class="empty-hint">暂无逾期事项</div>
-            <a-table v-else :columns="pmTaskCols" :data-source="mgmtData.overdueItems" :pagination="false" size="small" row-key="taskId" />
+            <a-table
+              v-else
+              :columns="pmTaskCols"
+              :data-source="mgmtData.overdueItems"
+              :pagination="false"
+              size="small"
+              row-key="taskId"
+            />
           </div>
         </div>
       </div>
@@ -718,7 +856,7 @@ onMounted(() => {
 
     <!-- Empty state -->
     <div v-if="!loading && needsProject(activeRole) && !selectedProjectId" class="empty-page">
-      <ProjectOutlined style="font-size:48px;color:#d1d5db;margin-bottom:16px" />
+      <ProjectOutlined style="font-size: 48px; color: #d1d5db; margin-bottom: 16px" />
       <div>请选择一个项目查看仪表盘数据</div>
     </div>
 
@@ -732,24 +870,49 @@ onMounted(() => {
     >
       <template v-if="drillSubject">
         <div class="drill-summary">
-          <span>目标成本：<b>{{ fmtWan(drillSubject.targetCost) }}</b> 万元</span>
-          <span>合同锁定成本：<b>{{ fmtWan(drillSubject.contractLockedCost) }}</b> 万元</span>
-          <span>实际成本：<b>{{ fmtWan(drillSubject.actualCost) }}</b> 万元</span>
-          <span>动态成本：<b>{{ fmtWan(drillSubject.dynamicCost) }}</b> 万元</span>
+          <span
+            >目标成本：<b>{{ fmtWan(drillSubject.targetCost) }}</b> 万元</span
+          >
+          <span
+            >合同锁定成本：<b>{{ fmtWan(drillSubject.contractLockedCost) }}</b> 万元</span
+          >
+          <span
+            >实际成本：<b>{{ fmtWan(drillSubject.actualCost) }}</b> 万元</span
+          >
+          <span
+            >动态成本：<b>{{ fmtWan(drillSubject.dynamicCost) }}</b> 万元</span
+          >
           <span>
             成本偏差：<b :style="{ color: devColor(drillSubject.costDeviation) }">
-              {{ devSign(drillSubject.costDeviation) }}{{ fmtDeviation(drillSubject.costDeviation) }} 万元
+              {{ devSign(drillSubject.costDeviation)
+              }}{{ fmtDeviation(drillSubject.costDeviation) }} 万元
             </b>
           </span>
         </div>
-        <div v-if="drillChildren.length" style="margin-top:16px">
-          <div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:8px">子科目明细</div>
-          <a-table :columns="drillCols" :data-source="drillChildren" :pagination="false" size="small" row-key="costSubjectId">
+        <div v-if="drillChildren.length" style="margin-top: 16px">
+          <div style="font-size: 14px; font-weight: 600; color: #111827; margin-bottom: 8px">
+            子科目明细
+          </div>
+          <a-table
+            :columns="drillCols"
+            :data-source="drillChildren"
+            :pagination="false"
+            size="small"
+            row-key="costSubjectId"
+          >
             <template #bodyCell="{ column, record }">
-              <template v-if="column.dataIndex === 'targetCost'">{{ fmtWan(record.targetCost) }}</template>
-              <template v-else-if="column.dataIndex === 'contractLockedCost'">{{ fmtWan(record.contractLockedCost) }}</template>
-              <template v-else-if="column.dataIndex === 'actualCost'">{{ fmtWan(record.actualCost) }}</template>
-              <template v-else-if="column.dataIndex === 'dynamicCost'">{{ fmtWan(record.dynamicCost) }}</template>
+              <template v-if="column.dataIndex === 'targetCost'">{{
+                fmtWan(record.targetCost)
+              }}</template>
+              <template v-else-if="column.dataIndex === 'contractLockedCost'">{{
+                fmtWan(record.contractLockedCost)
+              }}</template>
+              <template v-else-if="column.dataIndex === 'actualCost'">{{
+                fmtWan(record.actualCost)
+              }}</template>
+              <template v-else-if="column.dataIndex === 'dynamicCost'">{{
+                fmtWan(record.dynamicCost)
+              }}</template>
               <template v-else-if="column.dataIndex === 'costDeviation'">
                 <span :style="{ color: devColor(record.costDeviation), fontWeight: 600 }">
                   {{ devSign(record.costDeviation) }}{{ fmtDeviation(record.costDeviation) }}
@@ -758,7 +921,7 @@ onMounted(() => {
             </template>
           </a-table>
         </div>
-        <div v-else style="margin-top:16px;color:#9ca3af;text-align:center">
+        <div v-else style="margin-top: 16px; color: #9ca3af; text-align: center">
           该科目下暂无子科目数据（已达第2级）
         </div>
       </template>
@@ -804,10 +967,18 @@ onMounted(() => {
   gap: 10px;
   margin-bottom: 14px;
 }
-.kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
-.kpi-grid-5 { grid-template-columns: repeat(5, 1fr); }
-.kpi-grid-6 { grid-template-columns: repeat(6, 1fr); }
-.kpi-grid-7 { grid-template-columns: repeat(7, 1fr); }
+.kpi-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+.kpi-grid-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+.kpi-grid-6 {
+  grid-template-columns: repeat(6, 1fr);
+}
+.kpi-grid-7 {
+  grid-template-columns: repeat(7, 1fr);
+}
 
 .kpi-card {
   height: 96px;

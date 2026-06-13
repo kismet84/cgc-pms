@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 @TableName("var_order")
 public class VarOrder extends BaseEntity {
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 

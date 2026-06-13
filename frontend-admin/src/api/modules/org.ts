@@ -10,11 +10,13 @@ import type {
 
 // ─── Companies ───────────────────────────────────────────
 
-export function getCompanyList(params: PageParams & {
-  companyCode?: string
-  companyName?: string
-  status?: string
-}) {
+export function getCompanyList(
+  params: PageParams & {
+    companyCode?: string
+    companyName?: string
+    status?: string
+  },
+) {
   return request<PageResult<OrgCompanyVO>>({
     url: '/org/companies',
     method: 'get',
@@ -42,12 +44,15 @@ export function createCompany(data: {
   })
 }
 
-export function updateCompany(id: string, data: {
-  companyCode: string
-  companyName: string
-  status: string
-  remark?: string
-}) {
+export function updateCompany(
+  id: string,
+  data: {
+    companyCode: string
+    companyName: string
+    status: string
+    remark?: string
+  },
+) {
   return request<void>({
     url: `/org/companies/${id}`,
     method: 'put',
@@ -73,12 +78,14 @@ export function getDepartmentTree() {
 }
 
 /** 部门分页列表 */
-export function getDepartmentList(params: PageParams & {
-  companyId?: string
-  deptCode?: string
-  deptName?: string
-  status?: string
-}) {
+export function getDepartmentList(
+  params: PageParams & {
+    companyId?: string
+    deptCode?: string
+    deptName?: string
+    status?: string
+  },
+) {
   return request<PageResult<OrgDepartmentVO>>({
     url: '/org/departments',
     method: 'get',
@@ -118,11 +125,13 @@ export function deleteDepartment(id: string) {
 
 // ─── Positions ───────────────────────────────────────────
 
-export function getPositionList(params: PageParams & {
-  positionCode?: string
-  positionName?: string
-  status?: string
-}) {
+export function getPositionList(
+  params: PageParams & {
+    positionCode?: string
+    positionName?: string
+    status?: string
+  },
+) {
   return request<PageResult<OrgPositionVO>>({
     url: '/org/positions',
     method: 'get',
@@ -150,12 +159,15 @@ export function createPosition(data: {
   })
 }
 
-export function updatePosition(id: string, data: {
-  positionCode: string
-  positionName: string
-  status: string
-  remark?: string
-}) {
+export function updatePosition(
+  id: string,
+  data: {
+    positionCode: string
+    positionName: string
+    status: string
+    remark?: string
+  },
+) {
   return request<void>({
     url: `/org/positions/${id}`,
     method: 'put',

@@ -477,6 +477,7 @@ class Phase2FullChainIntegrationTest {
         // Set contract amount to 100000
         CtContract contract = contractMapper.selectById(CONTRACT_ID);
         contract.setContractAmount(new BigDecimal("100000"));
+        contract.setCurrentAmount(new BigDecimal("100000"));
         contractMapper.updateById(contract);
 
         // Create and approve first payment of 50000
@@ -520,6 +521,7 @@ class Phase2FullChainIntegrationTest {
         // Second payment = 50000.01 → should be REJECTED (exceeds by 1 cent)
         CtContract contract = contractMapper.selectById(CONTRACT_ID);
         contract.setContractAmount(new BigDecimal("100000"));
+        contract.setCurrentAmount(new BigDecimal("100000"));
         contractMapper.updateById(contract);
 
         PayApplication app1 = new PayApplication();

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -13,9 +14,11 @@ import lombok.EqualsAndHashCode;
 @TableName("md_partner")
 public class MdPartner extends BaseEntity {
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
     private String partnerCode;

@@ -188,7 +188,10 @@ async function fetchDeptTree() {
   }
 }
 
-function handleDeptSelect(_selectedKeys: string[], info: { node: { dataRef: OrgDepartmentTreeNodeVO } }) {
+function handleDeptSelect(
+  _selectedKeys: string[],
+  info: { node: { dataRef: OrgDepartmentTreeNodeVO } },
+) {
   // Selection handled by v-model:selectedKeys
 }
 
@@ -297,7 +300,10 @@ function openDeptEdit() {
   deptModalVisible.value = true
 }
 
-function findDeptNode(nodes: OrgDepartmentTreeNodeVO[], id: string): OrgDepartmentTreeNodeVO | null {
+function findDeptNode(
+  nodes: OrgDepartmentTreeNodeVO[],
+  id: string,
+): OrgDepartmentTreeNodeVO | null {
   for (const node of nodes) {
     if (node.id === id) return node
     if (node.children && node.children.length > 0) {
@@ -529,10 +535,12 @@ onMounted(() => {
           :pagination="false"
           row-key="id"
           size="small"
-          :custom-row="(record: OrgCompanyVO) => ({
-            onClick: () => handleCompanyRowClick(record),
-            class: getCompanyRowClass(record),
-          })"
+          :custom-row="
+            (record: OrgCompanyVO) => ({
+              onClick: () => handleCompanyRowClick(record),
+              class: getCompanyRowClass(record),
+            })
+          "
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.dataIndex === 'status'">
@@ -541,8 +549,21 @@ onMounted(() => {
               </a-tag>
             </template>
             <template v-else-if="column.dataIndex === 'ops'">
-              <a-button v-if="canEdit" size="small" type="link" @click.stop="openCompanyEdit(record)">编辑</a-button>
-              <a-button v-if="canDelete" size="small" type="link" danger @click.stop="handleCompanyDelete(record)">删除</a-button>
+              <a-button
+                v-if="canEdit"
+                size="small"
+                type="link"
+                @click.stop="openCompanyEdit(record)"
+                >编辑</a-button
+              >
+              <a-button
+                v-if="canDelete"
+                size="small"
+                type="link"
+                danger
+                @click.stop="handleCompanyDelete(record)"
+                >删除</a-button
+              >
             </template>
           </template>
         </a-table>
@@ -568,8 +589,21 @@ onMounted(() => {
           <span class="org-panel-title">部门架构</span>
           <div class="org-panel-actions">
             <a-button v-if="canAdd" size="small" @click="openDeptAdd">新增</a-button>
-            <a-button v-if="canEdit" size="small" :disabled="!selectedDeptKeys.length" @click="openDeptEdit">编辑</a-button>
-            <a-button v-if="canDelete" size="small" danger :disabled="!selectedDeptKeys.length" @click="handleDeptDelete">删除</a-button>
+            <a-button
+              v-if="canEdit"
+              size="small"
+              :disabled="!selectedDeptKeys.length"
+              @click="openDeptEdit"
+              >编辑</a-button
+            >
+            <a-button
+              v-if="canDelete"
+              size="small"
+              danger
+              :disabled="!selectedDeptKeys.length"
+              @click="handleDeptDelete"
+              >删除</a-button
+            >
           </div>
         </div>
 
@@ -593,7 +627,9 @@ onMounted(() => {
       <div class="org-panel-header">
         <span class="org-panel-title">岗位管理</span>
         <div class="org-panel-actions">
-          <a-button v-if="canAdd" type="primary" size="small" @click="openPositionAdd">新增</a-button>
+          <a-button v-if="canAdd" type="primary" size="small" @click="openPositionAdd"
+            >新增</a-button
+          >
         </div>
       </div>
 
@@ -635,8 +671,17 @@ onMounted(() => {
             </a-tag>
           </template>
           <template v-else-if="column.dataIndex === 'ops'">
-            <a-button v-if="canEdit" size="small" type="link" @click="openPositionEdit(record)">编辑</a-button>
-            <a-button v-if="canDelete" size="small" type="link" danger @click="handlePositionDelete(record)">删除</a-button>
+            <a-button v-if="canEdit" size="small" type="link" @click="openPositionEdit(record)"
+              >编辑</a-button
+            >
+            <a-button
+              v-if="canDelete"
+              size="small"
+              type="link"
+              danger
+              @click="handlePositionDelete(record)"
+              >删除</a-button
+            >
           </template>
         </template>
       </a-table>
@@ -692,11 +737,7 @@ onMounted(() => {
       <a-form layout="vertical">
         <a-form-item label="所属公司" required>
           <a-select v-model:value="deptForm.companyId" placeholder="选择公司" style="width: 100%">
-            <a-select-option
-              v-for="c in companyData"
-              :key="c.id"
-              :value="c.id"
-            >
+            <a-select-option v-for="c in companyData" :key="c.id" :value="c.id">
               {{ c.companyName }}
             </a-select-option>
           </a-select>

@@ -146,9 +146,14 @@ async function fetchKpi() {
     kpi.value = await getSettlementKpi()
   } catch {
     kpi.value = {
-      totalCount: 0, totalContractAmount: '0', totalFinalAmount: '0',
-      totalChangeAmount: '0', totalPaidAmount: '0', totalUnpaidAmount: '0',
-      draftCount: 0, finalizedCount: 0,
+      totalCount: 0,
+      totalContractAmount: '0',
+      totalFinalAmount: '0',
+      totalChangeAmount: '0',
+      totalPaidAmount: '0',
+      totalUnpaidAmount: '0',
+      draftCount: 0,
+      finalizedCount: 0,
     }
   }
 }
@@ -262,22 +267,65 @@ const columns = [
   { field: 'contractName', title: '关联合同', minWidth: 160 },
   { field: 'projectName', title: '所属项目', width: 150 },
   { field: 'partnerName', title: '合作方', width: 150 },
-  { field: 'contractAmount', title: '合同金额(含税)', width: 140, align: 'right' as const, slots: { default: 'contractAmount' } },
-  { field: 'changeAmount', title: '变更金额', width: 120, align: 'right' as const, slots: { default: 'changeAmount' } },
-  { field: 'finalAmount', title: '结算金额', width: 140, align: 'right' as const, slots: { default: 'finalAmount' } },
-  { field: 'paidAmount', title: '已付款', width: 120, align: 'right' as const, slots: { default: 'paidAmount' } },
-  { field: 'unpaidAmount', title: '未付款', width: 120, align: 'right' as const, slots: { default: 'unpaidAmount' } },
-  { field: 'settlementStatus', title: '结算状态', width: 100, slots: { default: 'settlementStatus' } },
+  {
+    field: 'contractAmount',
+    title: '合同金额(含税)',
+    width: 140,
+    align: 'right' as const,
+    slots: { default: 'contractAmount' },
+  },
+  {
+    field: 'changeAmount',
+    title: '变更金额',
+    width: 120,
+    align: 'right' as const,
+    slots: { default: 'changeAmount' },
+  },
+  {
+    field: 'finalAmount',
+    title: '结算金额',
+    width: 140,
+    align: 'right' as const,
+    slots: { default: 'finalAmount' },
+  },
+  {
+    field: 'paidAmount',
+    title: '已付款',
+    width: 120,
+    align: 'right' as const,
+    slots: { default: 'paidAmount' },
+  },
+  {
+    field: 'unpaidAmount',
+    title: '未付款',
+    width: 120,
+    align: 'right' as const,
+    slots: { default: 'unpaidAmount' },
+  },
+  {
+    field: 'settlementStatus',
+    title: '结算状态',
+    width: 100,
+    slots: { default: 'settlementStatus' },
+  },
   { field: 'approvalStatus', title: '审批状态', width: 100, slots: { default: 'approvalStatus' } },
   { field: 'createdAt', title: '创建时间', width: 160 },
   { title: '操作', width: 140, fixed: 'right' as const, slots: { default: 'ops' } },
 ]
 
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
-  DRAFT: '草稿', APPROVING: '审批中', APPROVED: '已通过', REJECTED: '已驳回', WITHDRAWN: '已撤回',
+  DRAFT: '草稿',
+  APPROVING: '审批中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+  WITHDRAWN: '已撤回',
 }
 const APPROVAL_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'default', APPROVING: 'processing', APPROVED: 'success', REJECTED: 'error', WITHDRAWN: 'warning',
+  DRAFT: 'default',
+  APPROVING: 'processing',
+  APPROVED: 'success',
+  REJECTED: 'error',
+  WITHDRAWN: 'warning',
 }
 
 onMounted(() => {
@@ -299,35 +347,37 @@ onMounted(() => {
     <!-- KPI cards -->
     <div class="stl-kpis">
       <div class="stl-kpi">
-        <div class="stl-kpi-icon" style="background:#3b82f6"><FileTextOutlined /></div>
+        <div class="stl-kpi-icon" style="background: #3b82f6"><FileTextOutlined /></div>
         <div>
           <div class="stl-kpi-title">结算单总数</div>
           <div class="stl-kpi-value">{{ kpi.totalCount }} <small>份</small></div>
         </div>
       </div>
       <div class="stl-kpi">
-        <div class="stl-kpi-icon" style="background:#22c55e"><DollarOutlined /></div>
+        <div class="stl-kpi-icon" style="background: #22c55e"><DollarOutlined /></div>
         <div>
           <div class="stl-kpi-title">合同金额合计</div>
-          <div class="stl-kpi-value">{{ fmtAmount(kpi.totalContractAmount) }} <small>万元</small></div>
+          <div class="stl-kpi-value">
+            {{ fmtAmount(kpi.totalContractAmount) }} <small>万元</small>
+          </div>
         </div>
       </div>
       <div class="stl-kpi">
-        <div class="stl-kpi-icon" style="background:#f59e0b"><PayCircleOutlined /></div>
+        <div class="stl-kpi-icon" style="background: #f59e0b"><PayCircleOutlined /></div>
         <div>
           <div class="stl-kpi-title">结算金额合计</div>
           <div class="stl-kpi-value">{{ fmtAmount(kpi.totalFinalAmount) }} <small>万元</small></div>
         </div>
       </div>
       <div class="stl-kpi">
-        <div class="stl-kpi-icon" style="background:#8b5cf6"><WalletOutlined /></div>
+        <div class="stl-kpi-icon" style="background: #8b5cf6"><WalletOutlined /></div>
         <div>
           <div class="stl-kpi-title">已付款合计</div>
           <div class="stl-kpi-value">{{ fmtAmount(kpi.totalPaidAmount) }} <small>万元</small></div>
         </div>
       </div>
       <div class="stl-kpi">
-        <div class="stl-kpi-icon" style="background:#ef4444"><CheckCircleOutlined /></div>
+        <div class="stl-kpi-icon" style="background: #ef4444"><CheckCircleOutlined /></div>
         <div>
           <div class="stl-kpi-title">已定案</div>
           <div class="stl-kpi-value">{{ kpi.finalizedCount }} <small>份</small></div>
@@ -344,27 +394,48 @@ onMounted(() => {
             v-model:value="filter.projectId"
             placeholder="请选择项目"
             allow-clear
-            style="width:160px"
+            style="width: 160px"
             @change="onProjectChange"
           >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{ p.projectName }}</a-select-option>
+            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
+              p.projectName
+            }}</a-select-option>
           </a-select>
         </div>
         <div class="stl-field">
           <label>关联合同：</label>
-          <a-select v-model:value="filter.contractId" placeholder="请选择合同" allow-clear style="width:180px">
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">{{ c.contractName }}</a-select-option>
+          <a-select
+            v-model:value="filter.contractId"
+            placeholder="请选择合同"
+            allow-clear
+            style="width: 180px"
+          >
+            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">{{
+              c.contractName
+            }}</a-select-option>
           </a-select>
         </div>
         <div class="stl-field">
           <label>合作方：</label>
-          <a-select v-model:value="filter.partnerId" placeholder="请选择合作方" allow-clear style="width:160px">
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">{{ p.partnerName }}</a-select-option>
+          <a-select
+            v-model:value="filter.partnerId"
+            placeholder="请选择合作方"
+            allow-clear
+            style="width: 160px"
+          >
+            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">{{
+              p.partnerName
+            }}</a-select-option>
           </a-select>
         </div>
         <div class="stl-field">
           <label>结算状态：</label>
-          <a-select v-model:value="filter.settlementStatus" placeholder="全部" allow-clear style="width:130px">
+          <a-select
+            v-model:value="filter.settlementStatus"
+            placeholder="全部"
+            allow-clear
+            style="width: 130px"
+          >
             <a-select-option value="DRAFT">草稿</a-select-option>
             <a-select-option value="FINALIZED">已定案</a-select-option>
             <a-select-option value="CANCELLED">已作废</a-select-option>
@@ -374,10 +445,16 @@ onMounted(() => {
       <div class="stl-filter-row stl-filter-row--last">
         <div class="stl-field">
           <label>结算编号：</label>
-          <a-input v-model:value="filter.settlementCode" placeholder="请输入结算编号" style="width:170px" />
+          <a-input
+            v-model:value="filter.settlementCode"
+            placeholder="请输入结算编号"
+            style="width: 170px"
+          />
         </div>
         <div class="stl-filter-actions">
-          <a-button type="primary" @click="handleSearch"><template #icon><SearchOutlined /></template>查询</a-button>
+          <a-button type="primary" @click="handleSearch"
+            ><template #icon><SearchOutlined /></template>查询</a-button
+          >
           <a-button @click="handleReset">重置</a-button>
         </div>
       </div>
@@ -385,8 +462,12 @@ onMounted(() => {
 
     <!-- Toolbar -->
     <div class="stl-toolbar">
-      <a-button type="primary" @click="openCreateModal"><template #icon><PlusOutlined /></template>新建结算</a-button>
-      <a-button @click="fetchData"><template #icon><ReloadOutlined /></template></a-button>
+      <a-button type="primary" @click="openCreateModal"
+        ><template #icon><PlusOutlined /></template>新建结算</a-button
+      >
+      <a-button @click="fetchData"
+        ><template #icon><ReloadOutlined /></template
+      ></a-button>
     </div>
 
     <!-- Table -->
@@ -412,7 +493,9 @@ onMounted(() => {
           <span class="stl-money">{{ fmtAmountYuan(row.changeAmount) }}</span>
         </template>
         <template #finalAmount="{ row }">
-          <span class="stl-money" style="font-weight:600;color:#3b82f6">{{ fmtAmountYuan(row.finalAmount) }}</span>
+          <span class="stl-money" style="font-weight: 600; color: #3b82f6">{{
+            fmtAmountYuan(row.finalAmount)
+          }}</span>
         </template>
         <template #paidAmount="{ row }">
           <span class="stl-money">{{ fmtAmountYuan(row.paidAmount) }}</span>
@@ -421,8 +504,13 @@ onMounted(() => {
           <span class="stl-money">{{ fmtAmountYuan(row.unpaidAmount) }}</span>
         </template>
         <template #settlementStatus="{ row }">
-          <a-tag :color="SETTLEMENT_STATUS_COLOR[row.settlementStatus as SettlementStatus] || 'default'">
-            {{ SETTLEMENT_STATUS_LABEL[row.settlementStatus as SettlementStatus] || row.settlementStatus }}
+          <a-tag
+            :color="SETTLEMENT_STATUS_COLOR[row.settlementStatus as SettlementStatus] || 'default'"
+          >
+            {{
+              SETTLEMENT_STATUS_LABEL[row.settlementStatus as SettlementStatus] ||
+              row.settlementStatus
+            }}
           </a-tag>
         </template>
         <template #approvalStatus="{ row }">
@@ -437,7 +525,8 @@ onMounted(() => {
               v-if="row.settlementStatus !== 'FINALIZED'"
               class="stl-link stl-del"
               @click="handleDelete(row)"
-            >删除</a>
+              >删除</a
+            >
           </div>
         </template>
       </vxe-grid>
@@ -470,7 +559,7 @@ onMounted(() => {
           <a-select
             v-model:value="createForm.contractId"
             placeholder="请选择合同"
-            style="width:100%"
+            style="width: 100%"
             show-search
             option-filter-prop="label"
           >
@@ -479,11 +568,17 @@ onMounted(() => {
               :key="c.id"
               :value="c.id"
               :label="c.contractName"
-            >{{ c.contractName }}</a-select-option>
+              >{{ c.contractName }}</a-select-option
+            >
           </a-select>
         </a-form-item>
         <a-form-item label="结算类型">
-          <a-select v-model:value="createForm.settlementType" placeholder="请选择结算类型" allow-clear style="width:100%">
+          <a-select
+            v-model:value="createForm.settlementType"
+            placeholder="请选择结算类型"
+            allow-clear
+            style="width: 100%"
+          >
             <a-select-option value="PROGRESS">进度结算</a-select-option>
             <a-select-option value="FINAL">竣工结算</a-select-option>
             <a-select-option value="INTERIM">期中结算</a-select-option>

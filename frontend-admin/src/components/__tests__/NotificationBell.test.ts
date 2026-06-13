@@ -55,11 +55,7 @@ const APopoverStub = defineComponent({
   },
   emits: ['open-change'],
   setup(_, { slots }) {
-    return () =>
-      h('div', { class: 'mock-popover' }, [
-        slots.default?.(),
-        slots.content?.(),
-      ])
+    return () => h('div', { class: 'mock-popover' }, [slots.default?.(), slots.content?.()])
   },
 })
 
@@ -126,9 +122,7 @@ describe('NotificationBell', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Default mocks: SSE returns fake EventSource
-    vi.mocked(createNotificationStream).mockReturnValue(
-      mockEventSource as unknown as EventSource,
-    )
+    vi.mocked(createNotificationStream).mockReturnValue(mockEventSource as unknown as EventSource)
   })
 
   it('fetches unread count on mount', async () => {
@@ -151,10 +145,7 @@ describe('NotificationBell', () => {
 
     expect(createNotificationStream).toHaveBeenCalledTimes(1)
     // Should register both event listeners
-    expect(mockEventSource.addEventListener).toHaveBeenCalledWith(
-      'connected',
-      expect.any(Function),
-    )
+    expect(mockEventSource.addEventListener).toHaveBeenCalledWith('connected', expect.any(Function))
     expect(mockEventSource.addEventListener).toHaveBeenCalledWith(
       'notification',
       expect.any(Function),
@@ -353,10 +344,7 @@ describe('NotificationBell', () => {
     await flushPromises()
 
     // Verify error was logged with NotificationBell prefix
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'NotificationBell: 标记已读失败',
-      expect.any(Error),
-    )
+    expect(consoleSpy).toHaveBeenCalledWith('NotificationBell: 标记已读失败', expect.any(Error))
     // Verify user-facing feedback
     expect(vi.mocked(message.error)).toHaveBeenCalledWith('标记已读失败')
 
@@ -404,10 +392,7 @@ describe('NotificationBell', () => {
     await flushPromises()
 
     // Verify error was logged with NotificationBell prefix
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'NotificationBell: 操作失败',
-      expect.any(Error),
-    )
+    expect(consoleSpy).toHaveBeenCalledWith('NotificationBell: 操作失败', expect.any(Error))
     // Verify user-facing feedback
     expect(vi.mocked(message.error)).toHaveBeenCalledWith('操作失败')
 

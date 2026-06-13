@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotNull;
@@ -19,9 +20,11 @@ import java.time.LocalDate;
 @TableName("sub_measure")
 public class SubMeasure extends BaseEntity {
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
     @NotNull

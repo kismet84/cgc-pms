@@ -4,12 +4,8 @@ import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import StepWizard, { type StepConfig } from '@/components/StepWizard.vue'
-import ContractItemEditor, {
-  type EditableContractItem,
-} from '@/components/ContractItemEditor.vue'
-import PaymentTermEditor, {
-  type EditablePaymentTerm,
-} from '@/components/PaymentTermEditor.vue'
+import ContractItemEditor, { type EditableContractItem } from '@/components/ContractItemEditor.vue'
+import PaymentTermEditor, { type EditablePaymentTerm } from '@/components/PaymentTermEditor.vue'
 import {
   createContract,
   saveContractItems,
@@ -302,16 +298,15 @@ onMounted(loadReferenceData)
       >
         <!-- Step 1: Basic Info -->
         <div v-show="current === 0">
-          <a-form
-            ref="basicFormRef"
-            :model="formData"
-            :rules="basicRules"
-            layout="vertical"
-          >
+          <a-form ref="basicFormRef" :model="formData" :rules="basicRules" layout="vertical">
             <a-row :gutter="24">
               <a-col :span="12">
                 <a-form-item label="合同名称" name="contractName">
-                  <a-input v-model:value="formData.contractName" placeholder="请输入合同名称" allow-clear />
+                  <a-input
+                    v-model:value="formData.contractName"
+                    placeholder="请输入合同名称"
+                    allow-clear
+                  />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
@@ -366,12 +361,20 @@ onMounted(loadReferenceData)
               </a-col>
               <a-col :span="12">
                 <a-form-item label="甲方" name="partyA">
-                  <a-input v-model:value="formData.partyA" placeholder="请输入甲方名称" allow-clear />
+                  <a-input
+                    v-model:value="formData.partyA"
+                    placeholder="请输入甲方名称"
+                    allow-clear
+                  />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
                 <a-form-item label="乙方" name="partyB">
-                  <a-input v-model:value="formData.partyB" placeholder="请输入乙方名称" allow-clear />
+                  <a-input
+                    v-model:value="formData.partyB"
+                    placeholder="请输入乙方名称"
+                    allow-clear
+                  />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
@@ -480,7 +483,9 @@ onMounted(loadReferenceData)
         <!-- Step 4: Review & Submit -->
         <div v-show="current === 3" class="cf-review">
           <a-descriptions title="基本信息" bordered :column="2" size="small">
-            <a-descriptions-item label="合同名称">{{ formData.contractName || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="合同名称">{{
+              formData.contractName || '-'
+            }}</a-descriptions-item>
             <a-descriptions-item label="合同类型">
               {{ formData.contractType ? TYPE_LABEL[formData.contractType] : '-' }}
             </a-descriptions-item>
@@ -491,22 +496,38 @@ onMounted(loadReferenceData)
             <a-descriptions-item label="合同金额">
               {{ fmtMoney(formData.contractAmount) }} 元
             </a-descriptions-item>
-            <a-descriptions-item label="签订日期">{{ formData.signedDate || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="开始日期">{{ formData.startDate || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="结束日期">{{ formData.endDate || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="付款方式">{{ formData.paymentMethod || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="结算方式">{{ formData.settlementMethod || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="质保金比例">{{ formData.warrantyRate }}%</a-descriptions-item>
+            <a-descriptions-item label="签订日期">{{
+              formData.signedDate || '-'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="开始日期">{{
+              formData.startDate || '-'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="结束日期">{{
+              formData.endDate || '-'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="付款方式">{{
+              formData.paymentMethod || '-'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="结算方式">{{
+              formData.settlementMethod || '-'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="质保金比例"
+              >{{ formData.warrantyRate }}%</a-descriptions-item
+            >
             <a-descriptions-item label="质保金金额">
               {{ fmtMoney(formData.warrantyAmount) }} 元
             </a-descriptions-item>
-            <a-descriptions-item label="备注" :span="2">{{ formData.remark || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="备注" :span="2">{{
+              formData.remark || '-'
+            }}</a-descriptions-item>
           </a-descriptions>
 
           <div class="cf-review-section">
             <div class="cf-review-title">
               合同明细
-              <span class="cf-review-sub">共 {{ items.length }} 项，合计 {{ fmtMoney(itemsTotal) }} 元</span>
+              <span class="cf-review-sub"
+                >共 {{ items.length }} 项，合计 {{ fmtMoney(itemsTotal) }} 元</span
+              >
             </div>
             <a-table
               :data-source="items"
@@ -528,7 +549,9 @@ onMounted(loadReferenceData)
           <div class="cf-review-section">
             <div class="cf-review-title">
               付款条款
-              <span class="cf-review-sub">共 {{ terms.length }} 项，合计 {{ fmtMoney(termsTotal) }} 元</span>
+              <span class="cf-review-sub"
+                >共 {{ terms.length }} 项，合计 {{ fmtMoney(termsTotal) }} 元</span
+              >
             </div>
             <a-table
               :data-source="terms"

@@ -255,6 +255,14 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            # Pre-deploy DB backup (uncomment when backup script exists)
+            # docker exec cgc-pms-mysql mysqldump --single-transaction cgc_pms > /tmp/pre-deploy-backup.sql
             docker pull ${{ secrets.REGISTRY_URL }}/cgc-pms-backend:latest
             docker pull ${{ secrets.REGISTRY_URL }}/cgc-pms-frontend:latest
             cd /opt/cgc-pms && docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # M-022: Post-deploy health check
+            echo "Waiting for services to stabilize..."
+            sleep 60
+            curl -f http://localhost/api/actuator/health || { echo "Health check failed"; exit 1; }
+            echo "Health check passed"
+            # Rollback hint: docker compose down && git checkout <previous-tag> && docker compose up -d

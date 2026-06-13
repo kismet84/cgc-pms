@@ -18,7 +18,6 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-
 async function fetchData() {
   loading.value = true
   try {
@@ -68,38 +67,67 @@ onMounted(fetchData)
 function fmtAmount(val: string): string {
   const n = parseFloat(val)
   if (isNaN(n)) return '-'
-  return (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' 万元'
+  return (
+    (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
+    ' 万元'
+  )
 }
 
 const TYPE_COLOR: Record<string, string> = {
-  '施工总承包': 'blue',
-  '专业分包': 'green',
-  '劳务分包': 'cyan',
-  '材料采购': 'orange',
+  施工总承包: 'blue',
+  专业分包: 'green',
+  劳务分包: 'cyan',
+  材料采购: 'orange',
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  '进行中': 'success',
-  '已完工': 'default',
-  '暂停': 'warning',
-  '前期': 'processing',
+  进行中: 'success',
+  已完工: 'default',
+  暂停: 'warning',
+  前期: 'processing',
 }
 
 const APPROVAL_COLOR: Record<string, string> = {
-  '已批准': 'success',
-  '审批中': 'processing',
-  '待审批': 'default',
-  '已拒绝': 'error',
+  已批准: 'success',
+  审批中: 'processing',
+  待审批: 'default',
+  已拒绝: 'error',
 }
 
 const columns = [
   { title: '项目编号', dataIndex: 'projectCode', width: 150 },
-  { title: '项目名称', dataIndex: 'projectName', minWidth: 180, slots: { customRender: 'projectName' } },
-  { title: '项目类型', dataIndex: 'projectType', width: 120, slots: { customRender: 'projectType' } },
-  { title: '合同金额', dataIndex: 'contractAmount', width: 140, align: 'right', slots: { customRender: 'contractAmount' } },
-  { title: '计划工期', dataIndex: 'plannedStartDate', width: 200, slots: { customRender: 'duration' } },
+  {
+    title: '项目名称',
+    dataIndex: 'projectName',
+    minWidth: 180,
+    slots: { customRender: 'projectName' },
+  },
+  {
+    title: '项目类型',
+    dataIndex: 'projectType',
+    width: 120,
+    slots: { customRender: 'projectType' },
+  },
+  {
+    title: '合同金额',
+    dataIndex: 'contractAmount',
+    width: 140,
+    align: 'right',
+    slots: { customRender: 'contractAmount' },
+  },
+  {
+    title: '计划工期',
+    dataIndex: 'plannedStartDate',
+    width: 200,
+    slots: { customRender: 'duration' },
+  },
   { title: '状态', dataIndex: 'status', width: 90, slots: { customRender: 'status' } },
-  { title: '审批状态', dataIndex: 'approvalStatus', width: 100, slots: { customRender: 'approvalStatus' } },
+  {
+    title: '审批状态',
+    dataIndex: 'approvalStatus',
+    width: 100,
+    slots: { customRender: 'approvalStatus' },
+  },
   { title: '操作', dataIndex: 'ops', width: 120, fixed: 'right', slots: { customRender: 'ops' } },
 ]
 </script>
@@ -113,15 +141,30 @@ const columns = [
       <div class="pj-filter-row">
         <div class="pj-field">
           <label>项目编号：</label>
-          <a-input v-model:value="filter.projectCode" placeholder="请输入项目编号" style="width:160px" allow-clear />
+          <a-input
+            v-model:value="filter.projectCode"
+            placeholder="请输入项目编号"
+            style="width: 160px"
+            allow-clear
+          />
         </div>
         <div class="pj-field">
           <label>项目名称：</label>
-          <a-input v-model:value="filter.projectName" placeholder="请输入项目名称" style="width:180px" allow-clear />
+          <a-input
+            v-model:value="filter.projectName"
+            placeholder="请输入项目名称"
+            style="width: 180px"
+            allow-clear
+          />
         </div>
         <div class="pj-field">
           <label>项目类型：</label>
-          <a-select v-model:value="filter.projectType" placeholder="全部" allow-clear style="width:140px">
+          <a-select
+            v-model:value="filter.projectType"
+            placeholder="全部"
+            allow-clear
+            style="width: 140px"
+          >
             <a-select-option value="施工总承包">施工总承包</a-select-option>
             <a-select-option value="专业分包">专业分包</a-select-option>
             <a-select-option value="劳务分包">劳务分包</a-select-option>
@@ -130,7 +173,12 @@ const columns = [
         </div>
         <div class="pj-field">
           <label>状态：</label>
-          <a-select v-model:value="filter.status" placeholder="全部" allow-clear style="width:120px">
+          <a-select
+            v-model:value="filter.status"
+            placeholder="全部"
+            allow-clear
+            style="width: 120px"
+          >
             <a-select-option value="进行中">进行中</a-select-option>
             <a-select-option value="已完工">已完工</a-select-option>
             <a-select-option value="暂停">暂停</a-select-option>
@@ -160,7 +208,9 @@ const columns = [
             <a class="pj-link" @click="() => record">{{ record.projectName }}</a>
           </template>
           <template v-else-if="column.dataIndex === 'projectType'">
-            <a-tag :color="TYPE_COLOR[record.projectType] ?? 'default'">{{ record.projectType }}</a-tag>
+            <a-tag :color="TYPE_COLOR[record.projectType] ?? 'default'">{{
+              record.projectType
+            }}</a-tag>
           </template>
           <template v-else-if="column.dataIndex === 'contractAmount'">
             <span class="pj-money">{{ fmtAmount(record.contractAmount) }}</span>
@@ -172,7 +222,9 @@ const columns = [
             <a-tag :color="STATUS_COLOR[record.status] ?? 'default'">{{ record.status }}</a-tag>
           </template>
           <template v-else-if="column.dataIndex === 'approvalStatus'">
-            <a-tag :color="APPROVAL_COLOR[record.approvalStatus] ?? 'default'">{{ record.approvalStatus }}</a-tag>
+            <a-tag :color="APPROVAL_COLOR[record.approvalStatus] ?? 'default'">{{
+              record.approvalStatus
+            }}</a-tag>
           </template>
           <template v-else-if="column.dataIndex === 'ops'">
             <div class="pj-ops">

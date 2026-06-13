@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { getMaterialList, createMaterial, updateMaterial, updateMaterialStatus } from '@/api/modules/material'
+import {
+  getMaterialList,
+  createMaterial,
+  updateMaterial,
+  updateMaterialStatus,
+} from '@/api/modules/material'
 import type { MaterialVO } from '@/types/material'
 
 const filter = reactive({
@@ -49,7 +54,13 @@ const columns = [
   { title: '规格型号', dataIndex: 'specification', width: 150 },
   { title: '单位', dataIndex: 'unit', width: 80 },
   { title: '品牌', dataIndex: 'brand', width: 120 },
-  { title: '默认税率(%)', dataIndex: 'defaultTaxRate', width: 120, align: 'right', key: 'defaultTaxRate' },
+  {
+    title: '默认税率(%)',
+    dataIndex: 'defaultTaxRate',
+    width: 120,
+    align: 'right',
+    key: 'defaultTaxRate',
+  },
   { title: '状态', dataIndex: 'status', width: 90, key: 'status' },
   { title: '创建时间', dataIndex: 'createdAt', width: 170 },
   { title: '操作', dataIndex: 'ops', width: 160, fixed: 'right', key: 'ops' },
@@ -140,7 +151,7 @@ function handleEdit(record: MaterialVO) {
 function handleToggleStatus(record: MaterialVO) {
   const newStatus = record.status === 'ENABLE' ? 'DISABLE' : 'ENABLE'
   const actionText = newStatus === 'ENABLE' ? '启用' : '禁用'
-  
+
   Modal.confirm({
     title: `确认${actionText}`,
     content: `确定要${actionText}材料"${record.materialName}"吗？`,
@@ -202,15 +213,30 @@ onMounted(fetchData)
       <div class="mat-filter-row">
         <div class="mat-field">
           <label>材料编码：</label>
-          <a-input v-model:value="filter.materialCode" placeholder="请输入材料编码" style="width:160px" allow-clear />
+          <a-input
+            v-model:value="filter.materialCode"
+            placeholder="请输入材料编码"
+            style="width: 160px"
+            allow-clear
+          />
         </div>
         <div class="mat-field">
           <label>材料名称：</label>
-          <a-input v-model:value="filter.materialName" placeholder="请输入材料名称" style="width:160px" allow-clear />
+          <a-input
+            v-model:value="filter.materialName"
+            placeholder="请输入材料名称"
+            style="width: 160px"
+            allow-clear
+          />
         </div>
         <div class="mat-field">
           <label>状态：</label>
-          <a-select v-model:value="filter.status" placeholder="全部" allow-clear style="width:110px">
+          <a-select
+            v-model:value="filter.status"
+            placeholder="全部"
+            allow-clear
+            style="width: 110px"
+          >
             <a-select-option value="ENABLE">启用</a-select-option>
             <a-select-option value="DISABLE">禁用</a-select-option>
           </a-select>
@@ -280,7 +306,11 @@ onMounted(fetchData)
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
         <a-form-item label="材料编码" required>
-          <a-input v-model:value="formData.materialCode" placeholder="请输入材料编码" :disabled="isEdit" />
+          <a-input
+            v-model:value="formData.materialCode"
+            placeholder="请输入材料编码"
+            :disabled="isEdit"
+          />
         </a-form-item>
         <a-form-item label="材料名称" required>
           <a-input v-model:value="formData.materialName" placeholder="请输入材料名称" />
@@ -298,7 +328,7 @@ onMounted(fetchData)
           <a-input v-model:value="formData.defaultTaxRate" placeholder="如：13.00" />
         </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="formData.status" style="width:120px">
+          <a-select v-model:value="formData.status" style="width: 120px">
             <a-select-option value="ENABLE">启用</a-select-option>
             <a-select-option value="DISABLE">禁用</a-select-option>
           </a-select>

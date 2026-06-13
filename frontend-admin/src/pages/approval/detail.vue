@@ -72,8 +72,9 @@ async function fetchDetail() {
   loading.value = true
   try {
     detail.value = await getInstanceDetail(instanceId)
-  } catch (e: any) {
-    message.error(e?.message || '加载审批详情失败')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '加载审批详情失败'
+    message.error(msg)
   } finally {
     loading.value = false
   }
@@ -106,8 +107,8 @@ function handleAction(action: string) {
 async function handleApprove() {
   actionLoading.value = true
   try {
-    const activeNode = detail.value?.nodes.find(n => n.nodeStatus === 'ACTIVE')
-    const myTask = activeNode?.tasks.find(t => t.taskStatus === 'PENDING')
+    const activeNode = detail.value?.nodes.find((n) => n.nodeStatus === 'ACTIVE')
+    const myTask = activeNode?.tasks.find((t) => t.taskStatus === 'PENDING')
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -120,8 +121,9 @@ async function handleApprove() {
     message.success('审批通过')
     showApproveModal.value = false
     fetchDetail()
-  } catch (e: any) {
-    message.error(e?.message || '操作失败')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '审批操作失败'
+    message.error(msg)
   } finally {
     actionLoading.value = false
   }
@@ -134,8 +136,8 @@ async function handleReject() {
   }
   actionLoading.value = true
   try {
-    const activeNode = detail.value?.nodes.find(n => n.nodeStatus === 'ACTIVE')
-    const myTask = activeNode?.tasks.find(t => t.taskStatus === 'PENDING')
+    const activeNode = detail.value?.nodes.find((n) => n.nodeStatus === 'ACTIVE')
+    const myTask = activeNode?.tasks.find((t) => t.taskStatus === 'PENDING')
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -148,8 +150,9 @@ async function handleReject() {
     message.success('已驳回')
     showRejectModal.value = false
     fetchDetail()
-  } catch (e: any) {
-    message.error(e?.message || '操作失败')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '审批操作失败'
+    message.error(msg)
   } finally {
     actionLoading.value = false
   }
@@ -162,18 +165,23 @@ async function handleTransfer() {
   }
   actionLoading.value = true
   try {
-    const activeNode = detail.value?.nodes.find(n => n.nodeStatus === 'ACTIVE')
-    const myTask = activeNode?.tasks.find(t => t.taskStatus === 'PENDING')
+    const activeNode = detail.value?.nodes.find((n) => n.nodeStatus === 'ACTIVE')
+    const myTask = activeNode?.tasks.find((t) => t.taskStatus === 'PENDING')
     if (!myTask) {
       message.error('未找到待处理任务')
       return
     }
-    await transferTask(myTask.id, transferTargetUserId.value.trim(), transferComment.value || undefined)
+    await transferTask(
+      myTask.id,
+      transferTargetUserId.value.trim(),
+      transferComment.value || undefined,
+    )
     message.success('已转办')
     showTransferModal.value = false
     fetchDetail()
-  } catch (e: any) {
-    message.error(e?.message || '操作失败')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '审批操作失败'
+    message.error(msg)
   } finally {
     actionLoading.value = false
   }
@@ -186,8 +194,8 @@ async function handleAddSign() {
   }
   actionLoading.value = true
   try {
-    const activeNode = detail.value?.nodes.find(n => n.nodeStatus === 'ACTIVE')
-    const myTask = activeNode?.tasks.find(t => t.taskStatus === 'PENDING')
+    const activeNode = detail.value?.nodes.find((n) => n.nodeStatus === 'ACTIVE')
+    const myTask = activeNode?.tasks.find((t) => t.taskStatus === 'PENDING')
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -196,8 +204,9 @@ async function handleAddSign() {
     message.success('已加签')
     showAddSignModal.value = false
     fetchDetail()
-  } catch (e: any) {
-    message.error(e?.message || '操作失败')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '审批操作失败'
+    message.error(msg)
   } finally {
     actionLoading.value = false
   }
@@ -209,8 +218,9 @@ async function handleWithdraw() {
     await withdrawInstance(instanceId)
     message.success('已撤回')
     fetchDetail()
-  } catch (e: any) {
-    message.error(e?.message || '撤回失败')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '撤回失败'
+    message.error(msg)
   } finally {
     actionLoading.value = false
   }
@@ -222,8 +232,9 @@ async function handleResubmit() {
     await resubmitInstance(instanceId)
     message.success('已重新提交')
     fetchDetail()
-  } catch (e: any) {
-    message.error(e?.message || '重新提交失败')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '重新提交失败'
+    message.error(msg)
   } finally {
     actionLoading.value = false
   }
@@ -260,8 +271,12 @@ onMounted(() => {
             <a-descriptions-item v-if="detail.amount" label="金额">
               {{ Number(detail.amount).toLocaleString() }} 元
             </a-descriptions-item>
-            <a-descriptions-item label="当前轮次">第 {{ detail.currentRound }} 轮</a-descriptions-item>
-            <a-descriptions-item v-if="detail.endedAt" label="结束时间">{{ detail.endedAt }}</a-descriptions-item>
+            <a-descriptions-item label="当前轮次"
+              >第 {{ detail.currentRound }} 轮</a-descriptions-item
+            >
+            <a-descriptions-item v-if="detail.endedAt" label="结束时间">{{
+              detail.endedAt
+            }}</a-descriptions-item>
           </a-descriptions>
         </div>
 
@@ -308,12 +323,16 @@ onMounted(() => {
 
         <!-- Node Flow -->
         <div class="wf-card">
-          <h4 style="margin-top:0">审批流程</h4>
-          <a-steps :current="detail.nodes.filter(n => n.nodeStatus === 'COMPLETED').length" size="small" direction="vertical">
+          <h4 style="margin-top: 0">审批流程</h4>
+          <a-steps
+            :current="detail.nodes.filter((n) => n.nodeStatus === 'COMPLETED').length"
+            size="small"
+            direction="vertical"
+          >
             <a-step v-for="node in detail.nodes" :key="node.id">
               <template #title>
                 {{ node.nodeName }}
-                <a-tag :color="nodeStatusMap[node.nodeStatus]?.color" style="margin-left:8px">
+                <a-tag :color="nodeStatusMap[node.nodeStatus]?.color" style="margin-left: 8px">
                   {{ nodeStatusMap[node.nodeStatus]?.text || node.nodeStatus }}
                 </a-tag>
               </template>
@@ -324,7 +343,9 @@ onMounted(() => {
                     <a-tag :color="taskStatusMap[task.taskStatus]?.color" size="small">
                       {{ taskStatusMap[task.taskStatus]?.text || task.taskStatus }}
                     </a-tag>
-                    <span v-if="task.comment" style="color:#999;font-size:12px">{{ task.comment }}</span>
+                    <span v-if="task.comment" style="color: #999; font-size: 12px">{{
+                      task.comment
+                    }}</span>
                   </div>
                 </div>
               </template>
@@ -334,17 +355,19 @@ onMounted(() => {
 
         <!-- Approval Records Timeline -->
         <div class="wf-card">
-          <h4 style="margin-top:0">审批记录</h4>
+          <h4 style="margin-top: 0">审批记录</h4>
           <a-timeline>
             <a-timeline-item v-for="record in detail.records" :key="record.id">
               <div>
                 <strong>{{ record.operatorName }}</strong>
-                <a-tag style="margin-left:8px">{{ actionNameMap[record.actionType] || record.actionName }}</a-tag>
+                <a-tag style="margin-left: 8px">{{
+                  actionNameMap[record.actionType] || record.actionName
+                }}</a-tag>
               </div>
-              <div v-if="record.comment" style="color:#666;font-size:13px;margin-top:4px">
+              <div v-if="record.comment" style="color: #666; font-size: 13px; margin-top: 4px">
                 {{ record.comment }}
               </div>
-              <div style="color:#999;font-size:12px;margin-top:2px">
+              <div style="color: #999; font-size: 12px; margin-top: 2px">
                 {{ record.createdAt }}
               </div>
             </a-timeline-item>
@@ -360,11 +383,7 @@ onMounted(() => {
       :confirm-loading="actionLoading"
       @ok="handleApprove"
     >
-      <a-textarea
-        v-model:value="approvalComment"
-        placeholder="审批意见（选填）"
-        :rows="3"
-      />
+      <a-textarea v-model:value="approvalComment" placeholder="审批意见（选填）" :rows="3" />
     </a-modal>
 
     <!-- Reject Modal -->
@@ -374,11 +393,7 @@ onMounted(() => {
       :confirm-loading="actionLoading"
       @ok="handleReject"
     >
-      <a-textarea
-        v-model:value="approvalComment"
-        placeholder="请输入驳回原因（必填）"
-        :rows="3"
-      />
+      <a-textarea v-model:value="approvalComment" placeholder="请输入驳回原因（必填）" :rows="3" />
     </a-modal>
 
     <!-- Transfer Modal -->
@@ -390,17 +405,10 @@ onMounted(() => {
     >
       <a-form layout="vertical">
         <a-form-item label="目标用户ID" required>
-          <a-input
-            v-model:value="transferTargetUserId"
-            placeholder="请输入目标用户的ID"
-          />
+          <a-input v-model:value="transferTargetUserId" placeholder="请输入目标用户的ID" />
         </a-form-item>
         <a-form-item label="转办说明">
-          <a-textarea
-            v-model:value="transferComment"
-            placeholder="转办说明（选填）"
-            :rows="3"
-          />
+          <a-textarea v-model:value="transferComment" placeholder="转办说明（选填）" :rows="3" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -422,11 +430,7 @@ onMounted(() => {
           />
         </a-form-item>
         <a-form-item label="加签说明">
-          <a-textarea
-            v-model:value="addSignComment"
-            placeholder="加签说明（选填）"
-            :rows="3"
-          />
+          <a-textarea v-model:value="addSignComment" placeholder="加签说明（选填）" :rows="3" />
         </a-form-item>
       </a-form>
     </a-modal>

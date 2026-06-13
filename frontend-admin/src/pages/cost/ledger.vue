@@ -15,7 +15,12 @@ import { getProjectList } from '@/api/modules/project'
 import { getContractLedger } from '@/api/modules/contract'
 import { getPartnerList } from '@/api/modules/partner'
 import { getCostSubjectTree, type CostSubjectTreeNode } from '@/api/modules/costSubject'
-import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO, SourceType } from '@/types/cost'
+import type {
+  CostLedgerVO,
+  CostLedgerQueryParams,
+  CostLedgerSummaryVO,
+  SourceType,
+} from '@/types/cost'
 import { SOURCE_TYPE_LABEL, SOURCE_TYPE_COLOR } from '@/types/cost'
 import type { PageResult } from '@/types/api'
 import type { ProjectVO } from '@/types/project'
@@ -169,7 +174,13 @@ async function fetchSummary() {
       keyword: filter.keyword || undefined,
     })
   } catch {
-    summary.value = { totalAmount: '0', totalTaxAmount: '0', bySourceType: {}, byProject: {}, byCostType: {} }
+    summary.value = {
+      totalAmount: '0',
+      totalTaxAmount: '0',
+      bySourceType: {},
+      byProject: {},
+      byCostType: {},
+    }
     message.error('加载成本汇总失败')
   }
 }
@@ -258,8 +269,20 @@ const columns = [
   { field: 'costSubjectName', title: '成本科目', width: 140 },
   { field: 'sourceType', title: '来源类型', width: 120, slots: { default: 'sourceType' } },
   { field: 'costType', title: '费用类型', width: 100, slots: { default: 'costType' } },
-  { field: 'amount', title: '金额(含税)', width: 130, align: 'right' as const, slots: { default: 'amount' } },
-  { field: 'taxAmount', title: '税额', width: 110, align: 'right' as const, slots: { default: 'taxAmount' } },
+  {
+    field: 'amount',
+    title: '金额(含税)',
+    width: 130,
+    align: 'right' as const,
+    slots: { default: 'amount' },
+  },
+  {
+    field: 'taxAmount',
+    title: '税额',
+    width: 110,
+    align: 'right' as const,
+    slots: { default: 'taxAmount' },
+  },
   { field: 'costStatus', title: '状态', width: 80, slots: { default: 'costStatus' } },
   { title: '操作', width: 80, fixed: 'right' as const, slots: { default: 'ops' } },
 ]
@@ -300,31 +323,37 @@ onMounted(() => {
     <!-- KPI cards -->
     <div class="cl-kpis">
       <div class="cl-kpi">
-        <div class="cl-kpi-icon" style="background:#3b82f6"><DollarOutlined /></div>
+        <div class="cl-kpi-icon" style="background: #3b82f6"><DollarOutlined /></div>
         <div>
           <div class="cl-kpi-title">成本总额(含税)</div>
           <div class="cl-kpi-value">{{ fmtAmount(summary.totalAmount) }} <small>万元</small></div>
         </div>
       </div>
       <div class="cl-kpi">
-        <div class="cl-kpi-icon" style="background:#f59e0b"><LockOutlined /></div>
+        <div class="cl-kpi-icon" style="background: #f59e0b"><LockOutlined /></div>
         <div>
           <div class="cl-kpi-title">合同锁定成本</div>
-          <div class="cl-kpi-value">{{ fmtAmount(summary.bySourceType?.CT_CONTRACT || '0') }} <small>万元</small></div>
+          <div class="cl-kpi-value">
+            {{ fmtAmount(summary.bySourceType?.CT_CONTRACT || '0') }} <small>万元</small>
+          </div>
         </div>
       </div>
       <div class="cl-kpi">
-        <div class="cl-kpi-icon" style="background:#22c55e"><ToolOutlined /></div>
+        <div class="cl-kpi-icon" style="background: #22c55e"><ToolOutlined /></div>
         <div>
           <div class="cl-kpi-title">材料验收成本</div>
-          <div class="cl-kpi-value">{{ fmtAmount(summary.bySourceType?.MAT_RECEIPT || '0') }} <small>万元</small></div>
+          <div class="cl-kpi-value">
+            {{ fmtAmount(summary.bySourceType?.MAT_RECEIPT || '0') }} <small>万元</small>
+          </div>
         </div>
       </div>
       <div class="cl-kpi">
-        <div class="cl-kpi-icon" style="background:#8b5cf6"><CarOutlined /></div>
+        <div class="cl-kpi-icon" style="background: #8b5cf6"><CarOutlined /></div>
         <div>
           <div class="cl-kpi-title">分包计量成本</div>
-          <div class="cl-kpi-value">{{ fmtAmount(summary.bySourceType?.SUB_MEASURE || '0') }} <small>万元</small></div>
+          <div class="cl-kpi-value">
+            {{ fmtAmount(summary.bySourceType?.SUB_MEASURE || '0') }} <small>万元</small>
+          </div>
         </div>
       </div>
     </div>
@@ -338,34 +367,38 @@ onMounted(() => {
             v-model:value="filter.projectId"
             placeholder="请选择项目"
             allow-clear
-            style="width:160px"
+            style="width: 160px"
             @change="onProjectChange"
           >
-            <a-select-option
-              v-for="p in projectList"
-              :key="p.id"
-              :value="p.id"
-            >{{ p.projectName }}</a-select-option>
+            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
+              p.projectName
+            }}</a-select-option>
           </a-select>
         </div>
         <div class="cl-field">
           <label>关联合同：</label>
-          <a-select v-model:value="filter.contractId" placeholder="请选择合同" allow-clear style="width:180px">
-            <a-select-option
-              v-for="c in contractList"
-              :key="c.id"
-              :value="c.id"
-            >{{ c.contractName }}</a-select-option>
+          <a-select
+            v-model:value="filter.contractId"
+            placeholder="请选择合同"
+            allow-clear
+            style="width: 180px"
+          >
+            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">{{
+              c.contractName
+            }}</a-select-option>
           </a-select>
         </div>
         <div class="cl-field">
           <label>合作方：</label>
-          <a-select v-model:value="filter.partnerId" placeholder="请选择合作方" allow-clear style="width:160px">
-            <a-select-option
-              v-for="p in partnerList"
-              :key="p.id"
-              :value="p.id"
-            >{{ p.partnerName }}</a-select-option>
+          <a-select
+            v-model:value="filter.partnerId"
+            placeholder="请选择合作方"
+            allow-clear
+            style="width: 160px"
+          >
+            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">{{
+              p.partnerName
+            }}</a-select-option>
           </a-select>
         </div>
         <div class="cl-field">
@@ -375,14 +408,19 @@ onMounted(() => {
             :tree-data="subjectTree"
             placeholder="请选择科目"
             allow-clear
-            style="width:180px"
+            style="width: 180px"
           />
         </div>
       </div>
       <div class="cl-filter-row cl-filter-row--last">
         <div class="cl-field">
           <label>费用类型：</label>
-          <a-select v-model:value="filter.costType" placeholder="全部" allow-clear style="width:130px">
+          <a-select
+            v-model:value="filter.costType"
+            placeholder="全部"
+            allow-clear
+            style="width: 130px"
+          >
             <a-select-option value="MATERIAL">材料费</a-select-option>
             <a-select-option value="LABOR">人工费</a-select-option>
             <a-select-option value="MACHINERY">机械费</a-select-option>
@@ -392,7 +430,12 @@ onMounted(() => {
         </div>
         <div class="cl-field">
           <label>来源类型：</label>
-          <a-select v-model:value="filter.sourceType" placeholder="全部" allow-clear style="width:150px">
+          <a-select
+            v-model:value="filter.sourceType"
+            placeholder="全部"
+            allow-clear
+            style="width: 150px"
+          >
             <a-select-option value="CT_CONTRACT">合同锁定</a-select-option>
             <a-select-option value="MAT_RECEIPT">材料验收</a-select-option>
             <a-select-option value="SUB_MEASURE">分包计量</a-select-option>
@@ -401,7 +444,12 @@ onMounted(() => {
         </div>
         <div class="cl-field">
           <label>成本状态：</label>
-          <a-select v-model:value="filter.costStatus" placeholder="全部" allow-clear style="width:130px">
+          <a-select
+            v-model:value="filter.costStatus"
+            placeholder="全部"
+            allow-clear
+            style="width: 130px"
+          >
             <a-select-option value="LOCKED">已锁定</a-select-option>
             <a-select-option value="CONFIRMED">已确认</a-select-option>
             <a-select-option value="PENDING">待确认</a-select-option>
@@ -409,12 +457,16 @@ onMounted(() => {
         </div>
         <div class="cl-field">
           <label>成本日期：</label>
-          <a-range-picker v-model:value="filter.dateRange" style="width:220px" />
+          <a-range-picker v-model:value="filter.dateRange" style="width: 220px" />
         </div>
         <div class="cl-filter-actions">
-          <a-button type="primary" @click="handleSearch"><template #icon><SearchOutlined /></template>查询</a-button>
+          <a-button type="primary" @click="handleSearch"
+            ><template #icon><SearchOutlined /></template>查询</a-button
+          >
           <a-button @click="handleReset">重置</a-button>
-          <a-button @click="fetchData"><template #icon><ReloadOutlined /></template></a-button>
+          <a-button @click="fetchData"
+            ><template #icon><ReloadOutlined /></template
+          ></a-button>
         </div>
       </div>
     </div>
@@ -472,7 +524,7 @@ onMounted(() => {
     </div>
 
     <!-- Summary section -->
-    <div class="cl-card cl-summary" style="margin-top:14px">
+    <div class="cl-card cl-summary" style="margin-top: 14px">
       <div class="cl-summary-header">
         <span class="cl-summary-title">成本汇总</span>
         <a-radio-group v-model:value="summaryMode" size="small">
@@ -482,18 +534,20 @@ onMounted(() => {
         </a-radio-group>
       </div>
       <div class="cl-summary-list">
-        <div
-          v-for="[key, val] in summaryEntries(summaryMode)"
-          :key="key"
-          class="cl-summary-item"
-        >
+        <div v-for="[key, val] in summaryEntries(summaryMode)" :key="key" class="cl-summary-item">
           <span class="cl-summary-label">{{ summaryLabel(summaryMode, key) }}</span>
           <div class="cl-summary-bar">
             <span
               class="cl-summary-bar-fill"
               :style="{
-                width: Math.max(2, (parseFloat(val) / Math.max(1, parseFloat(summary.totalAmount || '1')) * 100)) + '%',
-                background: ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#14b8c7'][summaryEntries(summaryMode).findIndex(([k]) => k === key) % 5]
+                width:
+                  Math.max(
+                    2,
+                    (parseFloat(val) / Math.max(1, parseFloat(summary.totalAmount || '1'))) * 100,
+                  ) + '%',
+                background: ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#14b8c7'][
+                  summaryEntries(summaryMode).findIndex(([k]) => k === key) % 5
+                ],
               }"
             ></span>
           </div>
@@ -503,12 +557,7 @@ onMounted(() => {
     </div>
 
     <!-- Detail drawer -->
-    <a-drawer
-      v-model:open="detailVisible"
-      title="成本详情"
-      :width="520"
-      placement="right"
-    >
+    <a-drawer v-model:open="detailVisible" title="成本详情" :width="520" placement="right">
       <template v-if="detailItem">
         <a-descriptions :column="2" bordered size="small">
           <a-descriptions-item label="成本日期">{{ detailItem.costDate }}</a-descriptions-item>
@@ -517,27 +566,53 @@ onMounted(() => {
               {{ COST_STATUS_LABEL[detailItem.costStatus] || detailItem.costStatus }}
             </a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="所属项目">{{ detailItem.projectName || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="关联合同">{{ detailItem.contractName || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="合作方">{{ detailItem.partnerName || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="成本科目">{{ detailItem.costSubjectName || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="费用类型">{{ COST_TYPE_LABEL[detailItem.costType] || detailItem.costType || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="所属项目">{{
+            detailItem.projectName || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="关联合同">{{
+            detailItem.contractName || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="合作方">{{
+            detailItem.partnerName || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="成本科目">{{
+            detailItem.costSubjectName || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="费用类型">{{
+            COST_TYPE_LABEL[detailItem.costType] || detailItem.costType || '-'
+          }}</a-descriptions-item>
           <a-descriptions-item label="来源类型">
             <a-tag :color="SOURCE_TYPE_COLOR[detailItem.sourceType as SourceType] || 'default'">
               {{ SOURCE_TYPE_LABEL[detailItem.sourceType as SourceType] || detailItem.sourceType }}
             </a-tag>
           </a-descriptions-item>
-          <a-descriptions-item label="金额(含税)">{{ fmtAmountYuan(detailItem.amount) }}</a-descriptions-item>
-          <a-descriptions-item label="税额">{{ fmtAmountYuan(detailItem.taxAmount) }}</a-descriptions-item>
-          <a-descriptions-item label="不含税金额">{{ fmtAmountYuan(detailItem.amountWithoutTax) }}</a-descriptions-item>
+          <a-descriptions-item label="金额(含税)">{{
+            fmtAmountYuan(detailItem.amount)
+          }}</a-descriptions-item>
+          <a-descriptions-item label="税额">{{
+            fmtAmountYuan(detailItem.taxAmount)
+          }}</a-descriptions-item>
+          <a-descriptions-item label="不含税金额">{{
+            fmtAmountYuan(detailItem.amountWithoutTax)
+          }}</a-descriptions-item>
           <a-descriptions-item label="生成标识">
             {{ detailItem.generatedFlag === '1' ? '自动生成' : '手动录入' }}
           </a-descriptions-item>
-          <a-descriptions-item label="来源单据ID">{{ detailItem.sourceId || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="来源明细ID">{{ detailItem.sourceItemId || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="创建人">{{ detailItem.createdBy || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="创建时间">{{ detailItem.createdAt || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="备注" :span="2">{{ detailItem.remark || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="来源单据ID">{{
+            detailItem.sourceId || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="来源明细ID">{{
+            detailItem.sourceItemId || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="创建人">{{
+            detailItem.createdBy || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="创建时间">{{
+            detailItem.createdAt || '-'
+          }}</a-descriptions-item>
+          <a-descriptions-item label="备注" :span="2">{{
+            detailItem.remark || '-'
+          }}</a-descriptions-item>
         </a-descriptions>
       </template>
     </a-drawer>

@@ -18,37 +18,64 @@ const activeTab = ref('basic')
 const submitting = ref(false)
 
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
-  DRAFT: '草稿', APPROVING: '审批中', APPROVED: '已通过', REJECTED: '已驳回', WITHDRAWN: '已撤回',
+  DRAFT: '草稿',
+  APPROVING: '审批中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+  WITHDRAWN: '已撤回',
 }
 const APPROVAL_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'default', APPROVING: 'processing', APPROVED: 'success', REJECTED: 'error', WITHDRAWN: 'warning',
+  DRAFT: 'default',
+  APPROVING: 'processing',
+  APPROVED: 'success',
+  REJECTED: 'error',
+  WITHDRAWN: 'warning',
 }
 
 const DIRECTION_LABEL: Record<string, string> = {
-  COST: '成本增加', DEDUCT: '成本减少', NEUTRAL: '中性变更',
+  COST: '成本增加',
+  DEDUCT: '成本减少',
+  NEUTRAL: '中性变更',
 }
 const DIRECTION_COLOR: Record<string, string> = {
-  COST: 'red', DEDUCT: 'green', NEUTRAL: 'blue',
+  COST: 'red',
+  DEDUCT: 'green',
+  NEUTRAL: 'blue',
 }
 
 const COST_TYPE_LABEL: Record<string, string> = {
-  MATERIAL: '材料费', LABOR: '人工费', MACHINERY: '机械费', SUBCONTRACT: '分包费', OTHER: '其他费用',
+  MATERIAL: '材料费',
+  LABOR: '人工费',
+  MACHINERY: '机械费',
+  SUBCONTRACT: '分包费',
+  OTHER: '其他费用',
 }
 const COST_STATUS_LABEL: Record<string, string> = {
-  LOCKED: '已锁定', CONFIRMED: '已确认', PENDING: '待确认',
+  LOCKED: '已锁定',
+  CONFIRMED: '已确认',
+  PENDING: '待确认',
 }
 const COST_STATUS_COLOR: Record<string, string> = {
-  LOCKED: 'blue', CONFIRMED: 'green', PENDING: 'orange',
+  LOCKED: 'blue',
+  CONFIRMED: 'green',
+  PENDING: 'orange',
 }
 
 const PAY_TYPE_LABEL: Record<string, string> = {
-  ADVANCE: '预付款', PROGRESS: '进度款', FINAL: '结算款', OTHER: '其他',
+  ADVANCE: '预付款',
+  PROGRESS: '进度款',
+  FINAL: '结算款',
+  OTHER: '其他',
 }
 const PAY_STATUS_LABEL: Record<string, string> = {
-  UNPAID: '未支付', PARTIAL: '部分支付', PAID: '已支付',
+  UNPAID: '未支付',
+  PARTIAL: '部分支付',
+  PAID: '已支付',
 }
 const PAY_STATUS_COLOR: Record<string, string> = {
-  UNPAID: 'default', PARTIAL: 'warning', PAID: 'success',
+  UNPAID: 'default',
+  PARTIAL: 'warning',
+  PAID: 'success',
 }
 
 const actionNameMap: Record<string, string> = {
@@ -67,9 +94,27 @@ const variationColumns = [
   { title: '签证名称', dataIndex: 'varName', key: 'varName', width: 180 },
   { title: '变更类型', dataIndex: 'varType', key: 'varType', width: 100 },
   { title: '方向', dataIndex: 'direction', key: 'direction', width: 100 },
-  { title: '上报金额', dataIndex: 'reportedAmount', key: 'reportedAmount', width: 120, align: 'right' as const },
-  { title: '审批金额', dataIndex: 'approvedAmount', key: 'approvedAmount', width: 120, align: 'right' as const },
-  { title: '确认金额', dataIndex: 'confirmedAmount', key: 'confirmedAmount', width: 120, align: 'right' as const },
+  {
+    title: '上报金额',
+    dataIndex: 'reportedAmount',
+    key: 'reportedAmount',
+    width: 120,
+    align: 'right' as const,
+  },
+  {
+    title: '审批金额',
+    dataIndex: 'approvedAmount',
+    key: 'approvedAmount',
+    width: 120,
+    align: 'right' as const,
+  },
+  {
+    title: '确认金额',
+    dataIndex: 'confirmedAmount',
+    key: 'confirmedAmount',
+    width: 120,
+    align: 'right' as const,
+  },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
 ]
 
@@ -77,9 +122,27 @@ const variationColumns = [
 const paymentColumns = [
   { title: '申请编号', dataIndex: 'applyCode', key: 'applyCode', width: 150 },
   { title: '付款类型', dataIndex: 'payType', key: 'payType', width: 100 },
-  { title: '申请金额', dataIndex: 'applyAmount', key: 'applyAmount', width: 120, align: 'right' as const },
-  { title: '审批金额', dataIndex: 'approvedAmount', key: 'approvedAmount', width: 120, align: 'right' as const },
-  { title: '实际付款', dataIndex: 'actualPayAmount', key: 'actualPayAmount', width: 120, align: 'right' as const },
+  {
+    title: '申请金额',
+    dataIndex: 'applyAmount',
+    key: 'applyAmount',
+    width: 120,
+    align: 'right' as const,
+  },
+  {
+    title: '审批金额',
+    dataIndex: 'approvedAmount',
+    key: 'approvedAmount',
+    width: 120,
+    align: 'right' as const,
+  },
+  {
+    title: '实际付款',
+    dataIndex: 'actualPayAmount',
+    key: 'actualPayAmount',
+    width: 120,
+    align: 'right' as const,
+  },
   { title: '付款状态', dataIndex: 'payStatus', key: 'payStatus', width: 100 },
   { title: '付款日期', dataIndex: 'payDate', key: 'payDate', width: 120 },
   { title: '凭证号', dataIndex: 'voucherNo', key: 'voucherNo', width: 140 },
@@ -94,7 +157,13 @@ const costColumns = [
   { title: '来源单据', dataIndex: 'sourceId', key: 'sourceId', width: 140 },
   { title: '金额(含税)', dataIndex: 'amount', key: 'amount', width: 120, align: 'right' as const },
   { title: '税额', dataIndex: 'taxAmount', key: 'taxAmount', width: 100, align: 'right' as const },
-  { title: '不含税金额', dataIndex: 'amountWithoutTax', key: 'amountWithoutTax', width: 130, align: 'right' as const },
+  {
+    title: '不含税金额',
+    dataIndex: 'amountWithoutTax',
+    key: 'amountWithoutTax',
+    width: 130,
+    align: 'right' as const,
+  },
   { title: '成本日期', dataIndex: 'costDate', key: 'costDate', width: 110 },
   { title: '状态', dataIndex: 'costStatus', key: 'costStatus', width: 80 },
 ]
@@ -199,10 +268,16 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
   <div class="stl-detail-page">
     <a-page-header title="结算详情" @back="goBack">
       <template #tags>
-        <a-tag v-if="settlement" :color="SETTLEMENT_STATUS_COLOR[settlement.settlementStatus as SettlementStatus]">
+        <a-tag
+          v-if="settlement"
+          :color="SETTLEMENT_STATUS_COLOR[settlement.settlementStatus as SettlementStatus]"
+        >
           {{ SETTLEMENT_STATUS_LABEL[settlement.settlementStatus as SettlementStatus] }}
         </a-tag>
-        <a-tag v-if="settlement" :color="APPROVAL_STATUS_COLOR[settlement.approvalStatus] || 'default'">
+        <a-tag
+          v-if="settlement"
+          :color="APPROVAL_STATUS_COLOR[settlement.approvalStatus] || 'default'"
+        >
           {{ APPROVAL_STATUS_LABEL[settlement.approvalStatus] || settlement.approvalStatus }}
         </a-tag>
       </template>
@@ -232,36 +307,76 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
             <!-- Tab 1: 基本信息 -->
             <a-tab-pane key="basic" tab="基本信息">
               <a-descriptions :column="3" size="small" bordered>
-                <a-descriptions-item label="结算编号" :span="2">{{ settlement.settlementCode }}</a-descriptions-item>
-                <a-descriptions-item label="结算类型">{{ settlement.settlementType || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="关联合同" :span="2">{{ settlement.contractName }}</a-descriptions-item>
-                <a-descriptions-item label="所属项目">{{ settlement.projectName }}</a-descriptions-item>
-                <a-descriptions-item label="合作方">{{ settlement.partnerName }}</a-descriptions-item>
+                <a-descriptions-item label="结算编号" :span="2">{{
+                  settlement.settlementCode
+                }}</a-descriptions-item>
+                <a-descriptions-item label="结算类型">{{
+                  settlement.settlementType || '-'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="关联合同" :span="2">{{
+                  settlement.contractName
+                }}</a-descriptions-item>
+                <a-descriptions-item label="所属项目">{{
+                  settlement.projectName
+                }}</a-descriptions-item>
+                <a-descriptions-item label="合作方">{{
+                  settlement.partnerName
+                }}</a-descriptions-item>
                 <a-descriptions-item label="合同金额(含税)">
-                  <span style="font-weight:600">{{ formatAmount(settlement.contractAmount) }} 元</span>
+                  <span style="font-weight: 600"
+                    >{{ formatAmount(settlement.contractAmount) }} 元</span
+                  >
                 </a-descriptions-item>
                 <a-descriptions-item label="变更金额">
-                  <span :style="{ color: parseFloat(settlement.changeAmount) >= 0 ? '#ef4444' : '#16a34a' }">
+                  <span
+                    :style="{
+                      color: parseFloat(settlement.changeAmount) >= 0 ? '#ef4444' : '#16a34a',
+                    }"
+                  >
                     {{ formatAmount(settlement.changeAmount) }} 元
                   </span>
                 </a-descriptions-item>
-                <a-descriptions-item label="计量金额">{{ formatAmount(settlement.measuredAmount) }} 元</a-descriptions-item>
+                <a-descriptions-item label="计量金额"
+                  >{{ formatAmount(settlement.measuredAmount) }} 元</a-descriptions-item
+                >
                 <a-descriptions-item label="结算金额">
-                  <span style="font-weight:600;color:#3b82f6;font-size:16px">{{ formatAmount(settlement.finalAmount) }} 元</span>
+                  <span style="font-weight: 600; color: #3b82f6; font-size: 16px"
+                    >{{ formatAmount(settlement.finalAmount) }} 元</span
+                  >
                 </a-descriptions-item>
-                <a-descriptions-item label="扣减金额">{{ formatAmount(settlement.deductionAmount) }} 元</a-descriptions-item>
-                <a-descriptions-item label="已付款">{{ formatAmount(settlement.paidAmount) }} 元</a-descriptions-item>
+                <a-descriptions-item label="扣减金额"
+                  >{{ formatAmount(settlement.deductionAmount) }} 元</a-descriptions-item
+                >
+                <a-descriptions-item label="已付款"
+                  >{{ formatAmount(settlement.paidAmount) }} 元</a-descriptions-item
+                >
                 <a-descriptions-item label="未付款">
-                  <span style="font-weight:600;color:#ef4444">{{ formatAmount(settlement.unpaidAmount) }} 元</span>
+                  <span style="font-weight: 600; color: #ef4444"
+                    >{{ formatAmount(settlement.unpaidAmount) }} 元</span
+                  >
                 </a-descriptions-item>
-                <a-descriptions-item label="质保金额">{{ formatAmount(settlement.warrantyAmount) }} 元</a-descriptions-item>
-                <a-descriptions-item label="合同状态">{{ settlement.status || '-' }}</a-descriptions-item>
-                <a-descriptions-item v-if="settlement.finalizedAt" label="定案时间">{{ settlement.finalizedAt }}</a-descriptions-item>
+                <a-descriptions-item label="质保金额"
+                  >{{ formatAmount(settlement.warrantyAmount) }} 元</a-descriptions-item
+                >
+                <a-descriptions-item label="合同状态">{{
+                  settlement.status || '-'
+                }}</a-descriptions-item>
+                <a-descriptions-item v-if="settlement.finalizedAt" label="定案时间">{{
+                  settlement.finalizedAt
+                }}</a-descriptions-item>
                 <a-descriptions-item label="创建人">{{ settlement.createdBy }}</a-descriptions-item>
-                <a-descriptions-item label="创建时间">{{ settlement.createdAt }}</a-descriptions-item>
-                <a-descriptions-item label="更新人">{{ settlement.updatedBy || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="更新时间" :span="2">{{ settlement.updatedAt || '-' }}</a-descriptions-item>
-                <a-descriptions-item v-if="settlement.remark" label="备注" :span="3">{{ settlement.remark }}</a-descriptions-item>
+                <a-descriptions-item label="创建时间">{{
+                  settlement.createdAt
+                }}</a-descriptions-item>
+                <a-descriptions-item label="更新人">{{
+                  settlement.updatedBy || '-'
+                }}</a-descriptions-item>
+                <a-descriptions-item label="更新时间" :span="2">{{
+                  settlement.updatedAt || '-'
+                }}</a-descriptions-item>
+                <a-descriptions-item v-if="settlement.remark" label="备注" :span="3">{{
+                  settlement.remark
+                }}</a-descriptions-item>
               </a-descriptions>
             </a-tab-pane>
 
@@ -274,7 +389,11 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                     {{ formatAmount(settlement.contractAmount) }} 元
                   </a-descriptions-item>
                   <a-descriptions-item label="变更金额合计">
-                    <span :style="{ color: parseFloat(settlement.changeAmount) >= 0 ? '#ef4444' : '#16a34a' }">
+                    <span
+                      :style="{
+                        color: parseFloat(settlement.changeAmount) >= 0 ? '#ef4444' : '#16a34a',
+                      }"
+                    >
                       {{ formatAmount(settlement.changeAmount) }} 元
                     </span>
                   </a-descriptions-item>
@@ -288,12 +407,12 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                 <a-divider />
                 <a-descriptions :column="2" size="small" bordered>
                   <a-descriptions-item label="结算金额（定案金额）">
-                    <span style="font-weight:700;color:#3b82f6;font-size:18px">
+                    <span style="font-weight: 700; color: #3b82f6; font-size: 18px">
                       {{ formatAmount(settlement.finalAmount) }} 元
                     </span>
                   </a-descriptions-item>
                   <a-descriptions-item label="计算公式">
-                    <span style="color:#6b7280;font-size:12px">
+                    <span style="color: #6b7280; font-size: 12px">
                       结算金额 = 合同金额 + 变更金额 + 计量金额 - 扣减金额
                     </span>
                   </a-descriptions-item>
@@ -304,12 +423,12 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                     {{ formatAmount(settlement.warrantyAmount) }} 元
                   </a-descriptions-item>
                   <a-descriptions-item label="未付款余额">
-                    <span style="font-weight:700;color:#ef4444;font-size:16px">
+                    <span style="font-weight: 700; color: #ef4444; font-size: 16px">
                       {{ formatAmount(settlement.unpaidAmount) }} 元
                     </span>
                   </a-descriptions-item>
                   <a-descriptions-item label="计算公式">
-                    <span style="color:#6b7280;font-size:12px">
+                    <span style="color: #6b7280; font-size: 12px">
                       未付款 = 结算金额 - 已付款 - 质保金额
                     </span>
                   </a-descriptions-item>
@@ -343,10 +462,15 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                       {{ formatAmount(record.approvedAmount) }}
                     </template>
                     <template v-else-if="column.key === 'confirmedAmount'">
-                      <span style="font-weight:600">{{ formatAmount(record.confirmedAmount) }}</span>
+                      <span style="font-weight: 600">{{
+                        formatAmount(record.confirmedAmount)
+                      }}</span>
                     </template>
                     <template v-else-if="column.key === 'varCode'">
-                      <a style="color:#1677ff;cursor:pointer" @click="jumpToSource('VAR_ORDER', record.id)">
+                      <a
+                        style="color: #1677ff; cursor: pointer"
+                        @click="jumpToSource('VAR_ORDER', record.id)"
+                      >
                         {{ record.varCode }}
                       </a>
                     </template>
@@ -379,11 +503,18 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                       </a-tag>
                     </template>
                     <template v-else-if="column.key === 'applyCode'">
-                      <a style="color:#1677ff;cursor:pointer" @click="jumpToSource('PAY_REQUEST', record.applicationId)">
+                      <a
+                        style="color: #1677ff; cursor: pointer"
+                        @click="jumpToSource('PAY_REQUEST', record.applicationId)"
+                      >
                         {{ record.applyCode }}
                       </a>
                     </template>
-                    <template v-else-if="['applyAmount','approvedAmount','actualPayAmount'].includes(column.key)">
+                    <template
+                      v-else-if="
+                        ['applyAmount', 'approvedAmount', 'actualPayAmount'].includes(column.key)
+                      "
+                    >
                       {{ formatAmount(record[column.key]) }}
                     </template>
                   </template>
@@ -407,14 +538,18 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                 >
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'sourceType'">
-                      <a-tag :color="SOURCE_TYPE_COLOR[record.sourceType as SourceType] || 'default'">
-                        {{ SOURCE_TYPE_LABEL[record.sourceType as SourceType] || record.sourceType }}
+                      <a-tag
+                        :color="SOURCE_TYPE_COLOR[record.sourceType as SourceType] || 'default'"
+                      >
+                        {{
+                          SOURCE_TYPE_LABEL[record.sourceType as SourceType] || record.sourceType
+                        }}
                       </a-tag>
                     </template>
                     <template v-else-if="column.key === 'sourceId'">
                       <a
                         v-if="record.sourceType && record.sourceId"
-                        style="color:#1677ff;cursor:pointer"
+                        style="color: #1677ff; cursor: pointer"
                         @click="jumpToSource(record.sourceType, record.sourceId)"
                       >
                         {{ record.sourceId }}
@@ -429,7 +564,9 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                         {{ COST_STATUS_LABEL[record.costStatus] || record.costStatus }}
                       </a-tag>
                     </template>
-                    <template v-else-if="['amount','taxAmount','amountWithoutTax'].includes(column.key)">
+                    <template
+                      v-else-if="['amount', 'taxAmount', 'amountWithoutTax'].includes(column.key)"
+                    >
                       {{ formatAmount(record[column.key]) }}
                     </template>
                   </template>
@@ -453,7 +590,7 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                 >
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'originalName'">
-                      <span style="color:#1677ff;cursor:pointer">{{ record.originalName }}</span>
+                      <span style="color: #1677ff; cursor: pointer">{{ record.originalName }}</span>
                     </template>
                     <template v-else-if="column.key === 'fileSize'">
                       {{ fmtFileSize(record.fileSize) }}
@@ -471,17 +608,23 @@ const isDraft = computed(() => settlement.value?.approvalStatus === 'DRAFT')
                   <a-timeline-item v-for="record in approvalRecords" :key="record.id">
                     <div>
                       <strong>{{ record.operatorName }}</strong>
-                      <a-tag style="margin-left:8px">
+                      <a-tag style="margin-left: 8px">
                         {{ actionNameMap[record.actionType] || record.actionName }}
                       </a-tag>
-                      <span v-if="record.nodeName" style="margin-left:8px;color:#999;font-size:13px">
+                      <span
+                        v-if="record.nodeName"
+                        style="margin-left: 8px; color: #999; font-size: 13px"
+                      >
                         {{ record.nodeName }}
                       </span>
                     </div>
-                    <div v-if="record.comment" style="color:#666;font-size:13px;margin-top:4px">
+                    <div
+                      v-if="record.comment"
+                      style="color: #666; font-size: 13px; margin-top: 4px"
+                    >
                       {{ record.comment }}
                     </div>
-                    <div style="color:#999;font-size:12px;margin-top:2px">
+                    <div style="color: #999; font-size: 12px; margin-top: 2px">
                       {{ record.createdAt }}
                     </div>
                   </a-timeline-item>

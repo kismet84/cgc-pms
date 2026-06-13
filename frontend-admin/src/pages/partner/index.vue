@@ -17,18 +17,29 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-
 const TYPE_LABEL: Record<string, string> = {
-  SUPPLIER: '供应商', SUB: '分包商', DESIGN: '设计单位', SUPERVISOR: '监理单位', OTHER: '其他',
+  SUPPLIER: '供应商',
+  SUB: '分包商',
+  DESIGN: '设计单位',
+  SUPERVISOR: '监理单位',
+  OTHER: '其他',
 }
 const TYPE_COLOR: Record<string, string> = {
-  SUPPLIER: 'blue', SUB: 'green', DESIGN: 'purple', SUPERVISOR: 'cyan', OTHER: 'default',
+  SUPPLIER: 'blue',
+  SUB: 'green',
+  DESIGN: 'purple',
+  SUPERVISOR: 'cyan',
+  OTHER: 'default',
 }
 const RISK_COLOR: Record<string, string> = {
-  LOW: 'success', MEDIUM: 'warning', HIGH: 'error',
+  LOW: 'success',
+  MEDIUM: 'warning',
+  HIGH: 'error',
 }
 const RISK_LABEL: Record<string, string> = {
-  LOW: '低', MEDIUM: '中', HIGH: '高',
+  LOW: '低',
+  MEDIUM: '中',
+  HIGH: '高',
 }
 
 const columns = [
@@ -99,15 +110,30 @@ onMounted(fetchData)
       <div class="pm-filter-row">
         <div class="pm-field">
           <label>合作方编号：</label>
-          <a-input v-model:value="filter.partnerCode" placeholder="请输入编号" style="width:160px" allow-clear />
+          <a-input
+            v-model:value="filter.partnerCode"
+            placeholder="请输入编号"
+            style="width: 160px"
+            allow-clear
+          />
         </div>
         <div class="pm-field">
           <label>合作方名称：</label>
-          <a-input v-model:value="filter.partnerName" placeholder="请输入名称" style="width:160px" allow-clear />
+          <a-input
+            v-model:value="filter.partnerName"
+            placeholder="请输入名称"
+            style="width: 160px"
+            allow-clear
+          />
         </div>
         <div class="pm-field">
           <label>类型：</label>
-          <a-select v-model:value="filter.partnerType" placeholder="全部" allow-clear style="width:130px">
+          <a-select
+            v-model:value="filter.partnerType"
+            placeholder="全部"
+            allow-clear
+            style="width: 130px"
+          >
             <a-select-option value="SUPPLIER">供应商</a-select-option>
             <a-select-option value="SUB">分包商</a-select-option>
             <a-select-option value="DESIGN">设计单位</a-select-option>
@@ -117,7 +143,12 @@ onMounted(fetchData)
         </div>
         <div class="pm-field">
           <label>状态：</label>
-          <a-select v-model:value="filter.status" placeholder="全部" allow-clear style="width:110px">
+          <a-select
+            v-model:value="filter.status"
+            placeholder="全部"
+            allow-clear
+            style="width: 110px"
+          >
             <a-select-option value="ENABLED">启用</a-select-option>
             <a-select-option value="DISABLED">禁用</a-select-option>
           </a-select>

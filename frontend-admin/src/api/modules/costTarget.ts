@@ -1,10 +1,6 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type {
-  CostTargetVO,
-  CostTargetItemVO,
-  CostTargetQueryParams,
-} from '@/types/costTarget'
+import type { CostTargetVO, CostTargetItemVO, CostTargetQueryParams } from '@/types/costTarget'
 
 /** 目标成本版本分页列表 */
 export function getCostTargetList(params: CostTargetQueryParams) {

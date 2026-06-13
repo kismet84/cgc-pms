@@ -151,7 +151,9 @@ onMounted(() => {
           </template>
           <template v-else-if="column.key === 'businessType'">
             <a-tag>{{
-              businessTypeMap[record.businessType as string] || (record.businessType as string) || '—'
+              businessTypeMap[record.businessType as string] ||
+              (record.businessType as string) ||
+              '—'
             }}</a-tag>
           </template>
           <template v-else-if="column.key === 'timeCol'">
@@ -164,7 +166,11 @@ onMounted(() => {
             <a-tag v-else>{{ record.instanceStatus }}</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="handleDetail(record as { instanceId: string })">
+            <a-button
+              type="link"
+              size="small"
+              @click="handleDetail(record as { instanceId: string })"
+            >
               {{ getActionLabel() }}
             </a-button>
           </template>

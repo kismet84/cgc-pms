@@ -1,6 +1,7 @@
 package com.cgcpms.workflow.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.system.entity.SysUser;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Internal shared helpers for workflow sub-services.
@@ -168,10 +170,13 @@ class WorkflowCoreService {
             wrapper.ne(WfTask::getId, excludeTaskId);
         }
         List<WfTask> tasks = wfTaskMapper.selectList(wrapper);
-        for (WfTask t : tasks) {
-            t.setTaskStatus(WorkflowConstants.TASK_CANCELLED);
-            t.setHandledAt(LocalDateTime.now());
-            wfTaskMapper.updateById(t);
+        // M-010: Batch update instead of loop
+        if (!tasks.isEmpty()) {
+            List<Long> taskIds = tasks.stream().map(WfTask::getId).collect(Collectors.toList());
+            wfTaskMapper.update(null, new LambdaUpdateWrapper<WfTask>()
+                    .in(WfTask::getId, taskIds)
+                    .set(WfTask::getTaskStatus, WorkflowConstants.TASK_CANCELLED)
+                    .set(WfTask::getHandledAt, LocalDateTime.now()));
         }
     }
 
@@ -180,10 +185,13 @@ class WorkflowCoreService {
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instanceId)
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
-        for (WfTask t : tasks) {
-            t.setTaskStatus(WorkflowConstants.TASK_CANCELLED);
-            t.setHandledAt(LocalDateTime.now());
-            wfTaskMapper.updateById(t);
+        // M-010: Batch update instead of loop
+        if (!tasks.isEmpty()) {
+            List<Long> taskIds = tasks.stream().map(WfTask::getId).collect(Collectors.toList());
+            wfTaskMapper.update(null, new LambdaUpdateWrapper<WfTask>()
+                    .in(WfTask::getId, taskIds)
+                    .set(WfTask::getTaskStatus, WorkflowConstants.TASK_CANCELLED)
+                    .set(WfTask::getHandledAt, LocalDateTime.now()));
         }
     }
 
@@ -192,10 +200,13 @@ class WorkflowCoreService {
                 new LambdaQueryWrapper<WfNodeInstance>()
                         .eq(WfNodeInstance::getInstanceId, instanceId)
                         .eq(WfNodeInstance::getNodeStatus, WorkflowConstants.NODE_ACTIVE));
-        for (WfNodeInstance n : nodes) {
-            n.setNodeStatus(WorkflowConstants.NODE_WAITING);
-            n.setEndedAt(LocalDateTime.now());
-            wfNodeInstanceMapper.updateById(n);
+        // M-010: Batch update instead of loop
+        if (!nodes.isEmpty()) {
+            List<Long> nodeIds = nodes.stream().map(WfNodeInstance::getId).collect(Collectors.toList());
+            wfNodeInstanceMapper.update(null, new LambdaUpdateWrapper<WfNodeInstance>()
+                    .in(WfNodeInstance::getId, nodeIds)
+                    .set(WfNodeInstance::getNodeStatus, WorkflowConstants.NODE_WAITING)
+                    .set(WfNodeInstance::getEndedAt, LocalDateTime.now()));
         }
     }
 

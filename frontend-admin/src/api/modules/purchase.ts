@@ -1,6 +1,10 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO, PurchaseOrderQuery } from '@/types/purchase'
+import type {
+  MatPurchaseOrderVO,
+  MatPurchaseOrderItemVO,
+  PurchaseOrderQuery,
+} from '@/types/purchase'
 
 /** 采购订单列表分页查询 */
 export function getOrderList(params: PurchaseOrderQuery) {

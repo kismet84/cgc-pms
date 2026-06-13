@@ -26,6 +26,7 @@ import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -403,7 +404,8 @@ public class CostSummaryService {
             log.info("Found {} active projects for cost summary refresh", activeProjects.size());
             for (PmProject project : activeProjects) {
                 try {
-                    refreshSummary(project.getTenantId(), project.getId());
+                    // M-004: Use AOP proxy to ensure @Transactional is applied
+                    ((CostSummaryService) AopContext.currentProxy()).refreshSummary(project.getTenantId(), project.getId());
                 } catch (Exception e) {
                     log.error("Failed to refresh summary for project {}", project.getId(), e);
                 }

@@ -1,10 +1,6 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type {
-  CostLedgerVO,
-  CostLedgerQueryParams,
-  CostLedgerSummaryVO,
-} from '@/types/cost'
+import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO } from '@/types/cost'
 
 /** 成本台账分页查询 */
 export function getCostLedger(params: CostLedgerQueryParams) {

@@ -160,7 +160,11 @@ defineExpose({ addRow })
       </template>
     </a-table>
 
-    <a-empty v-if="items.length === 0" description="暂无明细，点击“添加明细”新增" class="ie-empty" />
+    <a-empty
+      v-if="items.length === 0"
+      description="暂无明细，点击“添加明细”新增"
+      class="ie-empty"
+    />
   </div>
 </template>
 

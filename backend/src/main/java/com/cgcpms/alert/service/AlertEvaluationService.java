@@ -24,6 +24,7 @@ import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Alert evaluation engine — batch-evaluates 8 rules for active projects
@@ -78,7 +80,8 @@ public class AlertEvaluationService {
             log.info("Found {} active projects for alert evaluation", activeProjects.size());
             for (PmProject project : activeProjects) {
                 try {
-                    evaluateProject(project.getTenantId(), project.getId());
+                    // M-004: Use AOP proxy to ensure @Transactional is applied
+                    ((AlertEvaluationService) AopContext.currentProxy()).evaluateProject(project.getTenantId(), project.getId());
                 } catch (Exception e) {
                     log.error("Failed to evaluate alerts for project {}", project.getId(), e);
                 }
@@ -143,8 +146,6 @@ public class AlertEvaluationService {
         // Persist
         for (AlertLog alert : alerts) {
             alertLogMapper.insert(alert);
-            // Create notification for each alert — uses explicit tenantId from project,
-            // NOT from UserContext (safe in @Scheduled threads)
             try {
                 createAlertNotification(tenantId, projectId, alert);
             } catch (Exception e) {
@@ -206,8 +207,10 @@ public class AlertEvaluationService {
             if (cid == null) continue;
             receiptByContract.merge(cid, nvl(r.getTotalAmount()), BigDecimal::add);
         }
+        // M-009: Batch load contracts to avoid N+1
+        Map<Long, CtContract> contractMap = batchLoadContracts(receiptByContract.keySet());
         for (Map.Entry<Long, BigDecimal> entry : receiptByContract.entrySet()) {
-            CtContract contract = ctContractMapper.selectById(entry.getKey());
+            CtContract contract = contractMap.get(entry.getKey());
             if (contract == null) continue;
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
@@ -243,8 +246,10 @@ public class AlertEvaluationService {
             if (cid == null) continue;
             measureByContract.merge(cid, nvl(m.getApprovedAmount()), BigDecimal::add);
         }
+        // M-009: Batch load contracts
+        Map<Long, CtContract> contractMap = batchLoadContracts(measureByContract.keySet());
         for (Map.Entry<Long, BigDecimal> entry : measureByContract.entrySet()) {
-            CtContract contract = ctContractMapper.selectById(entry.getKey());
+            CtContract contract = contractMap.get(entry.getKey());
             if (contract == null) continue;
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
@@ -307,8 +312,10 @@ public class AlertEvaluationService {
             if (cid == null) continue;
             paidByContract.merge(cid, nvl(r.getPayAmount()), BigDecimal::add);
         }
+        // M-009: Batch load contracts
+        Map<Long, CtContract> contractMap = batchLoadContracts(paidByContract.keySet());
         for (Map.Entry<Long, BigDecimal> entry : paidByContract.entrySet()) {
-            CtContract contract = ctContractMapper.selectById(entry.getKey());
+            CtContract contract = contractMap.get(entry.getKey());
             if (contract == null) continue;
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
@@ -341,9 +348,15 @@ public class AlertEvaluationService {
                         .eq(StlSettlement::getProjectId, projectId)
                         .eq(StlSettlement::getSettlementStatus, "FINALIZED")
                         .gt(StlSettlement::getWarrantyAmount, BigDecimal.ZERO));
+        // M-009: Batch load contracts from settlement contractIds
+        Set<Long> contractIds = settlements.stream()
+                .map(StlSettlement::getContractId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, CtContract> contractMap = batchLoadContracts(contractIds);
         for (StlSettlement stl : settlements) {
             if (stl.getContractId() == null) continue;
-            CtContract contract = ctContractMapper.selectById(stl.getContractId());
+            CtContract contract = contractMap.get(stl.getContractId());
             if (contract == null) continue;
             // Warranty is "early-released" if finalised but contract warranty period
             // (endDate) hasn't passed yet, or no endDate is set
@@ -543,5 +556,12 @@ public class AlertEvaluationService {
         }
         alert.setIsRead(1);
         return alertLogMapper.updateById(alert) > 0;
+    }
+
+    // M-009: Batch-load contracts to avoid N+1 in rule evaluation loops
+    private Map<Long, CtContract> batchLoadContracts(Set<Long> contractIds) {
+        if (contractIds.isEmpty()) return Collections.emptyMap();
+        List<CtContract> contracts = ctContractMapper.selectBatchIds(contractIds);
+        return contracts.stream().collect(Collectors.toMap(CtContract::getId, c -> c));
     }
 }

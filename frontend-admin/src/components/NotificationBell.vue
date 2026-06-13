@@ -9,10 +9,7 @@ import {
   markAllAsRead,
   createNotificationStream,
 } from '@/api/modules/notification'
-import type {
-  NotificationVO,
-  SseNotificationEvent,
-} from '@/types/notification'
+import type { NotificationVO, SseNotificationEvent } from '@/types/notification'
 import type { PageResult } from '@/types/api'
 
 // ── State ──
@@ -50,7 +47,9 @@ async function fetchUnreadCount() {
     const res = await getUnreadCount()
     unreadCount.value = res.count
   } catch (error) {
-    console.error('NotificationBell: 加载未读数量失败', error)
+    if (import.meta.env.DEV) {
+      console.error('NotificationBell: 加载未读数量失败', error)
+    }
     message.error('加载未读数量失败')
   }
 }
@@ -64,7 +63,9 @@ async function fetchNotifications() {
     })
     notifications.value = res.records
   } catch (error) {
-    console.error('NotificationBell: 加载通知列表失败', error)
+    if (import.meta.env.DEV) {
+      console.error('NotificationBell: 加载通知列表失败', error)
+    }
     notifications.value = []
     message.error('加载通知列表失败')
   } finally {
@@ -101,7 +102,9 @@ function connectSSE() {
         notifications.value = [vo, ...notifications.value]
         unreadCount.value += 1
       } catch (error) {
-        console.error('NotificationBell: 解析通知消息失败', error)
+        if (import.meta.env.DEV) {
+          console.error('NotificationBell: 解析通知消息失败', error)
+        }
         message.error('解析通知消息失败')
       }
     })
@@ -111,7 +114,9 @@ function connectSSE() {
       // if not, re-fetch count on next popover open
     }
   } catch (error) {
-    console.error('NotificationBell: 建立消息推送连接失败', error)
+    if (import.meta.env.DEV) {
+      console.error('NotificationBell: 建立消息推送连接失败', error)
+    }
     message.error('建立消息推送连接失败')
   }
 }
@@ -125,7 +130,9 @@ async function handleMarkRead(record: NotificationVO) {
     record.isRead = 1
     if (unreadCount.value > 0) unreadCount.value -= 1
   } catch (err) {
-    console.error('NotificationBell: 标记已读失败', err)
+    if (import.meta.env.DEV) {
+      console.error('NotificationBell: 标记已读失败', err)
+    }
     message.error('标记已读失败')
   } finally {
     markingIds.value.delete(record.id)
@@ -140,7 +147,9 @@ async function handleMarkAllRead() {
     unreadCount.value = 0
     message.success('已全部标为已读')
   } catch (err) {
-    console.error('NotificationBell: 操作失败', err)
+    if (import.meta.env.DEV) {
+      console.error('NotificationBell: 操作失败', err)
+    }
     message.error('操作失败')
   } finally {
     markingAll.value = false
@@ -177,7 +186,12 @@ onUnmounted(() => {
     @open-change="handlePopoverChange"
   >
     <span class="nb-trigger">
-      <a-badge :count="unreadCount" :offset="[-2, 6]" :overflow-count="99" :number-style="{ fontSize: '11px' }">
+      <a-badge
+        :count="unreadCount"
+        :offset="[-2, 6]"
+        :overflow-count="99"
+        :number-style="{ fontSize: '11px' }"
+      >
         <BellOutlined style="font-size: 18px; cursor: pointer" />
       </a-badge>
     </span>

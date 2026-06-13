@@ -5,7 +5,9 @@ import type { DictTypeVO, DictDataVO } from '@/types/dict'
 /* ========== 字典类型 ========== */
 
 /** 字典类型分页查询 */
-export function getDictTypeList(params: PageParams & { dictCode?: string; dictName?: string; status?: string }) {
+export function getDictTypeList(
+  params: PageParams & { dictCode?: string; dictName?: string; status?: string },
+) {
   return request<PageResult<DictTypeVO>>({
     url: '/system/dict/types',
     method: 'get',
@@ -31,7 +33,10 @@ export function createDictType(data: { dictCode: string; dictName: string; statu
 }
 
 /** 更新字典类型 */
-export function updateDictType(id: string, data: { dictCode: string; dictName: string; status: string }) {
+export function updateDictType(
+  id: string,
+  data: { dictCode: string; dictName: string; status: string },
+) {
   return request<void>({
     url: `/system/dict/types/${id}`,
     method: 'put',
@@ -50,7 +55,9 @@ export function deleteDictType(id: string) {
 /* ========== 字典数据 ========== */
 
 /** 字典数据分页查询 */
-export function getDictDataList(params: PageParams & { typeId?: string; dictLabel?: string; status?: string }) {
+export function getDictDataList(
+  params: PageParams & { typeId?: string; dictLabel?: string; status?: string },
+) {
   return request<PageResult<DictDataVO>>({
     url: '/system/dict/data',
     method: 'get',
