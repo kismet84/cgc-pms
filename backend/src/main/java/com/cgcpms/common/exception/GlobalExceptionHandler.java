@@ -29,6 +29,7 @@ public class GlobalExceptionHandler {
     private static final String VALIDATION_ERROR_CODE = "VALIDATION_ERROR";
 
     @ExceptionHandler(BusinessException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleBusinessException(BusinessException e) {
         log.warn("Business exception: code={}, message={}", e.getCode(), e.getMessage());
         return ApiResponse.fail(e);
