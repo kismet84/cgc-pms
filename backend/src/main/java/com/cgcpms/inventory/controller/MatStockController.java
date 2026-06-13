@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 
 @RestController
-@RequestMapping("/api/inventory/stock")
+@RequestMapping("/inventory/stock")
 @RequiredArgsConstructor
 public class MatStockController {
 
