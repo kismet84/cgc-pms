@@ -16,8 +16,12 @@ CREATE TABLE IF NOT EXISTS sys_user_preference (
     tenant_id BIGINT NOT NULL COMMENT '租户ID',
     user_id BIGINT NOT NULL COMMENT '用户ID',
     preferences TEXT NULL COMMENT '偏好设置，JSON 格式',
+    created_by BIGINT NULL COMMENT '创建人',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_by BIGINT NULL COMMENT '更新人',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    deleted_flag SMALLINT NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+    remark VARCHAR(500) NULL COMMENT '备注',
     PRIMARY KEY (id),
     CONSTRAINT uk_tenant_user UNIQUE (tenant_id, user_id)
 );
