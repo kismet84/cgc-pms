@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/contracts")
@@ -36,6 +37,20 @@ public class CtContractController {
         IPage<CtContractVO> page = ctContractService.getPage(pageNo, pageSize, contractCode, contractName,
                 contractType, contractStatus, approvalStatus, projectId, partnerId);
         return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/kpi")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:query')")
+    public ApiResponse<Map<String, Object>> kpi(
+            @RequestParam(required = false) String contractCode,
+            @RequestParam(required = false) String contractName,
+            @RequestParam(required = false) String contractType,
+            @RequestParam(required = false) String contractStatus,
+            @RequestParam(required = false) String approvalStatus,
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) Long partnerId) {
+        return ApiResponse.success(ctContractService.getKpi(contractCode, contractName,
+                contractType, contractStatus, approvalStatus, projectId, partnerId));
     }
 
     @GetMapping("/{id}")

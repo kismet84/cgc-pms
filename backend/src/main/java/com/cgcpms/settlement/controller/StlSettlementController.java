@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/settlements")
@@ -35,6 +36,18 @@ public class StlSettlementController {
         IPage<StlSettlementVO> page = stlSettlementService.getPage(pageNo, pageSize,
                 projectId, contractId, partnerId, settlementCode, settlementType);
         return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/kpi")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
+    public ApiResponse<Map<String, Object>> kpi(
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) Long contractId,
+            @RequestParam(required = false) Long partnerId,
+            @RequestParam(required = false) String settlementCode,
+            @RequestParam(required = false) String settlementType) {
+        return ApiResponse.success(stlSettlementService.getKpi(projectId, contractId,
+                partnerId, settlementCode, settlementType));
     }
 
     @GetMapping("/{id}")

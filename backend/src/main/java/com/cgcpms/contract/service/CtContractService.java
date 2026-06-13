@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
@@ -80,6 +81,41 @@ public class CtContractService {
                         .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
 
         return page.convert(c -> toVO(c, projectNames, partnerNames));
+    }
+
+    public Map<String, Object> getKpi(String contractCode, String contractName,
+                                      String contractType, String contractStatus, String approvalStatus,
+                                      Long projectId, Long partnerId) {
+        LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.hasText(contractCode)) wrapper.like(CtContract::getContractCode, contractCode);
+        if (StringUtils.hasText(contractName)) wrapper.like(CtContract::getContractName, contractName);
+        if (StringUtils.hasText(contractType)) wrapper.eq(CtContract::getContractType, contractType);
+        if (StringUtils.hasText(contractStatus)) wrapper.eq(CtContract::getContractStatus, contractStatus);
+        if (StringUtils.hasText(approvalStatus)) wrapper.eq(CtContract::getApprovalStatus, approvalStatus);
+        if (projectId != null) wrapper.eq(CtContract::getProjectId, projectId);
+        if (partnerId != null) wrapper.eq(CtContract::getPartnerId, partnerId);
+        wrapper.eq(CtContract::getTenantId, UserContext.getCurrentTenantId());
+
+        List<CtContract> contracts = ctContractMapper.selectList(wrapper);
+        BigDecimal totalAmount = contracts.stream()
+                .map(contract -> contract.getCurrentAmount() != null
+                        ? contract.getCurrentAmount()
+                        : nullToZero(contract.getContractAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal paidAmount = contracts.stream()
+                .map(contract -> nullToZero(contract.getPaidAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long overdueCount = contracts.stream()
+                .filter(contract -> contract.getEndDate() != null && contract.getEndDate().isBefore(LocalDate.now()))
+                .filter(contract -> !"SETTLED".equals(contract.getContractStatus()))
+                .count();
+
+        return Map.of(
+                "totalCount", (long) contracts.size(),
+                "totalAmount", totalAmount.toPlainString(),
+                "paidAmount", paidAmount.toPlainString(),
+                "unpaidAmount", totalAmount.subtract(paidAmount).toPlainString(),
+                "overdueCount", overdueCount);
     }
 
     public CtContractVO getById(Long id) {
@@ -261,5 +297,9 @@ public class CtContractService {
         vo.setUpdatedAt(c.getUpdatedAt() != null ? DateTimeUtils.DTF.format(c.getUpdatedAt()) : null);
         vo.setRemark(c.getRemark());
         return vo;
+    }
+
+    private static BigDecimal nullToZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 }

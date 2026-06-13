@@ -35,12 +35,13 @@ const menuItems = computed(() => {
   return routes
     .find((r) => r.path === '/')
     ?.children?.filter((r) => !r.meta?.hidden)
-    .map((r) => buildMenuItem(r))
+    .map((r) => buildMenuItem(r, ''))
 })
 
-function buildMenuItem(route: RouteRecordRaw): MenuItem {
+function buildMenuItem(route: RouteRecordRaw, parentPath: string): MenuItem {
+  const fullPath = resolveMenuPath(parentPath, route.path)
   const item: MenuItem = {
-    key: route.path,
+    key: fullPath,
     label: route.meta?.title as string,
   }
   const iconName = route.meta?.icon as string
@@ -48,9 +49,15 @@ function buildMenuItem(route: RouteRecordRaw): MenuItem {
     item.icon = () => h(iconMap[iconName])
   }
   if (route.children && route.children.length > 0) {
-    item.children = route.children.filter((c) => !c.meta?.hidden).map((c) => buildMenuItem(c))
+    item.children = route.children.filter((c) => !c.meta?.hidden).map((c) => buildMenuItem(c, fullPath))
   }
   return item
+}
+
+function resolveMenuPath(parentPath: string, routePath: string) {
+  if (routePath.startsWith('/')) return routePath
+  const normalizedParent = parentPath === '/' ? '' : parentPath
+  return `${normalizedParent}/${routePath}`.replace(/\/+/g, '/')
 }
 
 const selectedKeys = computed(() => {

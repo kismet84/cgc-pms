@@ -82,6 +82,51 @@ public class StlSettlementService {
         return page.convert(m -> toVO(m, resolveNameMaps(page.getRecords())));
     }
 
+    public Map<String, Object> getKpi(Long projectId, Long contractId, Long partnerId,
+                                      String settlementCode, String settlementType) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        LambdaQueryWrapper<StlSettlement> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(StlSettlement::getTenantId, tenantId);
+        if (projectId != null) wrapper.eq(StlSettlement::getProjectId, projectId);
+        if (contractId != null) wrapper.eq(StlSettlement::getContractId, contractId);
+        if (partnerId != null) wrapper.eq(StlSettlement::getPartnerId, partnerId);
+        if (StringUtils.hasText(settlementCode)) wrapper.like(StlSettlement::getSettlementCode, settlementCode);
+        if (StringUtils.hasText(settlementType)) wrapper.eq(StlSettlement::getSettlementType, settlementType);
+
+        List<StlSettlement> settlements = stlSettlementMapper.selectList(wrapper);
+        BigDecimal totalContractAmount = settlements.stream()
+                .map(settlement -> nullToZero(settlement.getContractAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalFinalAmount = settlements.stream()
+                .map(settlement -> nullToZero(settlement.getFinalAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalChangeAmount = settlements.stream()
+                .map(settlement -> nullToZero(settlement.getChangeAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPaidAmount = settlements.stream()
+                .map(settlement -> nullToZero(settlement.getPaidAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalUnpaidAmount = settlements.stream()
+                .map(settlement -> nullToZero(settlement.getUnpaidAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long draftCount = settlements.stream()
+                .filter(settlement -> "DRAFT".equals(settlement.getSettlementStatus()))
+                .count();
+        long finalizedCount = settlements.stream()
+                .filter(settlement -> "FINALIZED".equals(settlement.getSettlementStatus()))
+                .count();
+
+        return Map.of(
+                "totalCount", (long) settlements.size(),
+                "totalContractAmount", totalContractAmount.toPlainString(),
+                "totalFinalAmount", totalFinalAmount.toPlainString(),
+                "totalChangeAmount", totalChangeAmount.toPlainString(),
+                "totalPaidAmount", totalPaidAmount.toPlainString(),
+                "totalUnpaidAmount", totalUnpaidAmount.toPlainString(),
+                "draftCount", draftCount,
+                "finalizedCount", finalizedCount);
+    }
+
     public StlSettlementVO getById(Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement settlement = stlSettlementMapper.selectById(id);
@@ -537,5 +582,9 @@ public class StlSettlementService {
     private record NameMaps(Map<Long, String> projectNames,
                             Map<Long, String> contractNames,
                             Map<Long, String> partnerNames) {
+    }
+
+    private static BigDecimal nullToZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
     }
 }
