@@ -1,78 +1,87 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\pre-release-review.md",
-  "started_at": "2026-06-13T03:24:03.408Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\user-menu-improvements.md",
+  "started_at": "2026-06-13T09:24:25.026Z",
   "session_ids": [
-    "ses_1410ca0c0ffehXzvbdqzEodKk6",
-    "ses_140f962dbffe6R6Ct2iCTXKw1L",
-    "ses_140f92184ffe7oqMntbpit6aY8",
-    "ses_140f8ea24ffeJgKAKS4yj92SjO",
-    "ses_140f8bc9fffe0xfotAUSH4E3kZ",
-    "ses_140f88757ffeT3nlL56MAUfseE"
+    "ses_13fff5ab1ffekmHjfY4a6N3XQQ",
+    "ses_13f8e9d2affeCg95q0Zn4OfoVq",
+    "ses_13f8e7085ffeApXMHGlARFzRpD",
+    "ses_13f8e68d2ffeB5DE2uOVdJmokk",
+    "ses_13f8e5aebffeHeOF0f44WGBP2d",
+    "ses_13f8e51f8ffeK1i20j5kBXXSd8",
+    "ses_13f36f996ffeXPqIH3WIrx7091",
+    "ses_13f35a171ffep7xMza6BMuzych",
+    "ses_13f3569efffe8Cfp4EJmhnGN84",
+    "ses_13f352282ffex5iGCluMp1z69C",
+    "ses_13f34e019ffeVFH2VNnFTAlFrq"
   ],
   "session_origins": {
-    "ses_1410ca0c0ffehXzvbdqzEodKk6": "direct",
-    "ses_140f962dbffe6R6Ct2iCTXKw1L": "appended",
-    "ses_140f92184ffe7oqMntbpit6aY8": "appended",
-    "ses_140f8ea24ffeJgKAKS4yj92SjO": "appended",
-    "ses_140f8bc9fffe0xfotAUSH4E3kZ": "appended",
-    "ses_140f88757ffeT3nlL56MAUfseE": "appended"
+    "ses_13fff5ab1ffekmHjfY4a6N3XQQ": "direct",
+    "ses_13f8e9d2affeCg95q0Zn4OfoVq": "appended",
+    "ses_13f8e7085ffeApXMHGlARFzRpD": "appended",
+    "ses_13f8e68d2ffeB5DE2uOVdJmokk": "appended",
+    "ses_13f8e5aebffeHeOF0f44WGBP2d": "appended",
+    "ses_13f8e51f8ffeK1i20j5kBXXSd8": "appended",
+    "ses_13f36f996ffeXPqIH3WIrx7091": "direct",
+    "ses_13f35a171ffep7xMza6BMuzych": "appended",
+    "ses_13f3569efffe8Cfp4EJmhnGN84": "appended",
+    "ses_13f352282ffex5iGCluMp1z69C": "appended",
+    "ses_13f34e019ffeVFH2VNnFTAlFrq": "appended"
   },
-  "plan_name": "pre-release-review",
+  "plan_name": "user-menu-improvements",
   "agent": "atlas",
   "task_sessions": {
-    "todo:0": {
-      "task_key": "todo:0",
-      "task_label": "0",
-      "task_title": "**预检 — 环境健康检查**",
-      "session_id": "ses_140fd48eeffeAn77T6J60l5tMZ",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-13T03:27:55.758Z"
-    },
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "**审查维度 1 — 安全与配置审查**",
-      "session_id": "ses_140f48714ffejShkXG3Pxv0UHl",
+      "task_title": "Fix logout gap — 调用后端 POST /auth/logout",
+      "session_id": "ses_13fb31fc7ffeU60sMlKoMfp65Q",
       "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-06-13T03:38:48.008Z"
+      "category": "quick",
+      "updated_at": "2026-06-13T09:34:23.723Z"
     },
-    "todo:7": {
-      "task_key": "todo:7",
-      "task_label": "7",
-      "task_title": "**综合分析 — 去重、分级、依赖映射**",
-      "session_id": "ses_140ef5ae3ffed3JeWOt7XYFQuc",
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Backend UserPreference entity + mapper + VO",
+      "session_id": "ses_13fa2b423ffeD4K4qd3ANIszZB",
       "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-06-13T03:43:23.326Z"
+      "category": "quick",
+      "updated_at": "2026-06-13T09:45:26.495Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Backend PreferenceController + PreferenceService（TDD）",
+      "session_id": "ses_13fa025f0ffe7XmozhzLWuWLlc",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-13T09:52:14.925Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "Profile page（个人中心）— TDD",
+      "session_id": "ses_13f991652ffeg16g3SzIoL8nP8",
+      "agent": "Sisyphus-Junior",
+      "category": "visual-engineering",
+      "updated_at": "2026-06-13T10:03:21.509Z"
+    },
+    "todo:11": {
+      "task_key": "todo:11",
+      "task_label": "11",
+      "task_title": "E2E Playwright tests — complete user flow",
+      "session_id": "ses_13f762e97ffesPBfFw4VszdOAr",
+      "agent": "oracle",
+      "updated_at": "2026-06-13T10:39:25.062Z"
     },
     "final-wave:f1": {
       "task_key": "final-wave:f1",
       "task_label": "F1",
-      "task_title": "**后端回归测试** — `oracle`",
-      "session_id": "ses_140ea3c88ffed4HcyBgIKZwcSr",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-13T03:47:11.959Z"
-    },
-    "final-wave:f2": {
-      "task_key": "final-wave:f2",
-      "task_label": "F2",
-      "task_title": "**前端构建与 ESLint** — `unspecified-high`",
-      "session_id": "ses_140e88eadffe7Vfw2O0iDAhhNg",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-13T03:49:00.581Z"
-    },
-    "final-wave:f3": {
-      "task_key": "final-wave:f3",
-      "task_label": "F3",
-      "task_title": "**E2E 冒烟测试** — `unspecified-high`（+ `playwright` skill）",
-      "session_id": "ses_140e61c8affeSSQ80fqrC08Drs",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_13f352282ffex5iGCluMp1z69C",
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
-      "updated_at": "2026-06-13T04:00:14.501Z"
+      "updated_at": "2026-06-13T11:52:53.118Z"
     }
   }
 }
