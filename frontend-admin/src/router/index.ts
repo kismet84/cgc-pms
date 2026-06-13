@@ -21,6 +21,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '首页', icon: 'HomeOutlined' },
       },
       {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/pages/profile/index.vue'),
+        meta: { title: '个人中心' },
+      },
+      {
         path: 'contract',
         name: 'Contract',
         redirect: '/contract/ledger',
@@ -283,6 +289,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '预警中心', icon: 'AlertOutlined' },
       },
       {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('@/pages/settings/index.vue'),
+        meta: { title: '设置' },
+      },
+      {
         path: 'approval',
         name: 'Approval',
         redirect: '/approval/todo',
@@ -315,6 +327,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '字典管理' },
           },
         ],
+      },
+      {
+        path: 'help',
+        name: 'Help',
+        component: () => import('@/pages/help/index.vue'),
+        meta: { title: '帮助' },
       },
     ],
   },
