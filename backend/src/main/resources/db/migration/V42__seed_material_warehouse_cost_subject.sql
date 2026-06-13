@@ -22,13 +22,13 @@ VALUES
 -- ----------------------------
 -- 物料字典种子数据 (P2-05)
 -- ----------------------------
-INSERT IGNORE INTO md_material (id, tenant_id, material_code, material_name, spec, unit, unit_price, status, created_at, updated_at, deleted_flag)
+INSERT IGNORE INTO md_material (id, tenant_id, material_code, material_name, specification, unit, status, created_at, updated_at, deleted_flag)
 VALUES
-(1, 0, 'MAT-001', '螺纹钢 HRB400 Φ12', 'Φ12mm×9m', '吨', 4200.00, 'ENABLE', NOW(), NOW(), 0),
-(2, 0, 'MAT-002', '商品混凝土 C30', 'C30', '立方米', 380.00, 'ENABLE', NOW(), NOW(), 0),
-(3, 0, 'MAT-003', '水泥 P.O 42.5', 'P.O 42.5', '吨', 350.00, 'ENABLE', NOW(), NOW(), 0),
-(4, 0, 'MAT-004', '砂子 中砂', '中砂', '吨', 80.00, 'ENABLE', NOW(), NOW(), 0),
-(5, 0, 'MAT-005', '碎石 5-31.5mm', '5-31.5mm', '吨', 90.00, 'ENABLE', NOW(), NOW(), 0);
+(1, 0, 'MAT-001', '螺纹钢 HRB400 Φ12', 'Φ12mm×9m', '吨', 'ENABLE', NOW(), NOW(), 0),
+(2, 0, 'MAT-002', '商品混凝土 C30', 'C30', '立方米', 'ENABLE', NOW(), NOW(), 0),
+(3, 0, 'MAT-003', '水泥 P.O 42.5', 'P.O 42.5', '吨', 'ENABLE', NOW(), NOW(), 0),
+(4, 0, 'MAT-004', '砂子 中砂', '中砂', '吨', 'ENABLE', NOW(), NOW(), 0),
+(5, 0, 'MAT-005', '碎石 5-31.5mm', '5-31.5mm', '吨', 'ENABLE', NOW(), NOW(), 0);
 
 -- ----------------------------
 -- 仓库种子数据 (P2-05)
