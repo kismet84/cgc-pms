@@ -1,8 +1,8 @@
 # Stage 1: Build
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:9385cd9f3001dfc3431e8ead12c43e9e1f87cc1b9b5c6cfd0f73865d405b27c4 AS builder
 
-# Install pnpm (version pinned from packageManager)
-RUN npm install -g pnpm@11.0.9
+# Install pnpm via Node.js corepack (version pinned from packageManager)
+RUN corepack enable && corepack prepare pnpm@11.0.9 --activate
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY src/ ./src/
 RUN pnpm build
 
 # Stage 2: Runtime
-FROM nginx:1.27-alpine
+FROM nginx:1.27-alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist/ /usr/share/nginx/html/

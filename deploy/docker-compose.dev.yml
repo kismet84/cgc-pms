@@ -1,0 +1,170 @@
+# =============================================================================
+# CGC-PMS Docker Compose — Development (with source bind mounts + hot reload)
+# =============================================================================
+# Usage:
+#   cd deploy
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Infrastructure (MySQL, Redis, MinIO) runs in Docker.
+# Backend + Frontend source is bind-mounted from host — no rebuild needed.
+# Backend:  Spring Boot DevTools auto-restart on class change
+# Frontend: Vite HMR (hot module replacement) on file save
+# =============================================================================
+
+version: "3.8"
+
+services:
+  # ===========================================================================
+  # MySQL 8.0
+  # ===========================================================================
+  mysql:
+    image: mysql:8.0
+    container_name: cgc-pms-mysql-dev
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-cgc_pms}
+      MYSQL_USER: ${MYSQL_USER:-cgc}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-dev-data:/var/lib/mysql
+      - ./mysql/conf.d:/etc/mysql/conf.d
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --default-time-zone=+08:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cgc-pms-dev-net
+
+  # ===========================================================================
+  # Redis 7
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: cgc-pms-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - cgc-pms-dev-net
+
+  # ===========================================================================
+  # MinIO
+  # ===========================================================================
+  minio:
+    image: minio/minio:RELEASE.2024-10-13T13-34-11Z
+    container_name: cgc-pms-minio-dev
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-dev-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cgc-pms-dev-net
+
+  # ===========================================================================
+  # Backend — Spring Boot with DevTools hot reload (bind mount source)
+  # ===========================================================================
+  backend:
+    image: maven:3.9-eclipse-temurin-21
+    container_name: cgc-pms-backend-dev
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      # Bind-mount source code — edit on host, auto-restart in container
+      - ../backend:/app
+      # Anonymous volume to keep Linux Maven cache (avoids re-download)
+      - maven-repo:/root/.m2
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      # Override dev profile's localhost → Docker service names
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_USERNAME: ${MYSQL_USER:-cgc}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      MINIO_ENDPOINT: "http://minio:9000"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-do-not-use-in-production}
+    command: ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -DskipTests
+    networks:
+      - cgc-pms-dev-net
+
+  # ===========================================================================
+  # Frontend — Vite dev server with HMR (bind mount source)
+  # ===========================================================================
+  frontend:
+    image: node:22-alpine
+    container_name: cgc-pms-frontend-dev
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    volumes:
+      # Bind-mount source code — edit on host, HMR updates browser instantly
+      - ../frontend-admin:/app
+      # Anonymous volume for Linux-native node_modules (avoids Windows binary conflicts)
+      - /app/node_modules
+    environment:
+      # Tell Vite proxy to forward /api → backend container (not localhost)
+      VITE_API_TARGET: "http://backend:8080"
+    command: >
+      sh -c "npm install -g pnpm@11.0.9 && pnpm install --ignore-scripts && pnpm dev --host"
+    networks:
+      - cgc-pms-dev-net
+
+# ===========================================================================
+# Networks
+# ===========================================================================
+networks:
+  cgc-pms-dev-net:
+    driver: bridge
+
+# ===========================================================================
+# Volumes
+# ===========================================================================
+volumes:
+  mysql-dev-data:
+  redis-dev-data:
+  minio-dev-data:
+  maven-repo:

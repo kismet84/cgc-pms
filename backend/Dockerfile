@@ -1,7 +1,7 @@
 # =============================================================================
 # Stage 1: Build — Maven 3.9 + Eclipse Temurin JDK 21
 # =============================================================================
-FROM maven:3.9-eclipse-temurin-21 AS builder
+FROM maven:3.9-eclipse-temurin-21@sha256:d7e7f57407437c014571f1ad5a9955f03fc3edcb1d964067ef351fa38e798665 AS builder
 
 WORKDIR /build
 
@@ -17,7 +17,7 @@ RUN MAVEN_CONFIG="" ./mvnw clean package -DskipTests -B
 # =============================================================================
 # Stage 2: Runtime — Eclipse Temurin JRE 21 (minimal image)
 # =============================================================================
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:21-jre@sha256:194b590649efee5555de080c634905a30c2885190210e37ada26370ed2a9c781
 
 # Non-root user
 RUN groupadd -r appgroup && useradd -r -g appgroup -d /app appuser
