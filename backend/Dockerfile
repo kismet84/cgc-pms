@@ -53,26 +53,26 @@ ENV SPRING_PROFILES_ACTIVE=prod
 # =============================================================================
 ENV SPRING_DATASOURCE_URL="jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
 ENV DB_USERNAME=cgc
-ENV DB_PASSWORD=""
+ENV DB_PASSWORD=must-be-set
 
 # =============================================================================
 # Redis — override localhost with Docker service name
 # =============================================================================
 ENV SPRING_DATA_REDIS_HOST=redis
 ENV SPRING_DATA_REDIS_PORT=6379
-ENV SPRING_DATA_REDIS_PASSWORD=""
+ENV SPRING_DATA_REDIS_PASSWORD=must-be-set
 
 # =============================================================================
 # MinIO object storage
 # =============================================================================
 ENV MINIO_ENDPOINT=http://minio:9000
 ENV MINIO_ACCESS_KEY=minioadmin
-ENV MINIO_SECRET_KEY=""
+ENV MINIO_SECRET_KEY=must-be-set
 
 # =============================================================================
 # JWT signing secret (MUST be overridden in production)
 # =============================================================================
-ENV JWT_SECRET=""
+ENV JWT_SECRET=change-me-in-production
 
 # ---------------------------------------------------------------------------
 # Copy the Spring Boot fat jar from the builder stage

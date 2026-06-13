@@ -228,6 +228,7 @@ class WorkflowCoreService {
                 }
             }
         } catch (Exception ignored) {
+            log.error("Failed to save workflow record", ignored);
         }
         record.setTenantId(tenantId);
         record.setBusinessType(businessType);

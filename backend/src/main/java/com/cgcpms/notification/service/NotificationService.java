@@ -161,7 +161,7 @@ public class NotificationService {
             try {
                 oldEmitter.complete();
             } catch (Exception ignored) {
-                // Ignore
+                log.warn("Failed to clean up SSE emitter", ignored);
             }
         }
 

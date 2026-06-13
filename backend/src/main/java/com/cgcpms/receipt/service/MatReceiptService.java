@@ -479,6 +479,7 @@ public class MatReceiptService {
                 Long id = (Long) e.getClass().getMethod("getId").invoke(e);
                 map.put(id, e);
             } catch (Exception ignored) {
+                log.warn("Failed to extract field value via reflection", ignored);
             }
         }
         return map;

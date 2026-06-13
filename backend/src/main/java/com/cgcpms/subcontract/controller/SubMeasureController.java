@@ -71,7 +71,7 @@ public class SubMeasureController {
 
     @PostMapping("/{id}/items/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:edit')")
-    public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @RequestBody List<SubMeasureItem> items) {
+    public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @Valid @RequestBody List<SubMeasureItem> items) {
         subMeasureService.saveItems(id, items);
         return ApiResponse.success();
     }

@@ -894,6 +894,32 @@ Added `workflow_dispatch:` to `on:` — enables manual deployment trigger from G
 | `SSH_USER` | SSH username for deployment |
 | `SSH_KEY` | SSH private key for authentication |
 
+## T26: Backend Silent Exception Swallowing Fix (2026-06-13)
+
+### Summary
+Fixed 3 catch blocks that silently swallowed exceptions with completely empty bodies or comment-only bodies. All 3 files already had `@Slf4j`. Added appropriate `log.warn()` or `log.error()` calls.
+
+### Fixes Applied
+
+| # | File | Line | Before | After |
+|---|------|------|--------|-------|
+| 1 | WorkflowCoreService.java | 230 | `catch (Exception ignored) {}` (empty) | `log.error("Failed to save workflow record", ignored)` |
+| 2 | MatReceiptService.java | 481 | `catch (Exception ignored) {}` (empty) | `log.warn("Failed to extract field value via reflection", ignored)` |
+| 3 | NotificationService.java | 163 | `catch (Exception ignored) { // Ignore }` (comment only) | `log.warn("Failed to clean up SSE emitter", ignored)` |
+
+### Log Level Rationale
+- **log.error**: WorkflowCoreService — saveRecord() failure is a data persistence issue (could lose workflow audit trail)
+- **log.warn**: MatReceiptService — reflection-based ID extraction in `resolveEntities()` is a best-effort batch resolution; failure degrades to no resolution for that entity
+- **log.warn**: NotificationService — SSE emitter cleanup in `subscribe()` is a cleanup operation; failure is non-critical (old emitter already removed from map)
+
+### Pattern
+All 3 catch blocks used the same `catch (Exception ignored)` pattern with variable named `ignored`. This matches the T16 pattern but uses the existing variable name rather than renaming to `e`.
+
+### Verification
+- `cd backend && .\mvnw.cmd test`: **206/206 pass**, 0 failures, 0 errors, BUILD SUCCESS
+- No business logic changes — only logging added
+- No new imports needed (all 3 files already had `@Slf4j`)
+
 ### Key Decisions
 - **docker/build-push-action@v6** — latest major version of the official Docker build-push action
 - **GHA cache** (`type=gha`) — Docker layer caching via GitHub Actions cache, speeds up subsequent builds
@@ -1717,3 +1743,96 @@ Added \catch (err)\ with \console.error('ComponentName: description', err)\ befo
 ### Verification
 - \pnpm build\: PASS (vue-tsc --noEmit + vite build, zero errors)
 - \pnpm test:unit -- --run\: 16/16 pass (4 test files)
+
+## JWT_SECRET Missing from deploy/.env.example (2026-06-13)
+
+### Issue
+`deploy/.env.example` was missing `JWT_SECRET` environment variable. The `docker-compose.prod.yml` references `${JWT_SECRET}` (line 144) and `application-prod.yml` line 47 references `secret: ${JWT_SECRET}` with no default — operators copying `.env.example` to `.env` would have no knowledge of the required variable, leading to silently broken JWT tokens.
+
+### Fix
+Added `JWT_SECRET=` line to `deploy/.env.example` after `REDIS_PASSWORD` (line 11):
+```
+# JWT signing secret — MUST be set for production (at least 256-bit, 32+ random chars)
+# Generate with: openssl rand -base64 32
+JWT_SECRET=
+```
+
+### Context
+- JWT uses jjwt 0.12.6 with HMAC-SHA256
+- `application-prod.yml` line 47: `secret: ${JWT_SECRET}` — no default, REQUIRED
+- `docker-compose.prod.yml` line 144: references `${JWT_SECRET}`
+- Placed near other security credentials (REDIS_PASSWORD, MINIO_ROOT_PASSWORD) for consistency
+- Value left empty with generation instructions in comment — no actual secret committed
+
+### Verification
+- `deploy/.env.example` now has 14 lines (was 10)
+- Only new lines are the `JWT_SECRET` comment + empty value
+- No existing lines modified
+
+## T25: Dockerfile Insecure Empty Defaults — Sentinel Values (2026-06-13)
+
+### Issue
+`backend/Dockerfile` had 4 environment variables with empty string defaults that would silently fail in production if not overridden:
+- Line 56: `DB_PASSWORD=""` — would connect without DB password
+- Line 63: `SPRING_DATA_REDIS_PASSWORD=""` — would connect to Redis without auth
+- Line 70: `MINIO_SECRET_KEY=""` — would fail MinIO operations silently
+- Line 75: `JWT_SECRET=""` — empty HMAC key, all tokens forgeable
+
+### Fix
+Changed all 4 empty defaults to sentinel values that fail-fast if not overridden:
+
+| Line | Variable | Old | New |
+|------|----------|-----|-----|
+| 56 | DB_PASSWORD | `""` | `must-be-set` |
+| 63 | SPRING_DATA_REDIS_PASSWORD | `""` | `must-be-set` |
+| 70 | MINIO_SECRET_KEY | `""` | `must-be-set` |
+| 75 | JWT_SECRET | `""` | `change-me-in-production` |
+
+### Design Rationale
+- `must-be-set` sentinel: clearly wrong value — if someone forgets to override, the app will fail to connect (DB auth error, Redis auth error, MinIO auth error) instead of silently working with no security
+- `change-me-in-production` for JWT_SECRET: distinct from the `must-be-set` pattern to make the severity obvious — an empty JWT secret means ALL tokens are forgeable, so it deserves a more alarming sentinel
+- ENV lines preserved (not removed): they document which variables are expected and serve as a template
+
+### What Was NOT Changed
+- HEALTHCHECK, USER, EXPOSE, ENTRYPOINT, JAVA_OPTS, SPRING_PROFILES_ACTIVE — all untouched
+- Comment blocks above each ENV section — preserved as-is
+- No actual secrets placed in Dockerfile
+
+### Verification
+- Visual inspection: all 4 lines show sentinel values (lines 56, 63, 70, 75)
+- Dockerfile syntax: existing structure unchanged, only values replaced
+- `docker build --check` timed out on Windows (image pull) but no structural changes could break syntax
+
+## T25: @Valid on batchSaveBasis + batchSaveItems (2026-06-13)
+
+### Issue
+PayApplicationController.batchSaveBasis() and SubMeasureController.batchSaveItems() accepted @RequestBody with business entities (List<PayApplicationBasis>, List<SubMeasureItem>) but lacked @Valid annotation. This means Jakarta Bean Validation annotations on those entity classes would not trigger, allowing invalid data to reach the service layer unchecked.
+
+### Fix
+Added @Valid before @RequestBody on both methods:
+
+**PayApplicationController.java** line 76:
+`java
+// Before:
+public ApiResponse<Void> batchSaveBasis(@PathVariable Long id, @RequestBody List<PayApplicationBasis> basisList)
+// After:
+public ApiResponse<Void> batchSaveBasis(@PathVariable Long id, @Valid @RequestBody List<PayApplicationBasis> basisList)
+`
+
+**SubMeasureController.java** line 74:
+`java
+// Before:
+public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @RequestBody List<SubMeasureItem> items)
+// After:
+public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @Valid @RequestBody List<SubMeasureItem> items)
+`
+
+### Context
+- Both files already had import jakarta.validation.Valid (from prior @Valid usage on create/update methods)
+- Map-based @RequestBody methods (SysUserController.updateStatus, assignRoles, SysRoleController.assignMenus, InvoiceController.verify) were NOT modified — Map<String, ...> has no validation annotations
+- GlobalExceptionHandler already handles MethodArgumentNotValidException → 400 with VALIDATION_ERROR code
+- This is forward-compatible hardening: even if PayApplicationBasis and SubMeasureItem currently lack validation annotations, adding @Valid ensures any future annotations will be enforced
+
+### Verification
+- cd backend && .\mvnw.cmd clean test: 206/206 pass, 0 failures, 0 errors, BUILD SUCCESS
+- No compilation errors, no import changes needed
