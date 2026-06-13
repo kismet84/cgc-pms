@@ -149,7 +149,7 @@ services:
       # Tell Vite proxy to forward /api → backend container (not localhost)
       VITE_API_TARGET: "http://backend:8080"
     command: >
-      sh -c "npm install -g pnpm@11.0.9 && pnpm install --ignore-scripts && pnpm dev --host"
+      sh -c "npm config set registry https://registry.npmmirror.com && npm install -g pnpm@11.0.9 && pnpm config set registry https://registry.npmmirror.com && pnpm install --ignore-scripts && pnpm dev --host"
     networks:
       - cgc-pms-dev-net
 
