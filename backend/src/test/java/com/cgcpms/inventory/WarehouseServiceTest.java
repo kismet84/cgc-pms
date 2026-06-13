@@ -1,5 +1,6 @@
 package com.cgcpms.inventory;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
@@ -36,6 +37,9 @@ class WarehouseServiceTest {
 
     @BeforeEach
     void setupContext() {
+        // Clean seed data for test isolation (V42 migration seeds 2 warehouses)
+        warehouseMapper.delete(new LambdaQueryWrapper<MatWarehouse>()
+                .eq(MatWarehouse::getTenantId, TENANT_ID));
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
