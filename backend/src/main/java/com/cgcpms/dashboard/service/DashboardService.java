@@ -33,7 +33,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -41,8 +41,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CostSummaryService costSummaryService;
     private final CostSummaryMapper costSummaryMapper;
@@ -84,7 +82,7 @@ public class DashboardService {
             item.setBusinessType(t.getBusinessType());
             item.setBusinessId(String.valueOf(t.getBusinessId()));
             item.setTaskStatus(t.getTaskStatus());
-            if (t.getReceivedAt() != null) item.setReceivedAt(DTF.format(t.getReceivedAt()));
+            if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
             WfInstance inst = instanceMap.get(t.getInstanceId());
             if (inst != null) {
                 item.setTitle(inst.getTitle());
@@ -131,7 +129,7 @@ public class DashboardService {
                 item.setInstanceId(String.valueOf(t.getInstanceId()));
                 item.setBusinessType(t.getBusinessType());
                 item.setTaskStatus(t.getTaskStatus());
-                if (t.getReceivedAt() != null) item.setReceivedAt(DTF.format(t.getReceivedAt()));
+                if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
                 WfInstance inst = instanceMap.get(t.getInstanceId());
                 if (inst != null) {
                     item.setTitle(inst.getTitle());
@@ -335,35 +333,40 @@ public class DashboardService {
 
         List<DashboardProjectSummaryVO> rankings = new ArrayList<>();
 
+        // Batch load all project summaries to avoid N+1 per-project queries
+        List<Long> projectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toList());
+        Map<Long, CostProjectSummaryVO> summaryMap = costSummaryService.getBatchProjectSummaries(tenantId, projectIds);
+
         for (PmProject project : activeProjects) {
-            try {
-                CostProjectSummaryVO summary = costSummaryService.getProjectSummary(tenantId, project.getId());
-                DashboardProjectSummaryVO rank = new DashboardProjectSummaryVO();
-                rank.setProjectId(String.valueOf(project.getId()));
-                rank.setProjectName(project.getProjectName());
-                rank.setProjectCode(project.getProjectCode());
-                rank.setStatus(project.getStatus());
-                rank.setTargetCost(summary.getTargetCost());
-                rank.setDynamicCost(summary.getDynamicCost());
-                rank.setContractIncome(summary.getContractIncome());
-                rank.setExpectedProfit(summary.getExpectedProfit());
-                rank.setCostDeviation(summary.getCostDeviation());
-                rank.setPaidAmount(summary.getPaidAmount());
-                rank.setContractAmount(summary.getContractIncome());
-
-                rankings.add(rank);
-
-                totalContractAmount = totalContractAmount.add(
-                        summary.getContractIncome() != null ? new BigDecimal(summary.getContractIncome()) : BigDecimal.ZERO);
-                totalDynamicCost = totalDynamicCost.add(
-                        summary.getDynamicCost() != null ? new BigDecimal(summary.getDynamicCost()) : BigDecimal.ZERO);
-                totalExpectedProfit = totalExpectedProfit.add(
-                        summary.getExpectedProfit() != null ? new BigDecimal(summary.getExpectedProfit()) : BigDecimal.ZERO);
-                totalPaidAmount = totalPaidAmount.add(
-                        summary.getPaidAmount() != null ? new BigDecimal(summary.getPaidAmount()) : BigDecimal.ZERO);
-            } catch (Exception e) {
-                log.warn("Failed to load summary for project {}: {}", project.getId(), e.getMessage());
+            CostProjectSummaryVO summary = summaryMap.get(project.getId());
+            if (summary == null) {
+                log.warn("No summary found for project {}", project.getId());
+                continue;
             }
+
+            DashboardProjectSummaryVO rank = new DashboardProjectSummaryVO();
+            rank.setProjectId(String.valueOf(project.getId()));
+            rank.setProjectName(project.getProjectName());
+            rank.setProjectCode(project.getProjectCode());
+            rank.setStatus(project.getStatus());
+            rank.setTargetCost(summary.getTargetCost());
+            rank.setDynamicCost(summary.getDynamicCost());
+            rank.setContractIncome(summary.getContractIncome());
+            rank.setExpectedProfit(summary.getExpectedProfit());
+            rank.setCostDeviation(summary.getCostDeviation());
+            rank.setPaidAmount(summary.getPaidAmount());
+            rank.setContractAmount(summary.getContractIncome());
+
+            rankings.add(rank);
+
+            totalContractAmount = totalContractAmount.add(
+                    summary.getContractIncome() != null ? new BigDecimal(summary.getContractIncome()) : BigDecimal.ZERO);
+            totalDynamicCost = totalDynamicCost.add(
+                    summary.getDynamicCost() != null ? new BigDecimal(summary.getDynamicCost()) : BigDecimal.ZERO);
+            totalExpectedProfit = totalExpectedProfit.add(
+                    summary.getExpectedProfit() != null ? new BigDecimal(summary.getExpectedProfit()) : BigDecimal.ZERO);
+            totalPaidAmount = totalPaidAmount.add(
+                    summary.getPaidAmount() != null ? new BigDecimal(summary.getPaidAmount()) : BigDecimal.ZERO);
         }
 
         vo.setTotalContractAmount(totalContractAmount.toPlainString());
@@ -397,7 +400,7 @@ public class DashboardService {
                     item.setInstanceId(String.valueOf(t.getInstanceId()));
                     item.setBusinessType(t.getBusinessType());
                     item.setTaskStatus(t.getTaskStatus());
-                    if (t.getReceivedAt() != null) item.setReceivedAt(DTF.format(t.getReceivedAt()));
+                    if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
                     return item;
                 }).collect(Collectors.toList());
         vo.setOverdueItems(overdueItems);

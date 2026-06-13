@@ -14,7 +14,7 @@ import { getCostLedger, getCostLedgerSummary, getCostLedgerDetail } from '@/api/
 import { getProjectList } from '@/api/modules/project'
 import { getContractLedger } from '@/api/modules/contract'
 import { getPartnerList } from '@/api/modules/partner'
-import { request } from '@/api/request'
+import { getCostSubjectTree, type CostSubjectTreeNode } from '@/api/modules/costSubject'
 import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO, SourceType } from '@/types/cost'
 import { SOURCE_TYPE_LABEL, SOURCE_TYPE_COLOR } from '@/types/cost'
 import type { PageResult } from '@/types/api'
@@ -96,7 +96,7 @@ async function fetchPartners() {
 
 async function fetchSubjectTree() {
   try {
-    const data = await request<any[]>({ url: '/cost-subjects/tree', method: 'get' })
+    const data = await getCostSubjectTree()
     subjectTree.value = convertToTreeData(data)
   } catch {
     subjectTree.value = []

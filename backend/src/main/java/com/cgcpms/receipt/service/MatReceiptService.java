@@ -26,6 +26,7 @@ import com.cgcpms.receipt.vo.MatReceiptItemVO;
 import com.cgcpms.receipt.vo.MatReceiptVO;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -33,15 +34,13 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatReceiptService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final MatReceiptMapper matReceiptMapper;
     private final MatReceiptItemMapper matReceiptItemMapper;
@@ -111,7 +110,7 @@ public class MatReceiptService {
     @Transactional
     public Long create(MatReceipt receipt) {
         // Auto-generate receipt code: MR-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "MR-" + today + "-";
 
         LambdaQueryWrapper<MatReceipt> wrapper = new LambdaQueryWrapper<>();
@@ -125,7 +124,8 @@ public class MatReceiptService {
         if (last != null && last.getReceiptCode() != null && last.getReceiptCode().length() == prefix.length() + 3) {
             try {
                 seq = Integer.parseInt(last.getReceiptCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getReceiptCode(), e);
             }
         }
         receipt.setReceiptCode(prefix + String.format("%03d", seq));
@@ -399,7 +399,7 @@ public class MatReceiptService {
         vo.setContractId(r.getContractId() != null ? r.getContractId().toString() : null);
         vo.setPartnerId(r.getPartnerId() != null ? r.getPartnerId().toString() : null);
         vo.setReceiptCode(r.getReceiptCode());
-        vo.setReceiptDate(r.getReceiptDate() != null ? DATE_FMT.format(r.getReceiptDate()) : null);
+        vo.setReceiptDate(r.getReceiptDate() != null ? DateTimeUtils.DATE_FMT.format(r.getReceiptDate()) : null);
         vo.setWarehouseId(r.getWarehouseId() != null ? r.getWarehouseId().toString() : null);
         vo.setReceiverId(r.getReceiverId() != null ? r.getReceiverId().toString() : null);
         vo.setQualityStatus(r.getQualityStatus());
@@ -407,8 +407,8 @@ public class MatReceiptService {
         vo.setApprovalStatus(r.getApprovalStatus());
         vo.setCostGeneratedFlag(r.getCostGeneratedFlag());
         vo.setCreatedBy(r.getCreatedBy() != null ? r.getCreatedBy().toString() : null);
-        vo.setCreatedAt(r.getCreatedAt() != null ? DTF.format(r.getCreatedAt()) : null);
-        vo.setUpdatedAt(r.getUpdatedAt() != null ? DTF.format(r.getUpdatedAt()) : null);
+        vo.setCreatedAt(r.getCreatedAt() != null ? DateTimeUtils.DTF.format(r.getCreatedAt()) : null);
+        vo.setUpdatedAt(r.getUpdatedAt() != null ? DateTimeUtils.DTF.format(r.getUpdatedAt()) : null);
         vo.setRemark(r.getRemark());
         return vo;
     }
@@ -428,8 +428,8 @@ public class MatReceiptService {
         vo.setUseLocation(i.getUseLocation());
         vo.setBatchNo(i.getBatchNo());
         vo.setCreatedBy(i.getCreatedBy() != null ? i.getCreatedBy().toString() : null);
-        vo.setCreatedAt(i.getCreatedAt() != null ? DTF.format(i.getCreatedAt()) : null);
-        vo.setUpdatedAt(i.getUpdatedAt() != null ? DTF.format(i.getUpdatedAt()) : null);
+        vo.setCreatedAt(i.getCreatedAt() != null ? DateTimeUtils.DTF.format(i.getCreatedAt()) : null);
+        vo.setUpdatedAt(i.getUpdatedAt() != null ? DateTimeUtils.DTF.format(i.getUpdatedAt()) : null);
         vo.setRemark(i.getRemark());
         return vo;
     }

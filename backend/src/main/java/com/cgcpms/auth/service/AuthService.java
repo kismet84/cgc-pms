@@ -11,6 +11,7 @@ import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -46,6 +48,7 @@ public class AuthService {
         List<String> roleCodes = getRoleCodes(user.getId());
         List<String> permCodes = getPermissionCodes(user.getId());
 
+        log.info("User login: {}", request.getUsername());
         String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes);
         String refreshToken = jwtUtils.generateRefreshToken(user.getId());
         UserInfo userInfo = UserInfo.builder()

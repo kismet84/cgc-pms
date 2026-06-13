@@ -34,11 +34,15 @@ function handleLogout() {
 
     <a-layout>
       <a-layout-header class="topbar">
-        <MenuFoldOutlined class="hamburger" @click="collapsed = !collapsed" />
+        <MenuFoldOutlined
+          class="hamburger"
+          :aria-label="collapsed ? '展开菜单' : '折叠菜单'"
+          @click="collapsed = !collapsed"
+        />
         <div class="flex-1"></div>
         <div class="top-actions">
-          <NotificationBell />
-          <QuestionCircleOutlined style="font-size: 18px; cursor: pointer" />
+          <span aria-label="通知"><NotificationBell /></span>
+          <QuestionCircleOutlined aria-label="帮助" style="font-size: 18px; cursor: pointer" />
           <a-dropdown>
             <div class="user-info">
               <a-avatar

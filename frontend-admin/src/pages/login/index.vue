@@ -39,13 +39,17 @@ async function handleSubmit() {
     loading.value = false
   }
 }
+
+function handleForgotPassword() {
+  message.info('请联系系统管理员重置密码')
+}
 </script>
 
 <template>
   <div class="login-page">
     <div class="login-card">
       <div class="login-header">
-        <div class="logo">▣</div>
+        <div class="logo" aria-hidden="true">▣</div>
         <h1 class="title">建筑工程总包项目管理系统</h1>
         <p class="subtitle">Construction General Contracting PMS</p>
       </div>
@@ -76,7 +80,13 @@ async function handleSubmit() {
         <a-form-item>
           <div class="form-extra">
             <a-checkbox v-model:checked="formState.remember">记住我</a-checkbox>
-            <a class="forgot">忘记密码？</a>
+            <a
+              class="forgot"
+              role="button"
+              tabindex="0"
+              @click="handleForgotPassword"
+              @keydown.enter="handleForgotPassword"
+            >忘记密码？</a>
           </div>
         </a-form-item>
 

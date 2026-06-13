@@ -14,7 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -25,8 +25,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class WorkflowQueryService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final WfTaskMapper wfTaskMapper;
     private final WfInstanceMapper wfInstanceMapper;
@@ -70,8 +68,8 @@ public class WorkflowQueryService {
             vo.setTaskStatus(task.getTaskStatus());
             vo.setRoundNo(task.getRoundNo());
             vo.setTaskVersion(task.getTaskVersion());
-            if (task.getReceivedAt() != null) vo.setReceivedAt(DTF.format(task.getReceivedAt()));
-            if (task.getHandledAt() != null) vo.setHandledAt(DTF.format(task.getHandledAt()));
+            if (task.getReceivedAt() != null) vo.setReceivedAt(DateTimeUtils.DTF.format(task.getReceivedAt()));
+            if (task.getHandledAt() != null) vo.setHandledAt(DateTimeUtils.DTF.format(task.getHandledAt()));
             vo.setActionType(task.getActionType());
             vo.setComment(task.getComment());
 
@@ -120,7 +118,7 @@ public class WorkflowQueryService {
             vo.setOperatorName(record.getOperatorName());
             vo.setComment(record.getComment());
             vo.setRecordStatus(record.getRecordStatus());
-            if (record.getCreatedAt() != null) vo.setCreatedAt(DTF.format(record.getCreatedAt()));
+            if (record.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(record.getCreatedAt()));
 
             // Include businessType from record entity
             vo.setBusinessType(record.getBusinessType());
@@ -176,8 +174,8 @@ public class WorkflowQueryService {
                 ? (initiator.getRealName() != null ? initiator.getRealName() : initiator.getUsername())
                 : "");
         vo.setBusinessSummary(instance.getBusinessSummary());
-        if (instance.getStartedAt() != null) vo.setStartedAt(DTF.format(instance.getStartedAt()));
-        if (instance.getEndedAt() != null) vo.setEndedAt(DTF.format(instance.getEndedAt()));
+        if (instance.getStartedAt() != null) vo.setStartedAt(DateTimeUtils.DTF.format(instance.getStartedAt()));
+        if (instance.getEndedAt() != null) vo.setEndedAt(DateTimeUtils.DTF.format(instance.getEndedAt()));
 
         WfTemplate template = wfTemplateMapper.selectById(instance.getTemplateId());
         if (template != null) {
@@ -216,8 +214,8 @@ public class WorkflowQueryService {
             nvo.setApproveMode(n.getApproveMode());
             nvo.setNodeStatus(n.getNodeStatus());
             nvo.setRoundNo(n.getRoundNo());
-            if (n.getStartedAt() != null) nvo.setStartedAt(DTF.format(n.getStartedAt()));
-            if (n.getEndedAt() != null) nvo.setEndedAt(DTF.format(n.getEndedAt()));
+            if (n.getStartedAt() != null) nvo.setStartedAt(DateTimeUtils.DTF.format(n.getStartedAt()));
+            if (n.getEndedAt() != null) nvo.setEndedAt(DateTimeUtils.DTF.format(n.getEndedAt()));
 
             // Tasks for this node
             List<WfTask> tasks = tasksByNode.getOrDefault(n.getId(), Collections.emptyList());
@@ -231,8 +229,8 @@ public class WorkflowQueryService {
                 tvo.setTaskStatus(t.getTaskStatus());
                 tvo.setRoundNo(t.getRoundNo());
                 tvo.setTaskVersion(t.getTaskVersion());
-                if (t.getReceivedAt() != null) tvo.setReceivedAt(DTF.format(t.getReceivedAt()));
-                if (t.getHandledAt() != null) tvo.setHandledAt(DTF.format(t.getHandledAt()));
+                if (t.getReceivedAt() != null) tvo.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
+                if (t.getHandledAt() != null) tvo.setHandledAt(DateTimeUtils.DTF.format(t.getHandledAt()));
                 tvo.setActionType(t.getActionType());
                 tvo.setComment(t.getComment());
                 return tvo;
@@ -264,7 +262,7 @@ public class WorkflowQueryService {
             rvo.setOperatorName(r.getOperatorName());
             rvo.setComment(r.getComment());
             rvo.setRecordStatus(r.getRecordStatus());
-            if (r.getCreatedAt() != null) rvo.setCreatedAt(DTF.format(r.getCreatedAt()));
+            if (r.getCreatedAt() != null) rvo.setCreatedAt(DateTimeUtils.DTF.format(r.getCreatedAt()));
             return rvo;
         }).collect(Collectors.toList());
         vo.setRecords(recordVOs);
@@ -305,7 +303,7 @@ public class WorkflowQueryService {
             if (cc.getBusinessId() != null) vo.setBusinessId(String.valueOf(cc.getBusinessId()));
             vo.setTitle(cc.getTitle());
             vo.setIsRead(cc.getIsRead());
-            if (cc.getCreatedTime() != null) vo.setCreatedTime(DTF.format(cc.getCreatedTime()));
+            if (cc.getCreatedTime() != null) vo.setCreatedTime(DateTimeUtils.DTF.format(cc.getCreatedTime()));
 
             // Enrich with instance info
             WfInstance instance = instanceMap.get(cc.getInstanceId());

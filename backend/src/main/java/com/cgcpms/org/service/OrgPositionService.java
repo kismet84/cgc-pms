@@ -13,13 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
 @Service
 @RequiredArgsConstructor
 public class OrgPositionService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final OrgPositionMapper orgPositionMapper;
 
@@ -88,8 +86,8 @@ public class OrgPositionService {
         vo.setPositionName(p.getPositionName());
         vo.setStatus(p.getStatus());
         vo.setCreatedBy(p.getCreatedBy() != null ? String.valueOf(p.getCreatedBy()) : null);
-        if (p.getCreatedTime() != null) vo.setCreatedAt(DTF.format(p.getCreatedTime()));
-        if (p.getUpdatedTime() != null) vo.setUpdatedAt(DTF.format(p.getUpdatedTime()));
+        if (p.getCreatedTime() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(p.getCreatedTime()));
+        if (p.getUpdatedTime() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(p.getUpdatedTime()));
         vo.setRemark(p.getRemark());
         return vo;
     }

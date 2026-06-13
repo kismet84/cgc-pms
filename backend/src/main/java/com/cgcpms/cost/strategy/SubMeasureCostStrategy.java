@@ -2,9 +2,7 @@ package com.cgcpms.cost.strategy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.cost.entity.CostItem;
-import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostItemMapper;
-import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
@@ -36,7 +34,7 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
     private final SubMeasureMapper subMeasureMapper;
     private final SubMeasureItemMapper subMeasureItemMapper;
     private final CostItemMapper costItemMapper;
-    private final CostSubjectMapper costSubjectMapper;
+    private final CostSubjectResolver costSubjectResolver;
 
     @Override
     public String supportSourceType() {
@@ -65,7 +63,7 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
         LocalDate today = LocalDate.now();
 
         // Resolve default cost subject for SUBCONTRACT type
-        Long defaultSubjectId = resolveDefaultSubjectId(measure.getTenantId(), "分包");
+        Long defaultSubjectId = costSubjectResolver.resolveDefaultSubjectId(measure.getTenantId(), "分包");
 
         int generated = 0;
         for (SubMeasureItem item : items) {
@@ -98,54 +96,6 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
         subMeasureMapper.updateById(measure);
 
         log.info("生成分包成本完成 measureId={}, 明细数={}, 新增={}", measureId, items.size(), generated);
-    }
-
-    /**
-     * Resolve a default cost_subject_id for the given tenant by subject_type.
-     * Falls back to any root-level subject, then any enabled subject.
-     */
-    private Long resolveDefaultSubjectId(Long tenantId, String subjectType) {
-        LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getSubjectType, subjectType);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getLevel);
-        wrapper.last("LIMIT 1");
-        CostSubject subject = costSubjectMapper.selectOne(wrapper);
-        if (subject != null) {
-            return subject.getId();
-        }
-
-        // Fallback: root-level subject
-        wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getParentId, 0L);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getSortOrder);
-        wrapper.last("LIMIT 1");
-        subject = costSubjectMapper.selectOne(wrapper);
-        if (subject != null) {
-            log.warn("未找到 subject_type={} 对应的科目，使用根科目 subjectId={}", subjectType, subject.getId());
-            return subject.getId();
-        }
-
-        // Last resort: any enabled subject
-        wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getLevel, CostSubject::getSortOrder);
-        wrapper.last("LIMIT 1");
-        subject = costSubjectMapper.selectOne(wrapper);
-        if (subject != null) {
-            log.warn("未找到 subject_type={} 对应的科目且无根科目，使用第一个可用科目 subjectId={}", subjectType, subject.getId());
-            return subject.getId();
-        }
-
-        log.error("租户 {} 下无任何启用科目，costSubjectId 将为 null，cost_type={}", tenantId, subjectType);
-        return null;
     }
 
 }

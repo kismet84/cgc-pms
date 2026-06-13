@@ -14,14 +14,12 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final PayInvoiceMapper payInvoiceMapper;
 
@@ -151,8 +149,8 @@ public class InvoiceService {
         vo.setInvoiceDate(invoice.getInvoiceDate() != null ? invoice.getInvoiceDate().toString() : null);
         vo.setVerifyStatus(invoice.getVerifyStatus());
         vo.setCreatedBy(invoice.getCreatedBy() != null ? invoice.getCreatedBy().toString() : null);
-        vo.setCreatedAt(invoice.getCreatedTime() != null ? invoice.getCreatedTime().format(DTF) : null);
-        vo.setUpdatedAt(invoice.getUpdatedTime() != null ? invoice.getUpdatedTime().format(DTF) : null);
+        vo.setCreatedAt(invoice.getCreatedTime() != null ? invoice.getCreatedTime().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(invoice.getUpdatedTime() != null ? invoice.getUpdatedTime().format(DateTimeUtils.DTF) : null);
         vo.setRemark(invoice.getRemark());
         return vo;
     }

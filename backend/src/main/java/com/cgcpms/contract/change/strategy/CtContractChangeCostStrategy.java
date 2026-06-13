@@ -1,15 +1,13 @@
 package com.cgcpms.contract.change.strategy;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
-import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostItemMapper;
-import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.strategy.CostGenerationStrategy;
+import com.cgcpms.cost.strategy.CostSubjectResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -38,7 +36,7 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
     private final CtContractChangeMapper changeMapper;
     private final CtContractMapper contractMapper;
     private final CostItemMapper costItemMapper;
-    private final CostSubjectMapper costSubjectMapper;
+    private final CostSubjectResolver costSubjectResolver;
 
     @Override
     public String supportSourceType() {
@@ -71,7 +69,7 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
         CtContract contract = contractMapper.selectById(change.getContractId());
 
         // Resolve cost subject: try "变更" type → "合同" type → root → any
-        Long costSubjectId = resolveCostSubjectId(change.getTenantId());
+        Long costSubjectId = costSubjectResolver.resolveForChange(change.getTenantId());
 
         LocalDate today = LocalDate.now();
 
@@ -107,66 +105,7 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
         // Update cost_generated_flag
         change.setCostGeneratedFlag(1);
         changeMapper.updateById(change);
-
         log.info("生成变更成本完成 changeId={}, amount={}", changeId, change.getChangeAmount());
     }
 
-    /**
-     * Resolve a cost_subject_id for CT_CHANGE.
-     * Tries "变更" subject_type first, then "合同", then root-level, then any enabled subject.
-     */
-    private Long resolveCostSubjectId(Long tenantId) {
-        // 1. Try "变更" subject type
-        Long id = findSubjectByType(tenantId, "变更");
-        if (id != null) return id;
-
-        // 2. Fallback: "合同" subject type (contract default)
-        id = findSubjectByType(tenantId, "合同");
-        if (id != null) {
-            log.warn("未找到 subject_type=变更 对应的科目，使用合同科目 subjectId={}", id);
-            return id;
-        }
-
-        // 3. Fallback: root-level subject
-        LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getParentId, 0L);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getSortOrder);
-        wrapper.last("LIMIT 1");
-        CostSubject subject = costSubjectMapper.selectOne(wrapper);
-        if (subject != null) {
-            log.warn("未找到 subject_type=变更/合同 对应的科目，使用根科目 subjectId={}", subject.getId());
-            return subject.getId();
-        }
-
-        // 4. Last resort: any enabled subject
-        wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getLevel, CostSubject::getSortOrder);
-        wrapper.last("LIMIT 1");
-        subject = costSubjectMapper.selectOne(wrapper);
-        if (subject != null) {
-            log.warn("未找到 subject_type=变更/合同 对应的科目且无根科目，使用第一个可用科目 subjectId={}", subject.getId());
-            return subject.getId();
-        }
-
-        log.error("租户 {} 下无任何启用科目，costSubjectId 将为 null，source_type=CT_CHANGE", tenantId);
-        return null;
-    }
-
-    private Long findSubjectByType(Long tenantId, String subjectType) {
-        LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getSubjectType, subjectType);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getLevel);
-        wrapper.last("LIMIT 1");
-        CostSubject subject = costSubjectMapper.selectOne(wrapper);
-        return subject != null ? subject.getId() : null;
-    }
 }

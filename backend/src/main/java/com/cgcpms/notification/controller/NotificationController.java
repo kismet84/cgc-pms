@@ -106,6 +106,7 @@ public class NotificationController {
      * </ul>
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("isAuthenticated()")
     public SseEmitter stream() {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();

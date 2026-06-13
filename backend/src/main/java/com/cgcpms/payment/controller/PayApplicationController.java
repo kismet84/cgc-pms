@@ -8,6 +8,7 @@ import com.cgcpms.payment.entity.PayApplicationBasis;
 import com.cgcpms.payment.service.PayApplicationService;
 import com.cgcpms.payment.vo.PayApplicationBasisVO;
 import com.cgcpms.payment.vo.PayApplicationVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -45,13 +46,13 @@ public class PayApplicationController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('payment:app:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Long> create(@RequestBody PayApplication app) {
+    public ApiResponse<Long> create(@Valid @RequestBody PayApplication app) {
         return ApiResponse.success(payApplicationService.create(app));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('payment:app:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> update(@PathVariable Long id, @RequestBody PayApplication app) {
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PayApplication app) {
         app.setId(id);
         payApplicationService.update(app);
         return ApiResponse.success();

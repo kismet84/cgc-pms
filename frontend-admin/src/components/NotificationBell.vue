@@ -49,8 +49,9 @@ async function fetchUnreadCount() {
   try {
     const res = await getUnreadCount()
     unreadCount.value = res.count
-  } catch {
-    // silently fail — badge stays at current value
+  } catch (error) {
+    console.error('NotificationBell: 加载未读数量失败', error)
+    message.error('加载未读数量失败')
   }
 }
 
@@ -62,8 +63,10 @@ async function fetchNotifications() {
       pageSize: 20,
     })
     notifications.value = res.records
-  } catch {
+  } catch (error) {
+    console.error('NotificationBell: 加载通知列表失败', error)
     notifications.value = []
+    message.error('加载通知列表失败')
   } finally {
     loading.value = false
   }
@@ -97,8 +100,9 @@ function connectSSE() {
         }
         notifications.value = [vo, ...notifications.value]
         unreadCount.value += 1
-      } catch {
-        // JSON parse error — skip malformed event
+      } catch (error) {
+        console.error('NotificationBell: 解析通知消息失败', error)
+        message.error('解析通知消息失败')
       }
     })
 
@@ -106,8 +110,9 @@ function connectSSE() {
       // SSE connection lost — browser will auto-reconnect;
       // if not, re-fetch count on next popover open
     }
-  } catch {
-    // EventSource creation failed — degrade gracefully
+  } catch (error) {
+    console.error('NotificationBell: 建立消息推送连接失败', error)
+    message.error('建立消息推送连接失败')
   }
 }
 
@@ -119,7 +124,8 @@ async function handleMarkRead(record: NotificationVO) {
     await markAsRead(record.id)
     record.isRead = 1
     if (unreadCount.value > 0) unreadCount.value -= 1
-  } catch {
+  } catch (err) {
+    console.error('NotificationBell: 标记已读失败', err)
     message.error('标记已读失败')
   } finally {
     markingIds.value.delete(record.id)
@@ -133,7 +139,8 @@ async function handleMarkAllRead() {
     notifications.value.forEach((n) => (n.isRead = 1))
     unreadCount.value = 0
     message.success('已全部标为已读')
-  } catch {
+  } catch (err) {
+    console.error('NotificationBell: 操作失败', err)
     message.error('操作失败')
   } finally {
     markingAll.value = false

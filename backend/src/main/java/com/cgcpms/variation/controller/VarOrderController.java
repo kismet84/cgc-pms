@@ -79,7 +79,7 @@ public class VarOrderController {
 
     @PostMapping("/{id}/items/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:edit')")
-    public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @RequestBody List<VarOrderItem> items) {
+    public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @Valid @RequestBody List<VarOrderItem> items) {
         varOrderService.saveItems(id, items);
         return ApiResponse.success();
     }

@@ -39,7 +39,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,8 +50,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class PayApplicationService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final PayApplicationMapper payApplicationMapper;
     private final PayApplicationBasisMapper payApplicationBasisMapper;
@@ -167,7 +165,7 @@ public class PayApplicationService {
     @Transactional
     public Long create(PayApplication app) {
         // Auto-generate apply code: PAY-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "PAY-" + today + "-";
 
         LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
@@ -180,7 +178,8 @@ public class PayApplicationService {
         if (last != null && last.getApplyCode() != null && last.getApplyCode().startsWith(prefix)) {
             try {
                 seq = Integer.parseInt(last.getApplyCode().substring(last.getApplyCode().lastIndexOf('-') + 1)) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getApplyCode(), e);
             }
         }
         app.setApplyCode(prefix + String.format("%03d", seq));
@@ -508,8 +507,8 @@ public class PayApplicationService {
         vo.setApprovalStatus(app.getApprovalStatus());
         vo.setApplyReason(app.getApplyReason());
         vo.setCreatedBy(app.getCreatedBy() != null ? app.getCreatedBy().toString() : null);
-        vo.setCreatedAt(app.getCreatedAt() != null ? app.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(app.getUpdatedAt() != null ? app.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(app.getCreatedAt() != null ? app.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(app.getUpdatedAt() != null ? app.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(app.getRemark());
         return vo;
     }
@@ -523,8 +522,8 @@ public class PayApplicationService {
         vo.setBasisId(basis.getBasisId() != null ? basis.getBasisId().toString() : null);
         vo.setBasisAmount(basis.getBasisAmount() != null ? basis.getBasisAmount().toPlainString() : null);
         vo.setCreatedBy(basis.getCreatedBy() != null ? basis.getCreatedBy().toString() : null);
-        vo.setCreatedAt(basis.getCreatedAt() != null ? basis.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(basis.getUpdatedAt() != null ? basis.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(basis.getCreatedAt() != null ? basis.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(basis.getUpdatedAt() != null ? basis.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(basis.getRemark());
         return vo;
     }

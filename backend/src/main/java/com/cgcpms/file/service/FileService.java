@@ -22,7 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(name = "minio.enabled", havingValue = "true", matchIfMissing = true)
 public class FileService {
 
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int PRESIGNED_URL_EXPIRE_DAYS = 7;
     private static final long MAX_FILE_SIZE = 50 * 1024 * 1024L; // 50 MB
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
@@ -212,7 +211,7 @@ public class FileService {
         vo.setStoragePath(f.getStoragePath());
         vo.setBucketName(f.getBucketName());
         vo.setPresignedUrl(presignedUrl);
-        if (f.getCreatedAt() != null) vo.setCreatedAt(DTF.format(f.getCreatedAt()));
+        if (f.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(f.getCreatedAt()));
         return vo;
     }
 

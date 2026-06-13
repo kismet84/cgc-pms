@@ -21,23 +21,22 @@ import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfRecordMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CtContractService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final CtContractMapper ctContractMapper;
     private final PmProjectMapper pmProjectMapper;
@@ -92,7 +91,7 @@ public class CtContractService {
 
     @Transactional
     public Long create(CtContract contract) {
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "CT-" + today + "-";
 
         LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
@@ -105,7 +104,8 @@ public class CtContractService {
         if (last != null && last.getContractCode() != null && last.getContractCode().length() == prefix.length() + 3) {
             try {
                 seq = Integer.parseInt(last.getContractCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getContractCode(), e);
             }
         }
         contract.setContractCode(prefix + String.format("%03d", seq));
@@ -197,7 +197,7 @@ public class CtContractService {
             vo.setActionType(r.getActionType());
             vo.setActionName(r.getActionName());
             vo.setComment(r.getComment());
-            vo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().format(DTF) : null);
+            vo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().format(DateTimeUtils.DTF) : null);
             return vo;
         }).toList();
     }
@@ -245,9 +245,9 @@ public class CtContractService {
         vo.setTaxRate(c.getTaxRate() != null ? c.getTaxRate().toPlainString() : null);
         vo.setTaxAmount(c.getTaxAmount() != null ? c.getTaxAmount().toPlainString() : null);
         vo.setAmountWithoutTax(c.getAmountWithoutTax() != null ? c.getAmountWithoutTax().toPlainString() : null);
-        vo.setSignedDate(c.getSignedDate() != null ? DATE_FMT.format(c.getSignedDate()) : null);
-        vo.setStartDate(c.getStartDate() != null ? DATE_FMT.format(c.getStartDate()) : null);
-        vo.setEndDate(c.getEndDate() != null ? DATE_FMT.format(c.getEndDate()) : null);
+        vo.setSignedDate(c.getSignedDate() != null ? DateTimeUtils.DATE_FMT.format(c.getSignedDate()) : null);
+        vo.setStartDate(c.getStartDate() != null ? DateTimeUtils.DATE_FMT.format(c.getStartDate()) : null);
+        vo.setEndDate(c.getEndDate() != null ? DateTimeUtils.DATE_FMT.format(c.getEndDate()) : null);
         vo.setPaymentMethod(c.getPaymentMethod());
         vo.setSettlementMethod(c.getSettlementMethod());
         vo.setWarrantyRate(c.getWarrantyRate() != null ? c.getWarrantyRate().toPlainString() : null);
@@ -257,8 +257,8 @@ public class CtContractService {
         vo.setContractStatus(c.getContractStatus());
         vo.setApprovalStatus(c.getApprovalStatus());
         vo.setCreatedBy(c.getCreatedBy() != null ? c.getCreatedBy().toString() : null);
-        vo.setCreatedAt(c.getCreatedAt() != null ? DTF.format(c.getCreatedAt()) : null);
-        vo.setUpdatedAt(c.getUpdatedAt() != null ? DTF.format(c.getUpdatedAt()) : null);
+        vo.setCreatedAt(c.getCreatedAt() != null ? DateTimeUtils.DTF.format(c.getCreatedAt()) : null);
+        vo.setUpdatedAt(c.getUpdatedAt() != null ? DateTimeUtils.DTF.format(c.getUpdatedAt()) : null);
         vo.setRemark(c.getRemark());
         return vo;
     }

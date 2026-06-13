@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
 @Slf4j
 @Service
@@ -65,7 +65,7 @@ public class CtContractChangeService {
                     "DRAFT 或 TERMINATED 状态的合同禁止创建变更");
 
         // 自动编号: CC-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "CC-" + today + "-";
 
         LambdaQueryWrapper<CtContractChange> wrapper = new LambdaQueryWrapper<>();
@@ -78,7 +78,8 @@ public class CtContractChangeService {
         if (last != null && last.getChangeCode() != null && last.getChangeCode().startsWith(prefix)) {
             try {
                 seq = Integer.parseInt(last.getChangeCode().substring(last.getChangeCode().lastIndexOf('-') + 1)) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getChangeCode(), e);
             }
         }
         change.setChangeCode(prefix + String.format("%03d", seq));

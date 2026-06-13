@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,8 +21,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CostSubjectService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CostSubjectMapper costSubjectMapper;
 
@@ -189,8 +187,8 @@ public class CostSubjectService {
         vo.setSortOrder(subject.getSortOrder());
         vo.setStatus(subject.getStatus());
         vo.setCreatedBy(subject.getCreatedBy() != null ? subject.getCreatedBy().toString() : null);
-        vo.setCreatedAt(subject.getCreatedAt() != null ? DTF.format(subject.getCreatedAt()) : null);
-        vo.setUpdatedAt(subject.getUpdatedAt() != null ? DTF.format(subject.getUpdatedAt()) : null);
+        vo.setCreatedAt(subject.getCreatedAt() != null ? DateTimeUtils.DTF.format(subject.getCreatedAt()) : null);
+        vo.setUpdatedAt(subject.getUpdatedAt() != null ? DateTimeUtils.DTF.format(subject.getUpdatedAt()) : null);
         vo.setRemark(subject.getRemark());
         return vo;
     }

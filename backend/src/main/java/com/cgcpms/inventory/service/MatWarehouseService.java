@@ -10,17 +10,17 @@ import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatWarehouseService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final MatWarehouseMapper matWarehouseMapper;
 
@@ -53,6 +53,7 @@ public class MatWarehouseService {
     public Long create(MatWarehouse warehouse) {
         warehouse.setTenantId(UserContext.getCurrentTenantId());
         matWarehouseMapper.insert(warehouse);
+        log.info("Creating warehouse: {}", warehouse.getWarehouseName());
         return warehouse.getId();
     }
 
@@ -90,8 +91,8 @@ public class MatWarehouseService {
         vo.setWarehouseName(w.getWarehouseName());
         vo.setStatus(w.getStatus());
         vo.setCreatedBy(w.getCreatedBy() != null ? w.getCreatedBy().toString() : null);
-        vo.setCreatedAt(w.getCreatedTime() != null ? DTF.format(w.getCreatedTime()) : null);
-        vo.setUpdatedAt(w.getUpdatedTime() != null ? DTF.format(w.getUpdatedTime()) : null);
+        vo.setCreatedAt(w.getCreatedTime() != null ? DateTimeUtils.DTF.format(w.getCreatedTime()) : null);
+        vo.setUpdatedAt(w.getUpdatedTime() != null ? DateTimeUtils.DTF.format(w.getUpdatedTime()) : null);
         vo.setRemark(w.getRemark());
         return vo;
     }

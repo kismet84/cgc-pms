@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 
 /**
@@ -33,8 +33,6 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
-
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final MatPurchaseRequestMapper requestMapper;
     private final MatPurchaseRequestItemMapper requestItemMapper;
@@ -130,7 +128,7 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
 
         // Auto-generate PO code with date sequence if needed
         if (poCode == null || poCode.isBlank()) {
-            String today = LocalDate.now().format(DATE_FMT);
+            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
             poCode = "PO-" + today + "-001";
         }
 

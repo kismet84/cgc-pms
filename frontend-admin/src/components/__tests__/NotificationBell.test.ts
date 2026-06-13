@@ -41,6 +41,7 @@ import {
   markAllAsRead,
   createNotificationStream,
 } from '@/api/modules/notification'
+import { message } from 'ant-design-vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 
 // ── Stub Components ──
@@ -309,5 +310,107 @@ describe('NotificationBell', () => {
     // Badge should no longer show since unreadCount is 0
     const badge = wrapper.find('.badge-count')
     expect(badge.exists()).toBe(false)
+  })
+
+  it('logs error and shows feedback when markAsRead fails', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    vi.mocked(getUnreadCount).mockResolvedValue({ count: 5 })
+    vi.mocked(getNotifications).mockResolvedValue({
+      records: [
+        {
+          id: 'n1',
+          tenantId: '',
+          userId: '',
+          title: 'Unread item',
+          content: 'Body',
+          bizType: 'INFO',
+          bizId: null,
+          notifyType: 'INFO',
+          isRead: 0,
+          readTime: null,
+          createdTime: '2026-06-13 10:00:00',
+        },
+      ],
+      total: 1,
+      pageNo: 1,
+      pageSize: 20,
+    })
+    // markAsRead rejects to simulate API failure
+    vi.mocked(markAsRead).mockRejectedValue(new Error('Network error'))
+
+    const wrapper = mount(NotificationBell, { global: { stubs } })
+    await flushPromises()
+
+    // Open popover to render notification list
+    emitPopoverOpen(wrapper, true)
+    await flushPromises()
+
+    // Click the unread item to trigger handleMarkRead
+    const unreadItem = wrapper.find('.nb-item.nb-unread')
+    expect(unreadItem.exists()).toBe(true)
+    await unreadItem.trigger('click')
+    await flushPromises()
+
+    // Verify error was logged with NotificationBell prefix
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'NotificationBell: 标记已读失败',
+      expect.any(Error),
+    )
+    // Verify user-facing feedback
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('标记已读失败')
+
+    consoleSpy.mockRestore()
+  })
+
+  it('logs error and shows feedback when markAllAsRead fails', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    vi.mocked(getUnreadCount).mockResolvedValue({ count: 3 })
+    vi.mocked(getNotifications).mockResolvedValue({
+      records: [
+        {
+          id: 'n1',
+          tenantId: '',
+          userId: '',
+          title: 'Item',
+          content: 'Content',
+          bizType: 'INFO',
+          bizId: null,
+          notifyType: 'INFO',
+          isRead: 0,
+          readTime: null,
+          createdTime: '2026-01-01 10:00:00',
+        },
+      ],
+      total: 1,
+      pageNo: 1,
+      pageSize: 20,
+    })
+    // markAllAsRead rejects to simulate API failure
+    vi.mocked(markAllAsRead).mockRejectedValue(new Error('Network error'))
+
+    const wrapper = mount(NotificationBell, { global: { stubs } })
+    await flushPromises()
+
+    // Open popover to reveal the "全部标为已读" button
+    emitPopoverOpen(wrapper, true)
+    await flushPromises()
+
+    // Click the button
+    const btn = wrapper.find('.mock-btn')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await flushPromises()
+
+    // Verify error was logged with NotificationBell prefix
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'NotificationBell: 操作失败',
+      expect.any(Error),
+    )
+    // Verify user-facing feedback
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('操作失败')
+
+    consoleSpy.mockRestore()
   })
 })

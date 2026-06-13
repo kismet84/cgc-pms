@@ -15,7 +15,8 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         LocalDateTime now = LocalDateTime.now();
         this.strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
         this.strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
-        // Support entities using "createdTime"/"updatedTime" naming (e.g. CtContractChange)
+        // Support entities with Java field named createdTime/updatedTime (e.g. CtContractChange, CostTarget)
+        // mapped via @TableField("created_at") / @TableField("updated_at")
         this.strictInsertFill(metaObject, "createdTime", LocalDateTime.class, now);
         this.strictInsertFill(metaObject, "updatedTime", LocalDateTime.class, now);
         Long userId = UserContext.getCurrentUserId();

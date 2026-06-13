@@ -5,8 +5,8 @@ import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import type { TreeSelectProps } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
-import { request } from '@/api/request'
 import { getProjectList } from '@/api/modules/project'
+import { getCostSubjectTree } from '@/api/modules/costSubject'
 import {
   createCostTarget,
   updateCostTarget,
@@ -101,7 +101,7 @@ function convertToTreeData(nodes: TreeNode[]): TreeSelectProps['treeData'] {
 
 async function fetchSubjectTree() {
   try {
-    const data = await request<TreeNode[]>({ url: '/cost-subjects/tree', method: 'get' })
+    const data = await getCostSubjectTree()
     subjectTree.value = convertToTreeData(data)
   } catch {
     subjectTree.value = []

@@ -33,7 +33,7 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -41,8 +41,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CostSummaryService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CostSummaryMapper costSummaryMapper;
     private final CostItemMapper costItemMapper;
@@ -231,6 +229,153 @@ public class CostSummaryService {
         return vo;
     }
 
+    /**
+     * Batch-load project summaries for multiple projects at once.
+     * Replaces N+1 pattern where callers loop over projects calling
+     * {@link #getProjectSummary(Long, Long)} individually.
+     * <p>
+     * Reduces ~8 SQL queries per project to ~6 total queries regardless of project count.
+     * Subjects list is returned empty — callers that need per-subject breakdowns
+     * should use the single-project method instead.
+     */
+    public Map<Long, CostProjectSummaryVO> getBatchProjectSummaries(Long tenantId, List<Long> projectIds) {
+        if (CollectionUtils.isEmpty(projectIds)) {
+            return Collections.emptyMap();
+        }
+
+        // 1. Batch load projects
+        List<PmProject> projects = projectMapper.selectBatchIds(projectIds);
+        Map<Long, PmProject> projectMap = projects.stream()
+                .filter(p -> Objects.equals(p.getTenantId(), tenantId))
+                .collect(Collectors.toMap(PmProject::getId, p -> p, (a, b) -> a));
+
+        if (projectMap.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Long> validProjectIds = new ArrayList<>(projectMap.keySet());
+
+        // 2. Batch load cost_summary for all projects
+        List<CostSummary> allSummaries = costSummaryMapper.selectList(
+                new LambdaQueryWrapper<CostSummary>()
+                        .eq(CostSummary::getTenantId, tenantId)
+                        .in(CostSummary::getProjectId, validProjectIds));
+        Map<Long, List<CostSummary>> summariesByProject = allSummaries.stream()
+                .collect(Collectors.groupingBy(CostSummary::getProjectId));
+
+        // 3. Batch load supporting data for project-level computations
+        List<CtContract> allContracts = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .in(CtContract::getProjectId, validProjectIds));
+        Map<Long, List<CtContract>> contractsByProject = allContracts.stream()
+                .collect(Collectors.groupingBy(CtContract::getProjectId));
+
+        List<SubMeasure> allSubMeasures = subMeasureMapper.selectList(
+                new LambdaQueryWrapper<SubMeasure>()
+                        .eq(SubMeasure::getTenantId, tenantId)
+                        .in(SubMeasure::getProjectId, validProjectIds)
+                        .eq(SubMeasure::getApprovalStatus, "APPROVED"));
+        Map<Long, List<SubMeasure>> subMeasuresByProject = allSubMeasures.stream()
+                .collect(Collectors.groupingBy(SubMeasure::getProjectId));
+
+        List<MatReceipt> allMatReceipts = matReceiptMapper.selectList(
+                new LambdaQueryWrapper<MatReceipt>()
+                        .eq(MatReceipt::getTenantId, tenantId)
+                        .in(MatReceipt::getProjectId, validProjectIds)
+                        .eq(MatReceipt::getApprovalStatus, "APPROVED"));
+        Map<Long, List<MatReceipt>> matReceiptsByProject = allMatReceipts.stream()
+                .collect(Collectors.groupingBy(MatReceipt::getProjectId));
+
+        List<VarOrder> allVarOrders = varOrderMapper.selectList(
+                new LambdaQueryWrapper<VarOrder>()
+                        .eq(VarOrder::getTenantId, tenantId)
+                        .in(VarOrder::getProjectId, validProjectIds)
+                        .eq(VarOrder::getDirection, "INCOME")
+                        .eq(VarOrder::getApprovalStatus, "APPROVED"));
+        Map<Long, List<VarOrder>> varOrdersByProject = allVarOrders.stream()
+                .collect(Collectors.groupingBy(VarOrder::getProjectId));
+
+        // 4. Build result map
+        Map<Long, CostProjectSummaryVO> result = new LinkedHashMap<>();
+        for (Long projectId : validProjectIds) {
+            PmProject project = projectMap.get(projectId);
+
+            // Find latest summary_date for this project
+            List<CostSummary> projectSummaries = summariesByProject.getOrDefault(projectId, Collections.emptyList());
+            LocalDate latestDate = projectSummaries.stream()
+                    .map(CostSummary::getSummaryDate)
+                    .filter(Objects::nonNull)
+                    .max(Comparator.naturalOrder())
+                    .orElse(null);
+
+            List<CostSummary> latestSummaries = latestDate != null
+                    ? projectSummaries.stream()
+                        .filter(s -> latestDate.equals(s.getSummaryDate()))
+                        .collect(Collectors.toList())
+                    : Collections.emptyList();
+
+            BigDecimal targetCost = project.getTargetCost() != null ? project.getTargetCost() : BigDecimal.ZERO;
+            BigDecimal contractLockedCost = latestSummaries.stream()
+                    .map(s -> s.getContractLockedCost() != null ? s.getContractLockedCost() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal actualCost = latestSummaries.stream()
+                    .map(s -> s.getActualCost() != null ? s.getActualCost() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal paidAmount = latestSummaries.stream()
+                    .map(s -> s.getPaidAmount() != null ? s.getPaidAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Compute project-level values from batched data
+            List<CtContract> projectContracts = contractsByProject.getOrDefault(projectId, Collections.emptyList());
+            BigDecimal totalCurrentAmount = projectContracts.stream()
+                    .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalContractAmount = projectContracts.stream()
+                    .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            List<SubMeasure> projectSubMeasures = subMeasuresByProject.getOrDefault(projectId, Collections.emptyList());
+            BigDecimal confirmedMeasureAmount = projectSubMeasures.stream()
+                    .map(m -> m.getApprovedAmount() != null ? m.getApprovedAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            List<MatReceipt> projectMatReceipts = matReceiptsByProject.getOrDefault(projectId, Collections.emptyList());
+            BigDecimal confirmedReceiptAmount = projectMatReceipts.stream()
+                    .map(r -> r.getTotalAmount() != null ? r.getTotalAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            List<VarOrder> projectVarOrders = varOrdersByProject.getOrDefault(projectId, Collections.emptyList());
+            BigDecimal incomeVarAmount = projectVarOrders.stream()
+                    .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal estimatedRemainingCost = totalCurrentAmount
+                    .subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
+            BigDecimal contractIncome = totalContractAmount.add(incomeVarAmount);
+            BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
+            BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
+            BigDecimal costDeviation = dynamicCost.subtract(targetCost);
+
+            CostProjectSummaryVO vo = new CostProjectSummaryVO();
+            vo.setProjectId(projectId.toString());
+            vo.setProjectName(project.getProjectName());
+            vo.setTargetCost(targetCost.toPlainString());
+            vo.setContractLockedCost(contractLockedCost.toPlainString());
+            vo.setActualCost(actualCost.toPlainString());
+            vo.setPaidAmount(paidAmount.toPlainString());
+            vo.setEstimatedRemainingCost(estimatedRemainingCost.toPlainString());
+            vo.setDynamicCost(dynamicCost.toPlainString());
+            vo.setContractIncome(contractIncome.toPlainString());
+            vo.setExpectedProfit(expectedProfit.toPlainString());
+            vo.setCostDeviation(costDeviation.toPlainString());
+            vo.setSubjects(Collections.emptyList());
+
+            result.put(projectId, vo);
+        }
+
+        return result;
+    }
+
     public List<CostSummaryVO> getSummaryHistory(Long projectId) {
         Long tenantId = UserContext.getCurrentTenantId();
 
@@ -344,8 +489,8 @@ public class CostSummaryService {
             vo.setExpectedProfit(s.getExpectedProfit() != null ? s.getExpectedProfit().toPlainString() : "0");
             vo.setCostDeviation(s.getCostDeviation() != null ? s.getCostDeviation().toPlainString() : "0");
             vo.setCreatedBy(s.getCreatedBy() != null ? s.getCreatedBy().toString() : null);
-            vo.setCreatedAt(s.getCreatedAt() != null ? DTF.format(s.getCreatedAt()) : null);
-            vo.setUpdatedAt(s.getUpdatedAt() != null ? DTF.format(s.getUpdatedAt()) : null);
+            vo.setCreatedAt(s.getCreatedAt() != null ? DateTimeUtils.DTF.format(s.getCreatedAt()) : null);
+            vo.setUpdatedAt(s.getUpdatedAt() != null ? DateTimeUtils.DTF.format(s.getUpdatedAt()) : null);
             vo.setRemark(s.getRemark());
             return vo;
         }).collect(Collectors.toList());

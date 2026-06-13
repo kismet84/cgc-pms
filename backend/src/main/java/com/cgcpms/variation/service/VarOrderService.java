@@ -27,7 +27,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,8 +37,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class VarOrderService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final VarOrderMapper varOrderMapper;
     private final VarOrderItemMapper varOrderItemMapper;
@@ -108,7 +106,7 @@ public class VarOrderService {
     @Transactional
     public Long create(VarOrder order) {
         // Auto-generate var code: VO-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "VO-" + today + "-";
 
         LambdaQueryWrapper<VarOrder> wrapper = new LambdaQueryWrapper<>();
@@ -121,7 +119,8 @@ public class VarOrderService {
         if (last != null && last.getVarCode() != null && last.getVarCode().startsWith(prefix)) {
             try {
                 seq = Integer.parseInt(last.getVarCode().substring(last.getVarCode().lastIndexOf('-') + 1)) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getVarCode(), e);
             }
         }
         order.setVarCode(prefix + String.format("%03d", seq));
@@ -289,8 +288,8 @@ public class VarOrderService {
         vo.setApprovalStatus(m.getApprovalStatus());
         vo.setCostGeneratedFlag(m.getCostGeneratedFlag());
         vo.setCreatedBy(m.getCreatedBy() != null ? m.getCreatedBy().toString() : null);
-        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(m.getRemark());
         return vo;
     }
@@ -307,8 +306,8 @@ public class VarOrderService {
         vo.setAmount(item.getAmount() != null ? item.getAmount().toPlainString() : null);
         vo.setCostSubjectId(item.getCostSubjectId() != null ? item.getCostSubjectId().toString() : null);
         vo.setCreatedBy(item.getCreatedBy() != null ? item.getCreatedBy().toString() : null);
-        vo.setCreatedAt(item.getCreatedAt() != null ? item.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(item.getUpdatedAt() != null ? item.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(item.getCreatedAt() != null ? item.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(item.getUpdatedAt() != null ? item.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(item.getRemark());
         return vo;
     }

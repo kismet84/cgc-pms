@@ -6,6 +6,7 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -38,13 +39,13 @@ public class InvoiceController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Long> create(@RequestBody PayInvoice invoice) {
+    public ApiResponse<Long> create(@Valid @RequestBody PayInvoice invoice) {
         return ApiResponse.success(invoiceService.create(invoice));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('invoice:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> update(@PathVariable Long id, @RequestBody PayInvoice invoice) {
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PayInvoice invoice) {
         invoice.setId(id);
         invoiceService.update(invoice);
         return ApiResponse.success();
@@ -67,7 +68,7 @@ public class InvoiceController {
 
     @PostMapping("/register")
     @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Long> register(@RequestBody PayInvoice invoice) {
+    public ApiResponse<Long> register(@Valid @RequestBody PayInvoice invoice) {
         return ApiResponse.success(invoiceService.register(invoice));
     }
 }

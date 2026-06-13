@@ -14,13 +14,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
 @Service
 @RequiredArgsConstructor
 public class MdMaterialService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final MdMaterialMapper mdMaterialMapper;
 
@@ -90,8 +88,8 @@ public class MdMaterialService {
         vo.setDefaultTaxRate(m.getDefaultTaxRate() != null ? m.getDefaultTaxRate().toPlainString() : null);
         vo.setStatus(m.getStatus());
         vo.setCreatedBy(m.getCreatedBy() != null ? m.getCreatedBy().toString() : null);
-        vo.setCreatedAt(m.getCreatedAt() != null ? DTF.format(m.getCreatedAt()) : null);
-        vo.setUpdatedAt(m.getUpdatedAt() != null ? DTF.format(m.getUpdatedAt()) : null);
+        vo.setCreatedAt(m.getCreatedAt() != null ? DateTimeUtils.DTF.format(m.getCreatedAt()) : null);
+        vo.setUpdatedAt(m.getUpdatedAt() != null ? DateTimeUtils.DTF.format(m.getUpdatedAt()) : null);
         vo.setRemark(m.getRemark());
         return vo;
     }

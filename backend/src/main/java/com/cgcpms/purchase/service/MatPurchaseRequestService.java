@@ -19,24 +19,23 @@ import com.cgcpms.purchase.vo.MatPurchaseRequestItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseRequestVO;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatPurchaseRequestService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final MatPurchaseRequestMapper requestMapper;
     private final MatPurchaseRequestItemMapper requestItemMapper;
@@ -128,7 +127,7 @@ public class MatPurchaseRequestService {
     @Transactional
     public Long create(MatPurchaseRequest request) {
         // Auto-generate request code: PR-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "PR-" + today + "-";
 
         LambdaQueryWrapper<MatPurchaseRequest> wrapper = new LambdaQueryWrapper<>();
@@ -142,7 +141,8 @@ public class MatPurchaseRequestService {
         if (last != null && last.getRequestCode() != null && last.getRequestCode().length() == prefix.length() + 3) {
             try {
                 seq = Integer.parseInt(last.getRequestCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getRequestCode(), e);
             }
         }
         request.setRequestCode(prefix + String.format("%03d", seq));
@@ -319,8 +319,8 @@ public class MatPurchaseRequestService {
         vo.setApprovalStatus(r.getApprovalStatus());
         vo.setStatus(r.getStatus());
         vo.setCreatedBy(r.getCreatedBy() != null ? r.getCreatedBy().toString() : null);
-        vo.setCreatedTime(r.getCreatedTime() != null ? DTF.format(r.getCreatedTime()) : null);
-        vo.setUpdatedTime(r.getUpdatedTime() != null ? DTF.format(r.getUpdatedTime()) : null);
+        vo.setCreatedTime(r.getCreatedTime() != null ? DateTimeUtils.DTF.format(r.getCreatedTime()) : null);
+        vo.setUpdatedTime(r.getUpdatedTime() != null ? DateTimeUtils.DTF.format(r.getUpdatedTime()) : null);
         vo.setRemark(r.getRemark());
         return vo;
     }
@@ -334,10 +334,10 @@ public class MatPurchaseRequestService {
         vo.setMaterialName(i.getMaterialId() != null ? materialNames.get(i.getMaterialId()) : null);
         vo.setQuantity(i.getQuantity() != null ? i.getQuantity().toPlainString() : null);
         vo.setUnit(i.getUnit());
-        vo.setPlannedDate(i.getPlannedDate() != null ? DATE_FMT.format(i.getPlannedDate()) : null);
+        vo.setPlannedDate(i.getPlannedDate() != null ? DateTimeUtils.DATE_FMT.format(i.getPlannedDate()) : null);
         vo.setCreatedBy(i.getCreatedBy() != null ? i.getCreatedBy().toString() : null);
-        vo.setCreatedTime(i.getCreatedTime() != null ? DTF.format(i.getCreatedTime()) : null);
-        vo.setUpdatedTime(i.getUpdatedTime() != null ? DTF.format(i.getUpdatedTime()) : null);
+        vo.setCreatedTime(i.getCreatedTime() != null ? DateTimeUtils.DTF.format(i.getCreatedTime()) : null);
+        vo.setUpdatedTime(i.getUpdatedTime() != null ? DateTimeUtils.DTF.format(i.getUpdatedTime()) : null);
         vo.setRemark(i.getRemark());
         return vo;
     }

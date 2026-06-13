@@ -74,7 +74,7 @@ public class StlSettlementController {
 
     @PostMapping("/{id}/items/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:edit')")
-    public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @RequestBody List<StlSettlementItem> items) {
+    public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @Valid @RequestBody List<StlSettlementItem> items) {
         stlSettlementService.saveItems(id, items);
         return ApiResponse.success();
     }

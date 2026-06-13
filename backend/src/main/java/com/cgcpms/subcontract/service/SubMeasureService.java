@@ -27,7 +27,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,9 +37,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SubMeasureService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final SubMeasureMapper subMeasureMapper;
     private final SubMeasureItemMapper subMeasureItemMapper;
@@ -108,7 +105,7 @@ public class SubMeasureService {
     @Transactional
     public Long create(SubMeasure measure) {
         // Auto-generate measure code: SM-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "SM-" + today + "-";
 
         LambdaQueryWrapper<SubMeasure> wrapper = new LambdaQueryWrapper<>();
@@ -121,7 +118,8 @@ public class SubMeasureService {
         if (last != null && last.getMeasureCode() != null && last.getMeasureCode().startsWith(prefix)) {
             try {
                 seq = Integer.parseInt(last.getMeasureCode().substring(last.getMeasureCode().lastIndexOf('-') + 1)) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getMeasureCode(), e);
             }
         }
         measure.setMeasureCode(prefix + String.format("%03d", seq));
@@ -276,7 +274,7 @@ public class SubMeasureService {
         vo.setPartnerId(m.getPartnerId() != null ? m.getPartnerId().toString() : null);
         vo.setMeasureCode(m.getMeasureCode());
         vo.setMeasurePeriod(m.getMeasurePeriod());
-        vo.setMeasureDate(m.getMeasureDate() != null ? m.getMeasureDate().format(DATE_FMT) : null);
+        vo.setMeasureDate(m.getMeasureDate() != null ? m.getMeasureDate().format(DateTimeUtils.DATE_FMT) : null);
         vo.setReportedAmount(m.getReportedAmount() != null ? m.getReportedAmount().toPlainString() : null);
         vo.setApprovedAmount(m.getApprovedAmount() != null ? m.getApprovedAmount().toPlainString() : null);
         vo.setDeductionAmount(m.getDeductionAmount() != null ? m.getDeductionAmount().toPlainString() : null);
@@ -285,8 +283,8 @@ public class SubMeasureService {
         vo.setCostGeneratedFlag(m.getCostGeneratedFlag());
         vo.setStatus(m.getStatus());
         vo.setCreatedBy(m.getCreatedBy() != null ? m.getCreatedBy().toString() : null);
-        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(m.getRemark());
         return vo;
     }
@@ -305,8 +303,8 @@ public class SubMeasureService {
         vo.setUnitPrice(item.getUnitPrice() != null ? item.getUnitPrice().toPlainString() : null);
         vo.setAmount(item.getAmount() != null ? item.getAmount().toPlainString() : null);
         vo.setCreatedBy(item.getCreatedBy() != null ? item.getCreatedBy().toString() : null);
-        vo.setCreatedAt(item.getCreatedAt() != null ? item.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(item.getUpdatedAt() != null ? item.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(item.getCreatedAt() != null ? item.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(item.getUpdatedAt() != null ? item.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(item.getRemark());
         return vo;
     }

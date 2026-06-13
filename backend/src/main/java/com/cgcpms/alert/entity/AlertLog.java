@@ -10,9 +10,8 @@ import java.time.LocalDateTime;
 /**
  * Alert log entity — maps to alert_log table created in V24.
  *
- * Does NOT extend BaseEntity because alert_log uses {@code created_time} /
- * {@code updated_time} column names instead of the conventional
- * {@code created_at} / {@code updated_at}.
+ * Does NOT extend BaseEntity because alert_log uses explicit
+ * {@code created_at} / {@code updated_at} mapping with custom fill strategy.
  */
 @Data
 @TableName("alert_log")
@@ -49,16 +48,16 @@ public class AlertLog implements Serializable {
     @TableField(fill = FieldFill.INSERT)
     private Long createdBy;
 
-    /** Maps to {@code created_time} column. Field named {@code createdAt} so MetaObjectHandler fills it. */
-    @TableField(value = "created_time", fill = FieldFill.INSERT)
+    /** Maps to {@code created_at} column. Field named {@code createdAt} so MetaObjectHandler fills it. */
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Long updatedBy;
 
-    /** Maps to {@code updated_time} column. Field named {@code updatedAt} so MetaObjectHandler fills it. */
-    @TableField(value = "updated_time", fill = FieldFill.INSERT_UPDATE)
+    /** Maps to {@code updated_at} column. Field named {@code updatedAt} so MetaObjectHandler fills it. */
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
 

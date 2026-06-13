@@ -18,21 +18,20 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CostLedgerService {
-
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final CostItemMapper costItemMapper;
     private final PmProjectMapper pmProjectMapper;
@@ -47,6 +46,7 @@ public class CostLedgerService {
                                        Long projectId, Long contractId, Long partnerId, Long costSubjectId,
                                        String costType, String sourceType, String costStatus,
                                        LocalDate startDate, LocalDate endDate, String keyword) {
+        log.info("Querying cost ledger: projectId={}, pageNo={}", projectId, pageNo);
         LambdaQueryWrapper<CostItem> wrapper = buildFilterWrapper(
                 projectId, contractId, partnerId, costSubjectId,
                 costType, sourceType, costStatus,
@@ -209,11 +209,11 @@ public class CostLedgerService {
         vo.setSourceType(item.getSourceType());
         vo.setSourceId(item.getSourceId() != null ? item.getSourceId().toString() : null);
         vo.setSourceItemId(item.getSourceItemId() != null ? item.getSourceItemId().toString() : null);
-        vo.setCostDate(item.getCostDate() != null ? DATE_FMT.format(item.getCostDate()) : null);
+        vo.setCostDate(item.getCostDate() != null ? DateTimeUtils.DATE_FMT.format(item.getCostDate()) : null);
         vo.setCostStatus(item.getCostStatus());
         vo.setGeneratedFlag(item.getGeneratedFlag() != null ? item.getGeneratedFlag().toString() : null);
         vo.setCreatedBy(item.getCreatedBy() != null ? item.getCreatedBy().toString() : null);
-        vo.setCreatedAt(item.getCreatedAt() != null ? DTF.format(item.getCreatedAt()) : null);
+        vo.setCreatedAt(item.getCreatedAt() != null ? DateTimeUtils.DTF.format(item.getCreatedAt()) : null);
         vo.setRemark(item.getRemark());
         return vo;
     }

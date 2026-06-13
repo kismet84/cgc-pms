@@ -45,7 +45,7 @@ minio:
 # JWT
 jwt:
   secret: ${JWT_SECRET:dev-only-change-me-cgc-pms-jwt-secret-key-256bit-minimum-length}
-  expiration: 86400000
+  expiration: 900000
   refresh-expiration: 604800000
   header: Authorization
   token-prefix: "Bearer "

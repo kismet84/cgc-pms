@@ -33,6 +33,7 @@ import com.cgcpms.workflow.entity.WfTask;
 import com.cgcpms.workflow.mapper.WfCcMapper;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
+import com.cgcpms.system.mapper.SysRoleMenuMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
@@ -91,6 +92,9 @@ class Phase4IntegrationTest {
     @Autowired private WfCcMapper wfCcMapper;
     @Autowired private WfInstanceMapper wfInstanceMapper;
     @Autowired private WfTaskMapper wfTaskMapper;
+
+    // ── SYSTEM ──
+    @Autowired private SysRoleMenuMapper sysRoleMenuMapper;
 
     @BeforeEach
     void setupContext() {
@@ -785,5 +789,27 @@ class Phase4IntegrationTest {
                 new LambdaQueryWrapper<WfInstance>()
                         .eq(WfInstance::getBusinessType, businessType)
                         .eq(WfInstance::getBusinessId, businessId));
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 场景8: P0-1 角色菜单绑定 — MATERIAL_CLERK 和 FINANCE 应有菜单权限
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Order(8)
+    @DisplayName("场景8: P0-1 MATERIAL_CLERK(role_id=5) 和 FINANCE(role_id=6) 拥有非空 sys_role_menu")
+    void test08_roleMenuBindingsForMaterialClerkAndFinance() {
+        // MATERIAL_CLERK (role_id=5): 至少应有仓库管理(731)、库存台账(732)、出入库管理(733)、采购申请(734) 等菜单
+        Long materialClerkCount = sysRoleMenuMapper.selectCount(
+                new LambdaQueryWrapper<com.cgcpms.system.entity.SysRoleMenu>()
+                        .eq(com.cgcpms.system.entity.SysRoleMenu::getRoleId, 5L));
+        assertTrue(materialClerkCount >= 3,
+                "MATERIAL_CLERK (role_id=5) should have at least 3 menu entries, but got " + materialClerkCount);
+
+        // FINANCE (role_id=6): 至少应有发票列表(751)、发票新增(752)、财务驾驶舱(810) 等菜单
+        Long financeCount = sysRoleMenuMapper.selectCount(
+                new LambdaQueryWrapper<com.cgcpms.system.entity.SysRoleMenu>()
+                        .eq(com.cgcpms.system.entity.SysRoleMenu::getRoleId, 6L));
+        assertTrue(financeCount >= 3,
+                "FINANCE (role_id=6) should have at least 3 menu entries, but got " + financeCount);
     }
 }

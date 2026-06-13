@@ -5,6 +5,7 @@ import com.cgcpms.system.entity.SysMenu;
 import com.cgcpms.system.mapper.SysMenuMapper;
 import com.cgcpms.system.vo.MenuTreeVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SysMenuService {
@@ -41,6 +43,7 @@ public class SysMenuService {
         if (menu.getStatus() == null) menu.setStatus("ENABLE");
         if (menu.getVisible() == null) menu.setVisible(1);
         sysMenuMapper.insert(menu);
+        log.info("Creating menu: {}", menu.getMenuName());
         return menu.getId();
     }
 

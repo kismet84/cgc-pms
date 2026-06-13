@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotNull;
@@ -22,6 +23,7 @@ public class StlSettlement extends BaseEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
     @NotNull
@@ -53,6 +55,7 @@ public class StlSettlement extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal finalAmount;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String approvalStatus;
 
     private String status;
@@ -64,6 +67,7 @@ public class StlSettlement extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal warrantyAmount;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String settlementStatus;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

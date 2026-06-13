@@ -23,6 +23,7 @@ import com.cgcpms.purchase.vo.MatPurchaseOrderItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,18 +31,16 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MatPurchaseOrderService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final MatPurchaseOrderMapper matPurchaseOrderMapper;
     private final MatPurchaseOrderItemMapper matPurchaseOrderItemMapper;
@@ -135,7 +134,7 @@ public class MatPurchaseOrderService {
     @Transactional
     public Long create(MatPurchaseOrder order) {
         // Auto-generate order code: PO-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "PO-" + today + "-";
 
         LambdaQueryWrapper<MatPurchaseOrder> wrapper = new LambdaQueryWrapper<>();
@@ -148,7 +147,8 @@ public class MatPurchaseOrderService {
         if (last != null && last.getOrderCode() != null && last.getOrderCode().length() == prefix.length() + 3) {
             try {
                 seq = Integer.parseInt(last.getOrderCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getOrderCode(), e);
             }
         }
         order.setOrderCode(prefix + String.format("%03d", seq));
@@ -319,14 +319,14 @@ public class MatPurchaseOrderService {
         vo.setPartnerId(o.getPartnerId() != null ? o.getPartnerId().toString() : null);
         vo.setOrderCode(o.getOrderCode());
         vo.setOrderType(o.getOrderType());
-        vo.setOrderDate(o.getOrderDate() != null ? DATE_FMT.format(o.getOrderDate()) : null);
-        vo.setDeliveryDate(o.getDeliveryDate() != null ? DATE_FMT.format(o.getDeliveryDate()) : null);
+        vo.setOrderDate(o.getOrderDate() != null ? DateTimeUtils.DATE_FMT.format(o.getOrderDate()) : null);
+        vo.setDeliveryDate(o.getDeliveryDate() != null ? DateTimeUtils.DATE_FMT.format(o.getDeliveryDate()) : null);
         vo.setTotalAmount(o.getTotalAmount() != null ? o.getTotalAmount().toPlainString() : null);
         vo.setApprovalStatus(o.getApprovalStatus());
         vo.setOrderStatus(o.getOrderStatus());
         vo.setCreatedBy(o.getCreatedBy() != null ? o.getCreatedBy().toString() : null);
-        vo.setCreatedAt(o.getCreatedAt() != null ? DTF.format(o.getCreatedAt()) : null);
-        vo.setUpdatedAt(o.getUpdatedAt() != null ? DTF.format(o.getUpdatedAt()) : null);
+        vo.setCreatedAt(o.getCreatedAt() != null ? DateTimeUtils.DTF.format(o.getCreatedAt()) : null);
+        vo.setUpdatedAt(o.getUpdatedAt() != null ? DateTimeUtils.DTF.format(o.getUpdatedAt()) : null);
         vo.setRemark(o.getRemark());
         return vo;
     }
@@ -346,8 +346,8 @@ public class MatPurchaseOrderService {
         vo.setAmount(i.getAmount() != null ? i.getAmount().toPlainString() : null);
         vo.setReceivedQuantity(i.getReceivedQuantity() != null ? i.getReceivedQuantity().toPlainString() : "0");
         vo.setCreatedBy(i.getCreatedBy() != null ? i.getCreatedBy().toString() : null);
-        vo.setCreatedAt(i.getCreatedAt() != null ? DTF.format(i.getCreatedAt()) : null);
-        vo.setUpdatedAt(i.getUpdatedAt() != null ? DTF.format(i.getUpdatedAt()) : null);
+        vo.setCreatedAt(i.getCreatedAt() != null ? DateTimeUtils.DTF.format(i.getCreatedAt()) : null);
+        vo.setUpdatedAt(i.getUpdatedAt() != null ? DateTimeUtils.DTF.format(i.getUpdatedAt()) : null);
         vo.setRemark(i.getRemark());
         return vo;
     }

@@ -11,17 +11,17 @@ import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.partner.vo.MdPartnerVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MdPartnerService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final MdPartnerMapper mdPartnerMapper;
     private final CtContractMapper ctContractMapper;
@@ -58,6 +58,7 @@ public class MdPartnerService {
         }
         if (partner.getStatus() == null) partner.setStatus("ENABLE");
         mdPartnerMapper.insert(partner);
+        log.info("Creating partner: {}", partner.getPartnerName());
         return partner.getId();
     }
 
@@ -104,8 +105,8 @@ public class MdPartnerService {
         vo.setBlacklistFlag(p.getBlacklistFlag());
         vo.setRiskLevel(p.getRiskLevel());
         vo.setStatus(p.getStatus());
-        if (p.getCreatedAt() != null) vo.setCreatedAt(DTF.format(p.getCreatedAt()));
-        if (p.getUpdatedAt() != null) vo.setUpdatedAt(DTF.format(p.getUpdatedAt()));
+        if (p.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(p.getCreatedAt()));
+        if (p.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(p.getUpdatedAt()));
         return vo;
     }
 }

@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,8 +27,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PayRecordService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final PayRecordMapper payRecordMapper;
     private final PayApplicationMapper payApplicationMapper;
@@ -173,8 +171,8 @@ public class PayRecordService {
         vo.setVoucherNo(record.getVoucherNo());
         vo.setPayStatus(record.getPayStatus());
         vo.setCreatedBy(record.getCreatedBy() != null ? record.getCreatedBy().toString() : null);
-        vo.setCreatedAt(record.getCreatedAt() != null ? record.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(record.getUpdatedAt() != null ? record.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(record.getCreatedAt() != null ? record.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(record.getUpdatedAt() != null ? record.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(record.getRemark());
         return vo;
     }

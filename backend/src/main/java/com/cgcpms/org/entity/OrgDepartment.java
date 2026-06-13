@@ -33,11 +33,11 @@ public class OrgDepartment extends BaseEntity {
 
     private String status;
 
-    @TableField("created_time")
+    @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
-    @TableField("updated_time")
+    @TableField("updated_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 

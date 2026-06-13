@@ -11,10 +11,12 @@ import com.cgcpms.cost.entity.CostTarget;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CostTargetService {
@@ -56,6 +58,7 @@ public class CostTargetService {
         target.setIsActive(target.getIsActive() != null ? target.getIsActive() : 0);
 
         costTargetMapper.insert(target);
+        log.info("Creating cost target: projectId={}", target.getProjectId());
         return target.getId();
     }
 

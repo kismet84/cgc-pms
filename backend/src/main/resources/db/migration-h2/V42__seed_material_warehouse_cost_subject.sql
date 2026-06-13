@@ -72,3 +72,18 @@ WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE id = 5);
 INSERT INTO sys_role (id, tenant_id, role_code, role_name, role_type, status, data_scope, created_by, remark)
 SELECT 6, 0, 'FINANCE', '财务人员', 'BUSINESS', 'ENABLE', 3, 1, '负责付款、发票、结算相关操作'
 WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE id = 6);
+
+-- ----------------------------
+-- 角色-菜单绑定 (P0-1 修复)
+-- MATERIAL_CLERK: 库存管理(710) + 仓库(731/735-737) + 台账(732) + 出入库(733/738) + 采购申请(734/739-740)
+-- FINANCE: 发票管理(720/751-755/762) + 付款提交(604) + 结算提交(607) + 预警(765-768) + 财务驾驶舱(810)
+-- ----------------------------
+INSERT INTO sys_role_menu (id, role_id, menu_id)
+SELECT 50000 + m.id, 5, m.id FROM sys_menu m
+WHERE m.id BETWEEN 710 AND 740 AND m.deleted_flag = 0
+  AND NOT EXISTS (SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 5 AND rm.menu_id = m.id);
+
+INSERT INTO sys_role_menu (id, role_id, menu_id)
+SELECT 60000 + m.id, 6, m.id FROM sys_menu m
+WHERE m.id IN (720, 751, 752, 753, 754, 755, 762, 765, 766, 767, 768, 604, 607, 810) AND m.deleted_flag = 0
+  AND NOT EXISTS (SELECT 1 FROM sys_role_menu rm WHERE rm.role_id = 6 AND rm.menu_id = m.id);

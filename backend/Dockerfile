@@ -25,6 +25,9 @@ RUN groupadd -r appgroup && useradd -r -g appgroup -d /app appuser
 # Log directory for file-based logging (logback-spring.xml)
 RUN mkdir -p /var/log/cgc-pms && chown -R appuser:appgroup /var/log/cgc-pms
 
+# Install curl for HEALTHCHECK
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # ---------------------------------------------------------------------------
@@ -41,7 +44,7 @@ ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=
 # ---------------------------------------------------------------------------
 # Spring profile (override via docker-compose or k8s for prod)
 # ---------------------------------------------------------------------------
-ENV SPRING_PROFILES_ACTIVE=dev
+ENV SPRING_PROFILES_ACTIVE=prod
 
 # =============================================================================
 # Database — MySQL 8.0
@@ -83,6 +86,12 @@ USER appuser
 # Expose backend port
 # ---------------------------------------------------------------------------
 EXPOSE 8080
+
+# ---------------------------------------------------------------------------
+# Health check — actuator must be enabled in application-{profile}.yml
+# ---------------------------------------------------------------------------
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/api/actuator/health || exit 1
 
 # ---------------------------------------------------------------------------
 # Start the application

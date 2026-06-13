@@ -4,8 +4,11 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -19,16 +22,20 @@ public class PayApplication extends BaseEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
     private Long projectId;
 
+    @NotNull
     private Long contractId;
 
     private Long partnerId;
 
     private String applyCode;
 
+    @NotNull
+    @Positive
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal applyAmount;
 
@@ -40,8 +47,10 @@ public class PayApplication extends BaseEntity {
 
     private String payType;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String payStatus;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String approvalStatus;
 
     private String applyReason;

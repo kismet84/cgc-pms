@@ -9,17 +9,17 @@ import com.cgcpms.system.dict.entity.SysDictData;
 import com.cgcpms.system.dict.mapper.SysDictDataMapper;
 import com.cgcpms.system.dict.vo.SysDictDataVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SysDictDataService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final SysDictDataMapper sysDictDataMapper;
 
@@ -56,6 +56,7 @@ public class SysDictDataService {
         if (entity.getOrderNum() == null) entity.setOrderNum(0);
         entity.setTenantId(UserContext.getCurrentTenantId());
         sysDictDataMapper.insert(entity);
+        log.info("Creating dict data: dictTypeId={}, dictValue={}", entity.getDictTypeId(), entity.getDictValue());
         return entity.getId();
     }
 
@@ -89,8 +90,8 @@ public class SysDictDataService {
         vo.setListClass(entity.getListClass());
         vo.setOrderNum(entity.getOrderNum());
         vo.setStatus(entity.getStatus());
-        if (entity.getCreatedAt() != null) vo.setCreatedAt(DTF.format(entity.getCreatedAt()));
-        if (entity.getUpdatedAt() != null) vo.setUpdatedAt(DTF.format(entity.getUpdatedAt()));
+        if (entity.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(entity.getCreatedAt()));
+        if (entity.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(entity.getUpdatedAt()));
         return vo;
     }
 }

@@ -15,6 +15,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -49,11 +50,13 @@ public class AuthController {
     }
 
     @GetMapping("/userinfo")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<UserInfo> userInfo() {
         return ApiResponse.success(authService.getUserInfo(UserContext.getCurrentUserId()));
     }
 
     @PostMapping("/logout")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> logout(HttpServletRequest request,
                                      HttpServletResponse response) {
         String token = resolveAccessToken(request);

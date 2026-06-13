@@ -15,23 +15,22 @@ import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.vo.SubTaskVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SubTaskService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final SubTaskMapper subTaskMapper;
     private final PmProjectMapper pmProjectMapper;
@@ -90,7 +89,7 @@ public class SubTaskService {
     @Transactional
     public Long create(SubTask task) {
         // Auto-generate task code: SUB-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "SUB-" + today + "-";
 
         LambdaQueryWrapper<SubTask> wrapper = new LambdaQueryWrapper<>();
@@ -103,7 +102,8 @@ public class SubTaskService {
         if (last != null && last.getTaskCode() != null && last.getTaskCode().length() == prefix.length() + 3) {
             try {
                 seq = Integer.parseInt(last.getTaskCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getTaskCode(), e);
             }
         }
         task.setTaskCode(prefix + String.format("%03d", seq));
@@ -173,15 +173,15 @@ public class SubTaskService {
         vo.setTaskCode(t.getTaskCode());
         vo.setTaskName(t.getTaskName());
         vo.setWorkArea(t.getWorkArea());
-        vo.setPlannedStartDate(t.getPlannedStartDate() != null ? t.getPlannedStartDate().format(DATE_FMT) : null);
-        vo.setPlannedEndDate(t.getPlannedEndDate() != null ? t.getPlannedEndDate().format(DATE_FMT) : null);
-        vo.setActualStartDate(t.getActualStartDate() != null ? t.getActualStartDate().format(DATE_FMT) : null);
-        vo.setActualEndDate(t.getActualEndDate() != null ? t.getActualEndDate().format(DATE_FMT) : null);
+        vo.setPlannedStartDate(t.getPlannedStartDate() != null ? t.getPlannedStartDate().format(DateTimeUtils.DATE_FMT) : null);
+        vo.setPlannedEndDate(t.getPlannedEndDate() != null ? t.getPlannedEndDate().format(DateTimeUtils.DATE_FMT) : null);
+        vo.setActualStartDate(t.getActualStartDate() != null ? t.getActualStartDate().format(DateTimeUtils.DATE_FMT) : null);
+        vo.setActualEndDate(t.getActualEndDate() != null ? t.getActualEndDate().format(DateTimeUtils.DATE_FMT) : null);
         vo.setProgressPercent(t.getProgressPercent() != null ? t.getProgressPercent().toPlainString() : null);
         vo.setStatus(t.getStatus());
         vo.setCreatedBy(t.getCreatedBy() != null ? t.getCreatedBy().toString() : null);
-        vo.setCreatedAt(t.getCreatedAt() != null ? t.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(t.getUpdatedAt() != null ? t.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(t.getCreatedAt() != null ? t.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(t.getUpdatedAt() != null ? t.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(t.getRemark());
         return vo;
     }

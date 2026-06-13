@@ -56,11 +56,11 @@ public class PmProjectMember extends BaseEntity {
 
     // ── V34 使用 created_time / updated_time 列名 ──
 
-    @TableField("created_time")
+    @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
-    @TableField("updated_time")
+    @TableField("updated_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 

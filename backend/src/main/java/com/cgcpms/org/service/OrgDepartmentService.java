@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +23,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class OrgDepartmentService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final OrgDepartmentMapper orgDepartmentMapper;
 
@@ -148,8 +146,8 @@ public class OrgDepartmentService {
         vo.setOrderNum(d.getOrderNum());
         vo.setStatus(d.getStatus());
         vo.setCreatedBy(d.getCreatedBy() != null ? String.valueOf(d.getCreatedBy()) : null);
-        if (d.getCreatedTime() != null) vo.setCreatedAt(DTF.format(d.getCreatedTime()));
-        if (d.getUpdatedTime() != null) vo.setUpdatedAt(DTF.format(d.getUpdatedTime()));
+        if (d.getCreatedTime() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(d.getCreatedTime()));
+        if (d.getUpdatedTime() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(d.getUpdatedTime()));
         vo.setRemark(d.getRemark());
         return vo;
     }

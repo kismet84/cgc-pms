@@ -6,6 +6,7 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.service.PayRecordService;
 import com.cgcpms.payment.vo.PayRecordVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -36,13 +37,13 @@ public class PayRecordController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('payment:record:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Long> create(@RequestBody PayRecord record) {
+    public ApiResponse<Long> create(@Valid @RequestBody PayRecord record) {
         return ApiResponse.success(payRecordService.create(record));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('payment:record:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> update(@PathVariable Long id, @RequestBody PayRecord record) {
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PayRecord record) {
         record.setId(id);
         payRecordService.update(record);
         return ApiResponse.success();
@@ -57,7 +58,7 @@ public class PayRecordController {
 
     @PostMapping("/writeback")
     @PreAuthorize("hasAuthority('payment:record:writeback') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<PayRecordVO> writeback(@RequestBody PayRecord input) {
+    public ApiResponse<PayRecordVO> writeback(@Valid @RequestBody PayRecord input) {
         return ApiResponse.success(payRecordService.writeback(input));
     }
 }

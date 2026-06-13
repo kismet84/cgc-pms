@@ -8,19 +8,19 @@ import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysRoleMenuMapper;
 import com.cgcpms.system.vo.SysRoleVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SysRoleService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
@@ -43,6 +43,7 @@ public class SysRoleService {
         }
         if (role.getStatus() == null) role.setStatus("ENABLE");
         sysRoleMapper.insert(role);
+        log.info("Creating role: {}", role.getRoleCode());
         return role.getId();
     }
 
@@ -81,7 +82,7 @@ public class SysRoleService {
         List<SysRoleMenu> roleMenus = sysRoleMenuMapper.selectList(
                 new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, role.getId()));
         vo.setMenuIds(roleMenus.stream().map(SysRoleMenu::getMenuId).collect(Collectors.toList()));
-        if (role.getCreatedAt() != null) vo.setCreatedAt(DTF.format(role.getCreatedAt()));
+        if (role.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(role.getCreatedAt()));
         return vo;
     }
 }

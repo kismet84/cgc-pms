@@ -45,4 +45,15 @@ INSERT IGNORE INTO sys_role (id, tenant_id, role_code, role_name, role_type, sta
 (5, 0, 'MATERIAL_CLERK', '材料员', 'BUSINESS', 'ENABLE', 3, 1, '负责材料验收、出入库管理'),
 (6, 0, 'FINANCE', '财务人员', 'BUSINESS', 'ENABLE', 3, 1, '负责付款、发票、结算相关操作');
 
+-- ----------------------------
+-- 角色-菜单绑定 (P0-1 修复)
+-- MATERIAL_CLERK: 库存管理(710) + 仓库(731/735-737) + 台账(732) + 出入库(733/738) + 采购申请(734/739-740)
+-- FINANCE: 发票管理(720/751-755/762) + 付款提交(604) + 结算提交(607) + 预警(765-768) + 财务驾驶舱(810)
+-- ----------------------------
+INSERT IGNORE INTO sys_role_menu (id, role_id, menu_id)
+SELECT 50000 + id, 5, id FROM sys_menu WHERE id BETWEEN 710 AND 740 AND deleted_flag = 0;
+
+INSERT IGNORE INTO sys_role_menu (id, role_id, menu_id)
+SELECT 60000 + id, 6, id FROM sys_menu WHERE id IN (720, 751, 752, 753, 754, 755, 762, 765, 766, 767, 768, 604, 607, 810) AND deleted_flag = 0;
+
 SET FOREIGN_KEY_CHECKS = 1;

@@ -11,17 +11,17 @@ import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.project.vo.PmProjectMemberVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PmProjectMemberService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final PmProjectMemberMapper memberMapper;
     private final PmProjectMapper projectMapper;
@@ -92,6 +92,7 @@ public class PmProjectMemberService {
         }
 
         memberMapper.insert(member);
+        log.info("Creating project member: userId={}, projectId={}", member.getUserId(), projectId);
         return member.getId();
     }
 
@@ -146,8 +147,8 @@ public class PmProjectMemberService {
         vo.setEndDate(m.getEndDate() != null ? m.getEndDate().toString() : null);
         vo.setStatus(m.getStatus());
         vo.setCreatedBy(m.getCreatedBy() != null ? m.getCreatedBy().toString() : null);
-        vo.setCreatedAt(m.getCreatedTime() != null ? DTF.format(m.getCreatedTime()) : null);
-        vo.setUpdatedAt(m.getUpdatedTime() != null ? DTF.format(m.getUpdatedTime()) : null);
+        vo.setCreatedAt(m.getCreatedTime() != null ? DateTimeUtils.DTF.format(m.getCreatedTime()) : null);
+        vo.setUpdatedAt(m.getUpdatedTime() != null ? DateTimeUtils.DTF.format(m.getUpdatedTime()) : null);
         vo.setRemark(m.getRemark());
         return vo;
     }

@@ -4,7 +4,7 @@
     <springProfile name="!prod">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] - %replace(%msg){'(?i)(password|token|secret|authorization)\s*[:=]\s*[^\s,;&amp;]+', '$1=***MASKED***'}%n</pattern>
                 <charset>UTF-8</charset>
             </encoder>
         </appender>
@@ -22,7 +22,7 @@
         <!-- Console appender (structured JSON for log aggregation) -->
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] - %replace(%msg){'(?i)(password|token|secret|authorization)\s*[:=]\s*[^\s,;&amp;]+', '$1=***MASKED***'}%n</pattern>
                 <charset>UTF-8</charset>
             </encoder>
         </appender>
@@ -37,7 +37,7 @@
                 <totalSizeCap>3GB</totalSizeCap>
             </rollingPolicy>
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] - %msg%n</pattern>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] - %replace(%msg){'(?i)(password|token|secret|authorization)\s*[:=]\s*[^\s,;&amp;]+', '$1=***MASKED***'}%n</pattern>
                 <charset>UTF-8</charset>
             </encoder>
         </appender>

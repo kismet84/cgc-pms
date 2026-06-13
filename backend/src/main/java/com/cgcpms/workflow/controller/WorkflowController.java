@@ -88,7 +88,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/approve")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('workflow:approve')")
     public ApiResponse<Void> approve(@PathVariable Long taskId,
                                       @Valid @RequestBody WorkflowActionRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -99,7 +99,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/reject")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('workflow:reject')")
     public ApiResponse<Void> reject(@PathVariable Long taskId,
                                      @Valid @RequestBody WorkflowActionRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -110,7 +110,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/instances/{instanceId}/withdraw")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('workflow:withdraw')")
     public ApiResponse<Void> withdraw(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -119,7 +119,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/instances/{instanceId}/resubmit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('workflow:resubmit')")
     public ApiResponse<Void> resubmit(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -128,7 +128,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/transfer")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('workflow:transfer')")
     public ApiResponse<Void> transfer(@PathVariable Long taskId,
                                        @Valid @RequestBody WorkflowTransferRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -139,7 +139,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/add-sign")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('workflow:add-sign')")
     public ApiResponse<Void> addSign(@PathVariable Long taskId,
                                       @Valid @RequestBody WorkflowAddSignRequest request) {
         Long userId = UserContext.getCurrentUserId();

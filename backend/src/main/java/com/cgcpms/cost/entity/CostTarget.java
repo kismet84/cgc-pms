@@ -15,9 +15,9 @@ import java.time.LocalDateTime;
 /**
  * 目标成本表实体 — 对应 V22 cost_target 表。
  * <p>
- * V22 使用 created_time / updated_time 列名，与 BaseEntity 默认的 created_at / updated_at
- * 不同。因此新增 createdTime / updatedTime 字段并显式映射，同时将 BaseEntity 的
- * createdAt / updatedAt 标记为 exist=false 以避免映射冲突。
+ * V22 原使用 created_time / updated_time 列名，经 V44 统一重命名为 created_at / updated_at。
+ * 保留显式映射以确保向后兼容，同时将 BaseEntity 的 createdAt / updatedAt 标记为 exist=false
+ * 以避免映射冲突。
  * <p>
  * 其他审计字段 (created_by, updated_by, deleted_flag, remark) 列名与 BaseEntity 默认
  * 驼峰→下划线映射一致，直接继承使用。
@@ -53,13 +53,13 @@ public class CostTarget extends BaseEntity {
     /** 业务状态：DRAFT草稿，ACTIVE已生效，CANCELLED已作废 */
     private String status;
 
-    // ── V22 使用 created_time / updated_time 列名 ──
+    // ── V22 列经 V44 统一为 created_at / updated_at ──
 
-    @TableField("created_time")
+    @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
-    @TableField("updated_time")
+    @TableField("updated_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 

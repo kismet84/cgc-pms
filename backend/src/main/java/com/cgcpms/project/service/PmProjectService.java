@@ -16,6 +16,7 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.vo.PmProjectVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cgcpms.auth.context.UserContext;
@@ -23,13 +24,12 @@ import org.springframework.util.StringUtils;
 
 import java.util.List;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PmProjectService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final PmProjectMapper pmProjectMapper;
     private final CtContractMapper ctContractMapper;
@@ -61,6 +61,7 @@ public class PmProjectService {
 
     @Transactional
     public Long create(PmProject project) {
+        log.info("Creating project: {}", project.getProjectName());
         pmProjectMapper.insert(project);
         return project.getId();
     }
@@ -131,8 +132,8 @@ public class PmProjectService {
         vo.setStatus(p.getStatus());
         vo.setApprovalStatus(p.getApprovalStatus());
         vo.setCreatedBy(p.getCreatedBy() != null ? p.getCreatedBy().toString() : null);
-        vo.setCreatedAt(p.getCreatedAt() != null ? DTF.format(p.getCreatedAt()) : null);
-        vo.setUpdatedAt(p.getUpdatedAt() != null ? DTF.format(p.getUpdatedAt()) : null);
+        vo.setCreatedAt(p.getCreatedAt() != null ? DateTimeUtils.DTF.format(p.getCreatedAt()) : null);
+        vo.setUpdatedAt(p.getUpdatedAt() != null ? DateTimeUtils.DTF.format(p.getUpdatedAt()) : null);
         vo.setRemark(p.getRemark());
         return vo;
     }

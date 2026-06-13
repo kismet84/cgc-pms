@@ -13,13 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 
 @Service
 @RequiredArgsConstructor
 public class OrgCompanyService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final OrgCompanyMapper orgCompanyMapper;
 
@@ -88,8 +86,8 @@ public class OrgCompanyService {
         vo.setCompanyName(c.getCompanyName());
         vo.setStatus(c.getStatus());
         vo.setCreatedBy(c.getCreatedBy() != null ? String.valueOf(c.getCreatedBy()) : null);
-        if (c.getCreatedTime() != null) vo.setCreatedAt(DTF.format(c.getCreatedTime()));
-        if (c.getUpdatedTime() != null) vo.setUpdatedAt(DTF.format(c.getUpdatedTime()));
+        if (c.getCreatedTime() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(c.getCreatedTime()));
+        if (c.getUpdatedTime() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(c.getUpdatedTime()));
         vo.setRemark(c.getRemark());
         return vo;
     }

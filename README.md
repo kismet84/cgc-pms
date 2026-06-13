@@ -53,7 +53,7 @@ cgc-pms/
 │           ├── org/          #   组织架构 (公司/部门/岗位)
 │           └── alert/        #   预警列表 + 批量评估
 ├── mobile/               # uni-app 移动端（预留）
-├── database/             # Flyway 迁移脚本 (V1~V41)
+├── backend/src/main/resources/db/migration/  # Flyway 迁移脚本 (V1~V43)
 ├── deploy/               # Docker Compose (MySQL + Redis + MinIO) + .env.example + docker-compose.prod.yml
 ├── doc/                  # 开发文档 + Backlog + 测试报告 + 审计修复报告
 ├── scripts/              # 辅助脚本

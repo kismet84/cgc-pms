@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotNull;
@@ -20,6 +21,7 @@ public class VarOrder extends BaseEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
     @NotNull
@@ -50,7 +52,9 @@ public class VarOrder extends BaseEntity {
 
     private Integer impactDays;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String approvalStatus;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Integer costGeneratedFlag;
 }

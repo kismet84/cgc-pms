@@ -33,7 +33,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +51,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StlSettlementService {
 
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final BigDecimal DEFAULT_WARRANTY_RATE = new BigDecimal("0.05");
 
     private final StlSettlementMapper stlSettlementMapper;
@@ -125,7 +124,7 @@ public class StlSettlementService {
         }
 
         // Auto-generate settlement code: STL-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "STL-" + today + "-";
         LambdaQueryWrapper<StlSettlement> codeWrapper = new LambdaQueryWrapper<>();
         codeWrapper.eq(StlSettlement::getTenantId, tenantId)
@@ -137,7 +136,8 @@ public class StlSettlementService {
         if (last != null && last.getSettlementCode() != null && last.getSettlementCode().startsWith(prefix)) {
             try {
                 seq = Integer.parseInt(last.getSettlementCode().substring(last.getSettlementCode().lastIndexOf('-') + 1)) + 1;
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getSettlementCode(), e);
             }
         }
         settlement.setSettlementCode(prefix + String.format("%03d", seq));
@@ -501,13 +501,13 @@ public class StlSettlementService {
         vo.setUnpaidAmount(m.getUnpaidAmount() != null ? m.getUnpaidAmount().toPlainString() : null);
         vo.setWarrantyAmount(m.getWarrantyAmount() != null ? m.getWarrantyAmount().toPlainString() : null);
         vo.setSettlementStatus(m.getSettlementStatus());
-        vo.setFinalizedAt(m.getFinalizedAt() != null ? m.getFinalizedAt().format(DTF) : null);
+        vo.setFinalizedAt(m.getFinalizedAt() != null ? m.getFinalizedAt().format(DateTimeUtils.DTF) : null);
         vo.setProjectName(maps.projectNames().get(m.getProjectId()));
         vo.setContractName(maps.contractNames().get(m.getContractId()));
         vo.setPartnerName(maps.partnerNames().get(m.getPartnerId()));
         vo.setCreatedBy(m.getCreatedBy() != null ? m.getCreatedBy().toString() : null);
-        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(m.getRemark());
         return vo;
     }
@@ -526,8 +526,8 @@ public class StlSettlementService {
         vo.setSourceType(item.getSourceType());
         vo.setSourceId(item.getSourceId() != null ? item.getSourceId().toString() : null);
         vo.setCreatedBy(item.getCreatedBy() != null ? item.getCreatedBy().toString() : null);
-        vo.setCreatedAt(item.getCreatedAt() != null ? item.getCreatedAt().format(DTF) : null);
-        vo.setUpdatedAt(item.getUpdatedAt() != null ? item.getUpdatedAt().format(DTF) : null);
+        vo.setCreatedAt(item.getCreatedAt() != null ? item.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedAt(item.getUpdatedAt() != null ? item.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(item.getRemark());
         return vo;
     }

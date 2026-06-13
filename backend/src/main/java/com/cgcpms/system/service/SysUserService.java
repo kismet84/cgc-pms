@@ -8,23 +8,23 @@ import com.cgcpms.system.entity.*;
 import com.cgcpms.system.mapper.*;
 import com.cgcpms.system.vo.SysUserVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.format.DateTimeFormatter;
+import com.cgcpms.common.util.DateTimeUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SysUserService {
-
-    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
@@ -61,8 +61,8 @@ public class SysUserService {
             vo.setStatus(user.getStatus());
             vo.setIsAdmin(user.getIsAdmin());
             vo.setRoleNames(roleNamesMap.getOrDefault(user.getId(), Collections.emptyList()));
-            if (user.getCreatedAt() != null) vo.setCreatedAt(DTF.format(user.getCreatedAt()));
-            if (user.getUpdatedAt() != null) vo.setUpdatedAt(DTF.format(user.getUpdatedAt()));
+            if (user.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(user.getCreatedAt()));
+            if (user.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(user.getUpdatedAt()));
             return vo;
         });
     }
@@ -81,8 +81,8 @@ public class SysUserService {
         vo.setStatus(user.getStatus());
         vo.setIsAdmin(user.getIsAdmin());
         vo.setRoleNames(getRoleNames(user.getId()));
-        if (user.getCreatedAt() != null) vo.setCreatedAt(DTF.format(user.getCreatedAt()));
-        if (user.getUpdatedAt() != null) vo.setUpdatedAt(DTF.format(user.getUpdatedAt()));
+        if (user.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(user.getCreatedAt()));
+        if (user.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(user.getUpdatedAt()));
         return vo;
     }
 
@@ -95,6 +95,7 @@ public class SysUserService {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         if (user.getStatus() == null) user.setStatus("ENABLE");
         sysUserMapper.insert(user);
+        log.info("Creating user: {}", user.getUsername());
         return user.getId();
     }
 

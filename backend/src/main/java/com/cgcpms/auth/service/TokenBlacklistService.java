@@ -1,5 +1,6 @@
 package com.cgcpms.auth.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -10,6 +11,7 @@ import java.time.Duration;
  * Redis-backed token blacklist. Only active when StringRedisTemplate is available
  * (i.e. not in the local profile where Redis is excluded).
  */
+@Slf4j
 @Service
 @ConditionalOnBean(StringRedisTemplate.class)
 public class TokenBlacklistService {
@@ -26,6 +28,7 @@ public class TokenBlacklistService {
         if (ttlMillis <= 0) return;
         String key = PREFIX + tokenKey(token);
         redisTemplate.opsForValue().set(key, "1", Duration.ofMillis(ttlMillis));
+        log.debug("Token blacklisted with TTL: {}ms", ttlMillis);
     }
 
     public boolean isBlacklisted(String token) {

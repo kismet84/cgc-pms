@@ -60,14 +60,14 @@ public class CtContractChange implements Serializable {
     @TableField(fill = FieldFill.INSERT)
     private Long createdBy;
 
-    @TableField(value = "created_time", fill = FieldFill.INSERT)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Long updatedBy;
 
-    @TableField(value = "updated_time", fill = FieldFill.INSERT_UPDATE)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 
