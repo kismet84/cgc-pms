@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UserInfo } from '@/types/user'
+import { logout as authLogout } from '@/api/modules/auth'
 
 const USER_INFO_KEY = 'cgc_pms_userinfo'
 
@@ -21,6 +22,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function logout() {
+    authLogout() // fire-and-forget — always clear local state regardless of API result
     userInfo.value = null
     clearUserInfo()
   }

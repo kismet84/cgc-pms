@@ -18,6 +18,8 @@ export interface UserInfo {
   username: string
   realName: string
   avatar?: string
+  phone?: string
+  email?: string
   roles: string[]
   permissions: string[]
   /** 部门/角色显示名，如“项目经理” */
