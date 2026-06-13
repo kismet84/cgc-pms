@@ -70,6 +70,7 @@ declare module 'vue' {
     ATree: typeof import('ant-design-vue/es')['Tree']
     ATreeSelect: typeof import('ant-design-vue/es')['TreeSelect']
     ATypographyTitle: typeof import('ant-design-vue/es')['TypographyTitle']
+    AUpload: typeof import('ant-design-vue/es')['Upload']
     ContractChangeList: typeof import('./components/ContractChangeList.vue')['default']
     ContractItemEditor: typeof import('./components/ContractItemEditor.vue')['default']
     ContractStatusTag: typeof import('./components/ContractStatusTag.vue')['default']

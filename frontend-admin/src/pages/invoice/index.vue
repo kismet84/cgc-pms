@@ -53,6 +53,7 @@ const formData = reactive<Partial<InvoiceVO>>({
 const uploadFileList = ref<any[]>([])
 const recognizing = ref(false)
 const recognizeResult = ref<InvoiceRecognizeResultVO | null>(null)
+const abortController = ref<AbortController | null>(null)
 
 const columns = [
   { title: '发票号码', dataIndex: 'invoiceNo', width: 160 },
@@ -137,6 +138,10 @@ function handleAdd() {
     buyerTaxNo: undefined,
     remark: '',
   })
+  if (abortController.value) {
+    abortController.value.abort()
+    abortController.value = null
+  }
   uploadFileList.value = []
   recognizeResult.value = null
   modalVisible.value = true
@@ -244,12 +249,21 @@ async function handleModalOk() {
         message.warning('发票已创建，但文件上传失败。请稍后在发票详情中重新上传。')
       }
     }
-  } catch {
-    message.error('操作失败，请稍后重试')
+  } catch (error: any) {
+    const msg = error?.response?.data?.message || error?.message || ''
+    if (msg.includes('已存在') || msg.includes('duplicate')) {
+      message.error('发票号码已存在，同一租户下发票号码不可重复')
+    } else {
+      message.error('操作失败，请稍后重试')
+    }
   }
 }
 
 function handleModalCancel() {
+  if (abortController.value) {
+    abortController.value.abort()
+    abortController.value = null
+  }
   uploadFileList.value = []
   recognizeResult.value = null
   modalVisible.value = false
@@ -272,6 +286,12 @@ function handleBeforeUpload(file: File) {
 async function handleRecognize() {
   if (!uploadFileList.value.length) return
 
+  // Cancel any previous in-flight request
+  if (abortController.value) {
+    abortController.value.abort()
+  }
+  abortController.value = new AbortController()
+
   recognizing.value = true
   try {
     const file = uploadFileList.value[0].originFileObj as File
@@ -282,6 +302,7 @@ async function handleRecognize() {
     const response = await axios.post(`${baseURL}/invoices/recognize`, fd, {
       timeout: 120000,
       withCredentials: true,
+      signal: abortController.value.signal,
     })
 
     // Raw axios: response.data is the full ApiResponse { code, message, data }
@@ -293,10 +314,22 @@ async function handleRecognize() {
       message.warning('未识别到发票信息，请手动填写')
     }
   } catch (error: any) {
-    const msg = error?.response?.data?.message || error?.message || '识别失败'
-    message.error(msg)
+    if (axios.isCancel(error)) {
+      // Request was cancelled (modal closed) — no message needed
+      return
+    }
+    const code = error?.response?.data?.code || error?.code
+    if (code === 'PDF_ENCRYPTED') {
+      message.warning('PDF已加密，无法识别。请手动填写。')
+    } else if (code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+      message.error('识别超时，请检查网络后重试')
+    } else {
+      const msg = error?.response?.data?.message || error?.message || '识别失败'
+      message.error(msg)
+    }
   } finally {
     recognizing.value = false
+    abortController.value = null
   }
 }
 
@@ -341,6 +374,15 @@ function getPayRecordLabel(record: InvoiceVO): string {
 onMounted(() => {
   fetchPayRecords()
   fetchData()
+})
+
+defineExpose({
+  formData,
+  uploadFileList,
+  recognizeResult,
+  applyRecognitionResult,
+  handleBeforeUpload,
+  handleAdd,
 })
 </script>
 
