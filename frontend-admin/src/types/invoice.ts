@@ -45,6 +45,23 @@ export interface InvoiceVO {
   createdAt?: string
   updatedAt?: string
   remark?: string
+  sellerName?: string
+  buyerName?: string
+  buyerTaxNo?: string
+}
+
+/** Invoice recognition result (from PDF extraction) */
+export interface InvoiceRecognizeResultVO {
+  invoiceNo?: string
+  invoiceType?: string
+  invoiceAmount?: string
+  taxRate?: string
+  taxAmount?: string
+  invoiceDate?: string
+  sellerName?: string
+  buyerName?: string
+  buyerTaxNo?: string
+  remark?: string
 }
 
 /** Pay record brief (for dropdown selector) */

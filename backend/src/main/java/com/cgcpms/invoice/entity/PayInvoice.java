@@ -77,4 +77,8 @@ public class PayInvoice extends BaseEntity {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime updatedAt;
+
+    private String sellerName;
+    private String buyerName;
+    private String buyerTaxNo;
 }

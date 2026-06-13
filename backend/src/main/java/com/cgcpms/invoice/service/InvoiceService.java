@@ -152,6 +152,9 @@ public class InvoiceService {
         vo.setCreatedAt(invoice.getCreatedTime() != null ? invoice.getCreatedTime().format(DateTimeUtils.DTF) : null);
         vo.setUpdatedAt(invoice.getUpdatedTime() != null ? invoice.getUpdatedTime().format(DateTimeUtils.DTF) : null);
         vo.setRemark(invoice.getRemark());
+        vo.setSellerName(invoice.getSellerName());
+        vo.setBuyerName(invoice.getBuyerName());
+        vo.setBuyerTaxNo(invoice.getBuyerTaxNo());
         return vo;
     }
 }
