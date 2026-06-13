@@ -6,6 +6,7 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.service.StlSettlementService;
+import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -84,5 +85,11 @@ public class StlSettlementController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<StlSettlementVO> computeSettlementAmount(@PathVariable Long contractId) {
         return ApiResponse.success(stlSettlementService.computeSettlementAmount(contractId));
+    }
+
+    @GetMapping("/{id}/sources")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
+    public ApiResponse<SettlementSourcesVO> getSources(@PathVariable Long id) {
+        return ApiResponse.success(stlSettlementService.getSources(id));
     }
 }

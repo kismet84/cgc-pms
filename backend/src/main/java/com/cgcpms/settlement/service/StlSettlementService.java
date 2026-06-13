@@ -17,6 +17,7 @@ import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
 import com.cgcpms.subcontract.entity.SubMeasure;
@@ -320,6 +321,75 @@ public class StlSettlementService {
         return records.stream()
                 .map(r -> r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // ---- Source data query ----
+
+    public SettlementSourcesVO getSources(Long settlementId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        StlSettlement settlement = stlSettlementMapper.selectById(settlementId);
+        if (settlement == null || !Objects.equals(settlement.getTenantId(), tenantId)) {
+            throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
+        }
+        Long contractId = settlement.getContractId();
+
+        // Query confirmed var orders
+        List<VarOrder> varOrders = varOrderMapper.selectList(
+            new LambdaQueryWrapper<VarOrder>()
+                .eq(VarOrder::getTenantId, tenantId)
+                .eq(VarOrder::getContractId, contractId)
+                .eq(VarOrder::getDirection, "COST")
+                .eq(VarOrder::getOwnerConfirmFlag, 1));
+
+        // Query approved sub measures
+        List<SubMeasure> subMeasures = subMeasureMapper.selectList(
+            new LambdaQueryWrapper<SubMeasure>()
+                .eq(SubMeasure::getTenantId, tenantId)
+                .eq(SubMeasure::getContractId, contractId)
+                .eq(SubMeasure::getApprovalStatus, "APPROVED"));
+
+        // Query success pay records
+        List<PayRecord> payRecords = payRecordMapper.selectList(
+            new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getTenantId, tenantId)
+                .eq(PayRecord::getContractId, contractId)
+                .eq(PayRecord::getPayStatus, "SUCCESS"));
+
+        // Map to VOs
+        SettlementSourcesVO vo = new SettlementSourcesVO();
+        vo.setVarOrders(varOrders.stream().map(v -> {
+            SettlementSourcesVO.VarOrderVO vvo = new SettlementSourcesVO.VarOrderVO();
+            vvo.setId(v.getId());
+            vvo.setVarCode(v.getVarCode());
+            vvo.setVarName(v.getVarName());
+            vvo.setVarType(v.getVarType());
+            vvo.setConfirmedAmount(v.getConfirmedAmount());
+            vvo.setApprovalStatus(v.getApprovalStatus());
+            return vvo;
+        }).collect(Collectors.toList()));
+
+        vo.setSubMeasures(subMeasures.stream().map(s -> {
+            SettlementSourcesVO.SubMeasureVO svo = new SettlementSourcesVO.SubMeasureVO();
+            svo.setId(s.getId());
+            svo.setMeasureCode(s.getMeasureCode());
+            svo.setMeasurePeriod(s.getMeasurePeriod());
+            svo.setApprovedAmount(s.getApprovedAmount());
+            svo.setApprovalStatus(s.getApprovalStatus());
+            return svo;
+        }).collect(Collectors.toList()));
+
+        vo.setPayRecords(payRecords.stream().map(p -> {
+            SettlementSourcesVO.PayRecordVO pvo = new SettlementSourcesVO.PayRecordVO();
+            pvo.setId(p.getId());
+            pvo.setPayAmount(p.getPayAmount());
+            pvo.setPayDate(p.getPayDate() != null ? p.getPayDate().toString() : null);
+            pvo.setPayMethod(p.getPayMethod());
+            pvo.setVoucherNo(p.getVoucherNo());
+            pvo.setPayStatus(p.getPayStatus());
+            return pvo;
+        }).collect(Collectors.toList()));
+
+        return vo;
     }
 
     // ---- Amount auto-fill on create/update ----
