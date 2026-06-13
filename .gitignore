@@ -49,3 +49,6 @@ temp/
 .playwright-mcp/
 *-snapshot.yml
 login-snapshot.yml
+
+# Sisyphus working files
+.sisyphus/
