@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import request from '@/api/request'
+import { request } from '@/api/request'
 
 interface Preferences {
   sidebarCollapsed: boolean

@@ -24,7 +24,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'profile',
         name: 'Profile',
         component: () => import('@/pages/profile/index.vue'),
-        meta: { title: '个人中心' },
+        meta: { title: '个人中心', hidden: true },
       },
       {
         path: 'contract',
@@ -292,7 +292,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'settings',
         name: 'Settings',
         component: () => import('@/pages/settings/index.vue'),
-        meta: { title: '设置' },
+        meta: { title: '设置', hidden: true },
       },
       {
         path: 'approval',
@@ -332,7 +332,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'help',
         name: 'Help',
         component: () => import('@/pages/help/index.vue'),
-        meta: { title: '帮助' },
+        meta: { title: '帮助', hidden: true },
       },
     ],
   },
