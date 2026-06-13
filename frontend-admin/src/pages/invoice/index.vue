@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import axios from 'axios'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import {
   getInvoiceList,
@@ -17,6 +18,9 @@ import {
   VERIFY_STATUS_LABEL,
   VERIFY_STATUS_COLOR,
 } from '@/types/invoice'
+import { uploadFile } from '@/api/modules/file'
+
+const INVOICE_BUSINESS_TYPE = 'INVOICE_ATTACHMENT'
 
 const filter = reactive({
   payRecordId: undefined as string | undefined,
@@ -219,15 +223,27 @@ async function handleModalOk() {
   }
 
   try {
+    let invoiceId: string | null = null
     if (editingId.value) {
       await updateInvoice(editingId.value, formData)
+      invoiceId = editingId.value
       message.success('更新成功')
     } else {
-      await createInvoice(formData)
+      invoiceId = await createInvoice(formData)
       message.success('创建成功')
     }
     modalVisible.value = false
     fetchData()
+
+    // Upload attachment if a file was selected
+    if (uploadFileList.value.length > 0 && invoiceId) {
+      const file = uploadFileList.value[0].originFileObj as File
+      try {
+        await uploadFile(file, INVOICE_BUSINESS_TYPE, invoiceId)
+      } catch {
+        message.warning('发票已创建，但文件上传失败。请稍后在发票详情中重新上传。')
+      }
+    }
   } catch {
     message.error('操作失败，请稍后重试')
   }
@@ -253,8 +269,57 @@ function handleBeforeUpload(file: File) {
   return false // prevent auto-upload
 }
 
-function handleRecognize() {
-  // Implementation in T10
+async function handleRecognize() {
+  if (!uploadFileList.value.length) return
+
+  recognizing.value = true
+  try {
+    const file = uploadFileList.value[0].originFileObj as File
+    const fd = new FormData()
+    fd.append('file', file)
+
+    const baseURL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+    const response = await axios.post(`${baseURL}/invoices/recognize`, fd, {
+      timeout: 120000,
+      withCredentials: true,
+    })
+
+    // Raw axios: response.data is the full ApiResponse { code, message, data }
+    const result = response.data?.data || response.data
+    if (result) {
+      applyRecognitionResult(result)
+      message.success('发票识别完成，请核对自动填充的内容')
+    } else {
+      message.warning('未识别到发票信息，请手动填写')
+    }
+  } catch (error: any) {
+    const msg = error?.response?.data?.message || error?.message || '识别失败'
+    message.error(msg)
+  } finally {
+    recognizing.value = false
+  }
+}
+
+function applyRecognitionResult(result: InvoiceRecognizeResultVO) {
+  // Only fill fields that are currently empty/null — never overwrite user input
+  const fields: (keyof InvoiceRecognizeResultVO)[] = [
+    'invoiceNo',
+    'invoiceType',
+    'invoiceAmount',
+    'taxRate',
+    'taxAmount',
+    'invoiceDate',
+    'sellerName',
+    'buyerName',
+    'buyerTaxNo',
+    'remark',
+  ]
+  for (const field of fields) {
+    const value = result[field]
+    if (value != null && value !== '' && !formData[field]) {
+      ;(formData as any)[field] = value
+    }
+  }
 }
 
 function fmtAmount(val: string | undefined): string {
