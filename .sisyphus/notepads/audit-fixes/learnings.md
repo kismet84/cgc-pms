@@ -1695,3 +1695,25 @@ Ready for production deployment (conditional on secrets configuration).
 **Recommendation**: Proceed. This codebase meets or exceeds quality standards for the defined scope.
 
 
+
+## T14b: Empty catch Block Fix — ContractChangeList + AlertStore (2026-06-13)
+
+### Issue
+5 empty \catch { }\ blocks (without error variable or console.error) in:
+- \ContractChangeList.vue\: 4 blocks (fetchData line 92, handleDelete line 153, handleSubmitApproval line 175, handleModalOk line 221)
+- \lert.ts\: 1 block (fetchAlerts line 21)
+
+### Fix
+Added \catch (err)\ with \console.error('ComponentName: description', err)\ before existing logic. All existing \message.error()\ calls and throw statements kept intact.
+
+| # | File | Line | Console Prefix | Existing Logic |
+|---|------|------|----------------|----------------|
+| 1 | ContractChangeList.vue | 92 | \ContractChangeList: 加载合同变更列表失败\ | fallback empty arrays + message.error |
+| 2 | ContractChangeList.vue | 153 | \ContractChangeList: 删除失败\ | message.error |
+| 3 | ContractChangeList.vue | 175 | \ContractChangeList: 提交审批失败\ | message.error |
+| 4 | ContractChangeList.vue | 221 | \ContractChangeList: 操作失败\ | message.error |
+| 5 | alert.ts | 21 | \AlertStore: 加载预警列表失败\ | fallback empty array + throw Error |
+
+### Verification
+- \pnpm build\: PASS (vue-tsc --noEmit + vite build, zero errors)
+- \pnpm test:unit -- --run\: 16/16 pass (4 test files)

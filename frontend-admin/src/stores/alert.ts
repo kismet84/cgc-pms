@@ -18,7 +18,8 @@ export const useAlertStore = defineStore('alert', () => {
     loading.value = true
     try {
       alerts.value = await getAlertList(params)
-    } catch {
+    } catch (err) {
+      console.error('AlertStore: 加载预警列表失败', err);
       alerts.value = []
       throw new Error('加载预警列表失败')
     } finally {

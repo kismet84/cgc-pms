@@ -89,7 +89,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (err) {
+    console.error('ContractChangeList: 加载合同变更列表失败', err);
     tableData.value = []
     total.value = 0
     message.error('加载合同变更列表失败')
@@ -150,7 +151,8 @@ function handleDelete(record: ContractChangeVO) {
         await deleteContractChange(record.id)
         message.success('删除成功')
         fetchData()
-      } catch {
+      } catch (err) {
+        console.error('ContractChangeList: 删除失败', err);
         message.error('删除失败')
       }
     },
@@ -172,7 +174,8 @@ function handleSubmitApproval(record: ContractChangeVO) {
         await submitContractChangeApproval(record.id)
         message.success('已提交审批')
         fetchData()
-      } catch {
+      } catch (err) {
+        console.error('ContractChangeList: 提交审批失败', err);
         message.error('提交审批失败')
       }
     },
@@ -218,7 +221,8 @@ async function handleModalOk() {
     modalVisible.value = false
     fetchData()
     emit('refresh')
-  } catch {
+  } catch (err) {
+    console.error('ContractChangeList: 操作失败', err);
     message.error('操作失败，请稍后重试')
   } finally {
     formSubmitting.value = false
