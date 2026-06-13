@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { message, Modal } from 'ant-design-vue'
+import { message, Modal, Upload } from 'ant-design-vue'
 import axios from 'axios'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import {
@@ -273,14 +273,14 @@ function handleBeforeUpload(file: File) {
   const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf')
   if (!isPdf) {
     message.error('仅支持PDF格式')
-    return false
+    return Upload.LIST_IGNORE
   }
-  const isLt50M = file.size / 1024 / 1024 < 50
+  const isLt50M = file.size / 1024 * 1024 < 50
   if (!isLt50M) {
     message.error('文件大小不能超过50MB')
-    return false
+    return Upload.LIST_IGNORE
   }
-  return false // prevent auto-upload
+  return true // accept the file (no action prop = no auto-upload)
 }
 
 async function handleRecognize() {
