@@ -2,10 +2,16 @@
   "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\audit-fixes.md",
   "started_at": "2026-06-13T01:32:00.980Z",
   "session_ids": [
-    "ses_1416486e6ffeClYQpAyVEEqjtU"
+    "ses_1416486e6ffeClYQpAyVEEqjtU",
+    "ses_141278f13ffezOX53PVpxxRX7l",
+    "ses_141278313ffefYO2eMrenguKcD",
+    "ses_1412774e4ffeaxV1t2uLX1XAos"
   ],
   "session_origins": {
-    "ses_1416486e6ffeClYQpAyVEEqjtU": "direct"
+    "ses_1416486e6ffeClYQpAyVEEqjtU": "direct",
+    "ses_141278f13ffezOX53PVpxxRX7l": "appended",
+    "ses_141278313ffefYO2eMrenguKcD": "appended",
+    "ses_1412774e4ffeaxV1t2uLX1XAos": "appended"
   },
   "plan_name": "audit-fixes",
   "agent": "atlas",

@@ -352,7 +352,7 @@ onMounted(() => {
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'approvalStatus'">
-            <ApprovalStatusTag :status="(record.approvalStatus as any)" />
+            <ApprovalStatusTag :status="record.approvalStatus" />
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="STATUS_COLOR[record.status]">

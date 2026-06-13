@@ -19,7 +19,7 @@ import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO, SourceTy
 import { SOURCE_TYPE_LABEL, SOURCE_TYPE_COLOR } from '@/types/cost'
 import type { PageResult } from '@/types/api'
 import type { ProjectVO } from '@/types/project'
-import type { ContractVO } from '@/types/contract'
+import type { ContractVO, ContractQueryParams } from '@/types/contract'
 import type { PartnerVO } from '@/types/partner'
 
 // ---- Dropdown data ----
@@ -76,9 +76,9 @@ async function fetchProjects() {
 
 async function fetchContracts(projectId?: string) {
   try {
-    const params: Record<string, unknown> = { pageNo: 1, pageSize: 500 }
+    const params: ContractQueryParams = { pageNo: 1, pageSize: 500 }
     if (projectId) params.projectId = projectId
-    const res = await getContractLedger(params as any)
+    const res = await getContractLedger(params)
     contractList.value = res.records
   } catch {
     contractList.value = []

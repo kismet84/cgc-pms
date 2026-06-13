@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import type { ApprovalStatus } from '@/types/contract'
+defineProps<{ status: string }>()
 
-defineProps<{ status: ApprovalStatus }>()
-
-const label: Record<ApprovalStatus, string> = {
+const label: Record<string, string> = {
   DRAFT: '草稿',
   APPROVING: '审批中',
   APPROVED: '已通过',
@@ -11,7 +9,7 @@ const label: Record<ApprovalStatus, string> = {
   WITHDRAWN: '已撤回',
 }
 
-const color: Record<ApprovalStatus, string> = {
+const color: Record<string, string> = {
   DRAFT: 'default',
   APPROVING: 'processing',
   APPROVED: 'success',

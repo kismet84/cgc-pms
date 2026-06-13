@@ -418,7 +418,7 @@ onMounted(() => {
             <span v-else class="pm-none">-</span>
           </template>
           <template v-else-if="column.key === 'approvalStatus'">
-            <ApprovalStatusTag :status="(record.approvalStatus as any)" />
+            <ApprovalStatusTag :status="record.approvalStatus" />
           </template>
           <template v-else-if="column.key === 'action'">
             <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>

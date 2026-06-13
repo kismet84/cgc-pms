@@ -1836,3 +1836,61 @@ public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @Valid @RequestBo
 ### Verification
 - cd backend && .\mvnw.cmd clean test: 206/206 pass, 0 failures, 0 errors, BUILD SUCCESS
 - No compilation errors, no import changes needed
+
+## T25: Eliminate Frontend `as any` Type Assertions (2026-06-13)
+
+### Summary
+Removed all 9 `as any` type assertions from the frontend codebase. Two files used `as any` to bypass type-safe API calls, and 6 files used `(record.approvalStatus as any)` to bypass the `ApprovalStatus` type constraint. The `ApprovalStatusTag` component was refactored to accept `string` instead of the `ApprovalStatus` enum, eliminating the need for type assertions at all call sites.
+
+### Changes Made
+
+#### ledger.vue (cost module)
+- Import: `ContractVO` → `ContractVO, ContractQueryParams`
+- `fetchContracts()`: Changed `params: Record<string, unknown>` → `params: ContractQueryParams` and removed `params as any` on `getContractLedger()` call
+
+#### settlement/index.vue (settlement module)
+- Import: `ContractVO` → `ContractVO, ContractQueryParams`
+- `fetchContracts()`: Changed `params: Record<string, unknown>` → `params: ContractQueryParams` and removed `params as any` on `getContractLedger()` call
+
+#### ApprovalStatusTag.vue (shared component)
+- Removed `import type { ApprovalStatus } from '@/types/contract'`
+- Changed `defineProps<{ status: ApprovalStatus }>()` → `defineProps<{ status: string }>()`
+- Changed `Record<ApprovalStatus, string>` → `Record<string, string>` for both `label` and `color` maps
+
+#### 6 Caller Files — removed `(record.approvalStatus as any)` → `record.approvalStatus`
+1. `pages/variation/order.vue` — line 421
+2. `pages/inventory/purchase-request.vue` — line 355
+3. `pages/payment/index.vue` — line 492
+4. `pages/subcontract/measure.vue` — line 432
+5. `pages/receipt/index.vue` — line 442
+6. `pages/purchase/order.vue` — line 443
+
+### Key Design Decision
+The `ApprovalStatusTag` component's `status` prop was changed from the specific `ApprovalStatus` enum type to generic `string`. This is safe because:
+- The component only uses the `status` value as a key into `Record` maps (`label` and `color`)
+- The template already had a fallback: `{{ label[status] || status }}`
+- The `Record<ApprovalStatus, string>` constraint was unnecessarily restrictive — the component works correctly with any string key
+- This eliminates `as any` at ALL 6 call sites without needing to refactor the record types in those pages
+
+### ContractQueryParams Interface
+The `ContractQueryParams` type already existed in `@/types/contract.ts` (line 76) — no new type needed. It matches the shape of the params object passed to `getContractLedger()`.
+
+### Verification
+- `grep -r 'as any' frontend-admin/src/` — **ZERO matches** (confirmed)
+- `pnpm build` (vue-tsc --noEmit + vite build) — **PASS**, zero type errors, zero build errors
+- `pnpm test:unit -- --run` — **16/16 pass** (4 test files, 0 failures)
+- No new type errors introduced by the `ContractQueryParams` type or the `string` prop change
+
+### Files Changed
+| File | Changes |
+|------|---------|
+| `frontend-admin/src/pages/cost/ledger.vue` | Import + type + remove as any (2 edits) |
+| `frontend-admin/src/pages/settlement/index.vue` | Import + type + remove as any (2 edits) |
+| `frontend-admin/src/components/ApprovalStatusTag.vue` | Remove import, change props+Records (1 edit) |
+| `frontend-admin/src/pages/variation/order.vue` | Remove as any (1 edit) |
+| `frontend-admin/src/pages/inventory/purchase-request.vue` | Remove as any (1 edit) |
+| `frontend-admin/src/pages/payment/index.vue` | Remove as any (1 edit) |
+| `frontend-admin/src/pages/subcontract/measure.vue` | Remove as any (1 edit) |
+| `frontend-admin/src/pages/receipt/index.vue` | Remove as any (1 edit) |
+| `frontend-admin/src/pages/purchase/order.vue` | Remove as any (1 edit) |
+| **Total** | **11 edits across 9 files** |
