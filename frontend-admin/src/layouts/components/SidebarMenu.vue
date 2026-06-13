@@ -10,6 +10,9 @@ import {
   TeamOutlined,
   AuditOutlined,
   SettingOutlined,
+  UserOutlined,
+  ControlOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -29,6 +32,9 @@ const iconMap: Record<string, MenuItem['icon']> = {
   TeamOutlined,
   AuditOutlined,
   SettingOutlined,
+  UserOutlined,
+  ControlOutlined,
+  QuestionCircleOutlined,
 }
 
 const menuItems = computed(() => {

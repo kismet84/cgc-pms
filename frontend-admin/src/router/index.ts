@@ -21,12 +21,6 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '首页', icon: 'HomeOutlined' },
       },
       {
-        path: 'profile',
-        name: 'Profile',
-        component: () => import('@/pages/profile/index.vue'),
-        meta: { title: '个人中心', hidden: true },
-      },
-      {
         path: 'contract',
         name: 'Contract',
         redirect: '/contract/ledger',
@@ -289,12 +283,6 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '预警中心', icon: 'AlertOutlined' },
       },
       {
-        path: 'settings',
-        name: 'Settings',
-        component: () => import('@/pages/settings/index.vue'),
-        meta: { title: '设置', hidden: true },
-      },
-      {
         path: 'approval',
         name: 'Approval',
         redirect: '/approval/todo',
@@ -329,10 +317,22 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/pages/profile/index.vue'),
+        meta: { title: '个人中心', icon: 'UserOutlined' },
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('@/pages/settings/index.vue'),
+        meta: { title: '设置', icon: 'ControlOutlined' },
+      },
+      {
         path: 'help',
         name: 'Help',
         component: () => import('@/pages/help/index.vue'),
-        meta: { title: '帮助', hidden: true },
+        meta: { title: '帮助', icon: 'QuestionCircleOutlined' },
       },
     ],
   },
