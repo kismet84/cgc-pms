@@ -5,8 +5,10 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.service.InvoiceService;
+import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
 import jakarta.validation.Valid;
+import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -70,5 +72,11 @@ public class InvoiceController {
     @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> register(@Valid @RequestBody PayInvoice invoice) {
         return ApiResponse.success(invoiceService.register(invoice));
+    }
+
+    @PostMapping("/recognize")
+    @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<InvoiceRecognizeResultVO> recognize(@RequestParam MultipartFile file) {
+        return ApiResponse.success(invoiceService.recognize(file));
     }
 }
