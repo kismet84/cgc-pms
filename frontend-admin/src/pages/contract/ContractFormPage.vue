@@ -12,11 +12,8 @@ import {
   savePaymentTerms,
   submitForApproval,
 } from '@/api/modules/contract'
-import { getProjectList } from '@/api/modules/project'
-import { getPartnerList } from '@/api/modules/partner'
+import { useReferenceStore } from '@/stores/reference'
 import type { ContractType, ContractItem, ContractPaymentTerm } from '@/types/contract'
-import type { ProjectVO } from '@/types/project'
-import type { PartnerVO } from '@/types/partner'
 
 const router = useRouter()
 
@@ -82,23 +79,9 @@ const items = ref<EditableContractItem[]>([])
 const terms = ref<EditablePaymentTerm[]>([])
 
 // ---- Reference data (projects / partners) ----
-const projects = ref<ProjectVO[]>([])
-const partners = ref<PartnerVO[]>([])
-
-async function loadReferenceData() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 200 })
-    projects.value = res.records
-  } catch {
-    projects.value = []
-  }
-  try {
-    const res = await getPartnerList({ pageNum: 1, pageSize: 200 })
-    partners.value = res.records
-  } catch {
-    partners.value = []
-  }
-}
+const referenceStore = useReferenceStore()
+const projects = computed(() => referenceStore.projects ?? [])
+const partners = computed(() => referenceStore.partners ?? [])
 
 const projectName = computed(
   () => projects.value.find((p) => p.id === formData.projectId)?.projectName ?? '-',
@@ -276,7 +259,9 @@ const termsTotal = computed(() =>
   terms.value.reduce((s, r) => s + (Number(r.paymentAmount) || 0), 0).toFixed(2),
 )
 
-onMounted(loadReferenceData)
+onMounted(() => {
+  Promise.all([referenceStore.fetchProjects(), referenceStore.fetchPartners()])
+})
 </script>
 
 <template>

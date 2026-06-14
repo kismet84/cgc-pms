@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
   getSubTaskList,
@@ -7,13 +8,8 @@ import {
   updateSubTask,
   deleteSubTask,
 } from '@/api/modules/subcontract'
-import { getProjectList } from '@/api/modules/project'
-import { getContractLedger } from '@/api/modules/contract'
-import { getPartnerList } from '@/api/modules/partner'
+import { useReferenceStore } from '@/stores/reference'
 import type { SubTaskVO } from '@/types/subcontract'
-import type { ProjectVO } from '@/types/project'
-import type { ContractVO } from '@/types/contract'
-import type { PartnerVO } from '@/types/partner'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -30,9 +26,9 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const projectList = ref<ProjectVO[]>([])
-const contractList = ref<ContractVO[]>([])
-const partnerList = ref<PartnerVO[]>([])
+const referenceStore = useReferenceStore()
+const { projects: projectList, contracts: contractList, partners: partnerList } =
+  storeToRefs(referenceStore)
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建分包任务')
@@ -103,32 +99,7 @@ async function fetchData() {
   }
 }
 
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
-  }
-}
 
-async function fetchContracts() {
-  try {
-    const res = await getContractLedger({ pageNo: 1, pageSize: 500, contractType: 'SUB' })
-    contractList.value = res.records
-  } catch {
-    contractList.value = []
-  }
-}
-
-async function fetchPartners() {
-  try {
-    const res = await getPartnerList({ pageNum: 1, pageSize: 500, partnerType: 'SUB' })
-    partnerList.value = res.records
-  } catch {
-    partnerList.value = []
-  }
-}
 
 function handleSearch() {
   pageNo.value = 1
@@ -245,9 +216,9 @@ function handleModalCancel() {
 }
 
 onMounted(() => {
-  fetchProjects()
-  fetchContracts()
-  fetchPartners()
+  referenceStore.fetchProjects()
+  referenceStore.fetchContracts({ contractType: 'SUB' })
+  referenceStore.fetchPartners({ partnerType: 'SUB' })
   fetchData()
 })
 </script>
@@ -266,6 +237,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
@@ -279,6 +252,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
@@ -292,6 +267,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 160px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
@@ -401,21 +378,21 @@ onMounted(() => {
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
         <a-form-item label="项目" required>
-          <a-select v-model:value="formData.projectId" placeholder="请选择项目">
+          <a-select v-model:value="formData.projectId" placeholder="请选择项目" show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="分包合同">
-          <a-select v-model:value="formData.contractId" placeholder="请选择合同" allow-clear>
+          <a-select v-model:value="formData.contractId" placeholder="请选择合同" allow-clear show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="分包商">
-          <a-select v-model:value="formData.partnerId" placeholder="请选择分包商" allow-clear>
+          <a-select v-model:value="formData.partnerId" placeholder="请选择分包商" allow-clear show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>

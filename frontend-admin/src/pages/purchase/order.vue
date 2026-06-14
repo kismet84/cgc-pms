@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
+import { useReferenceStore } from '@/stores/reference'
 import {
   getOrderList,
   createOrder,
@@ -9,10 +11,6 @@ import {
   getOrderItems,
   saveOrderItems,
 } from '@/api/modules/purchase'
-import { getProjectList } from '@/api/modules/project'
-import { getContractLedger } from '@/api/modules/contract'
-import { getPartnerList } from '@/api/modules/partner'
-import { getMaterialList } from '@/api/modules/material'
 import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchase'
 import type { ProjectVO } from '@/types/project'
 import type { ContractVO } from '@/types/contract'
@@ -34,10 +32,11 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const projectList = ref<ProjectVO[]>([])
-const contractList = ref<ContractVO[]>([])
-const partnerList = ref<PartnerVO[]>([])
-const materialList = ref<MaterialVO[]>([])
+const referenceStore = useReferenceStore()
+const projectList = computed(() => referenceStore.projects ?? [])
+const contractList = computed(() => referenceStore.contracts ?? [])
+const partnerList = computed(() => referenceStore.partners ?? [])
+const materialList = computed(() => referenceStore.materials ?? [])
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建采购订单')
@@ -120,41 +119,7 @@ async function fetchData() {
   }
 }
 
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
-  }
-}
 
-async function fetchContracts() {
-  try {
-    const res = await getContractLedger({ pageNo: 1, pageSize: 500, contractType: 'PURCHASE' })
-    contractList.value = res.records
-  } catch {
-    contractList.value = []
-  }
-}
-
-async function fetchPartners() {
-  try {
-    const res = await getPartnerList({ pageNum: 1, pageSize: 500, partnerType: 'SUPPLIER' })
-    partnerList.value = res.records
-  } catch {
-    partnerList.value = []
-  }
-}
-
-async function fetchMaterials() {
-  try {
-    const res = await getMaterialList({ pageNum: 1, pageSize: 500, status: 'ENABLE' })
-    materialList.value = res.records
-  } catch {
-    materialList.value = []
-  }
-}
 
 function handleSearch() {
   pageNo.value = 1
@@ -343,10 +308,10 @@ function handleModalCancel() {
 }
 
 onMounted(() => {
-  fetchProjects()
-  fetchContracts()
-  fetchPartners()
-  fetchMaterials()
+  referenceStore.fetchProjects()
+  referenceStore.fetchContracts({ contractType: 'PURCHASE' })
+  referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })
+  referenceStore.fetchMaterials({ status: 'ENABLE' })
   fetchData()
 })
 </script>
@@ -365,6 +330,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
@@ -378,6 +345,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
@@ -391,6 +360,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 160px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
@@ -510,21 +481,21 @@ onMounted(() => {
       <!-- Header Form -->
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
         <a-form-item label="项目" required>
-          <a-select v-model:value="formData.projectId" placeholder="请选择项目">
+          <a-select v-model:value="formData.projectId" placeholder="请选择项目" show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="采购合同">
-          <a-select v-model:value="formData.contractId" placeholder="请选择合同" allow-clear>
+          <a-select v-model:value="formData.contractId" placeholder="请选择合同" allow-clear show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="供应商">
-          <a-select v-model:value="formData.partnerId" placeholder="请选择供应商" allow-clear>
+          <a-select v-model:value="formData.partnerId" placeholder="请选择供应商" allow-clear show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>
@@ -577,6 +548,8 @@ onMounted(() => {
                 placeholder="请选择材料"
                 allow-clear
                 style="width: 100%"
+                show-search
+                :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
                 @change="(val: string) => handleMaterialChange(index, val)"
               >
                 <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
