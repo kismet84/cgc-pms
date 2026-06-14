@@ -32,12 +32,6 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '合同台账' },
           },
           {
-            path: 'approval',
-            name: 'ContractApproval',
-            redirect: '/approval/todo',
-            meta: { title: '合同审批' },
-          },
-          {
             path: 'create',
             name: 'ContractCreate',
             component: () => import('@/pages/contract/ContractFormPage.vue'),
