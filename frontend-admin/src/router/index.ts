@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
-import BasicLayout from '@/layouts/BasicLayout.vue'
 import { useUserStore } from '@/stores/user'
 
 export const routes: RouteRecordRaw[] = [
@@ -11,7 +10,7 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/',
-    component: BasicLayout,
+    component: () => import('@/layouts/BasicLayoutAsync.vue'),
     redirect: '/dashboard',
     children: [
       {
