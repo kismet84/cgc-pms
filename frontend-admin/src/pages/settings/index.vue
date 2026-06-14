@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { request } from '@/api/request'
+import service from '@/api/request'
 
 interface Preferences {
   sidebarCollapsed: boolean
@@ -23,7 +23,7 @@ const preferences = reactive<Preferences>({
 onMounted(async () => {
   loading.value = true
   try {
-    const data = await request.get<Preferences>('/profile/preferences')
+    const data = await service.get<Preferences>('/profile/preferences')
     Object.assign(preferences, data)
   } catch {
     message.error('加载偏好设置失败')
@@ -35,7 +35,7 @@ onMounted(async () => {
 async function handleSave() {
   saving.value = true
   try {
-    await request.put('/profile/preferences', {
+    await service.put('/profile/preferences', {
       theme: preferences.theme,
       sidebarCollapsed: preferences.sidebarCollapsed,
       notificationEnabled: preferences.notificationEnabled,
