@@ -1,6 +1,23 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
+
+// ── Mock window.matchMedia (not available in jsdom) ──
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      dispatchEvent: vi.fn(),
+    })),
+  })
+})
 
 // ── Captured mockPush for assertions ──
 const mockPush = vi.fn()
@@ -33,7 +50,7 @@ vi.mock('@/layouts/components/SidebarMenu.vue', () => ({
 }))
 
 // ── Import after mocks ──
-import BasicLayout from '@/layouts/BasicLayout.vue'
+import BasicLayout from '@/layouts/BasicLayoutAsync.vue'
 
 // ── Custom stubs for Ant Design components that need click handling ──
 const ADropdownStub = defineComponent({

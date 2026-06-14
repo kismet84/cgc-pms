@@ -1,6 +1,23 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { mount } from '@vue/test-utils'
-import BasicLayout from '@/layouts/BasicLayout.vue'
+import BasicLayout from '@/layouts/BasicLayoutAsync.vue'
+
+// ── Mock window.matchMedia (not available in jsdom) ──
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      dispatchEvent: vi.fn(),
+    })),
+  })
+})
 
 // ── Mock vue-router ──
 vi.mock('vue-router', () => ({
@@ -94,15 +111,25 @@ describe('BasicLayout accessibility', () => {
     expect(hamburger.attributes('aria-label')).toBe('折叠菜单')
   })
 
-  it('renders notification bell wrapper with aria-label', () => {
+  it('renders notification bell wrapper with aria-label after lazy load delay', async () => {
+    vi.useFakeTimers()
     const wrapper = mount(BasicLayout, {
       global: {
         stubs: makeStubs(antdStubs),
       },
     })
 
+    // bellReady starts false; NotificationBell is conditionally rendered via v-if
+    expect(wrapper.find('span[aria-label="通知"]').exists()).toBe(false)
+
+    // Advance past the 500ms setTimeout in onMounted
+    vi.advanceTimersByTime(500)
+    await wrapper.vm.$nextTick()
+
     const bellWrapper = wrapper.find('span[aria-label="通知"]')
     expect(bellWrapper.exists()).toBe(true)
+
+    vi.useRealTimers()
   })
 
   it('renders help icon with aria-label', () => {

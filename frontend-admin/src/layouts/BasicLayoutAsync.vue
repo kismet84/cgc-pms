@@ -11,6 +11,7 @@ const userStore = useUserStore()
 const collapsed = ref(false)
 const isMobile = ref(false)
 let mobileQuery: MediaQueryList | undefined
+const bellReady = ref(false)
 
 function syncMobileState(event: MediaQueryList | MediaQueryListEvent) {
   isMobile.value = event.matches
@@ -28,6 +29,9 @@ onMounted(() => {
   mobileQuery = window.matchMedia('(max-width: 768px)')
   syncMobileState(mobileQuery)
   mobileQuery.addEventListener('change', syncMobileState)
+  setTimeout(() => {
+    bellReady.value = true
+  }, 500)
 })
 
 onBeforeUnmount(() => {
@@ -68,7 +72,7 @@ onBeforeUnmount(() => {
         />
         <div class="flex-1"></div>
         <div class="top-actions">
-          <span aria-label="通知"><NotificationBell /></span>
+          <span v-if="bellReady" aria-label="通知"><NotificationBell /></span>
           <QuestionCircleOutlined aria-label="帮助" style="font-size: 18px; cursor: pointer" @click="router.push('/help')" />
           <a-dropdown>
             <div class="user-info">
