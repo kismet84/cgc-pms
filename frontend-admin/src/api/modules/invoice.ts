@@ -1,6 +1,6 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { InvoiceVO, PayRecordBrief } from '@/types/invoice'
+import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO } from '@/types/invoice'
 
 /** 发票列表分页查询 */
 export function getInvoiceList(params: Record<string, unknown>) {
@@ -60,6 +60,19 @@ export function verifyInvoice(id: string, verifyStatus: string) {
     url: `/invoices/${id}/verify`,
     method: 'put',
     data: { verifyStatus },
+  })
+}
+
+/** 发票 OCR 识别（上传 PDF） */
+export function recognizeInvoice(file: File, signal?: AbortSignal) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request<InvoiceRecognizeResultVO>({
+    url: '/invoices/recognize',
+    method: 'post',
+    data: formData,
+    timeout: 120000,
+    signal,
   })
 }
 

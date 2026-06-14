@@ -10,6 +10,7 @@ import {
   deleteInvoice,
   verifyInvoice,
   getPayRecordList,
+  recognizeInvoice,
 } from '@/api/modules/invoice'
 import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO } from '@/types/invoice'
 import {
@@ -295,18 +296,8 @@ async function handleRecognize() {
   recognizing.value = true
   try {
     const file = uploadFileList.value[0].originFileObj as File
-    const fd = new FormData()
-    fd.append('file', file)
+    const result = await recognizeInvoice(file, abortController.value.signal)
 
-    const baseURL = import.meta.env.VITE_API_BASE_URL ?? '/api'
-    const response = await axios.post(`${baseURL}/invoices/recognize`, fd, {
-      timeout: 120000,
-      withCredentials: true,
-      signal: abortController.value.signal,
-    })
-
-    // Raw axios: response.data is the full ApiResponse { code, message, data }
-    const result = response.data?.data || response.data
     if (result) {
       applyRecognitionResult(result)
       message.success('发票识别完成，请核对自动填充的内容')
@@ -318,15 +309,11 @@ async function handleRecognize() {
       // Request was cancelled (modal closed) — no message needed
       return
     }
-    const code = error?.response?.data?.code || error?.code
-    if (code === 'PDF_ENCRYPTED') {
-      message.warning('PDF已加密，无法识别。请手动填写。')
-    } else if (code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
+    // Timeout / network errors
+    if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
       message.error('识别超时，请检查网络后重试')
-    } else {
-      const msg = error?.response?.data?.message || error?.message || '识别失败'
-      message.error(msg)
     }
+    // Business errors (PDF_ENCRYPTED etc.) are handled by the shared interceptor
   } finally {
     recognizing.value = false
     abortController.value = null
