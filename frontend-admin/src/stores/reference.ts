@@ -9,6 +9,19 @@ import { getContractLedger } from '@/api/modules/contract'
 import { getPartnerList } from '@/api/modules/partner'
 import { getMaterialList } from '@/api/modules/material'
 
+export interface FetchContractsParams {
+  projectId?: string
+  contractType?: string
+}
+
+export interface FetchPartnersParams {
+  partnerType?: string
+}
+
+export interface FetchMaterialsParams {
+  status?: string
+}
+
 export const useReferenceStore = defineStore('reference', () => {
   // ── Data refs ──
   const projects = ref<ProjectVO[] | null>(null)
@@ -16,7 +29,7 @@ export const useReferenceStore = defineStore('reference', () => {
   const partners = ref<PartnerVO[] | null>(null)
   const materials = ref<MaterialVO[] | null>(null)
 
-  // ── In-flight dedup promises ──
+  // ── In-flight dedup promises (base queries only) ──
   let projectsPromise: Promise<ProjectVO[]> | null = null
   let contractsPromise: Promise<ContractVO[]> | null = null
   let partnersPromise: Promise<PartnerVO[]> | null = null
@@ -40,7 +53,15 @@ export const useReferenceStore = defineStore('reference', () => {
     return projectsPromise
   }
 
-  async function fetchContracts(): Promise<ContractVO[]> {
+  async function fetchContracts(params?: FetchContractsParams): Promise<ContractVO[]> {
+    // When filters are provided, skip cache — this is a filtered query
+    if (params && (params.projectId || params.contractType)) {
+      const res = await getContractLedger({ pageNo: 1, pageSize: 50, ...params })
+      const data = (res.records ?? res.data ?? res) as ContractVO[]
+      contracts.value = data
+      return data
+    }
+    // Base (unfiltered) query — cached + deduped
     if (contracts.value) return contracts.value
     if (contractsPromise) return contractsPromise
     contractsPromise = getContractLedger({ pageNo: 1, pageSize: 50 })
@@ -56,7 +77,13 @@ export const useReferenceStore = defineStore('reference', () => {
     return contractsPromise
   }
 
-  async function fetchPartners(): Promise<PartnerVO[]> {
+  async function fetchPartners(params?: FetchPartnersParams): Promise<PartnerVO[]> {
+    if (params && params.partnerType) {
+      const res = await getPartnerList({ pageNum: 1, pageSize: 50, ...params })
+      const data = (res.records ?? res.data ?? res) as PartnerVO[]
+      partners.value = data
+      return data
+    }
     if (partners.value) return partners.value
     if (partnersPromise) return partnersPromise
     partnersPromise = getPartnerList({ pageNum: 1, pageSize: 50 })
@@ -72,7 +99,13 @@ export const useReferenceStore = defineStore('reference', () => {
     return partnersPromise
   }
 
-  async function fetchMaterials(): Promise<MaterialVO[]> {
+  async function fetchMaterials(params?: FetchMaterialsParams): Promise<MaterialVO[]> {
+    if (params && params.status) {
+      const res = await getMaterialList({ pageNum: 1, pageSize: 50, ...params })
+      const data = (res.records ?? res.data ?? res) as MaterialVO[]
+      materials.value = data
+      return data
+    }
     if (materials.value) return materials.value
     if (materialsPromise) return materialsPromise
     materialsPromise = getMaterialList({ pageNum: 1, pageSize: 50 })
