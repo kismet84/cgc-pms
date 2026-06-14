@@ -140,12 +140,12 @@ function goBack() {
 
 // ── Table columns ──
 const columns = [
-  { title: '姓名', dataIndex: 'userId', width: 140, slots: { customRender: 'userName' } },
-  { title: '角色', dataIndex: 'roleCode', width: 160, slots: { customRender: 'role' } },
+  { title: '姓名', dataIndex: 'userId', width: 140 },
+  { title: '角色', dataIndex: 'roleCode', width: 160 },
   { title: '岗位', dataIndex: 'positionName', width: 140 },
   { title: '开始日期', dataIndex: 'startDate', width: 130 },
-  { title: '状态', dataIndex: 'status', width: 90, slots: { customRender: 'status' } },
-  { title: '操作', dataIndex: 'ops', width: 80, slots: { customRender: 'ops' } },
+  { title: '状态', dataIndex: 'status', width: 90 },
+  { title: '操作', dataIndex: 'ops', width: 80 },
 ]
 </script>
 

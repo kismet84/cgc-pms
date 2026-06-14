@@ -123,7 +123,7 @@ const columns = [
     dataIndex: 'approvalStatus',
     width: 100,
   },
-  { title: '操作', dataIndex: 'ops', width: 120, fixed: 'right', slots: { customRender: 'ops' } },
+  { title: '操作', dataIndex: 'ops', width: 120, fixed: 'right' },
 ]
 </script>
 
