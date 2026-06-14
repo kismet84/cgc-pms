@@ -23,6 +23,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import com.cgcpms.common.util.DateTimeUtils;
+import io.minio.BucketExistsArgs;
+import io.minio.MakeBucketArgs;
+import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -45,6 +48,23 @@ public class FileService {
     private final SysFileMapper sysFileMapper;
     private final MinioClient minioClient;
     private final MinioConfig minioConfig;
+
+    /**
+     * Ensure the configured bucket exists on startup.
+     */
+    @PostConstruct
+    public void ensureBucketExists() {
+        try {
+            String bucket = minioConfig.getBucket();
+            boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+            if (!exists) {
+                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
+                log.info("Created MinIO bucket: {}", bucket);
+            }
+        } catch (Exception e) {
+            log.warn("Could not ensure MinIO bucket exists: {}", e.getMessage());
+        }
+    }
 
     /**
      * Upload a file and associate it with a business entity.
