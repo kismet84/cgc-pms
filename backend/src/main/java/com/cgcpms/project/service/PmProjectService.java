@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.cgcpms.auth.context.UserContext;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import com.cgcpms.common.util.DateTimeUtils;
@@ -62,6 +63,28 @@ public class PmProjectService {
     @Transactional
     public Long create(PmProject project) {
         log.info("Creating project: {}", project.getProjectName());
+
+        // Auto-generate project code: XM-yyyyMMdd-XXX
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
+        String prefix = "XM-" + today + "-";
+
+        LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
+        wrapper.likeRight(PmProject::getProjectCode, prefix)
+                .orderByDesc(PmProject::getProjectCode)
+                .last("LIMIT 1");
+        PmProject last = pmProjectMapper.selectOne(wrapper);
+
+        int seq = 1;
+        if (last != null && last.getProjectCode() != null
+                && last.getProjectCode().length() == prefix.length() + 3) {
+            try {
+                seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getProjectCode(), e);
+            }
+        }
+        project.setProjectCode(prefix + String.format("%03d", seq));
+
         pmProjectMapper.insert(project);
         return project.getId();
     }
