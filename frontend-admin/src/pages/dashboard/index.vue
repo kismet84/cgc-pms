@@ -71,7 +71,7 @@ const selectedProjectId = ref<string | undefined>(undefined)
 
 async function fetchProjects() {
   try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
+    const res = await getProjectList({ pageNum: 1, pageSize: 50 })
     projectList.value = res.records
     if (projectList.value.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = projectList.value[0].id
@@ -629,7 +629,13 @@ onMounted(() => {
       </div>
       <div v-if="activeRole !== 'mgmt'" class="project-field">
         <label>选择项目</label>
-        <a-select v-model:value="selectedProjectId" placeholder="请选择项目" style="width: 260px">
+        <a-select
+          v-model:value="selectedProjectId"
+          placeholder="请选择项目"
+          style="width: 260px"
+          show-search
+          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+        >
           <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
             {{ p.projectName }}
           </a-select-option>

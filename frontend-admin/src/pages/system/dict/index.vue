@@ -40,7 +40,7 @@ async function fetchTypeList() {
   try {
     const res = await getDictTypeList({
       pageNum: 1,
-      pageSize: 500,
+      pageSize: 50,
       dictName: typeFilter.value || undefined,
     })
     typeList.value = res.records
