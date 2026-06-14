@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { getProjectList } from '@/api/modules/project'
+import { PlusOutlined } from '@ant-design/icons-vue'
+import { getProjectList, createProject } from '@/api/modules/project'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 
@@ -17,6 +18,70 @@ const tableData = ref<ProjectVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+
+const createVisible = ref(false)
+const createLoading = ref(false)
+const createFormRef = ref()
+const createForm = reactive({
+  projectName: '',
+  projectType: undefined as string | undefined,
+  projectAddress: '',
+  ownerUnit: '',
+  supervisorUnit: '',
+  designUnit: '',
+  contractAmount: undefined as number | undefined,
+  plannedStartDate: undefined as string | undefined,
+  plannedEndDate: undefined as string | undefined,
+})
+
+function handleCreateModalOpen() {
+  Object.assign(createForm, {
+    projectName: '',
+    projectType: undefined,
+    projectAddress: '',
+    ownerUnit: '',
+    supervisorUnit: '',
+    designUnit: '',
+    contractAmount: undefined,
+    plannedStartDate: undefined,
+    plannedEndDate: undefined,
+  })
+  createVisible.value = true
+}
+
+function handleCreateModalClose() {
+  createVisible.value = false
+  createFormRef.value?.resetFields()
+}
+
+async function handleCreateSubmit() {
+  try {
+    await createFormRef.value?.validate()
+  } catch {
+    return
+  }
+  createLoading.value = true
+  try {
+    await createProject({
+      projectName: createForm.projectName,
+      projectType: createForm.projectType,
+      projectAddress: createForm.projectAddress || undefined,
+      ownerUnit: createForm.ownerUnit || undefined,
+      supervisorUnit: createForm.supervisorUnit || undefined,
+      designUnit: createForm.designUnit || undefined,
+      contractAmount: createForm.contractAmount != null ? String(createForm.contractAmount) : undefined,
+      plannedStartDate: createForm.plannedStartDate,
+      plannedEndDate: createForm.plannedEndDate,
+    })
+    message.success('项目创建成功')
+    handleCreateModalClose()
+    fetchData()
+  } catch {
+    message.error('创建项目失败，请稍后重试')
+  } finally {
+    createLoading.value = false
+  }
+}
 
 async function fetchData() {
   loading.value = true
@@ -181,11 +246,95 @@ const columns = [
           </a-select>
         </div>
         <div class="pj-filter-actions">
+          <a-button type="primary" @click="handleCreateModalOpen">
+            <PlusOutlined />
+            新建项目
+          </a-button>
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
       </div>
     </div>
+
+    <!-- Create Modal -->
+    <a-modal
+      v-model:visible="createVisible"
+      title="新建项目"
+      :confirm-loading="createLoading"
+      :mask-closable="false"
+      ok-text="创建"
+      cancel-text="取消"
+      @ok="handleCreateSubmit"
+      @cancel="handleCreateModalClose"
+    >
+      <a-form
+        ref="createFormRef"
+        :model="createForm"
+        :label-col="{ span: 6 }"
+        :wrapper-col="{ span: 16 }"
+        class="pj-create-form"
+      >
+        <a-form-item
+          label="项目名称"
+          name="projectName"
+          :rules="[{ required: true, message: '请输入项目名称' }]"
+        >
+          <a-input v-model:value="createForm.projectName" placeholder="请输入项目名称" />
+        </a-form-item>
+        <a-form-item
+          label="项目类型"
+          name="projectType"
+          :rules="[{ required: true, message: '请选择项目类型' }]"
+        >
+          <a-select
+            v-model:value="createForm.projectType"
+            placeholder="请选择项目类型"
+          >
+            <a-select-option value="施工总承包">施工总承包</a-select-option>
+            <a-select-option value="专业分包">专业分包</a-select-option>
+            <a-select-option value="劳务分包">劳务分包</a-select-option>
+            <a-select-option value="材料采购">材料采购</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="项目地址" name="projectAddress">
+          <a-input v-model:value="createForm.projectAddress" placeholder="请输入项目地址" />
+        </a-form-item>
+        <a-form-item label="建设单位" name="ownerUnit">
+          <a-input v-model:value="createForm.ownerUnit" placeholder="请输入建设单位" />
+        </a-form-item>
+        <a-form-item label="监理单位" name="supervisorUnit">
+          <a-input v-model:value="createForm.supervisorUnit" placeholder="请输入监理单位" />
+        </a-form-item>
+        <a-form-item label="设计单位" name="designUnit">
+          <a-input v-model:value="createForm.designUnit" placeholder="请输入设计单位" />
+        </a-form-item>
+        <a-form-item label="合同金额(万元)" name="contractAmount">
+          <a-input-number
+            v-model:value="createForm.contractAmount"
+            :min="0"
+            :precision="2"
+            placeholder="请输入合同金额"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="计划开工日期" name="plannedStartDate">
+          <a-date-picker
+            v-model:value="createForm.plannedStartDate"
+            placeholder="请选择计划开工日期"
+            style="width: 100%"
+            value-format="YYYY-MM-DD"
+          />
+        </a-form-item>
+        <a-form-item label="计划竣工日期" name="plannedEndDate">
+          <a-date-picker
+            v-model:value="createForm.plannedEndDate"
+            placeholder="请选择计划竣工日期"
+            style="width: 100%"
+            value-format="YYYY-MM-DD"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     <!-- Table -->
     <div class="pj-card pj-table-wrap">
@@ -318,5 +467,8 @@ const columns = [
 .pj-total {
   font-size: 13px;
   color: #4b5563;
+}
+.pj-create-form {
+  padding-top: 16px;
 }
 </style>
