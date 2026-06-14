@@ -258,7 +258,7 @@ const columns = [
 
     <!-- Create Modal -->
     <a-modal
-      v-model:visible="createVisible"
+      v-model:open="createVisible"
       title="新建项目"
       :confirm-loading="createLoading"
       :mask-closable="false"
