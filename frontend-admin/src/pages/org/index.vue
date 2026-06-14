@@ -49,7 +49,7 @@ const companyFilter = reactive({
 const companyColumns = [
   { title: '公司编号', dataIndex: 'companyCode', width: 120 },
   { title: '公司名称', dataIndex: 'companyName', minWidth: 140 },
-  { title: '状态', dataIndex: 'status', width: 80, slots: { customRender: 'status' } },
+  { title: '状态', dataIndex: 'status', width: 80 },
   { title: '创建时间', dataIndex: 'createdAt', width: 150 },
 ]
 
@@ -81,7 +81,7 @@ const positionFilter = reactive({
 const positionColumns = [
   { title: '岗位编号', dataIndex: 'positionCode', width: 120 },
   { title: '岗位名称', dataIndex: 'positionName', minWidth: 140 },
-  { title: '状态', dataIndex: 'status', width: 80, slots: { customRender: 'posStatus' } },
+  { title: '状态', dataIndex: 'status', width: 80 },
   { title: '创建时间', dataIndex: 'createdAt', width: 150 },
 ]
 

@@ -1,76 +1,32 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\invoice-pdf-upload.md",
-  "started_at": "2026-06-13T12:50:34.846Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\fix-slow-page-load.md",
+  "started_at": "2026-06-14T05:37:56.582Z",
   "session_ids": [
-    "ses_13f28c55cffeip5zLUxDyjAg28"
+    "ses_13b7f409dffe9YxxnLQ8oLrGwt"
   ],
   "session_origins": {
-    "ses_13f28c55cffeip5zLUxDyjAg28": "direct"
+    "ses_13b7f409dffe9YxxnLQ8oLrGwt": "direct"
   },
-  "plan_name": "invoice-pdf-upload",
+  "plan_name": "fix-slow-page-load",
   "agent": "atlas",
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "**Add PDFBox dependency to backend pom.xml**",
-      "session_id": "ses_13ef6a075ffe4HlWdzhFO4z2h6",
+      "task_title": "Add manualChunks vendor splitting to vite.config.ts",
+      "session_id": "ses_13b5c3b76ffeP6jCyCjOs4BItY",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-06-13T12:57:31.124Z"
+      "updated_at": "2026-06-14T05:51:47.641Z"
     },
-    "todo:5": {
-      "task_key": "todo:5",
-      "task_label": "5",
-      "task_title": "**Update PayInvoice entity with new seller/buyer fields**",
-      "session_id": "ses_13eee5df2ffeLUrHVx9kdcT1uv",
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Lazy-load NotificationBell in BasicLayoutAsync",
+      "session_id": "ses_13b4855f9ffectlVdtRjiTEPOU",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-06-13T13:08:28.892Z"
-    },
-    "todo:10": {
-      "task_key": "todo:10",
-      "task_label": "10",
-      "task_title": "**Implement auto-fill logic from recognition response**",
-      "session_id": "ses_13ee1faa9ffeF1rV0J0NB3ROol",
-      "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-06-13T13:15:57.551Z"
-    },
-    "todo:11": {
-      "task_key": "todo:11",
-      "task_label": "11",
-      "task_title": "**Upload file after invoice creation**",
-      "session_id": "ses_13edf8fd9ffe3q27Gq9ZOmPwa3",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-13T13:18:11.071Z"
-    },
-    "todo:12": {
-      "task_key": "todo:12",
-      "task_label": "12",
-      "task_title": "**Error handling + edge cases for recognition flow**",
-      "session_id": "ses_13edd878cffecy0PAt5TmoGD14",
-      "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-06-13T13:22:22.960Z"
-    },
-    "todo:13": {
-      "task_key": "todo:13",
-      "task_label": "13",
-      "task_title": "**Backend unit tests for PDF recognition**",
-      "session_id": "ses_13ed99375ffeovFzrb3QG7Q4E4",
-      "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-06-13T13:34:39.491Z"
-    },
-    "final-wave:f1": {
-      "task_key": "final-wave:f1",
-      "task_label": "F1",
-      "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "ses_13eccac88ffebnOKGFerUm3qg4",
-      "agent": "oracle",
-      "updated_at": "2026-06-13T13:46:12.756Z"
+      "updated_at": "2026-06-14T06:02:36.871Z"
     }
   }
 }

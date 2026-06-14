@@ -93,21 +93,18 @@ const columns = [
     dataIndex: 'projectId',
     key: 'projectId',
     width: 140,
-    slots: { customRender: 'projectId' },
   },
   {
     title: '严重度',
     dataIndex: 'severity',
     key: 'severity',
     width: 90,
-    slots: { customRender: 'severity' },
   },
   {
     title: '规则类型',
     dataIndex: 'ruleType',
     key: 'ruleType',
     width: 130,
-    slots: { customRender: 'ruleType' },
   },
   { title: '触发时间', dataIndex: 'triggeredAt', key: 'triggeredAt', width: 170 },
   {
@@ -115,9 +112,8 @@ const columns = [
     dataIndex: 'isRead',
     key: 'isRead',
     width: 80,
-    slots: { customRender: 'isRead' },
   },
-  { title: '操作', key: 'action', width: 100, fixed: 'right', slots: { customRender: 'action' } },
+  { title: '操作', key: 'action', width: 100, fixed: 'right' },
 ]
 
 function getProjectName(projectId: number): string {
