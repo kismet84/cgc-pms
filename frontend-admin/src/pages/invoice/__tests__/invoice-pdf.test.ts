@@ -42,6 +42,9 @@ vi.mock('ant-design-vue', () => ({
   Modal: {
     confirm: vi.fn(),
   },
+  Upload: {
+    LIST_IGNORE: 'LIST_IGNORE',
+  },
 }))
 
 // ── Import mocked modules ──
@@ -119,7 +122,7 @@ describe('Invoice PDF Upload', () => {
     const vm = wrapper.vm
     const nonPdf = createFileLike('test.jpg', 'image/jpeg')
     const result = vm.handleBeforeUpload(nonPdf)
-    expect(result).toBe(false)
+    expect(result).toBe('LIST_IGNORE')
     expect(vi.mocked(message.error)).toHaveBeenCalledWith('仅支持PDF格式')
   })
 
@@ -128,7 +131,7 @@ describe('Invoice PDF Upload', () => {
     // PDF type passes, but size exceeds 50MB
     const oversized = createFileLike('large.pdf', 'application/pdf', 51)
     const result = vm.handleBeforeUpload(oversized)
-    expect(result).toBe(false)
+    expect(result).toBe('LIST_IGNORE')
     expect(vi.mocked(message.error)).toHaveBeenCalledWith('文件大小不能超过50MB')
   })
 })

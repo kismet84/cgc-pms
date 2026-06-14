@@ -11,7 +11,7 @@ const mockGet = vi.fn()
 const mockPut = vi.fn()
 
 vi.mock('@/api/request', () => ({
-  default: {
+  request: {
     get: (...args: unknown[]) => mockGet(...args),
     put: (...args: unknown[]) => mockPut(...args),
   },
