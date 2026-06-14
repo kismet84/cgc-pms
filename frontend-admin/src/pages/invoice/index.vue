@@ -275,12 +275,12 @@ function handleBeforeUpload(file: File) {
     message.error('仅支持PDF格式')
     return Upload.LIST_IGNORE
   }
-  const isLt50M = file.size / 1024 * 1024 < 50
+  const isLt50M = file.size / 1024 / 1024 < 50
   if (!isLt50M) {
     message.error('文件大小不能超过50MB')
     return Upload.LIST_IGNORE
   }
-  return true // accept the file (no action prop = no auto-upload)
+  return false // prevent auto-upload; manual upload handled in handleRecognize()
 }
 
 async function handleRecognize() {
@@ -595,7 +595,7 @@ defineExpose({
           />
         </a-form-item>
         <a-form-item label="开票日期">
-          <a-date-picker v-model:value="formData.invoiceDate" style="width: 100%" />
+          <a-date-picker v-model:value="formData.invoiceDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="卖方名称">
           <a-input v-model:value="formData.sellerName" placeholder="请输入卖方名称" />

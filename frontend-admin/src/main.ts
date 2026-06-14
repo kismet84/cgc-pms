@@ -1,6 +1,11 @@
 import { createApp } from 'vue'
 import Antd from 'ant-design-vue'
 import { createPinia } from 'pinia'
+import dayjs from 'dayjs'
+import localeData from 'dayjs/plugin/localeData'
+import 'dayjs/locale/zh-cn'
+
+dayjs.extend(localeData)
 
 // VxeTable
 import VxeUITable from 'vxe-table'

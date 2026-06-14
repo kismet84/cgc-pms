@@ -217,8 +217,8 @@ public class InvoiceService {
         result.setTaxAmount(extractAmount(text, "税额[:：].*?[¥￥]\\s*([\\d,]+\\.?\\d*)"));
         result.setInvoiceDate(extractInvoiceDate(text));
         result.setSellerName(extractSellerName(text));
-        result.setBuyerName(extractFirst(text, "购买方名称[:：]\\s*(.+)"));
-        result.setBuyerTaxNo(extractFirst(text, "纳税人识别号[:：]\\s*([A-Z0-9]+)"));
+        result.setBuyerName(extractBuyerName(text));
+        result.setBuyerTaxNo(extractBuyerTaxNo(text));
         result.setRemark(null);
 
         log.info("PDF recognition result: invoiceNo={}, amount={}", result.getInvoiceNo(), result.getInvoiceAmount());
@@ -264,10 +264,16 @@ public class InvoiceService {
     }
 
     private String extractInvoiceDate(String text) {
-        String raw = extractFirst(text, "开票日期[:：]\\s*(\\d{4}[-年]\\d{1,2}[-月]\\d{1,2})");
+        // Multiple date formats: 2024-01-15, 2024年01月15日, 2024/01/15
+        String[] patterns = {
+            "开票日期[:：]\\s*(\\d{4}[-/]\\d{1,2}[-/]\\d{1,2})",
+            "开票日期[:：]\\s*(\\d{4}\\s*年\\s*\\d{1,2}\\s*月\\s*\\d{1,2})\\s*日?",
+        };
+        String raw = extractFirstMulti(text, patterns);
         if (raw == null) return null;
-        raw = raw.replace("年", "-").replace("月", "-").replace("日", "");
-        String[] parts = raw.split("-");
+        raw = raw.replaceAll("[年月]", "-").replace("日", "").replaceAll("\\s+", "");
+        String separator = raw.contains("/") ? "/" : "-";
+        String[] parts = raw.split(separator);
         if (parts.length == 3) {
             return parts[0] + "-"
                     + (parts[1].length() == 1 ? "0" + parts[1] : parts[1]) + "-"
@@ -277,13 +283,58 @@ public class InvoiceService {
     }
 
     private String extractSellerName(String text) {
-        String name = extractFirst(text, "销售方名称[:：]\\s*(.+)");
+        // Multiple keyword variants for seller name
+        String[] patterns = {
+            "销售方名称[:：]\\s*([^\\n]+)",
+            "销货单位[:：]\\s*([^\\n]+)",
+            "销货方名称[:：]\\s*([^\\n]+)",
+            "卖方名称[:：]\\s*([^\\n]+)",
+            "销方名称[:：]\\s*([^\\n]+)",
+        };
+        String name = extractFirstMulti(text, patterns);
         if (name != null) return name;
-        Matcher m = Pattern.compile("名称[:：]\\s*(.+公司)").matcher(text);
+        // Fallback: second "名称：XXX公司" match
+        Matcher m = Pattern.compile("名称[:：]\\s*(.+公司)", Pattern.DOTALL).matcher(text);
         int count = 0;
         while (m.find()) {
             count++;
             if (count == 2) return m.group(1).trim();
+        }
+        return null;
+    }
+
+    private String extractBuyerName(String text) {
+        // Multiple keyword variants for buyer name
+        String[] patterns = {
+            "购买方名称[:：]\\s*([^\\n]+)",
+            "购货单位[:：]\\s*([^\\n]+)",
+            "购货方名称[:：]\\s*([^\\n]+)",
+            "买方名称[:：]\\s*([^\\n]+)",
+            "购方名称[:：]\\s*([^\\n]+)",
+        };
+        return extractFirstMulti(text, patterns);
+    }
+
+    private String extractBuyerTaxNo(String text) {
+        // Multiple tax ID label variants
+        String[] patterns = {
+            "纳税人识别号[:：]\\s*([\\dA-Z]{15,20})",
+            "统一社会信用代码[:：]\\s*([\\dA-Z]{18})",
+            "纳税人识别号[:：]\\s*([^\\n]{10,30})",
+        };
+        return extractFirstMulti(text, patterns);
+    }
+
+    /**
+     * Try multiple regex patterns in order, returning the first match.
+     */
+    private String extractFirstMulti(String text, String[] regexes) {
+        for (String regex : regexes) {
+            Matcher m = Pattern.compile(regex, Pattern.DOTALL).matcher(text);
+            if (m.find()) {
+                String value = m.group(1).trim();
+                if (!value.isEmpty()) return value;
+            }
         }
         return null;
     }
