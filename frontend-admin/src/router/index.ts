@@ -82,13 +82,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'cost-target',
         name: 'CostTarget',
         redirect: '/cost-target/index',
-        meta: { title: '目标成本管理', icon: 'AimOutlined' },
+        meta: { title: '目标管理', icon: 'AimOutlined' },
         children: [
           {
             path: 'index',
             name: 'CostTargetList',
             component: () => import('@/pages/cost-target/index.vue'),
-            meta: { title: '目标成本管理' },
+            meta: { title: '目标管理' },
           },
           {
             path: 'create',

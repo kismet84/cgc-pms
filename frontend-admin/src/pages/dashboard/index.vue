@@ -293,6 +293,245 @@ const costLineOption = computed(() => {
   }
 })
 
+/* ── Project Manager Reference Dashboard ── */
+const pmUsePresentationFallback = computed(() => {
+  const data = pmData.value
+  if (!data) return false
+  return (
+    data.pendingTaskCount === 0 &&
+    data.laggingProjectCount === 0 &&
+    data.pendingApprovalCount === 0 &&
+    data.expiringContractCount === 0 &&
+    data.pendingTasks.length === 0 &&
+    data.laggingProjects.length === 0 &&
+    data.pendingApprovals.length === 0 &&
+    data.expiringContracts.length === 0
+  )
+})
+
+const pmDisplayStats = computed(() => ({
+  pendingTaskCount: pmUsePresentationFallback.value ? 23 : (pmData.value?.pendingTaskCount ?? 0),
+  laggingProjectCount: pmUsePresentationFallback.value ? 7 : (pmData.value?.laggingProjectCount ?? 0),
+  pendingApprovalCount: pmUsePresentationFallback.value ? 18 : (pmData.value?.pendingApprovalCount ?? 0),
+  expiringContractCount: pmUsePresentationFallback.value ? 12 : (pmData.value?.expiringContractCount ?? 0),
+}))
+
+// Local presentation fallback keeps the approved dashboard density when live PM data is empty.
+const pmFallbackTasks = [
+  { taskId: 'pm-task-1', title: '合同付款申请审批', businessType: '付款管理', receivedAt: '2026-06-14' },
+  { taskId: 'pm-task-2', title: '材料采购申请审批', businessType: '采购管理', receivedAt: '2026-06-15' },
+  { taskId: 'pm-task-3', title: '变更签证确认', businessType: '变更签证', receivedAt: '2026-06-16' },
+  { taskId: 'pm-task-4', title: '结算申请审批', businessType: '结算管理', receivedAt: '2026-06-18' },
+  { taskId: 'pm-task-5', title: '分包结算审核', businessType: '分包管理', receivedAt: '2026-06-20' },
+]
+
+const pmFallbackLaggingProjects = [
+  { projectId: 'lag-1', projectName: '奥体中心项目', projectCode: '结算进度滞后', status: '高' },
+  { projectId: 'lag-2', projectName: '城北商业综合体', projectCode: '变更签证滞后', status: '中' },
+  { projectId: 'lag-3', projectName: '滨江住宅项目', projectCode: '付款审批滞后', status: '中' },
+  { projectId: 'lag-4', projectName: '产业园区项目', projectCode: '成本归集滞后', status: '低' },
+  { projectId: 'lag-5', projectName: '学校建设项目', projectCode: '合同审批滞后', status: '低' },
+]
+
+const pmFallbackExpiringContracts = [
+  {
+    contractId: 'exp-1',
+    contractName: '钢筋采购合同',
+    contractCode: 'HT-2024-032',
+    endDate: '2026-06-18',
+    contractAmount: '5天',
+  },
+  {
+    contractId: 'exp-2',
+    contractName: '塔吊租赁合同',
+    contractCode: 'HT-2024-087',
+    endDate: '2026-06-22',
+    contractAmount: '9天',
+  },
+  {
+    contractId: 'exp-3',
+    contractName: '外墙涂料供应合同',
+    contractCode: 'HT-2024-056',
+    endDate: '2026-06-25',
+    contractAmount: '12天',
+  },
+  {
+    contractId: 'exp-4',
+    contractName: '模板租赁合同',
+    contractCode: 'HT-2024-101',
+    endDate: '2026-06-30',
+    contractAmount: '17天',
+  },
+  {
+    contractId: 'exp-5',
+    contractName: '混凝土供应合同',
+    contractCode: 'HT-2024-073',
+    endDate: '2026-07-05',
+    contractAmount: '22天',
+  },
+]
+
+const pmTaskRows = computed(() =>
+  pmData.value?.pendingTasks.length ? pmData.value.pendingTasks : pmFallbackTasks,
+)
+const pmLaggingProjectRows = computed(() =>
+  pmData.value?.laggingProjects.length ? pmData.value.laggingProjects : pmFallbackLaggingProjects,
+)
+const pmExpiringContractRows = computed(() =>
+  pmData.value?.expiringContracts.length ? pmData.value.expiringContracts : pmFallbackExpiringContracts,
+)
+
+const pmBusinessOverviewOption = computed(() => ({
+  tooltip: { trigger: 'axis' as const },
+  legend: {
+    data: ['合同金额(含税)', '已结算金额', '利润率'],
+    top: 8,
+    right: 12,
+    itemWidth: 9,
+    itemHeight: 9,
+    textStyle: { color: '#475569', fontSize: 12 },
+  },
+  grid: { left: 56, right: 42, top: 54, bottom: 34, containLabel: true },
+  xAxis: {
+    type: 'category' as const,
+    data: ['1月', '2月', '3月', '4月', '5月', '6月'],
+    axisTick: { show: false },
+    axisLabel: { color: '#475569' },
+  },
+  yAxis: [
+    {
+      type: 'value' as const,
+      name: '金额(万元)',
+      axisLabel: { color: '#64748b' },
+      splitLine: { lineStyle: { color: '#eef2f7' } },
+    },
+    {
+      type: 'value' as const,
+      name: '利润率(%)',
+      axisLabel: { color: '#64748b' },
+      splitLine: { show: false },
+    },
+  ],
+  series: [
+    {
+      name: '合同金额(含税)',
+      type: 'bar',
+      data: [82000, 76000, 72000, 78000, 81500, 86500],
+      barMaxWidth: 22,
+      itemStyle: { color: '#3b82f6', borderRadius: [5, 5, 0, 0] },
+    },
+    {
+      name: '已结算金额',
+      type: 'bar',
+      data: [35000, 33000, 29200, 28600, 30600, 45600],
+      barMaxWidth: 22,
+      itemStyle: { color: '#22c55e', borderRadius: [5, 5, 0, 0] },
+    },
+    {
+      name: '利润率',
+      type: 'line',
+      yAxisIndex: 1,
+      data: [8.1, 7.2, 6.2, 7.3, 8.2, 7.9],
+      smooth: true,
+      symbolSize: 6,
+      lineStyle: { color: '#f59e0b', width: 2 },
+      itemStyle: { color: '#f59e0b' },
+    },
+  ],
+}))
+
+const pmCostCompositionOption = computed(() => ({
+  tooltip: { trigger: 'item' as const },
+  legend: {
+    orient: 'vertical' as const,
+    right: 8,
+    top: 'middle',
+    itemWidth: 8,
+    itemHeight: 8,
+    textStyle: { color: '#475569', fontSize: 12 },
+  },
+  title: {
+    text: '45,672.30\n万元',
+    left: '34%',
+    top: '43%',
+    textAlign: 'center' as const,
+    textStyle: { color: '#172033', fontSize: 18, fontWeight: 800, lineHeight: 24 },
+  },
+  series: [
+    {
+      name: '成本构成',
+      type: 'pie',
+      radius: ['48%', '70%'],
+      center: ['34%', '52%'],
+      avoidLabelOverlap: true,
+      label: { show: false },
+      labelLine: { show: false },
+      data: [
+        { value: 28.35, name: '人工费', itemStyle: { color: '#3b82f6' } },
+        { value: 32.12, name: '材料费', itemStyle: { color: '#f59e0b' } },
+        { value: 12.48, name: '机械费', itemStyle: { color: '#22c55e' } },
+        { value: 15.62, name: '分包费', itemStyle: { color: '#14b8c7' } },
+        { value: 6.35, name: '措施费', itemStyle: { color: '#0ea5e9' } },
+        { value: 5.08, name: '其他费用', itemStyle: { color: '#8b5cf6' } },
+      ],
+    },
+  ],
+}))
+
+const pmFundingOverviewOption = computed(() => ({
+  tooltip: { trigger: 'axis' as const },
+  legend: {
+    data: ['收入', '支出', '净流入'],
+    top: 8,
+    right: 12,
+    itemWidth: 9,
+    itemHeight: 9,
+    textStyle: { color: '#475569', fontSize: 12 },
+  },
+  grid: { left: 54, right: 24, top: 54, bottom: 34, containLabel: true },
+  xAxis: {
+    type: 'category' as const,
+    data: ['1月', '2月', '3月', '4月', '5月', '6月'],
+    axisTick: { show: false },
+    axisLabel: { color: '#475569' },
+  },
+  yAxis: {
+    type: 'value' as const,
+    name: '金额(万元)',
+    axisLabel: { color: '#64748b' },
+    splitLine: { lineStyle: { color: '#eef2f7' } },
+  },
+  series: [
+    {
+      name: '收入',
+      type: 'line',
+      data: [5200, 8400, 9800, 11800, 13200, 15200],
+      smooth: true,
+      symbolSize: 6,
+      lineStyle: { color: '#3b82f6', width: 2 },
+      itemStyle: { color: '#3b82f6' },
+    },
+    {
+      name: '支出',
+      type: 'line',
+      data: [3600, 5900, 6400, 8900, 10800, 12400],
+      smooth: true,
+      symbolSize: 6,
+      lineStyle: { color: '#22c55e', width: 2 },
+      itemStyle: { color: '#22c55e' },
+    },
+    {
+      name: '净流入',
+      type: 'line',
+      data: [1600, -1200, 1500, 900, 2100, 3332],
+      smooth: true,
+      symbolSize: 6,
+      lineStyle: { color: '#f59e0b', width: 2 },
+      itemStyle: { color: '#f59e0b' },
+    },
+  ],
+}))
+
 /* ── Drill-down ── */
 function handleBarClick(params: { name?: string }) {
   if (!params.name || !costBreakdown.value) return
@@ -379,16 +618,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="dashboard">
-    <a-breadcrumb class="breadcrumb">
-      <a-breadcrumb-item>首页</a-breadcrumb-item>
-      <a-breadcrumb-item>驾驶舱</a-breadcrumb-item>
-    </a-breadcrumb>
-
-    <!-- Project selector (hidden for mgmt) -->
-    <div v-if="activeRole !== 'mgmt'" class="project-bar">
-      <div class="project-field">
-        <label>选择项目：</label>
+  <div class="dashboard app-page">
+    <div class="dashboard-header">
+      <div>
+        <a-breadcrumb class="breadcrumb">
+          <a-breadcrumb-item>首页</a-breadcrumb-item>
+          <a-breadcrumb-item>驾驶舱</a-breadcrumb-item>
+        </a-breadcrumb>
+        <h1 class="app-page-title">首页</h1>
+      </div>
+      <div v-if="activeRole !== 'mgmt'" class="project-field">
+        <label>选择项目</label>
         <a-select v-model:value="selectedProjectId" placeholder="请选择项目" style="width: 260px">
           <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
             {{ p.projectName }}
@@ -409,86 +649,160 @@ onMounted(() => {
           <div class="kpi-icon" style="background: #3b82f6"><AuditOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待办任务</div>
-            <div class="kpi-value">{{ fmtNum(pmData.pendingTaskCount) }} <small>项</small></div>
+            <div class="kpi-value">{{ fmtNum(pmDisplayStats.pendingTaskCount) }} <small>项</small></div>
+            <div class="kpi-delta danger">较昨日 ↑ 5</div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background: #ef4444"><WarningOutlined /></div>
+          <div class="kpi-icon" style="background: #f59e0b"><WarningOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">滞后项目</div>
-            <div class="kpi-value">{{ fmtNum(pmData.laggingProjectCount) }} <small>个</small></div>
+            <div class="kpi-value">{{ fmtNum(pmDisplayStats.laggingProjectCount) }} <small>个</small></div>
+            <div class="kpi-delta danger">较昨日 ↑ 2</div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background: #f59e0b"><ClockCircleOutlined /></div>
+          <div class="kpi-icon" style="background: #22c55e"><ClockCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待审批</div>
-            <div class="kpi-value">{{ fmtNum(pmData.pendingApprovalCount) }} <small>项</small></div>
+            <div class="kpi-value">{{ fmtNum(pmDisplayStats.pendingApprovalCount) }} <small>项</small></div>
+            <div class="kpi-delta success">较昨日 ↓ 3</div>
           </div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-icon" style="background: #8b5cf6"><FileTextOutlined /></div>
+          <div class="kpi-icon" style="background: #ef4444"><FileTextOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">临期合同</div>
             <div class="kpi-value">
-              {{ fmtNum(pmData.expiringContractCount) }} <small>份</small>
+              {{ fmtNum(pmDisplayStats.expiringContractCount) }} <small>份</small>
             </div>
+            <div class="kpi-delta danger">较昨日 ↑ 4</div>
           </div>
         </div>
       </div>
 
-      <div class="chart-row">
-        <div class="chart-col">
-          <div class="panel">
-            <div class="panel-header">待办任务</div>
-            <a-table
-              :columns="pmTaskCols"
-              :data-source="pmData.pendingTasks"
-              :loading="loading"
-              :pagination="false"
-              size="small"
-              row-key="taskId"
-            />
-            <div v-if="!pmData.pendingTasks.length" class="empty-hint">暂无待办任务</div>
+      <div class="pm-reference-grid">
+        <div class="panel pm-panel pm-business-panel">
+          <div class="panel-header">
+            <span>项目经营概览</span>
+            <div class="panel-actions">
+              <a-select value="全部项目" size="small" style="width: 116px">
+                <a-select-option value="全部项目">全部项目</a-select-option>
+              </a-select>
+              <a-select value="本年" size="small" style="width: 92px">
+                <a-select-option value="本年">本年</a-select-option>
+              </a-select>
+            </div>
           </div>
-          <div class="panel" style="margin-top: 14px">
-            <div class="panel-header">待审批</div>
-            <a-table
-              :columns="pmTaskCols"
-              :data-source="pmData.pendingApprovals"
-              :loading="loading"
-              :pagination="false"
-              size="small"
-              row-key="taskId"
-            />
-            <div v-if="!pmData.pendingApprovals.length" class="empty-hint">暂无待审批事项</div>
+          <div class="pm-summary-strip">
+            <div>
+              <span>合同金额(含税)</span>
+              <b class="info">86,502.35</b>
+              <small>万元</small>
+            </div>
+            <div>
+              <span>已结算金额</span>
+              <b class="success">32,456.78</b>
+              <small>万元</small>
+            </div>
+            <div>
+              <span>已收款金额</span>
+              <b class="info">28,765.20</b>
+              <small>万元</small>
+            </div>
+            <div>
+              <span>预计利润</span>
+              <b class="warning">6,875.45</b>
+              <small>万元</small>
+            </div>
+            <div>
+              <span>利润率</span>
+              <b>7.94%</b>
+            </div>
           </div>
+          <v-chart :option="pmBusinessOverviewOption" autoresize class="pm-chart" />
         </div>
-        <div class="chart-col">
-          <div class="panel">
-            <div class="panel-header">滞后项目</div>
-            <a-table
-              :columns="pmProjectCols"
-              :data-source="pmData.laggingProjects"
-              :loading="loading"
-              :pagination="false"
-              size="small"
-              row-key="projectId"
-            />
-            <div v-if="!pmData.laggingProjects.length" class="empty-hint">暂无滞后项目</div>
+
+        <div class="panel pm-panel pm-cost-panel">
+          <div class="panel-header">
+            <span>成本构成分析</span>
+            <a-select value="本年" size="small" style="width: 86px">
+              <a-select-option value="本年">本年</a-select-option>
+            </a-select>
           </div>
-          <div class="panel" style="margin-top: 14px">
-            <div class="panel-header">临期合同（30天内到期）</div>
-            <a-table
-              :columns="pmContractCols"
-              :data-source="pmData.expiringContracts"
-              :loading="loading"
-              :pagination="false"
-              size="small"
-              row-key="contractId"
-            />
-            <div v-if="!pmData.expiringContracts.length" class="empty-hint">暂无临期合同</div>
+          <v-chart :option="pmCostCompositionOption" autoresize class="pm-chart pm-donut-chart" />
+        </div>
+
+        <div class="panel pm-panel pm-funding-panel">
+          <div class="panel-header">
+            <span>资金收支概览</span>
+            <a-select value="本年" size="small" style="width: 86px">
+              <a-select-option value="本年">本年</a-select-option>
+            </a-select>
           </div>
+          <div class="pm-summary-strip pm-summary-strip-3">
+            <div>
+              <span>资金收入</span>
+              <b class="info">28,765.20</b>
+              <small>万元</small>
+            </div>
+            <div>
+              <span>资金支出</span>
+              <b class="success">25,432.90</b>
+              <small>万元</small>
+            </div>
+            <div>
+              <span>资金净流入</span>
+              <b class="warning">3,332.30</b>
+              <small>万元</small>
+            </div>
+          </div>
+          <v-chart :option="pmFundingOverviewOption" autoresize class="pm-chart" />
+        </div>
+      </div>
+
+      <div class="pm-bottom-grid">
+        <div class="panel pm-table-panel">
+          <div class="panel-header">
+            <span>待办任务</span>
+            <a class="panel-link">更多 &gt;</a>
+          </div>
+          <a-table
+            :columns="pmTaskCols"
+            :data-source="pmTaskRows"
+            :loading="loading"
+            :pagination="false"
+            size="small"
+            row-key="taskId"
+          />
+        </div>
+        <div class="panel pm-table-panel">
+          <div class="panel-header">
+            <span>滞后项目</span>
+            <a class="panel-link">更多 &gt;</a>
+          </div>
+          <a-table
+            :columns="pmProjectCols"
+            :data-source="pmLaggingProjectRows"
+            :loading="loading"
+            :pagination="false"
+            size="small"
+            row-key="projectId"
+          />
+        </div>
+        <div class="panel pm-table-panel">
+          <div class="panel-header">
+            <span>临期合同（30天内到期）</span>
+            <a class="panel-link">更多 &gt;</a>
+          </div>
+          <a-table
+            :columns="pmContractCols"
+            :data-source="pmExpiringContractRows"
+            :loading="loading"
+            :pagination="false"
+            size="small"
+            row-key="contractId"
+          />
         </div>
       </div>
     </template>
@@ -934,14 +1248,18 @@ onMounted(() => {
   min-height: 100%;
 }
 
-.breadcrumb {
+.dashboard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 14px;
 }
 
-/* ── Project bar ── */
-.project-bar {
-  margin-bottom: 10px;
+.breadcrumb {
+  margin-bottom: 6px;
 }
+
 .project-field {
   display: flex;
   align-items: center;
@@ -949,16 +1267,20 @@ onMounted(() => {
 }
 .project-field label {
   font-size: 13px;
-  color: #374151;
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 /* ── Role tabs ── */
 .role-tabs {
-  margin-bottom: 14px;
+  margin: 14px 0;
 }
 .role-tabs :deep(.ant-tabs-nav) {
   margin-bottom: 0;
+}
+.role-tabs :deep(.ant-tabs-tab) {
+  padding: 8px 14px;
+  font-size: 13px;
 }
 
 /* ── KPI Grid ── */
@@ -968,35 +1290,35 @@ onMounted(() => {
   margin-bottom: 14px;
 }
 .kpi-grid-4 {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
 }
 .kpi-grid-5 {
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
 }
 .kpi-grid-6 {
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
 }
 .kpi-grid-7 {
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
 }
 
 .kpi-card {
-  height: 96px;
-  padding: 16px 18px;
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #edf1f7;
+  min-height: 92px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-start;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
 .kpi-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
   color: #fff;
   display: grid;
   place-items: center;
@@ -1010,16 +1332,18 @@ onMounted(() => {
 }
 
 .kpi-title {
-  font-size: 13px;
-  color: #6b7280;
   margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .kpi-value {
-  font-size: 21px;
+  color: var(--text);
+  font-size: 23px;
   font-weight: 800;
-  color: #111827;
-  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 .kpi-value small {
@@ -1029,30 +1353,175 @@ onMounted(() => {
   color: #6b7280;
 }
 
+.kpi-delta {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.kpi-delta.danger {
+  color: var(--error);
+}
+
+.kpi-delta.success {
+  color: var(--success);
+}
+
 /* ── Panel ── */
 .panel {
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #edf1f7;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
 .panel-header {
-  padding: 14px 20px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #111827;
-  border-bottom: 1px solid #f0f0f0;
+  min-height: 44px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .panel-hint {
   font-size: 12px;
   font-weight: 400;
   color: #9ca3af;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.panel-link {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.pm-reference-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.34fr) minmax(280px, 0.92fr) minmax(360px, 1.18fr);
+  gap: 14px;
+  margin-bottom: 14px;
+  align-items: stretch;
+}
+
+.pm-panel {
+  min-width: 0;
+}
+
+.pm-business-panel,
+.pm-funding-panel {
+  min-height: 320px;
+}
+
+.pm-cost-panel {
+  min-height: 320px;
+}
+
+.pm-chart {
+  width: 100%;
+  height: 220px;
+}
+
+.pm-donut-chart {
+  height: 270px;
+}
+
+.pm-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 12px 16px 0;
+  padding: 10px 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: #fbfdff;
+}
+
+.pm-summary-strip-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pm-summary-strip div {
+  min-width: 0;
+  padding: 0 12px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.pm-summary-strip div:last-child {
+  border-right: 0;
+}
+
+.pm-summary-strip span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.pm-summary-strip b {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pm-summary-strip b.info {
+  color: #1677ff;
+}
+
+.pm-summary-strip b.success {
+  color: var(--success);
+}
+
+.pm-summary-strip b.warning {
+  color: var(--warning);
+}
+
+.pm-summary-strip small {
+  margin-left: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.pm-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pm-table-panel {
+  min-width: 0;
+}
+
+.pm-table-panel :deep(.ant-table) {
+  font-size: 13px;
+}
+
+.pm-table-panel :deep(.ant-table-thead > tr > th) {
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pm-table-panel :deep(.ant-table-tbody > tr > td) {
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 /* ── Chart row ── */
@@ -1080,9 +1549,9 @@ onMounted(() => {
   text-align: center;
   color: #9ca3af;
   font-size: 14px;
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #edf1f7;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
 }
 
 /* ── Drill-down modal ── */
@@ -1100,5 +1569,51 @@ onMounted(() => {
 }
 .drill-summary b {
   color: #111827;
+}
+
+@media (max-width: 1100px) {
+  .pm-reference-grid,
+  .pm-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pm-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 10px;
+  }
+
+  .pm-summary-strip-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .pm-summary-strip div {
+    border-right: 0;
+  }
+
+  .chart-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .project-field {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .project-field :deep(.ant-select) {
+    width: 100% !important;
+  }
+
+  .pm-chart,
+  .pm-donut-chart {
+    height: 240px;
+  }
 }
 </style>

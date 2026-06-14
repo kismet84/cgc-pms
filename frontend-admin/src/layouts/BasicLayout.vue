@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { QuestionCircleOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
@@ -9,28 +9,55 @@ import NotificationBell from '@/components/NotificationBell.vue'
 const router = useRouter()
 const userStore = useUserStore()
 const collapsed = ref(false)
+const isMobile = ref(false)
+let mobileQuery: MediaQueryList | undefined
+
+function syncMobileState(event: MediaQueryList | MediaQueryListEvent) {
+  isMobile.value = event.matches
+  if (event.matches) {
+    collapsed.value = true
+  }
+}
 
 function handleLogout() {
   userStore.logout()
   router.push('/login')
 }
+
+onMounted(() => {
+  mobileQuery = window.matchMedia('(max-width: 768px)')
+  syncMobileState(mobileQuery)
+  mobileQuery.addEventListener('change', syncMobileState)
+})
+
+onBeforeUnmount(() => {
+  mobileQuery?.removeEventListener('change', syncMobileState)
+})
 </script>
 
 <template>
-  <a-layout class="basic-layout">
+  <a-layout class="basic-layout" :class="{ 'basic-layout--mobile-nav-open': isMobile && !collapsed }">
     <a-layout-sider
       v-model:collapsed="collapsed"
-      :width="206"
+      :width="216"
       :collapsed-width="64"
       class="sidebar"
       theme="light"
     >
-      <div class="brand">
-        <div class="logo">▣</div>
+      <div class="brand" :class="{ 'brand--collapsed': collapsed }">
+        <div class="logo" aria-hidden="true">
+          <span class="logo-mark">建</span>
+        </div>
         <span v-if="!collapsed" class="brand-text">建筑工程总包项目管理系统</span>
       </div>
       <SidebarMenu />
     </a-layout-sider>
+    <div
+      v-if="isMobile && !collapsed"
+      class="sidebar-mask"
+      aria-hidden="true"
+      @click="collapsed = true"
+    ></div>
 
     <a-layout>
       <a-layout-header class="topbar">
@@ -78,59 +105,74 @@ function handleLogout() {
 <style scoped>
 .basic-layout {
   min-height: 100vh;
+  background: var(--bg);
 }
 
 .sidebar {
   position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 10;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
+  inset: 0 auto 0 0;
+  z-index: 20;
+  overflow: hidden;
+  background: var(--surface) !important;
+  border-right: 1px solid var(--border);
+  box-shadow: none;
 }
 
 .brand {
-  height: 56px;
+  height: var(--shell-header-height);
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 20px;
-  border-bottom: 1px solid #e5eaf3;
-  font-weight: 700;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
+.brand--collapsed {
+  justify-content: center;
+  padding: 0;
+}
+
 .logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: linear-gradient(135deg, #1677ff, #0b5fe9);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1668dc, #0ea5e9);
   display: grid;
   place-items: center;
   color: #fff;
-  font-size: 15px;
-  box-shadow: 0 4px 10px rgba(22, 119, 255, 0.25);
   flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(22, 104, 220, 0.22);
+}
+
+.logo-mark {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .brand-text {
-  font-size: 14px;
+  min-width: 0;
   overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
   text-overflow: ellipsis;
 }
 
 .topbar {
-  height: 56px;
-  background: #fff;
-  border-bottom: 1px solid #e5eaf3;
-  padding: 0 24px;
+  height: var(--shell-header-height);
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--border);
+  padding: 0 22px;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   position: sticky;
   top: 0;
-  z-index: 5;
-  margin-left: 206px;
+  z-index: 10;
+  margin-left: var(--shell-sidebar-width);
+  backdrop-filter: blur(8px);
 }
 
 .hamburger {
@@ -162,24 +204,87 @@ function handleLogout() {
 
 .username {
   font-size: 14px;
-  font-weight: 600;
-  color: #111827;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .role {
+  margin-top: 1px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 .main-content {
   padding: 18px;
-  margin-left: 206px;
-  min-height: calc(100vh - 56px);
+  margin-left: var(--shell-sidebar-width);
+  min-height: calc(100vh - var(--shell-header-height));
+  background: var(--bg);
 }
 
 /* 折叠时调整 */
 :deep(.ant-layout-sider-collapsed) + .ant-layout .topbar,
 :deep(.ant-layout-sider-collapsed) + .ant-layout .main-content {
-  margin-left: 64px;
+  margin-left: var(--shell-sidebar-collapsed-width);
+}
+
+.sidebar-mask {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .basic-layout {
+    overflow-x: hidden;
+  }
+
+  .sidebar {
+    z-index: 30;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: 10px 0 30px rgba(15, 23, 42, 0.16);
+  }
+
+  .basic-layout--mobile-nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .topbar,
+  .main-content {
+    margin-left: 0;
+  }
+
+  :deep(.ant-layout-sider-collapsed) + .ant-layout .topbar,
+  :deep(.ant-layout-sider-collapsed) + .ant-layout .main-content {
+    margin-left: 0;
+  }
+
+  .topbar {
+    width: 100%;
+    padding: 0 12px;
+    gap: 12px;
+  }
+
+  .main-content {
+    width: 100%;
+    max-width: 100vw;
+    min-height: calc(100vh - var(--shell-header-height));
+    padding: 12px;
+    overflow-x: hidden;
+  }
+
+  .top-actions {
+    gap: 12px;
+  }
+
+  .user-text {
+    display: none;
+  }
+
+  .sidebar-mask {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    display: block;
+    background: rgba(15, 23, 42, 0.34);
+  }
 }
 </style>

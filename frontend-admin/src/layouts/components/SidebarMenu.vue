@@ -4,15 +4,21 @@ import { useRoute, useRouter } from 'vue-router'
 import { routes } from '@/router'
 import type { RouteRecordRaw } from 'vue-router'
 import {
-  HomeOutlined,
-  FileTextOutlined,
-  ProjectOutlined,
-  TeamOutlined,
+  AccountBookOutlined,
+  AimOutlined,
+  AlertOutlined,
+  ApartmentOutlined,
   AuditOutlined,
+  BranchesOutlined,
+  DatabaseOutlined,
+  DollarOutlined,
+  FileTextOutlined,
+  HomeOutlined,
+  InboxOutlined,
+  ProjectOutlined,
   SettingOutlined,
-  UserOutlined,
-  ControlOutlined,
-  QuestionCircleOutlined,
+  ShoppingCartOutlined,
+  SwapOutlined,
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -26,23 +32,55 @@ interface MenuItem {
 }
 
 const iconMap: Record<string, MenuItem['icon']> = {
-  HomeOutlined,
-  FileTextOutlined,
-  ProjectOutlined,
-  TeamOutlined,
+  AccountBookOutlined,
+  AimOutlined,
+  AlertOutlined,
+  ApartmentOutlined,
   AuditOutlined,
+  BranchesOutlined,
+  DatabaseOutlined,
+  DollarOutlined,
+  FileTextOutlined,
+  HomeOutlined,
+  InboxOutlined,
+  ProjectOutlined,
   SettingOutlined,
-  UserOutlined,
-  ControlOutlined,
-  QuestionCircleOutlined,
+  ShoppingCartOutlined,
+  SwapOutlined,
 }
+
+const MENU_ORDER = [
+  '/dashboard',
+  '/project',
+  '/cost-target',
+  '/cost',
+  '/contract',
+  '/variation',
+  '/settlement',
+  '/payment',
+  '/subcontract',
+  '/purchase',
+  '/inventory',
+  '/invoice',
+  '/approval',
+  '/alert',
+  '/material',
+  '/org',
+  '/system',
+]
 
 const menuItems = computed(() => {
   return routes
     .find((r) => r.path === '/')
     ?.children?.filter((r) => !r.meta?.hidden)
+    .sort((a, b) => menuRank(resolveMenuPath('', a.path)) - menuRank(resolveMenuPath('', b.path)))
     .map((r) => buildMenuItem(r, ''))
 })
+
+function menuRank(path: string) {
+  const index = MENU_ORDER.indexOf(path)
+  return index === -1 ? MENU_ORDER.length : index
+}
 
 function buildMenuItem(route: RouteRecordRaw, parentPath: string): MenuItem {
   const fullPath = resolveMenuPath(parentPath, route.path)
@@ -99,27 +137,32 @@ function handleMenuClick({ key }: { key: string }) {
 <style scoped>
 .sidebar-menu {
   border-right: none;
-  padding: 14px 8px;
-  height: calc(100vh - 56px);
+  padding: 10px 10px 14px;
+  height: calc(100vh - var(--shell-header-height));
   overflow-y: auto;
+  background: transparent;
+}
+
+:deep(.ant-menu) {
+  color: var(--text-secondary);
+  background: transparent;
 }
 
 :deep(.ant-menu-item),
 :deep(.ant-menu-submenu-title) {
-  border-radius: 8px;
-  margin: 4px 0;
-  height: 42px;
-  line-height: 42px;
+  height: 38px;
+  line-height: 38px;
+  margin: 3px 0;
+  border-radius: var(--radius-md);
 }
 
 :deep(.ant-menu-item-selected) {
-  background: #f1f6ff !important;
-  color: #1677ff !important;
-  font-weight: 600;
+  background: #edf5ff !important;
+  color: var(--primary) !important;
+  font-weight: 700;
 }
 
 :deep(.ant-menu-item-selected::after) {
-  border-right: 3px solid #1677ff;
-  border-radius: 0 8px 8px 0;
+  display: none;
 }
 </style>

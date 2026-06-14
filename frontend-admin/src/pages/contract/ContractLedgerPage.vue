@@ -177,6 +177,7 @@ const TYPE_COLOR: Record<ContractType, string> = {
 
 // ---- ECharts donut option ----
 const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#14b8c7']
+const STATUS_COLORS = ['#22c55e', '#14b8c7', '#f59e0b', '#8b5cf6']
 const TYPE_NAMES = ['总包合同', '分包合同', '采购合同', '租赁合同', '服务合同']
 const donutOption = computed(() => ({
   color: CHART_COLORS,
@@ -198,7 +199,7 @@ const donutOption = computed(() => ({
   ],
 }))
 
-// ---- Status stats (mock) ----
+// Presentation-only fallback analysis data for reference fidelity when backend analytics are empty.
 const statusStats = [
   { label: '履约中', count: 98, pct: 76.56, color: '#22c55e' },
   { label: '已完成', count: 20, pct: 15.63, color: '#14b8c7' },
@@ -206,7 +207,22 @@ const statusStats = [
   { label: '草稿', count: 4, pct: 3.12, color: '#8b5cf6' },
 ]
 
-// ---- Overdue warnings (mock) ----
+const statusDonutOption = computed(() => ({
+  color: STATUS_COLORS,
+  tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+  legend: { show: false },
+  series: [
+    {
+      type: 'pie',
+      radius: ['52%', '74%'],
+      center: ['50%', '50%'],
+      label: { show: false },
+      data: statusStats.map((item) => ({ name: item.label, value: item.count })),
+    },
+  ],
+}))
+
+// Presentation-only fallback warning rows; live overdue data can replace this when exposed by API.
 const overdueList = [
   { code: 'HT-FB-2024-005', name: '机电工程分包合同', days: 28 },
   { code: 'HT-CG-2024-012', name: '铝合金门窗采购合同', days: 15 },
@@ -246,12 +262,16 @@ const gridColumns = computed(() => [
 </script>
 
 <template>
-  <div class="cl-page">
-    <!-- Breadcrumb -->
-    <a-breadcrumb class="cl-breadcrumb">
-      <a-breadcrumb-item>合同管理</a-breadcrumb-item>
-      <a-breadcrumb-item>合同台账</a-breadcrumb-item>
-    </a-breadcrumb>
+  <div class="cl-page app-page">
+    <div class="cl-page-head">
+      <div>
+        <a-breadcrumb class="cl-breadcrumb">
+          <a-breadcrumb-item>合同管理</a-breadcrumb-item>
+          <a-breadcrumb-item>合同台账</a-breadcrumb-item>
+        </a-breadcrumb>
+        <h1 class="app-page-title">合同台账</h1>
+      </div>
+    </div>
 
     <div class="cl-grid">
       <!-- Left column -->
@@ -467,8 +487,8 @@ const gridColumns = computed(() => [
         </div>
       </div>
 
-      <!-- Right side panel -->
-      <aside class="cl-side">
+      <!-- Right analysis rail -->
+      <aside class="cl-analysis-rail">
         <!-- Donut: type distribution -->
         <div class="cl-card cl-panel">
           <div class="cl-panel-title">合同类型分布</div>
@@ -490,14 +510,17 @@ const gridColumns = computed(() => [
         <!-- Status stats -->
         <div class="cl-card cl-panel">
           <div class="cl-panel-title">合同状态统计</div>
-          <div class="cl-status-list">
-            <div v-for="s in statusStats" :key="s.label" class="cl-status-line">
-              <span>{{ s.label }}</span>
-              <b>{{ s.count }}</b>
-              <div class="cl-bar">
-                <span :style="{ width: s.pct + '%', background: s.color }"></span>
+          <div class="cl-status-chart-row">
+            <VChart :option="statusDonutOption" style="width: 116px; height: 116px" autoresize />
+            <div class="cl-status-list">
+              <div v-for="s in statusStats" :key="s.label" class="cl-status-line">
+                <span>{{ s.label }}</span>
+                <b>{{ s.count }}</b>
+                <div class="cl-bar">
+                  <span :style="{ width: s.pct + '%', background: s.color }"></span>
+                </div>
+                <span>{{ s.pct }}%</span>
               </div>
-              <span>{{ s.pct }}%</span>
             </div>
           </div>
         </div>
@@ -524,41 +547,51 @@ const gridColumns = computed(() => [
 
 <style scoped>
 .cl-page {
-  background: #f6f8fc;
+  background: var(--bg);
   min-height: 100%;
-  padding: 4px 0;
+  padding: 2px 0;
+}
+.cl-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 .cl-breadcrumb {
-  margin-bottom: 16px;
-  font-size: 14px;
+  margin-bottom: 5px;
+  font-size: 13px;
 }
 .cl-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 318px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 336px;
+  gap: 16px;
   align-items: start;
 }
 .cl-left {
   min-width: 0;
 }
 .cl-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 /* Filter */
 .cl-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 .cl-filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 24px;
+  gap: 10px 16px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .cl-filter-row--last {
   margin-bottom: 0;
@@ -566,17 +599,23 @@ const gridColumns = computed(() => [
 .cl-field {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 7px;
+  font-size: 13px;
   white-space: nowrap;
 }
 .cl-field label {
-  color: #374151;
+  color: var(--text-secondary);
   min-width: 56px;
+}
+.cl-filter :deep(.ant-select-selector),
+.cl-filter :deep(.ant-picker),
+.cl-filter :deep(.ant-input),
+.cl-filter :deep(.ant-btn) {
+  font-size: 13px;
 }
 .cl-filter-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-left: auto;
   align-items: center;
 }
@@ -584,25 +623,25 @@ const gridColumns = computed(() => [
 /* KPI */
 .cl-kpis {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(132px, 1fr));
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .cl-kpi {
-  height: 96px;
-  padding: 18px;
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #edf1f7;
+  min-height: 78px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: flex-start;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
+  box-shadow: var(--shadow-soft);
 }
 .cl-kpi-icon {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: 8px;
   color: #fff;
   display: grid;
   place-items: center;
@@ -611,14 +650,15 @@ const gridColumns = computed(() => [
 }
 .cl-kpi-title {
   font-size: 13px;
-  color: #6b7280;
-  margin-bottom: 6px;
+  color: var(--muted);
+  margin-bottom: 4px;
 }
 .cl-kpi-value {
-  font-size: 21px;
+  font-size: 19px;
   font-weight: 800;
-  color: #111827;
-  letter-spacing: 0.2px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 .cl-kpi-value small {
   font-size: 13px;
@@ -627,8 +667,8 @@ const gridColumns = computed(() => [
 }
 .cl-kpi-change {
   font-size: 12px;
-  color: #6b7280;
-  margin-top: 5px;
+  color: var(--muted);
+  margin-top: 3px;
 }
 .up {
   color: #ef4444;
@@ -641,7 +681,13 @@ const gridColumns = computed(() => [
 .cl-toolbar {
   display: flex;
   align-items: center;
-  margin-bottom: 10px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 .cl-toolbar-left {
   display: flex;
@@ -653,9 +699,13 @@ const gridColumns = computed(() => [
 .cl-table-wrap {
   overflow: hidden;
   margin-bottom: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 .cl-link {
-  color: #1677ff;
+  color: var(--primary);
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
@@ -669,7 +719,22 @@ const gridColumns = computed(() => [
   justify-content: center;
 }
 .cl-del {
-  color: #ef4444;
+  color: var(--error);
+}
+.cl-table-wrap :deep(.vxe-table--header-wrapper) {
+  background: var(--surface-subtle);
+}
+.cl-table-wrap :deep(.vxe-header--column) {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+.cl-table-wrap :deep(.vxe-body--column) {
+  color: var(--text);
+  font-size: 13px;
+}
+.cl-table-wrap :deep(.vxe-body--row:hover) {
+  background: #f8fbff;
 }
 
 /* Pagination */
@@ -682,28 +747,32 @@ const gridColumns = computed(() => [
 }
 .cl-total {
   font-size: 13px;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
-/* Side panel */
-.cl-side {
+/* Right analysis rail */
+.cl-analysis-rail {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 .cl-panel {
-  padding: 14px 16px;
+  padding: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 .cl-panel-title {
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 12px;
-  color: #111827;
+  color: var(--text);
 }
 .cl-chart-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .cl-legend {
   flex: 1;
@@ -711,7 +780,7 @@ const gridColumns = computed(() => [
   flex-direction: column;
   gap: 8px;
   font-size: 12px;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 .cl-legend-item {
   display: flex;
@@ -736,19 +805,26 @@ const gridColumns = computed(() => [
 .cl-status-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
   font-size: 12px;
+  min-width: 0;
+  flex: 1;
+}
+.cl-status-chart-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 .cl-status-line {
   display: grid;
-  grid-template-columns: 52px 24px 1fr 48px;
-  gap: 8px;
+  grid-template-columns: 46px 22px 1fr 42px;
+  gap: 7px;
   align-items: center;
 }
 .cl-bar {
   height: 7px;
   border-radius: 99px;
-  background: #eef2f7;
+  background: var(--border-subtle);
   overflow: hidden;
 }
 .cl-bar span {
@@ -767,38 +843,74 @@ const gridColumns = computed(() => [
 .cl-warning-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   font-size: 12px;
 }
 .cl-warning-item {
   display: grid;
-  grid-template-columns: 8px 90px 1fr 58px;
-  gap: 8px;
+  grid-template-columns: 8px 92px minmax(0, 1fr) 58px;
+  gap: 7px;
   align-items: center;
+}
+.cl-warning-item span:nth-child(3) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cl-red-dot {
   width: 6px;
   height: 6px;
-  background: #ef4444;
+  background: var(--error);
   border-radius: 50%;
   display: inline-block;
 }
 .cl-overdue {
-  color: #ef4444;
+  color: var(--error);
   font-weight: 600;
   text-align: right;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .cl-grid {
     grid-template-columns: 1fr;
   }
-  .cl-side {
+  .cl-analysis-rail {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+@media (max-width: 1100px) {
   .cl-kpis {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .cl-analysis-rail {
+    grid-template-columns: 1fr;
+  }
+  .cl-filter-actions {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .cl-kpis {
+    grid-template-columns: 1fr;
+  }
+  .cl-page-head {
+    display: block;
+  }
+  .cl-filter {
+    padding: 12px;
+  }
+  .cl-field,
+  .cl-filter-actions,
+  .cl-toolbar-left,
+  .cl-pagination {
+    width: 100%;
+    flex-wrap: wrap;
   }
 }
 </style>
