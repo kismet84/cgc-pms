@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   getWarehouseList,
@@ -7,9 +7,8 @@ import {
   updateWarehouse,
   deleteWarehouse,
 } from '@/api/modules/inventory'
-import { getProjectList } from '@/api/modules/project'
+import { useReferenceStore } from '@/stores/reference'
 import type { WarehouseVO } from '@/types/inventory'
-import type { ProjectVO } from '@/types/project'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -24,7 +23,8 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const projectList = ref<ProjectVO[]>([])
+const referenceStore = useReferenceStore()
+const projectList = computed(() => referenceStore.projects ?? [])
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建仓库')
@@ -74,15 +74,6 @@ async function fetchData() {
     message.error('加载仓库列表失败，请稍后重试')
   } finally {
     loading.value = false
-  }
-}
-
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
   }
 }
 
@@ -185,7 +176,7 @@ function handleModalCancel() {
 }
 
 onMounted(() => {
-  fetchProjects()
+  referenceStore.fetchProjects()
   fetchData()
 })
 </script>

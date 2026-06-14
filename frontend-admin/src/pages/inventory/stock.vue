@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { getStockLedger } from '@/api/modules/inventory'
 import { getWarehouseList } from '@/api/modules/inventory'
-import { getMaterialList } from '@/api/modules/material'
+import { useReferenceStore } from '@/stores/reference'
 import type { WarehouseVO, MatStockVO, MatStockTxnVO } from '@/types/inventory'
-import type { MaterialVO } from '@/types/material'
 
 const filter = reactive({
   warehouseId: undefined as string | undefined,
@@ -20,7 +19,8 @@ const txnPageNo = ref(1)
 const txnPageSize = ref(20)
 
 const warehouseList = ref<WarehouseVO[]>([])
-const materialList = ref<MaterialVO[]>([])
+const referenceStore = useReferenceStore()
+const materialList = computed(() => referenceStore.materials ?? [])
 
 const TXN_TYPE_LABEL: Record<string, string> = {
   IN: '入库',
@@ -77,19 +77,10 @@ async function fetchLedger() {
 
 async function fetchWarehouses() {
   try {
-    const res = await getWarehouseList({ pageNo: 1, pageSize: 500, status: 'ENABLE' })
+    const res = await getWarehouseList({ pageNo: 1, pageSize: 50, status: 'ENABLE' })
     warehouseList.value = res.records
   } catch {
     warehouseList.value = []
-  }
-}
-
-async function fetchMaterials() {
-  try {
-    const res = await getMaterialList({ pageNum: 1, pageSize: 500, status: 'ENABLE' })
-    materialList.value = res.records
-  } catch {
-    materialList.value = []
   }
 }
 
@@ -128,7 +119,7 @@ function getMaterialName(id: string): string {
 
 onMounted(() => {
   fetchWarehouses()
-  fetchMaterials()
+  referenceStore.fetchMaterials()
 })
 </script>
 
@@ -146,6 +137,8 @@ onMounted(() => {
             placeholder="请选择仓库"
             allow-clear
             style="width: 200px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
               {{ w.warehouseName }}
@@ -159,6 +152,8 @@ onMounted(() => {
             placeholder="全部物料"
             allow-clear
             style="width: 200px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
               {{ m.materialName }} <span style="color: #9ca3af">({{ m.materialCode }})</span>

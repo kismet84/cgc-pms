@@ -10,11 +10,8 @@ import {
   savePurchaseRequestItems,
   submitPurchaseRequest,
 } from '@/api/modules/inventory'
-import { getProjectList } from '@/api/modules/project'
-import { getMaterialList } from '@/api/modules/material'
+import { useReferenceStore } from '@/stores/reference'
 import type { PurchaseRequestVO, PurchaseRequestItemVO } from '@/types/inventory'
-import type { ProjectVO } from '@/types/project'
-import type { MaterialVO } from '@/types/material'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
 
 const filter = reactive({
@@ -30,8 +27,9 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const projectList = ref<ProjectVO[]>([])
-const materialList = ref<MaterialVO[]>([])
+const referenceStore = useReferenceStore()
+const projectList = computed(() => referenceStore.projects ?? [])
+const materialList = computed(() => referenceStore.materials ?? [])
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建采购申请')
@@ -97,24 +95,6 @@ async function fetchData() {
     message.error('加载采购申请列表失败，请稍后重试')
   } finally {
     loading.value = false
-  }
-}
-
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
-  }
-}
-
-async function fetchMaterials() {
-  try {
-    const res = await getMaterialList({ pageNum: 1, pageSize: 500, status: 'ENABLE' })
-    materialList.value = res.records
-  } catch {
-    materialList.value = []
   }
 }
 
@@ -289,8 +269,8 @@ function handleModalCancel() {
 }
 
 onMounted(() => {
-  fetchProjects()
-  fetchMaterials()
+  referenceStore.fetchProjects()
+  referenceStore.fetchMaterials()
   fetchData()
 })
 </script>
@@ -309,6 +289,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
@@ -470,6 +452,8 @@ onMounted(() => {
                 placeholder="请选择物料"
                 allow-clear
                 style="width: 100%"
+                show-search
+                :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
                 @change="(val: string) => handleMaterialChange(index, val)"
               >
                 <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
