@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
   getApplicationList,
@@ -11,9 +12,7 @@ import {
   submitForApproval,
   doWriteback,
 } from '@/api/modules/payment'
-import { getProjectList } from '@/api/modules/project'
-import { getContractLedger } from '@/api/modules/contract'
-import { getPartnerList } from '@/api/modules/partner'
+import { useReferenceStore } from '@/stores/reference'
 import { getReceiptList } from '@/api/modules/receipt'
 import { getMeasureList } from '@/api/modules/subcontract'
 import type { PayApplicationVO, PayApplicationBasisVO } from '@/types/payment'
@@ -39,9 +38,8 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const projectList = ref<ProjectVO[]>([])
-const contractList = ref<ContractVO[]>([])
-const partnerList = ref<PartnerVO[]>([])
+const referenceStore = useReferenceStore()
+const { projects, contracts, partners } = storeToRefs(referenceStore)
 const receiptList = ref<MatReceiptVO[]>([])
 const measureList = ref<SubMeasureVO[]>([])
 
@@ -109,36 +107,9 @@ async function fetchData() {
   }
 }
 
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
-  }
-}
-
-async function fetchContracts() {
-  try {
-    const res = await getContractLedger({ pageNo: 1, pageSize: 500 })
-    contractList.value = res.records
-  } catch {
-    contractList.value = []
-  }
-}
-
-async function fetchPartners() {
-  try {
-    const res = await getPartnerList({ pageNum: 1, pageSize: 500 })
-    partnerList.value = res.records
-  } catch {
-    partnerList.value = []
-  }
-}
-
 async function fetchReceipts() {
   try {
-    const res = await getReceiptList({ pageNum: 1, pageSize: 500 })
+    const res = await getReceiptList({ pageNum: 1, pageSize: 50 })
     receiptList.value = res.records
   } catch {
     receiptList.value = []
@@ -147,7 +118,7 @@ async function fetchReceipts() {
 
 async function fetchMeasures() {
   try {
-    const res = await getMeasureList({ pageNum: 1, pageSize: 500 })
+    const res = await getMeasureList({ pageNum: 1, pageSize: 50 })
     measureList.value = res.records
   } catch {
     measureList.value = []
@@ -392,9 +363,9 @@ function fmtAmount(val: string | undefined): string {
 }
 
 onMounted(() => {
-  fetchProjects()
-  fetchContracts()
-  fetchPartners()
+  referenceStore.fetchProjects()
+  referenceStore.fetchContracts()
+  referenceStore.fetchPartners()
   fetchReceipts()
   fetchMeasures()
   fetchData()
@@ -415,8 +386,10 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
           </a-select>
@@ -428,8 +401,10 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+            <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
           </a-select>
@@ -441,8 +416,10 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 160px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
+            <a-select-option v-for="p in partners" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>
           </a-select>
@@ -588,21 +565,21 @@ onMounted(() => {
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
         <a-form-item label="项目" required>
           <a-select v-model:value="formData.projectId" placeholder="请选择项目">
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="合同">
           <a-select v-model:value="formData.contractId" placeholder="请选择合同" allow-clear>
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+            <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="合作方">
           <a-select v-model:value="formData.partnerId" placeholder="请选择合作方" allow-clear>
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
+            <a-select-option v-for="p in partners" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>
           </a-select>

@@ -10,14 +10,9 @@ import {
   saveReceiptItems,
   getOrderItemsForReceipt,
 } from '@/api/modules/receipt'
-import { getProjectList } from '@/api/modules/project'
-import { getContractLedger } from '@/api/modules/contract'
-import { getPartnerList } from '@/api/modules/partner'
 import { getOrderList } from '@/api/modules/purchase'
+import { useReferenceStore } from '@/stores/reference'
 import type { MatReceiptVO, MatReceiptItemVO } from '@/types/receipt'
-import type { ProjectVO } from '@/types/project'
-import type { ContractVO } from '@/types/contract'
-import type { PartnerVO } from '@/types/partner'
 import type { MatPurchaseOrderVO } from '@/types/purchase'
 
 const filter = reactive({
@@ -35,9 +30,10 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
-const projectList = ref<ProjectVO[]>([])
-const contractList = ref<ContractVO[]>([])
-const partnerList = ref<PartnerVO[]>([])
+const referenceStore = useReferenceStore()
+const projectList = computed(() => referenceStore.projects ?? [])
+const contractList = computed(() => referenceStore.contracts ?? [])
+const partnerList = computed(() => referenceStore.partners ?? [])
 const orderList = ref<MatPurchaseOrderVO[]>([])
 
 const modalVisible = ref(false)
@@ -108,36 +104,9 @@ async function fetchData() {
   }
 }
 
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
-  }
-}
-
-async function fetchContracts() {
-  try {
-    const res = await getContractLedger({ pageNo: 1, pageSize: 500, contractType: 'PURCHASE' })
-    contractList.value = res.records
-  } catch {
-    contractList.value = []
-  }
-}
-
-async function fetchPartners() {
-  try {
-    const res = await getPartnerList({ pageNum: 1, pageSize: 500, partnerType: 'SUPPLIER' })
-    partnerList.value = res.records
-  } catch {
-    partnerList.value = []
-  }
-}
-
 async function fetchOrders() {
   try {
-    const res = await getOrderList({ pageNum: 1, pageSize: 500 })
+    const res = await getOrderList({ pageNum: 1, pageSize: 50 })
     orderList.value = res.records
   } catch {
     orderList.value = []
@@ -357,9 +326,9 @@ function handleModalCancel() {
 }
 
 onMounted(() => {
-  fetchProjects()
-  fetchContracts()
-  fetchPartners()
+  referenceStore.fetchProjects()
+  referenceStore.fetchContracts({ contractType: 'PURCHASE' })
+  referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })
   fetchOrders()
   fetchData()
 })
@@ -379,6 +348,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
@@ -392,6 +363,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="o in orderList" :key="o.id" :value="o.id">
               {{ o.orderCode }}
@@ -405,6 +378,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
@@ -418,6 +393,8 @@ onMounted(() => {
             placeholder="全部"
             allow-clear
             style="width: 160px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
