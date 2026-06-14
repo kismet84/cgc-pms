@@ -5,7 +5,7 @@ import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import type { TreeSelectProps } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
-import { getProjectList } from '@/api/modules/project'
+import { useReferenceStore } from '@/stores/reference'
 import { getCostSubjectTree } from '@/api/modules/costSubject'
 import {
   createCostTarget,
@@ -16,7 +16,6 @@ import {
   submitCostTargetForApproval,
 } from '@/api/modules/costTarget'
 import type { CostTargetVO, CostTargetItemVO } from '@/types/costTarget'
-import type { ProjectVO } from '@/types/project'
 
 const router = useRouter()
 const route = useRoute()
@@ -30,7 +29,8 @@ const saving = ref(false)
 const submitting = ref(false)
 
 // ---- Reference data ----
-const projects = ref<ProjectVO[]>([])
+const referenceStore = useReferenceStore()
+const projects = computed(() => referenceStore.projects ?? [])
 const subjectTree = ref<TreeSelectProps['treeData']>([])
 
 // ---- Form data ----
@@ -133,16 +133,6 @@ function onSubjectChange(val: string | number | undefined, record: EditableItem)
     const parts = (found.title as string).split(' ')
     record.costSubjectCode = parts[0] || ''
     record.costSubjectName = parts.slice(1).join(' ') || ''
-  }
-}
-
-// ---- Load reference data ----
-async function loadReferenceData() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 200 })
-    projects.value = res.records
-  } catch {
-    projects.value = []
   }
 }
 
@@ -322,7 +312,7 @@ function fmtMoney(val: number | undefined): string {
 }
 
 onMounted(() => {
-  loadReferenceData()
+  referenceStore.fetchProjects()
   fetchSubjectTree()
   if (isEdit.value) loadExisting()
 })

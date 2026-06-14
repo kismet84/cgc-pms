@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { message } from 'ant-design-vue'
 import {
   DollarOutlined,
@@ -11,9 +12,6 @@ import {
 } from '@ant-design/icons-vue'
 import type { TreeSelectProps } from 'ant-design-vue'
 import { getCostLedger, getCostLedgerSummary, getCostLedgerDetail } from '@/api/modules/cost'
-import { getProjectList } from '@/api/modules/project'
-import { getContractLedger } from '@/api/modules/contract'
-import { getPartnerList } from '@/api/modules/partner'
 import { getCostSubjectTree, type CostSubjectTreeNode } from '@/api/modules/costSubject'
 import type {
   CostLedgerVO,
@@ -23,14 +21,13 @@ import type {
 } from '@/types/cost'
 import { SOURCE_TYPE_LABEL, SOURCE_TYPE_COLOR } from '@/types/cost'
 import type { PageResult } from '@/types/api'
-import type { ProjectVO } from '@/types/project'
-import type { ContractVO, ContractQueryParams } from '@/types/contract'
-import type { PartnerVO } from '@/types/partner'
+import { useReferenceStore } from '@/stores/reference'
+
+// ---- Reference store ----
+const referenceStore = useReferenceStore()
+const { projects: projectList, contracts: contractList, partners: partnerList } = storeToRefs(referenceStore)
 
 // ---- Dropdown data ----
-const projectList = ref<ProjectVO[]>([])
-const contractList = ref<ContractVO[]>([])
-const partnerList = ref<PartnerVO[]>([])
 const subjectTree = ref<TreeSelectProps['treeData']>([])
 
 // ---- Filter state ----
@@ -69,36 +66,6 @@ const detailItem = ref<CostLedgerVO | null>(null)
 // ---- Summary view mode ----
 const summaryMode = ref<'sourceType' | 'project' | 'costType'>('sourceType')
 
-// ---- Fetch dropdown data ----
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
-  }
-}
-
-async function fetchContracts(projectId?: string) {
-  try {
-    const params: ContractQueryParams = { pageNo: 1, pageSize: 500 }
-    if (projectId) params.projectId = projectId
-    const res = await getContractLedger(params)
-    contractList.value = res.records
-  } catch {
-    contractList.value = []
-  }
-}
-
-async function fetchPartners() {
-  try {
-    const res = await getPartnerList({ pageNum: 1, pageSize: 500 })
-    partnerList.value = res.records
-  } catch {
-    partnerList.value = []
-  }
-}
-
 async function fetchSubjectTree() {
   try {
     const data = await getCostSubjectTree()
@@ -125,8 +92,7 @@ function convertToTreeData(nodes: TreeNode[]): TreeSelectProps['treeData'] {
 
 function onProjectChange(val: string | undefined) {
   filter.contractId = undefined
-  contractList.value = []
-  if (val) fetchContracts(val)
+  if (val) referenceStore.fetchContracts({ projectId: val })
 }
 
 // ---- Fetch data ----
@@ -201,7 +167,7 @@ function handleReset() {
   filter.costStatus = undefined
   filter.dateRange = []
   filter.keyword = ''
-  contractList.value = []
+  referenceStore.invalidateContracts()
   pageNum.value = 1
   fetchData()
   fetchSummary()
@@ -304,9 +270,9 @@ function summaryLabel(mode: 'sourceType' | 'project' | 'costType', key: string):
 }
 
 onMounted(() => {
-  fetchProjects()
-  fetchContracts()
-  fetchPartners()
+  referenceStore.fetchProjects()
+  referenceStore.fetchContracts()
+  referenceStore.fetchPartners()
   fetchSubjectTree()
   fetchData()
   fetchSummary()
@@ -368,6 +334,8 @@ onMounted(() => {
             placeholder="请选择项目"
             allow-clear
             style="width: 160px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
             @change="onProjectChange"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
@@ -382,6 +350,8 @@ onMounted(() => {
             placeholder="请选择合同"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">{{
               c.contractName
@@ -395,6 +365,8 @@ onMounted(() => {
             placeholder="请选择合作方"
             allow-clear
             style="width: 160px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">{{
               p.partnerName

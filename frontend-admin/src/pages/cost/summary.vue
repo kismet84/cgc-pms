@@ -20,7 +20,7 @@ const summary = ref<CostSummaryVO | null>(null)
 
 async function fetchProjects() {
   try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
+    const res = await getProjectList({ pageNum: 1, pageSize: 50 })
     projectList.value = res.records
   } catch {
     projectList.value = []
@@ -155,6 +155,8 @@ onMounted(() => {
             placeholder="请选择项目查看成本汇总"
             allow-clear
             style="width: 280px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
             @change="handleProjectChange"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">

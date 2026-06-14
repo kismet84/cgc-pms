@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { PlusOutlined, ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { getCostTargetList, activateCostTarget, deleteCostTarget } from '@/api/modules/costTarget'
-import { getProjectList } from '@/api/modules/project'
+import { useReferenceStore } from '@/stores/reference'
 import type { CostTargetVO, CostTargetQueryParams } from '@/types/costTarget'
 import {
   APPROVAL_STATUS_LABEL,
@@ -12,13 +12,12 @@ import {
   TARGET_STATUS_LABEL,
   TARGET_STATUS_COLOR,
 } from '@/types/costTarget'
-import type { PageResult } from '@/types/api'
-import type { ProjectVO } from '@/types/project'
 
 const router = useRouter()
 
 // ---- Dropdown data ----
-const projectList = ref<ProjectVO[]>([])
+const referenceStore = useReferenceStore()
+const projectList = computed(() => referenceStore.projects ?? [])
 
 // ---- Filter state ----
 const filter = reactive({
@@ -35,16 +34,6 @@ const tableData = ref<CostTargetVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
-
-// ---- Fetch projects for filter ----
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
-  }
-}
 
 // ---- Fetch data ----
 async function fetchData() {
@@ -175,7 +164,7 @@ const columns = [
 ]
 
 onMounted(() => {
-  fetchProjects()
+  referenceStore.fetchProjects()
   fetchData()
 })
 </script>
@@ -197,6 +186,8 @@ onMounted(() => {
             placeholder="请选择项目"
             allow-clear
             style="width: 180px"
+            show-search
+            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
               p.projectName
