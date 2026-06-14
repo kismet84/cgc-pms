@@ -21,6 +21,10 @@ import type { PageResult } from '@/types/api'
 
 const userStore = useUserStore()
 
+// ─── Page loading ────────────────────────────────────────
+
+const loading = ref(true)
+
 // ─── Permission checks ───────────────────────────────────
 
 const canAdd = computed(() => userStore.hasPermission('org:add'))
@@ -482,15 +486,19 @@ async function handlePositionDelete(record: OrgPositionVO) {
 
 // ─── Init ────────────────────────────────────────────────
 
-onMounted(() => {
-  fetchCompanies()
-  fetchDeptTree()
-  fetchPositions()
+onMounted(async () => {
+  await Promise.all([
+    fetchCompanies(),
+    fetchDeptTree(),
+    fetchPositions(),
+  ])
+  loading.value = false
 })
 </script>
 
 <template>
-  <div class="org-page">
+  <a-spin :spinning="loading">
+    <div class="org-page">
     <a-page-header title="组织架构管理" class="org-header" />
 
     <!-- ================== Top Row: Company + Department ================== -->
@@ -789,6 +797,7 @@ onMounted(() => {
       </a-form>
     </a-modal>
   </div>
+  </a-spin>
 </template>
 
 <style scoped>

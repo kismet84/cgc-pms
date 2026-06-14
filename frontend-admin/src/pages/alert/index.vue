@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { getProjectList } from '@/api/modules/project'
-import type { ProjectVO } from '@/types/project'
-import type { PageResult } from '@/types/api'
+import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { RULE_TYPE_LABELS, SEVERITY_COLOR, type AlertLogVO } from '@/types/alert'
 
@@ -17,25 +15,11 @@ const filter = reactive({
 })
 
 // ── Project dropdown ──
-const projectOptions = ref<ProjectVO[]>([])
+const referenceStore = useReferenceStore()
+const projectOptions = computed(() => referenceStore.projects ?? [])
 const projectsLoading = ref(false)
 
-async function loadProjects() {
-  projectsLoading.value = true
-  try {
-    const res: PageResult<ProjectVO> = await getProjectList({
-      pageNum: 1,
-      pageSize: 200,
-    })
-    projectOptions.value = res.records
-  } catch {
-    projectOptions.value = []
-  } finally {
-    projectsLoading.value = false
-  }
-}
-
-// ── Pagination (client-side since backend returns full list) ──
+// ── Fetch ──
 const pageNo = ref(1)
 const pageSize = ref(20)
 
@@ -143,7 +127,12 @@ function getProjectName(projectId: number): string {
 
 // ── Init ──
 onMounted(async () => {
-  await loadProjects()
+  projectsLoading.value = true
+  try {
+    await referenceStore.fetchProjects()
+  } finally {
+    projectsLoading.value = false
+  }
   fetchData()
 })
 </script>
