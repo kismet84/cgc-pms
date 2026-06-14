@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useReferenceStore } from '@/stores/reference'
+import { storeToRefs } from 'pinia'
 import {
   FileTextOutlined,
   DollarOutlined,
@@ -19,9 +21,6 @@ import {
   computeSettlementAmount,
   createSettlement,
 } from '@/api/modules/settlement'
-import { getProjectList } from '@/api/modules/project'
-import { getContractLedger } from '@/api/modules/contract'
-import { getPartnerList } from '@/api/modules/partner'
 import type {
   SettlementVO,
   SettlementQueryParams,
@@ -37,9 +36,8 @@ import type { PartnerVO } from '@/types/partner'
 const router = useRouter()
 
 // ---- Dropdown data ----
-const projectList = ref<ProjectVO[]>([])
-const contractList = ref<ContractVO[]>([])
-const partnerList = ref<PartnerVO[]>([])
+const referenceStore = useReferenceStore()
+const { projects, contracts, partners } = storeToRefs(referenceStore)
 
 // ---- Filter state ----
 const filter = reactive({
@@ -79,40 +77,9 @@ const createForm = reactive({
   remark: '',
 })
 
-// ---- Fetch dropdowns ----
-async function fetchProjects() {
-  try {
-    const res = await getProjectList({ pageNum: 1, pageSize: 500 })
-    projectList.value = res.records
-  } catch {
-    projectList.value = []
-  }
-}
-
-async function fetchContracts(projectId?: string) {
-  try {
-    const params: ContractQueryParams = { pageNo: 1, pageSize: 500 }
-    if (projectId) params.projectId = projectId
-    const res = await getContractLedger(params)
-    contractList.value = res.records
-  } catch {
-    contractList.value = []
-  }
-}
-
-async function fetchPartners() {
-  try {
-    const res = await getPartnerList({ pageNum: 1, pageSize: 500 })
-    partnerList.value = res.records
-  } catch {
-    partnerList.value = []
-  }
-}
-
 function onProjectChange(val: string | undefined) {
   filter.contractId = undefined
-  contractList.value = []
-  if (val) fetchContracts(val)
+  if (val) referenceStore.fetchContracts({ projectId: val })
 }
 
 // ---- Fetch data ----
@@ -171,7 +138,6 @@ function handleReset() {
   filter.settlementStatus = undefined
   filter.settlementCode = ''
   filter.settlementType = undefined
-  contractList.value = []
   pageNo.value = 1
   fetchData()
   fetchKpi()
@@ -329,9 +295,9 @@ const APPROVAL_STATUS_COLOR: Record<string, string> = {
 }
 
 onMounted(() => {
-  fetchProjects()
-  fetchContracts()
-  fetchPartners()
+  referenceStore.fetchProjects()
+  referenceStore.fetchContracts()
+  referenceStore.fetchPartners()
   fetchData()
   fetchKpi()
 })
@@ -397,7 +363,7 @@ onMounted(() => {
             style="width: 160px"
             @change="onProjectChange"
           >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
+            <a-select-option v-for="p in projects" :key="p.id" :value="p.id">{{
               p.projectName
             }}</a-select-option>
           </a-select>
@@ -410,7 +376,7 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
           >
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">{{
+            <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">{{
               c.contractName
             }}</a-select-option>
           </a-select>
@@ -423,7 +389,7 @@ onMounted(() => {
             allow-clear
             style="width: 160px"
           >
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">{{
+            <a-select-option v-for="p in partners" :key="p.id" :value="p.id">{{
               p.partnerName
             }}</a-select-option>
           </a-select>
@@ -564,7 +530,7 @@ onMounted(() => {
             option-filter-prop="label"
           >
             <a-select-option
-              v-for="c in contractList"
+              v-for="c in contracts"
               :key="c.id"
               :value="c.id"
               :label="c.contractName"
