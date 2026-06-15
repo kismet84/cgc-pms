@@ -7,7 +7,7 @@
 #
 # Infrastructure (MySQL, Redis, MinIO) runs in Docker.
 # Backend + Frontend source is bind-mounted from host — no rebuild needed.
-# Backend:  Spring Boot DevTools auto-restart on class change
+# Backend:  Java -jar from pre-built JAR (build on host first)
 # Frontend: Vite HMR (hot module replacement) on file save
 # =============================================================================
 
@@ -90,7 +90,7 @@ services:
       - cgc-pms-dev-net
 
   # ===========================================================================
-  # Backend — Spring Boot with DevTools hot reload (bind mount source)
+  # Backend — Spring Boot from pre-built JAR (bind mount source)
   # ===========================================================================
   backend:
     image: maven:3.9-eclipse-temurin-21
@@ -107,7 +107,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # Bind-mount source code — edit on host, auto-restart in container
+      # Bind-mount source code — build JAR on host first: cd backend && ./mvnw clean package -DskipTests
       - ../backend:/app
       # Anonymous volume to keep Linux Maven cache (avoids re-download)
       - maven-repo:/root/.m2
@@ -124,7 +124,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-do-not-use-in-production}
-    command: ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -DskipTests
+    command: java -jar target/cgc-pms-backend.jar
     networks:
       - cgc-pms-dev-net
 
