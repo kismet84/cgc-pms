@@ -397,12 +397,16 @@ function getPayRecordLabel(record: InvoiceVO): string {
 }
 
 onMounted(() => {
+  console.log('[invoice] onMounted START')
   ;(window as any).handleSearch = handleSearch
   ;(window as any).filter = filter
   console.log('[invoice] mounted, handleSearch attached to window')
   fetchPayRecords()
   fetchData()
 })
+
+// diagnostic: verify script compiled
+console.log('[invoice] script setup compiled, handleSearch type:', typeof handleSearch)
 
 defineExpose({
   formData,
