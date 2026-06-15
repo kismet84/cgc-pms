@@ -140,6 +140,7 @@ function handleMenuClick({ key }: { key: string }) {
     mode="inline"
     class="sidebar-menu"
     :items="menuItems"
+    tabindex="0"
     @click="handleMenuClick"
   />
 </template>

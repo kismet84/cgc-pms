@@ -15,7 +15,7 @@ const theme = {
     colorError: '#dc2626',
     colorText: '#172033',
     colorTextSecondary: '#475569',
-    colorTextTertiary: '#7b8798',
+    colorTextTertiary: '#64748b',
     colorBorder: '#e4e9f2',
     colorBgLayout: '#f5f7fb',
     colorBgContainer: '#ffffff',
