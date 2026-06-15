@@ -22,4 +22,5 @@ public class InvoiceVO {
     private String sellerName;
     private String buyerName;
     private String buyerTaxNo;
+    private String sellerTaxNo;
 }

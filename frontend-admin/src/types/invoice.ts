@@ -48,6 +48,7 @@ export interface InvoiceVO {
   sellerName?: string
   buyerName?: string
   buyerTaxNo?: string
+  sellerTaxNo?: string
 }
 
 /** Invoice recognition result (from PDF extraction) */
@@ -61,6 +62,7 @@ export interface InvoiceRecognizeResultVO {
   sellerName?: string
   buyerName?: string
   buyerTaxNo?: string
+  sellerTaxNo?: string
   remark?: string
 }
 

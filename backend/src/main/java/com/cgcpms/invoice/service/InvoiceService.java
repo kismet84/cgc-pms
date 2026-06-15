@@ -165,6 +165,7 @@ public class InvoiceService {
         vo.setSellerName(invoice.getSellerName());
         vo.setBuyerName(invoice.getBuyerName());
         vo.setBuyerTaxNo(invoice.getBuyerTaxNo());
+        vo.setSellerTaxNo(invoice.getSellerTaxNo());
         return vo;
     }
 
@@ -224,12 +225,14 @@ public class InvoiceService {
         result.setSellerName(extractSellerName(text));
         result.setBuyerName(extractBuyerName(text));
         result.setBuyerTaxNo(extractBuyerTaxNo(text));
+        result.setSellerTaxNo(extractSellerTaxNo(text));
         result.setRemark(null);
 
-        log.info("PDF recognition result: invoiceNo={}, amount={}, taxRate={}, taxAmount={}, seller={}, buyer={}",
+        log.info("PDF recognition result: invoiceNo={}, amount={}, taxRate={}, taxAmount={}, seller={}, buyer={}, sellerTaxNo={}",
                 result.getInvoiceNo(), result.getInvoiceAmount(),
                 result.getTaxRate(), result.getTaxAmount(),
-                result.getSellerName(), result.getBuyerName());
+                result.getSellerName(), result.getBuyerName(),
+                result.getSellerTaxNo());
         log.info("Extracted PDF text (first 500 chars):\n{}",
                 text.length() > 500 ? text.substring(0, 500) + "..." : text);
 
@@ -394,6 +397,20 @@ public class InvoiceService {
             "纳税人识别号[:：]\\s*([^\\n]{10,30})",
         };
         return extractFirstMulti(text, patterns);
+    }
+
+    /**
+     * Extract seller tax number — the SECOND 纳税人识别号 in the invoice
+     * (first = buyer, second = seller).
+     */
+    private String extractSellerTaxNo(String text) {
+        Matcher m = Pattern.compile("纳税人识别号[:：]\\s*([\\dA-Z]{15,20})").matcher(text);
+        int count = 0;
+        while (m.find()) {
+            count++;
+            if (count >= 2) return m.group(1).trim();
+        }
+        return null;
     }
 
     /**

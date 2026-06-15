@@ -48,6 +48,10 @@ const formData = reactive<Partial<InvoiceVO>>({
   taxRate: undefined,
   taxAmount: undefined,
   invoiceDate: undefined,
+  sellerName: undefined,
+  buyerName: undefined,
+  buyerTaxNo: undefined,
+  sellerTaxNo: undefined,
   remark: '',
 })
 
@@ -137,6 +141,7 @@ function handleAdd() {
     sellerName: undefined,
     buyerName: undefined,
     buyerTaxNo: undefined,
+    sellerTaxNo: undefined,
     remark: '',
   })
   if (abortController.value) {
@@ -162,6 +167,7 @@ function handleEdit(record: InvoiceVO) {
     sellerName: record.sellerName,
     buyerName: record.buyerName,
     buyerTaxNo: record.buyerTaxNo,
+    sellerTaxNo: record.sellerTaxNo,
     remark: record.remark,
   })
   modalVisible.value = true
@@ -293,6 +299,9 @@ async function handleRecognize() {
   }
   abortController.value = new AbortController()
 
+  // Clear invoice-related form fields so recognition result always overwrites
+  clearInvoiceFields()
+
   recognizing.value = true
   try {
     const file = uploadFileList.value[0].originFileObj as File
@@ -306,22 +315,45 @@ async function handleRecognize() {
     }
   } catch (error: any) {
     if (axios.isCancel(error)) {
-      // Request was cancelled (modal closed) — no message needed
       return
     }
-    // Timeout / network errors
     if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
       message.error('识别超时，请检查网络后重试')
     }
-    // Business errors (PDF_ENCRYPTED etc.) are handled by the shared interceptor
   } finally {
     recognizing.value = false
     abortController.value = null
   }
 }
 
+/** Clear all invoice-related fields before re-recognizing */
+function clearInvoiceFields() {
+  const fields: (keyof InvoiceVO)[] = [
+    'invoiceNo',
+    'invoiceType',
+    'invoiceAmount',
+    'taxRate',
+    'taxAmount',
+    'invoiceDate',
+    'sellerName',
+    'buyerName',
+    'buyerTaxNo',
+    'sellerTaxNo',
+    'remark',
+  ]
+  for (const field of fields) {
+    if (field === 'invoiceType') {
+      ;(formData as any)[field] = 'VAT_SPECIAL'
+    } else if (field === 'invoiceNo' || field === 'remark') {
+      ;(formData as any)[field] = ''
+    } else {
+      ;(formData as any)[field] = undefined
+    }
+  }
+}
+
 function applyRecognitionResult(result: InvoiceRecognizeResultVO) {
-  // Only fill fields that are currently empty/null — never overwrite user input
+  // Fill all recognized fields (form was cleared before recognition)
   const fields: (keyof InvoiceRecognizeResultVO)[] = [
     'invoiceNo',
     'invoiceType',
@@ -332,11 +364,12 @@ function applyRecognitionResult(result: InvoiceRecognizeResultVO) {
     'sellerName',
     'buyerName',
     'buyerTaxNo',
+    'sellerTaxNo',
     'remark',
   ]
   for (const field of fields) {
     const value = result[field]
-    if (value != null && value !== '' && !formData[field]) {
+    if (value != null && value !== '') {
       ;(formData as any)[field] = value
     }
   }
@@ -592,6 +625,9 @@ defineExpose({
         </a-form-item>
         <a-form-item label="买方税号">
           <a-input v-model:value="formData.buyerTaxNo" placeholder="请输入买方纳税人识别号" />
+        </a-form-item>
+        <a-form-item label="卖方税号">
+          <a-input v-model:value="formData.sellerTaxNo" placeholder="请输入卖方纳税人识别号" />
         </a-form-item>
         <a-form-item label="备注">
           <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />

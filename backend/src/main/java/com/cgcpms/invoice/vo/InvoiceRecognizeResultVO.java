@@ -16,5 +16,6 @@ public class InvoiceRecognizeResultVO implements Serializable {
     private String sellerName;
     private String buyerName;
     private String buyerTaxNo;
+    private String sellerTaxNo;
     private String remark;
 }
