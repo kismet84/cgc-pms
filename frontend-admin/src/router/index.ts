@@ -313,6 +313,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/system/users/index.vue'),
             meta: { title: '用户管理' },
           },
+          {
+            path: 'data',
+            name: 'SystemData',
+            component: () => import('@/pages/system/data/index.vue'),
+            meta: { title: '数据管理' },
+          },
         ],
       },
       {

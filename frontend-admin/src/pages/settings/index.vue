@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
-import { message, Modal } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import service from '@/api/request'
 
 interface Preferences {
@@ -12,7 +12,6 @@ interface Preferences {
 
 const loading = ref(false)
 const saving = ref(false)
-const clearing = ref(false)
 
 const preferences = reactive<Preferences>({
   sidebarCollapsed: false,
@@ -50,26 +49,6 @@ async function handleSave() {
   }
 }
 
-function handleClearDatabase() {
-  Modal.confirm({
-    title: '清空数据库',
-    content: '此操作将清空所有数据，不可恢复，确定继续？',
-    okText: '确定清空',
-    okType: 'danger',
-    cancelText: '取消',
-    onOk: async () => {
-      clearing.value = true
-      try {
-        const res = await service.delete<string>('/system/clear-database')
-        message.success(res || '数据库已清空')
-      } catch {
-        message.error('清空失败，请稍后重试')
-      } finally {
-        clearing.value = false
-      }
-    },
-  })
-}
 </script>
 
 <template>
@@ -104,15 +83,6 @@ function handleClearDatabase() {
           </a-radio-group>
         </a-form-item>
       </a-form>
-    </a-card>
-
-    <a-card title="数据管理" :bordered="false" style="margin-top: 16px">
-      <a-button type="primary" danger :loading="clearing" @click="handleClearDatabase">
-        清空数据库
-      </a-button>
-      <span style="margin-left: 12px; color: #8c8c8c; font-size: 13px">
-        清空所有业务数据，保留系统用户和菜单
-      </span>
     </a-card>
 
     <div style="margin-top: 24px">
