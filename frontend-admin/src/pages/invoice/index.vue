@@ -76,20 +76,16 @@ const columns = [
 async function fetchData() {
   loading.value = true
   try {
-    const params = {
+    const res = await getInvoiceList({
       pageNo: pageNo.value,
       pageSize: pageSize.value,
       payRecordId: filter.payRecordId,
       invoiceNo: filter.invoiceNo || undefined,
       verifyStatus: filter.verifyStatus,
-    }
-    console.log('[fetchData] calling getInvoiceList with:', params)
-    const res = await getInvoiceList(params)
-    console.log('[fetchData] response:', res)
+    })
     tableData.value = res.records
     total.value = res.total
-  } catch (err) {
-    console.error('[fetchData] error:', err)
+  } catch {
     tableData.value = []
     total.value = 0
     message.error('加载发票列表失败，请稍后重试')
@@ -108,7 +104,6 @@ async function fetchPayRecords() {
 }
 
 function handleSearch() {
-  console.log('[handleSearch] clicked, filter:', JSON.parse(JSON.stringify(filter)))
   pageNo.value = 1
   fetchData()
 }
@@ -397,16 +392,10 @@ function getPayRecordLabel(record: InvoiceVO): string {
 }
 
 onMounted(() => {
-  console.log('[invoice] onMounted START')
-  ;(window as any).handleSearch = handleSearch
-  ;(window as any).filter = filter
-  console.log('[invoice] mounted, handleSearch attached to window')
   fetchPayRecords()
   fetchData()
 })
 
-// diagnostic: verify script compiled
-console.log('[invoice] script setup compiled, handleSearch type:', typeof handleSearch)
 
 defineExpose({
   formData,
@@ -461,8 +450,7 @@ defineExpose({
           </a-select>
         </div>
         <div class="pm-filter-actions">
-          <span v-on:click="handleSearch"><a-button type="primary">查询</a-button></span>
-          <button v-on:click="handleSearch" class="ant-btn ant-btn-primary">查询(原生)</button>
+          <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
           <a-button type="primary" @click="handleAdd">新增发票</a-button>
         </div>
