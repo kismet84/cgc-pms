@@ -22,6 +22,22 @@ export interface UserInfo {
   email?: string
   roles: string[]
   permissions: string[]
-  /** 部门/角色显示名，如“项目经理” */
+  /** 部门/角色显示名，如"项目经理" */
   roleName?: string
+}
+
+/** 系统用户视图对象 */
+export interface SysUserVO {
+  id: string
+  username: string
+  realName: string
+  phone?: string
+  email?: string
+  avatar?: string
+  orgId?: string
+  status: string
+  isAdmin?: number
+  roleNames?: string[]
+  createdAt?: string
+  updatedAt?: string
 }

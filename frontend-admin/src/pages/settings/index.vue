@@ -2,6 +2,7 @@
 import { reactive, ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import service from '@/api/request'
+import UserManagement from './UserManagement.vue'
 
 interface Preferences {
   sidebarCollapsed: boolean
@@ -53,15 +54,15 @@ async function handleSave() {
 function handleClearDatabase() {
   Modal.confirm({
     title: '清空数据库',
-    content: '此操作将清空所有业务数据（项目、合同、发票、审批等），系统用户和菜单不受影响。数据不可恢复，确定继续？',
+    content: '此操作将清空所有数据，不可恢复，确定继续？',
     okText: '确定清空',
     okType: 'danger',
     cancelText: '取消',
     onOk: async () => {
       clearing.value = true
       try {
-        const res: any = await service.delete('/system/clear-database')
-        message.success(res?.data ?? res?.message ?? '数据库已清空')
+        const res = await service.delete<string>('/system/clear-database')
+        message.success(res || '数据库已清空')
       } catch {
         message.error('清空失败，请稍后重试')
       } finally {
@@ -104,6 +105,10 @@ function handleClearDatabase() {
           </a-radio-group>
         </a-form-item>
       </a-form>
+    </a-card>
+
+    <a-card title="用户管理" :bordered="false" style="margin-top: 16px">
+      <UserManagement />
     </a-card>
 
     <a-card title="数据管理" :bordered="false" style="margin-top: 16px">
