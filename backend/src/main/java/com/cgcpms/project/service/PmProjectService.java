@@ -146,6 +146,12 @@ public class PmProjectService {
                     .eq(CtContract::getProjectId, id));
         }
 
+        // 避免与已删除的同编码项目产生唯一键冲突：
+        // V51 唯一键 uk_pm_project_code (tenant_id, project_code, deleted_flag)
+        // 当已存在 deleted_flag=1 的同编码项目时，将当前项目编码追加唯一后缀
+        existing.setProjectCode(existing.getProjectCode() + "-DEL-" + id);
+        pmProjectMapper.updateById(existing);
+
         pmProjectMapper.deleteById(id);
     }
 
