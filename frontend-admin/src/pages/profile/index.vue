@@ -162,6 +162,7 @@ async function handlePasswordChange() {
             <a-input-password
               v-model:value="passwordForm.oldPassword"
               placeholder="请输入原密码"
+              autocomplete="current-password"
             />
           </a-form-item>
 
@@ -169,6 +170,7 @@ async function handlePasswordChange() {
             <a-input-password
               v-model:value="passwordForm.newPassword"
               placeholder="请输入新密码"
+              autocomplete="new-password"
             />
           </a-form-item>
 
@@ -176,6 +178,7 @@ async function handlePasswordChange() {
             <a-input-password
               v-model:value="passwordForm.confirmPassword"
               placeholder="请再次输入新密码"
+              autocomplete="new-password"
             />
           </a-form-item>
 
