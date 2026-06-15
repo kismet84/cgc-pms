@@ -216,15 +216,22 @@ public class InvoiceService {
         result.setTaxRate(extractTaxRate(text));
         result.setTaxAmount(extractAmountMulti(text,
                 "税额[:：].*?[¥￥]\\s*([\\d,]+\\.?\\d*)",
-                "税额[:：]\\s*([\\d,]+\\.?\\d{2})",
-                "税额[\\s\\S]{0,150}?([\\d,]+\\.?\\d{2})"));
+                "税额[:：]\\s*([\\d,]+\\.?\\d+)",
+                "税额[\\s\\S]{0,500}?([\\d,]+\\.?\\d{2})",
+                // Table row: tax rate % followed by amount (税率 13% 税额 19500.00 pattern)
+                "税率[\\s\\S]{0,200}?%[\\s\\S]{0,200}?([\\d,]+\\.?\\d{2})"));
         result.setInvoiceDate(extractInvoiceDate(text));
         result.setSellerName(extractSellerName(text));
         result.setBuyerName(extractBuyerName(text));
         result.setBuyerTaxNo(extractBuyerTaxNo(text));
         result.setRemark(null);
 
-        log.info("PDF recognition result: invoiceNo={}, amount={}", result.getInvoiceNo(), result.getInvoiceAmount());
+        log.info("PDF recognition result: invoiceNo={}, amount={}, taxRate={}, taxAmount={}, seller={}, buyer={}",
+                result.getInvoiceNo(), result.getInvoiceAmount(),
+                result.getTaxRate(), result.getTaxAmount(),
+                result.getSellerName(), result.getBuyerName());
+        log.debug("Extracted PDF text (first 2000 chars):\n{}",
+                text.length() > 2000 ? text.substring(0, 2000) + "..." : text);
 
         return result;
     }
@@ -319,19 +326,20 @@ public class InvoiceService {
         String name = extractFirstMulti(text, primaryPatterns);
         if (name != null) return name;
 
-        // Fallback 1: generic "名称：" near "销货" or "销售" context
-        name = extractFirstDotAll(text, "[销][货售方]\\s*单位[\\s\\S]{0,200}?名称[:：]\\s*([^\\n]+)");
-        if (name != null) return name.trim();
+        // Fallback 1: generic "名称：" near seller context (销货/销售/销方/卖方)
+        name = extractFirstDotAll(text, "(?:销货|销售|销方|卖方)\\s*单位[\\s\\S]{0,200}?名称[:：]\\s*([^\\n]{2,30})");
+        if (name != null && !name.trim().isEmpty()) return name.trim();
 
         // Fallback 2: second "名称：XXX" match (seller typically comes after buyer)
-        Matcher m = Pattern.compile("名称[:：]\\s*([^\\n]+)").matcher(text);
+        Matcher m = Pattern.compile("名称[:：]\\s*([^\\n]{2,40})").matcher(text);
         int count = 0;
         while (m.find()) {
             count++;
             if (count >= 2) {
                 String candidate = m.group(1).trim();
-                // Skip numeric-only matches (amounts, dates) and tax IDs
-                if (!candidate.matches("[\\d.,\\-\\s]+") && candidate.length() >= 2) {
+                // Skip numeric-only matches (amounts, dates), tax IDs, and buyer-context matches
+                if (!candidate.matches("[\\d.,\\-\\s]+") && candidate.length() >= 2
+                        && !candidate.contains("购") && !candidate.matches("[\\dA-Z\\-]{10,}")) {
                     return candidate;
                 }
             }
@@ -351,16 +359,17 @@ public class InvoiceService {
         String name = extractFirstMulti(text, primaryPatterns);
         if (name != null) return name;
 
-        // Fallback 1: generic "名称：" near "购货" or "购买" context
-        name = extractFirstDotAll(text, "[购買][货方]\\s*单位[\\s\\S]{0,200}?名称[:：]\\s*([^\\n]+)");
-        if (name != null) return name.trim();
+        // Fallback 1: generic "名称：" near buyer context (购货/购买/买方)
+        name = extractFirstDotAll(text, "(?:购货|购买|购方|买方)\\s*单位[\\s\\S]{0,200}?名称[:：]\\s*([^\\n]{2,30})");
+        if (name != null && !name.trim().isEmpty()) return name.trim();
 
-        // Fallback 2: first "名称：XXX" match (buyer appears first in Chinese invoices)
-        Matcher m = Pattern.compile("名称[:：]\\s*([^\\n]+)").matcher(text);
-        if (m.find()) {
+        // Fallback 2: first "名称：XXX" match that looks like a name (buyer appears first)
+        Matcher m = Pattern.compile("名称[:：]\\s*([^\\n]{2,40})").matcher(text);
+        while (m.find()) {
             String candidate = m.group(1).trim();
-            // Skip pure numbers, tax IDs, and dates
-            if (!candidate.matches("[\\dA-Z\\-\\s]+") && candidate.length() >= 2) {
+            // Skip pure numbers, tax IDs, dates, and seller-context matches
+            if (!candidate.matches("[\\dA-Z.,\\-\\s]+") && candidate.length() >= 2
+                    && !candidate.contains("销") && !candidate.contains("售")) {
                 return candidate;
             }
         }
