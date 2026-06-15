@@ -76,16 +76,20 @@ const columns = [
 async function fetchData() {
   loading.value = true
   try {
-    const res = await getInvoiceList({
+    const params = {
       pageNo: pageNo.value,
       pageSize: pageSize.value,
       payRecordId: filter.payRecordId,
       invoiceNo: filter.invoiceNo || undefined,
       verifyStatus: filter.verifyStatus,
-    })
+    }
+    console.log('[fetchData] calling getInvoiceList with:', params)
+    const res = await getInvoiceList(params)
+    console.log('[fetchData] response:', res)
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (err) {
+    console.error('[fetchData] error:', err)
     tableData.value = []
     total.value = 0
     message.error('加载发票列表失败，请稍后重试')
@@ -104,6 +108,7 @@ async function fetchPayRecords() {
 }
 
 function handleSearch() {
+  console.log('[handleSearch] clicked, filter:', JSON.parse(JSON.stringify(filter)))
   pageNo.value = 1
   fetchData()
 }
