@@ -2,10 +2,6 @@ server:
   port: 8080
   servlet:
     context-path: /api
-    encoding:
-      charset: UTF-8
-      enabled: true
-      force: true
 
 spring:
   application:
