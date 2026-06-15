@@ -413,7 +413,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
 ### Wave 2 — 综合分析
 
-- [ ] 7. **综合分析 — 去重、分级、依赖映射**
+- [x] 7. **综合分析 — 去重、分级、依赖映射**
 
   **What to do**:
   - 收集 6 份审查报告（review-1 至 review-6）
@@ -443,8 +443,597 @@ Wave 4（最终门禁 — 4 路并行）:
 
 ### Wave 3 — TDD 修复（综合报告完成后追加）
 
-> **Task 8-N 将在 Task 7 综合分析完成后按 P0/P1 优先顺序追加。**
-> 此波次结构待定，取决于审查发现的具体问题。
+> **综合报告**: `.sisyphus/evidence/synthesis-report.md`（2026-06-15）
+> **P0 发现**: 3（2 Frontend, 1 Backend）
+> **P1 发现**: 14（5 Backend, 4 Frontend, 3 Infra/Deploy, 2 Business）
+> **修复任务**: T8–T21（14 个任务，按依赖关系分 4 波次）
+
+#### Wave 3-A: P0 修复（3 个任务，全部可并行）
+
+- [ ] 8. **修复结算 TOCTOU 竞态条件（P0）**
+
+  **Synthesis IDs**: S-P0-03 (D5-001), S-P1-12 (D5-002)
+  **What to do**:
+  - 创建 Flyway V52 迁移: `ALTER TABLE stl_settlement ADD CONSTRAINT uk_stl_tenant_contract UNIQUE (tenant_id, contract_id)`
+  - 在 `StlSettlementService.create()` 中包装 insert 为 try-catch `DuplicateKeyException` → 抛出 `BusinessException("STL_DUPLICATE_SETTLEMENT")`
+  - 在编码生成逻辑中添加重试循环：catch `DuplicateKeyException` on `uk_stl_settlement_code`，重新计算序列号，最多重试 3 次
+  - 编写集成测试：2 个并发 POST 对同一个 contractId → 一个成功（201），一个失败（409 BusinessException）
+  - 验证：`./mvnw test -Dtest=StlSettlementServiceTest` 通过
+
+  **Must NOT do**:
+  - 不修改 V1–V51 中任何已有迁移脚本
+  - 不删除已有的 `uk_stl_settlement_code` 约束
+  - 不在无 Flyway 迁移的情况下修改服务代码（DB 约束必须先存在）
+
+  **Recommended Agent Profile**: `deep`
+  **Parallelization**: Wave 3-A | Blocks: T19 | Blocked By: none
+  **References**:
+  - `backend/src/main/java/com/cgcpms/settlement/service/StlSettlementService.java:162-188`
+  - `backend/src/main/resources/db/migration/V12__init_phase2_tables.sql` (uk_stl_settlement_code)
+  - `backend/src/main/resources/db/migration-h2/V12__init_phase2_tables.sql` (H2 同步)
+
+  **QA Scenarios**:
+  ```
+  Scenario: 同一 contractId 的并发结算只创建一个
+    Tool: Bash (JUnit + curl)
+    Steps:
+      1. 编写 integration test: 2 threads 同时 POST /settlements，contractId 相同
+      2. 验证：一个返回 201，一个返回 BusinessException
+    Expected Result: 无重复结算记录
+    Evidence: .sisyphus/evidence/task-8-settlement-race.txt
+
+  Scenario: 编码生成在并发场景下无 500 错误
+    Tool: Bash (JUnit)
+    Steps:
+      1. 编写 test: 高并发创建结算（10 线程同时）
+      2. 验证：所有创建成功或返回 BusinessException，无 500
+    Expected Result: 零 500 错误
+    Evidence: .sisyphus/evidence/task-8-code-gen.txt
+  ```
+
+  **Commit**: YES — `fix(settlement): add DB unique constraint and DuplicateKeyException handling for contractId TOCTOU race`
+
+- [ ] 9. **修复 system/data 页面 API 模块绕过（P0）**
+
+  **Synthesis ID**: S-P0-01 (D3-001)
+  **What to do**:
+  - 在 `api/modules/system.ts` 中创建 `clearDatabase()` 方法（如果文件不存在则创建）
+  - 方法签名: `export function clearDatabase() { return request<void>({ url: '/system/clear-database', method: 'delete' }) }`
+  - 在 `pages/system/data/index.vue` 中移除 `import service from '@/api/request'`
+  - 替换为 `import { clearDatabase } from '@/api/modules/system'`
+  - 修改 `handleClearDatabase()`: 移除 `: any`，直接使用返回值（拦截器已解包 data）
+  - 验证: `pnpm build` 零 TypeScript 错误
+
+  **Must NOT do**:
+  - 不修改 `api/request.ts` 拦截器逻辑
+  - 不修改 `/system/clear-database` 后端端点
+  - 不添加新的 API 方法到 `system.ts`（仅 clearDatabase）
+
+  **Recommended Agent Profile**: `visual-engineering`
+  **Parallelization**: Wave 3-A | Blocks: T21 | Blocked By: none
+  **References**:
+  - `frontend-admin/src/pages/system/data/index.vue:4,19`
+  - `frontend-admin/src/api/modules/system.ts`（参考其他 API 模块的模式）
+  - `frontend-admin/src/api/request.ts`
+
+  **QA Scenarios**:
+  ```
+  Scenario: 清除数据库功能使用 API 模块
+    Tool: Bash (grep)
+    Steps:
+      1. grep "from '@/api/request'" pages/system/data/index.vue → 0 匹配
+      2. grep "clearDatabase" pages/system/data/index.vue → 1 导入匹配
+    Expected Result: 无直接 request/service 导入
+    Evidence: .sisyphus/evidence/task-9-api-module.txt
+
+  Scenario: TypeScript 构建零错误
+    Tool: Bash
+    Steps:
+      1. cd frontend-admin && pnpm build
+    Expected Result: 构建成功，零 TS 错误
+    Evidence: .sisyphus/evidence/task-9-build.txt
+  ```
+
+  **Commit**: YES — `fix(frontend): replace raw axios import with API module in system/data page`
+
+- [ ] 10. **修复 profile 页面 API 模块绕过（P0）**
+
+  **Synthesis ID**: S-P0-02 (D3-002)
+  **What to do**:
+  - 在 `api/modules/user.ts` 中创建两个方法（如果文件不存在则创建）:
+    - `updateProfile(data: Partial<UserInfo>)` → `PUT /profile`
+    - `changePassword(data: { oldPassword: string; newPassword: string })` → `PUT /profile/password`
+  - 在 `pages/profile/index.vue` 中移除 `import { request } from '@/api/request'`
+  - 替换为 `import { updateProfile, changePassword } from '@/api/modules/user'`
+  - 修改 `handleProfileSave()` 和 `handlePasswordChange()` 使用新的 API 模块方法
+  - 验证: `pnpm build` 零 TypeScript 错误
+
+  **Must NOT do**:
+  - 不修改 profile 页面的 UI 或业务逻辑
+  - 不修改后端 `/profile` 或 `/profile/password` 端点
+
+  **Recommended Agent Profile**: `visual-engineering`
+  **Parallelization**: Wave 3-A | Blocks: T21 | Blocked By: none
+  **References**:
+  - `frontend-admin/src/pages/profile/index.vue:5,33,67`
+  - `frontend-admin/src/api/modules/user.ts`（参考其他 API 模块的模式）
+
+  **QA Scenarios**:
+  ```
+  Scenario: Profile 页面使用 API 模块
+    Tool: Bash (grep)
+    Steps:
+      1. grep "from '@/api/request'" pages/profile/index.vue → 0 匹配
+      2. grep "updateProfile\|changePassword" pages/profile/index.vue → API 模块导入
+    Expected Result: 无直接 request 导入
+    Evidence: .sisyphus/evidence/task-10-api-module.txt
+
+  Scenario: 前端构建通过
+    Tool: Bash
+    Steps:
+      1. cd frontend-admin && pnpm build
+    Expected Result: 构建成功
+    Evidence: .sisyphus/evidence/task-10-build.txt
+  ```
+
+  **Commit**: YES — `fix(frontend): replace direct request import with API module in profile page`
+
+#### Wave 3-B: P1 独立修复（6 个任务，全部可并行）
+
+- [ ] 11. **修复 deploy/.env 安全问题（P1）**
+
+  **Synthesis IDs**: S-P1-01 (D1-001), S-P1-11 (D4-015)
+  **What to do**:
+  - 在 `deploy/.env.example` 中：将所有 `${VAR_NAME}` 自引用占位符替换为明确的"请修改"占位符:
+    - `MYSQL_ROOT_PASSWORD=CHANGE-ME-ROOT-PASSWORD`
+    - `MYSQL_PASSWORD=CHANGE-ME-CGC-PASSWORD`
+    - `REDIS_PASSWORD=CHANGE-ME-REDIS-PASSWORD`
+    - `JWT_SECRET=CHANGE-ME-JWT-SECRET-MIN-32-CHARS`
+    - `MINIO_ROOT_PASSWORD=CHANGE-ME-MINIO-PASSWORD`
+  - 同样替换 `MINIO_ROOT_USER` 为 `CHANGE-ME-MINIO-USER`（覆盖 D1-015 P3）
+  - 在 `.gitignore` 中验证 `deploy/.env` 已存在且生效
+  - 在 `deploy/.env.example` 顶部添加注释块，说明如何使用（"复制为 .env 并填入真实值"）
+  - 验证: `docker compose config` 不再输出空凭据（如果 .env 存在）
+
+  **Must NOT do**:
+  - 不提交真实的 `deploy/.env`（确认 gitignore 生效）
+  - 不修改 docker-compose 文件的环境变量结构
+
+  **Recommended Agent Profile**: `quick`
+  **Parallelization**: Wave 3-B | Blocks: none | Blocked By: none
+  **References**:
+  - `deploy/.env.example:3,6,8,12,16,17`
+  - `deploy/.gitignore`
+
+  **QA Scenarios**:
+  ```
+  Scenario: .env.example 无自引用占位符
+    Tool: Bash
+    Steps:
+      1. grep '\${[A-Z_]*}' deploy/.env.example → 0 匹配
+    Expected Result: 所有变量有明确的占位符值
+    Evidence: .sisyphus/evidence/task-11-env-template.txt
+
+  Scenario: deploy/.env 被 gitignore 忽略
+    Tool: Bash
+    Steps:
+      1. git check-ignore deploy/.env → 确认忽略
+    Expected Result: deploy/.env 被排除在 git 跟踪之外
+    Evidence: .sisyphus/evidence/task-11-gitignore.txt
+  ```
+
+  **Commit**: YES — `fix(security): replace self-referencing placeholders in deploy/.env.example with explicit defaults`
+
+- [ ] 12. **修复 backend/Dockerfile 安全加固（P1）**
+
+  **Synthesis IDs**: S-P1-02 (D1-002 + D1-010), S-P1-10 (D4-007 + D1-009)
+  **What to do**:
+  - 在 `backend/Dockerfile` 中：将空 ENV 默认值替换为哨兵值:
+    - `ENV JWT_SECRET=__MUST_OVERRIDE_IN_PRODUCTION__`
+    - `ENV DB_PASSWORD=__MUST_OVERRIDE_IN_PRODUCTION__`
+    - `ENV SPRING_DATA_REDIS_PASSWORD=__MUST_OVERRIDE_IN_PRODUCTION__`
+    - `ENV MINIO_SECRET_KEY=__MUST_OVERRIDE_IN_PRODUCTION__`
+  - 移除 Dockerfile 中的硬编码 `SPRING_DATASOURCE_URL`（使用 compose 注入）
+  - 将所有 Docker 配置中的 `useSSL=false` 替换为 `useSSL=${DB_USE_SSL:-true}`:
+    - `deploy/docker-compose.prod.yml:133`
+    - `deploy/docker-compose.dev.yml:117`
+  - 在后端添加 `@PostConstruct` 启动验证：如果任何 secret 仍为哨兵值则启动失败
+  - 验证: `docker compose config` 显示正确的 URL 模板
+
+  **Must NOT do**:
+  - 不删除 Dockerfile 中的 ENV 声明（compose 需要它们作为可覆盖的默认值）
+  - 不修改 `application-prod.yml` 中的 `useSSL=true` 默认值
+
+  **Recommended Agent Profile**: `quick`
+  **Parallelization**: Wave 3-B | Blocks: none | Blocked By: none
+  **References**:
+  - `backend/Dockerfile:54-75`
+  - `deploy/docker-compose.prod.yml:132-133`
+  - `deploy/docker-compose.dev.yml:117`
+  - `backend/src/main/resources/application-prod.yml` (useSSL=true)
+
+  **QA Scenarios**:
+  ```
+  Scenario: Dockerfile 无空凭据
+    Tool: Bash
+    Steps:
+      1. grep 'ENV.*=""' backend/Dockerfile → 0 匹配（排除空默认值）
+      2. grep '__MUST_OVERRIDE' backend/Dockerfile → ≥4 匹配
+    Expected Result: 所有 secret ENV 使用哨兵值
+    Evidence: .sisyphus/evidence/task-12-dockerfile.txt
+
+  Scenario: useSSL 可通过环境变量配置
+    Tool: Bash
+    Steps:
+      1. grep 'useSSL=' deploy/docker-compose.prod.yml → 包含 ${DB_USE_SSL:-true}
+      2. grep 'useSSL=false' deploy/docker-compose.prod.yml → 0 匹配（无硬编码 false）
+    Expected Result: useSSL 参数化
+    Evidence: .sisyphus/evidence/task-12-useSSL.txt
+  ```
+
+  **Commit**: YES — `fix(security): harden backend Dockerfile with sentinel defaults and parameterized useSSL`
+
+- [ ] 13. **修复 nginx 安全头配置（P1）**
+
+  **Synthesis ID**: S-P1-03 (D1-003)
+  **What to do**:
+  - 在 `frontend-admin/nginx.conf` 的 HTTPS server block 中：
+    - 取消注释第 107 行的 `add_header Strict-Transport-Security "max-age=31536000" always;`
+    - 添加 `max-age=31536000; includeSubDomains; preload` 以获得更全面的 HSTS
+  - 将 HTTP server block 替换为 HTTPS 永久重定向：
+    - 移除所有现有 HTTP block 内容（location blocks, root, index）
+    - 替换为单个: `return 301 https://$host$request_uri;`
+  - 在 HTTPS block 中添加 Content-Security-Policy header:
+    - `add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'" always;`
+  - 验证: `docker compose -f docker-compose.prod.yml config` 显示正确的重定向
+
+  **Must NOT do**:
+  - 不移除现有的安全头（X-Frame-Options, X-Content-Type-Options 等）
+  - 不修改 SSE proxy_buffering 配置（已确认正确）
+  - 不修改 upstream 或 location 代理规则
+
+  **Recommended Agent Profile**: `quick`
+  **Parallelization**: Wave 3-B | Blocks: none | Blocked By: none
+  **References**:
+  - `frontend-admin/nginx.conf:36-80` (HTTP block), `:85-164` (HTTPS block), `:107` (注释掉的 HSTS)
+
+  **QA Scenarios**:
+  ```
+  Scenario: HTTP 端点重定向到 HTTPS
+    Tool: Bash (curl)
+    Steps:
+      1. curl -I http://localhost/ → 301 重定向 + Location: https://...
+    Expected Result: 301 状态码
+    Evidence: .sisyphus/evidence/task-13-redirect.txt
+
+  Scenario: HTTPS 端点包含安全头
+    Tool: Bash (curl)
+    Steps:
+      1. curl -I https://localhost/ 2>/dev/null（或检查 nginx 配置）
+      2. 验证 Strict-Transport-Security 和 Content-Security-Policy header
+    Expected Result: HSTS + CSP header 存在
+    Evidence: .sisyphus/evidence/task-13-headers.txt
+  ```
+
+  **Commit**: YES — `fix(security): enable HSTS, HTTP-to-HTTPS redirect, and Content-Security-Policy in nginx`
+
+- [ ] 14. **为登录/刷新端点添加速率限制（P1）**
+
+  **Synthesis ID**: S-P1-04 (D1-004)
+  **What to do**:
+  - 为 `/auth/login` 和 `/auth/refresh` 添加基于 Redis 的速率限制
+  - 策略：每个 IP + 用户名组合每分钟最多 5 次尝试
+  - 使用现有 Redis 基础设施（`RedisTemplate`）实现计数器
+  - 创建 `RateLimitFilter` 或自定义注解 `@RateLimit(maxAttempts=5, windowSeconds=60)` 应用于 AuthController 方法
+  - 超过限制时返回 429（Too Many Requests）
+  - 编写测试：5 次失败登录 → 第 6 次返回 429
+  - 考虑：N 次失败后账户锁定（Redis TTL 15 分钟）—— 可选增强
+
+  **Must NOT do**:
+  - 不引入重量级库（如 Bucket4j、Resilience4j）—— 使用现有 Redis
+  - 不修改 JWT token 生成或验证逻辑
+
+  **Recommended Agent Profile**: `deep`
+  **Parallelization**: Wave 3-B | Blocks: none | Blocked By: none
+  **References**:
+  - `backend/src/main/java/com/cgcpms/auth/controller/AuthController.java:42,79`
+  - `backend/src/main/java/com/cgcpms/auth/config/SecurityConfig.java`
+  - 用于速率限制的现有 Redis 基础设施
+
+  **QA Scenarios**:
+  ```
+  Scenario: 速率限制在 N 次尝试后触发
+    Tool: Bash (curl)
+    Steps:
+      1. 快速发送 6 次 POST /auth/login，使用错误的密码
+      2. 第 6 次: 429 状态码
+    Expected Result: 前 5 次返回 401，第 6 次返回 429
+    Evidence: .sisyphus/evidence/task-14-rate-limit.txt
+
+  Scenario: 速率限制窗口过期后重置
+    Tool: Bash (JUnit)
+    Steps:
+      1. 触发速率限制 → 等待 61 秒 → 重试 → 应允许
+    Expected Result: 窗口过期后计数器重置
+    Evidence: .sisyphus/evidence/task-14-rate-window.txt
+  ```
+
+  **Commit**: YES — `fix(security): add Redis-based rate limiting to auth login and refresh endpoints`
+
+- [ ] 15. **修复 InvoiceService 空 catch 块（P1）**
+
+  **Synthesis ID**: S-P1-06 (D2-002)
+  **What to do**:
+  - 在 `InvoiceService.java:210` 中：将 `catch (Exception ignored) { // ignore close errors }` 替换为:
+    ```java
+    catch (Exception e) {
+        log.debug("Failed to close PDF document", e);
+    }
+    ```
+  - 验证：`./mvnw test` 全部通过（0 回归）
+  - 同时检查代码库中是否还有其他无日志的 catch 块（D6 已确认 0 个，但请验证）
+
+  **Must NOT do**:
+  - 不改变 PDF 生成逻辑或资源管理流程
+  - 不将日志级别提升至 warn/error（close 失败不算错误）
+
+  **Recommended Agent Profile**: `quick`
+  **Parallelization**: Wave 3-B | Blocks: none | Blocked By: none
+  **References**:
+  - `backend/src/main/java/com/cgcpms/invoice/service/InvoiceService.java:210`
+
+  **QA Scenarios**:
+  ```
+  Scenario: Catch 块包含日志
+    Tool: Bash (grep)
+    Steps:
+      1. grep -A2 "catch.*ignored" InvoiceService.java → 0 匹配（变量重命名）
+      2. grep -A2 "catch.*Exception.*close" InvoiceService.java → 包含 log.debug
+    Expected Result: 无被忽略的异常，所有 catch 块均包含日志
+    Evidence: .sisyphus/evidence/task-15-empty-catch.txt
+  ```
+
+  **Commit**: YES — `fix(backend): add logging to empty catch block in InvoiceService PDF close`
+
+- [ ] 16. **填充 CostItem taxAmount/amountWithoutTax 字段（P1）**
+
+  **Synthesis ID**: S-P1-14 (D5-004)
+  **What to do**:
+  - 在 `MaterialReceiptCostStrategy.java`、`SubMeasureCostStrategy.java`、`VarOrderCostStrategy.java` 中：
+    - 如果源实体包含税务数据：填充 `cost.setTaxAmount(...)` 和 `cost.setAmountWithoutTax(...)`
+    - 如果源实体不包含税务数据：显式设置 `cost.setTaxAmount(BigDecimal.ZERO)` 和 `cost.setAmountWithoutTax(cost.getAmount())`（默认无税）
+  - 如果不确定税务数据可用性：将 `amountWithoutTax` 默认设置为 `amount`（即，假设全款未税），将 `taxAmount` 设置为 0，并在代码注释中说明
+  - 编写测试：验证所有 4 个策略生成的 CostItem 的 taxAmount 和 amountWithoutTax 均不为 null
+  - 验证：`./mvnw test -Dtest=CostStrategyTest` 通过
+
+  **Must NOT do**:
+  - 不修改 `ContractCostStrategy`（已正确填充税务字段）
+  - 不向没有税务数据的源实体添加税务字段
+  - 不改变成本科目解析逻辑
+
+  **Recommended Agent Profile**: `deep`
+  **Parallelization**: Wave 3-B | Blocks: none | Blocked By: none
+  **References**:
+  - `backend/src/main/java/com/cgcpms/cost/strategy/MaterialReceiptCostStrategy.java:78`
+  - `backend/src/main/java/com/cgcpms/cost/strategy/SubMeasureCostStrategy.java`
+  - `backend/src/main/java/com/cgcpms/cost/strategy/VarOrderCostStrategy.java`
+  - `backend/src/main/java/com/cgcpms/cost/strategy/ContractCostStrategy.java`（参考实现）
+  - `backend/src/main/java/com/cgcpms/cost/entity/CostItem.java`（taxAmount、amountWithoutTax 字段）
+
+  **QA Scenarios**:
+  ```
+  Scenario: 所有策略均填充税务字段
+    Tool: Bash (JUnit)
+    Steps:
+      1. 测试: 对每种策略，创建 CostItem 并断言 taxAmount != null 且 amountWithoutTax != null
+    Expected Result: 所有策略生成的税务字段均非空
+    Evidence: .sisyphus/evidence/task-16-tax-fields.txt
+
+  Scenario: 回归测试通过
+    Tool: Bash
+    Steps:
+      1. ./mvnw test → 全部通过
+    Expected Result: 零回归
+    Evidence: .sisyphus/evidence/task-16-test-pass.txt
+  ```
+
+  **Commit**: YES — `fix(cost): populate taxAmount and amountWithoutTax in MaterialReceipt, SubMeasure, and VarOrder cost strategies`
+
+#### Wave 3-C: P1 顺序修复（3 个任务，部分并行）
+
+- [ ] 17. **修复 PayApplicationService N+1 查询（P1）**
+
+  **Synthesis ID**: S-P1-05 (D2-001 + D2-004)
+  **What to do**:
+  - 重构 `PayApplicationService.getById()` 使用批量预取模式（类似现已生效的 `getPage()` 方法）:
+    - 收集 projectId、contractId、partnerId
+    - 使用 `selectBatchIds()` 批量查询
+    - 构建查找 Map
+    - 调用 batch toVO 重载方法
+  - 将单参数 `toVO(PayApplication)` 方法标记为 `@Deprecated` 或设置为 private
+  - 编写测试：`GET /pay-applications/{id}` 仅执行 1 次 DB 查询（非 4 次）
+  - 验证：`./mvnw test` 通过
+
+  **Must NOT do**:
+  - 不删除单参数 toVO 重载（用于向后兼容，仅标记为 deprecated）
+  - 不改变 getPage()（已针对 N+1 优化）
+
+  **Recommended Agent Profile**: `deep`
+  **Parallelization**: Wave 3-C | Blocks: T18 | Blocked By: none
+  **References**:
+  - `backend/src/main/java/com/cgcpms/payment/service/PayApplicationService.java:139,471-483`
+  - `backend/src/main/java/com/cgcpms/payment/service/PayApplicationService.java:97`（getPage 批量模式 — 参考）
+
+  **QA Scenarios**:
+  ```
+  Scenario: getById 无 N+1 查询
+    Tool: Bash (JUnit + SQL 日志)
+    Steps:
+      1. 开启 SQL 日志 → GET /pay-applications/{id}
+      2. 统计 SELECT 语句数量 → 应 ≤2（1 次查询 application + 1 次批量查询关联表）
+    Expected Result: ≤2 次 DB 查询（非 4 次）
+    Evidence: .sisyphus/evidence/task-17-nplus1.txt
+  ```
+
+  **Commit**: YES — `fix(payment): fix N+1 queries in PayApplicationService.getById by using batch pre-fetch`
+
+- [ ] 18. **为所有只读服务方法添加 @Transactional(readOnly=true)（P1）**
+
+  **Synthesis ID**: S-P1-07 (D2-003)
+  **What to do**:
+  - 审计所有 42+ 服务文件：分类方法为只读（getPage、getById、list、query、search）或写入（create、update、delete、submit、approve）
+  - 在类级别已有 `@Transactional` 的服务中：在只读方法上添加 `@Transactional(readOnly = true)`
+  - 在无类级别 `@Transactional` 但包含只读方法的服务中：添加方法级 `@Transactional(readOnly = true)`
+  - 不要覆盖写入方法上的 `@Transactional(rollbackFor = Exception.class)`（策略类已正确设置）
+  - 验证：`./mvnw test` 全部通过（≥174 用例）
+
+  **Must NOT do**:
+  - 不将 `readOnly=true` 应用于写入方法
+  - 不移除方法上已有的 `@Transactional` 注解
+  - 不在本任务中重构任何业务逻辑
+
+  **Recommended Agent Profile**: `deep`
+  **Parallelization**: Wave 3-C | Blocks: none | Blocked By: T17（同一文件，避免冲突）
+  **References**:
+  - 所有 42+ 服务文件（`**/service/*Service.java`）
+  - `backend/src/main/java/com/cgcpms/payment/service/PayApplicationService.java`（T17 中已修改 — 在此之后修改）
+
+  **QA Scenarios**:
+  ```
+  Scenario: 所有服务中的只读方法均有 readOnly=true
+    Tool: Bash (grep)
+    Steps:
+      1. 对每个服务文件，手动检查只读方法是否有 @Transactional(readOnly=true)
+      2. 抽查具体服务：DashboardService、CostSummaryService、WorkflowQueryService
+    Expected Result: 主要查询方法有 readOnly=true
+    Evidence: .sisyphus/evidence/task-18-readonly.txt
+
+  Scenario: 回归测试通过
+    Tool: Bash
+    Steps:
+      1. ./mvnw test → 全部通过
+    Expected Result: ≥174 用例通过
+    Evidence: .sisyphus/evidence/task-18-test-pass.txt
+  ```
+
+  **Commit**: YES — `perf(backend): add @Transactional(readOnly=true) to all read-only service methods`
+
+- [ ] 19. **修复结算完成时的乐观锁缺失问题（P1）**
+
+  **Synthesis ID**: S-P1-13 (D5-003)
+  **What to do**:
+  - 在 `SettlementWorkflowHandler.onApproved()` 中（第 106-110 行）:
+    - 在 `LambdaUpdateWrapper` 上添加 `.eq(StlSettlement::getSettlementStatus, "DRAFT")` 守卫
+    - 检查受影响行数：如果 `updated == 0`，记录警告并返回（最终状态可能已被另一个并发审批设置）
+  - 或者：向 `StlSettlement` 实体添加 `@Version` 字段，并使用 `updateById()` 携带版本号
+  - 编写测试：验证并发审批不会导致状态覆盖
+  - 验证：`./mvnw test -Dtest=SettlementWorkflowHandlerTest` 通过
+
+  **Must NOT do**:
+  - 不修改工作流引擎的核心审批逻辑（WorkflowCoreService、WorkflowApprovalService）
+  - 不改变 `isCritical()` 行为（当前所有 handler 返回 true）
+
+  **Recommended Agent Profile**: `deep`
+  **Parallelization**: Wave 3-C | Blocks: none | Blocked By: T8（同一结算模块 — 在 T8 修复之后）
+  **References**:
+  - `backend/src/main/java/com/cgcpms/settlement/handler/SettlementWorkflowHandler.java:106-118`
+  - `backend/src/main/java/com/cgcpms/settlement/entity/StlSettlement.java`（当前无 @Version）
+  - `backend/src/main/java/com/cgcpms/workflow/entity/WfTask.java:40-41`（@Version 参考实现）
+
+  **QA Scenarios**:
+  ```
+  Scenario: 并发审批不覆盖状态
+    Tool: Bash (JUnit)
+    Steps:
+      1. 测试: 2 个线程同时调用 onApproved()
+      2. 验证: 只执行一次完成操作
+    Expected Result: 第二次 update 返回 0 行，记录警告日志
+    Evidence: .sisyphus/evidence/task-19-lock.txt
+  ```
+
+  **Commit**: YES — `fix(settlement): add optimistic lock guard to SettlementWorkflowHandler.onApproved() finalization`
+
+#### Wave 3-D: P1 前端顺序修复（2 个任务，顺序执行）
+
+- [ ] 20. **替换 catch (e: any) 为 catch (e: unknown)（P1）**
+
+  **Synthesis ID**: S-P1-09 (D3-004 + D3-005)
+  **What to do**:
+  - 在 `pages/invoice/index.vue:265` 中：将 `catch (error: any)` 替换为 `catch (e: unknown)`，使用安全属性访问或 `instanceof` 检查
+  - 在 `pages/invoice/index.vue:322` 中：将 `catch (error: any)` 替换为 `catch (e: unknown)`，使用 `axios.isCancel(e)` 守卫
+  - 在 `pages/system/users/index.vue:131` 中：将 `catch (err: any)` 替换为 `catch (e: unknown)`，使用安全属性访问
+  - 验证：`pnpm lint` — `@typescript-eslint/no-explicit-any` 错误减少 ≥3 条
+  - 验证：`pnpm build` 零 TS 错误
+
+  **Must NOT do**:
+  - 不删除 catch 块本身（仅替换类型注解）
+  - 不改变 catch 块内的任何业务/UI 逻辑
+
+  **Recommended Agent Profile**: `visual-engineering`
+  **Parallelization**: Wave 3-D | Blocks: none | Blocked By: T9, T10（P0 前端修复；避免冲突）
+  **References**:
+  - `frontend-admin/src/pages/invoice/index.vue:265,322`
+  - `frontend-admin/src/pages/system/users/index.vue:131`
+
+  **QA Scenarios**:
+  ```
+  Scenario: 无 catch (e: any) 残留
+    Tool: Bash (grep)
+    Steps:
+      1. grep -rn "catch.*:\s*any" pages/ → 0 匹配
+    Expected Result: 所有 catch any 均已替换为 unknown
+    Evidence: .sisyphus/evidence/task-20-catch-any.txt
+
+  Scenario: 前端构建通过
+    Tool: Bash
+    Steps:
+      1. cd frontend-admin && pnpm build && pnpm lint
+    Expected Result: 构建成功，ESLint any 错误减少
+    Evidence: .sisyphus/evidence/task-20-build.txt
+  ```
+
+  **Commit**: YES — `fix(frontend): replace catch (e: any) with catch (e: unknown) in invoice and users pages`
+
+- [ ] 21. **修复 122 个无参数 catch 块（P1）**
+
+  **Synthesis ID**: S-P1-08 (D3-003)
+  **What to do**:
+  - 在所有 37 个文件、共 122 个 `} catch {` 实例中替换为 `} catch (e: unknown) {`
+  - 添加最小日志：`if (import.meta.env.DEV) console.error('ContextName:', e)`
+  - 对于面向用户的错误：回退到 `message.error('操作失败')` 或等效提示
+  - 优先处理最严重的文件（9 个 error context 丢失的 org/index.vue，8 个 payment/index.vue，8 个 stores/contract.ts，等等）
+  - 验证：`pnpm build` 零 TS 错误
+  - 验证：`pnpm lint` — 与基线相比无新增错误
+
+  **Must NOT do**:
+  - 不删除 catch 块或改变恢复逻辑（仅添加 error 参数 + 最小日志）
+  - 不在本任务中触及 catch (e: any) 实例（T20 负责处理）
+  - 不在无用户影响的情况下添加 `message.error()`（避免向用户发送垃圾错误信息）
+
+  **Recommended Agent Profile**: `visual-engineering`
+  **Parallelization**: Wave 3-D | Blocks: none | Blocked By: T9, T10, T20（最后执行的前端修复 — 影响范围最大）
+  **References**:
+  - 37 个文件，共 122 个实例（完整列表见 `review-3-frontend-api.md` 第 74-87 行）
+  - 最严重文件：`pages/org/index.vue` (9), `pages/payment/index.vue` (8), `stores/contract.ts` (8), `pages/invoice/index.vue` (6), `pages/system/dict/index.vue` (6)
+
+  **QA Scenarios**:
+  ```
+  Scenario: 无无参数 catch 块残留
+    Tool: Bash (grep)
+    Steps:
+      1. grep -rn "}\s*catch\s*{" src/ → 0 匹配
+    Expected Result: 所有 catch 块均有 error parameter
+    Evidence: .sisyphus/evidence/task-21-no-empty-catch.txt
+
+  Scenario: 前端构建通过，无新增 lint 错误
+    Tool: Bash
+    Steps:
+      1. cd frontend-admin && pnpm build && pnpm lint
+    Expected Result: 构建成功，lint 错误 ≤ T20 后的基线
+    Evidence: .sisyphus/evidence/task-21-build.txt
+  ```
+
+  **Commit**: YES — `fix(frontend): add error parameter to 122 empty catch blocks across 37 files`
 
 ---
 

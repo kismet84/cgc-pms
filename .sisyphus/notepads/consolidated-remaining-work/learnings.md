@@ -172,3 +172,49 @@
 
 ### No Issues Found
 No regressions, no new warnings, no new empty catch blocks, no new @SuppressWarnings. All fixes are stable.
+
+## Wave 2 Synthesis (2026-06-15)
+
+### Synthesis Summary
+- Collected all 6 review reports from `.sisyphus/evidence/review-*.md`
+- Cross-referenced 73 raw findings → deduplicated to 67 consolidated (6 merges)
+- Graded: **3 P0**, **14 P1**, **25 P2**, **28 P3**
+- Produced `.sisyphus/evidence/synthesis-report.md` (complete consolidation)
+- Appended 14 fix tasks (T8–T21) to `.sisyphus/plans/consolidated-remaining-work.md`
+
+### Deduplication Decisions
+- **M1** D1-009(P2) + D4-007(P1): Merged → P1. Empty Dockerfile secrets. D4's P1 justified (empty JWT_SECRET = critical vuln).
+- **M2** D1-002(P1) + D1-010(P2): Merged → P1. useSSL=false across all Docker configs. Super/subset relationship.
+- **M3** D2-001(P1) + D2-004(P1): Merged → P1. N+1 symptom vs root cause (wrong toVO overload). Same file, same fix.
+- **M4** D3-004(P1) + D3-005(P1): Merged → P1. catch (e: any) anti-pattern in 2 files.
+- **M5** D5-001(P0) + D5-002(P1): Kept separate. Same method but different races (contractId vs code generation).
+- **M6** D1-001(P1) + D4-015(P1): Kept separate. .env.example vs .env plaintext — different files, different concerns.
+
+### Key Design Decisions
+1. **P0 settlement fix (T8) merges S-P1-12**: The code sequence TOCTOU is in the same method as the contractId TOCTOU. Fixing both together avoids re-touching the file.
+2. **readOnly=true (T18) goes LAST among backend P1s**: Touches 42+ files. Any earlier task touching a service file would conflict.
+3. **122 catch blocks (T21) goes LAST among frontend fixes**: 37 files, massive blast radius. Must run after P0 frontend fixes (T9, T10) and catch-any fix (T20).
+4. **Rate limiting (T14) uses Redis only**: Avoids introducing Bucket4j/Resilience4j dependencies. Redis already in stack.
+5. **Nginx task (T13) includes CSP**: D1-011 (CSP P2) is rolled into the nginx security task because it's the same file and small scope.
+
+### Dependency Map Insights
+- T8 (settlement) blocks T19 (settlement lock) — same module
+- T17 (N+1) blocks T18 (readOnly) — both touch PayApplicationService.java
+- T9/T10 (P0 frontend) block T21 (122 catches) — P0 files are in the 37-file set
+- T11–T16 (Wave 3-B) are all independent — max parallelism
+- T17 and T19 can run in parallel (different modules: payment vs settlement)
+
+### P2/P3 Catalogue
+- 25 P2 items catalogued across Security(7), Backend(5), Frontend(4), Infra(7), Business(2)
+- 28 P3 items catalogued across all dimensions
+- No fix tasks created for P2/P3 per plan rules
+
+### Plan Template Adherence
+- Each T8-T21 task follows the plan template: What to do, Must NOT do, Agent Profile, Parallelization, References, QA Scenarios, Commit message
+- All tasks marked with `- [ ]` checkbox status
+- Wave substructure (3-A through 3-D) matches dependency graph
+
+### Files Modified
+- `.sisyphus/evidence/synthesis-report.md` (overwritten — new consolidation from 2026-06-15 reviews)
+- `.sisyphus/plans/consolidated-remaining-work.md` (appended T8–T21 under Wave 3)
+- `.sisyphus/notepads/consolidated-remaining-work/learnings.md` (this entry appended)
