@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import axios from 'axios'
 import {
   getUserList,
   createUser,
@@ -128,8 +129,12 @@ async function handleModalOk() {
     }
     modalVisible.value = false
     fetchData()
-  } catch (err: any) {
-    const msg = err?.response?.data?.message || err?.message || ''
+  } catch (e: unknown) {
+    const msg = axios.isAxiosError(e)
+      ? (e.response?.data as { message?: string })?.message || e.message
+      : e instanceof Error
+        ? e.message
+        : ''
     if (msg.includes('已存在') || msg.includes('duplicate')) {
       message.error('用户名已存在')
     } else {
@@ -189,7 +194,9 @@ onMounted(fetchData)
 <template>
   <div>
     <!-- Filter -->
-    <div style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; align-items: center">
+    <div
+      style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; align-items: center"
+    >
       <a-input
         v-model:value="filter.username"
         placeholder="用户名"
@@ -263,7 +270,11 @@ onMounted(fetchData)
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
         <a-form-item label="用户名" required>
-          <a-input v-model:value="formData.username" placeholder="请输入用户名" :disabled="!!editingId" />
+          <a-input
+            v-model:value="formData.username"
+            placeholder="请输入用户名"
+            :disabled="!!editingId"
+          />
         </a-form-item>
         <a-form-item label="密码" :required="!editingId">
           <a-input-password v-model:value="formData.password" placeholder="留空则不修改密码" />

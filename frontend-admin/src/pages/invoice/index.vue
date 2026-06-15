@@ -262,8 +262,12 @@ async function handleModalOk() {
         message.warning('发票已创建，但文件上传失败。请稍后在发票详情中重新上传。')
       }
     }
-  } catch (error: any) {
-    const msg = error?.response?.data?.message || error?.message || ''
+  } catch (e: unknown) {
+    const msg = axios.isAxiosError(e)
+      ? (e.response?.data as { message?: string })?.message || e.message
+      : e instanceof Error
+        ? e.message
+        : ''
     if (msg.includes('已存在') || msg.includes('duplicate')) {
       Modal.error({ title: '操作失败', content: '发票号码已存在，同一租户下发票号码不可重复' })
     } else {
@@ -319,12 +323,14 @@ async function handleRecognize() {
     } else {
       message.warning('未识别到发票信息，请手动填写')
     }
-  } catch (error: any) {
-    if (axios.isCancel(error)) {
+  } catch (e: unknown) {
+    if (axios.isCancel(e)) {
       return
     }
-    if (error?.code === 'ECONNABORTED' || error?.message?.includes('timeout')) {
-      message.error('识别超时，请检查网络后重试')
+    if (axios.isAxiosError(e)) {
+      if (e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
+        message.error('识别超时，请检查网络后重试')
+      }
     }
   } finally {
     recognizing.value = false
@@ -401,7 +407,6 @@ onMounted(() => {
   fetchPayRecords()
   fetchData()
 })
-
 
 defineExpose({
   formData,
@@ -631,7 +636,11 @@ defineExpose({
           />
         </a-form-item>
         <a-form-item label="开票日期">
-          <a-date-picker v-model:value="formData.invoiceDate" value-format="YYYY-MM-DD" style="width: 100%" />
+          <a-date-picker
+            v-model:value="formData.invoiceDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
         </a-form-item>
         <a-form-item label="卖方名称">
           <a-input v-model:value="formData.sellerName" placeholder="请输入卖方名称" />

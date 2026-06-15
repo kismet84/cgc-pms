@@ -841,7 +841,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
 #### Wave 3-C: P1 顺序修复（3 个任务，部分并行）
 
-- [ ] 17. **修复 PayApplicationService N+1 查询（P1）**
+- [x] 17. **修复 PayApplicationService N+1 查询（P1）**
 
   **Synthesis ID**: S-P1-05 (D2-001 + D2-004)
   **What to do**:
@@ -877,7 +877,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(payment): fix N+1 queries in PayApplicationService.getById by using batch pre-fetch`
 
-- [ ] 18. **为所有只读服务方法添加 @Transactional(readOnly=true)（P1）**
+- [x] 18. **为所有只读服务方法添加 @Transactional(readOnly=true)（P1）**
 
   **Synthesis ID**: S-P1-07 (D2-003)
   **What to do**:
@@ -918,7 +918,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `perf(backend): add @Transactional(readOnly=true) to all read-only service methods`
 
-- [ ] 19. **修复结算完成时的乐观锁缺失问题（P1）**
+- [x] 19. **修复结算完成时的乐观锁缺失问题（P1）**
 
   **Synthesis ID**: S-P1-13 (D5-003)
   **What to do**:
@@ -955,7 +955,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
 #### Wave 3-D: P1 前端顺序修复（2 个任务，顺序执行）
 
-- [ ] 20. **替换 catch (e: any) 为 catch (e: unknown)（P1）**
+- [x] 20. **替换 catch (e: any) 为 catch (e: unknown)（P1）**
 
   **Synthesis ID**: S-P1-09 (D3-004 + D3-005)
   **What to do**:

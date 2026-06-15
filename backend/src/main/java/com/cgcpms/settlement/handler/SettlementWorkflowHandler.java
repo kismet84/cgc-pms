@@ -103,8 +103,10 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
         log.info("结算审批通过，锁定结算单并回写合同结算金额 settlementId={}", settlementId);
 
         // Lock settlement: FINALIZED + set finalizedAt
+        // Status guard: only finalize if still in DRAFT (prevents double-finalization via concurrent approvals)
         stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
+                .eq(StlSettlement::getSettlementStatus, "DRAFT")
                 .set(StlSettlement::getApprovalStatus, "APPROVED")
                 .set(StlSettlement::getSettlementStatus, "FINALIZED")
                 .set(StlSettlement::getFinalizedAt, LocalDateTime.now()));

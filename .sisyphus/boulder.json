@@ -16,7 +16,12 @@
     "ses_134fddf17ffeW7U3Ige38LPkkR",
     "ses_134fdb91fffeLoYSNfZEvkNIGd",
     "ses_134fda563ffe2q5TbbzQBh4vYG",
-    "ses_134fd723effe2IHa1EoNN3ET9S"
+    "ses_134fd723effe2IHa1EoNN3ET9S",
+    "ses_134fb0d57ffeLSVAW8bgjAQNVj",
+    "ses_134faf690ffeJq83Mzzp272pcp",
+    "ses_134f96767ffeqXmp2r8FXz1IHr",
+    "ses_134f9517bffeR9ytLC7FXW8vvu",
+    "ses_134f6a8bbffeEiJbftsU0HQLJA"
   ],
   "session_origins": {
     "ses_1353c29c4ffekkF4VTxO4udf7X": "direct",
@@ -33,7 +38,12 @@
     "ses_134fddf17ffeW7U3Ige38LPkkR": "appended",
     "ses_134fdb91fffeLoYSNfZEvkNIGd": "appended",
     "ses_134fda563ffe2q5TbbzQBh4vYG": "appended",
-    "ses_134fd723effe2IHa1EoNN3ET9S": "appended"
+    "ses_134fd723effe2IHa1EoNN3ET9S": "appended",
+    "ses_134fb0d57ffeLSVAW8bgjAQNVj": "appended",
+    "ses_134faf690ffeJq83Mzzp272pcp": "appended",
+    "ses_134f96767ffeqXmp2r8FXz1IHr": "appended",
+    "ses_134f9517bffeR9ytLC7FXW8vvu": "appended",
+    "ses_134f6a8bbffeEiJbftsU0HQLJA": "appended"
   },
   "plan_name": "consolidated-remaining-work",
   "agent": "atlas",
@@ -72,6 +82,33 @@
       "agent": "Sisyphus-Junior",
       "category": "deep",
       "updated_at": "2026-06-15T11:20:02.855Z"
+    },
+    "todo:17": {
+      "task_key": "todo:17",
+      "task_label": "17",
+      "task_title": "**修复 PayApplicationService N+1 查询（P1）**",
+      "session_id": "ses_134faf690ffeJq83Mzzp272pcp",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-15T11:22:45.616Z"
+    },
+    "todo:18": {
+      "task_key": "todo:18",
+      "task_label": "18",
+      "task_title": "**为所有只读服务方法添加 @Transactional(readOnly=true)（P1）**",
+      "session_id": "ses_134f9517bffeR9ytLC7FXW8vvu",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-15T11:24:39.858Z"
+    },
+    "todo:20": {
+      "task_key": "todo:20",
+      "task_label": "20",
+      "task_title": "**替换 catch (e: any) 为 catch (e: unknown)（P1）**",
+      "session_id": "ses_134f6a8bbffeEiJbftsU0HQLJA",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-15T11:27:27.691Z"
     }
   }
 }

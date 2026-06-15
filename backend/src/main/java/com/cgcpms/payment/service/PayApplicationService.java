@@ -141,7 +141,21 @@ public class PayApplicationService {
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
 
-        PayApplicationVO vo = toVO(app);
+        // Pre-fetch related name maps to avoid N+1 queries (same pattern as getPage)
+        Map<Long, String> projectNames = app.getProjectId() != null
+                ? pmProjectMapper.selectBatchIds(Set.of(app.getProjectId())).stream()
+                        .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a))
+                : Map.of();
+        Map<Long, String> contractNames = app.getContractId() != null
+                ? ctContractMapper.selectBatchIds(Set.of(app.getContractId())).stream()
+                        .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a))
+                : Map.of();
+        Map<Long, String> partnerNames = app.getPartnerId() != null
+                ? mdPartnerMapper.selectBatchIds(Set.of(app.getPartnerId())).stream()
+                        .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a))
+                : Map.of();
+
+        PayApplicationVO vo = toVO(app, projectNames, contractNames, partnerNames);
 
         // Load basis items
         List<PayApplicationBasis> basisList = payApplicationBasisMapper.selectList(
