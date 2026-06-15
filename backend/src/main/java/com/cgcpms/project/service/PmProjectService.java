@@ -64,33 +64,38 @@ public class PmProjectService {
     public Long create(PmProject project) {
         log.info("Creating project: {}", project.getProjectName());
 
-        // Auto-generate project code: XM-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "XM-" + today + "-";
+        try {
+            // Auto-generate project code: XM-yyyyMMdd-XXX
+            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
+            String prefix = "XM-" + today + "-";
 
-        LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(PmProject::getTenantId, UserContext.getCurrentTenantId())
-                .likeRight(PmProject::getProjectCode, prefix)
-                .orderByDesc(PmProject::getProjectCode);
-        Page<PmProject> page = pmProjectMapper.selectPage(new Page<>(1, 1), wrapper);
+            LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(PmProject::getTenantId, UserContext.getCurrentTenantId())
+                    .likeRight(PmProject::getProjectCode, prefix)
+                    .orderByDesc(PmProject::getProjectCode);
+            Page<PmProject> page = pmProjectMapper.selectPage(new Page<>(1, 1), wrapper);
 
-        int seq = 1;
-        if (!page.getRecords().isEmpty()) {
-            PmProject last = page.getRecords().get(0);
-            if (last.getProjectCode() != null
-                    && last.getProjectCode().length() == prefix.length() + 3) {
-                try {
-                    seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1;
-                } catch (NumberFormatException e) {
-                    log.warn("Failed to parse sequence number: {}", last.getProjectCode(), e);
+            int seq = 1;
+            if (!page.getRecords().isEmpty()) {
+                PmProject last = page.getRecords().get(0);
+                if (last.getProjectCode() != null
+                        && last.getProjectCode().length() == prefix.length() + 3) {
+                    try {
+                        seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1;
+                    } catch (NumberFormatException ex) {
+                        log.warn("Failed to parse sequence number: {}", last.getProjectCode(), ex);
+                    }
                 }
             }
-        }
-        project.setProjectCode(prefix + String.format("%03d", seq));
-        project.setStatus("DRAFT");
+            project.setProjectCode(prefix + String.format("%03d", seq));
+            project.setStatus("DRAFT");
 
-        pmProjectMapper.insert(project);
-        return project.getId();
+            pmProjectMapper.insert(project);
+            return project.getId();
+        } catch (Exception e) {
+            log.error("Failed to create project: {}", project.getProjectName(), e);
+            throw e;
+        }
     }
 
     @Transactional

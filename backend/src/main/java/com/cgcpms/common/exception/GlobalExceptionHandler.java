@@ -5,6 +5,7 @@ import com.cgcpms.common.result.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.BindException;
@@ -67,6 +68,21 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         log.warn("Bind failed: {}", message);
         return ApiResponse.fail(VALIDATION_ERROR_CODE, message);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleHttpMessageNotReadable(HttpMessageNotReadableException e) {
+        String traceId = TraceIdContext.get();
+        if (traceId == null || traceId.isBlank()) {
+            traceId = UUID.randomUUID().toString().replace("-", "");
+        }
+        log.error("JSON parse error, traceId={}", traceId, e);
+        String detail = e.getMostSpecificCause().getMessage();
+        if (detail != null && detail.length() > 200) {
+            detail = detail.substring(0, 200) + "...";
+        }
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "请求数据格式错误: " + (detail != null ? detail : "无法解析"));
     }
 
     @ExceptionHandler(Exception.class)
