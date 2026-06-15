@@ -454,7 +454,7 @@ defineExpose({
           </a-select>
         </div>
         <div class="pm-filter-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
+          <span @click="handleSearch"><a-button type="primary">查询</a-button></span>
           <a-button @click="handleReset">重置</a-button>
           <a-button type="primary" @click="handleAdd">新增发票</a-button>
         </div>
