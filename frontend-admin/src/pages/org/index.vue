@@ -673,7 +673,7 @@ onMounted(async () => {
         size="small"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.dataIndex === 'posStatus'">
+          <template v-if="column.dataIndex === 'status'">
             <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
               {{ record.status === 'ENABLED' ? '启用' : '禁用' }}
             </a-tag>
