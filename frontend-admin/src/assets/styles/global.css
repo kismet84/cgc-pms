@@ -99,8 +99,11 @@ a {
   color: var(--muted);
 }
 
-.app-table-link {
-  color: var(--primary);
-  font-weight: 500;
-  text-decoration: none;
+/* vxe-table: Safari fallback for scrollbar-width:none */
+.vxe-table--body-wrapper::-webkit-scrollbar,
+.vxe-table--fixed-left-body-wrapper::-webkit-scrollbar,
+.vxe-table--fixed-right-body-wrapper::-webkit-scrollbar,
+.vxe-table--footer-wrapper::-webkit-scrollbar,
+.vxe-table--header-wrapper::-webkit-scrollbar {
+  display: none;
 }
