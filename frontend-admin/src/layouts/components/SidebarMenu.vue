@@ -141,6 +141,8 @@ function handleMenuClick({ key }: { key: string }) {
     class="sidebar-menu"
     :items="menuItems"
     tabindex="0"
+    role="menu"
+    aria-label="主导航菜单"
     @click="handleMenuClick"
   />
 </template>
