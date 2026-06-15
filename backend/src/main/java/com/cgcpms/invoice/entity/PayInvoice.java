@@ -82,4 +82,9 @@ public class PayInvoice extends BaseEntity {
     private String buyerName;
     private String buyerTaxNo;
     private String sellerTaxNo;
+
+    /** Override BaseEntity.deletedFlag — physical delete for invoices (avoid unique constraint conflicts) */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @TableField(exist = false)
+    private Integer deletedFlag;
 }
