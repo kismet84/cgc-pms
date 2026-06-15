@@ -620,14 +620,14 @@ defineExpose({
         <a-form-item label="卖方名称">
           <a-input v-model:value="formData.sellerName" placeholder="请输入卖方名称" />
         </a-form-item>
+        <a-form-item label="卖方税号">
+          <a-input v-model:value="formData.sellerTaxNo" placeholder="请输入卖方纳税人识别号" />
+        </a-form-item>
         <a-form-item label="买方名称">
           <a-input v-model:value="formData.buyerName" placeholder="请输入买方名称" />
         </a-form-item>
         <a-form-item label="买方税号">
           <a-input v-model:value="formData.buyerTaxNo" placeholder="请输入买方纳税人识别号" />
-        </a-form-item>
-        <a-form-item label="卖方税号">
-          <a-input v-model:value="formData.sellerTaxNo" placeholder="请输入卖方纳税人识别号" />
         </a-form-item>
         <a-form-item label="备注">
           <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
