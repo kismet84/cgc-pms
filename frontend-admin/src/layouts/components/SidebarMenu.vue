@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref, watch } from 'vue'
+import { computed, h, ref, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { routes } from '@/router'
 import type { RouteRecordRaw } from 'vue-router'
@@ -131,6 +131,15 @@ watch(
 function handleMenuClick({ key }: { key: string }) {
   router.push(key)
 }
+
+onMounted(() => {
+  nextTick(() => {
+    const menuUl = document.querySelector('.sidebar-menu')
+    if (menuUl && !menuUl.hasAttribute('role')) {
+      menuUl.setAttribute('role', 'menu')
+    }
+  })
+})
 </script>
 
 <template>
