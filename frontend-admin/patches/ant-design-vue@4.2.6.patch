@@ -1,0 +1,84 @@
+diff --git a/es/style/index.js b/es/style/index.js
+index 39caacabc15ab15e1d1b609858be674956bbc681..cec16abac77b3e474f5772b002a346704743cc55 100644
+--- a/es/style/index.js
++++ b/es/style/index.js
+@@ -60,7 +60,6 @@ export const genLinkStyle = token => ({
+     outline: 'none',
+     cursor: 'pointer',
+     transition: `color ${token.motionDurationSlow}`,
+-    '-webkit-text-decoration-skip': 'objects',
+     '&:hover': {
+       color: token.colorLinkHover
+     },
+diff --git a/es/vc-select/Selector/Input.js b/es/vc-select/Selector/Input.js
+index 64f547bc2943c4ecdca559dabff6226b2e31a0fb..38d3048491418e7761bb2b450ea22dfe2defbfbf 100644
+--- a/es/vc-select/Selector/Input.js
++++ b/es/vc-select/Selector/Input.js
+@@ -105,7 +105,7 @@ const Input = defineComponent({
+         style
+       } = inputProps;
+       inputNode = cloneElement(inputNode, _extends(_extends(_extends(_extends(_extends({
+-        type: 'search'
++        type: 'text'
+       }, inputProps), {
+         id,
+         ref: inputRef,
+@@ -117,6 +117,7 @@ const Input = defineComponent({
+         class: classNames(`${prefixCls}-selection-search-input`, (_a = inputNode === null || inputNode === void 0 ? void 0 : inputNode.props) === null || _a === void 0 ? void 0 : _a.class),
+         role: 'combobox',
+         'aria-expanded': open,
++        title: '',
+         'aria-haspopup': 'listbox',
+         'aria-owns': `${id}_list`,
+         'aria-autocomplete': 'list',
+@@ -177,7 +178,7 @@ const Input = defineComponent({
+           }, 100);
+         }
+       }), inputNode.type === 'textarea' ? {} : {
+-        type: 'search'
++        type: 'text'
+       }), true, true);
+       return inputNode;
+     };
+diff --git a/lib/style/index.js b/lib/style/index.js
+index aad40554238125539dad7d94e1184b261e6ce209..67af9e1b9af8e6cac2b4983f460a7dc66b98a8d7 100644
+--- a/lib/style/index.js
++++ b/lib/style/index.js
+@@ -90,7 +90,6 @@ const genLinkStyle = token => ({
+     outline: 'none',
+     cursor: 'pointer',
+     transition: `color ${token.motionDurationSlow}`,
+-    '-webkit-text-decoration-skip': 'objects',
+     '&:hover': {
+       color: token.colorLinkHover
+     },
+diff --git a/lib/vc-select/Selector/Input.js b/lib/vc-select/Selector/Input.js
+index a17dd83d5909fd21f5d311a384703963ddb1660d..09b572a1a3a76596d12e19dd483c525c8bc7bbdc 100644
+--- a/lib/vc-select/Selector/Input.js
++++ b/lib/vc-select/Selector/Input.js
+@@ -111,7 +111,7 @@ const Input = (0, _vue.defineComponent)({
+         style
+       } = inputProps;
+       inputNode = (0, _vnode.cloneElement)(inputNode, (0, _extends2.default)((0, _extends2.default)((0, _extends2.default)((0, _extends2.default)((0, _extends2.default)({
+-        type: 'search'
++        type: 'text'
+       }, inputProps), {
+         id,
+         ref: inputRef,
+@@ -123,6 +123,7 @@ const Input = (0, _vue.defineComponent)({
+         class: (0, _classNames.default)(`${prefixCls}-selection-search-input`, (_a = inputNode === null || inputNode === void 0 ? void 0 : inputNode.props) === null || _a === void 0 ? void 0 : _a.class),
+         role: 'combobox',
+         'aria-expanded': open,
++        title: '',
+         'aria-haspopup': 'listbox',
+         'aria-owns': `${id}_list`,
+         'aria-autocomplete': 'list',
+@@ -183,7 +184,7 @@ const Input = (0, _vue.defineComponent)({
+           }, 100);
+         }
+       }), inputNode.type === 'textarea' ? {} : {
+-        type: 'search'
++        type: 'text'
+       }), true, true);
+       return inputNode;
+     };

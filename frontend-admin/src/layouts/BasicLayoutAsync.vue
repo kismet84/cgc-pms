@@ -178,6 +178,7 @@ onBeforeUnmount(() => {
   top: 0;
   z-index: 10;
   margin-left: var(--shell-sidebar-width);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 

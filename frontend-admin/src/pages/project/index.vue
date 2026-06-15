@@ -200,8 +200,9 @@ const columns = [
     <div class="pj-card pj-filter">
       <div class="pj-filter-row">
         <div class="pj-field">
-          <label>项目编号：</label>
+          <label for="filter-project-code">项目编号：</label>
           <a-input
+            id="filter-project-code"
             v-model:value="filter.projectCode"
             placeholder="请输入项目编号"
             style="width: 160px"
@@ -209,8 +210,9 @@ const columns = [
           />
         </div>
         <div class="pj-field">
-          <label>项目名称：</label>
+          <label for="filter-project-name">项目名称：</label>
           <a-input
+            id="filter-project-name"
             v-model:value="filter.projectName"
             placeholder="请输入项目名称"
             style="width: 180px"
@@ -218,8 +220,9 @@ const columns = [
           />
         </div>
         <div class="pj-field">
-          <label>项目类型：</label>
+          <label for="filter-project-type">项目类型：</label>
           <a-select
+            id="filter-project-type"
             v-model:value="filter.projectType"
             placeholder="全部"
             allow-clear
@@ -232,8 +235,9 @@ const columns = [
           </a-select>
         </div>
         <div class="pj-field">
-          <label>状态：</label>
+          <label for="filter-status">状态：</label>
           <a-select
+            id="filter-status"
             v-model:value="filter.status"
             placeholder="全部"
             allow-clear

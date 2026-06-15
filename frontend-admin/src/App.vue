@@ -2,6 +2,10 @@
 import { RouterView } from 'vue-router'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 
+function getPopupContainer(trigger?: HTMLElement): HTMLElement {
+  return trigger?.parentElement ?? document.body
+}
+
 const theme = {
   token: {
     colorPrimary: '#1668dc',
@@ -48,7 +52,7 @@ const theme = {
 </script>
 
 <template>
-  <a-config-provider :locale="zhCN" :theme="theme">
+  <a-config-provider :locale="zhCN" :theme="theme" :get-popup-container="getPopupContainer">
     <RouterView />
   </a-config-provider>
 </template>
