@@ -26,6 +26,7 @@ import {
 
 import App from './App.vue'
 import router from './router'
+import vLoading from './directives/loading'
 import './assets/styles/global.css'
 
 use([
@@ -44,6 +45,7 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(Antd)
+app.directive('loading', vLoading)
 app.use(VxeUIAll)
 app.use(VxeUITable)
 
