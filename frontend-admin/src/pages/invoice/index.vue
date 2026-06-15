@@ -34,6 +34,7 @@ const tableData = ref<InvoiceVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const searchError = ref('')
 
 const payRecordList = ref<PayRecordBrief[]>([])
 
@@ -75,6 +76,7 @@ const columns = [
 
 async function fetchData() {
   loading.value = true
+  searchError.value = ''
   try {
     const res = await getInvoiceList({
       pageNo: pageNo.value,
@@ -85,9 +87,13 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
+    if (res.total === 0) {
+      searchError.value = '未查询到匹配的发票记录'
+    }
   } catch {
     tableData.value = []
     total.value = 0
+    searchError.value = '加载发票列表失败，请稍后重试'
     message.error('加载发票列表失败，请稍后重试')
   } finally {
     loading.value = false
@@ -459,6 +465,15 @@ defineExpose({
 
     <!-- Table -->
     <div class="pm-card pm-table-wrap">
+      <a-alert
+        v-if="searchError"
+        :message="searchError"
+        :type="searchError.includes('失败') ? 'error' : 'info'"
+        show-icon
+        closable
+        style="margin-bottom: 12px"
+        @close="searchError = ''"
+      />
       <a-table
         :columns="columns"
         :data-source="tableData"
