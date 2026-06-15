@@ -218,3 +218,70 @@ No regressions, no new warnings, no new empty catch blocks, no new @SuppressWarn
 - `.sisyphus/evidence/synthesis-report.md` (overwritten — new consolidation from 2026-06-15 reviews)
 - `.sisyphus/plans/consolidated-remaining-work.md` (appended T8–T21 under Wave 3)
 - `.sisyphus/notepads/consolidated-remaining-work/learnings.md` (this entry appended)
+
+## T9 — Fix frontend API module bypass in system/data/index.vue (2026-06-15)
+
+### What was done
+- Replaced `import service from '@/api/request'` with `import { request } from '@/api/request'`
+- Replaced `const res: any = await service.delete('/system/clear-database')` with `const msg = await request<string>({ url: '/system/clear-database', method: 'DELETE' })`
+- Replaced `message.success(res?.data ?? res?.message ?? '数据库已清空')` with `message.success(msg || '数据库已清空')`
+- The `request()` wrapper goes through the response interceptor which unwraps `ApiResponse.data` when `code === '0'`
+- Backend returns `ApiResponse.success("已清空 X 张业务数据表...")` → interceptor extracts the string → `msg` is the plain string
+
+### Verification
+- `pnpm build` (vue-tsc --noEmit + vite build): PASS, zero TypeScript errors
+- `pnpm lint`: PASS, no issues for this file
+- No `: any` type assertions remain in this file
+- No raw `service` import remains in this file
+
+### Key insight
+The old `res?.data ?? res?.message ?? '数据库已清空'` was misusing the interceptor response — the interceptor already unwraps `ApiResponse`, so `res` was already the string data (not an `AxiosResponse`). The `.data` and `.message` accesses were always falling through to the fallback string. The fix eliminates this confusion entirely.
+
+## D3-002: Fix P0 frontend API module bypass in profile/index.vue (2026-06-15)
+
+### What was done
+- Added `updateProfile()` and `changePassword()` functions to `frontend-admin/src/api/modules/auth.ts`
+- These encapsulate `/profile` (PUT) and `/profile/password` (PUT) endpoints respectively
+- Updated `profile/index.vue` to import from `@/api/modules/auth` instead of `@/api/request`
+- Removed direct `request` import from the profile page (line 5)
+- Removed unused `UserInfo` type import
+- Build (`pnpm build`) passes with zero TypeScript errors
+
+### Files Modified
+- `frontend-admin/src/api/modules/auth.ts` — added 2 functions (lines 24-30)
+- `frontend-admin/src/pages/profile/index.vue` — replaced import + 2 call sites
+
+### Pattern
+- All API calls should go through module functions in `@/api/modules/*`, never directly import `request` from `@/api/request` in page components
+- The `request<T>(config)` function returns `T` directly (response envelope already unwrapped by interceptor)
+
+## T8 — Fix P0 settlement TOCTOU race condition (2026-06-15)
+
+### What was done
+- Created V52 Flyway migration (MySQL + H2): `ALTER TABLE stl_settlement ADD UNIQUE KEY uk_stl_settlement_contract (tenant_id, contract_id)`
+- Updated `StlSettlementService.create()` to wrap `stlSettlementMapper.insert(settlement)` in try-catch for `DuplicateKeyException`, re-throwing as `BusinessException("STL_DUPLICATE_SETTLEMENT", "该合同已存在结算单，不允许重复创建")`
+- Kept the existing `selectCount` pre-check as the fast path (no exception overhead for common case)
+- Created `StlSettlementServiceTest.java` with 5 tests: basic create, duplicate rejection, concurrent TOCTOU simulation (2 threads, CountDownLatch), missing contractId validation, cross-project validation
+- All 5 tests pass on H2 with `@ActiveProfiles("local")`
+
+### Pre-existing bugs fixed (prerequisites)
+- **V50 H2**: `ALTER TABLE pay_invoice DROP INDEX uk_pi_tenant_invoice_no` failed because H2 V36 used `UNIQUE (tenant_id, invoice_no)` (unnamed) — H2 auto-generates a different constraint name. Fixed with `DROP INDEX IF EXISTS`.
+- **V51 H2**: `ALTER TABLE pm_project DROP UNIQUE (tenant_id, project_code)` is not valid H2 syntax (MySQL-specific). Fixed with H2 `CREATE ALIAS` inline Java procedure to query `INFORMATION_SCHEMA.TABLE_CONSTRAINTS` and drop by auto-generated name, then add new constraint.
+
+### Key implementation patterns
+- `DuplicateKeyException` import: `org.springframework.dao.DuplicateKeyException` (same as WorkflowCoreService, InvoiceService, cost strategies)
+- Test uses demo data contract IDs: 30001 (CT-2026-001, 采购合同), 30002 (CT-2026-002, 分包合同), 30003 (CT-2026-003, 服务合同) — all with tenant_id=0, project_id=10001
+- Concurrent test uses `CountDownLatch` (2 threads, startLatch + doneLatch) with atomic counters — exactly 1 success, 1 BusinessException
+- `UserContext` must be set per thread (ThreadLocal) and cleared in finally block
+
+### Files Modified
+- `backend/src/main/resources/db/migration/V52__add_settlement_contract_unique.sql` (new)
+- `backend/src/main/resources/db/migration-h2/V52__add_settlement_contract_unique.sql` (new)
+- `backend/src/main/resources/db/migration-h2/V50__fix_invoice_unique_with_deleted_flag.sql` (fixed `DROP INDEX` → `DROP INDEX IF EXISTS`)
+- `backend/src/main/resources/db/migration-h2/V51__fix_project_unique_with_deleted_flag.sql` (fixed `DROP UNIQUE(columns)` → H2 `CREATE ALIAS` inline Java)
+- `backend/src/main/java/com/cgcpms/settlement/service/StlSettlementService.java` (added DuplicateKeyException import + try-catch around insert)
+- `backend/src/test/java/com/cgcpms/settlement/StlSettlementServiceTest.java` (new — 5 tests)
+
+### Verification
+- `./mvnw compile -q`: PASS
+- `./mvnw test -Dtest=StlSettlementServiceTest`: PASS — 5/5 tests, 0 failures, 0 errors

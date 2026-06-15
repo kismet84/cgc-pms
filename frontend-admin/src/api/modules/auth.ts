@@ -20,3 +20,11 @@ export function refreshTokenApi() {
     method: 'post',
   })
 }
+
+export function updateProfile(data: { realName?: string; phone?: string; email?: string; avatar?: string }) {
+  return request<UserInfo>({ url: '/profile', method: 'put', data })
+}
+
+export function changePassword(data: { oldPassword: string; newPassword: string }) {
+  return request<void>({ url: '/profile/password', method: 'put', data })
+}

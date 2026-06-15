@@ -450,7 +450,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
 #### Wave 3-A: P0 修复（3 个任务，全部可并行）
 
-- [ ] 8. **修复结算 TOCTOU 竞态条件（P0）**
+- [x] 8. **修复结算 TOCTOU 竞态条件（P0）**
 
   **Synthesis IDs**: S-P0-03 (D5-001), S-P1-12 (D5-002)
   **What to do**:
@@ -493,7 +493,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(settlement): add DB unique constraint and DuplicateKeyException handling for contractId TOCTOU race`
 
-- [ ] 9. **修复 system/data 页面 API 模块绕过（P0）**
+- [x] 9. **修复 system/data 页面 API 模块绕过（P0）**
 
   **Synthesis ID**: S-P0-01 (D3-001)
   **What to do**:
@@ -536,7 +536,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(frontend): replace raw axios import with API module in system/data page`
 
-- [ ] 10. **修复 profile 页面 API 模块绕过（P0）**
+- [x] 10. **修复 profile 页面 API 模块绕过（P0）**
 
   **Synthesis ID**: S-P0-02 (D3-002)
   **What to do**:

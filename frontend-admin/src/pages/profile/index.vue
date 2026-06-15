@@ -2,8 +2,7 @@
 import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
-import { request } from '@/api/request'
-import type { UserInfo } from '@/types/user'
+import { updateProfile, changePassword } from '@/api/modules/auth'
 
 const userStore = useUserStore()
 
@@ -30,15 +29,11 @@ async function handleProfileSave() {
   }
   profileLoading.value = true
   try {
-    const data = await request<UserInfo>({
-      url: '/profile',
-      method: 'put',
-      data: {
-        realName: profileForm.realName.trim(),
-        phone: profileForm.phone.trim(),
-        email: profileForm.email.trim(),
-        avatar: profileForm.avatar.trim(),
-      },
+    const data = await updateProfile({
+      realName: profileForm.realName.trim(),
+      phone: profileForm.phone.trim(),
+      email: profileForm.email.trim(),
+      avatar: profileForm.avatar.trim(),
     })
     userStore.setUserInfo(data)
     message.success('个人资料更新成功')
@@ -64,13 +59,9 @@ async function handlePasswordChange() {
   }
   passwordLoading.value = true
   try {
-    await request({
-      url: '/profile/password',
-      method: 'put',
-      data: {
-        oldPassword: passwordForm.oldPassword,
-        newPassword: passwordForm.newPassword,
-      },
+    await changePassword({
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword,
     })
     message.success('密码修改成功')
     passwordForm.oldPassword = ''
@@ -122,13 +113,13 @@ async function handlePasswordChange() {
     <div class="profile-right">
       <!-- Profile edit card -->
       <a-card title="个人资料" class="profile-card">
-        <a-form
-          :model="profileForm"
-          layout="vertical"
-          @finish="handleProfileSave"
-        >
+        <a-form :model="profileForm" layout="vertical" @finish="handleProfileSave">
           <a-form-item label="真实姓名" name="realName">
-            <a-input v-model:value="profileForm.realName" placeholder="请输入真实姓名" allow-clear />
+            <a-input
+              v-model:value="profileForm.realName"
+              placeholder="请输入真实姓名"
+              allow-clear
+            />
           </a-form-item>
 
           <a-form-item label="手机号" name="phone">
@@ -140,24 +131,22 @@ async function handlePasswordChange() {
           </a-form-item>
 
           <a-form-item label="头像地址" name="avatar">
-            <a-input v-model:value="profileForm.avatar" placeholder="请输入头像图片地址" allow-clear />
+            <a-input
+              v-model:value="profileForm.avatar"
+              placeholder="请输入头像图片地址"
+              allow-clear
+            />
           </a-form-item>
 
           <a-form-item>
-            <a-button type="primary" html-type="submit" :loading="profileLoading">
-              保存
-            </a-button>
+            <a-button type="primary" html-type="submit" :loading="profileLoading"> 保存 </a-button>
           </a-form-item>
         </a-form>
       </a-card>
 
       <!-- Password change card -->
       <a-card title="修改密码" class="profile-card">
-        <a-form
-          :model="passwordForm"
-          layout="vertical"
-          @finish="handlePasswordChange"
-        >
+        <a-form :model="passwordForm" layout="vertical" @finish="handlePasswordChange">
           <!-- hidden username field for password manager context -->
           <input
             type="text"
@@ -192,9 +181,7 @@ async function handlePasswordChange() {
           </a-form-item>
 
           <a-form-item>
-            <a-button :loading="passwordLoading" html-type="submit">
-              修改密码
-            </a-button>
+            <a-button :loading="passwordLoading" html-type="submit"> 修改密码 </a-button>
           </a-form-item>
         </a-form>
       </a-card>

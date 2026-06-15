@@ -1,76 +1,56 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\unified-vue-fixes.md",
-  "started_at": "2026-06-15T04:02:22.328Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\consolidated-remaining-work.md",
+  "started_at": "2026-06-15T10:41:20.500Z",
   "session_ids": [
-    "ses_1369d9bb2ffeGFvWV29R2VTe8t",
-    "ses_13681aa38ffesSNxgrjG0bU1yh",
-    "ses_136819f6effe1QFs4nNszBXvyu",
-    "ses_136818880ffeQ482f0SiMWZj2S",
-    "ses_1368156d8ffe6ooRveK0eFA4uA"
+    "ses_1353c29c4ffekkF4VTxO4udf7X",
+    "ses_1351944f3ffehQP4h8apDXpH2Z",
+    "ses_135192114ffegyByGNnDVQhDWn",
+    "ses_13518fe31ffeBzJxIBc9x2XsWh",
+    "ses_13518ded5ffezgP1dllrxamWnP",
+    "ses_13518ba37ffeKFxhwOWc3UqeOh",
+    "ses_13506b1acffeokQptTqe5FgNmW",
+    "ses_135068e8effeXJdj5JRn1ttfEo",
+    "ses_135066c80ffeF8Fcs89BZ4R1J2"
   ],
   "session_origins": {
-    "ses_1369d9bb2ffeGFvWV29R2VTe8t": "direct",
-    "ses_13681aa38ffesSNxgrjG0bU1yh": "appended",
-    "ses_136819f6effe1QFs4nNszBXvyu": "appended",
-    "ses_136818880ffeQ482f0SiMWZj2S": "appended",
-    "ses_1368156d8ffe6ooRveK0eFA4uA": "appended"
+    "ses_1353c29c4ffekkF4VTxO4udf7X": "direct",
+    "ses_1351944f3ffehQP4h8apDXpH2Z": "appended",
+    "ses_135192114ffegyByGNnDVQhDWn": "appended",
+    "ses_13518fe31ffeBzJxIBc9x2XsWh": "appended",
+    "ses_13518ded5ffezgP1dllrxamWnP": "appended",
+    "ses_13518ba37ffeKFxhwOWc3UqeOh": "appended",
+    "ses_13506b1acffeokQptTqe5FgNmW": "appended",
+    "ses_135068e8effeXJdj5JRn1ttfEo": "appended",
+    "ses_135066c80ffeF8Fcs89BZ4R1J2": "appended"
   },
-  "plan_name": "unified-vue-fixes",
+  "plan_name": "consolidated-remaining-work",
   "agent": "atlas",
   "task_sessions": {
-    "todo:0": {
-      "task_key": "todo:0",
-      "task_label": "0",
-      "task_title": "Establish baseline — run tests and build BEFORE any changes",
-      "session_id": "ses_1368d568bffeIotF0d32KX3lZB",
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "**安全与配置审查**",
+      "session_id": "ses_13515e3d7ffeBner6X07vc3bRO",
+      "agent": "explore",
+      "updated_at": "2026-06-15T10:59:52.579Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "**综合分析 — 去重、分级、依赖映射**",
+      "session_id": "ses_1350ebf31ffes5iR0N4cJEL6aK",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-06-15T11:09:17.063Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "**修复结算 TOCTOU 竞态条件（P0）**",
+      "session_id": "ses_135066c80ffeF8Fcs89BZ4R1J2",
       "agent": "Sisyphus-Junior",
       "category": "quick",
-      "updated_at": "2026-06-15T04:04:21.599Z"
-    },
-    "todo:2": {
-      "task_key": "todo:2",
-      "task_label": "2",
-      "task_title": "Register v-loading directive globally in main.ts",
-      "session_id": "ses_1368b3c66ffecj1MtByo7vTBLQ",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T04:09:14.740Z"
-    },
-    "todo:3": {
-      "task_key": "todo:3",
-      "task_label": "3",
-      "task_title": "Fix userInfo binding in BasicLayoutAsync.vue",
-      "session_id": "ses_1368671d2ffewrqe6bJCTpmgNx",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T04:12:04.783Z"
-    },
-    "todo:4": {
-      "task_key": "todo:4",
-      "task_label": "4",
-      "task_title": "Fix computed v-model in SidebarMenu.vue (hardest refactor)",
-      "session_id": "ses_136847d46ffefJNq1LV39Ty8ce",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T04:14:27.138Z"
-    },
-    "final-wave:f1": {
-      "task_key": "final-wave:f1",
-      "task_label": "F1",
-      "task_title": "**Plan Compliance Audit** — `oracle`",
-      "session_id": "ses_136818880ffeQ482f0SiMWZj2S",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-06-15T04:32:28.837Z"
-    },
-    "final-wave:f3": {
-      "task_key": "final-wave:f3",
-      "task_label": "F3",
-      "task_title": "**Real QA** — `unspecified-high` (+ `playwright`)",
-      "session_id": "ses_1368156d8ffe6ooRveK0eFA4uA",
-      "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-06-15T04:34:57.971Z"
+      "updated_at": "2026-06-15T11:18:42.865Z"
     }
   }
 }

@@ -26,6 +26,7 @@ import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -201,7 +202,15 @@ public class StlSettlementService {
         // Auto-compute amounts (NEVER allow manual override)
         autoFillAmounts(settlement, contract);
 
-        stlSettlementMapper.insert(settlement);
+        // P0-01: Database-level UNIQUE constraint (tenant_id, contract_id) as safety net
+        // against TOCTOU race. The selectCount check above is the fast path;
+        // this catch handles the concurrent edge case.
+        try {
+            stlSettlementMapper.insert(settlement);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("STL_DUPLICATE_SETTLEMENT",
+                    "该合同已存在结算单，不允许重复创建");
+        }
         return settlement.getId();
     }
 
