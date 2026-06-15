@@ -20,6 +20,7 @@ import java.util.List;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -134,5 +135,78 @@ class InvoiceValidationTest {
         assertNotNull(dbInvoice, "Invoice should exist in DB");
         assertEquals(0L, dbInvoice.getTenantId(),
                 "tenantId should be 0 (from JWT), not 999 (from request body)");
+    }
+
+    @Test
+    @DisplayName("GET /api/invoices?invoiceNo=xxx → returns matching invoices only")
+    void shouldFilterByInvoiceNoPartialMatch() throws Exception {
+        // Create an invoice with a known partial invoiceNo
+        String body = """
+                {
+                    "invoiceNo": "INV-FILTER-PARTIAL-001",
+                    "invoiceType": "VAT_SPECIAL",
+                    "invoiceAmount": "3000.00"
+                }""";
+        mockMvc.perform(post("/api/invoices")
+                .contextPath("/api")
+                .cookie(adminCookie())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        // Filter by partial invoice number
+        mockMvc.perform(get("/api/invoices")
+                .contextPath("/api")
+                .cookie(adminCookie())
+                .param("invoiceNo", "FILTER-PARTIAL")
+                .param("pageSize", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.records.length()").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$.data.records[0].invoiceNo").value(org.hamcrest.Matchers.containsString("FILTER-PARTIAL")));
+    }
+
+    @Test
+    @DisplayName("GET /api/invoices?verifyStatus=PENDING → returns only PENDING invoices")
+    void shouldFilterByVerifyStatus() throws Exception {
+        // Create an invoice (defaults to PENDING)
+        String body = """
+                {
+                    "invoiceNo": "INV-FILTER-STATUS-001",
+                    "invoiceType": "VAT_SPECIAL",
+                    "invoiceAmount": "4000.00"
+                }""";
+        mockMvc.perform(post("/api/invoices")
+                .contextPath("/api")
+                .cookie(adminCookie())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        // Filter by verifyStatus=PENDING
+        mockMvc.perform(get("/api/invoices")
+                .contextPath("/api")
+                .cookie(adminCookie())
+                .param("verifyStatus", "PENDING")
+                .param("pageSize", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.records.length()").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$.data.records[0].verifyStatus").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("GET /api/invoices?verifyStatus=NONEXISTENT → returns empty, not error")
+    void shouldReturnEmptyForNonMatchingVerifyStatus() throws Exception {
+        mockMvc.perform(get("/api/invoices")
+                .contextPath("/api")
+                .cookie(adminCookie())
+                .param("verifyStatus", "NONEXISTENT_STATUS")
+                .param("pageSize", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.total").value(0));
     }
 }

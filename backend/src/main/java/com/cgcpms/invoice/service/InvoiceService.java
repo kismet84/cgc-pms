@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import org.apache.pdfbox.Loader;
@@ -35,11 +36,14 @@ public class InvoiceService {
 
     // ── Query ──
 
-    public IPage<InvoiceVO> getPage(long pageNo, long pageSize, Long payRecordId, Long payApplicationId) {
+    public IPage<InvoiceVO> getPage(long pageNo, long pageSize, Long payRecordId, Long payApplicationId,
+                                     String invoiceNo, String verifyStatus) {
         LambdaQueryWrapper<PayInvoice> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayInvoice::getTenantId, UserContext.getCurrentTenantId());
         if (payRecordId != null) wrapper.eq(PayInvoice::getPayRecordId, payRecordId);
         if (payApplicationId != null) wrapper.eq(PayInvoice::getPayApplicationId, payApplicationId);
+        if (StringUtils.hasText(invoiceNo)) wrapper.like(PayInvoice::getInvoiceNo, invoiceNo);
+        if (StringUtils.hasText(verifyStatus)) wrapper.eq(PayInvoice::getVerifyStatus, verifyStatus);
         wrapper.orderByDesc(PayInvoice::getCreatedTime);
 
         Page<PayInvoice> page = payInvoiceMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);

@@ -607,7 +607,7 @@ class Phase4IntegrationTest {
                 .add("tenantId", 1L)
                 .add("roleCodes", List.of())
                 .build());
-        var t1InvoicePage = invoiceService.getPage(1, 20, null, null);
+        var t1InvoicePage = invoiceService.getPage(1, 20, null, null, null, null);
         boolean t1HasInvoice = t1InvoicePage.getRecords().stream()
                 .anyMatch(r -> r.getId().equals(invoiceId.toString()));
         assertFalse(t1HasInvoice, "tenant 1发票列表不应包含tenant 0的发票");
