@@ -81,3 +81,11 @@ export function removeMember(projectId: string, memberId: string) {
     method: 'delete',
   })
 }
+
+/** 删除项目 */
+export function deleteProject(id: string) {
+  return request<void>({
+    url: `/projects/${id}`,
+    method: 'delete',
+  })
+}

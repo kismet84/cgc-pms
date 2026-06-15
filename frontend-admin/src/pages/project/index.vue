@@ -3,7 +3,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
-import { getProjectList, createProject } from '@/api/modules/project'
+import { getProjectList, createProject, deleteProject } from '@/api/modules/project'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 
@@ -54,6 +54,16 @@ function handleCreateModalOpen() {
 function handleCreateModalClose() {
   createVisible.value = false
   createFormRef.value?.resetFields()
+}
+
+async function handleDelete(id: string) {
+  try {
+    await deleteProject(id)
+    message.success('删除成功')
+    fetchData()
+  } catch {
+    message.error('删除失败，请稍后重试')
+  }
 }
 
 async function handleCreateSubmit() {
@@ -390,6 +400,14 @@ const columns = [
             <div class="pj-ops">
               <a class="pj-link" @click="router.push(`/project/${record.id}/overview`)">查看</a>
               <a class="pj-link" @click="router.push(`/project/${record.id}/edit`)">编辑</a>
+              <a-popconfirm
+                title="确认删除该项目？"
+                ok-text="确认"
+                cancel-text="取消"
+                @confirm="handleDelete(record.id)"
+              >
+                <a class="pj-link" style="color: #ff4d4f">删除</a>
+              </a-popconfirm>
             </div>
           </template>
         </template>
