@@ -315,19 +315,21 @@ public class InvoiceService {
     }
 
     private String extractSellerName(String text) {
+        // CJK name pattern: Chinese chars, parens, Latin letters, digits, middle dot
+        final String NAME_RE = "[\\u4e00-\\u9fff（）()A-Za-z\\d·]{2,40}";
         // Primary: explicit seller label patterns (existing)
         String[] primaryPatterns = {
-            "销售方名称[:：]\\s*([^\\n]+)",
-            "销货单位[:：]\\s*([^\\n]+)",
-            "销货方名称[:：]\\s*([^\\n]+)",
-            "卖方名称[:：]\\s*([^\\n]+)",
-            "销方名称[:：]\\s*([^\\n]+)",
+            "销售方名称[:：]\\s*(" + NAME_RE + ")",
+            "销货单位[:：]\\s*(" + NAME_RE + ")",
+            "销货方名称[:：]\\s*(" + NAME_RE + ")",
+            "卖方名称[:：]\\s*(" + NAME_RE + ")",
+            "销方名称[:：]\\s*(" + NAME_RE + ")",
         };
         String name = extractFirstMulti(text, primaryPatterns);
         if (name != null) return name;
 
         // Fallback 1: generic "名称：" near seller context (no 单位 requirement)
-        name = extractFirstDotAll(text, "(?:销货|销售|销方|卖方)(?:\\s*(?:单位|方))?[\\s\\S]{0,200}?名称[:：]\\s*([^\\n]{2,30})");
+        name = extractFirstDotAll(text, "(?:销货|销售|销方|卖方)(?:\\s*(?:单位|方))?[\\s\\S]{0,200}?名称[:：]\\s*(" + NAME_RE + ")");
         if (name != null && !name.trim().isEmpty()) return name.trim();
 
         // Fallback 2: seller name is near the SECOND tax ID
@@ -335,7 +337,7 @@ public class InvoiceService {
         if (name != null) return name;
 
         // Fallback 3: second "名称：XXX" match (seller typically comes after buyer)
-        Matcher m = Pattern.compile("名称[:：]\\s*([^\\n]{2,40})").matcher(text);
+        Matcher m = Pattern.compile("名称[:：]\\s*(" + NAME_RE + ")").matcher(text);
         int count = 0;
         while (m.find()) {
             count++;
@@ -351,19 +353,21 @@ public class InvoiceService {
     }
 
     private String extractBuyerName(String text) {
+        // CJK name pattern: Chinese chars, parens, Latin letters, digits, middle dot
+        final String NAME_RE = "[\\u4e00-\\u9fff（）()A-Za-z\\d·]{2,40}";
         // Primary: explicit buyer label patterns (existing)
         String[] primaryPatterns = {
-            "购买方名称[:：]\\s*([^\\n]+)",
-            "购货单位[:：]\\s*([^\\n]+)",
-            "购货方名称[:：]\\s*([^\\n]+)",
-            "买方名称[:：]\\s*([^\\n]+)",
-            "购方名称[:：]\\s*([^\\n]+)",
+            "购买方名称[:：]\\s*(" + NAME_RE + ")",
+            "购货单位[:：]\\s*(" + NAME_RE + ")",
+            "购货方名称[:：]\\s*(" + NAME_RE + ")",
+            "买方名称[:：]\\s*(" + NAME_RE + ")",
+            "购方名称[:：]\\s*(" + NAME_RE + ")",
         };
         String name = extractFirstMulti(text, primaryPatterns);
         if (name != null) return name;
 
         // Fallback 1: generic "名称：" near buyer context (no 单位 requirement)
-        name = extractFirstDotAll(text, "(?:购货|购买|购方|买方)(?:\\s*(?:单位|方))?[\\s\\S]{0,200}?名称[:：]\\s*([^\\n]{2,30})");
+        name = extractFirstDotAll(text, "(?:购货|购买|购方|买方)(?:\\s*(?:单位|方))?[\\s\\S]{0,200}?名称[:：]\\s*(" + NAME_RE + ")");
         if (name != null && !name.trim().isEmpty()) return name.trim();
 
         // Fallback 2: buyer name is near the FIRST tax ID
@@ -371,7 +375,7 @@ public class InvoiceService {
         if (name != null) return name;
 
         // Fallback 3: first "名称：XXX" match that looks like a name (buyer appears first)
-        Matcher m = Pattern.compile("名称[:：]\\s*([^\\n]{2,40})").matcher(text);
+        Matcher m = Pattern.compile("名称[:：]\\s*(" + NAME_RE + ")").matcher(text);
         while (m.find()) {
             String candidate = m.group(1).trim();
             if (!candidate.matches("[\\dA-Z.,\\-\\s]+") && candidate.length() >= 2
@@ -412,6 +416,7 @@ public class InvoiceService {
      * Looks backwards up to 300 chars from the tax ID for the nearest "名称：XXX".
      */
     private String extractNameNearTaxId(String text, int occurrence) {
+        final String NAME_RE = "[\\u4e00-\\u9fff（）()A-Za-z\\d·]{2,40}";
         Matcher m = Pattern.compile("纳税人识别号[:：]\\s*([\\dA-Z]{15,20})").matcher(text);
         int count = 0;
         while (m.find()) {
@@ -420,7 +425,7 @@ public class InvoiceService {
                 // Look backwards from this tax ID for the nearest "名称：XXX"
                 int start = Math.max(0, m.start() - 300);
                 String before = text.substring(start, m.start());
-                Matcher nameM = Pattern.compile("名称[:：]\\s*([^\\n]{2,30})").matcher(before);
+                Matcher nameM = Pattern.compile("名称[:：]\\s*(" + NAME_RE + ")").matcher(before);
                 String lastName = null;
                 while (nameM.find()) {
                     lastName = nameM.group(1).trim();
