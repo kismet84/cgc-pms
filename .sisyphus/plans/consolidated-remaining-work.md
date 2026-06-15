@@ -994,7 +994,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(frontend): replace catch (e: any) with catch (e: unknown) in invoice and users pages`
 
-- [ ] 21. **修复 122 个无参数 catch 块（P1）**
+- [x] 21. **修复 122 个无参数 catch 块（P1）**
 
   **Synthesis ID**: S-P1-08 (D3-003)
   **What to do**:
