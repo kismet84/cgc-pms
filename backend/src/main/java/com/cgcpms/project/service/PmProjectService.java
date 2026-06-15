@@ -69,15 +69,21 @@ public class PmProjectService {
             String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
             String prefix = "XM-" + today + "-";
 
+            Long tenantId = UserContext.getCurrentTenantId();
+            if (tenantId == null) {
+                tenantId = 0L;
+            }
+
             LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(PmProject::getTenantId, UserContext.getCurrentTenantId())
+            wrapper.eq(PmProject::getTenantId, tenantId)
                     .likeRight(PmProject::getProjectCode, prefix)
-                    .orderByDesc(PmProject::getProjectCode);
-            Page<PmProject> page = pmProjectMapper.selectPage(new Page<>(1, 1), wrapper);
+                    .orderByDesc(PmProject::getProjectCode)
+                    .last("LIMIT 1");
+            List<PmProject> list = pmProjectMapper.selectList(wrapper);
 
             int seq = 1;
-            if (!page.getRecords().isEmpty()) {
-                PmProject last = page.getRecords().get(0);
+            if (!list.isEmpty()) {
+                PmProject last = list.get(0);
                 if (last.getProjectCode() != null
                         && last.getProjectCode().length() == prefix.length() + 3) {
                     try {
@@ -89,6 +95,7 @@ public class PmProjectService {
             }
             project.setProjectCode(prefix + String.format("%03d", seq));
             project.setStatus("DRAFT");
+            project.setTenantId(tenantId);
 
             pmProjectMapper.insert(project);
             return project.getId();
