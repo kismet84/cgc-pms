@@ -158,6 +158,15 @@ async function handlePasswordChange() {
           layout="vertical"
           @finish="handlePasswordChange"
         >
+          <!-- hidden username field for password manager context -->
+          <input
+            type="text"
+            autocomplete="username"
+            :value="userStore.userInfo?.username"
+            readonly
+            hidden
+          />
+
           <a-form-item label="原密码" name="oldPassword">
             <a-input-password
               v-model:value="passwordForm.oldPassword"
