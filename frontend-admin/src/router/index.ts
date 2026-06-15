@@ -155,6 +155,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/project/members.vue'),
             meta: { title: '项目成员', hidden: true },
           },
+          {
+            path: ':projectId/edit',
+            name: 'ProjectEdit',
+            component: () => import('@/pages/project/edit.vue'),
+            meta: { title: '编辑项目', hidden: true },
+          },
         ],
       },
       {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { getProjectList, createProject } from '@/api/modules/project'
@@ -21,6 +22,7 @@ const pageSize = ref(20)
 
 const createVisible = ref(false)
 const createLoading = ref(false)
+const router = useRouter()
 const createFormRef = ref()
 const createForm = reactive({
   projectName: '',
@@ -146,10 +148,19 @@ const TYPE_COLOR: Record<string, string> = {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  进行中: 'success',
-  已完工: 'default',
-  暂停: 'warning',
-  前期: 'processing',
+  DRAFT: 'processing',
+  ONGOING: 'success',
+  COMPLETED: 'default',
+  SUSPENDED: 'warning',
+  CLOSED: 'error',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  DRAFT: '前期',
+  ONGOING: '在建',
+  COMPLETED: '已竣工',
+  SUSPENDED: '已暂停',
+  CLOSED: '已关闭',
 }
 
 const APPROVAL_COLOR: Record<string, string> = {
@@ -243,10 +254,11 @@ const columns = [
             allow-clear
             style="width: 120px"
           >
-            <a-select-option value="进行中">进行中</a-select-option>
-            <a-select-option value="已完工">已完工</a-select-option>
-            <a-select-option value="暂停">暂停</a-select-option>
-            <a-select-option value="前期">前期</a-select-option>
+            <a-select-option value="DRAFT">前期</a-select-option>
+            <a-select-option value="ONGOING">在建</a-select-option>
+            <a-select-option value="COMPLETED">已竣工</a-select-option>
+            <a-select-option value="SUSPENDED">已暂停</a-select-option>
+            <a-select-option value="CLOSED">已关闭</a-select-option>
           </a-select>
         </div>
         <div class="pj-filter-actions">
@@ -367,7 +379,7 @@ const columns = [
             <span>{{ record.plannedStartDate }} ~ {{ record.plannedEndDate }}</span>
           </template>
           <template v-else-if="column.dataIndex === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status] ?? 'default'">{{ record.status }}</a-tag>
+            <a-tag :color="STATUS_COLOR[record.status] ?? 'default'">{{ STATUS_LABEL[record.status] ?? record.status }}</a-tag>
           </template>
           <template v-else-if="column.dataIndex === 'approvalStatus'">
             <a-tag :color="APPROVAL_COLOR[record.approvalStatus] ?? 'default'">{{
@@ -376,8 +388,8 @@ const columns = [
           </template>
           <template v-else-if="column.dataIndex === 'ops'">
             <div class="pj-ops">
-              <a class="pj-link" @click="() => record">查看</a>
-              <a class="pj-link" @click="() => record">编辑</a>
+              <a class="pj-link" @click="router.push(`/project/${record.id}/overview`)">查看</a>
+              <a class="pj-link" @click="router.push(`/project/${record.id}/edit`)">编辑</a>
             </div>
           </template>
         </template>
