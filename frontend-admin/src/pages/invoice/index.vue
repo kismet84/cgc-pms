@@ -397,6 +397,9 @@ function getPayRecordLabel(record: InvoiceVO): string {
 }
 
 onMounted(() => {
+  ;(window as any).handleSearch = handleSearch
+  ;(window as any).filter = filter
+  console.log('[invoice] mounted, handleSearch attached to window')
   fetchPayRecords()
   fetchData()
 })
@@ -454,7 +457,8 @@ defineExpose({
           </a-select>
         </div>
         <div class="pm-filter-actions">
-          <span @click="handleSearch"><a-button type="primary">查询</a-button></span>
+          <span v-on:click="handleSearch"><a-button type="primary">查询</a-button></span>
+          <button v-on:click="handleSearch" class="ant-btn ant-btn-primary">查询(原生)</button>
           <a-button @click="handleReset">重置</a-button>
           <a-button type="primary" @click="handleAdd">新增发票</a-button>
         </div>
