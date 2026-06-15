@@ -80,6 +80,9 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
             cost.setCostType(COST_TYPE);
             cost.setCostSubjectId(item.getCostSubjectId());
             cost.setAmount(nvl(item.getAmount()));
+            // Source item does not provide tax breakdown; assume full amount without tax
+            cost.setTaxAmount(BigDecimal.ZERO);
+            cost.setAmountWithoutTax(nvl(item.getAmount()));
             cost.setSourceType(SOURCE_TYPE);
             cost.setSourceId(varOrderId);
             cost.setSourceItemId(item.getId());

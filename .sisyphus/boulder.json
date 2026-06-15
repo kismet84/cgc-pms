@@ -10,7 +10,13 @@
     "ses_13518ba37ffeKFxhwOWc3UqeOh",
     "ses_13506b1acffeokQptTqe5FgNmW",
     "ses_135068e8effeXJdj5JRn1ttfEo",
-    "ses_135066c80ffeF8Fcs89BZ4R1J2"
+    "ses_135066c80ffeF8Fcs89BZ4R1J2",
+    "ses_134fe18b8ffeol0sMXT0HRCfrP",
+    "ses_134fdf9b3ffeXD6LwEKCPu7nVe",
+    "ses_134fddf17ffeW7U3Ige38LPkkR",
+    "ses_134fdb91fffeLoYSNfZEvkNIGd",
+    "ses_134fda563ffe2q5TbbzQBh4vYG",
+    "ses_134fd723effe2IHa1EoNN3ET9S"
   ],
   "session_origins": {
     "ses_1353c29c4ffekkF4VTxO4udf7X": "direct",
@@ -21,7 +27,13 @@
     "ses_13518ba37ffeKFxhwOWc3UqeOh": "appended",
     "ses_13506b1acffeokQptTqe5FgNmW": "appended",
     "ses_135068e8effeXJdj5JRn1ttfEo": "appended",
-    "ses_135066c80ffeF8Fcs89BZ4R1J2": "appended"
+    "ses_135066c80ffeF8Fcs89BZ4R1J2": "appended",
+    "ses_134fe18b8ffeol0sMXT0HRCfrP": "appended",
+    "ses_134fdf9b3ffeXD6LwEKCPu7nVe": "appended",
+    "ses_134fddf17ffeW7U3Ige38LPkkR": "appended",
+    "ses_134fdb91fffeLoYSNfZEvkNIGd": "appended",
+    "ses_134fda563ffe2q5TbbzQBh4vYG": "appended",
+    "ses_134fd723effe2IHa1EoNN3ET9S": "appended"
   },
   "plan_name": "consolidated-remaining-work",
   "agent": "atlas",
@@ -51,6 +63,15 @@
       "agent": "Sisyphus-Junior",
       "category": "quick",
       "updated_at": "2026-06-15T11:18:42.865Z"
+    },
+    "todo:11": {
+      "task_key": "todo:11",
+      "task_label": "11",
+      "task_title": "**修复 deploy/.env 安全问题（P1）**",
+      "session_id": "ses_134fd723effe2IHa1EoNN3ET9S",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-06-15T11:20:02.855Z"
     }
   }
 }

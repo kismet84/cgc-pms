@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static com.cgcpms.common.util.BigDecimalUtils.nvl;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -76,6 +77,9 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
             cost.setCostType(COST_TYPE);
             cost.setCostSubjectId(defaultSubjectId);
             cost.setAmount(nvl(item.getAmount()));
+            // Source item does not provide tax breakdown; assume full amount without tax
+            cost.setTaxAmount(BigDecimal.ZERO);
+            cost.setAmountWithoutTax(nvl(item.getAmount()));
             cost.setSourceType(SOURCE_TYPE);
             cost.setSourceId(measureId);
             cost.setSourceItemId(item.getId());

@@ -580,7 +580,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
 #### Wave 3-B: P1 独立修复（6 个任务，全部可并行）
 
-- [ ] 11. **修复 deploy/.env 安全问题（P1）**
+- [x] 11. **修复 deploy/.env 安全问题（P1）**
 
   **Synthesis IDs**: S-P1-01 (D1-001), S-P1-11 (D4-015)
   **What to do**:
@@ -624,7 +624,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(security): replace self-referencing placeholders in deploy/.env.example with explicit defaults`
 
-- [ ] 12. **修复 backend/Dockerfile 安全加固（P1）**
+- [x] 12. **修复 backend/Dockerfile 安全加固（P1）**
 
   **Synthesis IDs**: S-P1-02 (D1-002 + D1-010), S-P1-10 (D4-007 + D1-009)
   **What to do**:
@@ -673,7 +673,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(security): harden backend Dockerfile with sentinel defaults and parameterized useSSL`
 
-- [ ] 13. **修复 nginx 安全头配置（P1）**
+- [x] 13. **修复 nginx 安全头配置（P1）**
 
   **Synthesis ID**: S-P1-03 (D1-003)
   **What to do**:
@@ -717,7 +717,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(security): enable HSTS, HTTP-to-HTTPS redirect, and Content-Security-Policy in nginx`
 
-- [ ] 14. **为登录/刷新端点添加速率限制（P1）**
+- [x] 14. **为登录/刷新端点添加速率限制（P1）**
 
   **Synthesis ID**: S-P1-04 (D1-004)
   **What to do**:
@@ -760,7 +760,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(security): add Redis-based rate limiting to auth login and refresh endpoints`
 
-- [ ] 15. **修复 InvoiceService 空 catch 块（P1）**
+- [x] 15. **修复 InvoiceService 空 catch 块（P1）**
 
   **Synthesis ID**: S-P1-06 (D2-002)
   **What to do**:
@@ -795,7 +795,7 @@ Wave 4（最终门禁 — 4 路并行）:
 
   **Commit**: YES — `fix(backend): add logging to empty catch block in InvoiceService PDF close`
 
-- [ ] 16. **填充 CostItem taxAmount/amountWithoutTax 字段（P1）**
+- [x] 16. **填充 CostItem taxAmount/amountWithoutTax 字段（P1）**
 
   **Synthesis ID**: S-P1-14 (D5-004)
   **What to do**:

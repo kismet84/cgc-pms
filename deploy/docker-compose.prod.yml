@@ -130,7 +130,7 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       # ---- Database (service names resolve via Docker network) ----
       # useSSL=false: Docker internal bridge network, traffic never leaves host
-      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&allowPublicKeyRetrieval=true"
       DB_USERNAME: ${MYSQL_USER:-cgc}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       # ---- Redis ----

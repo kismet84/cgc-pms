@@ -1,5 +1,6 @@
 package com.cgcpms.invoice.service;
 
+import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -207,8 +208,8 @@ public class InvoiceService {
             if (document != null) {
                 try {
                     document.close();
-                } catch (Exception ignored) {
-                    // ignore close errors
+                } catch (IOException e) {
+                    log.warn("Failed to close PDF document", e);
                 }
             }
         }
