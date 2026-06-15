@@ -206,21 +206,22 @@ public class CtContractService {
     }
 
     /**
-     * 查询合同审批记录。
-     * 注：wf_instance 的租户隔离由 WorkflowQueryService 的提交/查询入口统一处理，
-     * 此处通过 businessType + businessId 定位实例，实例级权限已在调用方校验。
+     * 查询合同审批记录（含租户隔离）。
      */
     public List<ContractApprovalRecordVO> getApprovalRecords(Long contractId) {
-        // 1. 查 wf_instance WHERE businessType=CONTRACT_APPROVAL AND businessId=contractId
+        Long tenantId = UserContext.getCurrentTenantId();
+        // 1. 查 wf_instance WHERE businessType=CONTRACT_APPROVAL AND businessId=contractId AND tenantId=?
         LambdaQueryWrapper<WfInstance> instQw = new LambdaQueryWrapper<>();
         instQw.eq(WfInstance::getBusinessType, ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL)
-                .eq(WfInstance::getBusinessId, contractId);
+                .eq(WfInstance::getBusinessId, contractId)
+                .eq(WfInstance::getTenantId, tenantId);
         WfInstance instance = wfInstanceMapper.selectOne(instQw);
         if (instance == null) return List.of();
 
-        // 2. 查 wf_record WHERE instanceId=instance.id ORDER BY createdAt ASC
+        // 2. 查 wf_record WHERE instanceId=instance.id AND tenantId=? ORDER BY createdAt ASC
         LambdaQueryWrapper<WfRecord> recQw = new LambdaQueryWrapper<>();
         recQw.eq(WfRecord::getInstanceId, instance.getId())
+                .eq(WfRecord::getTenantId, tenantId)
                 .orderByAsc(WfRecord::getCreatedAt);
         List<WfRecord> records = wfRecordMapper.selectList(recQw);
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, ref, watch, onMounted, nextTick } from 'vue'
+import { computed, h, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { routes } from '@/router'
 import type { RouteRecordRaw } from 'vue-router'
@@ -132,13 +132,25 @@ function handleMenuClick({ key }: { key: string }) {
   router.push(key)
 }
 
+let menuObserver: MutationObserver | null = null
+
+function ensureMenuRole() {
+  const menuUl = document.querySelector('.sidebar-menu')
+  if (menuUl && !menuUl.hasAttribute('role')) {
+    menuUl.setAttribute('role', 'menu')
+  }
+}
+
 onMounted(() => {
   nextTick(() => {
-    const menuUl = document.querySelector('.sidebar-menu')
-    if (menuUl && !menuUl.hasAttribute('role')) {
-      menuUl.setAttribute('role', 'menu')
-    }
+    ensureMenuRole()
+    menuObserver = new MutationObserver(() => ensureMenuRole())
+    menuObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
   })
+})
+
+onBeforeUnmount(() => {
+  menuObserver?.disconnect()
 })
 </script>
 

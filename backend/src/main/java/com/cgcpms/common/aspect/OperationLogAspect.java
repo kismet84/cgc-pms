@@ -70,7 +70,7 @@ public class OperationLogAspect {
                         if (arg == null) return "null";
                         String s = arg.toString();
                         // Mask password/token/secret fields that may appear in toString()
-                        return s.replaceAll("(?i)(password|secret|token|accessKey|secretKey)=[^,}\\]]+", "$1=***");
+                        return s.replaceAll("(?i)(password|secret|token|accessKey|secretKey|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard|身份证|手机号|银行卡|密码|令牌)=[^,}\\]]+", "$1=***");
                     })
                     .collect(java.util.stream.Collectors.joining(", ", "[", "]"));
         } catch (Exception e) {

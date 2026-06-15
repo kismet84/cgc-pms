@@ -456,13 +456,13 @@ class WorkflowEngineIntegrationTest {
                 100L, 100L, "{}", "{}", null);
 
         // 运行中 + 发起人 → 可撤回。POC模式下审批人=提交者，所以同时有审批权限
-        List<String> actions = workflowEngine.getAvailableActions(instance.getId(), USER_ADMIN);
+        List<String> actions = workflowEngine.getAvailableActions(instance.getTenantId(), instance.getId(), USER_ADMIN);
         assertTrue(actions.contains("withdraw"), "发起人应可撤回");
         assertTrue(actions.contains("approve"), "POC模式下发起人即审批人，应有同意按钮");
 
         // 撤回后 → 不可操作（除了重提）
         workflowEngine.withdraw(instance.getId(), USER_ADMIN, "admin");
-        List<String> actionsAfter = workflowEngine.getAvailableActions(instance.getId(), USER_ADMIN);
+        List<String> actionsAfter = workflowEngine.getAvailableActions(instance.getTenantId(), instance.getId(), USER_ADMIN);
         assertTrue(actionsAfter.contains("resubmit"), "撤回后发起人应可重提");
 
         System.out.println("✅ 场景10 通过: RUNNING状态actions=" + actions + ", WITHDRAWN状态actions=" + actionsAfter);

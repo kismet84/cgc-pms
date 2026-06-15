@@ -1,12 +1,76 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\reset-database.md",
-  "started_at": "2026-06-14T12:49:10.318Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\unified-vue-fixes.md",
+  "started_at": "2026-06-15T04:02:22.328Z",
   "session_ids": [
-    "ses_139eb1704ffeNug443DQy1xHFP"
+    "ses_1369d9bb2ffeGFvWV29R2VTe8t",
+    "ses_13681aa38ffesSNxgrjG0bU1yh",
+    "ses_136819f6effe1QFs4nNszBXvyu",
+    "ses_136818880ffeQ482f0SiMWZj2S",
+    "ses_1368156d8ffe6ooRveK0eFA4uA"
   ],
   "session_origins": {
-    "ses_139eb1704ffeNug443DQy1xHFP": "direct"
+    "ses_1369d9bb2ffeGFvWV29R2VTe8t": "direct",
+    "ses_13681aa38ffesSNxgrjG0bU1yh": "appended",
+    "ses_136819f6effe1QFs4nNszBXvyu": "appended",
+    "ses_136818880ffeQ482f0SiMWZj2S": "appended",
+    "ses_1368156d8ffe6ooRveK0eFA4uA": "appended"
   },
-  "plan_name": "reset-database",
-  "agent": "atlas"
+  "plan_name": "unified-vue-fixes",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:0": {
+      "task_key": "todo:0",
+      "task_label": "0",
+      "task_title": "Establish baseline — run tests and build BEFORE any changes",
+      "session_id": "ses_1368d568bffeIotF0d32KX3lZB",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-15T04:04:21.599Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Register v-loading directive globally in main.ts",
+      "session_id": "ses_1368b3c66ffecj1MtByo7vTBLQ",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-15T04:09:14.740Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Fix userInfo binding in BasicLayoutAsync.vue",
+      "session_id": "ses_1368671d2ffewrqe6bJCTpmgNx",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-15T04:12:04.783Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Fix computed v-model in SidebarMenu.vue (hardest refactor)",
+      "session_id": "ses_136847d46ffefJNq1LV39Ty8ce",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-15T04:14:27.138Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_136818880ffeQ482f0SiMWZj2S",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-15T04:32:28.837Z"
+    },
+    "final-wave:f3": {
+      "task_key": "final-wave:f3",
+      "task_label": "F3",
+      "task_title": "**Real QA** — `unspecified-high` (+ `playwright`)",
+      "session_id": "ses_1368156d8ffe6ooRveK0eFA4uA",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-15T04:34:57.971Z"
+    }
+  }
 }

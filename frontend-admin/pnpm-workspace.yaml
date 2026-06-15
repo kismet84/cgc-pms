@@ -2,3 +2,5 @@ allowBuilds:
   core-js: set this to true or false
   esbuild: true
   vue-demi: set this to true or false
+patchedDependencies:
+  ant-design-vue@4.2.6: patches/ant-design-vue@4.2.6.patch

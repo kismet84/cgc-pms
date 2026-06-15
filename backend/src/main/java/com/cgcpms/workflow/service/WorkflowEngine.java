@@ -85,10 +85,6 @@ public class WorkflowEngine {
 
     // ───────────────────── QUERY METHODS ─────────────────────
 
-    public List<String> getAvailableActions(Long instanceId, Long userId) {
-        return getAvailableActions(null, instanceId, userId);
-    }
-
     public List<String> getAvailableActions(Long tenantId, Long instanceId, Long userId) {
         LambdaQueryWrapper<WfInstance> instanceWrapper = new LambdaQueryWrapper<WfInstance>()
                 .eq(WfInstance::getId, instanceId);

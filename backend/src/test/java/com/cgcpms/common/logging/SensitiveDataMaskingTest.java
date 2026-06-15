@@ -18,16 +18,16 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Verifies sensitive data masking in log output via Logback %replace.
  * The logback-spring.xml uses:
- * %replace(%msg){'(?i)(password|token|secret|authorization)\\s*[:=]\\s*[^\\s,;&]+', '$1=***MASKED***'}
+ * %replace(%msg){'(?i)(password|token|secret|authorization|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard)\\s*[:=]\\s*[^\\s,;&]+', '$1=***MASKED***'}
  */
 class SensitiveDataMaskingTest {
 
     private static final Pattern SENSITIVE = Pattern.compile(
-        "(?i)(password|token|secret|authorization)\\s*[:=]\\s*([^\\s,;&]+)"
+        "(?i)(password|token|secret|authorization|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard)\\s*[:=]\\s*([^\\s,;&]+)"
     );
 
     private static final String REPLACE_PATTERN =
-        "%replace(%msg){'(?i)(password|token|secret|authorization)\\s*[:=]\\s*[^\\s,;&]+', '$1=***MASKED***'}";
+        "%replace(%msg){'(?i)(password|token|secret|authorization|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard)\\s*[:=]\\s*[^\\s,;&]+', '$1=***MASKED***'}";
 
     private LoggerContext lc;
     private Logger logger;
@@ -119,9 +119,9 @@ class SensitiveDataMaskingTest {
 
     @Test
     void leavesNonSensitiveKeyValueUntouched() {
-        String input = "username=john and email=john@test.com";
+        String input = "username=john and department=engineering";
         String result = SENSITIVE.matcher(input).replaceAll("$1=***MASKED***");
-        assertEquals("username=john and email=john@test.com", result);
+        assertEquals("username=john and department=engineering", result);
     }
 
     @Test
