@@ -214,7 +214,10 @@ public class InvoiceService {
         result.setInvoiceType(extractInvoiceType(text));
         result.setInvoiceAmount(extractAmount(text, "价税合计.*?[¥￥]\\s*([\\d,]+\\.?\\d*)"));
         result.setTaxRate(extractTaxRate(text));
-        result.setTaxAmount(extractAmount(text, "税额[:：].*?[¥￥]\\s*([\\d,]+\\.?\\d*)"));
+        result.setTaxAmount(extractAmountMulti(text,
+                "税额[:：].*?[¥￥]\\s*([\\d,]+\\.?\\d*)",
+                "税额[:：]\\s*([\\d,]+\\.?\\d{2})",
+                "税额[\\s\\S]{0,150}?([\\d,]+\\.?\\d{2})"));
         result.setInvoiceDate(extractInvoiceDate(text));
         result.setSellerName(extractSellerName(text));
         result.setBuyerName(extractBuyerName(text));
@@ -256,11 +259,33 @@ public class InvoiceService {
         return raw.replaceAll("[¥￥,\\s]", "");
     }
 
+    /**
+     * Try multiple amount regex patterns in order, returning first match with formatting stripped.
+     */
+    private String extractAmountMulti(String text, String... regexes) {
+        for (String regex : regexes) {
+            String raw = extractFirstDotAll(text, regex);
+            if (raw != null) {
+                return raw.replaceAll("[¥￥,\\s]", "");
+            }
+        }
+        return null;
+    }
+
     private String extractTaxRate(String text) {
+        // Pattern 1: Explicit label with colon "税率：13%" or "税率:13%" (existing)
         String raw = extractFirst(text, "税率[:：]\\s*([\\d]+\\.?\\d*)%?");
-        if (raw == null) return null;
-        if (raw.endsWith("%")) raw = raw.substring(0, raw.length() - 1);
-        return raw.trim();
+        if (raw != null) {
+            if (raw.endsWith("%")) raw = raw.substring(0, raw.length() - 1);
+            return raw.trim();
+        }
+        // Pattern 2: Table format - label and value across lines (no colon)
+        raw = extractFirstDotAll(text, "税率[\\s\\S]{0,80}?([\\d]+\\.?\\d*)\\s*%");
+        if (raw != null) return raw.trim();
+        // Pattern 3: "税率" followed by bare digits in table row
+        raw = extractFirstDotAll(text, "税率[\\s\\S]{0,80}?([\\d]{1,2})[%\\s]");
+        if (raw != null) return raw.trim();
+        return null;
     }
 
     private String extractInvoiceDate(String text) {
@@ -283,36 +308,63 @@ public class InvoiceService {
     }
 
     private String extractSellerName(String text) {
-        // Multiple keyword variants for seller name
-        String[] patterns = {
+        // Primary: explicit seller label patterns (existing)
+        String[] primaryPatterns = {
             "销售方名称[:：]\\s*([^\\n]+)",
             "销货单位[:：]\\s*([^\\n]+)",
             "销货方名称[:：]\\s*([^\\n]+)",
             "卖方名称[:：]\\s*([^\\n]+)",
             "销方名称[:：]\\s*([^\\n]+)",
         };
-        String name = extractFirstMulti(text, patterns);
+        String name = extractFirstMulti(text, primaryPatterns);
         if (name != null) return name;
-        // Fallback: second "名称：XXX公司" match
-        Matcher m = Pattern.compile("名称[:：]\\s*(.+公司)", Pattern.DOTALL).matcher(text);
+
+        // Fallback 1: generic "名称：" near "销货" or "销售" context
+        name = extractFirstDotAll(text, "[销][货售方]\\s*单位[\\s\\S]{0,200}?名称[:：]\\s*([^\\n]+)");
+        if (name != null) return name.trim();
+
+        // Fallback 2: second "名称：XXX" match (seller typically comes after buyer)
+        Matcher m = Pattern.compile("名称[:：]\\s*([^\\n]+)").matcher(text);
         int count = 0;
         while (m.find()) {
             count++;
-            if (count == 2) return m.group(1).trim();
+            if (count >= 2) {
+                String candidate = m.group(1).trim();
+                // Skip numeric-only matches (amounts, dates) and tax IDs
+                if (!candidate.matches("[\\d.,\\-\\s]+") && candidate.length() >= 2) {
+                    return candidate;
+                }
+            }
         }
         return null;
     }
 
     private String extractBuyerName(String text) {
-        // Multiple keyword variants for buyer name
-        String[] patterns = {
+        // Primary: explicit buyer label patterns (existing)
+        String[] primaryPatterns = {
             "购买方名称[:：]\\s*([^\\n]+)",
             "购货单位[:：]\\s*([^\\n]+)",
             "购货方名称[:：]\\s*([^\\n]+)",
             "买方名称[:：]\\s*([^\\n]+)",
             "购方名称[:：]\\s*([^\\n]+)",
         };
-        return extractFirstMulti(text, patterns);
+        String name = extractFirstMulti(text, primaryPatterns);
+        if (name != null) return name;
+
+        // Fallback 1: generic "名称：" near "购货" or "购买" context
+        name = extractFirstDotAll(text, "[购買][货方]\\s*单位[\\s\\S]{0,200}?名称[:：]\\s*([^\\n]+)");
+        if (name != null) return name.trim();
+
+        // Fallback 2: first "名称：XXX" match (buyer appears first in Chinese invoices)
+        Matcher m = Pattern.compile("名称[:：]\\s*([^\\n]+)").matcher(text);
+        if (m.find()) {
+            String candidate = m.group(1).trim();
+            // Skip pure numbers, tax IDs, and dates
+            if (!candidate.matches("[\\dA-Z\\-\\s]+") && candidate.length() >= 2) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private String extractBuyerTaxNo(String text) {
