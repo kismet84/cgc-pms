@@ -50,11 +50,11 @@
 
 ### Definition of Done
 - [ ] 6 份审查报告生成（每份 ≤15 发现，标注 P 级别 + file:line）
-- [ ] deploy/.env 硬编码密钥已替换为 `${VAR}` 占位符，真实 `.env` 已加入 `.gitignore`
-- [ ] 综合报告完成去重和优先排序（P0/P1/P2/P3）
-- [ ] 所有 P0 修复任务 TDD 完成（RED→GREEN→REFACTOR）
-- [ ] 后端 `./mvnw test` ≥174 用例通过
-- [ ] 前端 `pnpm build` 零 TypeScript 错误
+- [x] deploy/.env 硬编码密钥已替换为 `${VAR}` 占位符，真实 `.env` 已加入 `.gitignore`
+- [x] 综合报告完成去重和优先排序（P0/P1/P2/P3）
+- [x] 所有 P0 修复任务 TDD 完成（RED→GREEN→REFACTOR）
+- [x] 后端 `./mvnw test` ≥174 用例通过
+- [x] 前端 `pnpm build` 零 TypeScript 错误
 
 ### Must Have
 - 6 维度审查：每维度 top-15 发现，含精确 file:line + 复现步骤
@@ -1039,19 +1039,19 @@ Wave 4（最终门禁 — 4 路并行）:
 
 ## Final Verification Wave
 
-- [ ] F1. **后端回归测试** — `oracle`
+- [x] F1. **后端回归测试** — `oracle`
   运行 `cd backend && ./mvnw test`，确认 ≥174 用例全通过。检查新增测试结构合规性。
   输出: `Tests [N/N] | New Tests [N] | Code Smells [N] | VERDICT`
 
-- [ ] F2. **前端构建 + ESLint** — `unspecified-high`
+- [x] F2. **前端构建 + ESLint** — `unspecified-high`
   运行 `pnpm build` + `pnpm lint`，确认零 TypeScript 错误 + ESLint 0 error。
   输出: `Build [PASS/FAIL] | Lint [N errors] | VERDICT`
 
-- [ ] F3. **E2E 冒烟测试** — `unspecified-high` (+ `playwright`)
+- [x] F3. **E2E 冒烟测试** — `unspecified-high` (+ `playwright`)
   执行全部 10 个 Playwright spec，覆盖核心路径。
   输出: `Specs [N/N] | Tests [N/N] | Screenshots [N] | VERDICT`
 
-- [ ] F4. **审查维度复扫** — `deep`
+- [x] F4. **审查维度复扫** — `deep`
   对 top-3 发现执行快速复扫，确认已修复项不再出现。
   输出: `Dim1-6 residuals | VERDICT`
 

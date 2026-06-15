@@ -21,7 +21,8 @@
     "ses_134faf690ffeJq83Mzzp272pcp",
     "ses_134f96767ffeqXmp2r8FXz1IHr",
     "ses_134f9517bffeR9ytLC7FXW8vvu",
-    "ses_134f6a8bbffeEiJbftsU0HQLJA"
+    "ses_134f6a8bbffeEiJbftsU0HQLJA",
+    "ses_134f2368bffeGgIZWx4aGGy1tt"
   ],
   "session_origins": {
     "ses_1353c29c4ffekkF4VTxO4udf7X": "direct",
@@ -43,7 +44,8 @@
     "ses_134faf690ffeJq83Mzzp272pcp": "appended",
     "ses_134f96767ffeqXmp2r8FXz1IHr": "appended",
     "ses_134f9517bffeR9ytLC7FXW8vvu": "appended",
-    "ses_134f6a8bbffeEiJbftsU0HQLJA": "appended"
+    "ses_134f6a8bbffeEiJbftsU0HQLJA": "appended",
+    "ses_134f2368bffeGgIZWx4aGGy1tt": "appended"
   },
   "plan_name": "consolidated-remaining-work",
   "agent": "atlas",
@@ -118,6 +120,15 @@
       "agent": "Sisyphus-Junior",
       "category": "quick",
       "updated_at": "2026-06-15T11:27:55.591Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**后端回归测试** — `oracle`",
+      "session_id": "ses_134f2368bffeGgIZWx4aGGy1tt",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-15T11:33:44.228Z"
     }
   }
 }
