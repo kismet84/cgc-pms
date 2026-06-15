@@ -84,6 +84,7 @@ public class PmProjectService {
             }
         }
         project.setProjectCode(prefix + String.format("%03d", seq));
+        project.setStatus("DRAFT");
 
         pmProjectMapper.insert(project);
         return project.getId();
