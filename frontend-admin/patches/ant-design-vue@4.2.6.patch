@@ -1,3 +1,15 @@
+diff --git a/es/menu/src/SubMenu.js b/es/menu/src/SubMenu.js
+index 817ef215338c1b09c2781b6f56d5398698883039..5cd4f4ea2d3547a48b4ef58899982f20c99f62b6 100644
+--- a/es/menu/src/SubMenu.js
++++ b/es/menu/src/SubMenu.js
+@@ -204,6 +204,7 @@ export default defineComponent({
+         "ref": elementRef,
+         "title": typeof title === 'string' ? title : null,
+         "data-menu-id": key,
++        "role": "menuitem",
+         "aria-expanded": open.value,
+         "aria-haspopup": true,
+         "aria-controls": popupId,
 diff --git a/es/style/index.js b/es/style/index.js
 index 39caacabc15ab15e1d1b609858be674956bbc681..cec16abac77b3e474f5772b002a346704743cc55 100644
 --- a/es/style/index.js
@@ -40,6 +52,18 @@ index 64f547bc2943c4ecdca559dabff6226b2e31a0fb..38d3048491418e7761bb2b450ea22dfe
        }), true, true);
        return inputNode;
      };
+diff --git a/lib/menu/src/SubMenu.js b/lib/menu/src/SubMenu.js
+index 290b2ae7afe7040c28c9bbaef4bfa6bee79186d1..8d1561248fe0cd4aa61b4987b6797e2ebfd2a9e2 100644
+--- a/lib/menu/src/SubMenu.js
++++ b/lib/menu/src/SubMenu.js
+@@ -213,6 +213,7 @@ var _default = exports.default = (0, _vue.defineComponent)({
+         "ref": elementRef,
+         "title": typeof title === 'string' ? title : null,
+         "data-menu-id": key,
++        "role": "menuitem",
+         "aria-expanded": open.value,
+         "aria-haspopup": true,
+         "aria-controls": popupId,
 diff --git a/lib/style/index.js b/lib/style/index.js
 index aad40554238125539dad7d94e1184b261e6ce209..67af9e1b9af8e6cac2b4983f460a7dc66b98a8d7 100644
 --- a/lib/style/index.js
