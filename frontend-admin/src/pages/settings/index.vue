@@ -2,7 +2,6 @@
 import { reactive, ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import service from '@/api/request'
-import UserManagement from './UserManagement.vue'
 
 interface Preferences {
   sidebarCollapsed: boolean
@@ -105,10 +104,6 @@ function handleClearDatabase() {
           </a-radio-group>
         </a-form-item>
       </a-form>
-    </a-card>
-
-    <a-card title="用户管理" :bordered="false" style="margin-top: 16px">
-      <UserManagement />
     </a-card>
 
     <a-card title="数据管理" :bordered="false" style="margin-top: 16px">
