@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { routes } from '@/router'
 import type { RouteRecordRaw } from 'vue-router'
@@ -108,7 +108,7 @@ const selectedKeys = computed(() => {
   return [route.path]
 })
 
-const openKeys = computed(() => {
+function computeOpenKeys(): string[] {
   const keys: string[] = []
   let parent = route.matched[route.matched.length - 2]
   while (parent) {
@@ -116,7 +116,17 @@ const openKeys = computed(() => {
     parent = route.matched[route.matched.findIndex((r) => r.path === parent.path) - 1]
   }
   return keys
-})
+}
+
+const openKeys = ref<string[]>(computeOpenKeys())
+
+watch(
+  () => route.path,
+  () => {
+    openKeys.value = computeOpenKeys()
+  },
+  { immediate: true },
+)
 
 function handleMenuClick({ key }: { key: string }) {
   router.push(key)
@@ -125,7 +135,7 @@ function handleMenuClick({ key }: { key: string }) {
 
 <template>
   <a-menu
-    v-model:selected-keys="selectedKeys"
+    :selected-keys="selectedKeys"
     v-model:open-keys="openKeys"
     mode="inline"
     class="sidebar-menu"
