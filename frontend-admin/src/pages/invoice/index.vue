@@ -191,7 +191,7 @@ function handleDelete(record: InvoiceVO) {
         message.success('删除成功')
         fetchData()
       } catch {
-        message.error('删除失败，请稍后重试')
+        Modal.error({ title: '删除失败', content: '删除失败，请稍后重试' })
       }
     },
   })
@@ -265,9 +265,9 @@ async function handleModalOk() {
   } catch (error: any) {
     const msg = error?.response?.data?.message || error?.message || ''
     if (msg.includes('已存在') || msg.includes('duplicate')) {
-      message.error('发票号码已存在，同一租户下发票号码不可重复')
+      Modal.error({ title: '操作失败', content: '发票号码已存在，同一租户下发票号码不可重复' })
     } else {
-      message.error('操作失败，请稍后重试')
+      Modal.error({ title: '操作失败', content: '操作失败，请稍后重试' })
     }
   }
 }
