@@ -332,7 +332,7 @@ public class InvoiceService {
         if (name != null) return name;
 
         // Fallback 1: generic "名称：" near seller context (no 单位 requirement)
-        name = extractFirstDotAll(text, "(?:销货|销售|销方|卖方)(?:\\s*(?:单位|方))?[\\s\\S]{0,200}?名称[:：]\\s*(" + NAME_RE + ")");
+        name = extractFirstDotAll(text, "(?:销(?:货|售|方)?|卖(?:方)?)(?:\\s*(?:单位|方))?[\\s\\S]{0,200}?名称[:：]\\s*(" + NAME_RE + ")");
         if (name != null && !name.trim().isEmpty()) return name.trim();
 
         // Fallback 2: seller name is near the SECOND tax ID
@@ -370,7 +370,7 @@ public class InvoiceService {
         if (name != null) return name;
 
         // Fallback 1: generic "名称：" near buyer context (no 单位 requirement)
-        name = extractFirstDotAll(text, "(?:购货|购买|购方|买方)(?:\\s*(?:单位|方))?[\\s\\S]{0,200}?名称[:：]\\s*(" + NAME_RE + ")");
+        name = extractFirstDotAll(text, "(?:购(?:货|买|方)?|买(?:方)?)(?:\\s*(?:单位|方))?[\\s\\S]{0,200}?名称[:：]\\s*(" + NAME_RE + ")");
         if (name != null && !name.trim().isEmpty()) return name.trim();
 
         // Fallback 2: buyer name is near the FIRST tax ID
