@@ -2,12 +2,14 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { storeToRefs } from 'pinia'
 import { QuestionCircleOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const { userInfo } = storeToRefs(userStore)
 const collapsed = ref(false)
 const isMobile = ref(false)
 let mobileQuery: MediaQueryList | undefined
