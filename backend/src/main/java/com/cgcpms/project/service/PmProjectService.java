@@ -69,18 +69,21 @@ public class PmProjectService {
         String prefix = "XM-" + today + "-";
 
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(PmProject::getProjectCode, prefix)
-                .orderByDesc(PmProject::getProjectCode)
-                .last("LIMIT 1");
-        PmProject last = pmProjectMapper.selectOne(wrapper);
+        wrapper.eq(PmProject::getTenantId, UserContext.getCurrentTenantId())
+                .likeRight(PmProject::getProjectCode, prefix)
+                .orderByDesc(PmProject::getProjectCode);
+        Page<PmProject> page = pmProjectMapper.selectPage(new Page<>(1, 1), wrapper);
 
         int seq = 1;
-        if (last != null && last.getProjectCode() != null
-                && last.getProjectCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getProjectCode(), e);
+        if (!page.getRecords().isEmpty()) {
+            PmProject last = page.getRecords().get(0);
+            if (last.getProjectCode() != null
+                    && last.getProjectCode().length() == prefix.length() + 3) {
+                try {
+                    seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1;
+                } catch (NumberFormatException e) {
+                    log.warn("Failed to parse sequence number: {}", last.getProjectCode(), e);
+                }
             }
         }
         project.setProjectCode(prefix + String.format("%03d", seq));
