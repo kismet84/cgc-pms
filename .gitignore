@@ -55,3 +55,9 @@ login-snapshot.yml
 
 # Superpowers visual brainstorming working files
 .superpowers/
+
+# Agent runtime & docs (excluded from repo)
+doc/
+docs/
+scripts/
+.agent-runtime/
