@@ -183,9 +183,9 @@ function validateTerms(): boolean {
 }
 
 // ---- Step handlers ----
-function handleNext() {
+async function handleNext() {
   if (current.value === 0) {
-    if (!validateBasic()) return
+    if (!(await validateBasic())) return
   } else if (current.value === 1) {
     if (!validateItems()) return
   } else if (current.value === 2) {
@@ -468,6 +468,18 @@ function genTermKey(): string {
                 </a-form-item>
               </a-col>
               <a-col :span="12">
+                <a-form-item label="合同金额(元)" name="contractAmount">
+                  <a-input-number
+                    v-model:value="formData.contractAmount"
+                    :min="0"
+                    :precision="2"
+                    placeholder="请输入合同金额"
+                    style="width: 100%"
+                    @change="dirty = true"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
                 <a-form-item label="甲方">
                   <a-select
                     v-model:value="formData.partyAId"
@@ -509,18 +521,7 @@ function genTermKey(): string {
                   </a-select>
                 </a-form-item>
               </a-col>
-              <a-col :span="12">
-                <a-form-item label="合同金额(元)" name="contractAmount">
-                  <a-input-number
-                    v-model:value="formData.contractAmount"
-                    :min="0"
-                    :precision="2"
-                    placeholder="请输入合同金额"
-                    style="width: 100%"
-                    @change="dirty = true"
-                  />
-                </a-form-item>
-              </a-col>
+              
               <a-col :span="12">
                 <a-form-item label="签订日期" name="signedDate">
                   <a-date-picker
@@ -614,7 +615,7 @@ function genTermKey(): string {
 
         <!-- Step 2: Items -->
         <div v-show="current === 1">
-          <ContractItemEditor v-model:items="items" @change="dirty = true" />
+          <ContractItemEditor v-model="items" @change="dirty = true" />
         </div>
 
         <!-- Step 3: Payment Terms -->
