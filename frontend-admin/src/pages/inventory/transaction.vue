@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { DollarOutlined } from '@ant-design/icons-vue'
 import { stockIn, stockOut, getWarehouseList } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import type { WarehouseVO } from '@/types/inventory'
@@ -111,10 +112,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="pm-page">
-    <a-page-header title="出入库操作" class="pm-header" />
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>库存管理</a-breadcrumb-item><a-breadcrumb-item>库存交易</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">库存交易</h1>
+      <div class="pt-head-actions"></div>
+    </div>
 
-    <div class="pm-card" style="padding: 0">
+    <div class="pt-kpi-strip" style="grid-template-columns:repeat(2,1fr)">
+      <div class="pt-kpi"><div class="pt-kpi-label">入库操作</div><div class="pt-kpi-value" style="color:#22c55e"><DollarOutlined /> 快捷</div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">出库操作</div><div class="pt-kpi-value" style="color:#ef4444"><DollarOutlined /> 快捷</div></div>
+    </div>
+
+    <div class="pt-panel" style="padding: 0">
       <a-tabs v-model:activeKey="activeTab" style="padding: 0 22px">
         <a-tab-pane key="in" tab="入库" />
         <a-tab-pane key="out" tab="出库" />
@@ -273,20 +283,7 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-.pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.pm-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.pm-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-</style>
+<style scoped></style>
+
+
+

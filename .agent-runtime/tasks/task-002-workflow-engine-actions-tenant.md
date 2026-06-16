@@ -1,6 +1,6 @@
 # Task-002: WorkflowEngine.getAvailableActions 移除不安全重载
 
-## Status: pending
+## Status: Completed.
 
 ## 用户请求
 修复审计报告 P1-10 相关问题：`WorkflowEngine.getAvailableActions(Long instanceId, Long userId)` 重载传 `null` 作为 `tenantId`，导致跳过租户过滤。

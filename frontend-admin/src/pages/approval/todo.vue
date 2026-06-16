@@ -124,14 +124,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="wf-todo-page">
-    <a-page-header :title="pageHeaderTitle()" :sub-title="pageHeaderSubtitle()" />
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>审批管理</a-breadcrumb-item><a-breadcrumb-item>待办</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">待办审批</h1>
+      <div class="pt-head-actions"></div>
+    </div>
 
     <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
       <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label" />
     </a-tabs>
 
-    <div class="wf-card">
+    <div class="pt-panel">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -181,13 +185,5 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-.wf-todo-page {
-  padding: 0;
-}
-.wf-card {
-  background: #fff;
-  border-radius: 4px;
-  padding: 16px;
-}
-</style>
+<style scoped></style>
+

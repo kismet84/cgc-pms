@@ -335,6 +335,11 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
+const kpiMeasureTotal = computed(() => tableData.value.reduce((s,r) => s + (parseFloat(r.reportedAmount)||0), 0))
+const kpiApproved = computed(() => tableData.value.filter(r => r.status === "CONFIRMED" || r.status === "COMPLETED").reduce((s,r) => s + (parseFloat(r.approvedAmount)||0), 0))
+const kpiMeasurePending = computed(() => tableData.value.filter(r => r.status === "DRAFT" || r.status === "APPROVING").length)
+const measureStatusBreakdown = computed(() => { const m: Record<string,number> = {}; tableData.value.forEach(r => { m[STATUS_LABEL[r.status] ?? r.status] = (m[STATUS_LABEL[r.status] ?? r.status] || 0) + 1 }); return Object.entries(m).map(([k,v]) => ({label:k,count:v})) })
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({ contractType: 'SUB' })
@@ -344,13 +349,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="pm-page">
-    <a-page-header title="分包计量" class="pm-header" />
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>分包管理</a-breadcrumb-item><a-breadcrumb-item>分包计量</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">分包计量</h1>
+      <div class="pt-head-actions"></div>
+    </div>
+
+    <div class="pt-kpi-strip" style="grid-template-columns:repeat(3,1fr)">
+      <div class="pt-kpi"><div class="pt-kpi-label">计量总额</div><div class="pt-kpi-value">{{ kpiMeasureTotal.toLocaleString() }}<small>元</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">已审核</div><div class="pt-kpi-value">{{ kpiApproved.toLocaleString() }}<small>元</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">待审核</div><div class="pt-kpi-value">{{ kpiMeasurePending }}<small>条</small></div></div>
+    </div>
 
     <!-- Filter -->
-    <div class="pm-card pm-filter">
-      <div class="pm-filter-row">
-        <div class="pm-field">
+    <div class="pt-ledger-layout"><main style="flex:1;min-width:0"><div class="pt-panel pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label>项目：</label>
           <a-select
             v-model:value="filter.projectId"
@@ -368,7 +383,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>分包合同：</label>
           <a-select
             v-model:value="filter.contractId"
@@ -386,7 +401,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>分包商：</label>
           <a-select
             v-model:value="filter.partnerId"
@@ -404,7 +419,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>状态：</label>
           <a-select
             v-model:value="filter.status"
@@ -418,7 +433,7 @@ onMounted(() => {
             <a-select-option value="COMPLETED">已完成</a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>计量编号：</label>
           <a-input
             v-model:value="filter.measureCode"
@@ -427,7 +442,7 @@ onMounted(() => {
             allow-clear
           />
         </div>
-        <div class="pm-filter-actions">
+        <div class="pt-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
           <a-button type="primary" @click="handleAdd">新建计量</a-button>
@@ -436,7 +451,7 @@ onMounted(() => {
     </div>
 
     <!-- Table -->
-    <div class="pm-card pm-table-wrap">
+    <div class="pt-panel pt-table-panel">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -448,7 +463,7 @@ onMounted(() => {
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'measurePeriod'">
-            <a class="pm-link">{{ record.measurePeriod }}</a>
+            <a class="pt-link">{{ record.measurePeriod }}</a>
           </template>
           <template v-else-if="column.key === 'reportedAmount'">
             <span v-if="record.reportedAmount"
@@ -498,8 +513,8 @@ onMounted(() => {
     </div>
 
     <!-- Pagination -->
-    <div class="pm-pagination">
-      <span class="pm-total">共 {{ total }} 条</span>
+    <div class="pt-pagination">
+      <span class="pt-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -677,72 +692,9 @@ onMounted(() => {
         </div>
       </div>
     </a-modal>
-  </div>
+  </main><aside class="pt-analysis-rail"><section class="pt-panel"><div class="pt-panel-header">计量状态分布</div><div class="pt-panel-body"><ul class="pt-compact-list"><li v-for="it in measureStatusBreakdown" :key="it.label" class="pt-compact-row"><span>{{ it.label }}</span><b>{{ it.count }} 条</b></li></ul></div></section></aside></div></div>
 </template>
 
-<style scoped>
-.pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.pm-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.pm-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.pm-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.pm-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.pm-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.pm-field label {
-  color: #374151;
-}
-.pm-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.pm-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.pm-link {
-  color: #1677ff;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-.pm-none {
-  color: #9ca3af;
-}
-.pm-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.pm-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-</style>
+<style scoped></style>
+
+

@@ -1,6 +1,6 @@
 # Task-003: 扩展日志敏感数据脱敏规则
 
-## Status: pending
+## Status: Completed.
 
 ## 用户请求
 修复审计报告 P1-22：扩展 Logback 和 OperationLogAspect 的脱敏规则，覆盖更多敏感字段。

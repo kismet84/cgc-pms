@@ -204,17 +204,19 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="mat-page">
-    <a-page-header title="材料字典" class="mat-header">
-      <template #extra>
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>基础数据</a-breadcrumb-item><a-breadcrumb-item>材料字典</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">材料字典</h1>
+      <div class="pt-head-actions">
         <a-button type="primary" @click="handleAdd">新增材料</a-button>
-      </template>
-    </a-page-header>
+      </div>
+    </div>
 
     <!-- Filter -->
-    <div class="mat-card mat-filter">
-      <div class="mat-filter-row">
-        <div class="mat-field">
+    <div class="pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label>材料编码：</label>
           <a-input
             v-model:value="filter.materialCode"
@@ -223,7 +225,7 @@ onMounted(fetchData)
             allow-clear
           />
         </div>
-        <div class="mat-field">
+        <div class="pt-field">
           <label>材料名称：</label>
           <a-input
             v-model:value="filter.materialName"
@@ -232,7 +234,7 @@ onMounted(fetchData)
             allow-clear
           />
         </div>
-        <div class="mat-field">
+        <div class="pt-field">
           <label>状态：</label>
           <a-select
             v-model:value="filter.status"
@@ -244,7 +246,7 @@ onMounted(fetchData)
             <a-select-option value="DISABLE">禁用</a-select-option>
           </a-select>
         </div>
-        <div class="mat-filter-actions">
+        <div class="pt-filter-surface-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
@@ -252,7 +254,7 @@ onMounted(fetchData)
     </div>
 
     <!-- Table -->
-    <div class="mat-card mat-table-wrap">
+    <div class="pt-table-panel">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -272,9 +274,9 @@ onMounted(fetchData)
             </a-tag>
           </template>
           <template v-else-if="column.key === 'ops'">
-            <div class="mat-ops">
-              <a class="mat-link" @click="handleEdit(record)">编辑</a>
-              <a class="mat-link" @click="handleToggleStatus(record)">
+            <div class="pt-link">
+              <a class="pt-link" @click="handleEdit(record)">编辑</a>
+              <a class="pt-link" @click="handleToggleStatus(record)">
                 {{ record.status === 'ENABLE' ? '禁用' : '启用' }}
               </a>
             </div>
@@ -284,8 +286,8 @@ onMounted(fetchData)
     </div>
 
     <!-- Pagination -->
-    <div class="mat-pagination">
-      <span class="mat-total">共 {{ total }} 条</span>
+    <div class="pt-pagination">
+      <span class="pt-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -344,70 +346,6 @@ onMounted(fetchData)
   </div>
 </template>
 
-<style scoped>
-.mat-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.mat-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.mat-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.mat-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.mat-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.mat-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.mat-field label {
-  color: #374151;
-}
-.mat-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.mat-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.mat-link {
-  color: #1677ff;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-.mat-ops {
-  display: flex;
-  gap: 10px;
-}
-.mat-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.mat-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-</style>
+<style scoped></style>
+
+

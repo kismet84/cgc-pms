@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -219,6 +219,16 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
+// ---- KPI ----
+const kpiInProgress = computed(() => tableData.value.filter(r => r.status === "IN_PROGRESS").length)
+const kpiCompleted = computed(() => tableData.value.filter(r => r.status === "COMPLETED").length)
+const kpiPending = computed(() => tableData.value.filter(r => r.status === "NOT_STARTED").length)
+const kpiSuspended = computed(() => tableData.value.filter(r => r.status === "SUSPENDED").length)
+
+// ---- Analysis ----
+const taskStatusBreakdown = computed(() => { const m: Record<string,number> = {}; tableData.value.forEach(r => { m[STATUS_LABEL[r.status] ?? r.status] = (m[STATUS_LABEL[r.status] ?? r.status] || 0) + 1 }); return Object.entries(m).map(([k,v]) => ({label:k,count:v})) })
+const suspendedTasks = computed(() => tableData.value.filter(r => r.status === "SUSPENDED").slice(0,5))
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({ contractType: 'SUB' })
@@ -228,13 +238,24 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="pm-page">
-    <a-page-header title="分包任务管理" class="pm-header" />
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>分包管理</a-breadcrumb-item><a-breadcrumb-item>分包任务</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">分包任务</h1>
+      <div class="pt-head-actions"></div>
+    </div>
+
+    <div class="pt-kpi-strip">
+      <div class="pt-kpi"><div class="pt-kpi-label">进行中</div><div class="pt-kpi-value">{{ kpiInProgress }}<small>条</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">已完成</div><div class="pt-kpi-value">{{ kpiCompleted }}<small>条</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">待开始</div><div class="pt-kpi-value">{{ kpiPending }}<small>条</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">已暂停</div><div class="pt-kpi-value" style="color:#ef4444">{{ kpiSuspended }}<small>条</small></div></div>
+    </div>
 
     <!-- Filter -->
-    <div class="pm-card pm-filter">
-      <div class="pm-filter-row">
-        <div class="pm-field">
+    <div class="pt-ledger-layout"><main style="flex:1;min-width:0"><div class="pt-panel pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label>项目：</label>
           <a-select
             v-model:value="filter.projectId"
@@ -252,7 +273,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>合同：</label>
           <a-select
             v-model:value="filter.contractId"
@@ -270,7 +291,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>分包商：</label>
           <a-select
             v-model:value="filter.partnerId"
@@ -288,7 +309,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>状态：</label>
           <a-select
             v-model:value="filter.status"
@@ -302,7 +323,7 @@ onMounted(() => {
             <a-select-option value="SUSPENDED">已暂停</a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>任务编号：</label>
           <a-input
             v-model:value="filter.taskCode"
@@ -311,7 +332,7 @@ onMounted(() => {
             allow-clear
           />
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>任务名称：</label>
           <a-input
             v-model:value="filter.taskName"
@@ -320,7 +341,7 @@ onMounted(() => {
             allow-clear
           />
         </div>
-        <div class="pm-filter-actions">
+        <div class="pt-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
           <a-button type="primary" @click="handleAdd">新建任务</a-button>
@@ -329,7 +350,7 @@ onMounted(() => {
     </div>
 
     <!-- Table -->
-    <div class="pm-card pm-table-wrap">
+    <div class="pt-panel pt-table-panel" style="margin-bottom:0">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -341,7 +362,7 @@ onMounted(() => {
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'taskName'">
-            <a class="pm-link">{{ record.taskName }}</a>
+            <a class="pt-link">{{ record.taskName }}</a>
           </template>
           <template v-else-if="column.key === 'progressPercent'">
             <a-progress
@@ -367,8 +388,8 @@ onMounted(() => {
     </div>
 
     <!-- Pagination -->
-    <div class="pm-pagination">
-      <span class="pm-total">共 {{ total }} 条</span>
+    <div class="pt-pagination">
+      <span class="pt-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -477,72 +498,9 @@ onMounted(() => {
         </a-form-item>
       </a-form>
     </a-modal>
-  </div>
+  </main><aside class="pt-analysis-rail"><section class="pt-panel"><div class="pt-panel-header">任务状态分布</div><div class="pt-panel-body"><ul class="pt-compact-list"><li v-for="it in taskStatusBreakdown" :key="it.label" class="pt-compact-row"><span>{{ it.label }}</span><b>{{ it.count }} 条</b></li></ul></div></section><section class="pt-panel"><div class="pt-panel-header">已暂停任务</div><div class="pt-panel-body"><ul class="pt-compact-list"><li v-for="t in suspendedTasks" :key="t.id" class="pt-compact-row"><span>{{ t.taskName }}</span><b style="color:#ef4444">{{ t.workArea || "-" }}</b></li><li v-if="suspendedTasks.length===0" class="pt-compact-row"><span>无暂停任务</span></li></ul></div></section></aside></div></div>
 </template>
 
-<style scoped>
-.pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.pm-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.pm-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.pm-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.pm-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.pm-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.pm-field label {
-  color: #374151;
-}
-.pm-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.pm-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.pm-link {
-  color: #1677ff;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-.pm-none {
-  color: #9ca3af;
-}
-.pm-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.pm-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-</style>
+<style scoped></style>
+
+

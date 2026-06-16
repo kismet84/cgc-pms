@@ -4,7 +4,7 @@
 
 Redesign Project Management and Target Management pages using the approved new UI language.
 
-## Status
+## Status: Completed.
 
 Assigned to development.
 

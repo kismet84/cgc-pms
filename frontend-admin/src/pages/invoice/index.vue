@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal, Upload } from 'ant-design-vue'
 import axios from 'axios'
 import { UploadOutlined } from '@ant-design/icons-vue'
@@ -411,6 +411,12 @@ function getPayRecordLabel(record: InvoiceVO): string {
   return record.payRecordId
 }
 
+const kpiInvoiceTotal = computed(() => tableData.value.reduce((s,r) => s + (parseFloat(r.invoiceAmount)||0), 0))
+const kpiInvoiced = computed(() => tableData.value.filter(r => r.verifyStatus === "VERIFIED").reduce((s,r) => s + (parseFloat(r.invoiceAmount)||0), 0))
+const kpiUninvoiced = computed(() => tableData.value.filter(r => r.verifyStatus !== "VERIFIED").reduce((s,r) => s + (parseFloat(r.invoiceAmount)||0), 0))
+const kpiAbnormal = computed(() => tableData.value.filter(r => r.verifyStatus === "FAILED").length)
+const invoiceVerifyBreakdown = computed(() => { const m: Record<string,number> = {}; tableData.value.forEach(r => { m[VERIFY_STATUS_LABEL[r.verifyStatus] ?? r.verifyStatus] = (m[VERIFY_STATUS_LABEL[r.verifyStatus] ?? r.verifyStatus] || 0) + 1 }); return Object.entries(m).map(([k,v]) => ({label:k,count:v})) })
+
 onMounted(() => {
   fetchPayRecords()
   fetchData()
@@ -427,13 +433,24 @@ defineExpose({
 </script>
 
 <template>
-  <div class="pm-page">
-    <a-page-header title="发票管理" class="pm-header" />
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>发票管理</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">发票管理</h1>
+      <div class="pt-head-actions"></div>
+    </div>
+
+    <div class="pt-kpi-strip">
+      <div class="pt-kpi"><div class="pt-kpi-label">发票总额</div><div class="pt-kpi-value">{{ kpiInvoiceTotal.toLocaleString() }}<small>元</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">已核验</div><div class="pt-kpi-value">{{ kpiInvoiced.toLocaleString() }}<small>元</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">待核验</div><div class="pt-kpi-value">{{ kpiUninvoiced.toLocaleString() }}<small>元</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">异常发票</div><div class="pt-kpi-value" style="color:#ef4444">{{ kpiAbnormal }}<small>张</small></div></div>
+    </div>
 
     <!-- Filter -->
-    <div class="pm-card pm-filter">
-      <div class="pm-filter-row">
-        <div class="pm-field">
+    <div class="pt-ledger-layout"><main style="flex:1;min-width:0"><div class="pt-panel pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label>关联付款记录：</label>
           <a-select
             v-model:value="filter.payRecordId"
@@ -446,7 +463,7 @@ defineExpose({
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>发票号码：</label>
           <a-input
             v-model:value="filter.invoiceNo"
@@ -455,7 +472,7 @@ defineExpose({
             style="width: 180px"
           />
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>核验状态：</label>
           <a-select
             v-model:value="filter.verifyStatus"
@@ -468,7 +485,7 @@ defineExpose({
             <a-select-option value="ABNORMAL">异常</a-select-option>
           </a-select>
         </div>
-        <div class="pm-filter-actions">
+        <div class="pt-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
           <a-button type="primary" @click="handleAdd">新增发票</a-button>
@@ -477,7 +494,7 @@ defineExpose({
     </div>
 
     <!-- Table -->
-    <div class="pm-card pm-table-wrap">
+    <div class="pt-panel pt-table-panel">
       <a-alert
         v-if="searchError"
         :message="searchError"
@@ -548,8 +565,8 @@ defineExpose({
     </div>
 
     <!-- Pagination -->
-    <div class="pm-pagination">
-      <span class="pm-total">共 {{ total }} 条</span>
+    <div class="pt-pagination">
+      <span class="pt-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -667,63 +684,9 @@ defineExpose({
         </a-form-item>
       </a-form>
     </a-modal>
-  </div>
+  </main><aside class="pt-analysis-rail"><section class="pt-panel"><div class="pt-panel-header">核验状态分布</div><div class="pt-panel-body"><ul class="pt-compact-list"><li v-for="it in invoiceVerifyBreakdown" :key="it.label" class="pt-compact-row"><span>{{ it.label }}</span><b>{{ it.count }} 张</b></li></ul></div></section><section class="pt-panel"><div class="pt-panel-header">异常提醒</div><div class="pt-panel-body"><ul class="pt-compact-list"><li v-if="kpiAbnormal>0" class="pt-compact-row"><span>核验失败</span><b style="color:#ef4444">{{ kpiAbnormal }} 张</b></li><li v-else class="pt-compact-row"><span>无异常发票</span></li></ul></div></section></aside></div></div>
 </template>
 
-<style scoped>
-.pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.pm-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.pm-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.pm-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.pm-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.pm-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.pm-field label {
-  color: #374151;
-}
-.pm-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.pm-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.pm-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.pm-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-</style>
+<style scoped></style>
+
+

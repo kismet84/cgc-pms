@@ -503,13 +503,17 @@ onMounted(async () => {
 
 <template>
   <a-spin :spinning="loading">
-    <div class="org-page">
-      <a-page-header title="组织架构管理" class="org-header" />
+    <div class="project-target-redesign app-page">
+      <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>组织架构</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">组织架构</h1>
+      <div class="pt-head-actions"></div>
+    </div>
 
       <!-- ================== Top Row: Company + Department ================== -->
       <div class="org-top-row">
         <!-- Companies -->
-        <div class="org-card org-company-panel">
+        <div class="pt-panel org-company-panel">
           <div class="org-panel-header">
             <span class="org-panel-title">公司管理</span>
             <div class="org-panel-actions">
@@ -519,7 +523,7 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="org-filter-mini">
+          <div class="pt-filter-surface-mini">
             <a-input
               v-model:value="companyFilter.companyName"
               placeholder="公司名称"
@@ -582,7 +586,7 @@ onMounted(async () => {
           </a-table>
 
           <div class="org-panel-footer">
-            <span class="org-total">共 {{ companyTotal }} 条</span>
+            <span class="pt-total">共 {{ companyTotal }} 条</span>
             <a-pagination
               v-model:current="companyPageNo"
               v-model:page-size="companyPageSize"
@@ -597,7 +601,7 @@ onMounted(async () => {
         </div>
 
         <!-- Departments Tree -->
-        <div class="org-card org-dept-panel">
+        <div class="pt-panel org-dept-panel">
           <div class="org-panel-header">
             <span class="org-panel-title">部门架构</span>
             <div class="org-panel-actions">
@@ -636,7 +640,7 @@ onMounted(async () => {
       </div>
 
       <!-- ================== Bottom Row: Positions ================== -->
-      <div class="org-card org-position-panel">
+      <div class="pt-panel org-position-panel">
         <div class="org-panel-header">
           <span class="org-panel-title">岗位管理</span>
           <div class="org-panel-actions">
@@ -646,7 +650,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="org-filter-mini">
+        <div class="pt-filter-surface-mini">
           <a-input
             v-model:value="positionFilter.positionName"
             placeholder="岗位名称"
@@ -700,7 +704,7 @@ onMounted(async () => {
         </a-table>
 
         <div class="org-panel-footer">
-          <span class="org-total">共 {{ positionTotal }} 条</span>
+          <span class="pt-total">共 {{ positionTotal }} 条</span>
           <a-pagination
             v-model:current="positionPageNo"
             v-model:page-size="positionPageSize"
@@ -805,118 +809,5 @@ onMounted(async () => {
   </a-spin>
 </template>
 
-<style scoped>
-.org-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
+<style scoped></style>
 
-.org-header {
-  background: transparent;
-  padding-bottom: 8px;
-}
-
-/* ─── Top row: side-by-side panels ─── */
-
-.org-top-row {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.org-company-panel {
-  flex: 0 0 42%;
-  min-width: 380px;
-}
-
-.org-dept-panel {
-  flex: 1;
-}
-
-/* ─── Card base ─── */
-
-.org-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-  overflow: hidden;
-}
-
-/* ─── Panel header / footer ─── */
-
-.org-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid #f0f2f5;
-}
-
-.org-panel-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.org-panel-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.org-panel-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 8px 16px;
-  border-top: 1px solid #f0f2f5;
-}
-
-.org-total {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-/* ─── Filter row ─── */
-
-.org-filter-mini {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 10px 16px;
-  flex-wrap: wrap;
-}
-
-/* ─── Tree wrap ─── */
-
-.org-tree-wrap {
-  padding: 12px 16px;
-  min-height: 280px;
-  max-height: 480px;
-  overflow: auto;
-}
-
-/* ─── Selected row highlight ─── */
-
-:deep(.org-row-selected) {
-  background: #e6f4ff !important;
-}
-
-:deep(.org-row-selected td) {
-  background: #e6f4ff !important;
-}
-
-/* ─── Position panel ─── */
-
-.org-position-panel {
-  margin-bottom: 0;
-}
-
-/* ─── Cursor for clickable rows ─── */
-
-:deep(.ant-table-row) {
-  cursor: pointer;
-}
-</style>

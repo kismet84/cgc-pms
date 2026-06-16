@@ -53,7 +53,7 @@ async function handleSave() {
 </script>
 
 <template>
-  <div class="settings-page">
+  <div class="project-target-redesign app-page">
     <a-card title="通知设置" :bordered="false" :loading="loading">
       <a-form layout="horizontal">
         <a-form-item label="启用通知">
@@ -92,8 +92,5 @@ async function handleSave() {
   </div>
 </template>
 
-<style scoped>
-.settings-page {
-  max-width: 640px;
-}
-</style>
+<style scoped></style>
+

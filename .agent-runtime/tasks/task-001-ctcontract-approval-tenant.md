@@ -1,6 +1,6 @@
 # Task-001: CtContractService.getApprovalRecords 添加租户隔离
 
-## Status: pending
+## Status: Completed.
 
 ## 用户请求
 修复审计报告 P1-10 相关问题：`CtContractService.getApprovalRecords()` 查询 `wf_instance` 和 `wf_record` 时缺少 `tenantId` 过滤。

@@ -196,62 +196,66 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div>
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>用户管理</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">用户管理</h1>
+      <div class="pt-head-actions">
+        <a-button type="primary" @click="handleAdd">新增用户</a-button>
+      </div>
+    </div>
+
     <!-- Filter -->
-    <div
-      style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; align-items: center"
-    >
-      <a-input
-        v-model:value="filter.username"
-        placeholder="用户名"
-        allow-clear
-        style="width: 150px"
-      />
-      <a-input
-        v-model:value="filter.realName"
-        placeholder="姓名"
-        allow-clear
-        style="width: 150px"
-      />
-      <a-button type="primary" @click="handleSearch">查询</a-button>
-      <a-button @click="handleReset">重置</a-button>
-      <a-button type="primary" @click="handleAdd" style="margin-left: auto">新增用户</a-button>
+    <div class="pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
+          <label>用户名：</label>
+          <a-input v-model:value="filter.username" placeholder="用户名" allow-clear style="width: 150px" />
+        </div>
+        <div class="pt-field">
+          <label>姓名：</label>
+          <a-input v-model:value="filter.realName" placeholder="姓名" allow-clear style="width: 150px" />
+        </div>
+        <div class="pt-filter-surface-actions">
+          <a-button type="primary" @click="handleSearch">查询</a-button>
+          <a-button @click="handleReset">重置</a-button>
+        </div>
+      </div>
     </div>
 
     <!-- Table -->
-    <a-table
-      :columns="columns"
-      :data-source="tableData"
-      :loading="loading"
-      :pagination="false"
-      row-key="id"
-      size="small"
-      :scroll="{ x: 1000 }"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 'ENABLE' ? 'success' : 'error'">
-            {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
-          </a-tag>
+    <div class="pt-table-panel">
+      <a-table
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        size="small"
+        :scroll="{ x: 1000 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'status'">
+            <a-tag :color="record.status === 'ENABLE' ? 'success' : 'error'">
+              {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <div class="pt-link">
+              <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
+              <a-button type="link" size="small" :danger="record.status === 'ENABLE'" @click="handleToggleStatus(record)">
+                {{ record.status === 'ENABLE' ? '禁用' : '启用' }}
+              </a-button>
+              <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
+            </div>
+          </template>
         </template>
-        <template v-else-if="column.key === 'action'">
-          <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-          <a-button
-            type="link"
-            size="small"
-            :danger="record.status === 'ENABLE'"
-            @click="handleToggleStatus(record)"
-          >
-            {{ record.status === 'ENABLE' ? '禁用' : '启用' }}
-          </a-button>
-          <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
-        </template>
-      </template>
-    </a-table>
+      </a-table>
+    </div>
 
     <!-- Pagination -->
-    <div style="display: flex; align-items: center; justify-content: flex-end; margin-top: 12px">
-      <span style="color: #4b5563; font-size: 13px; margin-right: 12px">共 {{ total }} 条</span>
+    <div class="pt-pagination">
+      <span class="pt-pagination-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -274,11 +278,7 @@ onMounted(fetchData)
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
         <a-form-item label="用户名" required>
-          <a-input
-            v-model:value="formData.username"
-            placeholder="请输入用户名"
-            :disabled="!!editingId"
-          />
+          <a-input v-model:value="formData.username" placeholder="请输入用户名" :disabled="!!editingId" />
         </a-form-item>
         <a-form-item label="密码" :required="!editingId">
           <a-input-password v-model:value="formData.password" placeholder="留空则不修改密码" />
@@ -296,3 +296,4 @@ onMounted(fetchData)
     </a-modal>
   </div>
 </template>
+

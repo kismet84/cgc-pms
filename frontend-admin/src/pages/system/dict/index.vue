@@ -346,7 +346,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="dict-page">
+  <div class="project-target-redesign app-page">
     <a-layout class="dict-layout">
       <!-- 左侧：字典类型列表 -->
       <a-layout-sider class="dict-sider" width="280" theme="light">
@@ -398,9 +398,9 @@ onMounted(() => {
           </div>
 
           <!-- 数据筛选 -->
-          <div class="dict-card dict-data-filter">
-            <div class="dict-filter-row">
-              <div class="dict-field">
+          <div class="pt-filter-surface">
+            <div class="pt-filter-row">
+              <div class="pt-field">
                 <label>字典标签：</label>
                 <a-input
                   v-model:value="dataFilter.dictLabel"
@@ -409,7 +409,7 @@ onMounted(() => {
                   allow-clear
                 />
               </div>
-              <div class="dict-field">
+              <div class="pt-field">
                 <label>状态：</label>
                 <a-select
                   v-model:value="dataFilter.status"
@@ -421,7 +421,7 @@ onMounted(() => {
                   <a-select-option value="DISABLED">禁用</a-select-option>
                 </a-select>
               </div>
-              <div class="dict-filter-actions">
+              <div class="pt-filter-surface-actions">
                 <a-button type="primary" size="small" @click="handleDataSearch">查询</a-button>
                 <a-button size="small" @click="handleDataReset">重置</a-button>
               </div>
@@ -429,7 +429,7 @@ onMounted(() => {
           </div>
 
           <!-- 数据表格 -->
-          <div class="dict-card dict-table-wrap">
+          <div class="pt-table-panel">
             <a-table
               :columns="dataColumns"
               :data-source="dataTableData"
@@ -446,9 +446,9 @@ onMounted(() => {
                   </a-tag>
                 </template>
                 <template v-else-if="column.key === 'ops'">
-                  <div class="dict-ops">
-                    <a class="dict-link" @click="handleEditData(record)">编辑</a>
-                    <a class="dict-link dict-link-danger" @click="handleDeleteData(record)">删除</a>
+                  <div class="pt-link">
+                    <a class="pt-link" @click="handleEditData(record)">编辑</a>
+                    <a class="pt-link-danger" @click="handleDeleteData(record)">删除</a>
                   </div>
                 </template>
               </template>
@@ -456,8 +456,8 @@ onMounted(() => {
           </div>
 
           <!-- 分页 -->
-          <div class="dict-pagination">
-            <span class="dict-total">共 {{ dataTotal }} 条</span>
+          <div class="pt-pagination">
+            <span class="pt-total">共 {{ dataTotal }} 条</span>
             <a-pagination
               v-model:current="dataPageNo"
               v-model:page-size="dataPageSize"
@@ -545,227 +545,6 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-.dict-page {
-  background: #f6f8fc;
-  min-height: calc(100vh - 56px - 36px);
-}
+<style scoped></style>
 
-.dict-layout {
-  background: transparent;
-  gap: 14px;
-  height: 100%;
-}
 
-/* ---- 左侧字典类型 ---- */
-.dict-sider {
-  background: #fff !important;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.dict-sider-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 16px 12px;
-  border-bottom: 1px solid #f0f2f5;
-}
-
-.dict-sider-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.dict-sider-search {
-  padding: 10px 16px;
-}
-
-.dict-sider-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 0;
-}
-
-.dict-sider-empty {
-  padding: 32px 16px;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 13px;
-}
-
-.dict-type-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  cursor: pointer;
-  border-left: 3px solid transparent;
-  transition:
-    background 0.15s,
-    border-color 0.15s;
-  gap: 8px;
-}
-
-.dict-type-item:hover {
-  background: #f6f8fc;
-}
-
-.dict-type-item.active {
-  background: #e6f4ff;
-  border-left-color: #1677ff;
-}
-
-.dict-type-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.dict-type-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #111827;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dict-type-code {
-  font-size: 12px;
-  color: #6b7280;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dict-type-actions {
-  display: none;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.dict-type-item:hover .dict-type-actions {
-  display: flex;
-}
-
-/* ---- 右侧字典数据 ---- */
-.dict-content {
-  background: transparent;
-  min-height: 0;
-}
-
-.dict-content-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0 14px;
-}
-
-.dict-content-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.dict-content-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-
-.dict-placeholder-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.6;
-}
-
-.dict-placeholder-text {
-  font-size: 14px;
-  color: #9ca3af;
-}
-
-.dict-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-
-.dict-data-filter {
-  padding: 14px 18px;
-  margin-bottom: 14px;
-}
-
-.dict-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 20px;
-  align-items: center;
-}
-
-.dict-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.dict-field label {
-  color: #374151;
-}
-
-.dict-filter-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.dict-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-
-.dict-link {
-  color: #1677ff;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.dict-link-danger {
-  color: #ff4d4f;
-}
-
-.dict-ops {
-  display: flex;
-  gap: 10px;
-}
-
-.dict-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-
-.dict-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-</style>

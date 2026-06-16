@@ -89,54 +89,61 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div>
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>角色管理</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">角色管理</h1>
+    </div>
+
     <!-- Filter -->
-    <div
-      style="display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; align-items: center"
-    >
-      <a-input
-        v-model:value="filter.roleName"
-        placeholder="角色名称"
-        allow-clear
-        style="width: 150px"
-      />
-      <a-input
-        v-model:value="filter.roleCode"
-        placeholder="角色编码"
-        allow-clear
-        style="width: 150px"
-      />
-      <a-button type="primary" @click="handleSearch">查询</a-button>
-      <a-button @click="handleReset">重置</a-button>
+    <div class="pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
+          <label>角色名称：</label>
+          <a-input v-model:value="filter.roleName" placeholder="角色名称" allow-clear style="width: 150px" />
+        </div>
+        <div class="pt-field">
+          <label>角色编码：</label>
+          <a-input v-model:value="filter.roleCode" placeholder="角色编码" allow-clear style="width: 150px" />
+        </div>
+        <div class="pt-filter-surface-actions">
+          <a-button type="primary" @click="handleSearch">查询</a-button>
+          <a-button @click="handleReset">重置</a-button>
+        </div>
+      </div>
     </div>
 
     <!-- Table -->
-    <a-table
-      :columns="columns"
-      :data-source="tableData"
-      :loading="loading"
-      :pagination="false"
-      row-key="id"
-      size="small"
-      :scroll="{ x: 900 }"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 'ENABLE' ? 'success' : 'error'">
-            {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
-          </a-tag>
+    <div class="pt-table-panel">
+      <a-table
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        size="small"
+        :scroll="{ x: 900 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'status'">
+            <a-tag :color="record.status === 'ENABLE' ? 'success' : 'error'">
+              {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <div class="pt-link">
+              <a-button type="link" size="small" @click="handleEditPermission(record)">
+                编辑权限
+              </a-button>
+            </div>
+          </template>
         </template>
-        <template v-else-if="column.key === 'action'">
-          <a-button type="link" size="small" @click="handleEditPermission(record)">
-            编辑权限
-          </a-button>
-        </template>
-      </template>
-    </a-table>
+      </a-table>
+    </div>
 
     <!-- Pagination -->
-    <div style="display: flex; align-items: center; justify-content: flex-end; margin-top: 12px">
-      <span style="color: #4b5563; font-size: 13px; margin-right: 12px">共 {{ total }} 条</span>
+    <div class="pt-pagination">
+      <span class="pt-pagination-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -157,3 +164,4 @@ onMounted(fetchData)
     />
   </div>
 </template>
+

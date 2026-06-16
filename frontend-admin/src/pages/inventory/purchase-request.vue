@@ -273,6 +273,9 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
+const kpiReqTotal = computed(() => tableData.value.length)
+const kpiReqPending = computed(() => tableData.value.filter(r => r.approvalStatus === "DRAFT" || r.approvalStatus === "APPROVING").length)
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchMaterials()
@@ -281,13 +284,22 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="pm-page">
-    <a-page-header title="采购申请" class="pm-header" />
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>库存管理</a-breadcrumb-item><a-breadcrumb-item>采购申请</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">采购申请</h1>
+      <div class="pt-head-actions"></div>
+    </div>
+
+    <div class="pt-kpi-strip" style="grid-template-columns:repeat(2,1fr)">
+      <div class="pt-kpi"><div class="pt-kpi-label">申请数</div><div class="pt-kpi-value">{{ kpiReqTotal }}<small>条</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">待审批</div><div class="pt-kpi-value">{{ kpiReqPending }}<small>条</small></div></div>
+    </div>
 
     <!-- Filter -->
-    <div class="pm-card pm-filter">
-      <div class="pm-filter-row">
-        <div class="pm-field">
+    <div class="pt-panel pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label>项目：</label>
           <a-select
             v-model:value="filter.projectId"
@@ -305,7 +317,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>审批状态：</label>
           <a-select
             v-model:value="filter.approvalStatus"
@@ -320,7 +332,7 @@ onMounted(() => {
             <a-select-option value="WITHDRAWN">已撤回</a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>业务状态：</label>
           <a-select
             v-model:value="filter.status"
@@ -332,7 +344,7 @@ onMounted(() => {
             <a-select-option value="CONVERTED">已转PO</a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>申请编号：</label>
           <a-input
             v-model:value="filter.requestCode"
@@ -341,7 +353,7 @@ onMounted(() => {
             allow-clear
           />
         </div>
-        <div class="pm-filter-actions">
+        <div class="pt-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
           <a-button type="primary" @click="handleAdd">新建申请</a-button>
@@ -350,7 +362,7 @@ onMounted(() => {
     </div>
 
     <!-- Table -->
-    <div class="pm-card pm-table-wrap">
+    <div class="pt-panel pt-table-panel">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -391,8 +403,8 @@ onMounted(() => {
     </div>
 
     <!-- Pagination -->
-    <div class="pm-pagination">
-      <span class="pm-total">共 {{ total }} 条</span>
+    <div class="pt-pagination">
+      <span class="pt-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -511,69 +523,6 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-.pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.pm-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.pm-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.pm-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.pm-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.pm-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.pm-field label {
-  color: #374151;
-}
-.pm-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.pm-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.pm-link {
-  color: #1677ff;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-.pm-none {
-  color: #9ca3af;
-}
-.pm-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.pm-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-</style>
+<style scoped></style>
+
+

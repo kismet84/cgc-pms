@@ -137,19 +137,21 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="al-page">
-    <a-page-header title="预警中心" class="al-header">
-      <template #extra>
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>预警中心</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">预警中心</h1>
+      <div class="pt-head-actions">
         <a-button type="primary" danger :loading="store.evaluating" @click="handleBatchEvaluate">
           触发评估
         </a-button>
-      </template>
-    </a-page-header>
+      </div>
+    </div>
 
     <!-- Filter -->
-    <div class="al-card al-filter">
-      <div class="al-filter-row">
-        <div class="al-field">
+    <div class="pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label>项目：</label>
           <a-select
             v-model:value="filter.projectId"
@@ -173,7 +175,7 @@ onMounted(async () => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="al-field">
+        <div class="pt-field">
           <label>严重度：</label>
           <a-select
             v-model:value="filter.severity"
@@ -186,7 +188,7 @@ onMounted(async () => {
             <a-select-option value="LOW">低</a-select-option>
           </a-select>
         </div>
-        <div class="al-field">
+        <div class="pt-field">
           <label>读取状态：</label>
           <a-select
             v-model:value="filter.isRead"
@@ -198,7 +200,7 @@ onMounted(async () => {
             <a-select-option :value="1">已读</a-select-option>
           </a-select>
         </div>
-        <div class="al-filter-actions">
+        <div class="pt-filter-surface-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
@@ -206,7 +208,7 @@ onMounted(async () => {
     </div>
 
     <!-- Table -->
-    <div class="al-card al-table-wrap">
+    <div class="pt-table-panel">
       <a-table
         :data-source="pagedAlerts"
         :columns="columns"
@@ -249,8 +251,8 @@ onMounted(async () => {
     </div>
 
     <!-- Pagination -->
-    <div class="al-pagination">
-      <span class="al-total">共 {{ total }} 条</span>
+    <div class="pt-pagination">
+      <span class="pt-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -265,66 +267,6 @@ onMounted(async () => {
   </div>
 </template>
 
-<style scoped>
-.al-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.al-header {
-  background: transparent;
-  padding-bottom: 8px;
-}
-.al-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.al-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.al-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.al-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.al-field label {
-  color: #374151;
-  min-width: 56px;
-}
-.al-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-  align-items: center;
-}
-.al-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.al-muted {
-  color: #9ca3af;
-  font-size: 13px;
-}
-.al-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.al-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-</style>
+<style scoped></style>
+
+

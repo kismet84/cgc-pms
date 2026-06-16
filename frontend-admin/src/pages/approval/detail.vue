@@ -273,19 +273,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="wf-detail-page">
-    <a-page-header title="审批详情" @back="goBack">
-      <template #tags>
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>审批管理</a-breadcrumb-item><a-breadcrumb-item>审批详情</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">审批详情</h1>
+      <div class="pt-head-actions">
         <a-tag v-if="detail" :color="statusMap[detail.instanceStatus]?.color">
           {{ statusMap[detail.instanceStatus]?.text || detail.instanceStatus }}
         </a-tag>
-      </template>
-    </a-page-header>
+      </div>
+    </div>
 
     <a-spin :spinning="loading">
       <div v-if="detail" class="wf-detail-content">
         <!-- Info Card -->
-        <div class="wf-card">
+        <div class="pt-panel">
           <a-descriptions title="基本信息" :column="2" size="small" bordered>
             <a-descriptions-item label="审批标题">{{ detail.title }}</a-descriptions-item>
             <a-descriptions-item label="模板名称">{{ detail.templateName }}</a-descriptions-item>
@@ -345,7 +347,7 @@ onMounted(() => {
         </div>
 
         <!-- Node Flow -->
-        <div class="wf-card">
+        <div class="pt-panel">
           <h4 style="margin-top: 0">审批流程</h4>
           <a-steps
             :current="detail.nodes.filter((n) => n.nodeStatus === 'COMPLETED').length"
@@ -377,7 +379,7 @@ onMounted(() => {
         </div>
 
         <!-- Approval Records Timeline -->
-        <div class="wf-card">
+        <div class="pt-panel">
           <h4 style="margin-top: 0">审批记录</h4>
           <a-timeline>
             <a-timeline-item v-for="record in detail.records" :key="record.id">
@@ -460,26 +462,6 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-.wf-detail-page {
-  padding: 0;
-}
-.wf-card {
-  background: #fff;
-  border-radius: 4px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-.wf-actions {
-  margin-bottom: 16px;
-}
-.wf-node-tasks {
-  margin-top: 4px;
-}
-.wf-node-task-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 2px 0;
-}
-</style>
+<style scoped></style>
+
+

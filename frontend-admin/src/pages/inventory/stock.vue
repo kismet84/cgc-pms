@@ -119,6 +119,11 @@ function getMaterialName(id: string): string {
   return materialList.value.find((m) => m.id === id)?.materialName ?? id
 }
 
+const kpiStockValue = computed(() => stock.value ? Number(stock.value.availableQty || 0).toLocaleString() : "0")
+const kpiTxnIn = computed(() => txnList.value.filter(t => t.txnType === "IN").length)
+const kpiTxnOut = computed(() => txnList.value.filter(t => t.txnType === "OUT").length)
+const lowStockWarn = computed(() => stock.value && Number(stock.value.availableQty) < 10 ? [{name: getMaterialName(stock.value.materialId), qty: stock.value.availableQty}] : [])
+
 onMounted(() => {
   fetchWarehouses()
   referenceStore.fetchMaterials()
@@ -126,13 +131,24 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="pm-page">
-    <a-page-header title="库存台账" class="pm-header" />
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>库存管理</a-breadcrumb-item><a-breadcrumb-item>库存台账</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">库存台账</h1>
+      <div class="pt-head-actions"></div>
+    </div>
+
+    <div class="pt-kpi-strip" style="grid-template-columns:repeat(4,1fr)">
+      <div class="pt-kpi"><div class="pt-kpi-label">当前库存量</div><div class="pt-kpi-value">{{ kpiStockValue }}<small>{{ stock?.unit || "" }}</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">低库存物料</div><div class="pt-kpi-value" style="color:#ef4444">{{ lowStockWarn.length }}<small>种</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">入库记录</div><div class="pt-kpi-value">{{ kpiTxnIn }}<small>条</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">出库记录</div><div class="pt-kpi-value">{{ kpiTxnOut }}<small>条</small></div></div>
+    </div>
 
     <!-- Filter -->
-    <div class="pm-card pm-filter">
-      <div class="pm-filter-row">
-        <div class="pm-field">
+    <div class="pt-ledger-layout"><main style="flex:1;min-width:0"><div class="pt-panel pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label>仓库：</label>
           <a-select
             v-model:value="filter.warehouseId"
@@ -150,7 +166,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-field">
+        <div class="pt-field">
           <label>物料：</label>
           <a-select
             v-model:value="filter.materialId"
@@ -168,7 +184,7 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </div>
-        <div class="pm-filter-actions">
+        <div class="pt-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
@@ -176,7 +192,7 @@ onMounted(() => {
     </div>
 
     <!-- Stock Balance Card -->
-    <div v-if="stock" class="pm-card" style="padding: 20px 22px; margin-bottom: 14px">
+    <div v-if="stock" class="pt-panel" style="padding: 20px 22px; margin-bottom: 14px">
       <div style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap">
         <div>
           <span style="font-size: 13px; color: #6b7280">仓库：</span>
@@ -197,14 +213,14 @@ onMounted(() => {
     </div>
     <div
       v-else-if="filter.warehouseId"
-      class="pm-card"
+      class="pt-panel"
       style="padding: 20px 22px; margin-bottom: 14px; color: #9ca3af"
     >
       该仓库暂无选中物料库存记录
     </div>
 
     <!-- Transaction Ledger -->
-    <div class="pm-card pm-table-wrap">
+    <div class="pt-panel pt-table-panel">
       <div style="padding: 16px 22px 0; font-weight: 600; font-size: 14px; color: #374151">
         出入库流水
       </div>
@@ -247,8 +263,8 @@ onMounted(() => {
     </div>
 
     <!-- Pagination -->
-    <div class="pm-pagination">
-      <span class="pm-total">共 {{ txnTotal }} 条流水</span>
+    <div class="pt-pagination">
+      <span class="pt-total">共 {{ txnTotal }} 条流水</span>
       <a-pagination
         v-model:current="txnPageNo"
         v-model:page-size="txnPageSize"
@@ -260,72 +276,9 @@ onMounted(() => {
         @show-size-change="handleTxnPageSizeChange"
       />
     </div>
-  </div>
+  </main><aside class="pt-analysis-rail"><section class="pt-panel"><div class="pt-panel-header">低库存预警</div><div class="pt-panel-body"><ul class="pt-compact-list"><li v-for="w in lowStockWarn" :key="w.name" class="pt-compact-row"><span>{{ w.name }}</span><b style="color:#ef4444">{{ w.qty }}</b></li><li v-if="lowStockWarn.length===0" class="pt-compact-row"><span>库存正常</span></li></ul></div></section><section class="pt-panel"><div class="pt-panel-header">出入库统计</div><div class="pt-panel-body"><ul class="pt-compact-list"><li class="pt-compact-row"><span>入库次数</span><b style="color:#22c55e">{{ kpiTxnIn }} 次</b></li><li class="pt-compact-row"><span>出库次数</span><b style="color:#ef4444">{{ kpiTxnOut }} 次</b></li></ul></div></section></aside></div></div>
 </template>
 
-<style scoped>
-.pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.pm-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.pm-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.pm-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.pm-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.pm-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.pm-field label {
-  color: #374151;
-}
-.pm-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.pm-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.pm-link {
-  color: #1677ff;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-.pm-none {
-  color: #9ca3af;
-}
-.pm-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.pm-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-</style>
+<style scoped></style>
+
+

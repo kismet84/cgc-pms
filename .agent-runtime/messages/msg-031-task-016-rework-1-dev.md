@@ -1,0 +1,6 @@
+- task_id: task-016
+- from: main-agent (019ecee5)
+- to: dev-agent (019ebc4c)
+- type: rework_request
+- document: D:\projects-test\cgc-pms\.agent-runtime\tasks\task-016-commercial-flow-ui-redesign.md
+- summary: Rework 1 — 恢复 variation/order.vue 丢失的 handleSubmitApproval 审批提交功能。
