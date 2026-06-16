@@ -178,11 +178,15 @@ async function handleModalOk() {
   }
   formLoading.value = true
   try {
+    const payload = {
+      ...formData,
+      blacklistFlag: formData.blacklistFlag ? 1 : 0,
+    }
     if (editingId.value) {
-      await updatePartner(editingId.value, formData)
+      await updatePartner(editingId.value, payload)
       message.success('更新成功')
     } else {
-      await createPartner(formData)
+      await createPartner(payload)
       message.success('创建成功')
     }
     modalVisible.value = false
@@ -250,8 +254,8 @@ onMounted(fetchData)
             allow-clear
             style="width: 110px"
           >
-            <a-select-option value="ENABLED">启用</a-select-option>
-            <a-select-option value="DISABLED">禁用</a-select-option>
+            <a-select-option value="ENABLE">启用</a-select-option>
+            <a-select-option value="DISABLE">禁用</a-select-option>
           </a-select>
         </div>
         <div class="pm-filter-actions">
@@ -292,8 +296,8 @@ onMounted(fetchData)
             </a-tag>
           </template>
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
-              {{ record.status === 'ENABLED' ? '启用' : '禁用' }}
+            <a-tag :color="record.status === 'ENABLE' ? 'success' : 'default'">
+              {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
             </a-tag>
           </template>
           <template v-else-if="column.dataIndex === 'ops'">
@@ -340,7 +344,7 @@ onMounted(fetchData)
         <a-form-item label="合作方类型" required>
           <a-select v-model:value="formData.partnerType" placeholder="请选择合作方类型">
             <a-select-option value="SUPPLIER">供应商</a-select-option>
-            <a-select-option value="SUBCONTRACTOR">分包商</a-select-option>
+            <a-select-option value="SUB">分包商</a-select-option>
             <a-select-option value="DESIGN">设计单位</a-select-option>
             <a-select-option value="SUPERVISOR">监理单位</a-select-option>
             <a-select-option value="OTHER">其他</a-select-option>
@@ -380,7 +384,7 @@ onMounted(fetchData)
         <a-form-item label="状态">
           <a-select v-model:value="formData.status">
             <a-select-option value="ENABLE">启用</a-select-option>
-            <a-select-option value="DISABLED">禁用</a-select-option>
+            <a-select-option value="DISABLE">禁用</a-select-option>
           </a-select>
         </a-form-item>
       </a-form>

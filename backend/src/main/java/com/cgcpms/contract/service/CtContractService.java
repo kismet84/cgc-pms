@@ -206,6 +206,21 @@ public class CtContractService {
     }
 
     /**
+     * 删除合同（软删除，仅限 DRAFT 状态）。
+     */
+    @Transactional
+    public void delete(Long id) {
+        CtContract existing = ctContractMapper.selectById(id);
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
+            throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中或已审批，不可删除");
+
+        ctContractMapper.deleteById(id);
+    }
+
+    /**
      * 查询合同审批记录（含租户隔离）。
      */
     public List<ContractApprovalRecordVO> getApprovalRecords(Long contractId) {

@@ -80,6 +80,13 @@ public class CtContractController {
         return ApiResponse.success();
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:delete')")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        ctContractService.delete(id);
+        return ApiResponse.success();
+    }
+
     @GetMapping("/{id}/approval-records")
     @PreAuthorize("hasAuthority('contract:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<ContractApprovalRecordVO>> getApprovalRecords(@PathVariable Long id) {

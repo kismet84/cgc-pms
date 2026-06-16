@@ -229,22 +229,8 @@ const STATUS_COLOR: Record<ContractStatus, string> = {
   TERMINATED: '#ef4444',
 }
 
-const fallbackTypeDistribution = [
-  { key: 'MAIN' as ContractType, label: TYPE_LABEL.MAIN, value: 42, color: CHART_COLORS[0] },
-  { key: 'SUB' as ContractType, label: TYPE_LABEL.SUB, value: 28, color: CHART_COLORS[1] },
-  { key: 'PURCHASE' as ContractType, label: TYPE_LABEL.PURCHASE, value: 18, color: CHART_COLORS[2] },
-  { key: 'SERVICE' as ContractType, label: TYPE_LABEL.SERVICE, value: 12, color: CHART_COLORS[4] },
-]
-
-const fallbackStatusDistribution = [
-  { key: 'PERFORMING' as ContractStatus, label: STATUS_LABEL.PERFORMING, value: 56, color: STATUS_COLOR.PERFORMING },
-  { key: 'SETTLED' as ContractStatus, label: STATUS_LABEL.SETTLED, value: 24, color: STATUS_COLOR.SETTLED },
-  { key: 'TERMINATED' as ContractStatus, label: STATUS_LABEL.TERMINATED, value: 8, color: STATUS_COLOR.TERMINATED },
-  { key: 'DRAFT' as ContractStatus, label: STATUS_LABEL.DRAFT, value: 12, color: STATUS_COLOR.DRAFT },
-]
-
 const typeDistribution = computed(() => {
-  if (!tableData.value.length) return fallbackTypeDistribution
+  if (!tableData.value.length) return []
   const counts = tableData.value.reduce<Record<ContractType, number>>(
     (acc, item) => {
       acc[item.contractType] += 1
@@ -263,7 +249,7 @@ const typeDistribution = computed(() => {
 })
 
 const statusDistribution = computed(() => {
-  if (!tableData.value.length) return fallbackStatusDistribution
+  if (!tableData.value.length) return []
   const counts = tableData.value.reduce<Record<ContractStatus, number>>(
     (acc, item) => {
       acc[item.contractStatus] += 1
@@ -291,21 +277,21 @@ const statusBars = computed(() =>
 )
 
 const warningRows = computed(() => {
-  const rows = tableData.value
-    .filter((item) => item.contractStatus === 'PERFORMING')
-    .slice(0, 3)
-    .map((item, index) => ({
-      project: item.projectName || '在建项目',
-      title: item.contractName,
-      days: [18, 12, 8][index] ?? 7,
-    }))
-  return rows.length
-    ? rows
-    : [
-        { project: '城北安置房', title: '主体劳务分包合同', days: 18 },
-        { project: '国际会展中心', title: '幕墙专业分包合同', days: 12 },
-        { project: '轨交配套工程', title: '钢材采购合同', days: 8 },
-      ]
+  const now = new Date()
+  return tableData.value
+    .filter((item) => item.contractStatus === 'PERFORMING' && item.endDate)
+    .map((item) => {
+      const end = new Date(item.endDate)
+      const days = Math.ceil((now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24))
+      return {
+        project: item.projectName || '未知项目',
+        title: item.contractName,
+        days,
+      }
+    })
+    .filter((item) => item.days > 0)
+    .sort((a, b) => b.days - a.days)
+    .slice(0, 5)
 })
 
 const donutOption = computed(() => ({
