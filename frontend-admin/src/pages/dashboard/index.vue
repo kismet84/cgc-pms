@@ -426,7 +426,6 @@ onMounted(() => {
             <div class="kpi-value">
               {{ fmtNum(pmData.pendingTaskCount) }} <small>项</small>
             </div>
-            <div class="kpi-delta danger">较昨日 ↑ 5</div>
           </div>
         </div>
         <div class="kpi-card">
@@ -436,7 +435,6 @@ onMounted(() => {
             <div class="kpi-value">
               {{ fmtNum(pmData.laggingProjectCount) }} <small>个</small>
             </div>
-            <div class="kpi-delta danger">较昨日 ↑ 2</div>
           </div>
         </div>
         <div class="kpi-card">
@@ -446,7 +444,6 @@ onMounted(() => {
             <div class="kpi-value">
               {{ fmtNum(pmData.pendingApprovalCount) }} <small>项</small>
             </div>
-            <div class="kpi-delta success">较昨日 ↓ 3</div>
           </div>
         </div>
         <div class="kpi-card">
@@ -456,7 +453,6 @@ onMounted(() => {
             <div class="kpi-value">
               {{ fmtNum(pmData.expiringContractCount) }} <small>份</small>
             </div>
-            <div class="kpi-delta danger">较昨日 ↑ 4</div>
           </div>
         </div>
       </div>
