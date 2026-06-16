@@ -620,7 +620,7 @@ function genTermKey(): string {
 
         <!-- Step 3: Payment Terms -->
         <div v-show="current === 2">
-          <PaymentTermEditor v-model:terms="terms" @change="dirty = true" />
+          <PaymentTermEditor v-model="terms" @change="dirty = true" />
         </div>
 
         <!-- Step 4: Review & Confirm -->
