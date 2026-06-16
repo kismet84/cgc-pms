@@ -22,40 +22,40 @@ Construction General Contracting Project Management System
 
 ### 1. 基础设施
 
-`ash
+```bash
 cd deploy
 cp .env.example .env
 docker compose up -d    # MySQL:3306 / Redis:6379 / MinIO:9001
-`
+```
 
 ### 2. 后端
 
-`ash
+```bash
 cd backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev     # MySQL
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # H2
-`
+```
 
 Swagger: http://localhost:8080/api/swagger-ui.html
-默认账号: dmin / dmin123
+默认账号: `admin` / `admin123`
 
 ### 3. 前端
 
-`ash
+```bash
 cd frontend-admin
 pnpm install
 pnpm dev      # http://localhost:5173
-`
+```
 
 ### 一键启动 (Windows)
 
-`ash
+```bash
 scripts\start-dev.bat    # Docker → 后端 → 前端
-`
+```
 
 ## 项目结构
 
-`
+```
 cgc-pms/
 ├── backend/                         # Spring Boot
 │   └── src/main/java/com/cgcpms/
@@ -86,37 +86,37 @@ cgc-pms/
 │   └── src/
 │       ├── components/              # 共享组件
 │       ├── stores/                  # Pinia 状态管理
-│       ├── pages/                   # 30 页面 (dashboard/contract/project/cost/payment/purchase/subcontract/settlement/variation/inventory/invoice/approval/alert/org/material/system/settings 等)
+│       ├── pages/                   # 30 页面 (dashboard/contract/project/cost/payment/purchase/subcontract/settlement/variation/inventory/invoice/approval/alert/org/material/system/settings)
 │       └── router/                  # 路由配置
 ├── deploy/                          # Docker Compose + .env.example
 ├── doc/                             # 文档 (审计/计划/测试/验收/部署/手册/开发)
 ├── docs/                            # 协同文档 (agents/superpowers)
 ├── scripts/                         # 辅助脚本
-├── .agent-runtime/                  # Agent 协同运行时 (tasks/reports/messages)
+├── .agent-runtime/                  # 协同运行时 (tasks/reports/messages)
 └── .github/workflows/ci.yml        # CI/CD 流水线
-`
+```
 
 ## 功能模块
 
 | 模块 | 路由 | 说明 |
 |------|------|------|
-| 经营驾驶舱 | /dashboard | 五角色数据看板 |
-| 项目管理 | /project | 项目 CRUD + 概览 + 成员 |
-| 合同台账 | /contract | 合同全生命周期管理 |
-| 成本管理 | /cost | 成本台账 + 动态成本汇总 |
-| 目标管理 | /cost-target | 目标成本设定与跟踪 |
-| 变更签证 | /variation | 变更令 + 审批 |
-| 结算管理 | /settlement | 结算列表 + 详情 |
-| 付款管理 | /payment | 付款申请 + 财务回写 |
-| 分包管理 | /subcontract | 分包任务 + 计量 |
-| 采购管理 | /purchase | 采购订单 |
-| 库存管理 | /inventory | 仓库 + 台账 + 交易 + 采购申请 |
-| 发票管理 | /invoice | 发票登记与核验 |
-| 审批管理 | /approval | 待办/已办/我发起/抄送我 + 审批详情 |
-| 预警中心 | /alert | 风险预警列表 + 统计分析 |
-| 组织架构 | /org | 公司/部门/岗位树 |
-| 基础数据 | /material | 材料字典 |
-| 系统设置 | /system | 字典/用户/数据/角色管理 |
+| 经营驾驶舱 | `/dashboard` | 五角色数据看板 |
+| 项目管理 | `/project` | 项目 CRUD + 概览 + 成员 |
+| 合同台账 | `/contract` | 合同全生命周期管理 |
+| 成本管理 | `/cost` | 成本台账 + 动态成本汇总 |
+| 目标管理 | `/cost-target` | 目标成本设定与跟踪 |
+| 变更签证 | `/variation` | 变更令 + 审批 |
+| 结算管理 | `/settlement` | 结算列表 + 详情 |
+| 付款管理 | `/payment` | 付款申请 + 财务回写 |
+| 分包管理 | `/subcontract` | 分包任务 + 计量 |
+| 采购管理 | `/purchase` | 采购订单 |
+| 库存管理 | `/inventory` | 仓库 + 台账 + 交易 + 采购申请 |
+| 发票管理 | `/invoice` | 发票登记与核验 |
+| 审批管理 | `/approval` | 待办/已办/我发起/抄送我 + 审批详情 |
+| 预警中心 | `/alert` | 风险预警列表 + 统计分析 |
+| 组织架构 | `/org` | 公司/部门/岗位树 |
+| 基础数据 | `/material` | 材料字典 |
+| 系统设置 | `/system` | 字典/用户/数据/角色管理 |
 
 ## 测试
 
@@ -126,39 +126,39 @@ cgc-pms/
 | 前端 | Vitest | 136 | ~99% (1 预存) |
 | E2E | Playwright | 36 | 12 模块覆盖 |
 
-`ash
+```bash
 cd backend && ./mvnw test          # 后端
 cd frontend-admin && pnpm build    # 前端构建 + 类型检查
 cd frontend-admin && pnpm vitest   # 前端测试
-`
+```
 
 ## 部署
 
-`ash
+```bash
 cd deploy
 cp .env.example .env
 mkdir -p ssl
 docker compose -f docker-compose.prod.yml up -d
-`
+```
 
 服务规格: MySQL (512M) + Redis (256M) + MinIO (512M) + Backend (1G) + Nginx (128M)
 端口: HTTP 80 / HTTPS 443 → Nginx → Backend :8080
 
 ## CI/CD
 
-.github/workflows/ci.yml — push main 触发: backend-test → frontend-build → flyway-check → docker-build → deploy
+`.github/workflows/ci.yml` — push main 触发: backend-test → frontend-build → flyway-check → docker-build → deploy
 
 ## 常见问题
 
 ### Flyway 校验失败 → API 500
 
-**根因**: 已应用的迁移脚本 (V*.sql) 被修改，checksum 不匹配。
+**根因**: 已应用的迁移脚本 (`V*.sql`) 被修改，checksum 不匹配。
 
-**预防**: 不要修改已执行的迁移脚本，新增表结构用新的 V48__xxx.sql。
+**预防**: 不要修改已执行的迁移脚本，新增表结构用新的 `V48__xxx.sql`。
 
 ### 修复步骤
 
-`sql
+```sql
 -- 进入 MySQL 容器
 docker exec -it cgc-pms-mysql-dev mysql -u cgc -p cgc_pms
 
@@ -173,16 +173,16 @@ ALTER TABLE sys_user_preference
   ADD COLUMN remark VARCHAR(500) NULL COMMENT '备注' AFTER deleted_flag;
 
 docker restart cgc-pms-backend-dev
-`
+```
 
 ## 文档
 
 | 分类 | 路径 |
 |------|------|
-| 审计审查 | doc/01-审计审查/ |
-| 开发计划 | doc/02-开发计划/ |
-| 测试报告 | doc/03-测试报告/ |
-| 验收文档 | doc/04-验收文档/ |
-| 上线部署 | doc/05-上线部署/ |
-| 用户手册 | doc/06-用户手册/ |
-| 开发文档 | doc/07-开发文档/v2.3/ |
+| 审计审查 | `doc/01-审计审查/` |
+| 开发计划 | `doc/02-开发计划/` |
+| 测试报告 | `doc/03-测试报告/` |
+| 验收文档 | `doc/04-验收文档/` |
+| 上线部署 | `doc/05-上线部署/` |
+| 用户手册 | `doc/06-用户手册/` |
+| 开发文档 | `doc/07-开发文档/v2.3/` |
