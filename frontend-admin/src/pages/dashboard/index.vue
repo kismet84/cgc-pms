@@ -295,277 +295,7 @@ const costLineOption = computed(() => {
   }
 })
 
-/* ── Project Manager Reference Dashboard ── */
-const pmUsePresentationFallback = computed(() => {
-  const data = pmData.value
-  if (!data) return false
-  return (
-    data.pendingTaskCount === 0 &&
-    data.laggingProjectCount === 0 &&
-    data.pendingApprovalCount === 0 &&
-    data.expiringContractCount === 0 &&
-    data.pendingTasks.length === 0 &&
-    data.laggingProjects.length === 0 &&
-    data.pendingApprovals.length === 0 &&
-    data.expiringContracts.length === 0
-  )
-})
 
-const pmDisplayStats = computed(() => ({
-  pendingTaskCount: pmUsePresentationFallback.value ? 23 : (pmData.value?.pendingTaskCount ?? 0),
-  laggingProjectCount: pmUsePresentationFallback.value
-    ? 7
-    : (pmData.value?.laggingProjectCount ?? 0),
-  pendingApprovalCount: pmUsePresentationFallback.value
-    ? 18
-    : (pmData.value?.pendingApprovalCount ?? 0),
-  expiringContractCount: pmUsePresentationFallback.value
-    ? 12
-    : (pmData.value?.expiringContractCount ?? 0),
-}))
-
-// Local presentation fallback keeps the approved dashboard density when live PM data is empty.
-const pmFallbackTasks = [
-  {
-    taskId: 'pm-task-1',
-    title: '合同付款申请审批',
-    businessType: '付款管理',
-    receivedAt: '2026-06-14',
-  },
-  {
-    taskId: 'pm-task-2',
-    title: '材料采购申请审批',
-    businessType: '采购管理',
-    receivedAt: '2026-06-15',
-  },
-  {
-    taskId: 'pm-task-3',
-    title: '变更签证确认',
-    businessType: '变更签证',
-    receivedAt: '2026-06-16',
-  },
-  {
-    taskId: 'pm-task-4',
-    title: '结算申请审批',
-    businessType: '结算管理',
-    receivedAt: '2026-06-18',
-  },
-  {
-    taskId: 'pm-task-5',
-    title: '分包结算审核',
-    businessType: '分包管理',
-    receivedAt: '2026-06-20',
-  },
-]
-
-const pmFallbackLaggingProjects = [
-  { projectId: 'lag-1', projectName: '奥体中心项目', projectCode: '结算进度滞后', status: '高' },
-  { projectId: 'lag-2', projectName: '城北商业综合体', projectCode: '变更签证滞后', status: '中' },
-  { projectId: 'lag-3', projectName: '滨江住宅项目', projectCode: '付款审批滞后', status: '中' },
-  { projectId: 'lag-4', projectName: '产业园区项目', projectCode: '成本归集滞后', status: '低' },
-  { projectId: 'lag-5', projectName: '学校建设项目', projectCode: '合同审批滞后', status: '低' },
-]
-
-const pmFallbackExpiringContracts = [
-  {
-    contractId: 'exp-1',
-    contractName: '钢筋采购合同',
-    contractCode: 'HT-2024-032',
-    endDate: '2026-06-18',
-    contractAmount: '5天',
-  },
-  {
-    contractId: 'exp-2',
-    contractName: '塔吊租赁合同',
-    contractCode: 'HT-2024-087',
-    endDate: '2026-06-22',
-    contractAmount: '9天',
-  },
-  {
-    contractId: 'exp-3',
-    contractName: '外墙涂料供应合同',
-    contractCode: 'HT-2024-056',
-    endDate: '2026-06-25',
-    contractAmount: '12天',
-  },
-  {
-    contractId: 'exp-4',
-    contractName: '模板租赁合同',
-    contractCode: 'HT-2024-101',
-    endDate: '2026-06-30',
-    contractAmount: '17天',
-  },
-  {
-    contractId: 'exp-5',
-    contractName: '混凝土供应合同',
-    contractCode: 'HT-2024-073',
-    endDate: '2026-07-05',
-    contractAmount: '22天',
-  },
-]
-
-const pmTaskRows = computed(() =>
-  pmData.value?.pendingTasks.length ? pmData.value.pendingTasks : pmFallbackTasks,
-)
-const pmLaggingProjectRows = computed(() =>
-  pmData.value?.laggingProjects.length ? pmData.value.laggingProjects : pmFallbackLaggingProjects,
-)
-const pmExpiringContractRows = computed(() =>
-  pmData.value?.expiringContracts.length
-    ? pmData.value.expiringContracts
-    : pmFallbackExpiringContracts,
-)
-
-const pmBusinessOverviewOption = computed(() => ({
-  tooltip: { trigger: 'axis' as const },
-  legend: {
-    data: ['合同金额(含税)', '已结算金额', '利润率'],
-    top: 8,
-    right: 12,
-    itemWidth: 9,
-    itemHeight: 9,
-    textStyle: { color: '#475569', fontSize: 12 },
-  },
-  grid: { left: 56, right: 42, top: 54, bottom: 34, containLabel: true },
-  xAxis: {
-    type: 'category' as const,
-    data: ['1月', '2月', '3月', '4月', '5月', '6月'],
-    axisTick: { show: false },
-    axisLabel: { color: '#475569' },
-  },
-  yAxis: [
-    {
-      type: 'value' as const,
-      name: '金额(万元)',
-      axisLabel: { color: '#64748b' },
-      splitLine: { lineStyle: { color: '#eef2f7' } },
-    },
-    {
-      type: 'value' as const,
-      name: '利润率(%)',
-      axisLabel: { color: '#64748b' },
-      splitLine: { show: false },
-    },
-  ],
-  series: [
-    {
-      name: '合同金额(含税)',
-      type: 'bar',
-      data: [82000, 76000, 72000, 78000, 81500, 86500],
-      barMaxWidth: 22,
-      itemStyle: { color: '#3b82f6', borderRadius: [5, 5, 0, 0] },
-    },
-    {
-      name: '已结算金额',
-      type: 'bar',
-      data: [35000, 33000, 29200, 28600, 30600, 45600],
-      barMaxWidth: 22,
-      itemStyle: { color: '#22c55e', borderRadius: [5, 5, 0, 0] },
-    },
-    {
-      name: '利润率',
-      type: 'line',
-      yAxisIndex: 1,
-      data: [8.1, 7.2, 6.2, 7.3, 8.2, 7.9],
-      smooth: true,
-      symbolSize: 6,
-      lineStyle: { color: '#f59e0b', width: 2 },
-      itemStyle: { color: '#f59e0b' },
-    },
-  ],
-}))
-
-const pmCostCompositionOption = computed(() => ({
-  tooltip: { trigger: 'item' as const },
-  legend: {
-    orient: 'vertical' as const,
-    right: 8,
-    top: 'middle',
-    itemWidth: 8,
-    itemHeight: 8,
-    textStyle: { color: '#475569', fontSize: 12 },
-  },
-  title: {
-    text: '45,672.30\n万元',
-    left: '34%',
-    top: '43%',
-    textAlign: 'center' as const,
-    textStyle: { color: '#172033', fontSize: 18, fontWeight: 800, lineHeight: 24 },
-  },
-  series: [
-    {
-      name: '成本构成',
-      type: 'pie',
-      radius: ['48%', '70%'],
-      center: ['34%', '52%'],
-      avoidLabelOverlap: true,
-      label: { show: false },
-      labelLine: { show: false },
-      data: [
-        { value: 28.35, name: '人工费', itemStyle: { color: '#3b82f6' } },
-        { value: 32.12, name: '材料费', itemStyle: { color: '#f59e0b' } },
-        { value: 12.48, name: '机械费', itemStyle: { color: '#22c55e' } },
-        { value: 15.62, name: '分包费', itemStyle: { color: '#14b8c7' } },
-        { value: 6.35, name: '措施费', itemStyle: { color: '#0ea5e9' } },
-        { value: 5.08, name: '其他费用', itemStyle: { color: '#8b5cf6' } },
-      ],
-    },
-  ],
-}))
-
-const pmFundingOverviewOption = computed(() => ({
-  tooltip: { trigger: 'axis' as const },
-  legend: {
-    data: ['收入', '支出', '净流入'],
-    top: 8,
-    right: 12,
-    itemWidth: 9,
-    itemHeight: 9,
-    textStyle: { color: '#475569', fontSize: 12 },
-  },
-  grid: { left: 54, right: 24, top: 54, bottom: 34, containLabel: true },
-  xAxis: {
-    type: 'category' as const,
-    data: ['1月', '2月', '3月', '4月', '5月', '6月'],
-    axisTick: { show: false },
-    axisLabel: { color: '#475569' },
-  },
-  yAxis: {
-    type: 'value' as const,
-    name: '金额(万元)',
-    axisLabel: { color: '#64748b' },
-    splitLine: { lineStyle: { color: '#eef2f7' } },
-  },
-  series: [
-    {
-      name: '收入',
-      type: 'line',
-      data: [5200, 8400, 9800, 11800, 13200, 15200],
-      smooth: true,
-      symbolSize: 6,
-      lineStyle: { color: '#3b82f6', width: 2 },
-      itemStyle: { color: '#3b82f6' },
-    },
-    {
-      name: '支出',
-      type: 'line',
-      data: [3600, 5900, 6400, 8900, 10800, 12400],
-      smooth: true,
-      symbolSize: 6,
-      lineStyle: { color: '#22c55e', width: 2 },
-      itemStyle: { color: '#22c55e' },
-    },
-    {
-      name: '净流入',
-      type: 'line',
-      data: [1600, -1200, 1500, 900, 2100, 3332],
-      smooth: true,
-      symbolSize: 6,
-      lineStyle: { color: '#f59e0b', width: 2 },
-      itemStyle: { color: '#f59e0b' },
-    },
-  ],
-}))
 
 /* ── Drill-down ── */
 function handleBarClick(params: { name?: string }) {
@@ -694,7 +424,7 @@ onMounted(() => {
           <div class="kpi-body">
             <div class="kpi-title">待办任务</div>
             <div class="kpi-value">
-              {{ fmtNum(pmDisplayStats.pendingTaskCount) }} <small>项</small>
+              {{ fmtNum(pmData.pendingTaskCount) }} <small>项</small>
             </div>
             <div class="kpi-delta danger">较昨日 ↑ 5</div>
           </div>
@@ -704,7 +434,7 @@ onMounted(() => {
           <div class="kpi-body">
             <div class="kpi-title">滞后项目</div>
             <div class="kpi-value">
-              {{ fmtNum(pmDisplayStats.laggingProjectCount) }} <small>个</small>
+              {{ fmtNum(pmData.laggingProjectCount) }} <small>个</small>
             </div>
             <div class="kpi-delta danger">较昨日 ↑ 2</div>
           </div>
@@ -714,7 +444,7 @@ onMounted(() => {
           <div class="kpi-body">
             <div class="kpi-title">待审批</div>
             <div class="kpi-value">
-              {{ fmtNum(pmDisplayStats.pendingApprovalCount) }} <small>项</small>
+              {{ fmtNum(pmData.pendingApprovalCount) }} <small>项</small>
             </div>
             <div class="kpi-delta success">较昨日 ↓ 3</div>
           </div>
@@ -724,90 +454,10 @@ onMounted(() => {
           <div class="kpi-body">
             <div class="kpi-title">临期合同</div>
             <div class="kpi-value">
-              {{ fmtNum(pmDisplayStats.expiringContractCount) }} <small>份</small>
+              {{ fmtNum(pmData.expiringContractCount) }} <small>份</small>
             </div>
             <div class="kpi-delta danger">较昨日 ↑ 4</div>
           </div>
-        </div>
-      </div>
-
-      <div class="pm-reference-grid">
-        <div class="panel pm-panel pm-business-panel">
-          <div class="panel-header">
-            <span>项目经营概览</span>
-            <div class="panel-actions">
-              <a-select value="全部项目" size="small" style="width: 116px">
-                <a-select-option value="全部项目">全部项目</a-select-option>
-              </a-select>
-              <a-select value="本年" size="small" style="width: 92px">
-                <a-select-option value="本年">本年</a-select-option>
-              </a-select>
-            </div>
-          </div>
-          <div class="pm-summary-strip">
-            <div>
-              <span>合同金额(含税)</span>
-              <b class="info">86,502.35</b>
-              <small>万元</small>
-            </div>
-            <div>
-              <span>已结算金额</span>
-              <b class="success">32,456.78</b>
-              <small>万元</small>
-            </div>
-            <div>
-              <span>已收款金额</span>
-              <b class="info">28,765.20</b>
-              <small>万元</small>
-            </div>
-            <div>
-              <span>预计利润</span>
-              <b class="warning">6,875.45</b>
-              <small>万元</small>
-            </div>
-            <div>
-              <span>利润率</span>
-              <b>7.94%</b>
-            </div>
-          </div>
-          <v-chart :option="pmBusinessOverviewOption" autoresize class="pm-chart" />
-        </div>
-
-        <div class="panel pm-panel pm-cost-panel">
-          <div class="panel-header">
-            <span>成本构成分析</span>
-            <a-select value="本年" size="small" style="width: 86px">
-              <a-select-option value="本年">本年</a-select-option>
-            </a-select>
-          </div>
-          <v-chart :option="pmCostCompositionOption" autoresize class="pm-chart pm-donut-chart" />
-        </div>
-
-        <div class="panel pm-panel pm-funding-panel">
-          <div class="panel-header">
-            <span>资金收支概览</span>
-            <a-select value="本年" size="small" style="width: 86px">
-              <a-select-option value="本年">本年</a-select-option>
-            </a-select>
-          </div>
-          <div class="pm-summary-strip pm-summary-strip-3">
-            <div>
-              <span>资金收入</span>
-              <b class="info">28,765.20</b>
-              <small>万元</small>
-            </div>
-            <div>
-              <span>资金支出</span>
-              <b class="success">25,432.90</b>
-              <small>万元</small>
-            </div>
-            <div>
-              <span>资金净流入</span>
-              <b class="warning">3,332.30</b>
-              <small>万元</small>
-            </div>
-          </div>
-          <v-chart :option="pmFundingOverviewOption" autoresize class="pm-chart" />
         </div>
       </div>
 
@@ -819,7 +469,7 @@ onMounted(() => {
           </div>
           <a-table
             :columns="pmTaskCols"
-            :data-source="pmTaskRows"
+            :data-source="pmData.pendingTasks"
             :loading="loading"
             :pagination="false"
             size="small"
@@ -833,7 +483,7 @@ onMounted(() => {
           </div>
           <a-table
             :columns="pmProjectCols"
-            :data-source="pmLaggingProjectRows"
+            :data-source="pmData.laggingProjects"
             :loading="loading"
             :pagination="false"
             size="small"
@@ -847,7 +497,7 @@ onMounted(() => {
           </div>
           <a-table
             :columns="pmContractCols"
-            :data-source="pmExpiringContractRows"
+            :data-source="pmData.expiringContracts"
             :loading="loading"
             :pagination="false"
             size="small"

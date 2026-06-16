@@ -72,38 +72,5 @@ INSERT INTO sys_user_role (id, user_id, role_id) VALUES
 INSERT INTO sys_role_menu (id, role_id, menu_id)
 SELECT id, 1, id FROM sys_menu WHERE deleted_flag = 0;
 
--- ============================================================
--- 6. 演示项目（2个）
--- ============================================================
-INSERT INTO pm_project (id, tenant_id, project_code, project_name, project_type, project_address, owner_unit, supervisor_unit, design_unit, contract_amount, target_cost, planned_start_date, planned_end_date, project_manager_id, status, approval_status, created_by) VALUES
-(10001, 0, 'PRJ-2026-001', '城市中心商业综合体总承包工程', '房建工程', '某市高新区科技大道88号', '某市城投置业有限公司', '某建设监理咨询有限公司', '某建筑设计研究院', 580000000.00, 520000000.00, '2026-03-01', '2028-06-30', 1, 'ONGOING', 'APPROVED', 1),
-(10002, 0, 'PRJ-2026-002', '滨江路市政道路改造工程',     '市政工程', '某市滨江路全段',         '某市市政建设管理局',     '某市政工程监理公司',     '某市政设计院',     128000000.00, 115000000.00, '2026-05-01', '2027-04-30', 1, 'DRAFT',   'DRAFT',    1);
-
--- ============================================================
--- 7. 演示合作方（3个：供应商 / 分包商 / 服务商）
--- ============================================================
-INSERT INTO md_partner (id, tenant_id, partner_code, partner_name, partner_type, credit_code, legal_person, contact_name, contact_phone, bank_name, bank_account, qualification_level, blacklist_flag, risk_level, status, created_by) VALUES
-(20001, 0, 'PTN-S-001', '中建商砼材料供应有限公司', 'SUPPLIER',      '91110000MA001A0001', '张建国', '李采购', '13900000001', '中国建设银行某市分行', '6217000000000000001', '一级', 0, 'LOW',    'ENABLE', 1),
-(20002, 0, 'PTN-C-001', '宏远建筑劳务分包有限公司', 'SUBCONTRACTOR', '91110000MA001B0002', '王宏远', '赵分包', '13900000002', '中国工商银行某市分行', '6222000000000000002', '专业承包二级', 0, 'MEDIUM', 'ENABLE', 1),
-(20003, 0, 'PTN-V-001', '智联工程咨询服务有限公司', 'SERVICE_PROVIDER','91110000MA001C0003', '陈智联', '孙服务', '13900000003', '中国银行某市分行',     '6217000000000000003', '甲级', 0, 'LOW',    'ENABLE', 1);
-
--- ============================================================
--- 8. 演示合同（3个，关联演示项目与合作方）
--- ============================================================
-INSERT INTO ct_contract (id, tenant_id, project_id, partner_id, contract_code, contract_name, contract_type, party_a, party_b, contract_amount, current_amount, tax_rate, tax_amount, amount_without_tax, signed_date, start_date, end_date, payment_method, settlement_method, warranty_rate, warranty_amount, contract_status, approval_status, created_by) VALUES
-(30001, 0, 10001, 20001, 'CT-2026-001', '商砼及钢材采购合同',     'PURCHASE', '某建工集团有限公司', '中建商砼材料供应有限公司', 45000000.00, 45000000.00, 13.00, 5176991.15, 39823008.85, '2026-03-10', '2026-03-15', '2027-12-31', '按月结算', '验收结算', 3.00, 1350000.00, 'PERFORMING', 'APPROVED', 1),
-(30002, 0, 10001, 20002, 'CT-2026-002', '主体结构劳务分包合同',   'SUB',      '某建工集团有限公司', '宏远建筑劳务分包有限公司', 86000000.00, 86000000.00, 9.00,  7100917.43, 78899082.57, '2026-03-20', '2026-04-01', '2028-03-31', '按进度付款', '竣工结算', 5.00, 4300000.00, 'PERFORMING', 'APPROVED', 1),
-(30003, 0, 10001, 20003, 'CT-2026-003', '工程造价咨询服务合同',   'SERVICE',  '某建工集团有限公司', '智联工程咨询服务有限公司', 1200000.00,  1200000.00,  6.00,  67924.53,   1132075.47,  '2026-03-25', '2026-04-01', '2028-06-30', '分阶段付款', '一次性结算', 0.00, 0.00, 'DRAFT', 'DRAFT', 1);
-
--- ============================================================
--- 9. 演示审批模板：合同审批流程（业务类型 PAY_REQUEST_TEST），含 5 个节点
--- ============================================================
-INSERT INTO wf_template (id, tenant_id, template_code, template_name, business_type, enabled, amount_min, amount_max, condition_rule, form_schema, created_by, remark) VALUES
-(40001, 0, 'TPL-PAY-TEST-001', '付款申请测试审批流程', 'PAY_REQUEST_TEST', 1, 0.00, 999999999.99, NULL, NULL, 1, '演示用5节点审批流程');
-
-INSERT INTO wf_template_node (id, tenant_id, template_id, node_code, node_name, node_order, node_type, approve_mode, approver_config, condition_rule, allow_transfer, allow_add_sign, timeout_hours) VALUES
-(40101, 0, 40001, 'NODE_APPLY',    '发起申请',     1, 'START',    'SEQUENTIAL', JSON_OBJECT('type', 'INITIATOR'),                            NULL, 0, 0, NULL),
-(40102, 0, 40001, 'NODE_DEPT',     '部门负责人审批', 2, 'APPROVAL', 'SEQUENTIAL', JSON_OBJECT('type', 'ROLE', 'roleCode', 'PROJECT_MANAGER'), NULL, 1, 1, 48),
-(40103, 0, 40001, 'NODE_COST',     '成本部审核',   3, 'APPROVAL', 'SEQUENTIAL', JSON_OBJECT('type', 'ROLE', 'roleCode', 'COST_AUDIT'),     NULL, 1, 1, 48),
-(40104, 0, 40001, 'NODE_FINANCE',  '财务审批',     4, 'APPROVAL', 'SEQUENTIAL', JSON_OBJECT('type', 'ROLE', 'roleCode', 'FINANCE'),        NULL, 1, 1, 48),
-(40105, 0, 40001, 'NODE_GM',       '总经理审批',   5, 'APPROVAL', 'SEQUENTIAL', JSON_OBJECT('type', 'ROLE', 'roleCode', 'GENERAL_MANAGER'), NULL, 0, 1, 72);
+-- 业务演示数据（项目/合作方/合同/审批模板）已移除
+-- 如需恢复，请从 git history 中还原 V6__init_demo_data.sql
