@@ -40,8 +40,18 @@ const formData = reactive<Partial<PartnerVO>>({
 })
 
 
-const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([])
-const partnerTypeLabel = (val: string) => partnerTypeOptions.value.find(o => o.dictValue === val)?.dictLabel ?? val
+const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([
+  { dictLabel: '甲方', dictValue: 'PARTY_A' },
+  { dictLabel: '乙方', dictValue: 'PARTY_B' },
+  { dictLabel: '其他', dictValue: 'OTHER' },
+])
+const partnerTypeLabel = (val: string) => {
+  const fromDict = partnerTypeOptions.value.find(o => o.dictValue === val)
+  if (fromDict) return fromDict.dictLabel
+  // Static fallback in case dict not loaded yet
+  const fallback: Record<string, string> = { PARTY_A: '甲方', PARTY_B: '乙方', OTHER: '其他' }
+  return fallback[val] ?? val
+}
 const partnerTypeColor = (val: string): string => {
   const map: Record<string, string> = { PARTY_A: 'blue', PARTY_B: 'green', OTHER: 'default' }
   return map[val] ?? 'default'
