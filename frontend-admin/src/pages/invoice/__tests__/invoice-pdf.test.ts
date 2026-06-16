@@ -94,16 +94,16 @@ describe('Invoice PDF Upload', () => {
     expect(vm.formData.invoiceType).toBe('VAT_SPECIAL')
   })
 
-  it('should not overwrite manually entered fields', () => {
+  it('should overwrite manually entered fields with recognition result', () => {
     const vm = wrapper.vm
-    // Pre-fill invoiceNo manually
+    // Pre-fill invoiceNo manually — recognition takes priority
     vm.formData.invoiceNo = 'MANUAL-001'
     const result: InvoiceRecognizeResultVO = {
-      invoiceNo: '12345678', // should NOT overwrite
-      invoiceAmount: '150000.00', // should fill (empty)
+      invoiceNo: '12345678',
+      invoiceAmount: '150000.00',
     }
     vm.applyRecognitionResult(result)
-    expect(vm.formData.invoiceNo).toBe('MANUAL-001') // preserved!
+    expect(vm.formData.invoiceNo).toBe('12345678') // overwritten by OCR
     expect(vm.formData.invoiceAmount).toBe('150000.00') // filled
   })
 
