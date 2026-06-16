@@ -84,7 +84,7 @@ async function fetchData() {
       partnerType: filter.partnerType,
       status: filter.status,
     })
-    tableData.value = res.records
+    tableData.value = res.records; tableData.value.sort((a, b) => (a.partnerType === "PARTY_A" ? -1 : b.partnerType === "PARTY_A" ? 1 : 0))
     total.value = res.total
   } catch (e: unknown) {
     console.error(e)
