@@ -36,6 +36,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
         wrapper.eq(CtContractItem::getContractId, contractId);
         mapper.delete(wrapper);
         if (items != null && !items.isEmpty()) {
+            items.forEach(i -> i.setContractId(contractId));
             saveBatch(items);
         }
     }

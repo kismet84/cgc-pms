@@ -28,7 +28,7 @@ export function getContractDetail(id: string) {
 
 /** 新建合同 */
 export function createContract(data: Partial<ContractVO>) {
-  return request<ContractVO>({
+  return request<string>({
     url: '/contracts',
     method: 'post',
     data,

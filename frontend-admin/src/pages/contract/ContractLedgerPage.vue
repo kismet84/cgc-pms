@@ -14,6 +14,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
+import { useReferenceStore } from '@/stores/reference'
 import { getContractLedger, getContractKpi, deleteContract } from '@/api/modules/contract'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import type {
@@ -26,6 +27,8 @@ import type {
 import type { PageResult } from '@/types/api'
 
 const router = useRouter()
+const referenceStore = useReferenceStore()
+const projects = computed(() => referenceStore.projects ?? [])
 
 function handleCreate() {
   router.push('/contract/create')

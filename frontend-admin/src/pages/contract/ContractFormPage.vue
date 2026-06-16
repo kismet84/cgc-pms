@@ -234,33 +234,39 @@ function buildContractPayload() {
 }
 
 function buildItemsPayload(): ContractItem[] {
-  return items.value.map((r, idx) => ({
-    id: r.id ?? '',
-    itemCode: r.itemCode ?? '',
-    itemName: r.itemName ?? '',
-    itemSpec: r.itemSpec ?? '',
-    unit: r.unit ?? '',
-    quantity: Number(r.quantity) || 0,
-    unitPrice: String(r.unitPrice ?? '0'),
-    amount: String(r.amount ?? '0'),
-    taxRate: Number(r.taxRate) || 0,
-    taxAmount: String(r.taxAmount ?? '0'),
-    amountWithoutTax: String(r.amountWithoutTax ?? '0'),
-    sortOrder: idx + 1,
-  }))
+  return items.value.map((r, idx) => {
+    const item: Record<string, unknown> = {
+      itemCode: r.itemCode ?? '',
+      itemName: r.itemName ?? '',
+      itemSpec: r.itemSpec ?? '',
+      unit: r.unit ?? '',
+      quantity: Number(r.quantity) || 0,
+      unitPrice: String(r.unitPrice ?? '0'),
+      amount: String(r.amount ?? '0'),
+      taxRate: Number(r.taxRate) || 0,
+      taxAmount: String(r.taxAmount ?? '0'),
+      amountWithoutTax: String(r.amountWithoutTax ?? '0'),
+      sortOrder: idx + 1,
+    }
+    if (r.id) item.id = r.id
+    return item
+  }) as ContractItem[]
 }
 
 function buildTermsPayload(): ContractPaymentTerm[] {
-  return terms.value.map((r, idx) => ({
-    id: r.id ?? '',
-    termName: r.termName ?? '',
-    paymentRatio: Number(r.paymentRatio) || 0,
-    paymentAmount: String(r.paymentAmount ?? '0'),
-    paymentCondition: r.paymentCondition ?? '',
-    plannedDate: r.plannedDate ?? '',
-    termStatus: r.termStatus ?? 'PENDING',
-    sortOrder: idx + 1,
-  }))
+  return terms.value.map((r, idx) => {
+    const term: Record<string, unknown> = {
+      termName: r.termName ?? '',
+      paymentRatio: Number(r.paymentRatio) || 0,
+      paymentAmount: String(r.paymentAmount ?? '0'),
+      paymentCondition: r.paymentCondition ?? '',
+      plannedDate: r.plannedDate ?? '',
+      termStatus: r.termStatus ?? 'PENDING',
+      sortOrder: idx + 1,
+    }
+    if (r.id) term.id = r.id
+    return term
+  }) as ContractPaymentTerm[]
 }
 
 // ---- Submit ----
@@ -274,7 +280,7 @@ async function doSubmit(withApproval: boolean) {
       targetId = contractId.value
     } else {
       const created = await createContract(buildContractPayload())
-      targetId = created?.id
+      targetId = created != null ? String(created) : ''
       if (!targetId) {
         message.error('合同创建成功但未返回ID，无法保存明细')
         submitting.value = false

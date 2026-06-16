@@ -63,8 +63,8 @@ public class CtContractController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody CtContract contract) {
-        return ApiResponse.success(ctContractService.create(contract));
+    public ApiResponse<String> create(@Valid @RequestBody CtContract contract) {
+        return ApiResponse.success(ctContractService.create(contract).toString());
     }
 
     @PutMapping("/{id}")
