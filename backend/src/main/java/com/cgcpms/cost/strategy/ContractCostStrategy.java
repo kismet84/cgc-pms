@@ -72,7 +72,7 @@ public class ContractCostStrategy implements CostGenerationStrategy {
             cost.setOrgId(contract.getOrgId());
             cost.setProjectId(contract.getProjectId());
             cost.setContractId(contractId);
-            cost.setPartnerId(contract.getPartnerId());
+            cost.setPartnerId(null /* partnerId removed */);
             cost.setCostType(DEFAULT_COST_TYPE);
             cost.setCostSubjectId(defaultSubjectId);
             cost.setAmount(nvl(item.getAmount()));

@@ -111,7 +111,7 @@ public class MdPartnerService {
             throw new BusinessException("PARTNER_NOT_FOUND", "合作方不存在");
         }
         long contractCount = ctContractMapper.selectCount(
-                new LambdaQueryWrapper<CtContract>().eq(CtContract::getPartnerId, id));
+                new LambdaQueryWrapper<CtContract>().and(w -> w.eq(CtContract::getPartyAId, id).or().eq(CtContract::getPartyBId, id)));
         if (contractCount > 0) {
             throw new BusinessException("PARTNER_HAS_CONTRACTS", "该合作方存在关联合同，无法删除");
         }

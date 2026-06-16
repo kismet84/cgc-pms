@@ -78,7 +78,7 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
         cost.setOrgId(contract != null ? contract.getOrgId() : null);
         cost.setProjectId(change.getProjectId());
         cost.setContractId(change.getContractId());
-        cost.setPartnerId(contract != null ? contract.getPartnerId() : null);
+        cost.setPartnerId(contract != null ? null /* partnerId removed — use partyAId/partyBId */ : null);
         cost.setCostType(COST_TYPE);
         cost.setCostSubjectId(costSubjectId);
         cost.setAmount(nvl(change.getChangeAmount()));

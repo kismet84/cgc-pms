@@ -24,6 +24,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 public class SysDictDataService {
 
     private final SysDictDataMapper sysDictDataMapper;
+    private final SysDictTypeMapper sysDictTypeMapper;
 
     public IPage<SysDictDataVO> getPage(long pageNo, long pageSize, Long dictTypeId, String dictLabel, String status) {
         LambdaQueryWrapper<SysDictData> wrapper = new LambdaQueryWrapper<>();
