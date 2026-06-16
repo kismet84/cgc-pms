@@ -38,3 +38,10 @@ Before performing coordinated agent work, read and follow:
 ## User Preference
 
 For collaborative work, write task details to files first. When communicating with child agents, send the document path plus one sentence only.
+
+## Windows / PowerShell Command Notes
+
+- When running regex commands in PowerShell, wrap regex patterns in single quotes.
+  Example: `rg --files frontend-admin\src\pages | rg 'project|target|costTarget|goal'`
+- Do not pass unquoted regex alternation such as `project|target`; PowerShell may interpret `|` as a pipeline.
+- For complex filters, prefer `Select-String -Pattern '...'` or `Where-Object { $_ -match '...' }`.

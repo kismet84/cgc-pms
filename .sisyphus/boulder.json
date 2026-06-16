@@ -1,33 +1,23 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\button-fixes.md",
-  "started_at": "2026-06-16T12:32:00.000Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\partner-management-crud.md",
+  "started_at": "2026-06-16T02:35:13.192Z",
   "session_ids": [
-    "ses_1346de7d2ffe2qsRTiG4m7ygDK"
+    "ses_132136d88ffejKbXDHWcCUrbhy"
   ],
   "session_origins": {
-    "ses_1346de7d2ffe2qsRTiG4m7ygDK": "direct"
+    "ses_132136d88ffejKbXDHWcCUrbhy": "direct"
   },
-  "plan_name": "button-fixes",
-  "phase": "phase-b",
+  "plan_name": "partner-management-crud",
   "agent": "atlas",
   "task_sessions": {
-    "todo:10": {
-      "task_key": "todo:10",
-      "task_label": "10",
-      "task_title": "**驾驶舱 6 个占位值替换为真实查询**",
-      "session_id": "ses_1324cea78ffe9M2qL6Bf03XOVD",
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Add create/edit/delete operations to partner list page",
+      "session_id": "ses_131b6312fffeRUTM00674J2w3g",
       "agent": "Sisyphus-Junior",
-      "category": "unspecified-high",
-      "updated_at": "2026-06-15T23:57:51.585Z"
-    },
-    "todo:17": {
-      "task_key": "todo:17",
-      "task_label": "17",
-      "task_title": "**角色/权限管理前端页面（新建）**",
-      "session_id": "ses_132474fe2ffegxQmFO4vNByS6a",
-      "agent": "Sisyphus-Junior",
-      "category": "visual-engineering",
-      "updated_at": "2026-06-16T00:03:05.006Z"
+      "category": "quick",
+      "updated_at": "2026-06-16T02:40:41.256Z"
     }
   }
 }
