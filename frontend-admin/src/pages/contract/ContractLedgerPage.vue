@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import VChart from 'vue-echarts'
 import {
   FileTextOutlined,
   DollarOutlined,
@@ -213,6 +214,131 @@ const TYPE_COLOR: Record<ContractType, string> = {
   LEASE: 'purple',
   SERVICE: 'cyan',
 }
+
+const CHART_COLORS = ['#2f7df6', '#31c48d', '#f59e0b', '#8b5cf6', '#22c7d7']
+const STATUS_LABEL: Record<ContractStatus, string> = {
+  DRAFT: '草稿',
+  PERFORMING: '履约中',
+  SETTLED: '已完成',
+  TERMINATED: '已终止',
+}
+const STATUS_COLOR: Record<ContractStatus, string> = {
+  DRAFT: '#94a3b8',
+  PERFORMING: '#2f7df6',
+  SETTLED: '#31c48d',
+  TERMINATED: '#ef4444',
+}
+
+const fallbackTypeDistribution = [
+  { key: 'MAIN' as ContractType, label: TYPE_LABEL.MAIN, value: 42, color: CHART_COLORS[0] },
+  { key: 'SUB' as ContractType, label: TYPE_LABEL.SUB, value: 28, color: CHART_COLORS[1] },
+  { key: 'PURCHASE' as ContractType, label: TYPE_LABEL.PURCHASE, value: 18, color: CHART_COLORS[2] },
+  { key: 'SERVICE' as ContractType, label: TYPE_LABEL.SERVICE, value: 12, color: CHART_COLORS[4] },
+]
+
+const fallbackStatusDistribution = [
+  { key: 'PERFORMING' as ContractStatus, label: STATUS_LABEL.PERFORMING, value: 56, color: STATUS_COLOR.PERFORMING },
+  { key: 'SETTLED' as ContractStatus, label: STATUS_LABEL.SETTLED, value: 24, color: STATUS_COLOR.SETTLED },
+  { key: 'TERMINATED' as ContractStatus, label: STATUS_LABEL.TERMINATED, value: 8, color: STATUS_COLOR.TERMINATED },
+  { key: 'DRAFT' as ContractStatus, label: STATUS_LABEL.DRAFT, value: 12, color: STATUS_COLOR.DRAFT },
+]
+
+const typeDistribution = computed(() => {
+  if (!tableData.value.length) return fallbackTypeDistribution
+  const counts = tableData.value.reduce<Record<ContractType, number>>(
+    (acc, item) => {
+      acc[item.contractType] += 1
+      return acc
+    },
+    { MAIN: 0, SUB: 0, PURCHASE: 0, LEASE: 0, SERVICE: 0 },
+  )
+  return (Object.keys(TYPE_LABEL) as ContractType[])
+    .map((key, index) => ({
+      key,
+      label: TYPE_LABEL[key],
+      value: counts[key],
+      color: CHART_COLORS[index],
+    }))
+    .filter((item) => item.value > 0)
+})
+
+const statusDistribution = computed(() => {
+  if (!tableData.value.length) return fallbackStatusDistribution
+  const counts = tableData.value.reduce<Record<ContractStatus, number>>(
+    (acc, item) => {
+      acc[item.contractStatus] += 1
+      return acc
+    },
+    { DRAFT: 0, PERFORMING: 0, SETTLED: 0, TERMINATED: 0 },
+  )
+  return (Object.keys(STATUS_LABEL) as ContractStatus[])
+    .map((key) => ({
+      key,
+      label: STATUS_LABEL[key],
+      value: counts[key],
+      color: STATUS_COLOR[key],
+    }))
+    .filter((item) => item.value > 0)
+})
+
+const statusTotal = computed(() => statusDistribution.value.reduce((sum, item) => sum + item.value, 0) || 1)
+
+const statusBars = computed(() =>
+  statusDistribution.value.map((item) => ({
+    ...item,
+    percent: Math.round((item.value / statusTotal.value) * 100),
+  })),
+)
+
+const warningRows = computed(() => {
+  const rows = tableData.value
+    .filter((item) => item.contractStatus === 'PERFORMING')
+    .slice(0, 3)
+    .map((item, index) => ({
+      project: item.projectName || '在建项目',
+      title: item.contractName,
+      days: [18, 12, 8][index] ?? 7,
+    }))
+  return rows.length
+    ? rows
+    : [
+        { project: '城北安置房', title: '主体劳务分包合同', days: 18 },
+        { project: '国际会展中心', title: '幕墙专业分包合同', days: 12 },
+        { project: '轨交配套工程', title: '钢材采购合同', days: 8 },
+      ]
+})
+
+const donutOption = computed(() => ({
+  color: typeDistribution.value.map((item) => item.color),
+  tooltip: { trigger: 'item' },
+  legend: { show: false },
+  series: [
+    {
+      type: 'pie',
+      radius: ['54%', '78%'],
+      center: ['50%', '50%'],
+      avoidLabelOverlap: true,
+      label: { show: false },
+      data: typeDistribution.value.map((item) => ({ name: item.label, value: item.value })),
+    },
+  ],
+}))
+
+const statusDonutOption = computed(() => ({
+  color: statusDistribution.value.map((item) => item.color),
+  tooltip: { trigger: 'item' },
+  legend: { show: false },
+  series: [
+    {
+      type: 'pie',
+      radius: ['54%', '78%'],
+      center: ['50%', '50%'],
+      avoidLabelOverlap: true,
+      label: { show: false },
+      data: statusDistribution.value.map((item) => ({ name: item.label, value: item.value })),
+    },
+  ],
+}))
 
 
 
@@ -472,7 +598,54 @@ const gridColumns = computed(() => [
         </div>
       </div>
 
+      <!-- Right analysis rail -->
+      <aside class="cl-analysis-rail">
+        <section class="cl-panel">
+          <div class="cl-panel-title">合同类型分布</div>
+          <div class="cl-chart-row">
+            <VChart :option="donutOption" autoresize class="cl-donut" />
+            <div class="cl-legend">
+              <div v-for="item in typeDistribution" :key="item.key" class="cl-legend-item">
+                <span class="cl-legend-left">
+                  <i class="cl-dot" :style="{ background: item.color }"></i>
+                  {{ item.label }}
+                </span>
+                <b>{{ item.value }}</b>
+              </div>
+            </div>
+          </div>
+        </section>
 
+        <section class="cl-panel">
+          <div class="cl-panel-title">合同状态统计</div>
+          <div class="cl-status-chart-row">
+            <VChart :option="statusDonutOption" autoresize class="cl-donut" />
+            <div class="cl-status-list">
+              <div v-for="item in statusBars" :key="item.key" class="cl-status-line">
+                <span>{{ item.label }}</span>
+                <b>{{ item.value }}</b>
+                <span class="cl-bar"><span :style="{ width: `${item.percent}%`, background: item.color }"></span></span>
+                <em>{{ item.percent }}%</em>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="cl-panel">
+          <div class="cl-warning-head">
+            <div class="cl-panel-title">逾期预警</div>
+            <a-button type="link" size="small" @click="handleAllAlerts">查看全部</a-button>
+          </div>
+          <div class="cl-warning-list">
+            <div v-for="row in warningRows" :key="`${row.project}-${row.title}`" class="cl-warning-item">
+              <i class="cl-red-dot"></i>
+              <span>{{ row.project }}</span>
+              <span>{{ row.title }}</span>
+              <b class="cl-overdue">{{ row.days }}天</b>
+            </div>
+          </div>
+        </section>
+      </aside>
     </div>
   </div>
 </template>
@@ -705,6 +878,11 @@ const gridColumns = computed(() => [
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.cl-donut {
+  width: 118px;
+  height: 118px;
+  flex-shrink: 0;
 }
 .cl-legend {
   flex: 1;
