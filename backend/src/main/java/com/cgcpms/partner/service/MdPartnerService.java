@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
+import java.util.List;
+
 import com.cgcpms.common.util.DateTimeUtils;
 
 @Slf4j
@@ -50,6 +53,32 @@ public class MdPartnerService {
 
     @Transactional
     public Long create(MdPartner partner) {
+        // Auto-generate partner code: PTN-yyyyMMdd-NNN
+        if (!StringUtils.hasText(partner.getPartnerCode())) {
+            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
+            String prefix = "PTN-" + today + "-";
+            Long tenantId = UserContext.getCurrentTenantId();
+            LambdaQueryWrapper<MdPartner> codeWrapper = new LambdaQueryWrapper<>();
+            codeWrapper.eq(MdPartner::getTenantId, tenantId)
+                    .likeRight(MdPartner::getPartnerCode, prefix)
+                    .orderByDesc(MdPartner::getPartnerCode)
+                    .last("LIMIT 1");
+            List<MdPartner> list = mdPartnerMapper.selectList(codeWrapper);
+            int seq = 1;
+            if (!list.isEmpty()) {
+                MdPartner last = list.get(0);
+                if (last.getPartnerCode() != null
+                        && last.getPartnerCode().length() == prefix.length() + 3) {
+                    try {
+                        seq = Integer.parseInt(last.getPartnerCode().substring(prefix.length())) + 1;
+                    } catch (NumberFormatException ex) {
+                        log.warn("Failed to parse partner code sequence: {}", last.getPartnerCode(), ex);
+                    }
+                }
+            }
+            partner.setPartnerCode(prefix + String.format("%03d", seq));
+        }
+
         if (StringUtils.hasText(partner.getPartnerCode()) &&
                 mdPartnerMapper.selectCount(new LambdaQueryWrapper<MdPartner>()
                         .eq(MdPartner::getPartnerCode, partner.getPartnerCode())

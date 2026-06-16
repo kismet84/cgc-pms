@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { message } from 'ant-design-vue'
-import { getPartnerList } from '@/api/modules/partner'
+import { message, Modal } from 'ant-design-vue'
+import { PlusOutlined } from '@ant-design/icons-vue'
+import { getPartnerList, createPartner, updatePartner, deletePartner } from '@/api/modules/partner'
 import type { PartnerVO } from '@/types/partner'
 
 const filter = reactive({
@@ -16,6 +17,26 @@ const tableData = ref<PartnerVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+
+const modalVisible = ref(false)
+const modalTitle = ref('新建合作方')
+const editingId = ref<string | null>(null)
+const formLoading = ref(false)
+const formData = reactive<Partial<PartnerVO>>({
+  partnerCode: '',
+  partnerName: '',
+  partnerType: undefined,
+  creditCode: '',
+  legalPerson: '',
+  contactName: '',
+  contactPhone: '',
+  bankName: '',
+  bankAccount: '',
+  qualificationLevel: '',
+  blacklistFlag: false,
+  riskLevel: undefined as string | undefined,
+  status: 'ENABLE',
+})
 
 const TYPE_LABEL: Record<string, string> = {
   SUPPLIER: '供应商',
@@ -52,6 +73,7 @@ const columns = [
   { title: '黑名单', dataIndex: 'blacklistFlag', width: 90, key: 'blacklistFlag' },
   { title: '风险等级', dataIndex: 'riskLevel', width: 100, key: 'riskLevel' },
   { title: '状态', dataIndex: 'status', width: 90, key: 'status' },
+  { title: '操作', dataIndex: 'ops', width: 140, fixed: 'right' as const },
 ]
 
 async function fetchData() {
@@ -97,6 +119,84 @@ function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
   fetchData()
+}
+
+function handleAdd() {
+  modalTitle.value = '新建合作方'
+  editingId.value = null
+  Object.assign(formData, {
+    partnerCode: '', partnerName: '', partnerType: undefined, creditCode: '',
+    legalPerson: '', contactName: '', contactPhone: '', bankName: '',
+    bankAccount: '', qualificationLevel: '', blacklistFlag: false,
+    riskLevel: undefined, status: 'ENABLE',
+  })
+  modalVisible.value = true
+}
+
+function handleEdit(record: PartnerVO) {
+  modalTitle.value = '编辑合作方'
+  editingId.value = record.id
+  Object.assign(formData, {
+    partnerCode: record.partnerCode || '', partnerName: record.partnerName || '',
+    partnerType: record.partnerType || undefined, creditCode: record.creditCode || '',
+    legalPerson: record.legalPerson || '', contactName: record.contactName || '',
+    contactPhone: record.contactPhone || '', bankName: record.bankName || '',
+    bankAccount: record.bankAccount || '', qualificationLevel: record.qualificationLevel || '',
+    blacklistFlag: record.blacklistFlag, riskLevel: record.riskLevel || undefined,
+    status: record.status || 'ENABLE',
+  })
+  modalVisible.value = true
+}
+
+function handleDelete(record: PartnerVO) {
+  Modal.confirm({
+    title: '确认删除',
+    content: `确定要删除合作方"${record.partnerName}"吗？`,
+    okText: '确定',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await deletePartner(record.id)
+        message.success('删除成功')
+        fetchData()
+      } catch (e: unknown) {
+        console.error(e)
+        Modal.error({ title: '删除失败', content: '删除失败，请稍后重试' })
+      }
+    },
+  })
+}
+
+async function handleModalOk() {
+  if (!formData.partnerName || !formData.partnerName.trim()) {
+    message.warning('请输入合作方名称')
+    return
+  }
+  if (!formData.partnerType) {
+    message.warning('请选择合作方类型')
+    return
+  }
+  formLoading.value = true
+  try {
+    if (editingId.value) {
+      await updatePartner(editingId.value, formData)
+      message.success('更新成功')
+    } else {
+      await createPartner(formData)
+      message.success('创建成功')
+    }
+    modalVisible.value = false
+    fetchData()
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('操作失败，请稍后重试')
+  } finally {
+    formLoading.value = false
+  }
+}
+
+function handleModalCancel() {
+  modalVisible.value = false
 }
 
 onMounted(fetchData)
@@ -155,6 +255,7 @@ onMounted(fetchData)
           </a-select>
         </div>
         <div class="pm-filter-actions">
+          <a-button type="primary" @click="handleAdd"><PlusOutlined />新建合作方</a-button>
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
@@ -170,7 +271,7 @@ onMounted(fetchData)
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 1000 }"
+        :scroll="{ x: 1200 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'partnerName'">
@@ -195,6 +296,12 @@ onMounted(fetchData)
               {{ record.status === 'ENABLED' ? '启用' : '禁用' }}
             </a-tag>
           </template>
+          <template v-else-if="column.dataIndex === 'ops'">
+            <div class="pm-ops">
+              <a class="pm-link" @click="handleEdit(record)">编辑</a>
+              <a class="pm-link" style="color: #ff4d4f" @click="handleDelete(record)">删除</a>
+            </div>
+          </template>
         </template>
       </a-table>
     </div>
@@ -213,6 +320,71 @@ onMounted(fetchData)
         @show-size-change="handlePageSizeChange"
       />
     </div>
+
+    <!-- Add/Edit Modal -->
+    <a-modal
+      v-model:open="modalVisible"
+      :title="modalTitle"
+      :confirm-loading="formLoading"
+      :mask-closable="false"
+      ok-text="保存"
+      cancel-text="取消"
+      width="600px"
+      @ok="handleModalOk"
+      @cancel="handleModalCancel"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+        <a-form-item label="合作方名称" required>
+          <a-input v-model:value="formData.partnerName" placeholder="请输入合作方名称" />
+        </a-form-item>
+        <a-form-item label="合作方类型" required>
+          <a-select v-model:value="formData.partnerType" placeholder="请选择合作方类型">
+            <a-select-option value="SUPPLIER">供应商</a-select-option>
+            <a-select-option value="SUBCONTRACTOR">分包商</a-select-option>
+            <a-select-option value="DESIGN">设计单位</a-select-option>
+            <a-select-option value="SUPERVISOR">监理单位</a-select-option>
+            <a-select-option value="OTHER">其他</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="统一信用代码">
+          <a-input v-model:value="formData.creditCode" placeholder="请输入统一社会信用代码" />
+        </a-form-item>
+        <a-form-item label="法人代表">
+          <a-input v-model:value="formData.legalPerson" placeholder="请输入法人代表" />
+        </a-form-item>
+        <a-form-item label="联系人">
+          <a-input v-model:value="formData.contactName" placeholder="请输入联系人" />
+        </a-form-item>
+        <a-form-item label="联系电话">
+          <a-input v-model:value="formData.contactPhone" placeholder="请输入联系电话" />
+        </a-form-item>
+        <a-form-item label="开户银行">
+          <a-input v-model:value="formData.bankName" placeholder="请输入开户银行" />
+        </a-form-item>
+        <a-form-item label="银行账号">
+          <a-input v-model:value="formData.bankAccount" placeholder="请输入银行账号" />
+        </a-form-item>
+        <a-form-item label="资质等级">
+          <a-input v-model:value="formData.qualificationLevel" placeholder="请输入资质等级" />
+        </a-form-item>
+        <a-form-item label="黑名单">
+          <a-switch v-model:checked="formData.blacklistFlag" />
+        </a-form-item>
+        <a-form-item label="风险等级">
+          <a-select v-model:value="formData.riskLevel" placeholder="请选择风险等级">
+            <a-select-option value="LOW">低</a-select-option>
+            <a-select-option value="MEDIUM">中</a-select-option>
+            <a-select-option value="HIGH">高</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="formData.status">
+            <a-select-option value="ENABLE">启用</a-select-option>
+            <a-select-option value="DISABLED">禁用</a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -280,5 +452,9 @@ onMounted(fetchData)
 .pm-total {
   font-size: 13px;
   color: #4b5563;
+}
+.pm-ops {
+  display: flex;
+  gap: 10px;
 }
 </style>

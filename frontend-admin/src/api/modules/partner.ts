@@ -28,6 +28,14 @@ export function createPartner(data: Partial<PartnerVO>) {
   })
 }
 
+/** 删除合作方 */
+export function deletePartner(id: string) {
+  return request<void>({
+    url: `/partners/${id}`,
+    method: 'delete',
+  })
+}
+
 /** 更新合作方 */
 export function updatePartner(id: string, data: Partial<PartnerVO>) {
   return request<void>({
