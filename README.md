@@ -89,10 +89,6 @@ cgc-pms/
 │       ├── pages/                   # 30 页面 (dashboard/contract/project/cost/payment/purchase/subcontract/settlement/variation/inventory/invoice/approval/alert/org/material/system/settings)
 │       └── router/                  # 路由配置
 ├── deploy/                          # Docker Compose + .env.example
-├── doc/                             # 文档 (审计/计划/测试/验收/部署/手册/开发)
-├── docs/                            # 协同文档 (agents/superpowers)
-├── scripts/                         # 辅助脚本
-├── .agent-runtime/                  # 协同运行时 (tasks/reports/messages)
 └── .github/workflows/ci.yml        # CI/CD 流水线
 ```
 
