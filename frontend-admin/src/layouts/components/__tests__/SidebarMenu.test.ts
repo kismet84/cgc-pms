@@ -10,6 +10,7 @@ type MenuItem = {
 }
 
 const mockPush = vi.fn()
+const mockRoles = vi.hoisted(() => ({ value: ['ADMIN'] as string[] }))
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -24,6 +25,12 @@ vi.mock('vue-router', async () => {
     }),
   }
 })
+
+vi.mock('@/stores/user', () => ({
+  useUserStore: () => ({
+    roles: mockRoles.value,
+  }),
+}))
 
 const AMenuStub = defineComponent({
   name: 'AMenuStub',
@@ -54,6 +61,10 @@ const AMenuStub = defineComponent({
 })
 
 describe('SidebarMenu', () => {
+  beforeEach(() => {
+    mockRoles.value = ['ADMIN']
+  })
+
   it('uses full paths for nested menu item keys', () => {
     const wrapper = mount(SidebarMenu, {
       global: {
@@ -150,5 +161,35 @@ describe('SidebarMenu', () => {
     ])
 
     expect(wrapper.text()).toContain('合作方管理')
+  })
+
+  it('shows approval process management only to administrators', () => {
+    mockRoles.value = ['ADMIN']
+    const adminWrapper = mount(SidebarMenu, {
+      global: {
+        stubs: {
+          'a-menu': AMenuStub,
+        },
+      },
+    })
+
+    expect(adminWrapper.text()).toContain('审批流程管理')
+    expect(
+      adminWrapper.findAll('[data-menu-key]').map((node) => node.attributes('data-menu-key')),
+    ).toContain('/approval/process')
+
+    mockRoles.value = ['PROJECT_MANAGER']
+    const userWrapper = mount(SidebarMenu, {
+      global: {
+        stubs: {
+          'a-menu': AMenuStub,
+        },
+      },
+    })
+
+    expect(userWrapper.text()).not.toContain('审批流程管理')
+    expect(
+      userWrapper.findAll('[data-menu-key]').map((node) => node.attributes('data-menu-key')),
+    ).not.toContain('/approval/process')
   })
 })

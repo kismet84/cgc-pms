@@ -90,6 +90,41 @@ export interface WfInstanceVO {
   records: WfRecordVO[]
 }
 
+export interface WfTemplateNodeVO {
+  id: string
+  templateId: string
+  nodeCode: string
+  nodeName: string
+  nodeOrder: number
+  nodeType: string
+  approveMode: string
+  approverConfig: string
+  passRuleJson?: string
+  rejectRuleJson?: string
+  conditionRule?: string
+  nodeConfig?: string
+  allowTransfer?: number
+  allowAddSign?: number
+  timeoutHours?: number
+  remark?: string
+}
+
+export interface WfTemplateVO {
+  id: string
+  templateCode: string
+  templateName: string
+  businessType: string
+  enabled: number
+  amountMin?: string
+  amountMax?: string
+  conditionRule?: string
+  formSchema?: string
+  remark?: string
+  nodeCount: number
+  updatedAt?: string
+  nodes?: WfTemplateNodeVO[]
+}
+
 export interface WorkflowSubmitParams {
   businessType: string
   businessId: number
@@ -105,6 +140,33 @@ export interface WorkflowActionParams {
   action: string
   comment?: string
   idempotencyKey: string
+}
+
+export interface WorkflowTemplateUpdateParams {
+  templateName: string
+  enabled?: number
+  amountMin?: string | number
+  amountMax?: string | number
+  conditionRule?: string
+  formSchema?: string
+  remark?: string
+}
+
+export interface WorkflowTemplateNodeParams {
+  nodeCode?: string
+  nodeName: string
+  nodeOrder?: number
+  nodeType?: string
+  approveMode?: string
+  approverConfig: string
+  passRuleJson?: string
+  rejectRuleJson?: string
+  conditionRule?: string
+  nodeConfig?: string
+  allowTransfer?: number
+  allowAddSign?: number
+  timeoutHours?: number
+  remark?: string
 }
 
 /** 我的待办列表 */
@@ -200,5 +262,70 @@ export function getMyCc(params: PageParams) {
     url: '/workflow/tasks/cc',
     method: 'get',
     params,
+  })
+}
+
+/** 审批流程模板列表 */
+export function getWorkflowTemplates(params: PageParams) {
+  return request<PageResult<WfTemplateVO>>({
+    url: '/workflow/templates',
+    method: 'get',
+    params,
+  })
+}
+
+/** 审批流程模板详情 */
+export function getWorkflowTemplateDetail(templateId: string) {
+  return request<WfTemplateVO>({
+    url: `/workflow/templates/${templateId}`,
+    method: 'get',
+  })
+}
+
+/** 更新审批流程模板 */
+export function updateWorkflowTemplate(templateId: string, data: WorkflowTemplateUpdateParams) {
+  return request<void>({
+    url: `/workflow/templates/${templateId}`,
+    method: 'put',
+    data,
+  })
+}
+
+/** 新增审批流程节点 */
+export function createWorkflowTemplateNode(templateId: string, data: WorkflowTemplateNodeParams) {
+  return request<WfTemplateNodeVO>({
+    url: `/workflow/templates/${templateId}/nodes`,
+    method: 'post',
+    data,
+  })
+}
+
+/** 更新审批流程节点 */
+export function updateWorkflowTemplateNode(
+  templateId: string,
+  nodeId: string,
+  data: WorkflowTemplateNodeParams,
+) {
+  return request<void>({
+    url: `/workflow/templates/${templateId}/nodes/${nodeId}`,
+    method: 'put',
+    data,
+  })
+}
+
+/** 删除审批流程节点 */
+export function deleteWorkflowTemplateNode(templateId: string, nodeId: string) {
+  return request<void>({
+    url: `/workflow/templates/${templateId}/nodes/${nodeId}`,
+    method: 'delete',
+  })
+}
+
+/** 调整审批流程节点顺序 */
+export function reorderWorkflowTemplateNodes(templateId: string, nodeIds: string[]) {
+  return request<void>({
+    url: `/workflow/templates/${templateId}/nodes/reorder`,
+    method: 'put',
+    data: { nodeIds },
   })
 }

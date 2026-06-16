@@ -28,4 +28,13 @@ describe('ContractLedger reference fidelity', () => {
     expect(ledgerSource).toMatch(/<VChart[\s\S]*donutOption[\s\S]*<VChart[\s\S]*statusDonutOption/)
     expect(ledgerSource).not.toContain('目标成本管理')
   })
+
+  it('loads project options only for the project filter', () => {
+    expect(ledgerSource).toMatch(/v-model:value="filter\.projectId"[\s\S]*:options="projects\.map/)
+    expect(ledgerSource).toMatch(/referenceStore\.fetchProjects\(\)/)
+
+    const contractCodeInput = ledgerSource.match(/<a-input[\s\S]*?v-model:value="filter\.contractCode"[\s\S]*?\/>/)?.[0]
+    expect(contractCodeInput).toBeTruthy()
+    expect(contractCodeInput).not.toContain(':options=')
+  })
 })
