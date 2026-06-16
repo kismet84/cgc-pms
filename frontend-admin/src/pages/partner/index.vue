@@ -212,7 +212,7 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
-onMounted(fetchData)
+onMounted(() => { fetchData(); fetchPartnerTypes() })
 </script>
 
 <template>
