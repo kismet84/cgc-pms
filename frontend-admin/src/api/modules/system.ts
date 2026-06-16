@@ -1,12 +1,29 @@
 import { request } from '@/api/request'
 import type { PageParams, PageResult } from '@/types/api'
-import type { MenuTreeVO } from '@/types/system'
+import type { MenuTreeVO, SysRoleVO } from '@/types/system'
 
 /** 获取菜单树 */
 export function getMenuTree() {
   return request<MenuTreeVO[]>({
     url: '/system/menus/tree',
     method: 'get',
+  })
+}
+
+/** 获取角色列表 */
+export function getRoles() {
+  return request<SysRoleVO[]>({
+    url: '/system/roles',
+    method: 'get',
+  })
+}
+
+/** 更新角色菜单权限 */
+export function updateRoleMenus(roleId: number | string, menuIds: number[]) {
+  return request<void>({
+    url: `/system/roles/${roleId}/menus`,
+    method: 'put',
+    data: { menuIds },
   })
 }
 

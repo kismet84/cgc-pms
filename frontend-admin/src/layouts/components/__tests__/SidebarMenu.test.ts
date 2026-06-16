@@ -110,4 +110,45 @@ describe('SidebarMenu', () => {
     expect(wrapper.text()).toContain('目标管理')
     expect(wrapper.text()).not.toContain('目标成本管理')
   })
+
+  it('includes partner menu entry between project and cost-target', () => {
+    const wrapper = mount(SidebarMenu, {
+      global: {
+        stubs: {
+          'a-menu': AMenuStub,
+        },
+      },
+    })
+
+    const rootKeys = wrapper
+      .findAll('[data-menu-key]')
+      .map((node) => node.attributes('data-menu-key'))
+      .filter((key) =>
+        [
+          '/dashboard',
+          '/project',
+          '/partner',
+          '/cost-target',
+          '/cost',
+          '/contract',
+          '/variation',
+          '/settlement',
+          '/payment',
+        ].includes(key),
+      )
+
+    expect(rootKeys).toEqual([
+      '/dashboard',
+      '/project',
+      '/partner',
+      '/cost-target',
+      '/cost',
+      '/contract',
+      '/variation',
+      '/settlement',
+      '/payment',
+    ])
+
+    expect(wrapper.text()).toContain('合作方管理')
+  })
 })

@@ -114,7 +114,8 @@ class InvoiceValidationTest {
                     "tenantId": 999,
                     "invoiceNo": "INV-SEC-TENANT-001",
                     "invoiceType": "VAT_SPECIAL",
-                    "invoiceAmount": "5000.00"
+                    "invoiceAmount": "5000.00",
+                    "invoiceDate": "2026-01-15"
                 }""";
 
         MvcResult result = mockMvc.perform(post("/api/invoices")
@@ -145,7 +146,8 @@ class InvoiceValidationTest {
                 {
                     "invoiceNo": "INV-FILTER-PARTIAL-001",
                     "invoiceType": "VAT_SPECIAL",
-                    "invoiceAmount": "3000.00"
+                    "invoiceAmount": "3000.00",
+                    "invoiceDate": "2026-01-15"
                 }""";
         mockMvc.perform(post("/api/invoices")
                 .contextPath("/api")
@@ -175,7 +177,8 @@ class InvoiceValidationTest {
                 {
                     "invoiceNo": "INV-FILTER-STATUS-001",
                     "invoiceType": "VAT_SPECIAL",
-                    "invoiceAmount": "4000.00"
+                    "invoiceAmount": "4000.00",
+                    "invoiceDate": "2026-01-15"
                 }""";
         mockMvc.perform(post("/api/invoices")
                 .contextPath("/api")

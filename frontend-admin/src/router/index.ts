@@ -164,6 +164,12 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'partner',
+        name: 'Partner',
+        component: () => import('@/pages/partner/index.vue'),
+        meta: { title: '合作方管理', icon: 'TeamOutlined' },
+      },
+      {
         path: 'org',
         name: 'Org',
         component: () => import('@/pages/org/index.vue'),
@@ -324,6 +330,12 @@ export const routes: RouteRecordRaw[] = [
             name: 'SystemData',
             component: () => import('@/pages/system/data/index.vue'),
             meta: { title: '数据管理' },
+          },
+          {
+            path: 'roles',
+            name: 'RoleManagement',
+            component: () => import('@/pages/system/roles/index.vue'),
+            meta: { title: '角色管理' },
           },
         ],
       },

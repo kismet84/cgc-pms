@@ -37,7 +37,8 @@ async function handleProfileSave() {
     })
     userStore.setUserInfo(data)
     message.success('个人资料更新成功')
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     // error is already handled by request interceptor
   } finally {
     profileLoading.value = false
@@ -67,7 +68,8 @@ async function handlePasswordChange() {
     passwordForm.oldPassword = ''
     passwordForm.newPassword = ''
     passwordForm.confirmPassword = ''
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     // error is already handled by request interceptor
   } finally {
     passwordLoading.value = false

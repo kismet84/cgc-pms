@@ -99,7 +99,7 @@ public class ProfileService {
         update.setId(userId);
         update.setPassword(encoded);
         sysUserMapper.updateById(update);
-        log.info("User {} changed password", user.getUsername());
+        log.info("User changed password successfully");
     }
 
     /**

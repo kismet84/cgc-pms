@@ -107,3 +107,11 @@ export function saveMeasureItems(id: string, items: SubMeasureItemVO[]) {
     data: items,
   })
 }
+
+/** 提交审批 */
+export function submitMeasureForApproval(id: string) {
+  return request<void>({
+    url: `/sub-measures/${id}/submit`,
+    method: 'post',
+  })
+}

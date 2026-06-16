@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -41,6 +42,7 @@ public class PayInvoice extends BaseEntity {
     private String invoiceType;
 
     @NotNull
+    @Positive
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal invoiceAmount;
 
@@ -50,6 +52,7 @@ public class PayInvoice extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal taxAmount;
 
+    @NotNull
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate invoiceDate;
 

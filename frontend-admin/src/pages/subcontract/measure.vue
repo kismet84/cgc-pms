@@ -9,6 +9,7 @@ import {
   deleteMeasure,
   getMeasureItems,
   saveMeasureItems,
+  submitMeasureForApproval,
 } from '@/api/modules/subcontract'
 import { getContractItems } from '@/api/modules/contract'
 import { useReferenceStore } from '@/stores/reference'
@@ -30,8 +31,11 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 
 const referenceStore = useReferenceStore()
-const { projects: projectList, contracts: contractList, partners: partnerList } =
-  storeToRefs(referenceStore)
+const {
+  projects: projectList,
+  contracts: contractList,
+  partners: partnerList,
+} = storeToRefs(referenceStore)
 const contractItemList = ref<ContractItem[]>([])
 
 const modalVisible = ref(false)
@@ -92,7 +96,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载分包计量列表失败，请稍后重试')
@@ -101,13 +106,12 @@ async function fetchData() {
   }
 }
 
-
-
 async function loadContractItems(contractId: string) {
   try {
     const items = await getContractItems(contractId)
     contractItemList.value = items
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     contractItemList.value = []
     message.error('加载合同清单失败')
   }
@@ -180,7 +184,8 @@ async function handleEdit(record: SubMeasureVO) {
       ...item,
       key: itemKeyCounter++,
     }))
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载明细失败')
     itemList.value = []
   }
@@ -198,8 +203,28 @@ function handleDelete(record: SubMeasureVO) {
         await deleteMeasure(record.id)
         message.success('删除成功')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败，请稍后重试')
+      }
+    },
+  })
+}
+
+function handleSubmitApproval(record: SubMeasureVO) {
+  Modal.confirm({
+    title: '确认提交',
+    content: `确定要提交分包计量"${record.measureCode}"吗？提交后将进入审批流程`,
+    okText: '确定',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await submitMeasureForApproval(record.id)
+        message.success('提交审批成功')
+        fetchData()
+      } catch (e: unknown) {
+        console.error(e)
+        message.error('提交审批失败')
       }
     },
   })
@@ -300,7 +325,8 @@ async function handleModalOk() {
 
     modalVisible.value = false
     fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('操作失败，请稍后重试')
   }
 }
@@ -332,7 +358,10 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
@@ -347,7 +376,10 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
@@ -362,7 +394,10 @@ onMounted(() => {
             allow-clear
             style="width: 160px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
@@ -450,6 +485,13 @@ onMounted(() => {
           <template v-else-if="column.key === 'action'">
             <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
             <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
+            <a-button
+              v-if="record.approvalStatus === 'DRAFT'"
+              type="link"
+              size="small"
+              @click="handleSubmitApproval(record)"
+              >提交审批</a-button
+            >
           </template>
         </template>
       </a-table>
@@ -481,7 +523,15 @@ onMounted(() => {
       <!-- Header Form -->
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
         <a-form-item label="项目" required>
-          <a-select v-model:value="formData.projectId" placeholder="请选择项目" show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
+          <a-select
+            v-model:value="formData.projectId"
+            placeholder="请选择项目"
+            show-search
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
+          >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
@@ -493,7 +543,10 @@ onMounted(() => {
             placeholder="请选择合同"
             allow-clear
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
             @change="(val: string) => onContractSelect(val)"
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
@@ -502,7 +555,16 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="分包商">
-          <a-select v-model:value="formData.partnerId" placeholder="请选择分包商" allow-clear show-search :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())">
+          <a-select
+            v-model:value="formData.partnerId"
+            placeholder="请选择分包商"
+            allow-clear
+            show-search
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
+          >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>

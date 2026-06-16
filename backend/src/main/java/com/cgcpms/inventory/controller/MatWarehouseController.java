@@ -56,4 +56,11 @@ public class MatWarehouseController {
         matWarehouseService.updateStatus(id, status);
         return ApiResponse.success();
     }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:warehouse:delete')")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        matWarehouseService.delete(id);
+        return ApiResponse.success();
+    }
 }

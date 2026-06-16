@@ -31,7 +31,8 @@ const faqItems = [
   {
     key: '4',
     header: '如何上传文件？',
-    answer: '在合同详情或项目详情页面，点击"上传附件"按钮，选择文件（支持 PDF/Word/Excel/图片，最大 50MB）。',
+    answer:
+      '在合同详情或项目详情页面，点击"上传附件"按钮，选择文件（支持 PDF/Word/Excel/图片，最大 50MB）。',
   },
   {
     key: '5',
@@ -57,7 +58,12 @@ const faqItems = [
 
     <!-- Section 1: 快捷键 -->
     <a-card title="快捷键" class="section-card">
-      <a-table :columns="shortcutColumns" :data-source="shortcuts" :pagination="false" size="small" />
+      <a-table
+        :columns="shortcutColumns"
+        :data-source="shortcuts"
+        :pagination="false"
+        size="small"
+      />
     </a-card>
 
     <!-- Section 2: 常见问题 -->

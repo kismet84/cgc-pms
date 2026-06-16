@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.entity.MatWarehouse;
+import com.cgcpms.inventory.mapper.MatStockMapper;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,8 @@ import com.cgcpms.common.util.DateTimeUtils;
 public class MatWarehouseService {
 
     private final MatWarehouseMapper matWarehouseMapper;
+
+    private final MatStockMapper matStockMapper;
 
     public PageResult<MatWarehouseVO> getPage(long pageNo, long pageSize, Long projectId, String warehouseCode, String warehouseName, String status) {
         LambdaQueryWrapper<MatWarehouse> wrapper = new LambdaQueryWrapper<>();
@@ -80,6 +84,28 @@ public class MatWarehouseService {
         }
         existing.setStatus(status);
         matWarehouseMapper.updateById(existing);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        MatWarehouse existing = matWarehouseMapper.selectById(id);
+        if (existing == null) {
+            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
+        }
+        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
+        }
+
+        // Check if warehouse has related stock entries
+        long stockCount = matStockMapper.selectCount(
+                new LambdaQueryWrapper<MatStock>()
+                        .eq(MatStock::getWarehouseId, id));
+        if (stockCount > 0) {
+            throw new BusinessException("WAREHOUSE_HAS_STOCK", "无法删除含库存的仓库");
+        }
+
+        // Soft delete via MyBatis-Plus @TableLogic — deleteById converts to UPDATE deleted_flag=1
+        matWarehouseMapper.deleteById(id);
     }
 
     private MatWarehouseVO toVO(MatWarehouse w) {

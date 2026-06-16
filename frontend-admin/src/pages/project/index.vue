@@ -61,7 +61,8 @@ async function handleDelete(id: string) {
     await deleteProject(id)
     message.success('删除成功')
     fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('删除失败，请稍后重试')
   }
 }
@@ -69,7 +70,8 @@ async function handleDelete(id: string) {
 async function handleCreateSubmit() {
   try {
     await createFormRef.value?.validate()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     return
   }
   createLoading.value = true
@@ -81,14 +83,16 @@ async function handleCreateSubmit() {
       ownerUnit: createForm.ownerUnit || undefined,
       supervisorUnit: createForm.supervisorUnit || undefined,
       designUnit: createForm.designUnit || undefined,
-      contractAmount: createForm.contractAmount != null ? String(createForm.contractAmount) : undefined,
+      contractAmount:
+        createForm.contractAmount != null ? String(createForm.contractAmount) : undefined,
       plannedStartDate: createForm.plannedStartDate,
       plannedEndDate: createForm.plannedEndDate,
     })
     message.success('项目创建成功')
     handleCreateModalClose()
     fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('创建项目失败，请稍后重试')
   } finally {
     createLoading.value = false
@@ -108,7 +112,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载项目列表失败，请稍后重试')
@@ -312,10 +317,7 @@ const columns = [
           name="projectType"
           :rules="[{ required: true, message: '请选择项目类型' }]"
         >
-          <a-select
-            v-model:value="createForm.projectType"
-            placeholder="请选择项目类型"
-          >
+          <a-select v-model:value="createForm.projectType" placeholder="请选择项目类型">
             <a-select-option value="施工总承包">施工总承包</a-select-option>
             <a-select-option value="专业分包">专业分包</a-select-option>
             <a-select-option value="劳务分包">劳务分包</a-select-option>
@@ -375,7 +377,7 @@ const columns = [
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.dataIndex === 'projectName'">
-            <a class="pj-link" @click="() => record">{{ record.projectName }}</a>
+            <a class="pj-link" @click="router.push(`/project/${record.id}/overview`)">{{ record.projectName }}</a>
           </template>
           <template v-else-if="column.dataIndex === 'projectType'">
             <a-tag :color="TYPE_COLOR[record.projectType] ?? 'default'">{{
@@ -389,7 +391,9 @@ const columns = [
             <span>{{ record.plannedStartDate }} ~ {{ record.plannedEndDate }}</span>
           </template>
           <template v-else-if="column.dataIndex === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status] ?? 'default'">{{ STATUS_LABEL[record.status] ?? record.status }}</a-tag>
+            <a-tag :color="STATUS_COLOR[record.status] ?? 'default'">{{
+              STATUS_LABEL[record.status] ?? record.status
+            }}</a-tag>
           </template>
           <template v-else-if="column.dataIndex === 'approvalStatus'">
             <a-tag :color="APPROVAL_COLOR[record.approvalStatus] ?? 'default'">{{

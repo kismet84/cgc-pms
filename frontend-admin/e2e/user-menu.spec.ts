@@ -75,9 +75,9 @@ test.describe('User Menu Flow', () => {
     await profileCard.locator('button.ant-btn-primary').click()
 
     // Expect success toast
-    await expect(
-      page.locator('.ant-message-notice:has-text("个人资料更新成功")'),
-    ).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.ant-message-notice:has-text("个人资料更新成功")')).toBeVisible({
+      timeout: 8000,
+    })
 
     // ── Step 5: Change password → submit → success ──
     const passwordCard = page.locator('.ant-card:has-text("修改密码")')
@@ -90,9 +90,9 @@ test.describe('User Menu Flow', () => {
     await passwordCard.locator('button:has-text("修改密码")').click()
 
     // Expect password change success toast
-    await expect(
-      page.locator('.ant-message-notice:has-text("密码修改成功")'),
-    ).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.ant-message-notice:has-text("密码修改成功")')).toBeVisible({
+      timeout: 8000,
+    })
 
     // ── Step 6: User dropdown → 设置 → /settings → toggle notification → save ──
     await clickUserMenuItem(page, '设置')
@@ -109,9 +109,9 @@ test.describe('User Menu Flow', () => {
     await page.locator('button:has-text("保存设置")').click()
 
     // Expect save success toast
-    await expect(
-      page.locator('.ant-message-notice:has-text("保存成功")'),
-    ).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.ant-message-notice:has-text("保存成功")')).toBeVisible({
+      timeout: 8000,
+    })
 
     // ── Step 7: Help icon → /help → verify content ──
     await page.click('[aria-label="帮助"]')

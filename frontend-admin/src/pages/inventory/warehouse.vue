@@ -68,7 +68,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载仓库列表失败，请稍后重试')
@@ -139,7 +140,8 @@ function handleDelete(record: WarehouseVO) {
         await deleteWarehouse(record.id)
         message.success('删除成功')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败，请稍后重试')
       }
     },
@@ -166,7 +168,8 @@ async function handleModalOk() {
     }
     modalVisible.value = false
     fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('操作失败，请稍后重试')
   }
 }

@@ -13,8 +13,8 @@ import {
   SettingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
-import { getContractLedger, getContractKpi } from '@/api/modules/contract'
+import { message, Modal } from 'ant-design-vue'
+import { getContractLedger, getContractKpi, deleteContract } from '@/api/modules/contract'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import type {
   ContractVO,
@@ -31,7 +31,44 @@ function handleCreate() {
   router.push('/contract/create')
 }
 
+// ---- Row action handlers ----
+function handleView(row: ContractVO) {
+  router.push('/contract/' + row.id)
+}
+function handleEdit(row: ContractVO) {
+  router.push('/contract/' + row.id + '/edit')
+}
+function handleDelete(row: ContractVO) {
+  Modal.confirm({
+    title: '确认删除',
+    content: '确定删除该合同吗？',
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await deleteContract(String(row.id))
+        message.success('已删除')
+        fetchData()
+      } catch (e: unknown) {
+        console.error(e)
+        message.error('删除失败')
+      }
+    },
+  })
+}
+function handleExport() {
+  message.info('导出功能即将上线')
+}
+function handleAllAlerts() {
+  router.push('/alert')
+}
+
 // ---- Filter state ----
+const filterExpanded = ref(false)
+function toggleFilterExpand() {
+  filterExpanded.value = !filterExpanded.value
+}
 const filter = reactive({
   projectId: undefined as string | undefined,
   contractType: undefined as ContractType | undefined,
@@ -73,7 +110,8 @@ let saved: Record<string, boolean> = defaultCols
 try {
   const raw = localStorage.getItem(COLS_KEY)
   if (raw) saved = JSON.parse(raw)
-} catch {
+} catch (e: unknown) {
+  console.error(e)
   localStorage.removeItem(COLS_KEY)
 }
 const colVisible = reactive<Record<string, boolean>>({ ...defaultCols, ...saved })
@@ -100,7 +138,8 @@ async function fetchData() {
     const res: PageResult<ContractVO> = await getContractLedger(params)
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载合同台账失败，请稍后重试')
@@ -112,7 +151,8 @@ async function fetchData() {
 async function fetchKpi() {
   try {
     kpi.value = await getContractKpi()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     kpi.value = {
       totalCount: 0,
       totalAmount: '0',
@@ -343,7 +383,7 @@ const gridColumns = computed(() => [
             <div class="cl-filter-actions">
               <a-button type="primary" @click="handleSearch">查询</a-button>
               <a-button @click="handleReset">重置</a-button>
-              <a-button type="text">展开 ↓</a-button>
+              <a-button type="text" @click="toggleFilterExpand">{{ filterExpanded ? '收起 ↑' : '展开 ↓' }}</a-button>
             </div>
           </div>
         </div>
@@ -399,6 +439,9 @@ const gridColumns = computed(() => [
               ><template #icon><PlusOutlined /></template>新建合同</a-button
             >
             <a-button
+              :disabled="true"
+              title="即将上线"
+              @click="handleExport"
               ><template #icon><DownloadOutlined /></template>导出</a-button
             >
             <a-dropdown>
@@ -463,9 +506,9 @@ const gridColumns = computed(() => [
             </template>
             <template #ops="{ row }">
               <div class="cl-ops">
-                <a class="cl-link" @click="() => row">查看</a>
-                <a class="cl-link" @click="() => row">编辑</a>
-                <a class="cl-link cl-del" @click="() => row">删除</a>
+                <a class="cl-link" @click="handleView(row)">查看</a>
+                <a class="cl-link" @click="handleEdit(row)">编辑</a>
+                <a class="cl-link cl-del" @click="handleDelete(row)">删除</a>
               </div>
             </template>
           </vxe-grid>
@@ -529,7 +572,7 @@ const gridColumns = computed(() => [
         <div class="cl-card cl-panel">
           <div class="cl-warning-head">
             <div class="cl-panel-title" style="margin: 0">逾期预警</div>
-            <a class="cl-link" style="font-size: 12px">全部预警 ›</a>
+            <a class="cl-link" style="font-size: 12px" @click="handleAllAlerts">全部预警 ›</a>
           </div>
           <div class="cl-warning-list">
             <div v-for="w in overdueList" :key="w.code" class="cl-warning-item">

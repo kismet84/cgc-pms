@@ -79,7 +79,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载材料列表失败，请稍后重试')
@@ -162,7 +163,8 @@ function handleToggleStatus(record: MaterialVO) {
         await updateMaterialStatus(record.id, newStatus)
         message.success(`${actionText}成功`)
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error(`${actionText}失败`)
       }
     },
@@ -186,7 +188,8 @@ async function handleSubmit() {
     }
     modalVisible.value = false
     fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error(isEdit.value ? '编辑失败' : '新增失败')
   } finally {
     formLoading.value = false

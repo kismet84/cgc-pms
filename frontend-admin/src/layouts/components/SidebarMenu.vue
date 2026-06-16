@@ -19,6 +19,7 @@ import {
   SettingOutlined,
   ShoppingCartOutlined,
   SwapOutlined,
+  TeamOutlined,
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -47,11 +48,13 @@ const iconMap: Record<string, MenuItem['icon']> = {
   SettingOutlined,
   ShoppingCartOutlined,
   SwapOutlined,
+  TeamOutlined,
 }
 
 const MENU_ORDER = [
   '/dashboard',
   '/project',
+  '/partner',
   '/cost-target',
   '/cost',
   '/contract',
@@ -93,7 +96,9 @@ function buildMenuItem(route: RouteRecordRaw, parentPath: string): MenuItem {
     item.icon = () => h(iconMap[iconName])
   }
   if (route.children && route.children.length > 0) {
-    item.children = route.children.filter((c) => !c.meta?.hidden).map((c) => buildMenuItem(c, fullPath))
+    item.children = route.children
+      .filter((c) => !c.meta?.hidden)
+      .map((c) => buildMenuItem(c, fullPath))
   }
   return item
 }
@@ -145,7 +150,12 @@ onMounted(() => {
   nextTick(() => {
     ensureMenuRole()
     menuObserver = new MutationObserver(() => ensureMenuRole())
-    menuObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] })
+    menuObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
+    })
   })
 })
 

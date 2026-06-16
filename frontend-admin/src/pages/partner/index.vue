@@ -67,7 +67,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载合作方列表失败，请稍后重试')
@@ -173,7 +174,7 @@ onMounted(fetchData)
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'partnerName'">
-            <a class="pm-link">{{ record.partnerName }}</a>
+            <span>{{ record.partnerName }}</span>
           </template>
           <template v-else-if="column.key === 'partnerType'">
             <a-tag :color="TYPE_COLOR[record.partnerType]">

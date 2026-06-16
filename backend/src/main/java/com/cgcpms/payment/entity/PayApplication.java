@@ -7,6 +7,7 @@ import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
@@ -32,6 +33,7 @@ public class PayApplication extends BaseEntity {
 
     private Long partnerId;
 
+    @NotBlank
     private String applyCode;
 
     @NotNull

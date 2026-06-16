@@ -61,3 +61,11 @@ export function saveVarOrderItems(id: string, items: VarOrderItemVO[]) {
     data: items,
   })
 }
+
+/** 提交审批 */
+export function submitVarOrderForApproval(id: string) {
+  return request<void>({
+    url: `/var-orders/${id}/submit`,
+    method: 'post',
+  })
+}

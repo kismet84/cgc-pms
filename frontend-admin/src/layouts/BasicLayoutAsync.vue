@@ -42,7 +42,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <a-layout class="basic-layout" :class="{ 'basic-layout--mobile-nav-open': isMobile && !collapsed }">
+  <a-layout
+    class="basic-layout"
+    :class="{ 'basic-layout--mobile-nav-open': isMobile && !collapsed }"
+  >
     <a-layout-sider
       v-model:collapsed="collapsed"
       :width="216"
@@ -75,7 +78,11 @@ onBeforeUnmount(() => {
         <div class="flex-1"></div>
         <div class="top-actions">
           <span v-if="bellReady" aria-label="通知"><NotificationBell /></span>
-          <QuestionCircleOutlined aria-label="帮助" style="font-size: 18px; cursor: pointer" @click="router.push('/help')" />
+          <QuestionCircleOutlined
+            aria-label="帮助"
+            style="font-size: 18px; cursor: pointer"
+            @click="router.push('/help')"
+          />
           <a-dropdown>
             <div class="user-info">
               <a-avatar

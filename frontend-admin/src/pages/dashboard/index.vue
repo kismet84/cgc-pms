@@ -76,7 +76,8 @@ async function fetchProjects() {
     if (projectList.value.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = projectList.value[0].id
     }
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     projectList.value = []
   }
 }
@@ -131,7 +132,8 @@ async function fetchViewData() {
         mgmtData.value = await getManagementView()
         break
     }
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载仪表盘数据失败')
   } finally {
     loading.value = false
@@ -311,18 +313,49 @@ const pmUsePresentationFallback = computed(() => {
 
 const pmDisplayStats = computed(() => ({
   pendingTaskCount: pmUsePresentationFallback.value ? 23 : (pmData.value?.pendingTaskCount ?? 0),
-  laggingProjectCount: pmUsePresentationFallback.value ? 7 : (pmData.value?.laggingProjectCount ?? 0),
-  pendingApprovalCount: pmUsePresentationFallback.value ? 18 : (pmData.value?.pendingApprovalCount ?? 0),
-  expiringContractCount: pmUsePresentationFallback.value ? 12 : (pmData.value?.expiringContractCount ?? 0),
+  laggingProjectCount: pmUsePresentationFallback.value
+    ? 7
+    : (pmData.value?.laggingProjectCount ?? 0),
+  pendingApprovalCount: pmUsePresentationFallback.value
+    ? 18
+    : (pmData.value?.pendingApprovalCount ?? 0),
+  expiringContractCount: pmUsePresentationFallback.value
+    ? 12
+    : (pmData.value?.expiringContractCount ?? 0),
 }))
 
 // Local presentation fallback keeps the approved dashboard density when live PM data is empty.
 const pmFallbackTasks = [
-  { taskId: 'pm-task-1', title: '合同付款申请审批', businessType: '付款管理', receivedAt: '2026-06-14' },
-  { taskId: 'pm-task-2', title: '材料采购申请审批', businessType: '采购管理', receivedAt: '2026-06-15' },
-  { taskId: 'pm-task-3', title: '变更签证确认', businessType: '变更签证', receivedAt: '2026-06-16' },
-  { taskId: 'pm-task-4', title: '结算申请审批', businessType: '结算管理', receivedAt: '2026-06-18' },
-  { taskId: 'pm-task-5', title: '分包结算审核', businessType: '分包管理', receivedAt: '2026-06-20' },
+  {
+    taskId: 'pm-task-1',
+    title: '合同付款申请审批',
+    businessType: '付款管理',
+    receivedAt: '2026-06-14',
+  },
+  {
+    taskId: 'pm-task-2',
+    title: '材料采购申请审批',
+    businessType: '采购管理',
+    receivedAt: '2026-06-15',
+  },
+  {
+    taskId: 'pm-task-3',
+    title: '变更签证确认',
+    businessType: '变更签证',
+    receivedAt: '2026-06-16',
+  },
+  {
+    taskId: 'pm-task-4',
+    title: '结算申请审批',
+    businessType: '结算管理',
+    receivedAt: '2026-06-18',
+  },
+  {
+    taskId: 'pm-task-5',
+    title: '分包结算审核',
+    businessType: '分包管理',
+    receivedAt: '2026-06-20',
+  },
 ]
 
 const pmFallbackLaggingProjects = [
@@ -378,7 +411,9 @@ const pmLaggingProjectRows = computed(() =>
   pmData.value?.laggingProjects.length ? pmData.value.laggingProjects : pmFallbackLaggingProjects,
 )
 const pmExpiringContractRows = computed(() =>
-  pmData.value?.expiringContracts.length ? pmData.value.expiringContracts : pmFallbackExpiringContracts,
+  pmData.value?.expiringContracts.length
+    ? pmData.value.expiringContracts
+    : pmFallbackExpiringContracts,
 )
 
 const pmBusinessOverviewOption = computed(() => ({
@@ -634,7 +669,10 @@ onMounted(() => {
           placeholder="请选择项目"
           style="width: 260px"
           show-search
-          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+          :filter-option="
+            (input: string, option: any) =>
+              option.label?.toLowerCase().includes(input.toLowerCase())
+          "
         >
           <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
             {{ p.projectName }}
@@ -655,7 +693,9 @@ onMounted(() => {
           <div class="kpi-icon" style="background: #3b82f6"><AuditOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待办任务</div>
-            <div class="kpi-value">{{ fmtNum(pmDisplayStats.pendingTaskCount) }} <small>项</small></div>
+            <div class="kpi-value">
+              {{ fmtNum(pmDisplayStats.pendingTaskCount) }} <small>项</small>
+            </div>
             <div class="kpi-delta danger">较昨日 ↑ 5</div>
           </div>
         </div>
@@ -663,7 +703,9 @@ onMounted(() => {
           <div class="kpi-icon" style="background: #f59e0b"><WarningOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">滞后项目</div>
-            <div class="kpi-value">{{ fmtNum(pmDisplayStats.laggingProjectCount) }} <small>个</small></div>
+            <div class="kpi-value">
+              {{ fmtNum(pmDisplayStats.laggingProjectCount) }} <small>个</small>
+            </div>
             <div class="kpi-delta danger">较昨日 ↑ 2</div>
           </div>
         </div>
@@ -671,7 +713,9 @@ onMounted(() => {
           <div class="kpi-icon" style="background: #22c55e"><ClockCircleOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">待审批</div>
-            <div class="kpi-value">{{ fmtNum(pmDisplayStats.pendingApprovalCount) }} <small>项</small></div>
+            <div class="kpi-value">
+              {{ fmtNum(pmDisplayStats.pendingApprovalCount) }} <small>项</small>
+            </div>
             <div class="kpi-delta success">较昨日 ↓ 3</div>
           </div>
         </div>

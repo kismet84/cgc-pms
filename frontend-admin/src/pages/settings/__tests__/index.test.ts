@@ -115,11 +115,7 @@ const ARadioStub = defineComponent({
   props: { value: String },
   setup(props, { slots }) {
     return () =>
-      h(
-        'span',
-        { class: 'mock-radio', 'data-radio-value': props.value },
-        slots.default?.(),
-      )
+      h('span', { class: 'mock-radio', 'data-radio-value': props.value }, slots.default?.())
   },
 })
 

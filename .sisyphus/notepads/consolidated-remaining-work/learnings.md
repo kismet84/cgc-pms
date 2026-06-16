@@ -285,3 +285,34 @@ The old `res?.data ?? res?.message ?? '数据库已清空'` was misusing the int
 ### Verification
 - `./mvnw compile -q`: PASS
 - `./mvnw test -Dtest=StlSettlementServiceTest`: PASS — 5/5 tests, 0 failures, 0 errors
+
+## T18 — Add @Transactional(readOnly = true) to read-only service methods (2026-06-15)
+
+### Analysis Result: NO CHANGES NEEDED
+
+**Full investigation of all 42 service files with @Transactional:**
+
+- Found 137 `@Transactional` annotations across 42 service files
+- **Zero** read-only methods (getPage, getById, get*, find*, list*, query*) are annotated with `@Transactional`
+- All 137 `@Transactional` annotations are exclusively on write methods: create(), update(), delete(), submitForApproval(), verify(), register(), saveItems(), batchSave(), refreshSummary(), evaluateProject(), withdraw(), transfer(), addSign(), markAsRead(), etc.
+- Zero existing `readOnly = true` annotations anywhere in the codebase
+
+**Key services checked (all read methods are @Transactional-free):**
+- PayApplicationService: getPage(), getById(), getBasisList() — no annotation
+- InvoiceService: getPage(), getById(), recognize() — no annotation
+- CtContractService: getPage(), getById(), getKpi(), getApprovalRecords() — no annotation
+- CostSubjectService: getTree(), getList(), getById() — no annotation
+- All other 38 services follow the same pattern
+
+**Why the codebase is already correct:**
+1. This is a MyBatis-Plus project (DataSourceTransactionManager), not JPA/Hibernate
+2. `readOnly = true` on DataSourceTransactionManager only sets a JDBC connection hint — negligible benefit
+3. Read-only SELECT queries don't need transactions — auto-commit handles them efficiently
+4. Adding unnecessary `@Transactional` to every read method would add overhead (transaction begin/commit) with no upside
+
+**Task outcome:** The precondition "where read methods have existing @Transactional" does not exist in this codebase. No changes were made. `./mvnw compile -q` passes cleanly.
+
+### Files Analyzed
+- 42 service files with @Transactional (full grep)
+- 137 ast-grep matches confirmed all are write methods
+- 50 total *Service.java files in project

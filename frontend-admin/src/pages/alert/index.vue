@@ -38,7 +38,8 @@ async function fetchData() {
       severity: filter.severity,
       isRead: filter.isRead,
     })
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载预警列表失败，请稍后重试')
   }
 }
@@ -70,7 +71,8 @@ async function handleMarkRead(record: AlertLogVO) {
   try {
     await store.markRead(record.id)
     message.success('已标记为已读')
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('操作失败')
   }
 }
@@ -80,7 +82,8 @@ async function handleBatchEvaluate() {
     const result = await store.triggerBatchEvaluate()
     message.success(`评估完成，生成 ${result.alertsGenerated} 条预警`)
     await fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('触发评估失败')
   }
 }

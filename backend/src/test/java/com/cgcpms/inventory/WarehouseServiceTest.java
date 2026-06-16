@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.entity.MatWarehouse;
+import com.cgcpms.inventory.mapper.MatStockMapper;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.service.MatWarehouseService;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
@@ -18,7 +20,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-@SpringBootTest
+@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
 @ActiveProfiles("local")
 @DisplayName("仓库服务 TDD 测试")
 class WarehouseServiceTest {
@@ -32,6 +34,9 @@ class WarehouseServiceTest {
 
     @Autowired
     private MatWarehouseMapper warehouseMapper;
+
+    @Autowired
+    private MatStockMapper stockMapper;
 
     private Long createdWarehouseId;
 
@@ -311,5 +316,102 @@ class WarehouseServiceTest {
         assertEquals(String.valueOf(USER_ADMIN), vo.getCreatedBy());
         assertNotNull(vo.getCreatedAt(), "createdAt 应由 MetaObjectHandler 填充");
         assertNotNull(vo.getUpdatedAt(), "updatedAt 应由 MetaObjectHandler 填充");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RED → GREEN: Delete warehouse — no stock → success
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 删除无库存仓库，软删除成功")
+    void testDeleteWarehouseWithNoStock() {
+        MatWarehouse warehouse = new MatWarehouse();
+        warehouse.setProjectId(PROJECT_ID);
+        warehouse.setWarehouseCode("WH-DEL-001");
+        warehouse.setWarehouseName("待删除仓库");
+        warehouse.setStatus("ENABLE");
+        Long id = warehouseService.create(warehouse);
+
+        // Verify exists before delete
+        assertNotNull(warehouseService.getById(id));
+
+        // Delete
+        warehouseService.delete(id);
+
+        // Verify soft-deleted: getById should throw WAREHOUSE_NOT_FOUND
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            warehouseService.getById(id);
+        }, "软删除后查询应抛 BusinessException");
+        assertEquals("WAREHOUSE_NOT_FOUND", ex.getCode());
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RED → GREEN: Delete warehouse — has stock → 400
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 删除含库存仓库应抛400")
+    void testDeleteWarehouseWithStock() {
+        MatWarehouse warehouse = new MatWarehouse();
+        warehouse.setProjectId(PROJECT_ID);
+        warehouse.setWarehouseCode("WH-DEL-STK");
+        warehouse.setWarehouseName("有库存的仓库");
+        warehouse.setStatus("ENABLE");
+        Long id = warehouseService.create(warehouse);
+
+        // Insert stock for this warehouse
+        MatStock stock = new MatStock();
+        stock.setTenantId(TENANT_ID);
+        stock.setWarehouseId(id);
+        stock.setMaterialId(1L);
+        stock.setAvailableQty(new java.math.BigDecimal("100.0000"));
+        stockMapper.insert(stock);
+
+        // Delete should fail
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            warehouseService.delete(id);
+        }, "删除含库存仓库应抛 BusinessException");
+        assertEquals("WAREHOUSE_HAS_STOCK", ex.getCode());
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RED → GREEN: Delete non-existent warehouse → 404
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 删除不存在的仓库应抛异常")
+    void testDeleteNonExistentWarehouse() {
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            warehouseService.delete(99999999L);
+        }, "删除不存在的仓库应抛 BusinessException");
+        assertEquals("WAREHOUSE_NOT_FOUND", ex.getCode());
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RED → GREEN: Delete cross-tenant → denied
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 跨租户删除应抛异常")
+    void testDeleteCrossTenantWarehouse() {
+        MatWarehouse warehouse = new MatWarehouse();
+        warehouse.setProjectId(PROJECT_ID);
+        warehouse.setWarehouseCode("WH-DEL-XTNT");
+        warehouse.setWarehouseName("跨租户删除仓库");
+        warehouse.setStatus("ENABLE");
+        Long id = warehouseService.create(warehouse);
+
+        // Switch to tenant 999
+        UserContext.clear();
+        UserContext.set(Jwts.claims()
+                .add("userId", 999L)
+                .add("username", "other")
+                .add("tenantId", 999L)
+                .build());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            warehouseService.delete(id);
+        }, "跨租户删除应抛 BusinessException");
+        assertEquals("WAREHOUSE_NOT_FOUND", ex.getCode());
     }
 }

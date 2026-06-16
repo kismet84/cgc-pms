@@ -69,3 +69,11 @@ export function getOrderItemsForReceipt(orderId: string) {
     method: 'get',
   })
 }
+
+/** 提交审批 */
+export function submitReceiptForApproval(id: string) {
+  return request<void>({
+    url: `/receipts/${id}/submit`,
+    method: 'post',
+  })
+}

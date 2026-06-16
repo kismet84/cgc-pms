@@ -137,7 +137,8 @@ async function fetchCompanies() {
     })
     companyData.value = res.records
     companyTotal.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     companyData.value = []
     companyTotal.value = 0
     message.error('加载公司列表失败')
@@ -184,7 +185,8 @@ async function fetchDeptTree() {
   deptTreeLoading.value = true
   try {
     deptTreeData.value = await getDepartmentTree()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     deptTreeData.value = []
     message.error('加载部门树失败')
   } finally {
@@ -239,7 +241,8 @@ async function handleCompanySave() {
     }
     companyModalVisible.value = false
     await fetchCompanies()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('操作失败')
   } finally {
     companySaving.value = false
@@ -259,7 +262,8 @@ async function handleCompanyDelete(record: OrgCompanyVO) {
         message.success('已删除')
         if (selectedCompanyId.value === record.id) selectedCompanyId.value = null
         await fetchCompanies()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败')
       }
     },
@@ -339,7 +343,8 @@ async function handleDeptSave() {
     }
     deptModalVisible.value = false
     await fetchDeptTree()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('操作失败')
   } finally {
     deptSaving.value = false
@@ -364,7 +369,8 @@ async function handleDeptDelete() {
         message.success('已删除')
         selectedDeptKeys.value = []
         await fetchDeptTree()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败')
       }
     },
@@ -385,7 +391,8 @@ async function fetchPositions() {
     })
     positionData.value = res.records
     positionTotal.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     positionData.value = []
     positionTotal.value = 0
     message.error('加载岗位列表失败')
@@ -458,7 +465,8 @@ async function handlePositionSave() {
     }
     positionModalVisible.value = false
     await fetchPositions()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('操作失败')
   } finally {
     positionSaving.value = false
@@ -477,7 +485,8 @@ async function handlePositionDelete(record: OrgPositionVO) {
         await deletePosition(record.id)
         message.success('已删除')
         await fetchPositions()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败')
       }
     },
@@ -487,11 +496,7 @@ async function handlePositionDelete(record: OrgPositionVO) {
 // ─── Init ────────────────────────────────────────────────
 
 onMounted(async () => {
-  await Promise.all([
-    fetchCompanies(),
-    fetchDeptTree(),
-    fetchPositions(),
-  ])
+  await Promise.all([fetchCompanies(), fetchDeptTree(), fetchPositions()])
   loading.value = false
 })
 </script>
@@ -499,32 +504,159 @@ onMounted(async () => {
 <template>
   <a-spin :spinning="loading">
     <div class="org-page">
-    <a-page-header title="组织架构管理" class="org-header" />
+      <a-page-header title="组织架构管理" class="org-header" />
 
-    <!-- ================== Top Row: Company + Department ================== -->
-    <div class="org-top-row">
-      <!-- Companies -->
-      <div class="org-card org-company-panel">
+      <!-- ================== Top Row: Company + Department ================== -->
+      <div class="org-top-row">
+        <!-- Companies -->
+        <div class="org-card org-company-panel">
+          <div class="org-panel-header">
+            <span class="org-panel-title">公司管理</span>
+            <div class="org-panel-actions">
+              <a-button v-if="canAdd" type="primary" size="small" @click="openCompanyAdd">
+                新增
+              </a-button>
+            </div>
+          </div>
+
+          <div class="org-filter-mini">
+            <a-input
+              v-model:value="companyFilter.companyName"
+              placeholder="公司名称"
+              size="small"
+              style="width: 140px"
+              allow-clear
+              @press-enter="handleCompanySearch"
+            />
+            <a-select
+              v-model:value="companyFilter.status"
+              placeholder="状态"
+              size="small"
+              allow-clear
+              style="width: 90px"
+            >
+              <a-select-option value="ENABLED">启用</a-select-option>
+              <a-select-option value="DISABLED">禁用</a-select-option>
+            </a-select>
+            <a-button size="small" @click="handleCompanySearch">查询</a-button>
+          </div>
+
+          <a-table
+            :columns="companyColumns"
+            :data-source="companyData"
+            :loading="companyLoading"
+            :pagination="false"
+            row-key="id"
+            size="small"
+            :custom-row="
+              (record: OrgCompanyVO) => ({
+                onClick: () => handleCompanyRowClick(record),
+                class: getCompanyRowClass(record),
+              })
+            "
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.dataIndex === 'status'">
+                <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
+                  {{ record.status === 'ENABLED' ? '启用' : '禁用' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.dataIndex === 'ops'">
+                <a-button
+                  v-if="canEdit"
+                  size="small"
+                  type="link"
+                  @click.stop="openCompanyEdit(record)"
+                  >编辑</a-button
+                >
+                <a-button
+                  v-if="canDelete"
+                  size="small"
+                  type="link"
+                  danger
+                  @click.stop="handleCompanyDelete(record)"
+                  >删除</a-button
+                >
+              </template>
+            </template>
+          </a-table>
+
+          <div class="org-panel-footer">
+            <span class="org-total">共 {{ companyTotal }} 条</span>
+            <a-pagination
+              v-model:current="companyPageNo"
+              v-model:page-size="companyPageSize"
+              :total="companyTotal"
+              size="small"
+              :page-size-options="['10', '20', '50']"
+              show-size-changer
+              @change="handleCompanyPageChange"
+              @show-size-change="handleCompanyPageSizeChange"
+            />
+          </div>
+        </div>
+
+        <!-- Departments Tree -->
+        <div class="org-card org-dept-panel">
+          <div class="org-panel-header">
+            <span class="org-panel-title">部门架构</span>
+            <div class="org-panel-actions">
+              <a-button v-if="canAdd" size="small" @click="openDeptAdd">新增</a-button>
+              <a-button
+                v-if="canEdit"
+                size="small"
+                :disabled="!selectedDeptKeys.length"
+                @click="openDeptEdit"
+                >编辑</a-button
+              >
+              <a-button
+                v-if="canDelete"
+                size="small"
+                danger
+                :disabled="!selectedDeptKeys.length"
+                @click="handleDeptDelete"
+                >删除</a-button
+              >
+            </div>
+          </div>
+
+          <div class="org-tree-wrap">
+            <a-spin :spinning="deptTreeLoading">
+              <a-tree
+                v-model:selected-keys="selectedDeptKeys"
+                :tree-data="filteredDeptTree"
+                :field-names="{ title: 'deptName', key: 'id', children: 'children' }"
+                default-expand-all
+                block-node
+                @select="handleDeptSelect"
+              />
+            </a-spin>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================== Bottom Row: Positions ================== -->
+      <div class="org-card org-position-panel">
         <div class="org-panel-header">
-          <span class="org-panel-title">公司管理</span>
+          <span class="org-panel-title">岗位管理</span>
           <div class="org-panel-actions">
-            <a-button v-if="canAdd" type="primary" size="small" @click="openCompanyAdd">
-              新增
-            </a-button>
+            <a-button v-if="canAdd" type="primary" size="small" @click="openPositionAdd"
+              >新增</a-button
+            >
           </div>
         </div>
 
         <div class="org-filter-mini">
           <a-input
-            v-model:value="companyFilter.companyName"
-            placeholder="公司名称"
+            v-model:value="positionFilter.positionName"
+            placeholder="岗位名称"
             size="small"
             style="width: 140px"
             allow-clear
-            @press-enter="handleCompanySearch"
+            @press-enter="handlePositionSearch"
           />
           <a-select
-            v-model:value="companyFilter.status"
+            v-model:value="positionFilter.status"
             placeholder="状态"
             size="small"
             allow-clear
@@ -533,22 +665,17 @@ onMounted(async () => {
             <a-select-option value="ENABLED">启用</a-select-option>
             <a-select-option value="DISABLED">禁用</a-select-option>
           </a-select>
-          <a-button size="small" @click="handleCompanySearch">查询</a-button>
+          <a-button size="small" @click="handlePositionSearch">查询</a-button>
+          <a-button size="small" @click="handlePositionReset">重置</a-button>
         </div>
 
         <a-table
-          :columns="companyColumns"
-          :data-source="companyData"
-          :loading="companyLoading"
+          :columns="positionColumns"
+          :data-source="positionData"
+          :loading="positionLoading"
           :pagination="false"
           row-key="id"
           size="small"
-          :custom-row="
-            (record: OrgCompanyVO) => ({
-              onClick: () => handleCompanyRowClick(record),
-              class: getCompanyRowClass(record),
-            })
-          "
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.dataIndex === 'status'">
@@ -557,11 +684,7 @@ onMounted(async () => {
               </a-tag>
             </template>
             <template v-else-if="column.dataIndex === 'ops'">
-              <a-button
-                v-if="canEdit"
-                size="small"
-                type="link"
-                @click.stop="openCompanyEdit(record)"
+              <a-button v-if="canEdit" size="small" type="link" @click="openPositionEdit(record)"
                 >编辑</a-button
               >
               <a-button
@@ -569,7 +692,7 @@ onMounted(async () => {
                 size="small"
                 type="link"
                 danger
-                @click.stop="handleCompanyDelete(record)"
+                @click="handlePositionDelete(record)"
                 >删除</a-button
               >
             </template>
@@ -577,226 +700,108 @@ onMounted(async () => {
         </a-table>
 
         <div class="org-panel-footer">
-          <span class="org-total">共 {{ companyTotal }} 条</span>
+          <span class="org-total">共 {{ positionTotal }} 条</span>
           <a-pagination
-            v-model:current="companyPageNo"
-            v-model:page-size="companyPageSize"
-            :total="companyTotal"
+            v-model:current="positionPageNo"
+            v-model:page-size="positionPageSize"
+            :total="positionTotal"
             size="small"
             :page-size-options="['10', '20', '50']"
             show-size-changer
-            @change="handleCompanyPageChange"
-            @show-size-change="handleCompanyPageSizeChange"
+            @change="handlePositionPageChange"
+            @show-size-change="handlePositionPageSizeChange"
           />
         </div>
       </div>
 
-      <!-- Departments Tree -->
-      <div class="org-card org-dept-panel">
-        <div class="org-panel-header">
-          <span class="org-panel-title">部门架构</span>
-          <div class="org-panel-actions">
-            <a-button v-if="canAdd" size="small" @click="openDeptAdd">新增</a-button>
-            <a-button
-              v-if="canEdit"
-              size="small"
-              :disabled="!selectedDeptKeys.length"
-              @click="openDeptEdit"
-              >编辑</a-button
-            >
-            <a-button
-              v-if="canDelete"
-              size="small"
-              danger
-              :disabled="!selectedDeptKeys.length"
-              @click="handleDeptDelete"
-              >删除</a-button
-            >
-          </div>
-        </div>
-
-        <div class="org-tree-wrap">
-          <a-spin :spinning="deptTreeLoading">
-            <a-tree
-              v-model:selected-keys="selectedDeptKeys"
-              :tree-data="filteredDeptTree"
-              :field-names="{ title: 'deptName', key: 'id', children: 'children' }"
-              default-expand-all
-              block-node
-              @select="handleDeptSelect"
-            />
-          </a-spin>
-        </div>
-      </div>
-    </div>
-
-    <!-- ================== Bottom Row: Positions ================== -->
-    <div class="org-card org-position-panel">
-      <div class="org-panel-header">
-        <span class="org-panel-title">岗位管理</span>
-        <div class="org-panel-actions">
-          <a-button v-if="canAdd" type="primary" size="small" @click="openPositionAdd"
-            >新增</a-button
-          >
-        </div>
-      </div>
-
-      <div class="org-filter-mini">
-        <a-input
-          v-model:value="positionFilter.positionName"
-          placeholder="岗位名称"
-          size="small"
-          style="width: 140px"
-          allow-clear
-          @press-enter="handlePositionSearch"
-        />
-        <a-select
-          v-model:value="positionFilter.status"
-          placeholder="状态"
-          size="small"
-          allow-clear
-          style="width: 90px"
-        >
-          <a-select-option value="ENABLED">启用</a-select-option>
-          <a-select-option value="DISABLED">禁用</a-select-option>
-        </a-select>
-        <a-button size="small" @click="handlePositionSearch">查询</a-button>
-        <a-button size="small" @click="handlePositionReset">重置</a-button>
-      </div>
-
-      <a-table
-        :columns="positionColumns"
-        :data-source="positionData"
-        :loading="positionLoading"
-        :pagination="false"
-        row-key="id"
-        size="small"
+      <!-- ================== Company Modal ================== -->
+      <a-modal
+        v-model:open="companyModalVisible"
+        :title="companyModalTitle"
+        :confirm-loading="companySaving"
+        @ok="handleCompanySave"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.dataIndex === 'status'">
-            <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
-              {{ record.status === 'ENABLED' ? '启用' : '禁用' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'ops'">
-            <a-button v-if="canEdit" size="small" type="link" @click="openPositionEdit(record)"
-              >编辑</a-button
-            >
-            <a-button
-              v-if="canDelete"
-              size="small"
-              type="link"
-              danger
-              @click="handlePositionDelete(record)"
-              >删除</a-button
-            >
-          </template>
-        </template>
-      </a-table>
+        <a-form layout="vertical">
+          <a-form-item label="公司编号" required>
+            <a-input v-model:value="companyForm.companyCode" placeholder="请输入公司编号" />
+          </a-form-item>
+          <a-form-item label="公司名称" required>
+            <a-input v-model:value="companyForm.companyName" placeholder="请输入公司名称" />
+          </a-form-item>
+          <a-form-item label="状态">
+            <a-select v-model:value="companyForm.status" style="width: 100%">
+              <a-select-option value="ENABLED">启用</a-select-option>
+              <a-select-option value="DISABLED">禁用</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="备注">
+            <a-textarea v-model:value="companyForm.remark" placeholder="备注信息" :rows="2" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
 
-      <div class="org-panel-footer">
-        <span class="org-total">共 {{ positionTotal }} 条</span>
-        <a-pagination
-          v-model:current="positionPageNo"
-          v-model:page-size="positionPageSize"
-          :total="positionTotal"
-          size="small"
-          :page-size-options="['10', '20', '50']"
-          show-size-changer
-          @change="handlePositionPageChange"
-          @show-size-change="handlePositionPageSizeChange"
-        />
-      </div>
+      <!-- ================== Department Modal ================== -->
+      <a-modal
+        v-model:open="deptModalVisible"
+        :title="deptModalTitle"
+        :confirm-loading="deptSaving"
+        @ok="handleDeptSave"
+      >
+        <a-form layout="vertical">
+          <a-form-item label="所属公司" required>
+            <a-select v-model:value="deptForm.companyId" placeholder="选择公司" style="width: 100%">
+              <a-select-option v-for="c in companyData" :key="c.id" :value="c.id">
+                {{ c.companyName }}
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="部门编号" required>
+            <a-input v-model:value="deptForm.deptCode" placeholder="请输入部门编号" />
+          </a-form-item>
+          <a-form-item label="部门名称" required>
+            <a-input v-model:value="deptForm.deptName" placeholder="请输入部门名称" />
+          </a-form-item>
+          <a-form-item label="排序号">
+            <a-input-number v-model:value="deptForm.orderNum" :min="0" style="width: 100%" />
+          </a-form-item>
+          <a-form-item label="状态">
+            <a-select v-model:value="deptForm.status" style="width: 100%">
+              <a-select-option value="ENABLED">启用</a-select-option>
+              <a-select-option value="DISABLED">禁用</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="备注">
+            <a-textarea v-model:value="deptForm.remark" placeholder="备注信息" :rows="2" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
+
+      <!-- ================== Position Modal ================== -->
+      <a-modal
+        v-model:open="positionModalVisible"
+        :title="positionModalTitle"
+        :confirm-loading="positionSaving"
+        @ok="handlePositionSave"
+      >
+        <a-form layout="vertical">
+          <a-form-item label="岗位编号" required>
+            <a-input v-model:value="positionForm.positionCode" placeholder="请输入岗位编号" />
+          </a-form-item>
+          <a-form-item label="岗位名称" required>
+            <a-input v-model:value="positionForm.positionName" placeholder="请输入岗位名称" />
+          </a-form-item>
+          <a-form-item label="状态">
+            <a-select v-model:value="positionForm.status" style="width: 100%">
+              <a-select-option value="ENABLED">启用</a-select-option>
+              <a-select-option value="DISABLED">禁用</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="备注">
+            <a-textarea v-model:value="positionForm.remark" placeholder="备注信息" :rows="2" />
+          </a-form-item>
+        </a-form>
+      </a-modal>
     </div>
-
-    <!-- ================== Company Modal ================== -->
-    <a-modal
-      v-model:open="companyModalVisible"
-      :title="companyModalTitle"
-      :confirm-loading="companySaving"
-      @ok="handleCompanySave"
-    >
-      <a-form layout="vertical">
-        <a-form-item label="公司编号" required>
-          <a-input v-model:value="companyForm.companyCode" placeholder="请输入公司编号" />
-        </a-form-item>
-        <a-form-item label="公司名称" required>
-          <a-input v-model:value="companyForm.companyName" placeholder="请输入公司名称" />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="companyForm.status" style="width: 100%">
-            <a-select-option value="ENABLED">启用</a-select-option>
-            <a-select-option value="DISABLED">禁用</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea v-model:value="companyForm.remark" placeholder="备注信息" :rows="2" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
-
-    <!-- ================== Department Modal ================== -->
-    <a-modal
-      v-model:open="deptModalVisible"
-      :title="deptModalTitle"
-      :confirm-loading="deptSaving"
-      @ok="handleDeptSave"
-    >
-      <a-form layout="vertical">
-        <a-form-item label="所属公司" required>
-          <a-select v-model:value="deptForm.companyId" placeholder="选择公司" style="width: 100%">
-            <a-select-option v-for="c in companyData" :key="c.id" :value="c.id">
-              {{ c.companyName }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="部门编号" required>
-          <a-input v-model:value="deptForm.deptCode" placeholder="请输入部门编号" />
-        </a-form-item>
-        <a-form-item label="部门名称" required>
-          <a-input v-model:value="deptForm.deptName" placeholder="请输入部门名称" />
-        </a-form-item>
-        <a-form-item label="排序号">
-          <a-input-number v-model:value="deptForm.orderNum" :min="0" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="deptForm.status" style="width: 100%">
-            <a-select-option value="ENABLED">启用</a-select-option>
-            <a-select-option value="DISABLED">禁用</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea v-model:value="deptForm.remark" placeholder="备注信息" :rows="2" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
-
-    <!-- ================== Position Modal ================== -->
-    <a-modal
-      v-model:open="positionModalVisible"
-      :title="positionModalTitle"
-      :confirm-loading="positionSaving"
-      @ok="handlePositionSave"
-    >
-      <a-form layout="vertical">
-        <a-form-item label="岗位编号" required>
-          <a-input v-model:value="positionForm.positionCode" placeholder="请输入岗位编号" />
-        </a-form-item>
-        <a-form-item label="岗位名称" required>
-          <a-input v-model:value="positionForm.positionName" placeholder="请输入岗位名称" />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="positionForm.status" style="width: 100%">
-            <a-select-option value="ENABLED">启用</a-select-option>
-            <a-select-option value="DISABLED">禁用</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea v-model:value="positionForm.remark" placeholder="备注信息" :rows="2" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
-  </div>
   </a-spin>
 </template>
 

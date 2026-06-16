@@ -55,7 +55,7 @@ function loadUserInfo(): UserInfo | null {
     const raw = localStorage.getItem(USER_INFO_KEY)
     if (!raw) return null
     return JSON.parse(raw) as UserInfo
-  } catch {
+  } catch (e: unknown) {
     if (import.meta.env.DEV) {
       console.warn('localStorage operation failed:', 'loadUserInfo')
     }
@@ -66,7 +66,7 @@ function loadUserInfo(): UserInfo | null {
 function persistUserInfo(info: UserInfo) {
   try {
     localStorage.setItem(USER_INFO_KEY, JSON.stringify(info))
-  } catch {
+  } catch (e: unknown) {
     if (import.meta.env.DEV) {
       console.warn('localStorage operation failed:', 'persistUserInfo')
     }
@@ -77,7 +77,7 @@ function persistUserInfo(info: UserInfo) {
 function clearUserInfo() {
   try {
     localStorage.removeItem(USER_INFO_KEY)
-  } catch {
+  } catch (e: unknown) {
     if (import.meta.env.DEV) {
       console.warn('localStorage operation failed:', 'clearUserInfo')
     }

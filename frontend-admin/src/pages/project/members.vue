@@ -68,7 +68,8 @@ async function loadUsers() {
   try {
     const res = await getUserList({ pageNum: 1, pageSize: 200 })
     userList.value = res.records
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     userList.value = []
   }
 }
@@ -98,7 +99,8 @@ async function handleAdd() {
     message.success('添加成功')
     addVisible.value = false
     await store.fetchMembers(projectId)
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     // error handled by interceptor
   } finally {
     addLoading.value = false
@@ -114,7 +116,8 @@ async function handleRoleChange(member: MemberVO, newRole: string) {
     })
     message.success('角色更新成功')
     member.roleCode = newRole
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     // error handled by interceptor
   }
 }

@@ -11,7 +11,7 @@ import {
   addSignTask,
   type WfInstanceVO,
 } from '@/api/modules/workflow'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -73,6 +73,7 @@ async function fetchDetail() {
   try {
     detail.value = await getInstanceDetail(instanceId)
   } catch (e: unknown) {
+    console.error(e)
     const msg = e instanceof Error ? e.message : '加载审批详情失败'
     message.error(msg)
   } finally {
@@ -122,6 +123,7 @@ async function handleApprove() {
     showApproveModal.value = false
     fetchDetail()
   } catch (e: unknown) {
+    console.error(e)
     const msg = e instanceof Error ? e.message : '审批操作失败'
     message.error(msg)
   } finally {
@@ -151,6 +153,7 @@ async function handleReject() {
     showRejectModal.value = false
     fetchDetail()
   } catch (e: unknown) {
+    console.error(e)
     const msg = e instanceof Error ? e.message : '审批操作失败'
     message.error(msg)
   } finally {
@@ -180,6 +183,7 @@ async function handleTransfer() {
     showTransferModal.value = false
     fetchDetail()
   } catch (e: unknown) {
+    console.error(e)
     const msg = e instanceof Error ? e.message : '审批操作失败'
     message.error(msg)
   } finally {
@@ -205,6 +209,7 @@ async function handleAddSign() {
     showAddSignModal.value = false
     fetchDetail()
   } catch (e: unknown) {
+    console.error(e)
     const msg = e instanceof Error ? e.message : '审批操作失败'
     message.error(msg)
   } finally {
@@ -213,31 +218,49 @@ async function handleAddSign() {
 }
 
 async function handleWithdraw() {
-  actionLoading.value = true
-  try {
-    await withdrawInstance(instanceId)
-    message.success('已撤回')
-    fetchDetail()
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '撤回失败'
-    message.error(msg)
-  } finally {
-    actionLoading.value = false
-  }
+  Modal.confirm({
+    title: '确认撤回',
+    content: '撤回后审批将回到草稿状态，是否继续？',
+    okText: '确认',
+    cancelText: '取消',
+    onOk: async () => {
+      actionLoading.value = true
+      try {
+        await withdrawInstance(instanceId)
+        message.success('已撤回')
+        fetchDetail()
+      } catch (e: unknown) {
+        console.error(e)
+        const msg = e instanceof Error ? e.message : '撤回失败'
+        message.error(msg)
+      } finally {
+        actionLoading.value = false
+      }
+    },
+  })
 }
 
 async function handleResubmit() {
-  actionLoading.value = true
-  try {
-    await resubmitInstance(instanceId)
-    message.success('已重新提交')
-    fetchDetail()
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : '重新提交失败'
-    message.error(msg)
-  } finally {
-    actionLoading.value = false
-  }
+  Modal.confirm({
+    title: '确认重新提交',
+    content: '确定重新提交该审批吗？',
+    okText: '确认',
+    cancelText: '取消',
+    onOk: async () => {
+      actionLoading.value = true
+      try {
+        await resubmitInstance(instanceId)
+        message.success('已重新提交')
+        fetchDetail()
+      } catch (e: unknown) {
+        console.error(e)
+        const msg = e instanceof Error ? e.message : '重新提交失败'
+        message.error(msg)
+      } finally {
+        actionLoading.value = false
+      }
+    },
+  })
 }
 
 function goBack() {

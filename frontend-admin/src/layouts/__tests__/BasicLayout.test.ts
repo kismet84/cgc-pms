@@ -56,10 +56,11 @@ import BasicLayout from '@/layouts/BasicLayoutAsync.vue'
 const ADropdownStub = defineComponent({
   name: 'ADropdownStub',
   setup(_, { slots }) {
-    return () => h('div', { class: 'stub-dropdown' }, [
-      h('div', { class: 'stub-dropdown-default' }, slots.default?.()),
-      h('div', { class: 'stub-dropdown-overlay' }, slots.overlay?.()),
-    ])
+    return () =>
+      h('div', { class: 'stub-dropdown' }, [
+        h('div', { class: 'stub-dropdown-default' }, slots.default?.()),
+        h('div', { class: 'stub-dropdown-overlay' }, slots.overlay?.()),
+      ])
   },
 })
 

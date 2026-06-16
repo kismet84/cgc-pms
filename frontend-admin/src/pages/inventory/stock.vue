@@ -65,7 +65,8 @@ async function fetchLedger() {
       txnList.value = []
       txnTotal.value = 0
     }
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     stock.value = null
     txnList.value = []
     txnTotal.value = 0
@@ -79,7 +80,8 @@ async function fetchWarehouses() {
   try {
     const res = await getWarehouseList({ pageNo: 1, pageSize: 50, status: 'ENABLE' })
     warehouseList.value = res.records
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     warehouseList.value = []
   }
 }
@@ -138,7 +140,10 @@ onMounted(() => {
             allow-clear
             style="width: 200px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
               {{ w.warehouseName }}
@@ -153,7 +158,10 @@ onMounted(() => {
             allow-clear
             style="width: 200px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
               {{ m.materialName }} <span style="color: #9ca3af">({{ m.materialCode }})</span>

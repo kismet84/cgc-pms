@@ -58,9 +58,11 @@ test.describe('Invoice PDF Upload & Recognition', () => {
 
     // Wait for recognition to complete (button stops loading)
     // Timeout generous because OCR backend may be slow or unreachable
-    await expect(recognizeBtn).not.toHaveClass(/ant-btn-loading/, { timeout: 30000 }).catch(() => {
-      // Recognition may have failed gracefully — proceed with manual fill
-    })
+    await expect(recognizeBtn)
+      .not.toHaveClass(/ant-btn-loading/, { timeout: 30000 })
+      .catch(() => {
+        // Recognition may have failed gracefully — proceed with manual fill
+      })
 
     // Check if invoice number was auto-filled; if not, fill manually
     const invoiceNoInput = page.locator('.ant-modal input[placeholder="请输入发票号码"]')

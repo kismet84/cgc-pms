@@ -29,6 +29,13 @@ public class GlobalExceptionHandler {
     private static final String SYSTEM_ERROR_CODE = "SYSTEM_ERROR";
     private static final String VALIDATION_ERROR_CODE = "VALIDATION_ERROR";
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public ApiResponse<Void> handleRateLimitExceeded(RateLimitExceededException e) {
+        log.warn("Rate limit exceeded: {}", e.getMessage());
+        return ApiResponse.fail("RATE_LIMIT_EXCEEDED", e.getMessage());
+    }
+
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleBusinessException(BusinessException e) {

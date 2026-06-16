@@ -50,7 +50,8 @@ async function fetchData() {
       ccData.value = res.records
       total.value = res.total
     }
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     if (activeTab.value === 'todo') todoData.value = []
     else if (activeTab.value === 'done') doneData.value = []
     else ccData.value = []

@@ -49,7 +49,8 @@ async function fetchTypeList() {
       selectedTypeId.value = typeList.value[0].id
       fetchDataList()
     }
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     typeList.value = []
     message.error('加载字典类型失败')
   } finally {
@@ -105,7 +106,8 @@ async function handleDeleteType(record: DictTypeVO) {
           selectedTypeId.value = ''
         }
         fetchTypeList()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败')
       }
     },
@@ -136,7 +138,8 @@ async function handleTypeSubmit() {
     }
     typeModalVisible.value = false
     fetchTypeList()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error(typeIsEdit.value ? '编辑失败' : '新增失败')
   } finally {
     typeFormLoading.value = false
@@ -207,7 +210,8 @@ async function fetchDataList() {
     })
     dataTableData.value = res.records
     dataTotal.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     dataTableData.value = []
     dataTotal.value = 0
     message.error('加载字典数据失败')
@@ -285,7 +289,8 @@ async function handleDeleteData(record: DictDataVO) {
         await deleteDictData(record.id)
         message.success('删除成功')
         fetchDataList()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败')
       }
     },
@@ -321,7 +326,8 @@ async function handleDataSubmit() {
     }
     dataModalVisible.value = false
     fetchDataList()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error(dataIsEdit.value ? '编辑失败' : '新增失败')
   } finally {
     dataFormLoading.value = false

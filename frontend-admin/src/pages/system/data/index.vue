@@ -18,7 +18,8 @@ function handleClearDatabase() {
       try {
         const msg = await request<string>({ url: '/system/clear-database', method: 'DELETE' })
         message.success(msg || '数据库已清空')
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('清空失败，请稍后重试')
       } finally {
         clearing.value = false

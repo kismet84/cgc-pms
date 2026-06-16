@@ -11,10 +11,13 @@ export interface SysUserVO {
 }
 
 export interface SysRoleVO {
-  id: string
+  id: number | string
   roleCode: string
   roleName: string
+  roleType?: string
   status: string
+  dataScope?: string
+  menuIds?: number[]
   createdAt: string
 }
 

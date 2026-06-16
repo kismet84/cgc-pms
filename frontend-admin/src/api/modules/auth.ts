@@ -21,7 +21,12 @@ export function refreshTokenApi() {
   })
 }
 
-export function updateProfile(data: { realName?: string; phone?: string; email?: string; avatar?: string }) {
+export function updateProfile(data: {
+  realName?: string
+  phone?: string
+  email?: string
+  avatar?: string
+}) {
   return request<UserInfo>({ url: '/profile', method: 'put', data })
 }
 

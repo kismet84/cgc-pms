@@ -141,7 +141,9 @@ test.describe('Invoice: Create → Register → Verify', () => {
     await page.waitForSelector('.ant-table', { timeout: 5000 })
 
     // Verify filtered results: should find exactly 1 row matching the invoice number
-    await expect(page.locator('.ant-table-tbody tr.ant-table-row')).toHaveCount(1, { timeout: 5000 })
+    await expect(page.locator('.ant-table-tbody tr.ant-table-row')).toHaveCount(1, {
+      timeout: 5000,
+    })
     await expect(page.locator('.ant-table-tbody tr.ant-table-row').first()).toContainText(invoiceNo)
 
     // Verify verify status shows "待核验" (PENDING)
@@ -283,12 +285,16 @@ test.describe('Invoice: Create → Register → Verify', () => {
 
     // Assert: at least one row with PENDING status visible
     // Check that visible rows contain PENDING status tags
-    const pendingTags = page.locator('.ant-table-tbody tr.ant-table-row .ant-tag:has-text("待核验")')
+    const pendingTags = page.locator(
+      '.ant-table-tbody tr.ant-table-row .ant-tag:has-text("待核验")',
+    )
     const pendingCount = await pendingTags.count()
     expect(pendingCount).toBeGreaterThan(0)
 
     // Assert: no rows with VERIFIED status visible
-    const verifiedTags = page.locator('.ant-table-tbody tr.ant-table-row .ant-tag:has-text("已认证")')
+    const verifiedTags = page.locator(
+      '.ant-table-tbody tr.ant-table-row .ant-tag:has-text("已认证")',
+    )
     await expect(verifiedTags).toHaveCount(0)
 
     // Assert: no rows with ABNORMAL status visible
@@ -309,12 +315,16 @@ test.describe('Invoice: Create → Register → Verify', () => {
     await page.waitForSelector('.ant-table', { timeout: 5000 })
 
     // Assert: at least one row with VERIFIED status visible
-    const verifiedTags2 = page.locator('.ant-table-tbody tr.ant-table-row .ant-tag:has-text("已认证")')
+    const verifiedTags2 = page.locator(
+      '.ant-table-tbody tr.ant-table-row .ant-tag:has-text("已认证")',
+    )
     const verifiedCount2 = await verifiedTags2.count()
     expect(verifiedCount2).toBeGreaterThan(0)
 
     // Assert: no rows with PENDING status visible
-    const pendingTags2 = page.locator('.ant-table-tbody tr.ant-table-row .ant-tag:has-text("待核验")')
+    const pendingTags2 = page.locator(
+      '.ant-table-tbody tr.ant-table-row .ant-tag:has-text("待核验")',
+    )
     await expect(pendingTags2).toHaveCount(0)
 
     await page.screenshot({ path: 'e2e/screenshots/invoice-filtered-verified.png', fullPage: true })

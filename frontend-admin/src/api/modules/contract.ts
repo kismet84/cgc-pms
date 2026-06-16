@@ -108,6 +108,14 @@ export function saveContractPaymentTerms(
   return savePaymentTerms(contractId, terms)
 }
 
+/** 删除合同 */
+export function deleteContract(id: string) {
+  return request<void>({
+    url: `/contracts/${id}`,
+    method: 'delete',
+  })
+}
+
 /** 获取合同审批记录 */
 export function getContractApprovalRecords(contractId: string) {
   return request<ContractApprovalRecord[]>({

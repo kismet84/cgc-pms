@@ -50,7 +50,8 @@ async function fetchData() {
     const res: PageResult<CostTargetVO> = await getCostTargetList(params)
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载目标成本版本列表失败')
@@ -105,7 +106,8 @@ function handleActivate(row: CostTargetVO) {
         await activateCostTarget(row.id)
         message.success('版本已激活')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('版本激活失败')
       } finally {
         activating.value = false
@@ -126,7 +128,8 @@ function handleDelete(row: CostTargetVO) {
         await deleteCostTarget(row.id)
         message.success('已删除')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败')
       }
     },
@@ -187,7 +190,10 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
               p.projectName

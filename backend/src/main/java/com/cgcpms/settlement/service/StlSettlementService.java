@@ -1,12 +1,17 @@
 package com.cgcpms.settlement.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
@@ -17,6 +22,7 @@ import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
@@ -24,6 +30,12 @@ import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.entity.WfRecord;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
+import com.cgcpms.workflow.mapper.WfRecordMapper;
+import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -62,6 +74,11 @@ public class StlSettlementService {
     private final VarOrderMapper varOrderMapper;
     private final SubMeasureMapper subMeasureMapper;
     private final PayRecordMapper payRecordMapper;
+    private final CostItemMapper costItemMapper;
+    private final SysFileMapper sysFileMapper;
+    private final WfInstanceMapper wfInstanceMapper;
+    private final WfRecordMapper wfRecordMapper;
+    private final WorkflowEngine workflowEngine;
 
     // ================================================================
     // Query
@@ -284,6 +301,131 @@ public class StlSettlementService {
                 stlSettlementItemMapper.insert(item);
             }
         }
+    }
+
+    // ================================================================
+    // Related data queries (read-only)
+    // ================================================================
+
+    /**
+     * Query variation orders linked to this settlement via contractId.
+     */
+    public List<VarOrder> getVariations(Long settlementId) {
+        StlSettlement settlement = validateAndGetSettlement(settlementId);
+        Long tenantId = UserContext.getCurrentTenantId();
+        return varOrderMapper.selectList(new LambdaQueryWrapper<VarOrder>()
+                .eq(VarOrder::getTenantId, tenantId)
+                .eq(VarOrder::getContractId, settlement.getContractId()));
+    }
+
+    /**
+     * Query payment records linked to this settlement via contractId.
+     */
+    public List<PayRecord> getPayments(Long settlementId) {
+        StlSettlement settlement = validateAndGetSettlement(settlementId);
+        Long tenantId = UserContext.getCurrentTenantId();
+        return payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getTenantId, tenantId)
+                .eq(PayRecord::getContractId, settlement.getContractId()));
+    }
+
+    /**
+     * Query cost items linked to this settlement via contractId.
+     */
+    public List<CostItem> getCosts(Long settlementId) {
+        StlSettlement settlement = validateAndGetSettlement(settlementId);
+        Long tenantId = UserContext.getCurrentTenantId();
+        return costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getTenantId, tenantId)
+                .eq(CostItem::getContractId, settlement.getContractId()));
+    }
+
+    /**
+     * Query file attachments for this settlement.
+     */
+    public List<SysFile> getAttachments(Long settlementId) {
+        validateAndGetSettlement(settlementId);
+        Long tenantId = UserContext.getCurrentTenantId();
+        return sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, tenantId)
+                .eq(SysFile::getBusinessType, "SETTLEMENT")
+                .eq(SysFile::getBusinessId, settlementId));
+    }
+
+    /**
+     * Query approval records for this settlement's workflow instance.
+     */
+    public List<SettlementApprovalRecordVO> getApprovalRecords(Long settlementId) {
+        validateAndGetSettlement(settlementId);
+        Long tenantId = UserContext.getCurrentTenantId();
+
+        LambdaQueryWrapper<WfInstance> instQw = new LambdaQueryWrapper<>();
+        instQw.eq(WfInstance::getBusinessType, WorkflowBusinessTypes.SETTLEMENT)
+                .eq(WfInstance::getBusinessId, settlementId)
+                .eq(WfInstance::getTenantId, tenantId);
+        WfInstance instance = wfInstanceMapper.selectOne(instQw);
+        if (instance == null) return List.of();
+
+        LambdaQueryWrapper<WfRecord> recQw = new LambdaQueryWrapper<>();
+        recQw.eq(WfRecord::getInstanceId, instance.getId())
+                .eq(WfRecord::getTenantId, tenantId)
+                .orderByAsc(WfRecord::getCreatedAt);
+        List<WfRecord> records = wfRecordMapper.selectList(recQw);
+
+        return records.stream().map(r -> {
+            SettlementApprovalRecordVO vo = new SettlementApprovalRecordVO();
+            vo.setId(r.getId() != null ? r.getId().toString() : null);
+            vo.setNodeName(r.getNodeName());
+            vo.setOperatorName(r.getOperatorName());
+            vo.setActionType(r.getActionType());
+            vo.setActionName(r.getActionName());
+            vo.setComment(r.getComment());
+            vo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().format(DateTimeUtils.DTF) : null);
+            return vo;
+        }).toList();
+    }
+
+    /**
+     * Submit settlement for approval via workflow engine.
+     */
+    @Transactional
+    public void submitForApproval(Long settlementId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        StlSettlement settlement = stlSettlementMapper.selectById(settlementId);
+        if (settlement == null || !Objects.equals(settlement.getTenantId(), tenantId)) {
+            throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
+        }
+        if (!"DRAFT".equals(settlement.getApprovalStatus())) {
+            throw new BusinessException("STL_ALREADY_SUBMITTED", "结算单已提交审批，不可重复提交");
+        }
+
+        // Update status to APPROVING
+        stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
+                .eq(StlSettlement::getId, settlementId)
+                .set(StlSettlement::getApprovalStatus, "APPROVING"));
+
+        // Submit to workflow engine
+        Long userId = UserContext.getCurrentUserId();
+        String username = UserContext.getCurrentUsername();
+        workflowEngine.submit(userId, username, tenantId,
+                WorkflowBusinessTypes.SETTLEMENT,
+                settlementId,
+                settlement.getSettlementCode(),
+                settlement.getFinalAmount(),
+                settlement.getProjectId(),
+                settlement.getContractId(),
+                null, null, null);
+    }
+
+    // ---- Internal helper ----
+
+    private StlSettlement validateAndGetSettlement(Long settlementId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        StlSettlement settlement = stlSettlementMapper.selectById(settlementId);
+        if (settlement == null || !Objects.equals(settlement.getTenantId(), tenantId)) {
+            throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
+        }
+        return settlement;
     }
 
     // ================================================================

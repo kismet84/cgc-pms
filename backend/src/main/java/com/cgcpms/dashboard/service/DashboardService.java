@@ -1,6 +1,8 @@
 package com.cgcpms.dashboard.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.alert.entity.AlertLog;
+import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
@@ -19,6 +21,10 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfTask;
@@ -51,6 +57,9 @@ public class DashboardService {
     private final WfInstanceMapper wfInstanceMapper;
     private final PayRecordMapper payRecordMapper;
     private final StlSettlementMapper stlSettlementMapper;
+    private final VarOrderMapper varOrderMapper;
+    private final SubMeasureMapper subMeasureMapper;
+    private final AlertLogMapper alertLogMapper;
 
     // ========================================================================
     // 1. Project Manager Dashboard
@@ -204,9 +213,27 @@ public class DashboardService {
         long finalizedCount = settlements.stream().filter(s -> "FINALIZED".equals(s.getSettlementStatus())).count();
         vo.setSettlementProgress(settlements.isEmpty() ? "0/0" : finalizedCount + "/" + settlements.size());
 
-        // Var order amount placeholder (query var_order table not directly available here)
-        vo.setVarOrderAmount("0");
-        vo.setSubMeasureAmount("0");
+        // Var order amount: SUM(approvedAmount) WHERE approvalStatus='APPROVED'
+        BigDecimal varOrderTotal = varOrderMapper.selectList(
+                new LambdaQueryWrapper<VarOrder>()
+                        .eq(VarOrder::getTenantId, tenantId)
+                        .eq(VarOrder::getProjectId, projectId)
+                        .eq(VarOrder::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setVarOrderAmount(varOrderTotal.toPlainString());
+
+        // Sub measure amount: SUM(approvedAmount) WHERE approvalStatus='APPROVED'
+        BigDecimal subMeasureTotal = subMeasureMapper.selectList(
+                new LambdaQueryWrapper<SubMeasure>()
+                        .eq(SubMeasure::getTenantId, tenantId)
+                        .eq(SubMeasure::getProjectId, projectId)
+                        .eq(SubMeasure::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(s -> s.getApprovedAmount() != null ? s.getApprovedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setSubMeasureAmount(subMeasureTotal.toPlainString());
 
         // Recent changes (top 5 contracts by currentAmount)
         vo.setRecentChanges(contracts.stream()
@@ -250,8 +277,14 @@ public class DashboardService {
         vo.setExpectedProfit(summary.getExpectedProfit());
         vo.setContractIncome(summary.getContractIncome());
 
-        // Over-budget alerts placeholder (alert_log not yet implemented)
-        vo.setOverBudgetAlerts(Collections.emptyList());
+        // Over-budget alerts from alert_log (cost-exceeds-target + material-exceeds-budget)
+        List<AlertLog> overBudgetAlerts = alertLogMapper.selectList(
+                new LambdaQueryWrapper<AlertLog>()
+                        .eq(AlertLog::getTenantId, tenantId)
+                        .eq(AlertLog::getProjectId, projectId)
+                        .in(AlertLog::getRuleType, Set.of("DYNAMIC_COST_EXCEEDS_TARGET", "MATERIAL_EXCEEDS_BUDGET"))
+                        .orderByDesc(AlertLog::getTriggeredAt));
+        vo.setOverBudgetAlerts(overBudgetAlerts.stream().map(this::toAlertItem).collect(Collectors.toList()));
 
         return vo;
     }
@@ -286,11 +319,50 @@ public class DashboardService {
         // Approved unpaid (SUCCESS status = paid, so approved unpaid = non-SUCCESS)
         vo.setApprovedUnpaidAmount(pendingAmount.toPlainString());
 
-        // Over-ratio payments placeholder
-        vo.setOverRatioAmount("0");
+        // Over-ratio payments: SUM of excess where SUCCESS paid > contract_amount
+        BigDecimal overRatioTotal = BigDecimal.ZERO;
+        List<PayRecord> successRecords = payRecords.stream()
+                .filter(p -> "SUCCESS".equals(p.getPayStatus()) && p.getContractId() != null)
+                .collect(Collectors.toList());
+        if (!successRecords.isEmpty()) {
+            Map<Long, BigDecimal> paidByContract = new HashMap<>();
+            for (PayRecord r : successRecords) {
+                paidByContract.merge(r.getContractId(),
+                        r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO, BigDecimal::add);
+            }
+            List<CtContract> relatedContracts = ctContractMapper.selectList(
+                    new LambdaQueryWrapper<CtContract>()
+                            .eq(CtContract::getTenantId, tenantId)
+                            .eq(CtContract::getProjectId, projectId)
+                            .in(CtContract::getId, paidByContract.keySet()));
+            Map<Long, CtContract> contractMap = relatedContracts.stream()
+                    .collect(Collectors.toMap(CtContract::getId, c -> c));
+            for (Map.Entry<Long, BigDecimal> entry : paidByContract.entrySet()) {
+                CtContract contract = contractMap.get(entry.getKey());
+                if (contract == null) continue;
+                BigDecimal contractAmount = contract.getContractAmount() != null ? contract.getContractAmount() : BigDecimal.ZERO;
+                if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
+                if (entry.getValue().compareTo(contractAmount) > 0) {
+                    overRatioTotal = overRatioTotal.add(entry.getValue().subtract(contractAmount));
+                }
+            }
+        }
+        vo.setOverRatioAmount(overRatioTotal.toPlainString());
 
-        // Warranty expiring placeholder
-        vo.setWarrantyExpiringAmount("0");
+        // Warranty expiring: SUM contractAmount WHERE endDate within 30 days
+        LocalDate today = LocalDate.now();
+        LocalDate threshold = today.plusDays(30);
+        BigDecimal warrantyExpiringTotal = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .eq(CtContract::getProjectId, projectId)
+                        .eq(CtContract::getContractStatus, "PERFORMING")
+                        .ge(CtContract::getEndDate, today)
+                        .le(CtContract::getEndDate, threshold))
+                .stream()
+                .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setWarrantyExpiringAmount(warrantyExpiringTotal.toPlainString());
 
         // Detail lists
         vo.setPendingPayments(pendingPayments.stream().limit(20).map(p -> {
@@ -405,9 +477,15 @@ public class DashboardService {
                 }).collect(Collectors.toList());
         vo.setOverdueItems(overdueItems);
 
-        // Risks placeholder
-        vo.setTotalRiskCount(0L);
-        vo.setMajorRisks(Collections.emptyList());
+        // Risks from alert_log: HIGH severity unread alerts tenant-wide
+        List<AlertLog> highAlerts = alertLogMapper.selectList(
+                new LambdaQueryWrapper<AlertLog>()
+                        .eq(AlertLog::getTenantId, tenantId)
+                        .eq(AlertLog::getIsRead, 0)
+                        .eq(AlertLog::getSeverity, "HIGH")
+                        .orderByDesc(AlertLog::getTriggeredAt));
+        vo.setTotalRiskCount((long) highAlerts.size());
+        vo.setMajorRisks(highAlerts.stream().limit(10).map(this::toAlertItem).collect(Collectors.toList()));
 
         return vo;
     }
@@ -527,6 +605,18 @@ public class DashboardService {
         vo.setEndDate(contract.getEndDate() != null ? contract.getEndDate().toString() : null);
         vo.setProjectId(contract.getProjectId() != null ? String.valueOf(contract.getProjectId()) : null);
         vo.setContractStatus(contract.getContractStatus());
+        return vo;
+    }
+
+    private DashboardAlertItemVO toAlertItem(AlertLog alert) {
+        DashboardAlertItemVO vo = new DashboardAlertItemVO();
+        vo.setAlertType(alert.getRuleType());
+        vo.setSeverity(alert.getSeverity());
+        vo.setMessage(alert.getMessage());
+        vo.setProjectId(alert.getProjectId() != null ? String.valueOf(alert.getProjectId()) : null);
+        if (alert.getTriggeredAt() != null) {
+            vo.setTriggeredAt(DateTimeUtils.DTF.format(alert.getTriggeredAt()));
+        }
         return vo;
     }
 }

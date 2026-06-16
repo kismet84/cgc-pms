@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -19,6 +22,7 @@ public class PayApplicationBasis extends BaseEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
     private Long payApplicationId;
@@ -27,6 +31,8 @@ public class PayApplicationBasis extends BaseEntity {
 
     private Long basisId;
 
+    @NotNull
+    @Positive
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal basisAmount;
 }

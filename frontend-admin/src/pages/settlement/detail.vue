@@ -218,7 +218,8 @@ function handleSubmitApproval() {
         await submitSettlement(settlementId)
         message.success('已提交审批')
         await loadData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('提交失败，请稍后重试')
       } finally {
         submitting.value = false

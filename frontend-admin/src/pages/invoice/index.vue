@@ -90,7 +90,8 @@ async function fetchData() {
     if (res.total === 0) {
       searchError.value = '未查询到匹配的发票记录'
     }
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     searchError.value = '加载发票列表失败，请稍后重试'
@@ -104,7 +105,8 @@ async function fetchPayRecords() {
   try {
     const res = await getPayRecordList()
     payRecordList.value = res.records
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     payRecordList.value = []
   }
 }
@@ -190,7 +192,8 @@ function handleDelete(record: InvoiceVO) {
         await deleteInvoice(record.id)
         message.success('删除成功')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         Modal.error({ title: '删除失败', content: '删除失败，请稍后重试' })
       }
     },
@@ -210,7 +213,8 @@ function handleVerify(record: InvoiceVO) {
         await verifyInvoice(record.id, 'VERIFIED')
         message.success('发票已认证通过')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('核验操作失败，请稍后重试')
       }
     },
@@ -219,7 +223,8 @@ function handleVerify(record: InvoiceVO) {
         await verifyInvoice(record.id, 'ABNORMAL')
         message.warning('发票已标记为异常')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('核验操作失败，请稍后重试')
       }
     },
@@ -258,11 +263,13 @@ async function handleModalOk() {
       const file = uploadFileList.value[0].originFileObj as File
       try {
         await uploadFile(file, INVOICE_BUSINESS_TYPE, invoiceId)
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.warning('发票已创建，但文件上传失败。请稍后在发票详情中重新上传。')
       }
     }
   } catch (e: unknown) {
+    console.error(e)
     const msg = axios.isAxiosError(e)
       ? (e.response?.data as { message?: string })?.message || e.message
       : e instanceof Error
@@ -324,6 +331,7 @@ async function handleRecognize() {
       message.warning('未识别到发票信息，请手动填写')
     }
   } catch (e: unknown) {
+    console.error(e)
     if (axios.isCancel(e)) {
       return
     }

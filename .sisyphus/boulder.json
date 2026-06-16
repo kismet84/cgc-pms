@@ -1,134 +1,33 @@
 {
-  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\consolidated-remaining-work.md",
-  "started_at": "2026-06-15T10:41:20.500Z",
+  "active_plan": "D:\\projects-test\\cgc-pms\\.sisyphus\\plans\\button-fixes.md",
+  "started_at": "2026-06-16T12:32:00.000Z",
   "session_ids": [
-    "ses_1353c29c4ffekkF4VTxO4udf7X",
-    "ses_1351944f3ffehQP4h8apDXpH2Z",
-    "ses_135192114ffegyByGNnDVQhDWn",
-    "ses_13518fe31ffeBzJxIBc9x2XsWh",
-    "ses_13518ded5ffezgP1dllrxamWnP",
-    "ses_13518ba37ffeKFxhwOWc3UqeOh",
-    "ses_13506b1acffeokQptTqe5FgNmW",
-    "ses_135068e8effeXJdj5JRn1ttfEo",
-    "ses_135066c80ffeF8Fcs89BZ4R1J2",
-    "ses_134fe18b8ffeol0sMXT0HRCfrP",
-    "ses_134fdf9b3ffeXD6LwEKCPu7nVe",
-    "ses_134fddf17ffeW7U3Ige38LPkkR",
-    "ses_134fdb91fffeLoYSNfZEvkNIGd",
-    "ses_134fda563ffe2q5TbbzQBh4vYG",
-    "ses_134fd723effe2IHa1EoNN3ET9S",
-    "ses_134fb0d57ffeLSVAW8bgjAQNVj",
-    "ses_134faf690ffeJq83Mzzp272pcp",
-    "ses_134f96767ffeqXmp2r8FXz1IHr",
-    "ses_134f9517bffeR9ytLC7FXW8vvu",
-    "ses_134f6a8bbffeEiJbftsU0HQLJA",
-    "ses_134f2368bffeGgIZWx4aGGy1tt"
+    "ses_1346de7d2ffe2qsRTiG4m7ygDK"
   ],
   "session_origins": {
-    "ses_1353c29c4ffekkF4VTxO4udf7X": "direct",
-    "ses_1351944f3ffehQP4h8apDXpH2Z": "appended",
-    "ses_135192114ffegyByGNnDVQhDWn": "appended",
-    "ses_13518fe31ffeBzJxIBc9x2XsWh": "appended",
-    "ses_13518ded5ffezgP1dllrxamWnP": "appended",
-    "ses_13518ba37ffeKFxhwOWc3UqeOh": "appended",
-    "ses_13506b1acffeokQptTqe5FgNmW": "appended",
-    "ses_135068e8effeXJdj5JRn1ttfEo": "appended",
-    "ses_135066c80ffeF8Fcs89BZ4R1J2": "appended",
-    "ses_134fe18b8ffeol0sMXT0HRCfrP": "appended",
-    "ses_134fdf9b3ffeXD6LwEKCPu7nVe": "appended",
-    "ses_134fddf17ffeW7U3Ige38LPkkR": "appended",
-    "ses_134fdb91fffeLoYSNfZEvkNIGd": "appended",
-    "ses_134fda563ffe2q5TbbzQBh4vYG": "appended",
-    "ses_134fd723effe2IHa1EoNN3ET9S": "appended",
-    "ses_134fb0d57ffeLSVAW8bgjAQNVj": "appended",
-    "ses_134faf690ffeJq83Mzzp272pcp": "appended",
-    "ses_134f96767ffeqXmp2r8FXz1IHr": "appended",
-    "ses_134f9517bffeR9ytLC7FXW8vvu": "appended",
-    "ses_134f6a8bbffeEiJbftsU0HQLJA": "appended",
-    "ses_134f2368bffeGgIZWx4aGGy1tt": "appended"
+    "ses_1346de7d2ffe2qsRTiG4m7ygDK": "direct"
   },
-  "plan_name": "consolidated-remaining-work",
+  "plan_name": "button-fixes",
+  "phase": "phase-b",
   "agent": "atlas",
   "task_sessions": {
-    "todo:1": {
-      "task_key": "todo:1",
-      "task_label": "1",
-      "task_title": "**安全与配置审查**",
-      "session_id": "ses_13515e3d7ffeBner6X07vc3bRO",
-      "agent": "explore",
-      "updated_at": "2026-06-15T10:59:52.579Z"
-    },
-    "todo:7": {
-      "task_key": "todo:7",
-      "task_label": "7",
-      "task_title": "**综合分析 — 去重、分级、依赖映射**",
-      "session_id": "ses_1350ebf31ffes5iR0N4cJEL6aK",
+    "todo:10": {
+      "task_key": "todo:10",
+      "task_label": "10",
+      "task_title": "**驾驶舱 6 个占位值替换为真实查询**",
+      "session_id": "ses_1324cea78ffe9M2qL6Bf03XOVD",
       "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-06-15T11:09:17.063Z"
-    },
-    "todo:8": {
-      "task_key": "todo:8",
-      "task_label": "8",
-      "task_title": "**修复结算 TOCTOU 竞态条件（P0）**",
-      "session_id": "ses_135066c80ffeF8Fcs89BZ4R1J2",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T11:18:42.865Z"
-    },
-    "todo:11": {
-      "task_key": "todo:11",
-      "task_label": "11",
-      "task_title": "**修复 deploy/.env 安全问题（P1）**",
-      "session_id": "ses_134fd723effe2IHa1EoNN3ET9S",
-      "agent": "Sisyphus-Junior",
-      "category": "deep",
-      "updated_at": "2026-06-15T11:20:02.855Z"
+      "category": "unspecified-high",
+      "updated_at": "2026-06-15T23:57:51.585Z"
     },
     "todo:17": {
       "task_key": "todo:17",
       "task_label": "17",
-      "task_title": "**修复 PayApplicationService N+1 查询（P1）**",
-      "session_id": "ses_134faf690ffeJq83Mzzp272pcp",
+      "task_title": "**角色/权限管理前端页面（新建）**",
+      "session_id": "ses_132474fe2ffegxQmFO4vNByS6a",
       "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T11:22:45.616Z"
-    },
-    "todo:18": {
-      "task_key": "todo:18",
-      "task_label": "18",
-      "task_title": "**为所有只读服务方法添加 @Transactional(readOnly=true)（P1）**",
-      "session_id": "ses_134f9517bffeR9ytLC7FXW8vvu",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T11:24:39.858Z"
-    },
-    "todo:20": {
-      "task_key": "todo:20",
-      "task_label": "20",
-      "task_title": "**替换 catch (e: any) 为 catch (e: unknown)（P1）**",
-      "session_id": "ses_134f6a8bbffeEiJbftsU0HQLJA",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T11:27:27.691Z"
-    },
-    "todo:21": {
-      "task_key": "todo:21",
-      "task_label": "21",
-      "task_title": "**修复 122 个无参数 catch 块（P1）**",
-      "session_id": "ses_134f6a8bbffeEiJbftsU0HQLJA",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T11:27:55.591Z"
-    },
-    "final-wave:f1": {
-      "task_key": "final-wave:f1",
-      "task_label": "F1",
-      "task_title": "**后端回归测试** — `oracle`",
-      "session_id": "ses_134f2368bffeGgIZWx4aGGy1tt",
-      "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-06-15T11:33:44.228Z"
+      "category": "visual-engineering",
+      "updated_at": "2026-06-16T00:03:05.006Z"
     }
   }
 }

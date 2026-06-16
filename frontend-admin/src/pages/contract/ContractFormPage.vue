@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import StepWizard, { type StepConfig } from '@/components/StepWizard.vue'
@@ -8,6 +8,10 @@ import ContractItemEditor, { type EditableContractItem } from '@/components/Cont
 import PaymentTermEditor, { type EditablePaymentTerm } from '@/components/PaymentTermEditor.vue'
 import {
   createContract,
+  updateContract,
+  getContractDetail,
+  getContractItems,
+  getPaymentTerms,
   saveContractItems,
   savePaymentTerms,
   submitForApproval,
@@ -16,6 +20,11 @@ import { useReferenceStore } from '@/stores/reference'
 import type { ContractType, ContractItem, ContractPaymentTerm } from '@/types/contract'
 
 const router = useRouter()
+const route = useRoute()
+
+const isEdit = computed(() => !!route.params.id)
+const contractId = computed(() => String(route.params.id || ''))
+const loadingDetail = ref(false)
 
 // ---- Steps ----
 const stepConfig: StepConfig[] = [
@@ -105,7 +114,8 @@ async function validateBasic(): Promise<boolean> {
   try {
     await basicFormRef.value?.validate()
     return true
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.warning('请完善基本信息后再继续')
     return false
   }
@@ -154,7 +164,7 @@ function handlePrev() {
 
 function handleCancel() {
   Modal.confirm({
-    title: '放弃新建合同？',
+    title: isEdit.value ? '放弃编辑合同？' : '放弃新建合同？',
     content: '已填写的内容将不会保存。',
     okText: '确认放弃',
     cancelText: '继续编辑',
@@ -218,22 +228,29 @@ async function doSubmit(withApproval: boolean) {
   if (!(await validateBasic()) || !validateItems() || !validateTerms()) return
   submitting.value = true
   try {
-    const created = await createContract(buildContractPayload())
-    const contractId = created?.id
-    if (!contractId) {
-      message.error('合同创建成功但未返回ID，无法保存明细')
-      return
-    }
-    await saveContractItems(contractId, buildItemsPayload())
-    await savePaymentTerms(contractId, buildTermsPayload())
-    if (withApproval) {
-      await submitForApproval(contractId)
-      message.success('合同已创建并提交审批')
+    let targetId: string
+    if (isEdit.value) {
+      await updateContract(contractId.value, buildContractPayload())
+      targetId = contractId.value
     } else {
-      message.success('合同已保存为草稿')
+      const created = await createContract(buildContractPayload())
+      targetId = created?.id
+      if (!targetId) {
+        message.error('合同创建成功但未返回ID，无法保存明细')
+        return
+      }
+    }
+    await saveContractItems(targetId, buildItemsPayload())
+    await savePaymentTerms(targetId, buildTermsPayload())
+    if (withApproval) {
+      await submitForApproval(targetId)
+      message.success(isEdit.value ? '合同已更新并提交审批' : '合同已创建并提交审批')
+    } else {
+      message.success(isEdit.value ? '合同已更新' : '合同已保存为草稿')
     }
     router.push('/contract/ledger')
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('保存失败，请稍后重试')
   } finally {
     submitting.value = false
@@ -259,9 +276,88 @@ const termsTotal = computed(() =>
   terms.value.reduce((s, r) => s + (Number(r.paymentAmount) || 0), 0).toFixed(2),
 )
 
-onMounted(() => {
-  Promise.all([referenceStore.fetchProjects(), referenceStore.fetchPartners()])
+onMounted(async () => {
+  await Promise.all([referenceStore.fetchProjects(), referenceStore.fetchPartners()])
+  if (isEdit.value) {
+    await loadContractDetail()
+  }
 })
+
+async function loadContractDetail() {
+  loadingDetail.value = true
+  try {
+    const contract = await getContractDetail(contractId.value)
+    formData.contractName = contract.contractName
+    formData.contractType = contract.contractType
+    formData.projectId = contract.projectId
+    formData.partnerId = contract.partnerId
+    formData.partyA = contract.partyA || ''
+    formData.partyB = contract.partyB || ''
+    formData.contractAmount = Number(contract.contractAmount) || undefined
+    formData.signedDate = contract.signedDate || ''
+    formData.startDate = contract.startDate || ''
+    formData.endDate = contract.endDate || ''
+    formData.paymentMethod = contract.paymentMethod || undefined
+    formData.settlementMethod = contract.settlementMethod || undefined
+    formData.warrantyRate = contract.warrantyRate ?? 0
+    formData.warrantyAmount = Number(contract.warrantyAmount) || undefined
+    formData.remark = contract.remark || ''
+
+    try {
+      const existingItems = await getContractItems(contractId.value)
+      items.value = existingItems.map((it, idx) => ({
+        _key: genItemKey(),
+        id: it.id,
+        itemCode: it.itemCode ?? '',
+        itemName: it.itemName ?? '',
+        itemSpec: it.itemSpec ?? '',
+        unit: it.unit ?? '',
+        quantity: it.quantity,
+        unitPrice: it.unitPrice ?? '0',
+        amount: it.amount ?? '0',
+        taxRate: it.taxRate,
+        taxAmount: it.taxAmount ?? '0',
+        amountWithoutTax: it.amountWithoutTax ?? '0',
+        sortOrder: idx + 1,
+      }))
+    } catch (e: unknown) {
+      console.error(e)
+      items.value = []
+    }
+
+    try {
+      const existingTerms = await getPaymentTerms(contractId.value)
+      terms.value = existingTerms.map((t, idx) => ({
+        _key: genTermKey(),
+        id: t.id,
+        termName: t.termName ?? '',
+        paymentRatio: t.paymentRatio,
+        paymentAmount: t.paymentAmount ?? '0',
+        paymentCondition: t.paymentCondition ?? '',
+        plannedDate: t.plannedDate ?? '',
+        termStatus: t.termStatus ?? 'PENDING',
+        sortOrder: idx + 1,
+      }))
+    } catch (e: unknown) {
+      console.error(e)
+      terms.value = []
+    }
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载合同信息失败')
+    router.push('/contract/ledger')
+  } finally {
+    loadingDetail.value = false
+  }
+}
+
+function genItemKey(): string {
+  return `ci_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function genTermKey(): string {
+  return `ct_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
 </script>
 
 <template>
@@ -269,7 +365,7 @@ onMounted(() => {
     <a-breadcrumb class="cf-breadcrumb">
       <a-breadcrumb-item>合同管理</a-breadcrumb-item>
       <a-breadcrumb-item>合同台账</a-breadcrumb-item>
-      <a-breadcrumb-item>新建合同</a-breadcrumb-item>
+      <a-breadcrumb-item>{{ isEdit ? '编辑合同' : '新建合同' }}</a-breadcrumb-item>
     </a-breadcrumb>
 
     <div class="cf-card">

@@ -22,7 +22,8 @@ async function fetchProjects() {
   try {
     const res = await getProjectList({ pageNum: 1, pageSize: 50 })
     projectList.value = res.records
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     projectList.value = []
   }
 }
@@ -35,7 +36,8 @@ async function fetchSummary() {
   loading.value = true
   try {
     summary.value = await getCostSummary(selectedProjectId.value)
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     summary.value = null
     message.error('加载动态成本汇总失败')
   } finally {
@@ -52,7 +54,8 @@ async function handleRefresh() {
   try {
     summary.value = await refreshCostSummary(selectedProjectId.value)
     message.success('刷新成功')
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('刷新失败')
   } finally {
     loading.value = false
@@ -156,7 +159,10 @@ onMounted(() => {
             allow-clear
             style="width: 280px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
             @change="handleProjectChange"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">

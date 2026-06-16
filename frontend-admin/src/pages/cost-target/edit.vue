@@ -103,7 +103,8 @@ async function fetchSubjectTree() {
   try {
     const data = await getCostSubjectTree()
     subjectTree.value = convertToTreeData(data)
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     subjectTree.value = []
   }
 }
@@ -160,10 +161,12 @@ async function loadExisting() {
         targetAmount: Number(it.targetAmount) || undefined,
         sortOrder: idx + 1,
       }))
-    } catch {
+    } catch (e: unknown) {
+      console.error(e)
       items.value = []
     }
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载目标成本信息失败')
     router.push('/cost-target')
   } finally {
@@ -187,7 +190,8 @@ const totalMatch = computed(() => {
 async function validateForm(): Promise<boolean> {
   try {
     await formRef.value?.validate()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.warning('请完善基本信息后再提交')
     return false
   }
@@ -260,7 +264,8 @@ async function doSubmit(withApproval: boolean) {
       message.success('目标成本已保存')
     }
     router.push('/cost-target')
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('保存失败，请稍后重试')
   } finally {
     saving.value = false

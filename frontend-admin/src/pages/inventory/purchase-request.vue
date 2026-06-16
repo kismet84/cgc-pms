@@ -89,7 +89,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载采购申请列表失败，请稍后重试')
@@ -151,7 +152,8 @@ async function handleEdit(record: PurchaseRequestVO) {
       ...item,
       key: itemKeyCounter++,
     }))
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载明细失败')
     itemList.value = []
   }
@@ -169,7 +171,8 @@ function handleDelete(record: PurchaseRequestVO) {
         await deletePurchaseRequest(record.id)
         message.success('删除成功')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败，请稍后重试')
       }
     },
@@ -187,7 +190,8 @@ function handleSubmit(record: PurchaseRequestVO) {
         await submitPurchaseRequest(record.id)
         message.success('已提交审批')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('提交失败，请稍后重试')
       }
     },
@@ -259,7 +263,8 @@ async function handleModalOk() {
 
     modalVisible.value = false
     fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('操作失败，请稍后重试')
   }
 }
@@ -290,7 +295,10 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
@@ -453,7 +461,10 @@ onMounted(() => {
                 allow-clear
                 style="width: 100%"
                 show-search
-                :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
                 @change="(val: string) => handleMaterialChange(index, val)"
               >
                 <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">

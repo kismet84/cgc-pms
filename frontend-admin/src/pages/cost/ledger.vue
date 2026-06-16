@@ -25,7 +25,11 @@ import { useReferenceStore } from '@/stores/reference'
 
 // ---- Reference store ----
 const referenceStore = useReferenceStore()
-const { projects: projectList, contracts: contractList, partners: partnerList } = storeToRefs(referenceStore)
+const {
+  projects: projectList,
+  contracts: contractList,
+  partners: partnerList,
+} = storeToRefs(referenceStore)
 
 // ---- Dropdown data ----
 const subjectTree = ref<TreeSelectProps['treeData']>([])
@@ -70,7 +74,8 @@ async function fetchSubjectTree() {
   try {
     const data = await getCostSubjectTree()
     subjectTree.value = convertToTreeData(data)
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     subjectTree.value = []
   }
 }
@@ -116,7 +121,8 @@ async function fetchData() {
     const res: PageResult<CostLedgerVO> = await getCostLedger(params)
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载成本台账失败，请稍后重试')
@@ -139,7 +145,8 @@ async function fetchSummary() {
       endDate: filter.dateRange[1],
       keyword: filter.keyword || undefined,
     })
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     summary.value = {
       totalAmount: '0',
       totalTaxAmount: '0',
@@ -188,7 +195,8 @@ async function handleViewDetail(row: CostLedgerVO) {
   try {
     detailItem.value = await getCostLedgerDetail(row.id)
     detailVisible.value = true
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载成本详情失败')
   }
 }
@@ -335,7 +343,10 @@ onMounted(() => {
             allow-clear
             style="width: 160px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
             @change="onProjectChange"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
@@ -351,7 +362,10 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">{{
               c.contractName
@@ -366,7 +380,10 @@ onMounted(() => {
             allow-clear
             style="width: 160px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">{{
               p.partnerName

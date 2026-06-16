@@ -9,6 +9,7 @@ import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.auth.service.TokenBlacklistService;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.annotation.RateLimit;
 import com.cgcpms.common.result.ApiResponse;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,6 +39,7 @@ public class AuthController {
         this.blacklistProvider = blacklistProvider;
     }
 
+    @RateLimit(maxRequests = 5, windowSeconds = 60)
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                              HttpServletResponse response) {
@@ -75,6 +77,7 @@ public class AuthController {
         return ApiResponse.success();
     }
 
+    @RateLimit(maxRequests = 5, windowSeconds = 60)
     @PostMapping("/refresh")
     public ApiResponse<LoginResponse> refresh(HttpServletRequest request,
                                                 HttpServletResponse response,

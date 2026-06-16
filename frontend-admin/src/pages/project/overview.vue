@@ -26,7 +26,8 @@ async function fetchOverview() {
   loading.value = true
   try {
     data.value = await getProjectOverview(projectId)
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载项目总览数据失败')
     data.value = null
   } finally {

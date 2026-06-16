@@ -3,11 +3,16 @@ package com.cgcpms.settlement.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.service.StlSettlementService;
+import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
+import com.cgcpms.variation.entity.VarOrder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -104,5 +109,46 @@ public class StlSettlementController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<SettlementSourcesVO> getSources(@PathVariable Long id) {
         return ApiResponse.success(stlSettlementService.getSources(id));
+    }
+
+    // ---- Related data queries (read-only) ----
+
+    @GetMapping("/{id}/variations")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
+    public ApiResponse<List<VarOrder>> getVariations(@PathVariable Long id) {
+        return ApiResponse.success(stlSettlementService.getVariations(id));
+    }
+
+    @GetMapping("/{id}/payments")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
+    public ApiResponse<List<PayRecord>> getPayments(@PathVariable Long id) {
+        return ApiResponse.success(stlSettlementService.getPayments(id));
+    }
+
+    @GetMapping("/{id}/costs")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
+    public ApiResponse<List<CostItem>> getCosts(@PathVariable Long id) {
+        return ApiResponse.success(stlSettlementService.getCosts(id));
+    }
+
+    @GetMapping("/{id}/attachments")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
+    public ApiResponse<List<SysFile>> getAttachments(@PathVariable Long id) {
+        return ApiResponse.success(stlSettlementService.getAttachments(id));
+    }
+
+    @GetMapping("/{id}/approval-records")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
+    public ApiResponse<List<SettlementApprovalRecordVO>> getApprovalRecords(@PathVariable Long id) {
+        return ApiResponse.success(stlSettlementService.getApprovalRecords(id));
+    }
+
+    // ---- Workflow ----
+
+    @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('settlement:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
+        stlSettlementService.submitForApproval(id);
+        return ApiResponse.success();
     }
 }

@@ -70,7 +70,8 @@ service.interceptors.response.use(
         await refreshTokenApi()
         processQueue()
         return service(originalRequest)
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         // Refresh failed — reject all queued requests, then logout
         pendingQueue.forEach((entry) => entry.reject(new Error('Token refresh failed')))
         pendingQueue = []

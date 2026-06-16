@@ -30,7 +30,8 @@ async function fetchWarehouses() {
   try {
     const res = await getWarehouseList({ pageNo: 1, pageSize: 50, status: 'ENABLE' })
     warehouseList.value = res.records
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     warehouseList.value = []
   }
 }
@@ -63,7 +64,8 @@ async function handleStockIn() {
     message.success('入库成功')
     inForm.materialId = undefined
     inForm.quantity = ''
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('入库失败，请稍后重试')
   } finally {
     inSubmitting.value = false
@@ -94,7 +96,8 @@ async function handleStockOut() {
     message.success('出库成功')
     outForm.materialId = undefined
     outForm.quantity = ''
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('出库失败，请稍后重试')
   } finally {
     outSubmitting.value = false
@@ -127,7 +130,10 @@ onMounted(() => {
                 placeholder="请选择仓库"
                 style="width: 300px"
                 show-search
-                :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
               >
                 <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
                   {{ w.warehouseName }}
@@ -198,7 +204,10 @@ onMounted(() => {
                 placeholder="请选择仓库"
                 style="width: 300px"
                 show-search
-                :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
               >
                 <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
                   {{ w.warehouseName }}

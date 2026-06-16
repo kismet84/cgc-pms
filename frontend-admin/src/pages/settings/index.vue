@@ -25,7 +25,8 @@ onMounted(async () => {
   try {
     const data = await service.get<Preferences>('/profile/preferences')
     Object.assign(preferences, data)
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载偏好设置失败')
   } finally {
     loading.value = false
@@ -42,13 +43,13 @@ async function handleSave() {
       tableDensity: preferences.tableDensity,
     })
     message.success('保存成功')
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('保存失败')
   } finally {
     saving.value = false
   }
 }
-
 </script>
 
 <template>

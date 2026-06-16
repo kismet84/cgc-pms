@@ -98,7 +98,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载付款申请列表失败，请稍后重试')
@@ -111,7 +112,8 @@ async function fetchReceipts() {
   try {
     const res = await getReceiptList({ pageNum: 1, pageSize: 50 })
     receiptList.value = res.records
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     receiptList.value = []
   }
 }
@@ -120,7 +122,8 @@ async function fetchMeasures() {
   try {
     const res = await getMeasureList({ pageNum: 1, pageSize: 50 })
     measureList.value = res.records
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     measureList.value = []
   }
 }
@@ -187,7 +190,8 @@ async function handleEdit(record: PayApplicationVO) {
       ...item,
       key: basisKeyCounter++,
     }))
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载依据明细失败')
     basisList.value = []
   }
@@ -205,7 +209,8 @@ function handleDelete(record: PayApplicationVO) {
         await deleteApplication(record.id)
         message.success('删除成功')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败，请稍后重试')
       }
     },
@@ -290,7 +295,8 @@ async function handleModalOk() {
 
     modalVisible.value = false
     fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('操作失败，请稍后重试')
   }
 }
@@ -310,7 +316,8 @@ function handleSubmitApproval(record: PayApplicationVO) {
         await submitForApproval(record.id)
         message.success('提交审批成功')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('提交审批失败')
       }
     },
@@ -346,7 +353,8 @@ async function handleWritebackOk() {
     message.success('回写成功')
     writebackVisible.value = false
     fetchData()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('回写失败，请稍后重试')
   }
 }
@@ -387,7 +395,10 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
               {{ p.projectName }}
@@ -402,7 +413,10 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">
               {{ c.contractName }}
@@ -417,7 +431,10 @@ onMounted(() => {
             allow-clear
             style="width: 160px"
             show-search
-            :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
           >
             <a-select-option v-for="p in partners" :key="p.id" :value="p.id">
               {{ p.partnerName }}

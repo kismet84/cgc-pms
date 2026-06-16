@@ -99,7 +99,8 @@ async function fetchData() {
     const res: PageResult<SettlementVO> = await getSettlementList(params)
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载结算列表失败，请稍后重试')
@@ -111,7 +112,8 @@ async function fetchData() {
 async function fetchKpi() {
   try {
     kpi.value = await getSettlementKpi()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     kpi.value = {
       totalCount: 0,
       totalContractAmount: '0',
@@ -175,7 +177,8 @@ async function handleDelete(row: SettlementVO) {
         message.success('已删除')
         fetchData()
         fetchKpi()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败，请稍后重试')
       }
     },
@@ -206,7 +209,8 @@ async function handleCreate() {
     createModalVisible.value = false
     fetchData()
     fetchKpi()
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('创建失败，请稍后重试')
   } finally {
     createLoading.value = false

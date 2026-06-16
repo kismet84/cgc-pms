@@ -65,3 +65,11 @@ export function saveOrderItems(id: string, items: MatPurchaseOrderItemVO[]) {
     data: items,
   })
 }
+
+/** 提交审批 */
+export function submitOrderForApproval(id: string) {
+  return request<void>({
+    url: `/purchase-orders/${id}/submit`,
+    method: 'post',
+  })
+}

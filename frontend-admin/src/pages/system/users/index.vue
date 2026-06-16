@@ -55,7 +55,8 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = res.total
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载用户列表失败')
@@ -130,6 +131,7 @@ async function handleModalOk() {
     modalVisible.value = false
     fetchData()
   } catch (e: unknown) {
+    console.error(e)
     const msg = axios.isAxiosError(e)
       ? (e.response?.data as { message?: string })?.message || e.message
       : e instanceof Error
@@ -158,7 +160,8 @@ function handleToggleStatus(record: SysUserVO) {
         await updateUserStatus(record.id, newStatus)
         message.success(`${action}成功`)
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error(`${action}失败`)
       }
     },
@@ -176,7 +179,8 @@ function handleDelete(record: SysUserVO) {
         await deleteUser(record.id)
         message.success('删除成功')
         fetchData()
-      } catch {
+      } catch (e: unknown) {
+        console.error(e)
         message.error('删除失败')
       }
     },

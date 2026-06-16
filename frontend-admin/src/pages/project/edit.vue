@@ -47,7 +47,8 @@ onMounted(async () => {
       : undefined
     formData.plannedStartDate = project.plannedStartDate
     formData.plannedEndDate = project.plannedEndDate
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     notFound.value = true
   } finally {
     loading.value = false
@@ -65,15 +66,14 @@ async function handleSave() {
       supervisorUnit: formData.supervisorUnit || undefined,
       designUnit: formData.designUnit || undefined,
       contractAmount:
-        formData.contractAmount != null
-          ? String(formData.contractAmount * 10000)
-          : undefined,
+        formData.contractAmount != null ? String(formData.contractAmount * 10000) : undefined,
       plannedStartDate: formData.plannedStartDate,
       plannedEndDate: formData.plannedEndDate,
     })
     message.success('项目更新成功')
     router.push('/project/list')
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('更新项目失败，请稍后重试')
   } finally {
     saving.value = false
@@ -113,10 +113,7 @@ function handleCancel() {
           class="pj-edit-form"
         >
           <a-form-item label="项目名称" required>
-            <a-input
-              v-model:value="formData.projectName"
-              placeholder="请输入项目名称"
-            />
+            <a-input v-model:value="formData.projectName" placeholder="请输入项目名称" />
           </a-form-item>
           <a-form-item label="项目类型" required>
             <a-select
@@ -126,28 +123,16 @@ function handleCancel() {
             />
           </a-form-item>
           <a-form-item label="项目地址">
-            <a-input
-              v-model:value="formData.projectAddress"
-              placeholder="请输入项目地址"
-            />
+            <a-input v-model:value="formData.projectAddress" placeholder="请输入项目地址" />
           </a-form-item>
           <a-form-item label="建设单位">
-            <a-input
-              v-model:value="formData.ownerUnit"
-              placeholder="请输入建设单位"
-            />
+            <a-input v-model:value="formData.ownerUnit" placeholder="请输入建设单位" />
           </a-form-item>
           <a-form-item label="监理单位">
-            <a-input
-              v-model:value="formData.supervisorUnit"
-              placeholder="请输入监理单位"
-            />
+            <a-input v-model:value="formData.supervisorUnit" placeholder="请输入监理单位" />
           </a-form-item>
           <a-form-item label="设计单位">
-            <a-input
-              v-model:value="formData.designUnit"
-              placeholder="请输入设计单位"
-            />
+            <a-input v-model:value="formData.designUnit" placeholder="请输入设计单位" />
           </a-form-item>
           <a-form-item label="合同金额(万元)">
             <a-input-number
@@ -177,9 +162,7 @@ function handleCancel() {
 
           <a-form-item :wrapper-col="{ offset: 6, span: 14 }">
             <div class="pj-form-actions">
-              <a-button type="primary" :loading="saving" @click="handleSave">
-                保存
-              </a-button>
+              <a-button type="primary" :loading="saving" @click="handleSave"> 保存 </a-button>
               <a-button @click="handleCancel">取消</a-button>
             </div>
           </a-form-item>

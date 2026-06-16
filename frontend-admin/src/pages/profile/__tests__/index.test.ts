@@ -87,7 +87,8 @@ describe('Profile page', () => {
             emits: ['update:value'],
           },
           'a-button': {
-            template: '<button type="submit" class="stub-button" @click="$emit(\'click\')"><slot /></button>',
+            template:
+              '<button type="submit" class="stub-button" @click="$emit(\'click\')"><slot /></button>',
             emits: ['click'],
           },
           'a-descriptions': { template: '<div class="stub-descriptions"><slot /></div>' },
@@ -112,9 +113,7 @@ describe('Profile page', () => {
     const inputs = wrapper.findAll('.stub-input')
     expect(inputs.length).toBeGreaterThanOrEqual(2)
 
-    const phoneInput = inputs.find(
-      (el) => (el.element as HTMLInputElement).value === '13800138000',
-    )
+    const phoneInput = inputs.find((el) => (el.element as HTMLInputElement).value === '13800138000')
     expect(phoneInput).toBeTruthy()
 
     const emailInput = inputs.find(
@@ -178,8 +177,8 @@ describe('Profile page', () => {
     await passwordForm!.trigger('submit')
     await nextTick()
 
-    const hasErrorMessage = mockMessage.error.mock.calls.length > 0
-      || mockMessage.warning.mock.calls.length > 0
+    const hasErrorMessage =
+      mockMessage.error.mock.calls.length > 0 || mockMessage.warning.mock.calls.length > 0
     expect(hasErrorMessage).toBe(true)
 
     const pwdCalls = mockRequest.mock.calls.filter(
