@@ -69,6 +69,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/cost/summary.vue'),
             meta: { title: '动态成本汇总', icon: 'FundOutlined' },
           },
+          {
+            path: 'subject',
+            name: 'CostSubject',
+            component: () => import('@/pages/cost-subject/index.vue'),
+            meta: { title: '成本科目' },
+          },
         ],
       },
       {

@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.dict.entity.SysDictData;
+import com.cgcpms.system.dict.entity.SysDictType;
 import com.cgcpms.system.dict.mapper.SysDictDataMapper;
+import com.cgcpms.system.dict.mapper.SysDictTypeMapper;
 import com.cgcpms.system.dict.vo.SysDictDataVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -93,5 +95,26 @@ public class SysDictDataService {
         if (entity.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(entity.getCreatedAt()));
         if (entity.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(entity.getUpdatedAt()));
         return vo;
+    }
+    public java.util.List<SysDictDataVO> getByDictCode(String dictCode) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        // 1. 查字典类型
+        SysDictType dictType = sysDictTypeMapper.selectOne(
+                new LambdaQueryWrapper<SysDictType>()
+                        .eq(SysDictType::getDictCode, dictCode)
+                        .eq(SysDictType::getTenantId, tenantId)
+        );
+        if (dictType == null) {
+            return java.util.List.of();
+        }
+        // 2. 查字典数据
+        java.util.List<SysDictData> dataList = sysDictDataMapper.selectList(
+                new LambdaQueryWrapper<SysDictData>()
+                        .eq(SysDictData::getDictTypeId, dictType.getId())
+                        .eq(SysDictData::getTenantId, tenantId)
+                        .eq(SysDictData::getStatus, "ENABLED")
+                        .orderByAsc(SysDictData::getOrderNum)
+        );
+        return dataList.stream().map(this::toVO).toList();
     }
 }

@@ -6,6 +6,7 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.system.dict.entity.SysDictData;
 import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.system.dict.vo.SysDictDataVO;
+import java.util.List;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -55,5 +56,10 @@ public class SysDictDataController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         sysDictDataService.delete(id);
         return ApiResponse.success();
+    }
+    @GetMapping("/by-code/{dictCode}")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:list')")
+    public ApiResponse<List<SysDictDataVO>> getByDictCode(@PathVariable String dictCode) {
+        return ApiResponse.success(sysDictDataService.getByDictCode(dictCode));
     }
 }

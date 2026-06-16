@@ -110,6 +110,15 @@ export function updateDictData(
   })
 }
 
+
+/** 根据字典编码获取字典数据列表（用于业务页面动态下拉） */
+export function getDictDataByCode(dictCode: string) {
+  return request<DictDataVO[]>({
+    url: `/system/dict/data/by-code/${dictCode}`,
+    method: 'get',
+  })
+}
+
 /** 删除字典数据 */
 export function deleteDictData(id: string) {
   return request<void>({

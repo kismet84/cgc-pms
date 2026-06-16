@@ -345,17 +345,23 @@ onMounted(() => {
 })
 </script>
 
+
 <template>
   <div class="project-target-redesign app-page">
-    <a-layout class="dict-layout">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>字典管理</a-breadcrumb-item></a-breadcrumb>
+      <h1 class="app-page-title">字典管理</h1>
+    </div>
+
+    <div class="pt-panel dc-panel">
       <!-- 左侧：字典类型列表 -->
-      <a-layout-sider class="dict-sider" width="280" theme="light">
-        <div class="dict-sider-header">
-          <span class="dict-sider-title">字典类型</span>
+      <div class="dc-left">
+        <div class="dc-left-header">
+          <span class="dc-left-title">字典类型</span>
           <a-button type="primary" size="small" @click="handleAddType">新增</a-button>
         </div>
 
-        <div class="dict-sider-search">
+        <div class="dc-left-search">
           <a-input-search
             v-model:value="typeFilter"
             placeholder="搜索字典名称"
@@ -364,22 +370,22 @@ onMounted(() => {
           />
         </div>
 
-        <div class="dict-sider-list" v-loading="typeLoading">
-          <div v-if="typeList.length === 0 && !typeLoading" class="dict-sider-empty">
+        <div class="dc-left-list" v-loading="typeLoading">
+          <div v-if="typeList.length === 0 && !typeLoading" class="dc-left-empty">
             暂无字典类型
           </div>
           <div
             v-for="item in typeList"
             :key="item.id"
-            class="dict-type-item"
-            :class="{ active: selectedTypeId === item.id }"
+            class="dc-type-item"
+            :class="{ 'dc-type-item--active': selectedTypeId === item.id }"
             @click="handleSelectType(item.id)"
           >
-            <div class="dict-type-info">
-              <span class="dict-type-name">{{ item.dictName }}</span>
-              <span class="dict-type-code">{{ item.dictCode }}</span>
+            <div class="dc-type-info">
+              <span class="dc-type-name">{{ item.dictName }}</span>
+              <span class="dc-type-code">{{ item.dictCode }}</span>
             </div>
-            <div class="dict-type-actions">
+            <div class="dc-type-actions">
               <a-button type="link" size="small" @click.stop="handleEditType(item)">编辑</a-button>
               <a-button type="link" size="small" danger @click.stop="handleDeleteType(item)"
                 >删除</a-button
@@ -387,13 +393,15 @@ onMounted(() => {
             </div>
           </div>
         </div>
-      </a-layout-sider>
+
+        <div class="dc-left-footer">共 {{ typeList.length }} 个类型</div>
+      </div>
 
       <!-- 右侧：字典数据表格 -->
-      <a-layout-content class="dict-content">
+      <div class="dc-right">
         <template v-if="selectedTypeId">
-          <div class="dict-content-header">
-            <span class="dict-content-title">{{ selectedTypeName || '字典数据' }}</span>
+          <div class="dc-right-header">
+            <span class="dc-right-title">{{ selectedTypeName || '字典数据' }}</span>
             <a-button type="primary" size="small" @click="handleAddData">新增数据</a-button>
           </div>
 
@@ -473,12 +481,11 @@ onMounted(() => {
         </template>
 
         <!-- 未选择类型时的占位 -->
-        <div v-else class="dict-content-placeholder">
-          <div class="dict-placeholder-icon">📋</div>
-          <div class="dict-placeholder-text">请在左侧选择一个字典类型</div>
+        <div v-else class="dc-right-empty">
+          <a-empty description="请在左侧选择一个字典类型" />
         </div>
-      </a-layout-content>
-    </a-layout>
+      </div>
+    </div>
 
     <!-- 字典类型弹窗 -->
     <a-modal
@@ -545,6 +552,141 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.dc-panel {
+  display: flex;
+  min-height: 500px;
+  overflow: hidden;
+}
 
+.dc-left {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
 
+.dc-left-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+
+.dc-left-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dc-left-search {
+  padding: 0 16px 10px;
+}
+
+.dc-left-list {
+  flex: 1;
+  overflow: auto;
+  padding: 0 8px;
+}
+
+.dc-left-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dc-left-footer {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+.dc-type-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dc-type-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.dc-type-item--active {
+  background: var(--primary-light, #e6f4ff);
+}
+
+.dc-type-item--active:hover {
+  background: var(--primary-light, #d6ecff);
+}
+
+.dc-type-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.dc-type-name {
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dc-type-code {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.dc-type-actions {
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.dc-type-item:hover .dc-type-actions {
+  opacity: 1;
+}
+
+.dc-type-item--active .dc-type-actions {
+  opacity: 1;
+}
+
+.dc-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dc-right-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dc-right-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dc-right-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>

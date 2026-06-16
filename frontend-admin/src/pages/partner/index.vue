@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
+import { getDictDataByCode } from '@/api/modules/dict'
 import { getPartnerList, createPartner, updatePartner, deletePartner } from '@/api/modules/partner'
 import type { PartnerVO } from '@/types/partner'
 
@@ -38,17 +39,28 @@ const formData = reactive<Partial<PartnerVO>>({
   status: 'ENABLE',
 })
 
-const TYPE_LABEL: Record<string, string> = {
-  PARTY_A: '甲方',
-  PARTY_B: '乙方',
-  OTHER: '其他',
+
+const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([])
+const partnerTypeLabel = (val: string) => partnerTypeOptions.value.find(o => o.dictValue === val)?.dictLabel ?? val
+const partnerTypeColor = (val: string): string => {
+  const map: Record<string, string> = { PARTY_A: 'blue', PARTY_B: 'green', OTHER: 'default' }
+  return map[val] ?? 'default'
 }
 
-const TYPE_COLOR: Record<string, string> = {
-  PARTY_A: 'blue',
-  PARTY_B: 'green',
-  OTHER: 'default',
+async function fetchPartnerTypes() {
+  try {
+    partnerTypeOptions.value = await getDictDataByCode('partner_type')
+  } catch (e: unknown) {
+    console.error(e)
+    partnerTypeOptions.value = [
+      { dictLabel: '甲方', dictValue: 'PARTY_A' },
+      { dictLabel: '乙方', dictValue: 'PARTY_B' },
+      { dictLabel: '其他', dictValue: 'OTHER' },
+    ]
+  }
 }
+
+
 const RISK_COLOR: Record<string, string> = {
   LOW: 'success',
   MEDIUM: 'warning',
@@ -236,11 +248,13 @@ onMounted(fetchData)
             allow-clear
             style="width: 130px"
           >
-            <a-select-option value="PARTY_A">甲方</a-select-option>
-            <a-select-option value="PARTY_B">乙方</a-select-option>
-            <a-select-option value="OTHER">其他</a-select-option>
-
-          </a-select>
+                        <a-select-option
+              v-for="opt in partnerTypeOptions"
+              :key="opt.dictValue"
+              :value="opt.dictValue"
+            >
+              {{ opt.dictLabel }}
+            </a-select-option></a-select>
         </div>
         <div class="pm-field">
           <label>状态：</label>
@@ -278,8 +292,8 @@ onMounted(fetchData)
             <span>{{ record.partnerName }}</span>
           </template>
           <template v-else-if="column.key === 'partnerType'">
-            <a-tag :color="TYPE_COLOR[record.partnerType]">
-              {{ TYPE_LABEL[record.partnerType] ?? record.partnerType }}
+            <a-tag :color="partnerTypeColor(record.partnerType)">
+              {{ partnerTypeLabel(record.partnerType) }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'blacklistFlag'">
@@ -339,11 +353,13 @@ onMounted(fetchData)
         </a-form-item>
         <a-form-item label="合作方类型" required>
           <a-select v-model:value="formData.partnerType" placeholder="请选择合作方类型">
-            <a-select-option value="PARTY_A">甲方</a-select-option>
-            <a-select-option value="PARTY_B">乙方</a-select-option>
-            <a-select-option value="OTHER">其他</a-select-option>
-
-          </a-select>
+                        <a-select-option
+              v-for="opt in partnerTypeOptions"
+              :key="opt.dictValue"
+              :value="opt.dictValue"
+            >
+              {{ opt.dictLabel }}
+            </a-select-option></a-select>
         </a-form-item>
         <a-form-item label="统一信用代码">
           <a-input v-model:value="formData.creditCode" placeholder="请输入统一社会信用代码" />
