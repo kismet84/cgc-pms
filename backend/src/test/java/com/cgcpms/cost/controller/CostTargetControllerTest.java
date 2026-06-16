@@ -105,15 +105,15 @@ class CostTargetControllerTest {
         String response = mockMvc.perform(postWithApiContext("/cost-targets")
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data").isNumber())
+                .andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();
 
         // Extract created ID
         testTargetId = Long.parseLong(
-                response.replaceAll(".*\"data\":(\\d+).*", "$1"));
+                response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
         Assertions.assertNotNull(testTargetId, "Created target ID should not be null");
         Assertions.assertTrue(testTargetId > 0, "Created target ID should be positive");
     }

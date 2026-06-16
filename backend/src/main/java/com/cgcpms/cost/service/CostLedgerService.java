@@ -195,13 +195,13 @@ public class CostLedgerService {
         CostLedgerVO vo = new CostLedgerVO();
         vo.setId(item.getId() != null ? item.getId().toString() : null);
         vo.setProjectId(item.getProjectId() != null ? item.getProjectId().toString() : null);
-        vo.setProjectName(projectNames.get(item.getProjectId()));
+        vo.setProjectName(resolveName(projectNames, item.getProjectId()));
         vo.setContractId(item.getContractId() != null ? item.getContractId().toString() : null);
-        vo.setContractName(contractNames.get(item.getContractId()));
+        vo.setContractName(resolveName(contractNames, item.getContractId()));
         vo.setPartnerId(item.getPartnerId() != null ? item.getPartnerId().toString() : null);
-        vo.setPartnerName(partnerNames.get(item.getPartnerId()));
+        vo.setPartnerName(resolveName(partnerNames, item.getPartnerId()));
         vo.setCostSubjectId(item.getCostSubjectId() != null ? item.getCostSubjectId().toString() : null);
-        vo.setCostSubjectName(subjectNames.get(item.getCostSubjectId()));
+        vo.setCostSubjectName(resolveName(subjectNames, item.getCostSubjectId()));
         vo.setCostType(item.getCostType());
         vo.setAmount(item.getAmount() != null ? item.getAmount().toPlainString() : null);
         vo.setTaxAmount(item.getTaxAmount() != null ? item.getTaxAmount().toPlainString() : null);
@@ -216,6 +216,10 @@ public class CostLedgerService {
         vo.setCreatedAt(item.getCreatedAt() != null ? DateTimeUtils.DTF.format(item.getCreatedAt()) : null);
         vo.setRemark(item.getRemark());
         return vo;
+    }
+
+    private String resolveName(Map<Long, String> names, Long id) {
+        return id == null ? null : names.get(id);
     }
 
     private Map<String, String> convertToStringMap(Map<String, BigDecimal> bigDecimalMap) {

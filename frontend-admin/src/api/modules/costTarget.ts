@@ -21,7 +21,7 @@ export function getCostTargetDetail(id: string) {
 
 /** 新建目标成本版本 */
 export function createCostTarget(data: Partial<CostTargetVO>) {
-  return request<number>({
+  return request<string>({
     url: '/cost-targets',
     method: 'post',
     data,

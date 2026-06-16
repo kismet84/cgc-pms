@@ -101,11 +101,10 @@ public class CostSubjectService {
             subject.setLevel(1);
         }
 
-        // Validate unique subject_code within tenant
-        LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, UserContext.getCurrentTenantId());
-        wrapper.eq(CostSubject::getSubjectCode, subject.getSubjectCode());
-        Long count = costSubjectMapper.selectCount(wrapper);
+        // Validate unique subject_code within tenant, including logically deleted rows,
+        // because the database unique index still blocks the same code.
+        Long count = costSubjectMapper.countByTenantAndCodeIncludingDeleted(
+                UserContext.getCurrentTenantId(), subject.getSubjectCode(), null);
         if (count > 0) {
             throw new BusinessException("SUBJECT_CODE_DUPLICATE", "科目编码已存在");
         }
@@ -124,12 +123,9 @@ public class CostSubjectService {
             throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
         }
 
-        // Validate unique subject_code within tenant (excluding self)
-        LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, UserContext.getCurrentTenantId());
-        wrapper.eq(CostSubject::getSubjectCode, subject.getSubjectCode());
-        wrapper.ne(CostSubject::getId, subject.getId());
-        Long count = costSubjectMapper.selectCount(wrapper);
+        // Validate unique subject_code within tenant, including logically deleted rows.
+        Long count = costSubjectMapper.countByTenantAndCodeIncludingDeleted(
+                UserContext.getCurrentTenantId(), subject.getSubjectCode(), subject.getId());
         if (count > 0) {
             throw new BusinessException("SUBJECT_CODE_DUPLICATE", "科目编码已存在");
         }

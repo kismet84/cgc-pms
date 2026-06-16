@@ -44,8 +44,8 @@ public class CostTargetController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody CostTarget target) {
-        return ApiResponse.success(costTargetService.create(target));
+    public ApiResponse<String> create(@Valid @RequestBody CostTarget target) {
+        return ApiResponse.success(String.valueOf(costTargetService.create(target)));
     }
 
     @PutMapping("/{id}")
