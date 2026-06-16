@@ -239,8 +239,7 @@ onMounted(fetchData)
             <a-select-option value="PARTY_A">甲方</a-select-option>
             <a-select-option value="PARTY_B">乙方</a-select-option>
             <a-select-option value="OTHER">其他</a-select-option>
-
-            <a-select-option value="OTHER">其他</a-select-option>
+
           </a-select>
         </div>
         <div class="pm-field">
@@ -343,8 +342,7 @@ onMounted(fetchData)
             <a-select-option value="PARTY_A">甲方</a-select-option>
             <a-select-option value="PARTY_B">乙方</a-select-option>
             <a-select-option value="OTHER">其他</a-select-option>
-
-            <a-select-option value="OTHER">其他</a-select-option>
+
           </a-select>
         </a-form-item>
         <a-form-item label="统一信用代码">
