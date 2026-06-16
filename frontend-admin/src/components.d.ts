@@ -47,7 +47,6 @@ declare module 'vue' {
     ApprovalStatusTag: typeof import('./components/ApprovalStatusTag.vue')['default']
     AProgress: typeof import('ant-design-vue/es')['Progress']
     ARadio: typeof import('ant-design-vue/es')['Radio']
-    ARadioButton: typeof import('ant-design-vue/es')['RadioButton']
     ARadioGroup: typeof import('ant-design-vue/es')['RadioGroup']
     ARangePicker: typeof import('ant-design-vue/es')['RangePicker']
     AResult: typeof import('ant-design-vue/es')['Result']

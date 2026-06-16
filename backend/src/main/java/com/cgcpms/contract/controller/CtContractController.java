@@ -33,9 +33,10 @@ public class CtContractController {
             @RequestParam(required = false) String contractStatus,
             @RequestParam(required = false) String approvalStatus,
             @RequestParam(required = false) Long projectId,
-            @RequestParam(required = false) Long partnerId) {
+            @RequestParam(required = false) Long partyAId,
+            @RequestParam(required = false) Long partyBId) {
         IPage<CtContractVO> page = ctContractService.getPage(pageNo, pageSize, contractCode, contractName,
-                contractType, contractStatus, approvalStatus, projectId, partnerId);
+                contractType, contractStatus, approvalStatus, projectId, partyAId, partyBId);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -48,9 +49,10 @@ public class CtContractController {
             @RequestParam(required = false) String contractStatus,
             @RequestParam(required = false) String approvalStatus,
             @RequestParam(required = false) Long projectId,
-            @RequestParam(required = false) Long partnerId) {
+            @RequestParam(required = false) Long partyAId,
+            @RequestParam(required = false) Long partyBId) {
         return ApiResponse.success(ctContractService.getKpi(contractCode, contractName,
-                contractType, contractStatus, approvalStatus, projectId, partnerId));
+                contractType, contractStatus, approvalStatus, projectId, partyAId, partyBId));
     }
 
     @GetMapping("/{id}")

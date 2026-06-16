@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import StepWizard, { type StepConfig } from '@/components/StepWizard.vue'
@@ -25,6 +25,21 @@ const route = useRoute()
 const isEdit = computed(() => !!route.params.id)
 const contractId = computed(() => String(route.params.id || ''))
 const loadingDetail = ref(false)
+const dirty = ref(false)
+
+// ---- beforeRouteLeave guard ----
+onBeforeRouteLeave((_to, _from, next) => {
+  if (!dirty.value) { next(); return }
+  Modal.confirm({
+    title: '未保存的更改',
+    content: '当前合同有未保存的修改，确定离开吗？',
+    okText: '确定离开',
+    okType: 'danger',
+    cancelText: '继续编辑',
+    onOk: () => next(),
+    onCancel: () => next(false),
+  })
+})
 
 // ---- Steps ----
 const stepConfig: StepConfig[] = [
@@ -70,9 +85,8 @@ const formData = reactive({
   contractName: '',
   contractType: undefined as ContractType | undefined,
   projectId: undefined as string | undefined,
-  partnerId: undefined as string | undefined,
-  partyA: '',
-  partyB: '',
+  partyAId: undefined as string | undefined,
+  partyBId: undefined as string | undefined,
   contractAmount: undefined as number | undefined,
   signedDate: '',
   startDate: '',
@@ -92,12 +106,29 @@ const referenceStore = useReferenceStore()
 const projects = computed(() => referenceStore.projects ?? [])
 const partners = computed(() => referenceStore.partners ?? [])
 
+// Filtered partner lists
+const partyAPartners = computed(() => partners.value.filter((p) => p.partnerType === 'PARTY_A'))
+const partyBPartners = computed(() => partners.value.filter((p) => p.partnerType === 'PARTY_B'))
+
 const projectName = computed(
   () => projects.value.find((p) => p.id === formData.projectId)?.projectName ?? '-',
 )
-const partnerName = computed(
-  () => partners.value.find((p) => p.id === formData.partnerId)?.partnerName ?? '-',
+const partyAName = computed(
+  () => partners.value.find((p) => p.id === formData.partyAId)?.partnerName ?? '-',
 )
+const partyBName = computed(
+  () => partners.value.find((p) => p.id === formData.partyBId)?.partnerName ?? '-',
+)
+
+// ---- Warranty warning ----
+const warrantyWarning = computed(() => {
+  const hasRate = formData.warrantyRate > 0
+  const hasAmount = formData.warrantyAmount && formData.warrantyAmount > 0
+  if (hasRate !== hasAmount) {
+    return '质保金比例和金额建议同时填写，当前仅填写了一项'
+  }
+  return ''
+})
 
 // ---- Step 1 form & validation ----
 const basicFormRef = ref<FormInstance>()
@@ -105,7 +136,6 @@ const basicRules: Record<string, Rule[]> = {
   contractName: [{ required: true, message: '请输入合同名称', trigger: 'blur' }],
   contractType: [{ required: true, message: '请选择合同类型', trigger: 'change' }],
   projectId: [{ required: true, message: '请选择所属项目', trigger: 'change' }],
-  partnerId: [{ required: true, message: '请选择合作方', trigger: 'change' }],
   contractAmount: [{ required: true, message: '请输入合同金额', trigger: 'blur' }],
   signedDate: [{ required: true, message: '请选择签订日期', trigger: 'change' }],
 }
@@ -113,12 +143,17 @@ const basicRules: Record<string, Rule[]> = {
 async function validateBasic(): Promise<boolean> {
   try {
     await basicFormRef.value?.validate()
-    return true
   } catch (e: unknown) {
     console.error(e)
     message.warning('请完善基本信息后再继续')
     return false
   }
+  // Cross-field validation: startDate < endDate
+  if (formData.startDate && formData.endDate && formData.startDate >= formData.endDate) {
+    message.warning('开始日期必须早于结束日期')
+    return false
+  }
+  return true
 }
 
 function validateItems(): boolean {
@@ -147,44 +182,49 @@ function validateTerms(): boolean {
   return true
 }
 
-// ---- Navigation ----
-async function handleNext() {
-  let ok = true
-  if (current.value === 0) ok = await validateBasic()
-  else if (current.value === 1) ok = validateItems()
-  else if (current.value === 2) ok = validateTerms()
-  if (ok && current.value < stepConfig.length - 1) {
-    current.value += 1
+// ---- Step handlers ----
+function handleNext() {
+  if (current.value === 0) {
+    if (!validateBasic()) return
+  } else if (current.value === 1) {
+    if (!validateItems()) return
+  } else if (current.value === 2) {
+    if (!validateTerms()) return
   }
+  current.value++
 }
 
 function handlePrev() {
-  if (current.value > 0) current.value -= 1
+  if (current.value > 0) current.value--
 }
 
 function handleCancel() {
-  Modal.confirm({
-    title: isEdit.value ? '放弃编辑合同？' : '放弃新建合同？',
-    content: '已填写的内容将不会保存。',
-    okText: '确认放弃',
-    cancelText: '继续编辑',
-    onOk: () => router.push('/contract/ledger'),
-  })
+  if (dirty.value) {
+    Modal.confirm({
+      title: '确认取消',
+      content: '当前合同有未保存的修改，确定取消吗？',
+      okText: '确定',
+      okType: 'danger',
+      cancelText: '继续编辑',
+      onOk: () => router.push('/contract/ledger'),
+    })
+    return
+  }
+  router.push('/contract/ledger')
 }
 
-// ---- Build payloads ----
+// ---- Payload builders ----
 function buildContractPayload() {
   return {
     contractName: formData.contractName,
     contractType: formData.contractType,
     projectId: formData.projectId,
-    partnerId: formData.partnerId,
-    partyA: formData.partyA,
-    partyB: formData.partyB,
+    partyAId: formData.partyAId,
+    partyBId: formData.partyBId,
     contractAmount: String(formData.contractAmount ?? 0),
     signedDate: formData.signedDate,
-    startDate: formData.startDate,
-    endDate: formData.endDate,
+    startDate: formData.startDate || undefined,
+    endDate: formData.endDate || undefined,
     paymentMethod: formData.paymentMethod ?? '',
     settlementMethod: formData.settlementMethod ?? '',
     warrantyRate: formData.warrantyRate,
@@ -237,6 +277,7 @@ async function doSubmit(withApproval: boolean) {
       targetId = created?.id
       if (!targetId) {
         message.error('合同创建成功但未返回ID，无法保存明细')
+        submitting.value = false
         return
       }
     }
@@ -248,6 +289,7 @@ async function doSubmit(withApproval: boolean) {
     } else {
       message.success(isEdit.value ? '合同已更新' : '合同已保存为草稿')
     }
+    dirty.value = false
     router.push('/contract/ledger')
   } catch (e: unknown) {
     console.error(e)
@@ -290,9 +332,8 @@ async function loadContractDetail() {
     formData.contractName = contract.contractName
     formData.contractType = contract.contractType
     formData.projectId = contract.projectId
-    formData.partnerId = contract.partnerId
-    formData.partyA = contract.partyA || ''
-    formData.partyB = contract.partyB || ''
+    formData.partyAId = contract.partyAId || undefined
+    formData.partyBId = contract.partyBId || undefined
     formData.contractAmount = Number(contract.contractAmount) || undefined
     formData.signedDate = contract.signedDate || ''
     formData.startDate = contract.startDate || ''
@@ -361,14 +402,17 @@ function genTermKey(): string {
 </script>
 
 <template>
-  <div class="cf-page">
-    <a-breadcrumb class="cf-breadcrumb">
-      <a-breadcrumb-item>合同管理</a-breadcrumb-item>
-      <a-breadcrumb-item>合同台账</a-breadcrumb-item>
-      <a-breadcrumb-item>{{ isEdit ? '编辑合同' : '新建合同' }}</a-breadcrumb-item>
-    </a-breadcrumb>
+  <div class="project-target-redesign app-page">
+    <div class="pt-page-head">
+      <a-breadcrumb class="pt-breadcrumb">
+        <a-breadcrumb-item>合同管理</a-breadcrumb-item>
+        <a-breadcrumb-item>合同台账</a-breadcrumb-item>
+        <a-breadcrumb-item>{{ isEdit ? '编辑合同' : '新建合同' }}</a-breadcrumb-item>
+      </a-breadcrumb>
+      <h1 class="app-page-title">{{ isEdit ? '编辑合同' : '新建合同' }}</h1>
+    </div>
 
-    <div class="cf-card">
+    <div class="pt-panel" style="position: relative; padding-bottom: 12px">
       <StepWizard
         :current="current"
         :steps="stepConfig"
@@ -387,6 +431,7 @@ function genTermKey(): string {
                     v-model:value="formData.contractName"
                     placeholder="请输入合同名称"
                     allow-clear
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
@@ -397,6 +442,7 @@ function genTermKey(): string {
                     placeholder="请选择合同类型"
                     :options="contractTypeOptions"
                     allow-clear
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
@@ -408,6 +454,7 @@ function genTermKey(): string {
                     show-search
                     option-filter-prop="label"
                     allow-clear
+                    @change="dirty = true"
                   >
                     <a-select-option
                       v-for="p in projects"
@@ -421,16 +468,17 @@ function genTermKey(): string {
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="合作方" name="partnerId">
+                <a-form-item label="甲方">
                   <a-select
-                    v-model:value="formData.partnerId"
-                    placeholder="请选择合作方"
+                    v-model:value="formData.partyAId"
+                    placeholder="请选择甲方（合作方-甲方类型）"
                     show-search
                     option-filter-prop="label"
                     allow-clear
+                    @change="dirty = true"
                   >
                     <a-select-option
-                      v-for="p in partners"
+                      v-for="p in partyAPartners"
                       :key="p.id"
                       :value="p.id"
                       :label="p.partnerName"
@@ -441,21 +489,24 @@ function genTermKey(): string {
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="甲方" name="partyA">
-                  <a-input
-                    v-model:value="formData.partyA"
-                    placeholder="请输入甲方名称"
+                <a-form-item label="乙方">
+                  <a-select
+                    v-model:value="formData.partyBId"
+                    placeholder="请选择乙方（合作方-乙方类型）"
+                    show-search
+                    option-filter-prop="label"
                     allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item label="乙方" name="partyB">
-                  <a-input
-                    v-model:value="formData.partyB"
-                    placeholder="请输入乙方名称"
-                    allow-clear
-                  />
+                    @change="dirty = true"
+                  >
+                    <a-select-option
+                      v-for="p in partyBPartners"
+                      :key="p.id"
+                      :value="p.id"
+                      :label="p.partnerName"
+                    >
+                      {{ p.partnerName }}
+                    </a-select-option>
+                  </a-select>
                 </a-form-item>
               </a-col>
               <a-col :span="12">
@@ -466,6 +517,7 @@ function genTermKey(): string {
                     :precision="2"
                     placeholder="请输入合同金额"
                     style="width: 100%"
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
@@ -475,75 +527,84 @@ function genTermKey(): string {
                     v-model:value="formData.signedDate"
                     value-format="YYYY-MM-DD"
                     style="width: 100%"
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="开始日期" name="startDate">
+                <a-form-item label="开始日期">
                   <a-date-picker
                     v-model:value="formData.startDate"
                     value-format="YYYY-MM-DD"
                     style="width: 100%"
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="结束日期" name="endDate">
+                <a-form-item label="结束日期">
                   <a-date-picker
                     v-model:value="formData.endDate"
                     value-format="YYYY-MM-DD"
                     style="width: 100%"
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="付款方式" name="paymentMethod">
+                <a-form-item label="付款方式">
                   <a-select
                     v-model:value="formData.paymentMethod"
                     placeholder="请选择付款方式"
                     :options="paymentMethodOptions"
                     allow-clear
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="结算方式" name="settlementMethod">
+                <a-form-item label="结算方式">
                   <a-select
                     v-model:value="formData.settlementMethod"
                     placeholder="请选择结算方式"
                     :options="settlementMethodOptions"
                     allow-clear
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="质保金比例(%)" name="warrantyRate">
+                <a-form-item label="质保金比例(%)">
                   <a-input-number
                     v-model:value="formData.warrantyRate"
                     :min="0"
                     :max="100"
                     :precision="2"
+                    placeholder="如：5"
                     style="width: 100%"
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="质保金金额(元)" name="warrantyAmount">
+                <a-form-item label="质保金金额(元)">
                   <a-input-number
                     v-model:value="formData.warrantyAmount"
                     :min="0"
                     :precision="2"
+                    placeholder="如：50000"
                     style="width: 100%"
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
               <a-col :span="24">
-                <a-form-item label="备注" name="remark">
+                <a-form-item label="备注">
                   <a-textarea
                     v-model:value="formData.remark"
                     placeholder="请输入备注信息"
                     :rows="3"
-                    allow-clear
+                    @change="dirty = true"
                   />
                 </a-form-item>
               </a-col>
@@ -551,29 +612,28 @@ function genTermKey(): string {
           </a-form>
         </div>
 
-        <!-- Step 2: Contract Items -->
+        <!-- Step 2: Items -->
         <div v-show="current === 1">
-          <ContractItemEditor v-model="items" />
+          <ContractItemEditor v-model:items="items" @change="dirty = true" />
         </div>
 
         <!-- Step 3: Payment Terms -->
         <div v-show="current === 2">
-          <PaymentTermEditor v-model="terms" />
+          <PaymentTermEditor v-model:terms="terms" @change="dirty = true" />
         </div>
 
-        <!-- Step 4: Review & Submit -->
+        <!-- Step 4: Review & Confirm -->
         <div v-show="current === 3" class="cf-review">
-          <a-descriptions title="基本信息" bordered :column="2" size="small">
-            <a-descriptions-item label="合同名称">{{
+          <a-descriptions title="合同基本信息" :column="2" size="small" bordered>
+            <a-descriptions-item label="合同名称" :span="2">{{
               formData.contractName || '-'
             }}</a-descriptions-item>
             <a-descriptions-item label="合同类型">
               {{ formData.contractType ? TYPE_LABEL[formData.contractType] : '-' }}
             </a-descriptions-item>
             <a-descriptions-item label="所属项目">{{ projectName }}</a-descriptions-item>
-            <a-descriptions-item label="合作方">{{ partnerName }}</a-descriptions-item>
-            <a-descriptions-item label="甲方">{{ formData.partyA || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="乙方">{{ formData.partyB || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="甲方">{{ partyAName }}</a-descriptions-item>
+            <a-descriptions-item label="乙方">{{ partyBName }}</a-descriptions-item>
             <a-descriptions-item label="合同金额">
               {{ fmtMoney(formData.contractAmount) }} 元
             </a-descriptions-item>
@@ -602,6 +662,15 @@ function genTermKey(): string {
               formData.remark || '-'
             }}</a-descriptions-item>
           </a-descriptions>
+
+          <!-- Warranty warning -->
+          <a-alert
+            v-if="warrantyWarning"
+            type="warning"
+            :message="warrantyWarning"
+            show-icon
+            style="margin-top: 12px"
+          />
 
           <div class="cf-review-section">
             <div class="cf-review-title">
@@ -664,21 +733,18 @@ function genTermKey(): string {
 </template>
 
 <style scoped>
-.cf-page {
+.project-target-redesign.app-page {
   background: var(--bg);
   min-height: 100%;
-  padding: 4px 0;
 }
-.cf-breadcrumb {
-  margin-bottom: 16px;
+.pt-breadcrumb {
+  margin-bottom: 4px;
   font-size: 14px;
 }
-.cf-card {
+.pt-panel {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-  padding-bottom: 12px;
   position: relative;
 }
 .cf-review {

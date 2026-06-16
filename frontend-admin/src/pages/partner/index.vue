@@ -39,17 +39,14 @@ const formData = reactive<Partial<PartnerVO>>({
 })
 
 const TYPE_LABEL: Record<string, string> = {
-  SUPPLIER: '供应商',
-  SUB: '分包商',
-  DESIGN: '设计单位',
-  SUPERVISOR: '监理单位',
+  PARTY_A: '甲方',
+  PARTY_B: '乙方',
   OTHER: '其他',
 }
+
 const TYPE_COLOR: Record<string, string> = {
-  SUPPLIER: 'blue',
-  SUB: 'green',
-  DESIGN: 'purple',
-  SUPERVISOR: 'cyan',
+  PARTY_A: 'blue',
+  PARTY_B: 'green',
   OTHER: 'default',
 }
 const RISK_COLOR: Record<string, string> = {
@@ -239,10 +236,10 @@ onMounted(fetchData)
             allow-clear
             style="width: 130px"
           >
-            <a-select-option value="SUPPLIER">供应商</a-select-option>
-            <a-select-option value="SUB">分包商</a-select-option>
-            <a-select-option value="DESIGN">设计单位</a-select-option>
-            <a-select-option value="SUPERVISOR">监理单位</a-select-option>
+            <a-select-option value="PARTY_A">甲方</a-select-option>
+            <a-select-option value="PARTY_B">乙方</a-select-option>
+            <a-select-option value="OTHER">其他</a-select-option>
+
             <a-select-option value="OTHER">其他</a-select-option>
           </a-select>
         </div>
@@ -343,10 +340,10 @@ onMounted(fetchData)
         </a-form-item>
         <a-form-item label="合作方类型" required>
           <a-select v-model:value="formData.partnerType" placeholder="请选择合作方类型">
-            <a-select-option value="SUPPLIER">供应商</a-select-option>
-            <a-select-option value="SUB">分包商</a-select-option>
-            <a-select-option value="DESIGN">设计单位</a-select-option>
-            <a-select-option value="SUPERVISOR">监理单位</a-select-option>
+            <a-select-option value="PARTY_A">甲方</a-select-option>
+            <a-select-option value="PARTY_B">乙方</a-select-option>
+            <a-select-option value="OTHER">其他</a-select-option>
+
             <a-select-option value="OTHER">其他</a-select-option>
           </a-select>
         </a-form-item>

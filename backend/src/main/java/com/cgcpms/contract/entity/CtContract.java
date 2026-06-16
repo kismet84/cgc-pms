@@ -33,7 +33,6 @@ public class CtContract extends BaseEntity {
 
     private Long projectId;
 
-    private Long partnerId;
 
     private String contractCode;
 
@@ -43,9 +42,9 @@ public class CtContract extends BaseEntity {
     @NotBlank
     private String contractType;
 
-    private String partyA;
+    private Long partyAId;
 
-    private String partyB;
+    private Long partyBId;
 
     @NotNull
     @PositiveOrZero

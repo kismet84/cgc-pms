@@ -36,7 +36,7 @@ describe('ContractFormPage edit mode', () => {
     expect(source).toMatch(/formData\.contractName\s*=\s*contract\.contractName/)
     expect(source).toMatch(/formData\.contractType\s*=\s*contract\.contractType/)
     expect(source).toMatch(/formData\.projectId\s*=\s*contract\.projectId/)
-    expect(source).toMatch(/formData\.partnerId\s*=\s*contract\.partnerId/)
+    expect(source).toMatch(/formData\.partyAId\s*=\s*contract\.partyAId/)
     expect(source).toMatch(/formData\.contractAmount\s*=\s*Number\(contract\.contractAmount\)/)
     expect(source).toMatch(/formData\.warrantyRate\s*=\s*contract\.warrantyRate/)
   })
@@ -69,15 +69,16 @@ describe('ContractFormPage edit mode', () => {
     expect(source).toMatch(/\{\{\s*isEdit\s*\?\s*['"]编辑合同['"]\s*:\s*['"]新建合同['"]\s*\}\}/)
   })
 
-  // ── TEST 10: Cancel modal title reflects mode ──
-  it('cancel modal title shows 放弃编辑合同？ in edit mode and 放弃新建合同？ in create mode', () => {
-    expect(source).toMatch(/isEdit\.value\s*\?\s*['"]放弃编辑合同.*['"]\s*:\s*['"]放弃新建合同.*['"]/)
+  // ── TEST 10: beforeRouteLeave guard warns on unsaved changes ──
+  it('has onBeforeRouteLeave guard for unsaved changes', () => {
+    expect(source).toMatch(/onBeforeRouteLeave/)
+    expect(source).toMatch(/未保存的修改/)
   })
 
   // ── TEST 11: Success message reflects mode ──
   it('success message differs between edit and create mode', () => {
-    expect(source).toMatch(/isEdit\.value\s*\?\s*['"]合同已更新并提交审批['"]/)
-    expect(source).toMatch(/isEdit\.value\s*\?\s*['"]合同已更新['"]\s*:\s*['"]合同已保存为草稿['"]/)
+    expect(source).toMatch(/isEdit\.value\s*\?\s*['\"]合同已更新并提交审批['\"]/)
+    expect(source).toMatch(/isEdit\.value\s*\?\s*['\"]合同已更新['\"]\s*:\s*['\"]合同已保存为草稿['\"]/)
   })
 
   // ── TEST 12: Non-regression: create mode behavior unchanged ──

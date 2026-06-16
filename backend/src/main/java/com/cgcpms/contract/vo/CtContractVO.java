@@ -8,12 +8,13 @@ public class CtContractVO {
     private String tenantId;
     private String orgId;
     private String projectId;
-    private String partnerId;
     private String contractCode;
     private String contractName;
     private String contractType;
-    private String partyA;
-    private String partyB;
+    private String partyAId;
+    private String partyAName;
+    private String partyBId;
+    private String partyBName;
     private String contractAmount;
     private String currentAmount;
     private String taxRate;
@@ -31,7 +32,6 @@ public class CtContractVO {
     private String contractStatus;
     private String approvalStatus;
     private String projectName;
-    private String partnerName;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

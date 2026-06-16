@@ -43,13 +43,13 @@ export interface ContractVO {
   id: string
   tenantId: string
   orgId: string
-  projectId: string
-  partnerId: string
-  contractCode: string
+  projectId: string  contractCode: string
   contractName: string
   contractType: ContractType
-  partyA: string
-  partyB: string
+  partyAId: string
+  partyAName: string
+  partyBId: string
+  partyBName: string
   contractAmount: string
   currentAmount: string
   taxRate: number
@@ -64,9 +64,7 @@ export interface ContractVO {
   warrantyAmount: string
   contractStatus: ContractStatus
   approvalStatus: ApprovalStatus
-  projectName: string
-  partnerName: string
-  createdBy: string
+  projectName: string  createdBy: string
   createdAt: string
   updatedBy: string
   updatedAt: string
@@ -77,9 +75,7 @@ export interface ContractQueryParams {
   projectId?: string
   contractType?: ContractType
   contractStatus?: ContractStatus
-  approvalStatus?: ApprovalStatus
-  partnerId?: string
-  contractCode?: string
+  approvalStatus?: ApprovalStatus  contractCode?: string
   keyword?: string
   startDate?: string
   endDate?: string

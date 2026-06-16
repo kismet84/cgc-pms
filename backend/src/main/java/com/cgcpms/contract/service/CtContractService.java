@@ -48,7 +48,7 @@ public class CtContractService {
 
     public IPage<CtContractVO> getPage(long pageNo, long pageSize, String contractCode, String contractName,
                                        String contractType, String contractStatus, String approvalStatus,
-                                       Long projectId, Long partnerId) {
+                                       Long projectId, Long partyAId, Long partyBId) {
         LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(contractCode)) wrapper.like(CtContract::getContractCode, contractCode);
         if (StringUtils.hasText(contractName)) wrapper.like(CtContract::getContractName, contractName);
@@ -56,7 +56,8 @@ public class CtContractService {
         if (StringUtils.hasText(contractStatus)) wrapper.eq(CtContract::getContractStatus, contractStatus);
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(CtContract::getApprovalStatus, approvalStatus);
         if (projectId != null) wrapper.eq(CtContract::getProjectId, projectId);
-        if (partnerId != null) wrapper.eq(CtContract::getPartnerId, partnerId);
+        if (partyAId != null) wrapper.eq(CtContract::getPartyAId, partyAId);
+        if (partyBId != null) wrapper.eq(CtContract::getPartyBId, partyBId);
         wrapper.eq(CtContract::getTenantId, UserContext.getCurrentTenantId());
         wrapper.orderByDesc(CtContract::getCreatedAt);
 
@@ -68,24 +69,30 @@ public class CtContractService {
                 .map(CtContract::getProjectId)
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet());
-        Set<Long> partnerIds = records.stream()
-                .map(CtContract::getPartnerId)
+                Set<Long> partyAIds = records.stream()
+                .map(CtContract::getPartyAId)
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet());
+        Set<Long> partyBIds = records.stream()
+                .map(CtContract::getPartyBId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> allPartyIds = new java.util.HashSet<>(partyAIds);
+        allPartyIds.addAll(partyBIds);
 
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
                 : pmProjectMapper.selectBatchIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
-        Map<Long, String> partnerNames = partnerIds.isEmpty() ? Map.of()
-                : mdPartnerMapper.selectBatchIds(partnerIds).stream()
+        Map<Long, String> partyNames = allPartyIds.isEmpty() ? Map.of()
+                : mdPartnerMapper.selectBatchIds(allPartyIds).stream()
                         .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
 
-        return page.convert(c -> toVO(c, projectNames, partnerNames));
+        return page.convert(c -> toVO(c, projectNames, partyNames));
     }
 
     public Map<String, Object> getKpi(String contractCode, String contractName,
                                       String contractType, String contractStatus, String approvalStatus,
-                                      Long projectId, Long partnerId) {
+                                      Long projectId, Long partyAId, Long partyBId) {
         LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(contractCode)) wrapper.like(CtContract::getContractCode, contractCode);
         if (StringUtils.hasText(contractName)) wrapper.like(CtContract::getContractName, contractName);
@@ -93,7 +100,8 @@ public class CtContractService {
         if (StringUtils.hasText(contractStatus)) wrapper.eq(CtContract::getContractStatus, contractStatus);
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(CtContract::getApprovalStatus, approvalStatus);
         if (projectId != null) wrapper.eq(CtContract::getProjectId, projectId);
-        if (partnerId != null) wrapper.eq(CtContract::getPartnerId, partnerId);
+        if (partyAId != null) wrapper.eq(CtContract::getPartyAId, partyAId);
+        if (partyBId != null) wrapper.eq(CtContract::getPartyBId, partyBId);
         wrapper.eq(CtContract::getTenantId, UserContext.getCurrentTenantId());
 
         List<CtContract> contracts = ctContractMapper.selectList(wrapper);
@@ -261,21 +269,28 @@ public class CtContractService {
             PmProject project = pmProjectMapper.selectById(c.getProjectId());
             if (project != null) vo.setProjectName(project.getProjectName());
         }
-        if (c.getPartnerId() != null) {
-            MdPartner partner = mdPartnerMapper.selectById(c.getPartnerId());
-            if (partner != null) vo.setPartnerName(partner.getPartnerName());
+                if (c.getPartyAId() != null) {
+            MdPartner partyA = mdPartnerMapper.selectById(c.getPartyAId());
+            if (partyA != null) vo.setPartyAName(partyA.getPartnerName());
+        }
+        if (c.getPartyBId() != null) {
+            MdPartner partyB = mdPartnerMapper.selectById(c.getPartyBId());
+            if (partyB != null) vo.setPartyBName(partyB.getPartnerName());
         }
         return vo;
     }
 
-    private CtContractVO toVO(CtContract c, Map<Long, String> projectNames, Map<Long, String> partnerNames) {
+    private CtContractVO toVO(CtContract c, Map<Long, String> projectNames, Map<Long, String> partyNames) {
         // Batch-friendly variant: use pre-fetched maps to avoid N+1.
         CtContractVO vo = buildBaseVO(c);
         if (c.getProjectId() != null) {
             vo.setProjectName(projectNames.get(c.getProjectId()));
         }
-        if (c.getPartnerId() != null) {
-            vo.setPartnerName(partnerNames.get(c.getPartnerId()));
+                if (c.getPartyAId() != null) {
+            vo.setPartyAName(partyNames.get(c.getPartyAId()));
+        }
+        if (c.getPartyBId() != null) {
+            vo.setPartyBName(partyNames.get(c.getPartyBId()));
         }
         return vo;
     }
@@ -286,12 +301,12 @@ public class CtContractService {
         vo.setTenantId(c.getTenantId() != null ? c.getTenantId().toString() : null);
         vo.setOrgId(c.getOrgId() != null ? c.getOrgId().toString() : null);
         vo.setProjectId(c.getProjectId() != null ? c.getProjectId().toString() : null);
-        vo.setPartnerId(c.getPartnerId() != null ? c.getPartnerId().toString() : null);
+        
         vo.setContractCode(c.getContractCode());
         vo.setContractName(c.getContractName());
         vo.setContractType(c.getContractType());
-        vo.setPartyA(c.getPartyA());
-        vo.setPartyB(c.getPartyB());
+        vo.setPartyAId(c.getPartyAId() != null ? c.getPartyAId().toString() : null);
+        vo.setPartyBId(c.getPartyBId() != null ? c.getPartyBId().toString() : null);
         vo.setContractAmount(c.getContractAmount() != null ? c.getContractAmount().toPlainString() : null);
         vo.setCurrentAmount(c.getCurrentAmount() != null ? c.getCurrentAmount().toPlainString() : null);
         vo.setTaxRate(c.getTaxRate() != null ? c.getTaxRate().toPlainString() : null);

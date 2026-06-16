@@ -175,9 +175,8 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
               </a-tag>
             </a-descriptions-item>
             <a-descriptions-item label="项目名称">{{ contract.projectName }}</a-descriptions-item>
-            <a-descriptions-item label="合作方">{{ contract.partnerName }}</a-descriptions-item>
-            <a-descriptions-item label="甲方">{{ contract.partyA }}</a-descriptions-item>
-            <a-descriptions-item label="乙方">{{ contract.partyB }}</a-descriptions-item>
+            <a-descriptions-item label="甲方">{{ contract.partyAName || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="乙方">{{ contract.partyBName || '-' }}</a-descriptions-item>
             <a-descriptions-item label="合同金额(含税)">
               <span style="font-weight: 600; color: #1890ff"
                 >{{ formatAmount(contract.contractAmount) }} 元</span

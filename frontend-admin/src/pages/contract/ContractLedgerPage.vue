@@ -73,7 +73,7 @@ const filter = reactive({
   projectId: undefined as string | undefined,
   contractType: undefined as ContractType | undefined,
   contractStatus: undefined as ContractStatus | undefined,
-  partnerId: undefined as string | undefined,
+
   contractCode: '',
   dateRange: [] as string[],
 })
@@ -100,7 +100,8 @@ const defaultCols: Record<string, boolean> = {
   contractCode: true,
   contractName: true,
   contractType: true,
-  partnerName: true,
+  partyAName: true,
+  partyBName: true,
   contractAmount: true,
   signedDate: true,
   contractStatus: true,
@@ -127,7 +128,7 @@ async function fetchData() {
     projectId: filter.projectId,
     contractType: filter.contractType,
     contractStatus: filter.contractStatus,
-    partnerId: filter.partnerId,
+
     contractCode: filter.contractCode || undefined,
     startDate: filter.dateRange[0],
     endDate: filter.dateRange[1],
@@ -172,7 +173,7 @@ function handleReset() {
   filter.projectId = undefined
   filter.contractType = undefined
   filter.contractStatus = undefined
-  filter.partnerId = undefined
+
   filter.contractCode = ''
   filter.dateRange = []
   pageNo.value = 1
@@ -338,7 +339,8 @@ const gridColumns = computed(() => [
   ...(colVisible.contractType
     ? [{ field: 'contractType', title: '合同类型', width: 110, slots: { default: 'contractType' } }]
     : []),
-  ...(colVisible.partnerName ? [{ field: 'partnerName', title: '合作方', width: 160 }] : []),
+  ...(colVisible.partyAName ? [{ field: 'partyAName', title: '甲方', width: 140 }] : []),
+  ...(colVisible.partyBName ? [{ field: 'partyBName', title: '乙方', width: 140 }] : []),
   ...(colVisible.contractAmount
     ? [
         {
@@ -419,13 +421,6 @@ const gridColumns = computed(() => [
           </div>
           <div class="cl-filter-row cl-filter-row--last">
             <div class="cl-field">
-              <label>合作方：</label>
-              <a-select
-                v-model:value="filter.partnerId"
-                placeholder="请选择合作方"
-                allow-clear
-                style="width: 160px"
-              />
             </div>
             <div class="cl-field">
               <label>合同编号：</label>
@@ -511,7 +506,8 @@ const gridColumns = computed(() => [
                           contractCode: '合同编号',
                           contractName: '合同名称',
                           contractType: '合同类型',
-                          partnerName: '合作方',
+                          partyAName: '甲方',
+                          partyBName: '乙方',
                           contractAmount: '合同金额',
                           signedDate: '签订日期',
                           contractStatus: '合同状态',
