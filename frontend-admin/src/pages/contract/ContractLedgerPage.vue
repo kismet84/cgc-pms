@@ -192,7 +192,8 @@ function handlePageSizeChange(_cur: number, size: number) {
   fetchData()
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await referenceStore.fetchProjects()
   fetchData()
   fetchKpi()
 })
@@ -390,6 +391,7 @@ const gridColumns = computed(() => [
                 placeholder="请选择项目"
                 allow-clear
                 style="width: 160px"
+                :options="projects.map(p => ({ value: p.id, label: p.projectName }))"
               />
             </div>
             <div class="cl-field">

@@ -306,6 +306,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '我的待办' },
           },
           {
+            path: 'process',
+            name: 'ApprovalProcess',
+            component: () => import('@/pages/approval/process.vue'),
+            meta: { title: '审批流程管理', adminOnly: true },
+          },
+          {
             path: ':instanceId',
             name: 'ApprovalDetail',
             component: () => import('@/pages/approval/detail.vue'),
@@ -388,8 +394,15 @@ router.beforeEach((to) => {
   if (!userStore.isLogin) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
+  if (to.meta?.adminOnly && !isAdminRole(userStore.roles)) {
+    return { path: '/dashboard' }
+  }
   return true
 })
+
+function isAdminRole(roles: string[]) {
+  return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN')
+}
 
 router.afterEach((to) => {
   const title = (to.meta?.title as string) || ''

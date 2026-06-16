@@ -40,7 +40,7 @@ export const useReferenceStore = defineStore('reference', () => {
   async function fetchProjects(): Promise<ProjectVO[]> {
     if (projects.value) return projects.value
     if (projectsPromise) return projectsPromise
-    projectsPromise = getProjectList({ pageNum: 1, pageSize: 50 })
+    projectsPromise = getProjectList({ pageNo: 1, pageSize: 50 })
       .then((res) => {
         projects.value = res.records ?? res.data ?? res
         projectsPromise = null

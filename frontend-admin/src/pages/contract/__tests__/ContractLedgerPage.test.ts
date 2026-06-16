@@ -59,10 +59,10 @@ describe('ContractLedgerPage button handlers', () => {
     expect(hasClick).toBe(true)
   })
 
-  // ── TEST 6: 全部预警 › → router.push to /alert ──
-  it('wires 全部预警 link to navigate to /alert via router.push', () => {
+  // ── TEST 6: 查看全部 › → router.push to /alert ──
+  it('wires 查看全部 link to navigate to /alert via router.push', () => {
     // Verify the link has @click wired (any order relative to text)
-    expect(source).toMatch(/全部预警[\s\S]*@click|@click[\s\S]*全部预警/)
+    expect(source).toMatch(/查看全部[\s\S]*@click|@click[\s\S]*查看全部/)
     // Verify handleAllAlerts function exists with router.push('/alert')
     expect(source).toMatch(/function handleAllAlerts[\s\S]*?router\.push\('\/alert'\)/)
   })

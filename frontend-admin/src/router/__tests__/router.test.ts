@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { routes } from '@/router'
 
 describe('router lazy loading', () => {
@@ -53,5 +54,29 @@ describe('router lazy loading', () => {
     expect(partnerRoute?.meta?.title).toBe('合作方管理')
     expect(partnerRoute?.meta?.icon).toBe('TeamOutlined')
     expect(typeof partnerRoute!.component).toBe('function')
+  })
+
+  it('approval process management route is admin-only and lazily loaded', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')
+    const processRoute = approvalRoute?.children?.find((c) => c.path === 'process')
+
+    expect(processRoute).toBeDefined()
+    expect(processRoute?.name).toBe('ApprovalProcess')
+    expect(processRoute?.meta?.title).toBe('审批流程管理')
+    expect(processRoute?.meta?.adminOnly).toBe(true)
+    expect(typeof processRoute!.component).toBe('function')
+  })
+
+  it('matches approval process route before approval detail route', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes,
+    })
+
+    await router.push('/approval/process')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('ApprovalProcess')
   })
 })

@@ -14,6 +14,10 @@ import com.cgcpms.contract.vo.ContractApprovalRecordVO;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.partner.entity.MdPartner;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfRecord;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
@@ -30,6 +34,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -65,6 +70,12 @@ class ContractApprovalIntegrationTest {
     private CtContractItemMapper contractItemMapper;
 
     @Autowired
+    private PmProjectMapper projectMapper;
+
+    @Autowired
+    private MdPartnerMapper partnerMapper;
+
+    @Autowired
     private CostItemMapper costItemMapper;
 
     @Autowired
@@ -80,11 +91,82 @@ class ContractApprovalIntegrationTest {
                 .add("username", "admin")
                 .add("tenantId", 0L)
                 .build());
+        seedRequiredContractData();
     }
 
     @AfterEach
     void clearContext() {
         UserContext.clear();
+    }
+
+    private void seedRequiredContractData() {
+        if (projectMapper.selectById(10001L) == null) {
+            PmProject project = new PmProject();
+            project.setId(10001L);
+            project.setProjectCode("PRJ-TEST-001");
+            project.setProjectName("测试项目");
+            project.setProjectType("CONSTRUCTION");
+            project.setContractAmount(new BigDecimal("5000000.00"));
+            project.setTargetCost(new BigDecimal("4200000.00"));
+            project.setStatus("RUNNING");
+            project.setApprovalStatus("APPROVED");
+            projectMapper.insert(project);
+        }
+
+        if (partnerMapper.selectById(20001L) == null) {
+            MdPartner partyA = new MdPartner();
+            partyA.setId(20001L);
+            partyA.setPartnerCode("PT-TEST-A");
+            partyA.setPartnerName("测试甲方");
+            partyA.setPartnerType("PARTY_A");
+            partyA.setBlacklistFlag(0);
+            partyA.setStatus("ENABLE");
+            partnerMapper.insert(partyA);
+        }
+
+        if (partnerMapper.selectById(20002L) == null) {
+            MdPartner partyB = new MdPartner();
+            partyB.setId(20002L);
+            partyB.setPartnerCode("PT-TEST-B");
+            partyB.setPartnerName("测试乙方");
+            partyB.setPartnerType("PARTY_B");
+            partyB.setBlacklistFlag(0);
+            partyB.setStatus("ENABLE");
+            partnerMapper.insert(partyB);
+        }
+
+        ensureContract(DRAFT_CONTRACT_ID, "CT-TEST-APPROVAL-DRAFT", "工程造价咨询服务合同",
+                ContractStatusConstants.STATUS_DRAFT, ContractStatusConstants.APPROVAL_DRAFT);
+        ensureContract(APPROVED_CONTRACT_ID, "CT-TEST-APPROVAL-APPROVED", "已审批成本生成合同",
+                ContractStatusConstants.STATUS_PERFORMING, ContractStatusConstants.APPROVAL_APPROVED);
+    }
+
+    private void ensureContract(Long id, String contractCode, String contractName,
+                                String contractStatus, String approvalStatus) {
+        if (contractMapper.selectById(id) != null) return;
+        CtContract contract = new CtContract();
+        contract.setId(id);
+        contract.setProjectId(10001L);
+        contract.setContractCode(contractCode);
+        contract.setContractName(contractName);
+        contract.setContractType("SUB");
+        contract.setPartyAId(20001L);
+        contract.setPartyBId(20002L);
+        contract.setContractAmount(new BigDecimal("640000.00"));
+        contract.setCurrentAmount(new BigDecimal("640000.00"));
+        contract.setPaidAmount(BigDecimal.ZERO);
+        contract.setTaxRate(new BigDecimal("13.00"));
+        contract.setTaxAmount(new BigDecimal("73628.32"));
+        contract.setAmountWithoutTax(new BigDecimal("566371.68"));
+        contract.setSignedDate(LocalDate.now());
+        contract.setPaymentMethod("银行转账");
+        contract.setSettlementMethod("按进度结算");
+        contract.setWarrantyRate(new BigDecimal("5.00"));
+        contract.setWarrantyAmount(new BigDecimal("32000.00"));
+        contract.setContractStatus(contractStatus);
+        contract.setApprovalStatus(approvalStatus);
+        contract.setCostGeneratedFlag(0);
+        contractMapper.insert(contract);
     }
 
     // ═══════════════════════════════════════════════════════════

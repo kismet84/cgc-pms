@@ -6,6 +6,10 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.handler.ContractWorkflowHandler;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.partner.entity.MdPartner;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import io.jsonwebtoken.Jwts;
@@ -18,6 +22,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -42,6 +49,12 @@ class ContractApprovalRollbackTest {
     @Autowired
     private CtContractMapper contractMapper;
 
+    @Autowired
+    private PmProjectMapper projectMapper;
+
+    @Autowired
+    private MdPartnerMapper partnerMapper;
+
     @BeforeEach
     void setupContext() {
         UserContext.set(Jwts.claims()
@@ -49,11 +62,74 @@ class ContractApprovalRollbackTest {
                 .add("username", "admin")
                 .add("tenantId", 0L)
                 .build());
+        seedApprovedContract();
     }
 
     @AfterEach
     void clearContext() {
         UserContext.clear();
+    }
+
+    private void seedApprovedContract() {
+        if (projectMapper.selectById(10001L) == null) {
+            PmProject project = new PmProject();
+            project.setId(10001L);
+            project.setProjectCode("PRJ-ROLLBACK-001");
+            project.setProjectName("回滚测试项目");
+            project.setProjectType("CONSTRUCTION");
+            project.setContractAmount(new BigDecimal("5000000.00"));
+            project.setTargetCost(new BigDecimal("4200000.00"));
+            project.setStatus("RUNNING");
+            project.setApprovalStatus("APPROVED");
+            projectMapper.insert(project);
+        }
+
+        if (partnerMapper.selectById(20001L) == null) {
+            MdPartner partyA = new MdPartner();
+            partyA.setId(20001L);
+            partyA.setPartnerCode("PT-ROLLBACK-A");
+            partyA.setPartnerName("回滚测试甲方");
+            partyA.setPartnerType("PARTY_A");
+            partyA.setBlacklistFlag(0);
+            partyA.setStatus("ENABLE");
+            partnerMapper.insert(partyA);
+        }
+
+        if (partnerMapper.selectById(20002L) == null) {
+            MdPartner partyB = new MdPartner();
+            partyB.setId(20002L);
+            partyB.setPartnerCode("PT-ROLLBACK-B");
+            partyB.setPartnerName("回滚测试乙方");
+            partyB.setPartnerType("PARTY_B");
+            partyB.setBlacklistFlag(0);
+            partyB.setStatus("ENABLE");
+            partnerMapper.insert(partyB);
+        }
+
+        if (contractMapper.selectById(APPROVED_CONTRACT_ID) != null) return;
+        CtContract contract = new CtContract();
+        contract.setId(APPROVED_CONTRACT_ID);
+        contract.setProjectId(10001L);
+        contract.setContractCode("CT-ROLLBACK-APPROVED");
+        contract.setContractName("回滚测试合同");
+        contract.setContractType("SUB");
+        contract.setPartyAId(20001L);
+        contract.setPartyBId(20002L);
+        contract.setContractAmount(new BigDecimal("640000.00"));
+        contract.setCurrentAmount(new BigDecimal("640000.00"));
+        contract.setPaidAmount(BigDecimal.ZERO);
+        contract.setTaxRate(new BigDecimal("13.00"));
+        contract.setTaxAmount(new BigDecimal("73628.32"));
+        contract.setAmountWithoutTax(new BigDecimal("566371.68"));
+        contract.setSignedDate(LocalDate.now());
+        contract.setPaymentMethod("银行转账");
+        contract.setSettlementMethod("按进度结算");
+        contract.setWarrantyRate(new BigDecimal("5.00"));
+        contract.setWarrantyAmount(new BigDecimal("32000.00"));
+        contract.setContractStatus(ContractStatusConstants.STATUS_PERFORMING);
+        contract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
+        contract.setCostGeneratedFlag(0);
+        contractMapper.insert(contract);
     }
 
     // ═══════════════════════════════════════════════════════════

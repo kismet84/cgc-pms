@@ -2,6 +2,7 @@
 import { computed, h, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { routes } from '@/router'
+import { useUserStore } from '@/stores/user'
 import type { RouteRecordRaw } from 'vue-router'
 import {
   AccountBookOutlined,
@@ -24,6 +25,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 interface MenuItem {
   key: string
@@ -75,9 +77,13 @@ const MENU_ORDER = [
 const menuItems = computed(() => {
   return routes
     .find((r) => r.path === '/')
-    ?.children?.filter((r) => !r.meta?.hidden)
+    ?.children?.filter((r) => isMenuVisible(r))
     .sort((a, b) => menuRank(resolveMenuPath('', a.path)) - menuRank(resolveMenuPath('', b.path)))
     .map((r) => buildMenuItem(r, ''))
+})
+
+const isAdmin = computed(() => {
+  return userStore.roles.includes('ADMIN') || userStore.roles.includes('SUPER_ADMIN')
 })
 
 function menuRank(path: string) {
@@ -97,10 +103,16 @@ function buildMenuItem(route: RouteRecordRaw, parentPath: string): MenuItem {
   }
   if (route.children && route.children.length > 0) {
     item.children = route.children
-      .filter((c) => !c.meta?.hidden)
+      .filter((c) => isMenuVisible(c))
       .map((c) => buildMenuItem(c, fullPath))
   }
   return item
+}
+
+function isMenuVisible(route: RouteRecordRaw) {
+  if (route.meta?.hidden) return false
+  if (route.meta?.adminOnly && !isAdmin.value) return false
+  return true
 }
 
 function resolveMenuPath(parentPath: string, routePath: string) {
