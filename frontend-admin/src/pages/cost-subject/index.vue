@@ -195,7 +195,7 @@ function handleDelete() {
   Modal.confirm({
     title: '确认删除',
     content: hasChildren
-      ? `科目「${node.subjectName}」下有子节点，删除后子节点也将被删除。确定继续？`
+      ? `科目「${node.subjectName}」下有子节点，当前不支持直接删除，请先删除或调整其子节点。`
       : `确定删除科目「${node.subjectName}」吗？`,
     okText: '确认删除',
     okType: 'danger',
@@ -280,7 +280,14 @@ onMounted(() => {
               >
                 {{ selectedNode.status === 'ENABLE' ? '停用' : '启用' }}
               </a-button>
-              <a-button size="small" danger @click="handleDelete">删除</a-button>
+               <a-button
+                 size="small"
+                 danger
+                 :disabled="(selectedNode.children?.length ?? 0) > 0"
+                 @click="handleDelete"
+               >
+                 删除
+               </a-button>
             </a-space>
           </div>
           <a-descriptions :column="2" size="small" bordered>
