@@ -107,3 +107,15 @@ a {
 .vxe-table--header-wrapper::-webkit-scrollbar {
   display: none;
 }
+
+/* 全局居中所有 Modal.confirm() 确认弹窗 */
+.ant-modal-confirm .ant-modal-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ant-modal-confirm .ant-modal {
+  top: 0;
+  padding-bottom: 0;
+}

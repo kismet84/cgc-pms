@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
-import { message, Modal } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 
 message.config({
   top: '80px',
   duration: 3,
   maxCount: 3,
-})
-
-Modal.config({
-  centered: true,
 })
 
 function getPopupContainer(trigger?: HTMLElement): HTMLElement {
