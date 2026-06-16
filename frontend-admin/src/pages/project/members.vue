@@ -38,6 +38,26 @@ const ROLE_COLOR: Record<string, string> = {
   OTH: 'default',
 }
 
+const memberStats = computed(() => ({
+  total: store.membersTotal || store.members.length,
+  manager: store.members.filter((item) => item.roleCode === 'PM').length,
+  business: store.members.filter((item) => ['CM', 'CSTM', 'FIN'].includes(item.roleCode)).length,
+  pending: store.members.filter((item) => item.status !== 'ACTIVE').length,
+}))
+
+const roleDistribution = computed(() => {
+  const counts = store.members.reduce<Record<string, number>>((acc, item) => {
+    acc[item.roleCode] = (acc[item.roleCode] || 0) + 1
+    return acc
+  }, {})
+  const rows = Object.entries(counts).map(([role, count]) => ({
+    role,
+    label: ROLE_MAP[role] ?? role,
+    count,
+  }))
+  return rows.length ? rows : [{ role: 'EMPTY', label: '待添加成员', count: 0 }]
+})
+
 // ── User lookup ──
 const userList = ref<SysUserBrief[]>([])
 const userMap = computed<Record<string, string>>(() => {
@@ -153,89 +173,120 @@ const columns = [
 </script>
 
 <template>
-  <div class="pm-page">
-    <!-- Header -->
-    <div class="pm-header">
-      <a-button type="text" @click="goBack">
-        <ArrowLeftOutlined />
-      </a-button>
-      <div class="pm-title">
-        <span class="pm-title-label">项目成员管理</span>
-        <span v-if="store.currentProject" class="pm-title-project">
+  <div class="pm-page app-page project-target-redesign">
+    <div class="pt-page-head">
+      <div>
+        <a-breadcrumb class="pt-breadcrumb">
+          <a-breadcrumb-item>项目管理</a-breadcrumb-item>
+          <a-breadcrumb-item>项目成员</a-breadcrumb-item>
+        </a-breadcrumb>
+        <h1 class="app-page-title">项目成员</h1>
+        <div v-if="store.currentProject" class="pm-title-project">
           {{ store.currentProject.projectName }}
-        </span>
+        </div>
       </div>
-      <a-button type="primary" @click="openAddModal">
-        <PlusOutlined />
-        添加成员
-      </a-button>
+      <div class="pt-head-actions">
+        <a-button @click="goBack">
+          <ArrowLeftOutlined />
+          返回项目
+        </a-button>
+        <a-button type="primary" @click="openAddModal">
+          <PlusOutlined />
+          添加成员
+        </a-button>
+      </div>
     </div>
 
-    <!-- Table -->
-    <div class="pj-card pm-table-wrap">
-      <a-table
-        :data-source="store.members"
-        :columns="columns"
-        :loading="store.membersLoading"
-        :pagination="false"
-        row-key="id"
-        size="middle"
-        :scroll="{ x: 740 }"
-      >
-        <template #bodyCell="{ column, record }">
-          <!-- 姓名 -->
-          <template v-if="column.dataIndex === 'userId'">
-            <div class="pm-user-cell">
-              <a-avatar :size="28" class="pm-avatar">
-                {{ getUserName(record.userId).charAt(0) }}
-              </a-avatar>
-              <span class="pm-user-name">{{ getUserName(record.userId) }}</span>
-            </div>
-          </template>
-
-          <!-- 角色 -->
-          <template v-else-if="column.dataIndex === 'roleCode'">
-            <a-select
-              :value="record.roleCode"
-              size="small"
-              style="width: 130px"
-              :options="ROLE_OPTIONS"
-              @change="(val: string) => handleRoleChange(record, val)"
-            />
-          </template>
-
-          <!-- 状态 -->
-          <template v-else-if="column.dataIndex === 'status'">
-            <a-tag :color="record.status === 'ACTIVE' ? 'success' : 'default'">
-              {{ record.status === 'ACTIVE' ? '在岗' : (record.status ?? '-') }}
-            </a-tag>
-          </template>
-
-          <!-- 操作 -->
-          <template v-else-if="column.dataIndex === 'ops'">
-            <a-popconfirm
-              title="确定移除该成员？"
-              ok-text="确认"
-              cancel-text="取消"
-              @confirm="handleDelete(record)"
-            >
-              <a class="pm-link-danger">移除</a>
-            </a-popconfirm>
-          </template>
-        </template>
-      </a-table>
-
-      <!-- Empty -->
-      <a-empty
-        v-if="!store.membersLoading && store.members.length === 0"
-        description="暂无项目成员，点击上方按钮添加"
-        style="padding: 48px 0"
-      />
+    <div class="pt-kpi-strip">
+      <div class="pt-kpi"><div class="pt-kpi-label">成员总数</div><div class="pt-kpi-value">{{ memberStats.total }} <small>人</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">项目经理</div><div class="pt-kpi-value">{{ memberStats.manager }} <small>人</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">业务人员</div><div class="pt-kpi-value">{{ memberStats.business }} <small>人</small></div></div>
+      <div class="pt-kpi"><div class="pt-kpi-label">待确认</div><div class="pt-kpi-value">{{ memberStats.pending }} <small>人</small></div></div>
     </div>
 
-    <!-- Total -->
-    <div class="pj-pagination">
-      <span class="pj-total">共 {{ store.membersTotal }} 人</span>
+    <div class="pt-ledger-layout">
+      <main class="pt-panel pt-table-panel">
+        <div class="pt-panel-header">成员清单</div>
+        <a-table
+          :data-source="store.members"
+          :columns="columns"
+          :loading="store.membersLoading"
+          :pagination="false"
+          row-key="id"
+          size="small"
+          :scroll="{ x: 740 }"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.dataIndex === 'userId'">
+              <div class="pm-user-cell">
+                <a-avatar :size="28" class="pm-avatar">
+                  {{ getUserName(record.userId).charAt(0) }}
+                </a-avatar>
+                <span class="pm-user-name">{{ getUserName(record.userId) }}</span>
+              </div>
+            </template>
+
+            <template v-else-if="column.dataIndex === 'roleCode'">
+              <a-select
+                :value="record.roleCode"
+                size="small"
+                style="width: 130px"
+                :options="ROLE_OPTIONS"
+                @change="(val: string) => handleRoleChange(record, val)"
+              />
+            </template>
+
+            <template v-else-if="column.dataIndex === 'status'">
+              <a-tag :color="record.status === 'ACTIVE' ? 'success' : 'default'">
+                {{ record.status === 'ACTIVE' ? '在岗' : (record.status ?? '-') }}
+              </a-tag>
+            </template>
+
+            <template v-else-if="column.dataIndex === 'ops'">
+              <a-popconfirm
+                title="确定移除该成员？"
+                ok-text="确认"
+                cancel-text="取消"
+                @confirm="handleDelete(record)"
+              >
+                <a class="pt-link pt-danger">移除</a>
+              </a-popconfirm>
+            </template>
+          </template>
+        </a-table>
+        <a-empty
+          v-if="!store.membersLoading && store.members.length === 0"
+          description="暂无项目成员，点击上方按钮添加"
+          style="padding: 48px 0"
+        />
+        <div class="pt-pagination">
+          <span class="pt-total">共 {{ store.membersTotal }} 人</span>
+        </div>
+      </main>
+
+      <aside class="pt-analysis-rail">
+        <section class="pt-panel">
+          <div class="pt-panel-header">角色分布</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li v-for="item in roleDistribution" :key="item.role" class="pt-compact-row">
+                <span>{{ item.label }}</span>
+                <b>{{ item.count }} 人</b>
+              </li>
+            </ul>
+          </div>
+        </section>
+        <section class="pt-panel">
+          <div class="pt-panel-header">成员职责提示</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li class="pt-compact-row"><span>项目经理</span><b>总负责</b></li>
+              <li class="pt-compact-row"><span>商务/成本</span><b>经营控制</b></li>
+              <li class="pt-compact-row"><span>财务/物资</span><b>执行支持</b></li>
+            </ul>
+          </div>
+        </section>
+      </aside>
     </div>
 
     <!-- Add Member Modal -->
@@ -295,63 +346,13 @@ const columns = [
 
 <style scoped>
 .pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
   padding: 4px 0;
 }
 
-.pm-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-  padding: 0 2px;
-}
-
-.pm-title {
-  flex: 1;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.pm-title-label {
-  font-size: 17px;
-  font-weight: 600;
-  color: #111827;
-}
-
 .pm-title-project {
+  margin-top: 4px;
   font-size: 13px;
   color: #6b7280;
-  background: #f3f4f6;
-  padding: 2px 10px;
-  border-radius: 4px;
-}
-
-/* ── Shared card style with project list ── */
-.pj-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-
-.pm-table-wrap {
-  overflow: hidden;
-}
-
-.pj-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-
-.pj-total {
-  font-size: 13px;
-  color: #4b5563;
 }
 
 /* ── User cell ── */
@@ -371,19 +372,6 @@ const columns = [
   font-size: 14px;
   color: #111827;
   font-weight: 500;
-}
-
-/* ── Links ── */
-.pm-link-danger {
-  color: #ef4444;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.pm-link-danger:hover {
-  color: #dc2626;
-  text-decoration: underline;
 }
 
 /* ── Form ── */

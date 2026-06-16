@@ -35,6 +35,46 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 
+const targetStats = computed(() => {
+  const rows = tableData.value
+  const totalTarget = rows.reduce((sum, item) => sum + (parseFloat(item.totalTargetAmount) || 0), 0)
+  const locked = rows
+    .filter((item) => item.isActive === 1 || item.approvalStatus === 'APPROVED')
+    .reduce((sum, item) => sum + (parseFloat(item.totalTargetAmount) || 0), 0)
+  const dynamic = rows
+    .filter((item) => item.status === 'ACTIVE')
+    .reduce((sum, item) => sum + (parseFloat(item.totalTargetAmount) || 0), 0)
+  return {
+    totalTarget,
+    locked,
+    dynamic,
+    deviation: totalTarget - locked,
+  }
+})
+
+const approvalRows = computed(() => {
+  const counts = tableData.value.reduce<Record<string, number>>((acc, item) => {
+    acc[item.approvalStatus] = (acc[item.approvalStatus] || 0) + 1
+    return acc
+  }, {})
+  const rows = Object.entries(counts).map(([status, count]) => ({
+    label: APPROVAL_STATUS_LABEL[status] ?? status,
+    count,
+  }))
+  return rows.length ? rows : [{ label: '暂无版本', count: 0 }]
+})
+
+const warningRows = computed(() => {
+  const rows = tableData.value
+    .filter((item) => item.approvalStatus === 'REJECTED' || item.status === 'CANCELLED')
+    .slice(0, 3)
+    .map((item) => ({
+      name: item.versionName,
+      status: APPROVAL_STATUS_LABEL[item.approvalStatus] ?? TARGET_STATUS_LABEL[item.status] ?? item.status,
+    }))
+  return rows.length ? rows : [{ name: '暂无偏差预警', status: '平稳' }]
+})
+
 // ---- Fetch data ----
 async function fetchData() {
   loading.value = true
@@ -173,16 +213,30 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="ct-page">
-    <a-breadcrumb class="ct-breadcrumb">
-      <a-breadcrumb-item>成本管理</a-breadcrumb-item>
-      <a-breadcrumb-item>目标成本管理</a-breadcrumb-item>
-    </a-breadcrumb>
+  <div class="ct-page app-page project-target-redesign">
+    <div class="pt-page-head">
+      <div>
+        <a-breadcrumb class="pt-breadcrumb">
+          <a-breadcrumb-item>目标管理</a-breadcrumb-item>
+          <a-breadcrumb-item>目标管理</a-breadcrumb-item>
+        </a-breadcrumb>
+        <h1 class="app-page-title">目标管理</h1>
+      </div>
+      <div class="pt-head-actions">
+        <a-button type="primary" @click="handleCreate">
+          <template #icon><PlusOutlined /></template>
+          新建目标成本
+        </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+      </div>
+    </div>
 
     <!-- Filter card -->
-    <div class="ct-card ct-filter">
-      <div class="ct-filter-row">
-        <div class="ct-field">
+    <div class="pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label>所属项目：</label>
           <a-select
             v-model:value="filter.projectId"
@@ -200,7 +254,7 @@ onMounted(() => {
             }}</a-select-option>
           </a-select>
         </div>
-        <div class="ct-field">
+        <div class="pt-field">
           <label>版本号：</label>
           <a-input
             v-model:value="filter.versionNo"
@@ -208,7 +262,7 @@ onMounted(() => {
             style="width: 160px"
           />
         </div>
-        <div class="ct-field">
+        <div class="pt-field">
           <label>审批状态：</label>
           <a-select
             v-model:value="filter.approvalStatus"
@@ -222,7 +276,7 @@ onMounted(() => {
             <a-select-option value="REJECTED">已驳回</a-select-option>
           </a-select>
         </div>
-        <div class="ct-field">
+        <div class="pt-field">
           <label>版本标识：</label>
           <a-select
             v-model:value="filter.isActive"
@@ -234,161 +288,137 @@ onMounted(() => {
             <a-select-option :value="0">历史版本</a-select-option>
           </a-select>
         </div>
-        <div class="ct-filter-actions">
+        <div class="pt-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
       </div>
     </div>
 
-    <!-- Toolbar -->
-    <div class="ct-toolbar">
-      <div class="ct-toolbar-left">
-        <a-button type="primary" @click="handleCreate">
-          <template #icon><PlusOutlined /></template>
-          新建目标成本
-        </a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
+    <div class="pt-kpi-strip">
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">目标总额</div>
+        <div class="pt-kpi-value">{{ fmtAmount(String(targetStats.totalTarget)) }} <small>万元</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">已锁定成本</div>
+        <div class="pt-kpi-value">{{ fmtAmount(String(targetStats.locked)) }} <small>万元</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">动态成本</div>
+        <div class="pt-kpi-value">{{ fmtAmount(String(targetStats.dynamic)) }} <small>万元</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">偏差金额</div>
+        <div class="pt-kpi-value">{{ fmtAmount(String(targetStats.deviation)) }} <small>万元</small></div>
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="ct-card ct-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="columns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #amount="{ row }">
-          <span class="ct-money">{{ fmtAmount(row.totalTargetAmount) }}</span>
-        </template>
-        <template #approvalStatus="{ row }">
-          <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'">
-            {{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus }}
-          </a-tag>
-        </template>
-        <template #status="{ row }">
-          <a-tag :color="TARGET_STATUS_COLOR[row.status] || 'default'">
-            {{ TARGET_STATUS_LABEL[row.status] || row.status }}
-          </a-tag>
-        </template>
-        <template #isActive="{ row }">
-          <a-tag v-if="row.isActive === 1" color="green">当前版本</a-tag>
-          <span v-else class="ct-muted">历史版本</span>
-        </template>
-        <template #ops="{ row }">
-          <div class="ct-ops">
-            <a class="ct-link" @click="handleEdit(row)">编辑</a>
-            <a
-              v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
-              class="ct-link"
-              :class="{ 'ct-link--disabled': activating }"
-              @click="handleActivate(row)"
-            >
-              <CheckCircleOutlined style="margin-right: 4px" />切换版本
-            </a>
-            <a
-              v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
-              class="ct-link ct-del"
-              @click="handleDelete(row)"
-              >删除</a
-            >
-          </div>
-        </template>
-      </vxe-grid>
-    </div>
+    <div class="pt-ledger-layout target-layout">
+      <main class="pt-panel pt-table-panel">
+        <div class="pt-panel-header">目标版本列表</div>
+        <vxe-grid
+          :data="tableData"
+          :columns="columns"
+          :loading="loading"
+          :column-config="{ resizable: true }"
+          stripe
+          border="inner"
+          size="small"
+          max-height="480"
+        >
+          <template #amount="{ row }">
+            <span class="ct-money">{{ fmtAmount(row.totalTargetAmount) }}</span>
+          </template>
+          <template #approvalStatus="{ row }">
+            <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'">
+              {{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus }}
+            </a-tag>
+          </template>
+          <template #status="{ row }">
+            <a-tag :color="TARGET_STATUS_COLOR[row.status] || 'default'">
+              {{ TARGET_STATUS_LABEL[row.status] || row.status }}
+            </a-tag>
+          </template>
+          <template #isActive="{ row }">
+            <a-tag v-if="row.isActive === 1" color="green">当前版本</a-tag>
+            <span v-else class="ct-muted">历史版本</span>
+          </template>
+          <template #ops="{ row }">
+            <div class="ct-ops">
+              <a class="pt-link" @click="handleEdit(row)">编辑</a>
+              <a
+                v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
+                class="pt-link"
+                :class="{ 'ct-link--disabled': activating }"
+                @click="handleActivate(row)"
+              >
+                <CheckCircleOutlined style="margin-right: 4px" />切换版本
+              </a>
+              <a
+                v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+                class="pt-link pt-danger"
+                @click="handleDelete(row)"
+                >删除</a
+              >
+            </div>
+          </template>
+        </vxe-grid>
+        <div class="pt-pagination">
+          <span class="pt-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
 
-    <!-- Pagination -->
-    <div class="ct-pagination">
-      <span class="ct-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+      <aside class="pt-analysis-rail">
+        <section class="pt-panel">
+          <div class="pt-panel-header">目标占比</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li class="pt-compact-row"><span>当前版本</span><b>{{ tableData.filter((i) => i.isActive === 1).length }} 个</b></li>
+              <li class="pt-compact-row"><span>历史版本</span><b>{{ tableData.filter((i) => i.isActive !== 1).length }} 个</b></li>
+            </ul>
+          </div>
+        </section>
+        <section class="pt-panel">
+          <div class="pt-panel-header">偏差预警</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li v-for="item in warningRows" :key="item.name" class="pt-compact-row">
+                <span>{{ item.name }}</span>
+                <b>{{ item.status }}</b>
+              </li>
+            </ul>
+          </div>
+        </section>
+        <section class="pt-panel">
+          <div class="pt-panel-header">审批状态</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li v-for="item in approvalRows" :key="item.label" class="pt-compact-row">
+                <span>{{ item.label }}</span>
+                <b>{{ item.count }} 个</b>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </aside>
     </div>
   </div>
 </template>
 
 <style scoped>
 .ct-page {
-  background: #f6f8fc;
-  min-height: 100%;
   padding: 4px 0;
-}
-.ct-breadcrumb {
-  margin-bottom: 16px;
-  font-size: 14px;
-}
-.ct-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-
-/* Filter */
-.ct-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.ct-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.ct-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.ct-field label {
-  color: #374151;
-  min-width: 56px;
-}
-.ct-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-  align-items: center;
-}
-
-/* Toolbar */
-.ct-toolbar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.ct-toolbar-left {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* Table */
-.ct-table-wrap {
-  overflow: hidden;
-}
-.ct-link {
-  color: #1677ff;
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
 }
 .ct-link--disabled {
   color: #9ca3af;
@@ -402,24 +432,8 @@ onMounted(() => {
   gap: 10px;
   justify-content: center;
 }
-.ct-del {
-  color: #ef4444;
-}
 .ct-muted {
   color: #9ca3af;
   font-size: 13px;
-}
-
-/* Pagination */
-.ct-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.ct-total {
-  font-size: 13px;
-  color: #4b5563;
 }
 </style>

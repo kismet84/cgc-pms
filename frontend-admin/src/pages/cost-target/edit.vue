@@ -324,223 +324,193 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="cte-page">
-    <a-breadcrumb class="cte-breadcrumb">
-      <a-breadcrumb-item>成本管理</a-breadcrumb-item>
-      <a-breadcrumb-item>
-        <a @click="router.push('/cost-target')">目标成本管理</a>
-      </a-breadcrumb-item>
-      <a-breadcrumb-item>{{ isEdit ? '编辑目标成本' : '新建目标成本' }}</a-breadcrumb-item>
-    </a-breadcrumb>
+  <div class="cte-page app-page project-target-redesign">
+    <div class="pt-page-head">
+      <div>
+        <a-breadcrumb class="pt-breadcrumb">
+          <a-breadcrumb-item>目标管理</a-breadcrumb-item>
+          <a-breadcrumb-item>
+            <a @click="router.push('/cost-target')">目标管理</a>
+          </a-breadcrumb-item>
+          <a-breadcrumb-item>{{ isEdit ? '编辑目标成本' : '新建目标成本' }}</a-breadcrumb-item>
+        </a-breadcrumb>
+        <h1 class="app-page-title">{{ isEdit ? '编辑目标成本' : '新建目标成本' }}</h1>
+      </div>
+      <div class="pt-head-actions">
+        <a-button :disabled="saving" @click="handleCancel">取消</a-button>
+        <a-button :loading="saving" @click="handleSave">保存</a-button>
+        <a-button type="primary" :loading="saving && !submitting" @click="handleSubmit">
+          提交审批
+        </a-button>
+      </div>
+    </div>
 
     <a-spin :spinning="loading">
-      <div class="cte-card">
-        <!-- Basic info -->
-        <div class="cte-section">
-          <div class="cte-section-title">基本信息</div>
-          <a-form ref="formRef" :model="formData" :rules="formRules" layout="vertical">
-            <a-row :gutter="24">
-              <a-col :span="8">
-                <a-form-item label="所属项目" name="projectId">
-                  <a-select
-                    v-model:value="formData.projectId"
-                    placeholder="请选择项目"
-                    show-search
-                    option-filter-prop="label"
-                    allow-clear
-                  >
-                    <a-select-option
-                      v-for="p in projects"
-                      :key="p.id"
-                      :value="p.id"
-                      :label="p.projectName"
-                    >
-                      {{ p.projectName }}
-                    </a-select-option>
-                  </a-select>
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="版本号" name="versionNo">
-                  <a-input
-                    v-model:value="formData.versionNo"
-                    placeholder="如 V1.0、2024Q1"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="版本名称" name="versionName">
-                  <a-input
-                    v-model:value="formData.versionName"
-                    placeholder="如 2024年第一版目标成本"
-                    allow-clear
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="目标成本总额(元)" name="totalTargetAmount">
-                  <a-input-number
-                    v-model:value="formData.totalTargetAmount"
-                    :min="0"
-                    :precision="2"
-                    placeholder="请输入目标成本总额"
-                    style="width: 100%"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="生效日期" name="effectiveDate">
-                  <a-date-picker
-                    v-model:value="formData.effectiveDate"
-                    value-format="YYYY-MM-DD"
-                    style="width: 100%"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="8">
-                <a-form-item label="备注" name="remark">
-                  <a-input v-model:value="formData.remark" placeholder="备注信息" allow-clear />
-                </a-form-item>
-              </a-col>
-            </a-row>
-          </a-form>
-        </div>
+      <a-form ref="formRef" :model="formData" :rules="formRules" layout="vertical">
+        <section class="pt-panel cte-section">
+          <div class="pt-panel-header">基础信息</div>
+          <div class="pt-panel-body pt-form-grid">
+            <a-form-item label="所属项目" name="projectId">
+              <a-select
+                v-model:value="formData.projectId"
+                placeholder="请选择项目"
+                show-search
+                option-filter-prop="label"
+                allow-clear
+              >
+                <a-select-option
+                  v-for="p in projects"
+                  :key="p.id"
+                  :value="p.id"
+                  :label="p.projectName"
+                >
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="版本号" name="versionNo">
+              <a-input v-model:value="formData.versionNo" placeholder="如 V1.0、2024Q1" allow-clear />
+            </a-form-item>
+            <a-form-item label="版本名称" name="versionName">
+              <a-input
+                v-model:value="formData.versionName"
+                placeholder="如 2024年第一版目标成本"
+                allow-clear
+              />
+            </a-form-item>
+            <a-form-item label="生效日期" name="effectiveDate">
+              <a-date-picker
+                v-model:value="formData.effectiveDate"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </div>
+        </section>
 
-        <!-- Subject items -->
-        <div class="cte-section">
-          <div class="cte-section-title">
-            成本科目明细
+        <section class="pt-panel cte-section">
+          <div class="pt-panel-header">
+            成本科目
             <span class="cte-section-sub">
               合计：<b :class="{ 'cte-warn': !totalMatch }">{{ fmtMoney(itemsTotal) }}</b> 元
               <span v-if="!totalMatch" class="cte-warn-text">（与总额不一致）</span>
             </span>
           </div>
+          <div class="pt-panel-body">
+            <div class="cte-toolbar">
+              <a-button type="dashed" size="small" @click="addRow">
+                <template #icon><PlusOutlined /></template>
+                添加科目
+              </a-button>
+            </div>
 
-          <div class="cte-toolbar">
-            <a-button type="dashed" size="small" @click="addRow">
-              <template #icon><PlusOutlined /></template>
-              添加科目
-            </a-button>
+            <a-table
+              :data-source="items"
+              :columns="itemColumns"
+              :pagination="false"
+              row-key="_key"
+              size="small"
+              bordered
+              :scroll="{ x: 800 }"
+            >
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.dataIndex === 'index'">
+                  {{ index + 1 }}
+                </template>
+                <template v-else-if="column.dataIndex === 'costSubjectId'">
+                  <a-tree-select
+                    v-model:value="record.costSubjectId"
+                    :tree-data="subjectTree"
+                    placeholder="选择科目"
+                    allow-clear
+                    tree-node-filter-prop="title"
+                    style="width: 100%"
+                    size="small"
+                    @change="(val: any) => onSubjectChange(val, record)"
+                  />
+                </template>
+                <template v-else-if="column.dataIndex === 'targetAmount'">
+                  <a-input-number
+                    v-model:value="record.targetAmount"
+                    :min="0"
+                    :precision="2"
+                    size="small"
+                    style="width: 100%"
+                    placeholder="金额"
+                  />
+                </template>
+                <template v-else-if="column.dataIndex === 'ops'">
+                  <a-popconfirm title="确认删除该行？" @confirm="removeRow(record._key)">
+                    <a-button type="text" danger size="small">
+                      <template #icon><DeleteOutlined /></template>
+                    </a-button>
+                  </a-popconfirm>
+                </template>
+              </template>
+
+              <template #footer>
+                <div class="cte-footer">
+                  <span>合计：</span>
+                  <span class="cte-total" :class="{ 'cte-warn': !totalMatch }">
+                    {{ fmtMoney(itemsTotal) }} 元
+                  </span>
+                </div>
+              </template>
+            </a-table>
+
+            <a-empty
+              v-if="items.length === 0"
+              description="暂无科目明细，请点击「添加科目」新增"
+              class="cte-empty"
+            />
           </div>
+        </section>
 
-          <a-table
-            :data-source="items"
-            :columns="itemColumns"
-            :pagination="false"
-            row-key="_key"
-            size="small"
-            bordered
-            :scroll="{ x: 800 }"
-          >
-            <template #bodyCell="{ column, record, index }">
-              <template v-if="column.dataIndex === 'index'">
-                {{ index + 1 }}
-              </template>
-              <template v-else-if="column.dataIndex === 'costSubjectId'">
-                <a-tree-select
-                  v-model:value="record.costSubjectId"
-                  :tree-data="subjectTree"
-                  placeholder="选择科目"
-                  allow-clear
-                  tree-node-filter-prop="title"
-                  style="width: 100%"
-                  size="small"
-                  @change="(val: any) => onSubjectChange(val, record)"
-                />
-              </template>
-              <template v-else-if="column.dataIndex === 'targetAmount'">
-                <a-input-number
-                  v-model:value="record.targetAmount"
-                  :min="0"
-                  :precision="2"
-                  size="small"
-                  style="width: 100%"
-                  placeholder="金额"
-                />
-              </template>
-              <template v-else-if="column.dataIndex === 'ops'">
-                <a-popconfirm title="确认删除该行？" @confirm="removeRow(record._key)">
-                  <a-button type="text" danger size="small">
-                    <template #icon><DeleteOutlined /></template>
-                  </a-button>
-                </a-popconfirm>
-              </template>
-            </template>
+        <section class="pt-panel cte-section">
+          <div class="pt-panel-header">金额明细</div>
+          <div class="pt-panel-body pt-form-grid">
+            <a-form-item label="目标成本总额(元)" name="totalTargetAmount">
+              <a-input-number
+                v-model:value="formData.totalTargetAmount"
+                :min="0"
+                :precision="2"
+                placeholder="请输入目标成本总额"
+                style="width: 100%"
+              />
+            </a-form-item>
+            <div class="cte-amount-check">
+              <span>科目金额合计</span>
+              <b :class="{ 'cte-warn': !totalMatch }">{{ fmtMoney(itemsTotal) }} 元</b>
+            </div>
+          </div>
+        </section>
 
-            <template #footer>
-              <div class="cte-footer">
-                <span>合计：</span>
-                <span class="cte-total" :class="{ 'cte-warn': !totalMatch }">
-                  {{ fmtMoney(itemsTotal) }} 元
-                </span>
-              </div>
-            </template>
-          </a-table>
-
-          <a-empty
-            v-if="items.length === 0"
-            description="暂无科目明细，请点击「添加科目」新增"
-            class="cte-empty"
-          />
-        </div>
-
-        <!-- Actions -->
-        <div class="cte-actions">
-          <a-space>
-            <a-button type="primary" :loading="saving && !submitting" @click="handleSubmit">
-              提交审批
-            </a-button>
-            <a-button :loading="saving" @click="handleSave"> 保存 </a-button>
-            <a-button :disabled="saving" @click="handleCancel">取消</a-button>
-          </a-space>
-        </div>
-      </div>
+        <section class="pt-panel cte-section">
+          <div class="pt-panel-header">审批与备注</div>
+          <div class="pt-panel-body">
+            <a-form-item label="备注" name="remark">
+              <a-textarea v-model:value="formData.remark" :rows="4" placeholder="请输入备注信息" />
+            </a-form-item>
+          </div>
+        </section>
+      </a-form>
     </a-spin>
   </div>
 </template>
 
 <style scoped>
 .cte-page {
-  background: #f6f8fc;
-  min-height: 100%;
   padding: 4px 0;
 }
-.cte-breadcrumb {
-  margin-bottom: 16px;
-  font-size: 14px;
-}
-.cte-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-  padding: 24px 28px;
-}
-
-/* Sections */
 .cte-section {
-  margin-bottom: 28px;
-}
-.cte-section:last-of-type {
-  margin-bottom: 0;
-}
-.cte-section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
+  margin-bottom: 10px;
 }
 .cte-section-sub {
+  margin-left: auto;
   font-size: 13px;
   font-weight: 400;
-  color: #6b7280;
+  color: var(--muted);
 }
-
-/* Toolbar */
 .cte-toolbar {
   display: flex;
   align-items: center;
@@ -568,18 +538,22 @@ onMounted(() => {
   font-weight: 400;
   font-size: 12px;
 }
+.cte-amount-check {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cte-amount-check b {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+}
 
 /* Empty */
 .cte-empty {
   padding: 12px 0;
-}
-
-/* Actions */
-.cte-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: 28px;
-  padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
 }
 </style>

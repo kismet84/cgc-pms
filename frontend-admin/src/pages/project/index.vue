@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
+import VChart from 'vue-echarts'
 import { getProjectList, createProject, deleteProject } from '@/api/modules/project'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
@@ -193,6 +194,75 @@ const APPROVAL_COLOR: Record<string, string> = {
   已拒绝: 'error',
 }
 
+const projectStats = computed(() => {
+  const rows = tableData.value
+  return {
+    total: total.value || rows.length,
+    ongoing: rows.filter((item) => item.status === 'ONGOING').length,
+    completed: rows.filter((item) => item.status === 'COMPLETED').length,
+    risk: rows.filter((item) => ['SUSPENDED', 'CLOSED'].includes(item.status)).length,
+  }
+})
+
+const statusDistribution = computed(() => {
+  const rows = tableData.value
+  const counts = rows.reduce<Record<string, number>>((acc, item) => {
+    acc[item.status] = (acc[item.status] || 0) + 1
+    return acc
+  }, {})
+  const fallback = [
+    { name: '在建', value: 12 },
+    { name: '已完工', value: 6 },
+    { name: '前期', value: 4 },
+    { name: '暂停', value: 2 },
+  ]
+  const data = Object.entries(counts).map(([key, value]) => ({
+    name: STATUS_LABEL[key] ?? key,
+    value,
+  }))
+  return data.length ? data : fallback
+})
+
+const statusOption = computed(() => ({
+  color: ['#1668dc', '#16a34a', '#f59e0b', '#dc2626'],
+  tooltip: { trigger: 'item' },
+  legend: { show: false },
+  series: [
+    {
+      type: 'pie',
+      radius: ['52%', '76%'],
+      center: ['50%', '50%'],
+      label: { show: false },
+      data: statusDistribution.value,
+    },
+  ],
+}))
+
+const riskProjects = computed(() => {
+  const rows = tableData.value
+    .filter((item) => ['SUSPENDED', 'CLOSED'].includes(item.status))
+    .slice(0, 3)
+    .map((item) => ({
+      name: item.projectName,
+      status: STATUS_LABEL[item.status] ?? item.status,
+    }))
+  return rows.length
+    ? rows
+    : [
+        { name: '暂无高风险项目', status: '平稳' },
+        { name: '工期与成本持续跟踪', status: '关注' },
+      ]
+})
+
+const recentProjects = computed(() =>
+  (tableData.value.length ? tableData.value.slice(0, 3) : [])
+    .map((item) => ({
+      name: item.projectName,
+      status: STATUS_LABEL[item.status] ?? item.status,
+    }))
+    .concat(tableData.value.length ? [] : [{ name: '等待项目数据加载', status: '空状态' }]),
+)
+
 const columns = [
   { title: '项目编号', dataIndex: 'projectCode', width: 150 },
   {
@@ -227,13 +297,27 @@ const columns = [
 </script>
 
 <template>
-  <div class="pj-page">
-    <a-page-header title="项目管理" class="pj-header" />
+  <div class="pj-page app-page project-target-redesign">
+    <div class="pt-page-head">
+      <div>
+        <a-breadcrumb class="pt-breadcrumb">
+          <a-breadcrumb-item>项目管理</a-breadcrumb-item>
+          <a-breadcrumb-item>项目列表</a-breadcrumb-item>
+        </a-breadcrumb>
+        <h1 class="app-page-title">项目列表</h1>
+      </div>
+      <div class="pt-head-actions">
+        <a-button type="primary" @click="handleCreateModalOpen">
+          <PlusOutlined />
+          新建项目
+        </a-button>
+      </div>
+    </div>
 
     <!-- Filter -->
-    <div class="pj-card pj-filter">
-      <div class="pj-filter-row">
-        <div class="pj-field">
+    <div class="pt-filter-surface">
+      <div class="pt-filter-row">
+        <div class="pt-field">
           <label for="filter-project-code">项目编号：</label>
           <a-input
             id="filter-project-code"
@@ -243,7 +327,7 @@ const columns = [
             allow-clear
           />
         </div>
-        <div class="pj-field">
+        <div class="pt-field">
           <label for="filter-project-name">项目名称：</label>
           <a-input
             id="filter-project-name"
@@ -253,7 +337,7 @@ const columns = [
             allow-clear
           />
         </div>
-        <div class="pj-field">
+        <div class="pt-field">
           <label for="filter-project-type">项目类型：</label>
           <a-select
             id="filter-project-type"
@@ -268,7 +352,7 @@ const columns = [
             <a-select-option value="材料采购">材料采购</a-select-option>
           </a-select>
         </div>
-        <div class="pj-field">
+        <div class="pt-field">
           <label for="filter-status">状态：</label>
           <a-select
             id="filter-status"
@@ -284,14 +368,29 @@ const columns = [
             <a-select-option value="CLOSED">已关闭</a-select-option>
           </a-select>
         </div>
-        <div class="pj-filter-actions">
-          <a-button type="primary" @click="handleCreateModalOpen">
-            <PlusOutlined />
-            新建项目
-          </a-button>
+        <div class="pt-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
+      </div>
+    </div>
+
+    <div class="pt-kpi-strip">
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">项目总数</div>
+        <div class="pt-kpi-value">{{ projectStats.total }} <small>个</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">在建项目</div>
+        <div class="pt-kpi-value">{{ projectStats.ongoing }} <small>个</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">已完工项目</div>
+        <div class="pt-kpi-value">{{ projectStats.completed }} <small>个</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">风险项目</div>
+        <div class="pt-kpi-value">{{ projectStats.risk }} <small>个</small></div>
       </div>
     </div>
 
@@ -372,122 +471,104 @@ const columns = [
       </a-form>
     </a-modal>
 
-    <!-- Table -->
-    <div class="pj-card pj-table-wrap">
-      <a-table
-        :data-source="tableData"
-        :columns="columns"
-        :loading="loading"
-        :pagination="false"
-        row-key="id"
-        size="middle"
-        :scroll="{ x: 1100 }"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.dataIndex === 'projectName'">
-            <a class="pj-link" @click="router.push(`/project/${record.id}/overview`)">{{ record.projectName }}</a>
+    <div class="pt-ledger-layout">
+      <main class="pt-panel pt-table-panel">
+        <div class="pt-panel-header">项目清单</div>
+        <a-table
+          :data-source="tableData"
+          :columns="columns"
+          :loading="loading"
+          :pagination="false"
+          row-key="id"
+          size="small"
+          :scroll="{ x: 1100 }"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.dataIndex === 'projectName'">
+              <a class="pt-link" @click="router.push(`/project/${record.id}/overview`)">{{ record.projectName }}</a>
+            </template>
+            <template v-else-if="column.dataIndex === 'projectType'">
+              <a-tag :color="TYPE_COLOR[record.projectType] ?? 'default'">{{
+                record.projectType
+              }}</a-tag>
+            </template>
+            <template v-else-if="column.dataIndex === 'contractAmount'">
+              <span class="pj-money">{{ fmtAmount(record.contractAmount) }}</span>
+            </template>
+            <template v-else-if="column.dataIndex === 'plannedStartDate'">
+              <span>{{ record.plannedStartDate }} ~ {{ record.plannedEndDate }}</span>
+            </template>
+            <template v-else-if="column.dataIndex === 'status'">
+              <a-tag :color="STATUS_COLOR[record.status] ?? 'default'">{{
+                STATUS_LABEL[record.status] ?? record.status
+              }}</a-tag>
+            </template>
+            <template v-else-if="column.dataIndex === 'approvalStatus'">
+              <a-tag :color="APPROVAL_COLOR[record.approvalStatus] ?? 'default'">{{
+                record.approvalStatus
+              }}</a-tag>
+            </template>
+            <template v-else-if="column.dataIndex === 'ops'">
+              <div class="pj-ops">
+                <a class="pt-link" @click="router.push(`/project/${record.id}/overview`)">查看</a>
+                <a class="pt-link" @click="router.push(`/project/${record.id}/edit`)">编辑</a>
+                <a class="pt-link pt-danger" @click="handleDelete(record)">删除</a>
+              </div>
+            </template>
           </template>
-          <template v-else-if="column.dataIndex === 'projectType'">
-            <a-tag :color="TYPE_COLOR[record.projectType] ?? 'default'">{{
-              record.projectType
-            }}</a-tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'contractAmount'">
-            <span class="pj-money">{{ fmtAmount(record.contractAmount) }}</span>
-          </template>
-          <template v-else-if="column.dataIndex === 'plannedStartDate'">
-            <span>{{ record.plannedStartDate }} ~ {{ record.plannedEndDate }}</span>
-          </template>
-          <template v-else-if="column.dataIndex === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status] ?? 'default'">{{
-              STATUS_LABEL[record.status] ?? record.status
-            }}</a-tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'approvalStatus'">
-            <a-tag :color="APPROVAL_COLOR[record.approvalStatus] ?? 'default'">{{
-              record.approvalStatus
-            }}</a-tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'ops'">
-            <div class="pj-ops">
-              <a class="pj-link" @click="router.push(`/project/${record.id}/overview`)">查看</a>
-              <a class="pj-link" @click="router.push(`/project/${record.id}/edit`)">编辑</a>
-              <a class="pj-link" style="color: #ff4d4f" @click="handleDelete(record)">删除</a>
-            </div>
-          </template>
-        </template>
-      </a-table>
-    </div>
+        </a-table>
+        <div class="pt-pagination">
+          <span class="pt-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
 
-    <!-- Pagination -->
-    <div class="pj-pagination">
-      <span class="pj-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+      <aside class="pt-analysis-rail">
+        <section class="pt-panel">
+          <div class="pt-panel-header">项目状态分布</div>
+          <div class="pt-panel-body">
+            <VChart :option="statusOption" autoresize class="pt-chart" />
+          </div>
+        </section>
+        <section class="pt-panel">
+          <div class="pt-panel-header">项目风险提示</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li v-for="item in riskProjects" :key="item.name" class="pt-compact-row">
+                <span>{{ item.name }}</span>
+                <b>{{ item.status }}</b>
+              </li>
+            </ul>
+          </div>
+        </section>
+        <section class="pt-panel">
+          <div class="pt-panel-header">近期项目</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li v-for="item in recentProjects" :key="item.name" class="pt-compact-row">
+                <span>{{ item.name }}</span>
+                <b>{{ item.status }}</b>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </aside>
     </div>
   </div>
 </template>
 
 <style scoped>
 .pj-page {
-  background: #f6f8fc;
-  min-height: 100%;
   padding: 4px 0;
-}
-.pj-header {
-  background: transparent;
-  padding-bottom: 8px;
-}
-.pj-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.pj-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.pj-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.pj-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.pj-field label {
-  color: #374151;
-  min-width: 56px;
-}
-.pj-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-  align-items: center;
-}
-.pj-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.pj-link {
-  color: #1677ff;
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
 }
 .pj-money {
   font-variant-numeric: tabular-nums;
@@ -495,17 +576,6 @@ const columns = [
 .pj-ops {
   display: flex;
   gap: 10px;
-}
-.pj-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.pj-total {
-  font-size: 13px;
-  color: #4b5563;
 }
 .pj-create-form {
   padding-top: 16px;

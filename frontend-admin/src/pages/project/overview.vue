@@ -130,125 +130,120 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="overview">
-    <a-breadcrumb class="breadcrumb">
-      <a-breadcrumb-item>项目管理</a-breadcrumb-item>
-      <a-breadcrumb-item>项目总览</a-breadcrumb-item>
-    </a-breadcrumb>
+  <div class="overview app-page project-target-redesign">
+    <div class="pt-page-head">
+      <div>
+        <a-breadcrumb class="pt-breadcrumb">
+          <a-breadcrumb-item>项目管理</a-breadcrumb-item>
+          <a-breadcrumb-item>项目总览</a-breadcrumb-item>
+        </a-breadcrumb>
+        <h1 class="app-page-title">项目总览</h1>
+      </div>
+    </div>
 
     <a-spin :spinning="loading" tip="加载中...">
       <template v-if="data">
-        <!-- ═══ KPI Cards ═══ -->
-        <div class="kpi-grid kpi-grid-4">
-          <div class="kpi-card">
-            <div class="kpi-icon" style="background: #3b82f6">
-              <FileTextOutlined />
-            </div>
-            <div class="kpi-body">
-              <div class="kpi-title">合同总额</div>
-              <div class="kpi-value">
-                {{ fmtWan(data.totalContractAmount) }} <small>万元</small>
-              </div>
-            </div>
+        <div class="pt-kpi-strip">
+          <div class="pt-kpi">
+            <div class="pt-kpi-label">合同总额</div>
+            <div class="pt-kpi-value">{{ fmtWan(data.totalContractAmount) }} <small>万元</small></div>
           </div>
-          <div class="kpi-card">
-            <div class="kpi-icon" style="background: #f59e0b">
-              <LineChartOutlined />
-            </div>
-            <div class="kpi-body">
-              <div class="kpi-title">动态成本</div>
-              <div class="kpi-value">{{ fmtWan(data.dynamicCost) }} <small>万元</small></div>
-            </div>
+          <div class="pt-kpi">
+            <div class="pt-kpi-label">动态成本</div>
+            <div class="pt-kpi-value">{{ fmtWan(data.dynamicCost) }} <small>万元</small></div>
           </div>
-          <div class="kpi-card">
-            <div class="kpi-icon" style="background: #22c55e">
-              <PayCircleOutlined />
-            </div>
-            <div class="kpi-body">
-              <div class="kpi-title">已付金额</div>
-              <div class="kpi-value">{{ fmtWan(data.paidAmount) }} <small>万元</small></div>
-            </div>
+          <div class="pt-kpi">
+            <div class="pt-kpi-label">已付金额</div>
+            <div class="pt-kpi-value">{{ fmtWan(data.paidAmount) }} <small>万元</small></div>
           </div>
-          <div class="kpi-card">
-            <div class="kpi-icon" style="background: #ef4444">
-              <WarningOutlined />
-            </div>
-            <div class="kpi-body">
-              <div class="kpi-title">预警数量</div>
-              <div class="kpi-value">{{ fmtNum(data.warningCount) }} <small>条</small></div>
-            </div>
+          <div class="pt-kpi">
+            <div class="pt-kpi-label">预警数量</div>
+            <div class="pt-kpi-value">{{ fmtNum(data.warningCount) }} <small>条</small></div>
           </div>
         </div>
 
-        <!-- ═══ Chart + Members ═══ -->
-        <div class="chart-row">
-          <div class="chart-col">
-            <div class="panel">
-              <div class="panel-header">成本构成分布</div>
-              <v-chart :option="pieOption" autoresize style="height: 360px" />
-            </div>
+        <div class="overview-summary pt-panel">
+          <div class="summary-cell">
+            <span>项目状态</span>
+            <b>执行中</b>
           </div>
-          <div class="chart-col">
-            <div class="panel">
-              <div class="panel-header">
-                <TeamOutlined />
-                项目成员
-                <span class="panel-hint">共 {{ fmtNum(data.memberCount) }} 人</span>
-              </div>
-              <a-table
-                :columns="memberCols"
-                :data-source="data.members"
-                :pagination="false"
-                size="small"
-                row-key="userId"
-              >
-                <template #bodyCell="{ column, record }">
-                  <template v-if="column.dataIndex === 'roleCode'">
-                    {{ roleLabel(record.roleCode) }}
-                  </template>
+          <div class="summary-cell">
+            <span>项目经理</span>
+            <b>{{ data.members.find((m) => m.roleCode === 'PM')?.userName || '待维护' }}</b>
+          </div>
+          <div class="summary-cell">
+            <span>合同数量</span>
+            <b>{{ fmtNum(data.contractCount) }} 份</b>
+          </div>
+          <div class="summary-cell">
+            <span>成员数量</span>
+            <b>{{ fmtNum(data.memberCount) }} 人</b>
+          </div>
+        </div>
+
+        <div class="overview-analysis-grid">
+          <section class="pt-panel">
+            <div class="pt-panel-header">项目经营概览</div>
+            <div class="pt-panel-body">
+              <ul class="pt-compact-list">
+                <li class="pt-compact-row"><span>合同总额</span><b>{{ fmtWan(data.totalContractAmount) }} 万元</b></li>
+                <li class="pt-compact-row"><span>已付金额</span><b>{{ fmtWan(data.paidAmount) }} 万元</b></li>
+                <li class="pt-compact-row"><span>未付金额</span><b>{{
+                  fmtWan(String(Math.max(0, (parseFloat(data.totalContractAmount) || 0) - (parseFloat(data.paidAmount) || 0))))
+                }} 万元</b></li>
+              </ul>
+            </div>
+          </section>
+          <section class="pt-panel">
+            <div class="pt-panel-header">成本执行概览</div>
+            <VChart :option="pieOption" autoresize class="overview-chart" />
+          </section>
+          <section class="pt-panel">
+            <div class="pt-panel-header">关键风险</div>
+            <div class="pt-panel-body">
+              <ul class="pt-compact-list">
+                <li class="pt-compact-row"><span>本月预警</span><b>{{ fmtNum(data.warningCount) }} 条</b></li>
+                <li class="pt-compact-row"><span>成本偏差</span><b>{{ fmtWan(data.dynamicCost) }} 万元</b></li>
+                <li class="pt-compact-row"><span>成员覆盖</span><b>{{ fmtNum(data.memberCount) }} 人</b></li>
+              </ul>
+            </div>
+          </section>
+        </div>
+
+        <div class="overview-bottom-grid">
+          <section class="pt-panel">
+            <div class="pt-panel-header">合同清单</div>
+            <div class="pt-panel-body">
+              <div class="summary-cell compact"><span>合同数量</span><b>{{ fmtNum(data.contractCount) }} 份</b></div>
+            </div>
+          </section>
+          <section class="pt-panel">
+            <div class="pt-panel-header">待办事项</div>
+            <div class="pt-panel-body">
+              <div class="summary-cell compact"><span>预警待处理</span><b>{{ fmtNum(data.warningCount) }} 条</b></div>
+            </div>
+          </section>
+          <section class="pt-panel">
+            <div class="pt-panel-header">
+              <TeamOutlined />
+              项目成员
+              <span class="overview-hint">共 {{ fmtNum(data.memberCount) }} 人</span>
+            </div>
+            <a-table
+              :columns="memberCols"
+              :data-source="data.members"
+              :pagination="false"
+              size="small"
+              row-key="userId"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.dataIndex === 'roleCode'">
+                  {{ roleLabel(record.roleCode) }}
                 </template>
-              </a-table>
-              <div v-if="!data.members.length" class="empty-hint">暂无成员数据</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ═══ Summary row ═══ -->
-        <div class="summary-row">
-          <div class="panel">
-            <div class="panel-header">指标概览</div>
-            <div class="summary-grid">
-              <div class="summary-item">
-                <span class="summary-label">合同数量</span>
-                <span class="summary-value">{{ fmtNum(data.contractCount) }} 份</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">成员数量</span>
-                <span class="summary-value">{{ fmtNum(data.memberCount) }} 人</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">本月预警</span>
-                <span class="summary-value warning">{{ fmtNum(data.warningCount) }} 条</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">未付金额</span>
-                <span class="summary-value">
-                  {{
-                    fmtWan(
-                      String(
-                        Math.max(
-                          0,
-                          (parseFloat(data.totalContractAmount) || 0) -
-                            (parseFloat(data.paidAmount) || 0),
-                        ),
-                      ),
-                    )
-                  }}
-                  万元
-                </span>
-              </div>
-            </div>
-          </div>
+              </template>
+            </a-table>
+            <div v-if="!data.members.length" class="empty-hint">暂无成员数据</div>
+          </section>
         </div>
       </template>
 
@@ -264,151 +259,55 @@ onMounted(() => {
 <style scoped>
 .overview {
   min-height: 100%;
+  padding: 4px 0;
 }
-
-.breadcrumb {
-  margin-bottom: 14px;
-}
-
-/* ── KPI Grid ── */
-.kpi-grid {
-  display: grid;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.kpi-grid-4 {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-.kpi-card {
-  height: 96px;
-  padding: 16px 18px;
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #edf1f7;
+.overview-summary {
   display: flex;
-  gap: 14px;
-  align-items: flex-start;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-  overflow: hidden;
-}
-
-.kpi-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  flex-shrink: 0;
-}
-
-.kpi-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.kpi-title {
-  font-size: 13px;
-  color: #6b7280;
-  margin-bottom: 6px;
-}
-
-.kpi-value {
-  font-size: 21px;
-  font-weight: 800;
-  color: #111827;
-  letter-spacing: 0.2px;
-}
-
-.kpi-value small {
-  font-size: 13px;
-  font-weight: 500;
-  margin-left: 4px;
-  color: #6b7280;
-}
-
-/* ── Panel ── */
-.panel {
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #edf1f7;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-  overflow: hidden;
-}
-
-.panel-header {
-  padding: 14px 20px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #111827;
-  border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.panel-hint {
-  font-size: 12px;
-  font-weight: 400;
-  color: #9ca3af;
-  margin-left: auto;
-}
-
-/* ── Chart row ── */
-.chart-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.chart-col {
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── Summary row ── */
-.summary-row {
-  margin-bottom: 14px;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 0;
-  padding: 18px 20px;
+  margin-bottom: 10px;
+  overflow: hidden;
 }
-
-.summary-item {
+.summary-cell {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 16px;
-  border-right: 1px solid #f0f0f0;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+  padding: 12px 16px;
+  border-right: 1px solid var(--border-subtle);
 }
-
-.summary-item:last-child {
+.summary-cell:last-child {
   border-right: none;
 }
-
-.summary-label {
+.summary-cell span {
+  color: var(--muted);
   font-size: 13px;
-  color: #6b7280;
 }
-
-.summary-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #111827;
+.summary-cell b {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
 }
-
-.summary-value.warning {
-  color: #ef4444;
+.summary-cell.compact {
+  padding: 0;
+  border-right: none;
 }
-
-/* ── Empty hints ── */
+.overview-analysis-grid,
+.overview-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.overview-chart {
+  height: 230px;
+}
+.overview-hint {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
 .empty-hint {
   padding: 40px 20px;
   text-align: center;
@@ -424,5 +323,24 @@ onMounted(() => {
   background: #fff;
   border-radius: 10px;
   border: 1px solid #edf1f7;
+}
+@media (max-width: 1100px) {
+  .overview-analysis-grid,
+  .overview-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+  .overview-summary {
+    flex-wrap: wrap;
+  }
+  .summary-cell {
+    min-width: 50%;
+  }
+}
+@media (max-width: 520px) {
+  .summary-cell {
+    min-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
 }
 </style>
