@@ -534,7 +534,7 @@ onMounted(() => {
           size="small"
           :scroll="{ y: 250 }"
         >
-          <a-table-column title="物料" width="260">
+          <a-table-column title="物料" width="300">
             <template #default="{ record: item }">
               <div style="display: flex; gap: 4px">
                 <a-select
@@ -561,12 +561,12 @@ onMounted(() => {
               </div>
             </template>
           </a-table-column>
-          <a-table-column title="单位" width="80">
+          <a-table-column title="单位" width="70">
             <template #default="{ record: item }">
               <a-input v-model:value="item.unit" placeholder="单位" size="small" style="width: 100%" />
             </template>
           </a-table-column>
-          <a-table-column title="数量" width="130">
+          <a-table-column title="数量" width="100">
             <template #default="{ record: item }">
               <a-input-number
                 v-model:value="item.quantity"
