@@ -201,8 +201,8 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
     <a-modal v-model:open="modalVisible" :title="modalTitle" :width="860" @ok="handleSubmit">
       <a-form layout="vertical" :model="formData">
         <a-row :gutter="16">
-          <a-col :span="8"><a-form-item label="项目"><a-select v-model:value="formData.projectId" placeholder="请选择项目" style="width:100%" :options="(projectList??[]).map(p=>({value:p.id,label:p.projectName}))" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="合同"><a-select v-model:value="formData.contractId" placeholder="请选择合同" style="width:100%" :options="(contractList??[]).map(c=>({value:c.id,label:c.contractName}))" @change="onContractChange" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="项目"><a-select v-model:value="formData.projectId" placeholder="请选择项目" style="width:100%" :options="(projectList??[]).map(p=>({value:p.id,label:p.projectName}))" @change="(v: string) => { formData.contractId = undefined; formData.partnerId = undefined; referenceStore.fetchContracts({ projectId: v }); }" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="合同"><a-select v-model:value="formData.contractId" placeholder="请选择合同" style="width:100%" :options="(contractList??[]).filter(c => !formData.projectId || c.projectId === formData.projectId).map(c=>({value:c.id,label:c.contractName}))" @change="onContractChange" /></a-form-item></a-col>
           <a-col :span="8"><a-form-item label="合作方"><a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="16">
