@@ -16,6 +16,7 @@ import {
 import { message, Modal } from 'ant-design-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { getContractLedger, getContractKpi, deleteContract } from '@/api/modules/contract'
+import ContractFormPage from './ContractFormPage.vue'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import type {
   ContractVO,
@@ -30,8 +31,14 @@ const router = useRouter()
 const referenceStore = useReferenceStore()
 const projects = computed(() => referenceStore.projects ?? [])
 
+const contractModalVisible = ref(false)
+const contractModalMode = ref<'create' | 'edit'>('create')
+const contractModalId = ref('')
+
 function handleCreate() {
-  router.push('/contract/create')
+  contractModalMode.value = 'create'
+  contractModalId.value = ''
+  contractModalVisible.value = true
 }
 
 // ---- Row action handlers ----
@@ -39,7 +46,9 @@ function handleView(row: ContractVO) {
   router.push('/contract/' + row.id)
 }
 function handleEdit(row: ContractVO) {
-  router.push('/contract/' + row.id + '/edit')
+  contractModalMode.value = 'edit'
+  contractModalId.value = String(row.id)
+  contractModalVisible.value = true
 }
 function handleDelete(row: ContractVO) {
   Modal.confirm({
@@ -65,6 +74,16 @@ function handleExport() {
 }
 function handleAllAlerts() {
   router.push('/alert')
+}
+
+function handleContractSaved() {
+  contractModalVisible.value = false
+  fetchData()
+  fetchKpi()
+}
+
+function handleContractClose() {
+  contractModalVisible.value = false
 }
 
 // ---- Filter state ----
@@ -634,6 +653,26 @@ const gridColumns = computed(() => [
       </aside>
     </div>
   </div>
+
+  <a-modal
+    v-model:open="contractModalVisible"
+    :title="contractModalMode === 'edit' ? '编辑合同' : '新建合同'"
+    :width="1180"
+    :destroy-on-close="true"
+    :footer="null"
+    :mask-closable="false"
+    centered
+    class="cl-contract-modal"
+    @cancel="handleContractClose"
+  >
+    <ContractFormPage
+      :embedded="true"
+      :mode="contractModalMode"
+      :contract-id="contractModalId"
+      @saved="handleContractSaved"
+      @close="handleContractClose"
+    />
+  </a-modal>
 </template>
 
 <style scoped>
@@ -641,6 +680,10 @@ const gridColumns = computed(() => [
   background: var(--bg);
   min-height: 100%;
   padding: 2px 0;
+}
+.cl-contract-modal :deep(.ant-modal-body) {
+  max-height: 82vh;
+  overflow: auto;
 }
 .cl-page-head {
   display: flex;

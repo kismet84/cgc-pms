@@ -17,27 +17,50 @@ import type { ContractSaveRequest } from '@/api/modules/contract'
 import { useReferenceStore } from '@/stores/reference'
 import type { ContractType, ContractItem, ContractPaymentTerm } from '@/types/contract'
 
+interface Props {
+  embedded?: boolean
+  contractId?: string
+  mode?: 'create' | 'edit'
+}
+
+interface Emits {
+  (e: 'saved'): void
+  (e: 'close'): void
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  embedded: false,
+  contractId: '',
+})
+const emit = defineEmits<Emits>()
+
 const router = useRouter()
 const route = useRoute()
 
-const isEdit = computed(() => !!route.params.id)
-const contractId = computed(() => String(route.params.id || ''))
+const isEmbedded = computed(() => props.embedded)
+const isEdit = computed(() => props.mode ? props.mode === 'edit' : !!route.params.id)
+const contractId = computed(() => props.contractId || String(route.params.id || ''))
 const loadingDetail = ref(false)
 const dirty = ref(false)
 
 // ---- beforeRouteLeave guard ----
-onBeforeRouteLeave((_to, _from, next) => {
-  if (!dirty.value) { next(); return }
-  Modal.confirm({
-    title: '未保存的更改',
-    content: '当前合同有未保存的修改，确定离开吗？',
-    okText: '确定离开',
-    okType: 'danger',
-    cancelText: '继续编辑',
-    onOk: () => next(),
-    onCancel: () => next(false),
+if (!isEmbedded.value) {
+  onBeforeRouteLeave((_to, _from, next) => {
+    if (!dirty.value) {
+      next()
+      return
+    }
+    Modal.confirm({
+      title: '未保存的更改',
+      content: '当前合同有未保存的修改，确定离开吗？',
+      okText: '确定离开',
+      okType: 'danger',
+      cancelText: '继续编辑',
+      onOk: () => next(),
+      onCancel: () => next(false),
+    })
   })
-})
+}
 
 // ---- Steps ----
 const stepConfig: StepConfig[] = [
@@ -192,8 +215,16 @@ function handleCancel() {
       okText: '确定',
       okType: 'danger',
       cancelText: '继续编辑',
-      onOk: () => router.push('/contract/ledger'),
+      onOk: () => finishClose(),
     })
+    return
+  }
+  finishClose()
+}
+
+function finishClose() {
+  if (isEmbedded.value) {
+    emit('close')
     return
   }
   router.push('/contract/ledger')
@@ -272,7 +303,8 @@ async function doSubmit(withApproval: boolean) {
       message.success(withApproval ? '合同已创建并提交审批' : '合同已保存为草稿')
     }
     dirty.value = false
-    router.push('/contract/ledger')
+    emit('saved')
+    finishClose()
   } catch (e: unknown) {
     console.error(e)
     message.error('保存失败，请稍后重试')
@@ -302,7 +334,7 @@ const termsTotal = computed(() =>
 
 onMounted(async () => {
   await Promise.all([referenceStore.fetchProjects(), referenceStore.fetchPartners()])
-  if (isEdit.value) {
+  if (isEdit.value && contractId.value) {
     await loadContractDetail()
   }
 })
@@ -366,7 +398,7 @@ async function loadContractDetail() {
   } catch (e: unknown) {
     console.error(e)
     message.error('加载合同信息失败')
-    router.push('/contract/ledger')
+    finishClose()
   } finally {
     loadingDetail.value = false
   }
@@ -382,8 +414,10 @@ function genTermKey(): string {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
+  <div
+    :class="['project-target-redesign app-page', { 'cf-embedded': isEmbedded }]"
+  >
+    <div v-if="!isEmbedded" class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb">
         <a-breadcrumb-item>合同管理</a-breadcrumb-item>
         <a-breadcrumb-item>合同台账</a-breadcrumb-item>
@@ -665,7 +699,7 @@ function genTermKey(): string {
         </div>
       </StepWizard>
 
-      <div class="cf-cancel">
+      <div v-if="!isEmbedded" class="cf-cancel">
         <a-button type="text" :disabled="submitting" @click="handleCancel">取消</a-button>
       </div>
     </div>
@@ -676,6 +710,11 @@ function genTermKey(): string {
 .project-target-redesign.app-page {
   background: var(--bg);
   min-height: 100%;
+}
+.project-target-redesign.cf-embedded {
+  background: transparent;
+  min-height: 0;
+  padding: 0;
 }
 .pt-breadcrumb {
   margin-bottom: 4px;

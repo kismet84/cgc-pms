@@ -76,12 +76,12 @@ const itemColumns = [
     title: '物料',
     dataIndex: 'material',
     key: 'material',
-    width: 480,
+    width: 240,
     customHeaderCell: () => ({
-      style: { width: '480px', minWidth: '480px', maxWidth: '480px' },
+      style: { width: '240px', minWidth: '240px', maxWidth: '240px' },
     }),
     customCell: () => ({
-      style: { width: '480px', minWidth: '480px', maxWidth: '480px' },
+      style: { width: '240px', minWidth: '240px', maxWidth: '240px' },
     }),
   },
   { title: '单位', dataIndex: 'unit', key: 'unit', width: 120 },
@@ -163,6 +163,7 @@ function handleAdd() {
   })
   itemList.value = []
   keySeq.value = 0
+  contractList.value = []
   modalVisible.value = true
 }
 
@@ -176,6 +177,7 @@ async function handleEdit(record: PurchaseRequestVO) {
   })
   itemList.value = []
   keySeq.value = 0
+  await loadContractsByProject(record.projectId)
   // Load existing items
   try {
     const items = await getPurchaseRequestItems(record.id)
@@ -189,6 +191,31 @@ async function handleEdit(record: PurchaseRequestVO) {
     itemList.value = []
   }
   modalVisible.value = true
+}
+
+async function loadContractsByProject(projectId?: string) {
+  if (!projectId) {
+    contractList.value = []
+    return
+  }
+  try {
+    const res = await getContractLedger({
+      projectId,
+      contractType: 'PURCHASE',
+      pageNo: 1,
+      pageSize: 200,
+    })
+    contractList.value = res.records
+  } catch (e: unknown) {
+    console.error(e)
+    contractList.value = []
+  }
+}
+
+async function handleProjectChange(projectId?: string) {
+  formData.projectId = projectId
+  formData.contractId = undefined
+  await loadContractsByProject(projectId)
 }
 
 function handleDelete(record: PurchaseRequestVO) {
@@ -349,20 +376,9 @@ function getPopupContainer() {
 const kpiReqTotal = computed(() => tableData.value.length)
 const kpiReqPending = computed(() => tableData.value.filter(r => r.approvalStatus === "DRAFT" || r.approvalStatus === "APPROVING").length)
 
-async function fetchContracts() {
-  try {
-    const res = await getContractLedger({ contractType: 'PURCHASE', pageNo: 1, pageSize: 200 })
-    contractList.value = res.records
-  } catch (e: unknown) {
-    console.error(e)
-    contractList.value = []
-  }
-}
-
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchMaterials()
-  fetchContracts()
   fetchData()
 })
 </script>
@@ -510,7 +526,11 @@ onMounted(() => {
       <!-- Header Form -->
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
         <a-form-item label="项目" required>
-          <a-select v-model:value="formData.projectId" placeholder="请选择项目">
+          <a-select
+            v-model:value="formData.projectId"
+            placeholder="请选择项目"
+            @change="handleProjectChange"
+          >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
@@ -553,7 +573,7 @@ onMounted(() => {
           :columns="itemColumns"
           row-key="key"
           size="small"
-          :scroll="{ x: 1140, y: 250 }"
+          :scroll="{ x: 900, y: 250 }"
         >
           <template #bodyCell="{ column, record: item }">
             <template v-if="column.key === 'material'">
@@ -562,7 +582,7 @@ onMounted(() => {
                   :value="item.materialId"
                   placeholder="选择已有物料"
                   allow-clear
-                  :style="{ width: item.materialId ? '100%' : '55%', flexShrink: 0 }"
+                  :style="{ width: item.materialId ? '100%' : '50%', flexShrink: 0 }"
                   show-search
                   :filter-option="filterOption"
                   @change="(val: string) => handleMaterialChange(item.key, val)"
@@ -644,14 +664,14 @@ onMounted(() => {
 
 :deep(.pr-items-section .ant-table-thead > tr > th:first-child),
 :deep(.pr-items-section .ant-table-tbody > tr > td:first-child) {
-  width: 480px !important;
-  min-width: 480px !important;
-  max-width: 480px !important;
+  width: 240px !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
 }
 
 :deep(.pr-items-section .ant-table colgroup col:first-child) {
-  width: 480px !important;
-  min-width: 480px !important;
-  max-width: 480px !important;
+  width: 240px !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
 }
 </style>

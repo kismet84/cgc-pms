@@ -17,11 +17,29 @@ import {
 } from '@/api/modules/costTarget'
 import type { CostTargetVO, CostTargetItemVO } from '@/types/costTarget'
 
+interface Props {
+  embedded?: boolean
+  targetId?: string
+  mode?: 'create' | 'edit'
+}
+
+interface Emits {
+  (e: 'saved'): void
+  (e: 'close'): void
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  embedded: false,
+  targetId: '',
+})
+const emit = defineEmits<Emits>()
+
 const router = useRouter()
 const route = useRoute()
 
-const editId = (route.params.id as string) || ''
-const isEdit = ref(Boolean(editId))
+const isEmbedded = computed(() => props.embedded)
+const editId = computed(() => props.targetId || String(route.params.id || ''))
+const isEdit = computed(() => (props.mode ? props.mode === 'edit' : !!route.params.id))
 
 // ---- Page state ----
 const loading = ref(false)
@@ -139,10 +157,10 @@ function onSubjectChange(val: string | number | undefined, record: EditableItem)
 
 // ---- Load existing data (edit mode) ----
 async function loadExisting() {
-  if (!editId) return
+  if (!editId.value) return
   loading.value = true
   try {
-    const target = await getCostTargetDetail(editId)
+    const target = await getCostTargetDetail(editId.value)
     formData.projectId = String(target.projectId)
     formData.versionNo = target.versionNo
     formData.versionName = target.versionName
@@ -152,7 +170,7 @@ async function loadExisting() {
 
     // Load items
     try {
-      const existingItems = await getCostTargetItems(editId)
+      const existingItems = await getCostTargetItems(editId.value)
       items.value = existingItems.map((it, idx) => ({
         _key: genKey(),
         costSubjectId: String(it.costSubjectId),
@@ -168,7 +186,7 @@ async function loadExisting() {
   } catch (e: unknown) {
     console.error(e)
     message.error('加载目标成本信息失败')
-    router.push('/cost-target')
+    finishClose()
   } finally {
     loading.value = false
   }
@@ -245,7 +263,7 @@ async function doSubmit(withApproval: boolean) {
 
   saving.value = true
   try {
-    let targetId = editId
+    let targetId = editId.value
 
     if (isEdit.value) {
       await updateCostTarget(targetId, buildTargetPayload())
@@ -263,7 +281,8 @@ async function doSubmit(withApproval: boolean) {
     } else {
       message.success('目标成本已保存')
     }
-    router.push('/cost-target')
+    emit('saved')
+    finishClose()
   } catch (e: unknown) {
     console.error(e)
     message.error('保存失败，请稍后重试')
@@ -293,11 +312,19 @@ function handleCancel() {
       content: '已填写的内容将不会保存。',
       okText: '确认放弃',
       cancelText: '继续编辑',
-      onOk: () => router.push('/cost-target'),
+      onOk: () => finishClose(),
     })
   } else {
-    router.push('/cost-target')
+    finishClose()
   }
+}
+
+function finishClose() {
+  if (isEmbedded.value) {
+    emit('close')
+    return
+  }
+  router.push('/cost-target')
 }
 
 // ---- Table columns ----
@@ -319,13 +346,15 @@ function fmtMoney(val: number | undefined): string {
 onMounted(() => {
   referenceStore.fetchProjects()
   fetchSubjectTree()
-  if (isEdit.value) loadExisting()
+  if (isEdit.value && editId.value) loadExisting()
 })
 </script>
 
 <template>
-  <div class="cte-page app-page project-target-redesign">
-    <div class="pt-page-head">
+  <div
+    :class="['cte-page app-page project-target-redesign', { 'cte-embedded': isEmbedded }]"
+  >
+    <div v-if="!isEmbedded" class="pt-page-head">
       <div>
         <a-breadcrumb class="pt-breadcrumb">
           <a-breadcrumb-item>目标管理</a-breadcrumb-item>
@@ -500,6 +529,11 @@ onMounted(() => {
 <style scoped>
 .cte-page {
   padding: 4px 0;
+}
+.project-target-redesign.cte-embedded {
+  background: transparent;
+  min-height: 0;
+  padding: 0;
 }
 .cte-section {
   margin-bottom: 10px;

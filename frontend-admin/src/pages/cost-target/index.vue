@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { PlusOutlined, ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { getCostTargetList, activateCostTarget, deleteCostTarget } from '@/api/modules/costTarget'
 import { useReferenceStore } from '@/stores/reference'
+import CostTargetEditPage from './edit.vue'
 import type { CostTargetVO, CostTargetQueryParams } from '@/types/costTarget'
 import {
   APPROVAL_STATUS_LABEL,
@@ -12,8 +12,6 @@ import {
   TARGET_STATUS_LABEL,
   TARGET_STATUS_COLOR,
 } from '@/types/costTarget'
-
-const router = useRouter()
 
 // ---- Dropdown data ----
 const referenceStore = useReferenceStore()
@@ -34,6 +32,9 @@ const tableData = ref<CostTargetVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const targetModalVisible = ref(false)
+const targetModalMode = ref<'create' | 'edit'>('create')
+const targetModalId = ref('')
 
 const targetStats = computed(() => {
   const rows = tableData.value
@@ -127,11 +128,15 @@ function handlePageSizeChange(_cur: number, size: number) {
 
 // ---- Actions ----
 function handleCreate() {
-  router.push('/cost-target/create')
+  targetModalMode.value = 'create'
+  targetModalId.value = ''
+  targetModalVisible.value = true
 }
 
 function handleEdit(row: CostTargetVO) {
-  router.push(`/cost-target/${row.id}/edit`)
+  targetModalMode.value = 'edit'
+  targetModalId.value = String(row.id)
+  targetModalVisible.value = true
 }
 
 function handleActivate(row: CostTargetVO) {
@@ -175,6 +180,15 @@ function handleDelete(row: CostTargetVO) {
       }
     },
   })
+}
+
+function handleTargetSaved() {
+  targetModalVisible.value = false
+  fetchData()
+}
+
+function handleTargetClose() {
+  targetModalVisible.value = false
 }
 
 // ---- Helpers ----
@@ -413,12 +427,36 @@ onMounted(() => {
         </section>
       </aside>
     </div>
+
+    <a-modal
+      v-model:open="targetModalVisible"
+      :title="targetModalMode === 'edit' ? '编辑目标成本' : '新建目标成本'"
+      :width="1160"
+      :destroy-on-close="true"
+      :footer="null"
+      :mask-closable="false"
+      centered
+      class="ct-target-modal"
+      @cancel="handleTargetClose"
+    >
+      <CostTargetEditPage
+        :embedded="true"
+        :mode="targetModalMode"
+        :target-id="targetModalId"
+        @saved="handleTargetSaved"
+        @close="handleTargetClose"
+      />
+    </a-modal>
   </div>
 </template>
 
 <style scoped>
 .ct-page {
   padding: 4px 0;
+}
+.ct-target-modal :deep(.ant-modal-body) {
+  max-height: 82vh;
+  overflow: auto;
 }
 .ct-link--disabled {
   color: #9ca3af;
