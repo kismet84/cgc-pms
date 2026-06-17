@@ -375,6 +375,7 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
+            @change="(v: string|undefined) => { filter.contractId = undefined; if(v) referenceStore.fetchContracts({projectId:v}) }"
             :filter-option="
               (input: string, option: any) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())

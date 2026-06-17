@@ -373,6 +373,7 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
+            @change="(v: string|undefined) => { filter.contractId = undefined; if(v) referenceStore.fetchContracts({projectId:v}) }"
             :filter-option="
               (input: string, option: any) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
@@ -543,6 +544,7 @@ onMounted(() => {
             v-model:value="formData.projectId"
             placeholder="请选择项目"
             show-search
+            @change="(v: string) => { formData.contractId = undefined; formData.partnerId = undefined; referenceStore.fetchContracts({ projectId: v }); }"
             :filter-option="
               (input: string, option: any) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())

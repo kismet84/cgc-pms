@@ -101,7 +101,7 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
 
     <div class="pt-panel pt-filter-surface">
       <div class="pt-filter-row">
-        <div class="pt-field"><label>项目：</label><a-select v-model:value="filter.projectId" placeholder="全部" allow-clear style="width:160px"><a-select-option v-for="p in projects" :key="p.id" :value="p.id">{{ p.projectName }}</a-select-option></a-select></div>
+        <div class="pt-field"><label>项目：</label><a-select v-model:value="filter.projectId" placeholder="全部" allow-clear style="width:160px" @change="(v: string|undefined) => { filter.contractId = undefined; if(v) referenceStore.fetchContracts({projectId:v}) }"><a-select-option v-for="p in projects" :key="p.id" :value="p.id">{{ p.projectName }}</a-select-option></a-select></div>
         <div class="pt-field"><label>合同：</label><a-select v-model:value="filter.contractId" placeholder="全部" allow-clear style="width:160px"><a-select-option v-for="c in contracts" :key="c.id" :value="c.id">{{ c.contractName }}</a-select-option></a-select></div>
         <div class="pt-field"><label>付款类型：</label><a-select v-model:value="filter.payType" placeholder="全部" allow-clear style="width:120px"><a-select-option v-for="(label,key) in PAY_TYPE_LABEL" :key="key" :value="key">{{ label }}</a-select-option></a-select></div>
         <div class="pt-field"><label>状态：</label><a-select v-model:value="filter.payStatus" placeholder="全部" allow-clear style="width:120px"><a-select-option v-for="(label,key) in PAY_STATUS_LABEL" :key="key" :value="key">{{ label }}</a-select-option></a-select></div>
@@ -143,7 +143,7 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
     <a-modal v-model:open="modalVisible" :title="modalTitle" :width="760" @ok="handleSubmit">
       <a-form layout="vertical" :model="formData">
         <a-row :gutter="16">
-          <a-col :span="12"><a-form-item label="项目"><a-select v-model:value="formData.projectId" placeholder="请选择项目" style="width:100%" :options="(projects??[]).map(p=>({value:p.id,label:p.projectName}))" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="项目"><a-select v-model:value="formData.projectId" placeholder="请选择项目" style="width:100%" :options="(projects??[]).map(p=>({value:p.id,label:p.projectName}))" @change="(v: string) => { formData.contractId = undefined; formData.partnerId = undefined; referenceStore.fetchContracts({ projectId: v }); }" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="合同"><a-select v-model:value="formData.contractId" placeholder="请选择合同" style="width:100%" :options="(contracts??[]).map(c=>({value:c.id,label:c.contractName}))" @change="onContractChange" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="16">
