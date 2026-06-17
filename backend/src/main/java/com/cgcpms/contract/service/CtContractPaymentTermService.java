@@ -36,7 +36,10 @@ public class CtContractPaymentTermService {
         deleteWrapper.eq(CtContractPaymentTerm::getContractId, contractId);
         ctContractPaymentTermMapper.delete(deleteWrapper);
         if (!newTerms.isEmpty()) {
-            newTerms.forEach(t -> t.setContractId(contractId));
+            newTerms.forEach(t -> {
+                t.setId(null);            // 清空ID，让ASSIGN_ID自动生成新ID，避免与软删除记录主键冲突
+                t.setContractId(contractId);
+            });
             Db.saveBatch(newTerms);
         }
     }
