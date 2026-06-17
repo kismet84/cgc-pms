@@ -222,6 +222,14 @@ function handleRemoveItem(key: number) {
   }
 }
 
+function handleMaterialClear(key: number) {
+  const item = itemList.value.find((i) => i.key === key)
+  if (!item) return
+  item.materialId = ''
+  item.materialName = ''
+  item.unit = ''
+}
+
 function handleMaterialChange(key: number, materialId: string | undefined) {
   const item = itemList.value.find((i) => i.key === key)
   if (!item) return
@@ -254,8 +262,8 @@ async function handleModalOk() {
     return
   }
   for (const item of itemList.value) {
-    if (!item.materialId) {
-      message.warning('请为所有明细选择物料')
+    if (!item.materialId && !item.materialName) {
+      message.warning('请为所有明细选择物料或输入物料名称')
       return
     }
     if (!item.quantity || Number(item.quantity) <= 0) {
@@ -499,22 +507,30 @@ onMounted(() => {
             <template #default="{ record: item }">
               <a-select
                 :value="item.materialId"
-                placeholder="请选择物料"
+                placeholder="选择已有物料"
                 allow-clear
                 style="width: 100%"
                 show-search
                 :filter-option="filterOption"
                 @change="(val: string) => handleMaterialChange(item.key, val)"
+                @clear="handleMaterialClear(item.key)"
               >
                 <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
                   {{ m.materialName }}
                 </a-select-option>
               </a-select>
+              <a-input
+                v-if="!item.materialId"
+                v-model:value="item.materialName"
+                placeholder="或输入自定义物料名称"
+                size="small"
+                style="margin-top: 4px"
+              />
             </template>
           </a-table-column>
-          <a-table-column title="单位" width="70">
+          <a-table-column title="单位" width="80">
             <template #default="{ record: item }">
-              <span>{{ item.unit || '-' }}</span>
+              <a-input v-model:value="item.unit" placeholder="单位" size="small" style="width: 100%" />
             </template>
           </a-table-column>
           <a-table-column title="数量" width="130">

@@ -18,6 +18,7 @@ import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.purchase.vo.MatPurchaseRequestItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseRequestVO;
 import com.cgcpms.workflow.service.WorkflowEngine;
+import com.cgcpms.common.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,8 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,9 +42,9 @@ public class MatPurchaseRequestService {
     private final MdMaterialMapper mdMaterialMapper;
     private final WorkflowEngine workflowEngine;
 
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
     // 分页查询
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
 
     public PageResult<MatPurchaseRequestVO> getPage(long pageNum, long pageSize, Long projectId,
                                                 String approvalStatus, String status, String requestCode) {
@@ -71,58 +70,36 @@ public class MatPurchaseRequestService {
         return PageResult.of(voPage);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 详情查询
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
+    // 查询详情
+    // ================================================================
 
     public MatPurchaseRequestVO getById(Long id) {
-        MatPurchaseRequest request = requestMapper.selectById(id);
-        if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
+        MatPurchaseRequest r = requestMapper.selectById(id);
+        if (r == null || !r.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
-
-        MatPurchaseRequestVO vo = toVO(request);
-
-        // Load items
-        LambdaQueryWrapper<MatPurchaseRequestItem> itemWrapper = new LambdaQueryWrapper<>();
-        itemWrapper.eq(MatPurchaseRequestItem::getRequestId, id)
-                .eq(MatPurchaseRequestItem::getTenantId, UserContext.getCurrentTenantId())
-                .orderByAsc(MatPurchaseRequestItem::getCreatedTime);
-        List<MatPurchaseRequestItem> items = requestItemMapper.selectList(itemWrapper);
-
-        // Resolve material names
-        Set<Long> materialIds = items.stream().map(MatPurchaseRequestItem::getMaterialId)
-                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
-        Map<Long, String> materialNames = materialIds.isEmpty() ? Map.of()
-                : mdMaterialMapper.selectBatchIds(materialIds).stream()
-                        .collect(Collectors.toMap(MdMaterial::getId, MdMaterial::getMaterialName, (a, b) -> a));
-
-        vo.setItems(items.stream().map(i -> toItemVO(i, materialNames)).toList());
-        return vo;
+        return toVO(r);
     }
+
+    // ================================================================
+    // 查询明细
+    // ================================================================
 
     public List<MatPurchaseRequestItemVO> getItems(Long requestId) {
         MatPurchaseRequest request = requestMapper.selectById(requestId);
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
 
-        LambdaQueryWrapper<MatPurchaseRequestItem> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MatPurchaseRequestItem::getRequestId, requestId)
-                .eq(MatPurchaseRequestItem::getTenantId, UserContext.getCurrentTenantId())
-                .orderByAsc(MatPurchaseRequestItem::getCreatedTime);
-        List<MatPurchaseRequestItem> items = requestItemMapper.selectList(wrapper);
-
-        Set<Long> materialIds = items.stream().map(MatPurchaseRequestItem::getMaterialId)
-                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
-        Map<Long, String> materialNames = materialIds.isEmpty() ? Map.of()
-                : mdMaterialMapper.selectBatchIds(materialIds).stream()
-                        .collect(Collectors.toMap(MdMaterial::getId, MdMaterial::getMaterialName, (a, b) -> a));
-
-        return items.stream().map(i -> toItemVO(i, materialNames)).toList();
+        List<MatPurchaseRequestItem> items = requestItemMapper.selectList(
+                new LambdaQueryWrapper<MatPurchaseRequestItem>()
+                        .eq(MatPurchaseRequestItem::getRequestId, requestId)
+                        .eq(MatPurchaseRequestItem::getTenantId, UserContext.getCurrentTenantId()));
+        return items.stream().map(this::toItemVO).collect(Collectors.toList());
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 创建采购申请
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
+    // 创建
+    // ================================================================
 
     @Transactional
     public Long create(MatPurchaseRequest request) {
@@ -154,9 +131,9 @@ public class MatPurchaseRequestService {
         return request.getId();
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 更新采购申请
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
+    // 更新
+    // ================================================================
 
     @Transactional
     public void update(MatPurchaseRequest request) {
@@ -164,8 +141,8 @@ public class MatPurchaseRequestService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
 
-        // Guard: cannot edit if approving or approved
-        if ("APPROVED".equals(existing.getApprovalStatus()) || "APPROVING".equals(existing.getApprovalStatus()))
+        // Only DRAFT can be updated
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
             throw new BusinessException("REQUEST_IN_APPROVAL", "采购申请审批中或已审批，不可编辑");
 
         // Prevent overwriting approval status via update
@@ -175,9 +152,9 @@ public class MatPurchaseRequestService {
         requestMapper.updateById(request);
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
     // 提交审批
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
 
     @Transactional
     public void submitForApproval(Long requestId) {
@@ -221,29 +198,31 @@ public class MatPurchaseRequestService {
                 null, null, null);
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
     // 删除
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
 
     @Transactional
     public void delete(Long id) {
-        MatPurchaseRequest request = requestMapper.selectById(id);
-        if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
+        MatPurchaseRequest existing = requestMapper.selectById(id);
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
 
-        if (!"DRAFT".equals(request.getApprovalStatus()))
+        if (!"DRAFT".equals(existing.getApprovalStatus()))
             throw new BusinessException("REQUEST_IN_APPROVAL", "采购申请审批中或已审批，不可删除");
 
-        // Soft delete
-        LambdaUpdateWrapper<MatPurchaseRequest> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(MatPurchaseRequest::getId, id)
-                .set(MatPurchaseRequest::getDeletedFlag, 1);
-        requestMapper.update(null, wrapper);
+        // Delete items first
+        LambdaQueryWrapper<MatPurchaseRequestItem> itemWrapper = new LambdaQueryWrapper<>();
+        itemWrapper.eq(MatPurchaseRequestItem::getRequestId, id)
+                .eq(MatPurchaseRequestItem::getTenantId, UserContext.getCurrentTenantId());
+        requestItemMapper.delete(itemWrapper);
+
+        requestMapper.deleteById(id);
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
     // 批量保存明细
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
 
     @Transactional
     public void saveItemsBatch(Long requestId, List<MatPurchaseRequestItem> items) {
@@ -265,13 +244,44 @@ public class MatPurchaseRequestService {
         for (MatPurchaseRequestItem item : items) {
             item.setRequestId(requestId);
             item.setTenantId(tenantId);
+            // Auto-create material if name provided but no existing materialId
+            resolveMaterial(item, tenantId);
             requestItemMapper.insert(item);
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 转采购订单（手动触发，用于审批通过后未自动转换的场景）
-    // ═══════════════════════════════════════════════════════════════
+    /**
+     * 自定义物料：name + unit -> 自动查找或创建 MdMaterial
+     */
+    private void resolveMaterial(MatPurchaseRequestItem item, Long tenantId) {
+        if (item.getMaterialId() != null) return;
+        if (item.getMaterialName() == null || item.getMaterialName().isBlank()) return;
+
+        MdMaterial existing = mdMaterialMapper.selectOne(
+                new LambdaQueryWrapper<MdMaterial>()
+                        .eq(MdMaterial::getMaterialName, item.getMaterialName().trim())
+                        .eq(MdMaterial::getTenantId, tenantId));
+        if (existing != null) {
+            item.setMaterialId(existing.getId());
+            if (item.getUnit() == null || item.getUnit().isBlank()) {
+                item.setUnit(existing.getUnit());
+            }
+            return;
+        }
+
+        MdMaterial material = new MdMaterial();
+        material.setTenantId(tenantId);
+        material.setMaterialName(item.getMaterialName().trim());
+        material.setMaterialCode("CUSTOM-" + System.currentTimeMillis());
+        material.setUnit(item.getUnit());
+        material.setStatus("ENABLE");
+        mdMaterialMapper.insert(material);
+        item.setMaterialId(material.getId());
+    }
+
+    // ================================================================
+    // 转采购订单（手动触发）
+    // ================================================================
 
     @Transactional
     public void convertToPurchaseOrder(Long requestId) {
@@ -285,15 +295,12 @@ public class MatPurchaseRequestService {
         if ("CONVERTED".equals(request.getStatus()))
             throw new BusinessException("REQUEST_ALREADY_CONVERTED", "采购申请已转换，不可重复转换");
 
-        // This method delegates to the handler's convert logic.
-        // For manual trigger, we mark as CONVERTED directly and delegate to handler pattern.
-        // Actually, the handler does the conversion. Here we just mark and let caller handle.
         throw new BusinessException("NOT_IMPLEMENTED", "手动转换请通过审批流程自动触发");
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
     // VO 转换
-    // ═══════════════════════════════════════════════════════════════
+    // ================================================================
 
     private MatPurchaseRequestVO toVO(MatPurchaseRequest r) {
         MatPurchaseRequestVO vo = buildBaseVO(r);
@@ -312,33 +319,32 @@ public class MatPurchaseRequestService {
 
     private MatPurchaseRequestVO buildBaseVO(MatPurchaseRequest r) {
         MatPurchaseRequestVO vo = new MatPurchaseRequestVO();
-        vo.setId(r.getId() != null ? r.getId().toString() : null);
-        vo.setTenantId(r.getTenantId() != null ? r.getTenantId().toString() : null);
-        vo.setProjectId(r.getProjectId() != null ? r.getProjectId().toString() : null);
+        vo.setId(String.valueOf(r.getId()));
+        vo.setTenantId(String.valueOf(r.getTenantId()));
+        vo.setProjectId(r.getProjectId() != null ? String.valueOf(r.getProjectId()) : null);
         vo.setRequestCode(r.getRequestCode());
         vo.setApprovalStatus(r.getApprovalStatus());
         vo.setStatus(r.getStatus());
-        vo.setCreatedBy(r.getCreatedBy() != null ? r.getCreatedBy().toString() : null);
-        vo.setCreatedTime(r.getCreatedTime() != null ? DateTimeUtils.DTF.format(r.getCreatedTime()) : null);
-        vo.setUpdatedTime(r.getUpdatedTime() != null ? DateTimeUtils.DTF.format(r.getUpdatedTime()) : null);
+        vo.setCreatedBy(String.valueOf(r.getCreatedBy()));
+        vo.setCreatedTime(r.getCreatedTime() != null ? r.getCreatedTime().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedTime(r.getUpdatedTime() != null ? r.getUpdatedTime().format(DateTimeUtils.DTF) : null);
         vo.setRemark(r.getRemark());
         return vo;
     }
 
-    private MatPurchaseRequestItemVO toItemVO(MatPurchaseRequestItem i, Map<Long, String> materialNames) {
+    private MatPurchaseRequestItemVO toItemVO(MatPurchaseRequestItem item) {
         MatPurchaseRequestItemVO vo = new MatPurchaseRequestItemVO();
-        vo.setId(i.getId() != null ? i.getId().toString() : null);
-        vo.setTenantId(i.getTenantId() != null ? i.getTenantId().toString() : null);
-        vo.setRequestId(i.getRequestId() != null ? i.getRequestId().toString() : null);
-        vo.setMaterialId(i.getMaterialId() != null ? i.getMaterialId().toString() : null);
-        vo.setMaterialName(i.getMaterialId() != null ? materialNames.get(i.getMaterialId()) : null);
-        vo.setQuantity(i.getQuantity() != null ? i.getQuantity().toPlainString() : null);
-        vo.setUnit(i.getUnit());
-        vo.setPlannedDate(i.getPlannedDate() != null ? DateTimeUtils.DATE_FMT.format(i.getPlannedDate()) : null);
-        vo.setCreatedBy(i.getCreatedBy() != null ? i.getCreatedBy().toString() : null);
-        vo.setCreatedTime(i.getCreatedTime() != null ? DateTimeUtils.DTF.format(i.getCreatedTime()) : null);
-        vo.setUpdatedTime(i.getUpdatedTime() != null ? DateTimeUtils.DTF.format(i.getUpdatedTime()) : null);
-        vo.setRemark(i.getRemark());
+        vo.setId(String.valueOf(item.getId()));
+        vo.setTenantId(String.valueOf(item.getTenantId()));
+        vo.setRequestId(String.valueOf(item.getRequestId()));
+        vo.setMaterialId(String.valueOf(item.getMaterialId()));
+        vo.setQuantity(String.valueOf(item.getQuantity()));
+        vo.setUnit(item.getUnit());
+        vo.setPlannedDate(item.getPlannedDate() != null ? item.getPlannedDate().toString() : null);
+        vo.setCreatedBy(item.getCreatedBy() != null ? String.valueOf(item.getCreatedBy()) : null);
+        vo.setCreatedTime(item.getCreatedTime() != null ? item.getCreatedTime().format(DateTimeUtils.DTF) : null);
+        vo.setUpdatedTime(item.getUpdatedTime() != null ? item.getUpdatedTime().format(DateTimeUtils.DTF) : null);
+        vo.setRemark(item.getRemark());
         return vo;
     }
 }

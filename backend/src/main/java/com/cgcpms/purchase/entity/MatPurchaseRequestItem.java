@@ -36,6 +36,10 @@ public class MatPurchaseRequestItem extends BaseEntity {
     @NotNull
     private Long materialId;
 
+    /** 自定义物料名称（非表字段，仅用于接收前端输入，后端据此创建 MdMaterial） */
+    @TableField(exist = false)
+    private String materialName;
+
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal quantity;
 
