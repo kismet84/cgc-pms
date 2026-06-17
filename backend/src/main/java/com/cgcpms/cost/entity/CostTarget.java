@@ -28,10 +28,13 @@ import java.time.LocalDateTime;
 public class CostTarget extends BaseEntity {
 
     @TableId(type = IdType.ASSIGN_ID)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long tenantId;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long projectId;
 
     private String versionNo;

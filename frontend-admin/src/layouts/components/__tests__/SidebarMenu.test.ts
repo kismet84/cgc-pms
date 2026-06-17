@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h, type PropType } from 'vue'
 import SidebarMenu from '@/layouts/components/SidebarMenu.vue'
@@ -11,6 +11,7 @@ type MenuItem = {
 
 const mockPush = vi.fn()
 const mockRoles = vi.hoisted(() => ({ value: ['ADMIN'] as string[] }))
+let renderedMenuItems: MenuItem[] = []
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -39,9 +40,14 @@ const AMenuStub = defineComponent({
       type: Array as PropType<MenuItem[]>,
       default: () => [],
     },
+    openKeys: {
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
   },
   emits: ['click'],
   setup(props, { emit }) {
+    renderedMenuItems = props.items as MenuItem[]
     const renderItems = (items: MenuItem[]) =>
       items.flatMap((item) => [
         h(
@@ -56,24 +62,37 @@ const AMenuStub = defineComponent({
         ...(item.children ? renderItems(item.children) : []),
       ])
 
-    return () => h('nav', { class: 'menu-stub' }, renderItems(props.items))
+    return () =>
+      h(
+        'nav',
+        {
+          class: 'menu-stub',
+          'data-open-keys': props.openKeys.join(','),
+        },
+        renderItems(props.items),
+      )
   },
 })
+
+function mountMenu() {
+  return mount(SidebarMenu, {
+    global: {
+      stubs: {
+        'a-menu': AMenuStub,
+      },
+    },
+  })
+}
 
 describe('SidebarMenu', () => {
   beforeEach(() => {
     mockRoles.value = ['ADMIN']
+    renderedMenuItems = []
+    mockPush.mockClear()
   })
 
   it('uses full paths for nested menu item keys', () => {
-    const wrapper = mount(SidebarMenu, {
-      global: {
-        stubs: {
-          'a-menu': AMenuStub,
-        },
-      },
-    })
-
+    const wrapper = mountMenu()
     const keys = wrapper.findAll('[data-menu-key]').map((node) => node.attributes('data-menu-key'))
 
     expect(keys).toContain('/variation/order')
@@ -82,96 +101,70 @@ describe('SidebarMenu', () => {
     expect(keys).not.toContain('warehouse')
   })
 
-  it('orders root menu items by approved business flow and renames target cost', () => {
-    const wrapper = mount(SidebarMenu, {
-      global: {
-        stubs: {
-          'a-menu': AMenuStub,
-        },
-      },
-    })
+  it('groups root menu items by business domains', () => {
+    const wrapper = mountMenu()
 
-    const rootKeys = wrapper
-      .findAll('[data-menu-key]')
-      .map((node) => node.attributes('data-menu-key'))
-      .filter((key) =>
-        [
-          '/dashboard',
-          '/project',
-          '/cost-target',
-          '/cost',
-          '/contract',
-          '/variation',
-          '/settlement',
-          '/payment',
-        ].includes(key),
-      )
-
-    expect(rootKeys).toEqual([
-      '/dashboard',
-      '/project',
-      '/cost-target',
-      '/cost',
-      '/contract',
-      '/variation',
-      '/settlement',
-      '/payment',
+    expect(renderedMenuItems.map((item) => item.label)).toEqual([
+      '工作台',
+      '项目与主数据',
+      '合同管理',
+      '成本管理',
+      '采购与库存',
+      '分包管理',
+      '付款与发票',
+      '结算管理',
+      '审批中心',
+      '系统管理',
     ])
-
-    expect(wrapper.text()).toContain('目标管理')
-    expect(wrapper.text()).not.toContain('目标成本管理')
+    expect(wrapper.text()).toContain('目标成本')
+    expect(wrapper.text()).not.toContain('目标管理')
   })
 
-  it('includes partner menu entry between project and cost-target', () => {
-    const wrapper = mount(SidebarMenu, {
-      global: {
-        stubs: {
-          'a-menu': AMenuStub,
-        },
-      },
-    })
+  it('opens the domain containing the current route', () => {
+    const wrapper = mountMenu()
+    expect(wrapper.find('.menu-stub').attributes('data-open-keys')).toBe('/workbench')
+  })
 
-    const rootKeys = wrapper
-      .findAll('[data-menu-key]')
-      .map((node) => node.attributes('data-menu-key'))
-      .filter((key) =>
-        [
-          '/dashboard',
-          '/project',
-          '/partner',
-          '/cost-target',
-          '/cost',
-          '/contract',
-          '/variation',
-          '/settlement',
-          '/payment',
-        ].includes(key),
-      )
+  it('places master data and target cost under the approved domains', () => {
+    const wrapper = mountMenu()
 
-    expect(rootKeys).toEqual([
-      '/dashboard',
-      '/project',
-      '/partner',
-      '/cost-target',
-      '/cost',
-      '/contract',
-      '/variation',
-      '/settlement',
-      '/payment',
+    const masterData = renderedMenuItems.find((item) => item.label === '项目与主数据')
+    expect(masterData?.children?.map((item) => item.label)).toEqual([
+      '项目列表',
+      '合作方管理',
+      '组织架构',
+      '材料字典',
     ])
 
-    expect(wrapper.text()).toContain('合作方管理')
+    const cost = renderedMenuItems.find((item) => item.label === '成本管理')
+    expect(cost?.children?.map((item) => item.label)).toEqual([
+      '成本科目',
+      '成本台账',
+      '动态成本汇总',
+      '目标成本',
+    ])
+
+    expect(wrapper.find('[data-menu-key="/cost-target/index"]').exists()).toBe(true)
+  })
+
+  it('places invoice under payment and exposes approval center work lists', () => {
+    mountMenu()
+
+    const payment = renderedMenuItems.find((item) => item.label === '付款与发票')
+    expect(payment?.children?.map((item) => item.label)).toEqual(['付款申请', '发票管理'])
+
+    const approval = renderedMenuItems.find((item) => item.label === '审批中心')
+    expect(approval?.children?.map((item) => item.label)).toEqual([
+      '我的待办',
+      '我的已办',
+      '抄送我的',
+      '审批流程管理',
+    ])
   })
 
   it('shows approval process management only to administrators', () => {
     mockRoles.value = ['ADMIN']
-    const adminWrapper = mount(SidebarMenu, {
-      global: {
-        stubs: {
-          'a-menu': AMenuStub,
-        },
-      },
-    })
+    const adminWrapper = mountMenu()
 
     expect(adminWrapper.text()).toContain('审批流程管理')
     expect(
@@ -179,13 +172,7 @@ describe('SidebarMenu', () => {
     ).toContain('/approval/process')
 
     mockRoles.value = ['PROJECT_MANAGER']
-    const userWrapper = mount(SidebarMenu, {
-      global: {
-        stubs: {
-          'a-menu': AMenuStub,
-        },
-      },
-    })
+    const userWrapper = mountMenu()
 
     expect(userWrapper.text()).not.toContain('审批流程管理')
     expect(

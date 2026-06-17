@@ -118,6 +118,23 @@ class CostTargetControllerTest {
         Assertions.assertTrue(testTargetId > 0, "Created target ID should be positive");
     }
 
+    @Test
+    @Order(3)
+    @DisplayName("T2b: GET /cost-targets returns target id as string")
+    void testListCostTargets_IdSerializedAsString() throws Exception {
+        Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
+        mockMvc.perform(getWithApiContext("/cost-targets")
+                        .cookie(adminCookie())
+                        .param("projectId", String.valueOf(PROJECT_ID))
+                        .param("versionNo", "V1.0-TEST")
+                        .param("pageNo", "1")
+                        .param("pageSize", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.records[0].id").isString())
+                .andExpect(jsonPath("$.data.records[0].id").value(String.valueOf(testTargetId)));
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // T3: GET items — empty list
     // ═══════════════════════════════════════════════════════════════
@@ -253,6 +270,55 @@ class CostTargetControllerTest {
                 .andExpect(jsonPath("$.code").value("COST_TARGET_NOT_FOUND"));
     }
 
+    @Test
+    @Order(10)
+    @DisplayName("T10: DELETE /cost-targets/{id} succeeds with id returned from list")
+    void testDeleteCostTarget_UsesStringIdFromList() throws Exception {
+        String versionNo = "V1.0-DELETE-" + System.nanoTime();
+        String body = """
+                {
+                    "projectId": %d,
+                    "versionNo": "%s",
+                    "versionName": "删除测试版本",
+                    "totalTargetAmount": 1000.00,
+                    "isActive": 0,
+                    "approvalStatus": "DRAFT",
+                    "status": "DRAFT"
+                }
+                """.formatted(PROJECT_ID, versionNo);
+
+        mockMvc.perform(postWithApiContext("/cost-targets")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        String listResponse = mockMvc.perform(getWithApiContext("/cost-targets")
+                        .cookie(adminCookie())
+                        .param("projectId", String.valueOf(PROJECT_ID))
+                        .param("versionNo", versionNo)
+                        .param("pageNo", "1")
+                        .param("pageSize", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.records[0].id").isString())
+                .andReturn().getResponse().getContentAsString();
+
+        String idFromList = listResponse.replaceAll(".*\"id\":\"(\\d+)\".*", "$1");
+        Assertions.assertTrue(idFromList.matches("\\d+"), "List response should contain string id");
+
+        mockMvc.perform(deleteWithApiContext("/cost-targets/" + idFromList)
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        mockMvc.perform(getWithApiContext("/cost-targets/" + idFromList)
+                        .cookie(adminCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COST_TARGET_NOT_FOUND"));
+    }
+
     // ---- helpers ----
 
     private MockHttpServletRequestBuilder getWithApiContext(String pathWithinContext) {
@@ -261,5 +327,9 @@ class CostTargetControllerTest {
 
     private MockHttpServletRequestBuilder postWithApiContext(String pathWithinContext) {
         return post("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder deleteWithApiContext(String pathWithinContext) {
+        return delete("/api" + pathWithinContext).contextPath("/api");
     }
 }

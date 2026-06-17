@@ -68,6 +68,31 @@ describe('router lazy loading', () => {
     expect(typeof processRoute!.component).toBe('function')
   })
 
+  it('uses business-domain titles for target cost and approval center', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const costTargetRoute = rootRoute?.children?.find((c) => c.path === 'cost-target')
+    const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')
+
+    expect(costTargetRoute?.meta?.title).toBe('目标成本')
+    expect(approvalRoute?.meta?.title).toBe('审批中心')
+  })
+
+  it('registers dedicated approval done and cc routes', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')
+    const doneRoute = approvalRoute?.children?.find((c) => c.path === 'done')
+    const ccRoute = approvalRoute?.children?.find((c) => c.path === 'cc')
+
+    expect(doneRoute?.name).toBe('ApprovalDone')
+    expect(doneRoute?.meta?.title).toBe('我的已办')
+    expect(doneRoute?.meta?.approvalTab).toBe('done')
+    expect(typeof doneRoute?.component).toBe('function')
+    expect(ccRoute?.name).toBe('ApprovalCc')
+    expect(ccRoute?.meta?.title).toBe('抄送我的')
+    expect(ccRoute?.meta?.approvalTab).toBe('cc')
+    expect(typeof ccRoute?.component).toBe('function')
+  })
+
   it('matches approval process route before approval detail route', async () => {
     const router = createRouter({
       history: createMemoryHistory(),

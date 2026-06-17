@@ -81,13 +81,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'cost-target',
         name: 'CostTarget',
         redirect: '/cost-target/index',
-        meta: { title: '目标管理', icon: 'AimOutlined' },
+        meta: { title: '目标成本', icon: 'AimOutlined' },
         children: [
           {
             path: 'index',
             name: 'CostTargetList',
             component: () => import('@/pages/cost-target/index.vue'),
-            meta: { title: '目标管理' },
+            meta: { title: '目标成本' },
           },
           {
             path: 'create',
@@ -297,13 +297,25 @@ export const routes: RouteRecordRaw[] = [
         path: 'approval',
         name: 'Approval',
         redirect: '/approval/todo',
-        meta: { title: '审批管理', icon: 'AuditOutlined' },
+        meta: { title: '审批中心', icon: 'AuditOutlined' },
         children: [
           {
             path: 'todo',
             name: 'ApprovalTodo',
             component: () => import('@/pages/approval/todo.vue'),
-            meta: { title: '我的待办' },
+            meta: { title: '我的待办', approvalTab: 'todo' },
+          },
+          {
+            path: 'done',
+            name: 'ApprovalDone',
+            component: () => import('@/pages/approval/todo.vue'),
+            meta: { title: '我的已办', approvalTab: 'done' },
+          },
+          {
+            path: 'cc',
+            name: 'ApprovalCc',
+            component: () => import('@/pages/approval/todo.vue'),
+            meta: { title: '抄送我的', approvalTab: 'cc' },
           },
           {
             path: 'process',

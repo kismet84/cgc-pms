@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
   getMyTodos,
@@ -13,8 +13,9 @@ import {
 import type { PageResult } from '@/types/api'
 
 const router = useRouter()
+const route = useRoute()
 
-const activeTab = ref('todo')
+const activeTab = ref(String(route.meta.approvalTab ?? 'todo'))
 
 const loading = ref(false)
 const pageNo = ref(1)
@@ -62,8 +63,9 @@ async function fetchData() {
   }
 }
 
-function handleTabChange(_key: string) {
+function handleTabChange(key: string) {
   pageNo.value = 1
+  router.push(`/approval/${key}`)
   fetchData()
 }
 
@@ -88,7 +90,7 @@ const columns = [
 const tabs = [
   { key: 'todo', label: '我的待办' },
   { key: 'done', label: '我的已办' },
-  { key: 'cc', label: '抄送我' },
+  { key: 'cc', label: '抄送我的' },
 ]
 
 const tableData = computed<Record<string, unknown>[]>(() => {
@@ -121,13 +123,28 @@ function pageHeaderSubtitle(): string {
 onMounted(() => {
   fetchData()
 })
+
+watch(
+  () => route.meta.approvalTab,
+  (tab) => {
+    const nextTab = String(tab ?? 'todo')
+    if (nextTab === activeTab.value) return
+    activeTab.value = nextTab
+    pageNo.value = 1
+    fetchData()
+  },
+)
 </script>
 
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>审批管理</a-breadcrumb-item><a-breadcrumb-item>待办</a-breadcrumb-item></a-breadcrumb>
-      <h1 class="app-page-title">待办审批</h1>
+      <a-breadcrumb class="pt-breadcrumb">
+        <a-breadcrumb-item>审批中心</a-breadcrumb-item>
+        <a-breadcrumb-item>{{ pageHeaderTitle() }}</a-breadcrumb-item>
+      </a-breadcrumb>
+      <h1 class="app-page-title">{{ pageHeaderTitle() }}</h1>
+      <p class="app-page-subtitle">{{ pageHeaderSubtitle() }}</p>
       <div class="pt-head-actions"></div>
     </div>
 

@@ -1,26 +1,18 @@
 <script setup lang="ts">
 import { computed, h, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { routes } from '@/router'
+import { navigationItems, type NavigationItem } from '@/router/navigation'
 import { useUserStore } from '@/stores/user'
-import type { RouteRecordRaw } from 'vue-router'
 import {
   AccountBookOutlined,
-  AimOutlined,
-  AlertOutlined,
-  ApartmentOutlined,
   AuditOutlined,
   BranchesOutlined,
-  DatabaseOutlined,
   DollarOutlined,
   FileTextOutlined,
   HomeOutlined,
-  InboxOutlined,
   ProjectOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
-  SwapOutlined,
-  TeamOutlined,
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -36,89 +28,46 @@ interface MenuItem {
 
 const iconMap: Record<string, MenuItem['icon']> = {
   AccountBookOutlined,
-  AimOutlined,
-  AlertOutlined,
-  ApartmentOutlined,
   AuditOutlined,
   BranchesOutlined,
-  DatabaseOutlined,
   DollarOutlined,
   FileTextOutlined,
   HomeOutlined,
-  InboxOutlined,
   ProjectOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
-  SwapOutlined,
-  TeamOutlined,
 }
 
-const MENU_ORDER = [
-  '/dashboard',
-  '/project',
-  '/partner',
-  '/cost-target',
-  '/cost',
-  '/contract',
-  '/variation',
-  '/settlement',
-  '/payment',
-  '/subcontract',
-  '/purchase',
-  '/inventory',
-  '/invoice',
-  '/approval',
-  '/alert',
-  '/material',
-  '/org',
-  '/system',
-]
-
 const menuItems = computed(() => {
-  return routes
-    .find((r) => r.path === '/')
-    ?.children?.filter((r) => isMenuVisible(r))
-    .sort((a, b) => menuRank(resolveMenuPath('', a.path)) - menuRank(resolveMenuPath('', b.path)))
-    .map((r) => buildMenuItem(r, ''))
+  return navigationItems
+    .filter((item) => isMenuVisible(item))
+    .map((item) => buildMenuItem(item))
 })
 
 const isAdmin = computed(() => {
   return userStore.roles.includes('ADMIN') || userStore.roles.includes('SUPER_ADMIN')
 })
 
-function menuRank(path: string) {
-  const index = MENU_ORDER.indexOf(path)
-  return index === -1 ? MENU_ORDER.length : index
-}
-
-function buildMenuItem(route: RouteRecordRaw, parentPath: string): MenuItem {
-  const fullPath = resolveMenuPath(parentPath, route.path)
+function buildMenuItem(navigation: NavigationItem): MenuItem {
   const item: MenuItem = {
-    key: fullPath,
-    label: route.meta?.title as string,
+    key: navigation.key,
+    label: navigation.label,
   }
-  const iconName = route.meta?.icon as string
+  const iconName = navigation.icon
   if (iconName && iconMap[iconName]) {
     item.icon = () => h(iconMap[iconName])
   }
-  if (route.children && route.children.length > 0) {
-    item.children = route.children
-      .filter((c) => isMenuVisible(c))
-      .map((c) => buildMenuItem(c, fullPath))
+  if (navigation.children && navigation.children.length > 0) {
+    item.children = navigation.children
+      .filter((child) => isMenuVisible(child))
+      .map((child) => buildMenuItem(child))
   }
   return item
 }
 
-function isMenuVisible(route: RouteRecordRaw) {
-  if (route.meta?.hidden) return false
-  if (route.meta?.adminOnly && !isAdmin.value) return false
+function isMenuVisible(item: NavigationItem) {
+  if (item.adminOnly && !isAdmin.value) return false
   return true
-}
-
-function resolveMenuPath(parentPath: string, routePath: string) {
-  if (routePath.startsWith('/')) return routePath
-  const normalizedParent = parentPath === '/' ? '' : parentPath
-  return `${normalizedParent}/${routePath}`.replace(/\/+/g, '/')
 }
 
 const selectedKeys = computed(() => {
@@ -126,13 +75,12 @@ const selectedKeys = computed(() => {
 })
 
 function computeOpenKeys(): string[] {
-  const keys: string[] = []
-  let parent = route.matched[route.matched.length - 2]
-  while (parent) {
-    keys.push(parent.path)
-    parent = route.matched[route.matched.findIndex((r) => r.path === parent.path) - 1]
-  }
-  return keys
+  const parent = navigationItems.find((item) =>
+    item.matchPrefixes?.some(
+      (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
+    ),
+  )
+  return parent ? [parent.key] : []
 }
 
 const openKeys = ref<string[]>(computeOpenKeys())

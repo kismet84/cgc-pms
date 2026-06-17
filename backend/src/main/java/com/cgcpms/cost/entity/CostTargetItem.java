@@ -22,16 +22,21 @@ import java.time.LocalDateTime;
 public class CostTargetItem extends BaseEntity {
 
     @TableId(type = IdType.ASSIGN_ID)
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long tenantId;
 
     /** 关联 cost_target.id */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long targetId;
 
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long projectId;
 
     /** 关联 cost_subject.id */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long costSubjectId;
 
     @JsonSerialize(using = ToStringSerializer.class)
