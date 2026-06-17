@@ -532,7 +532,7 @@ onMounted(() => {
           :pagination="false"
           row-key="key"
           size="small"
-          :scroll="{ y: 250 }"
+          :scroll="{ x: 850, y: 250 }"
         >
           <a-table-column title="物料" width="360">
             <template #default="{ record: item }">
