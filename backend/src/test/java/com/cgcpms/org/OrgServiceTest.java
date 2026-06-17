@@ -518,7 +518,7 @@ class OrgServiceTest {
         Long id = orgPositionService.create(position);
 
         // List
-        IPage<OrgPositionVO> page = orgPositionService.getPage(1, 20, null, null, null);
+        IPage<OrgPositionVO> page = orgPositionService.getPage(1L, 20L, null, null, null, null, null);
         assertTrue(page.getTotal() >= 1, "应有记录");
 
         // Update
