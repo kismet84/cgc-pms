@@ -300,8 +300,9 @@ public class CtContractService {
             paymentTermService.batchSave(contractId, terms);
         }
 
-        // ── 可选：立即提交审批 ──
-        if (Boolean.TRUE.equals(request.getSubmitForApproval())) {
+        // ── 可选：立即提交审批（仅草稿状态可提交）──
+        if (Boolean.TRUE.equals(request.getSubmitForApproval())
+                && ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus())) {
             submitForApproval(contractId);
         }
 
