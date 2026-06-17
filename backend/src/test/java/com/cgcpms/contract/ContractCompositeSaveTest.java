@@ -2,14 +2,13 @@ package com.cgcpms.contract;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.TestUserContext;
+import com.cgcpms.contract.dto.ContractSaveRequest;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
-import com.cgcpms.contract.service.CtContractItemService;
-import com.cgcpms.contract.service.CtContractPaymentTermService;
 import com.cgcpms.contract.service.CtContractService;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
@@ -19,7 +18,6 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,20 +26,14 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * TDD RED phase — reproduce non-atomic contract save behavior.
+ * GREEN phase — 验证复合原子保存 (compositeSave) 的事务一致性。
  * <p>
- * Known bugs:
- * <ul>
- *   <li>Frontend calls create/update contract, batch save items, batch save
- *       payment terms as separate HTTP requests → no cross-request transaction</li>
- *   <li>If payment terms save fails after header+items succeed, orphan header
- *       and items remain (no rollback)</li>
- * </ul>
- * ALL tests expect failure on current code — this is the RED phase.
+ * 所有调用走 contractService.compositeSave()，确保 header + items + paymentTerms
+ * 在同一 @Transactional 中完成，任一子操作失败即整体回滚。
  */
 @SpringBootTest
 @ActiveProfiles("local")
-@DisplayName("ContractCompositeSave — non-atomic multi-call save behavior")
+@DisplayName("ContractCompositeSave — composite atomic save behavior")
 class ContractCompositeSaveTest {
 
     private static final long PROJECT_ID = 10001L;
@@ -50,12 +42,6 @@ class ContractCompositeSaveTest {
 
     @Autowired
     private CtContractService contractService;
-
-    @Autowired
-    private CtContractItemService itemService;
-
-    @Autowired
-    private CtContractPaymentTermService paymentTermService;
 
     @Autowired
     private CtContractMapper contractMapper;
@@ -172,125 +158,130 @@ class ContractCompositeSaveTest {
         return term;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // RED-1: Multi-call save is NON-ATOMIC — demonstrates orphan risk
-    // Creates header + items + terms in separate calls (simulating
-    // frontend multi-request flow). Then verifies that a failure in
-    // one step cannot rollback earlier steps.
-    //
-    // RED assertion: After creating header + items, we expect that
-    // deleting items (simulating a mid-save failure scenario) would
-    // also clean up the header (atomicity). But it doesn't — header
-    // survives → assertion FAILS → RED.
-    // ═══════════════════════════════════════════════════════════════
-
-    @Test
-    @DisplayName("RED-1: non-atomic save — header survives after items deleted (no composite rollback)")
-    void testNonAtomicSaveHeaderSurvivesItemDeletion() {
-        // Step 1: Create contract header (commits independently)
-        CtContract contract = buildContract(null, "原子保存测试-RED1-非原子");
-        Long contractId = contractService.create(contract);
-        assertNotNull(contractId, "合同头创建应返回ID");
-
-        // Step 2: Save items (separate transaction)
-        CtContractItem item = buildItem("CI-RED1-001", "测试清单项-混凝土", new BigDecimal("100.00"), new BigDecimal("450.00"));
-        itemService.batchSave(contractId, List.of(item));
-
-        // Step 3: Save payment terms (separate transaction)
-        CtContractPaymentTerm term = buildTerm("预付款", new BigDecimal("30.00"), 1);
-        paymentTermService.batchSave(contractId, List.of(term));
-
-        // Simulate a mid-save failure: delete the items (simulating
-        // "item save failed but header was already committed")
-        contractItemMapper.delete(new LambdaQueryWrapper<CtContractItem>()
-                .eq(CtContractItem::getContractId, contractId));
-        paymentTermMapper.delete(new LambdaQueryWrapper<CtContractPaymentTerm>()
-                .eq(CtContractPaymentTerm::getContractId, contractId));
-
-        // RED assertion: With atomic composite save, if children are
-        // deleted/absent, the header should ALSO be absent (rollback).
-        // But current multi-call approach leaves orphan header.
-        // This assertion FAILS because header still exists → RED.
-        CtContract afterDelete = contractMapper.selectById(contractId);
-        assertNull(afterDelete,
-                "RED: 子项删除后，合同头应不存在（原子性）。"
-                        + "但当前非原子保存导致合同头仍存在（孤儿记录），contractId=" + contractId);
+    private ContractSaveRequest buildRequest(String contractName, List<CtContractItem> items,
+                                             List<CtContractPaymentTerm> terms, boolean submit) {
+        ContractSaveRequest request = new ContractSaveRequest();
+        request.setContract(buildContract(null, contractName));
+        request.setItems(items);
+        request.setPaymentTerms(terms);
+        request.setSubmitForApproval(submit);
+        return request;
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RED-2: Orphan header risk — terms failure does NOT roll back header
-    // After header + items succeed in their own transactions, if terms
-    // save fails, the header and items are already committed (orphans).
-    // This test FAILS (assertion error) because:
-    //   assertNull(orphan) — expects NO orphan, but header exists → FAILS → RED
+    // GREEN-1: 复合原子保存 — header + items + terms 全量持久化
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("RED-2: orphan header remains after terms save fails (no rollback)")
-    void testOrphanHeaderAfterTermsFail() {
-        // Step 1: Create contract header (commits in its own transaction)
-        CtContract contract = buildContract(null, "原子保存测试-RED2-孤儿风险");
-        Long contractId = contractService.create(contract);
-        assertNotNull(contractId);
+    @DisplayName("GREEN-1: compositeSave persists header + items + terms atomically")
+    void testCompositeSaveAllThreePersist() {
+        CtContractItem item = buildItem("CI-GRN1-001", "测试清单项-混凝土",
+                new BigDecimal("100.00"), new BigDecimal("450.00"));
+        CtContractPaymentTerm term = buildTerm("预付款", new BigDecimal("30.00"), 1);
 
-        // Step 2: Save items (commits in its own transaction)
-        CtContractItem item = buildItem("CI-RED2-001", "测试清单项-钢筋", new BigDecimal("50.00"), new BigDecimal("3800.00"));
-        itemService.batchSave(contractId, List.of(item));
+        ContractSaveRequest request = buildRequest("原子保存测试-GREEN1-全量保存",
+                List.of(item), List.of(term), false);
 
-        // Step 3: Save payment terms WITH INVALID DATA to trigger failure
-        // termName exceeds VARCHAR(200) → causes SQL error
+        Long contractId = contractService.compositeSave(request);
+        assertNotNull(contractId, "复合保存应返回合同 ID");
+
+        // 验证 header
+        CtContract saved = contractMapper.selectById(contractId);
+        assertNotNull(saved, "合同头应持久化");
+        assertEquals("DRAFT", saved.getApprovalStatus());
+        assertNotNull(saved.getContractCode(), "合同编号应已生成");
+
+        // 验证 items
+        List<CtContractItem> items = contractItemMapper.selectList(
+                new LambdaQueryWrapper<CtContractItem>()
+                        .eq(CtContractItem::getContractId, contractId));
+        assertEquals(1, items.size(), "应持久化 1 条明细项");
+        assertEquals("CI-GRN1-001", items.get(0).getItemCode());
+
+        // 验证 terms
+        List<CtContractPaymentTerm> terms = paymentTermMapper.selectList(
+                new LambdaQueryWrapper<CtContractPaymentTerm>()
+                        .eq(CtContractPaymentTerm::getContractId, contractId));
+        assertEquals(1, terms.size(), "应持久化 1 条付款条款");
+        assertEquals("预付款", terms.get(0).getTermName());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // GREEN-2: 事务回滚 — 付款条款保存失败时整体回滚
+    // 构造 termName 超过 VARCHAR(200) 触发 SQL 错误 → 整个事务回滚
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("GREEN-2: transactional rollback on child failure — no orphan header")
+    void testTransactionalRollbackOnChildFailure() {
+        CtContractItem item = buildItem("CI-GRN2-001", "测试清单项-钢筋",
+                new BigDecimal("50.00"), new BigDecimal("3800.00"));
+
+        // termName 超过 VARCHAR(200) — 必定触发 SQL 错误
         CtContractPaymentTerm badTerm = new CtContractPaymentTerm();
-        badTerm.setTermName("X".repeat(250)); // exceeds column limit
+        badTerm.setTermName("X".repeat(250));
         badTerm.setPaymentRatio(new BigDecimal("100.00"));
         badTerm.setPaymentAmount(new BigDecimal("640000.00"));
         badTerm.setSortOrder(1);
 
-        // Terms save FAILS
-        try {
-            paymentTermService.batchSave(contractId, List.of(badTerm));
-            System.out.println("RED-2 WARNING: 预期条款保存失败，但实际成功了 — 可能需要调整触发条件");
-        } catch (Exception e) {
-            // Expected: terms save failed
-            System.out.println("RED-2: 条款保存失败（预期）: " + e.getClass().getSimpleName());
-        }
+        ContractSaveRequest request = buildRequest("原子保存测试-GREEN2-回滚",
+                List.of(item), List.of(badTerm), false);
 
-        // RED assertion: header SHOULD NOT exist after terms failure
-        // But with non-atomic multi-call save, the header IS already committed.
-        // This assertion FAILS → RED indicator of the bug.
-        CtContract orphan = contractMapper.selectById(contractId);
-        assertNull(orphan,
-                "RED: 付款条款保存失败后，合同头应回滚（原子性要求）。"
-                        + "但当前非原子保存导致合同头仍存在（孤儿记录），contractId=" + contractId);
+        // compositeSave 应抛出异常（terms 保存失败）
+        assertThrows(Exception.class, () -> contractService.compositeSave(request),
+                "复合保存中任一子操作失败应抛异常并回滚");
+
+        // 验证：没有任何孤儿记录残留（通过名称搜索）
+        List<CtContract> orphans = contractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getContractName, "原子保存测试-GREEN2-回滚"));
+        assertTrue(orphans.isEmpty(),
+                "事务回滚后不应残留合同头（孤儿记录）。"
+                        + "当前残留 " + orphans.size() + " 条记录，可能未回滚。");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RED-3: Partial save — items saved but no terms
-    // Simulates scenario where user saves but forgets/omits payment terms.
-    // With atomic composite save, either ALL data is saved or NONE is.
-    //
-    // RED assertion: After saving header + items, we expect terms to
-    // also exist (atomic save would have rejected incomplete data).
-    // But terms are absent → assertion FAILS → RED.
+    // GREEN-3: 复合保存数据完整性 — 所有字段正确持久化
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("RED-3: partial save (header+items, no terms) — terms should exist (atomicity)")
-    void testPartialSaveMissingTerms() {
-        CtContract contract = buildContract(null, "原子保存测试-RED3-缺少条款");
-        Long contractId = contractService.create(contract);
+    @DisplayName("GREEN-3: composite save with full data — all fields persisted correctly")
+    void testCompositeSaveFullDataIntegrity() {
+        CtContractItem item = buildItem("CI-GRN3-001", "测试清单项-模板",
+                new BigDecimal("200.00"), new BigDecimal("350.00"));
+        CtContractPaymentTerm term1 = buildTerm("首付款", new BigDecimal("40.00"), 1);
+        CtContractPaymentTerm term2 = buildTerm("验收款", new BigDecimal("55.00"), 2);
+        CtContractPaymentTerm term3 = buildTerm("质保金", new BigDecimal("5.00"), 3);
+
+        ContractSaveRequest request = buildRequest("原子保存测试-GREEN3-完整性",
+                List.of(item), List.of(term1, term2, term3), false);
+
+        Long contractId = contractService.compositeSave(request);
         assertNotNull(contractId);
 
-        CtContractItem item = buildItem("CI-RED3-001", "测试清单项-模板", new BigDecimal("200.00"), new BigDecimal("350.00"));
-        itemService.batchSave(contractId, List.of(item));
+        // 验证 header 字段
+        CtContract saved = contractMapper.selectById(contractId);
+        assertNotNull(saved);
+        assertEquals("SUB", saved.getContractType());
+        assertEquals(PROJECT_ID, saved.getProjectId());
+        assertEquals(PARTY_A_ID, saved.getPartyAId());
+        assertEquals(PARTY_B_ID, saved.getPartyBId());
+        assertEquals(0, new BigDecimal("640000.00").compareTo(saved.getContractAmount()));
 
-        // Deliberately skip payment terms (simulating incomplete save)
-        // RED assertion: With atomic save, terms SHOULD exist
-        // (either all saved or none saved). But they don't → FAILS.
+        // 验证 1 条 item
+        List<CtContractItem> items = contractItemMapper.selectList(
+                new LambdaQueryWrapper<CtContractItem>()
+                        .eq(CtContractItem::getContractId, contractId));
+        assertEquals(1, items.size());
+
+        // 验证 3 条 terms
         List<CtContractPaymentTerm> terms = paymentTermMapper.selectList(
                 new LambdaQueryWrapper<CtContractPaymentTerm>()
-                        .eq(CtContractPaymentTerm::getContractId, contractId));
-        assertEquals(1, terms.size(),
-                "RED: 应有付款条款（原子保存要求全有或全无），但实际缺少条款。"
-                        + "非原子保存允许部分数据提交产生不完整记录。contractId=" + contractId);
+                        .eq(CtContractPaymentTerm::getContractId, contractId)
+                        .orderByAsc(CtContractPaymentTerm::getSortOrder));
+        assertEquals(3, terms.size());
+        assertEquals("首付款", terms.get(0).getTermName());
+        assertEquals("验收款", terms.get(1).getTermName());
+        assertEquals("质保金", terms.get(2).getTermName());
     }
 }

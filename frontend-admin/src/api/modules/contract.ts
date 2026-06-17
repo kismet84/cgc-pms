@@ -116,6 +116,32 @@ export function deleteContract(id: string) {
   })
 }
 
+/** 复合原子保存请求类型 */
+export interface ContractSaveRequest {
+  contract: Partial<ContractVO>
+  items: Partial<ContractItem>[]
+  paymentTerms: Partial<ContractPaymentTerm>[]
+  submitForApproval: boolean
+}
+
+/** 原子保存合同（新建草稿） — header + items + paymentTerms 在同一事务 */
+export function saveContractDraft(data: ContractSaveRequest) {
+  return request<string>({
+    url: '/contracts/composite',
+    method: 'post',
+    data,
+  })
+}
+
+/** 原子保存合同（更新） — header + items + paymentTerms 在同一事务 */
+export function updateContractDraft(id: string, data: ContractSaveRequest) {
+  return request<void>({
+    url: `/contracts/${id}/composite`,
+    method: 'put',
+    data,
+  })
+}
+
 /** 获取合同审批记录 */
 export function getContractApprovalRecords(contractId: string) {
   return request<ContractApprovalRecord[]>({

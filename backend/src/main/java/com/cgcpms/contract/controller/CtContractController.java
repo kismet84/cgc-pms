@@ -3,6 +3,7 @@ package com.cgcpms.contract.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.contract.dto.ContractSaveRequest;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.service.CtContractService;
 import com.cgcpms.contract.vo.ContractApprovalRecordVO;
@@ -86,6 +87,20 @@ public class CtContractController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         ctContractService.delete(id);
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/composite")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
+    public ApiResponse<String> compositeCreate(@Valid @RequestBody ContractSaveRequest request) {
+        return ApiResponse.success(ctContractService.compositeSave(request).toString());
+    }
+
+    @PutMapping("/{id}/composite")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:edit')")
+    public ApiResponse<Void> compositeUpdate(@PathVariable Long id, @Valid @RequestBody ContractSaveRequest request) {
+        request.getContract().setId(id);
+        ctContractService.compositeSave(request);
         return ApiResponse.success();
     }
 

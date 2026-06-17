@@ -7,7 +7,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
+import com.cgcpms.contract.dto.ContractSaveRequest;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.vo.ContractApprovalRecordVO;
 import com.cgcpms.contract.vo.CtContractVO;
@@ -42,6 +45,8 @@ public class CtContractService {
     private final CtContractMapper ctContractMapper;
     private final PmProjectMapper pmProjectMapper;
     private final MdPartnerMapper mdPartnerMapper;
+    private final CtContractItemService itemService;
+    private final CtContractPaymentTermService paymentTermService;
     private final WorkflowEngine workflowEngine;
     private final WfInstanceMapper wfInstanceMapper;
     private final WfRecordMapper wfRecordMapper;
@@ -226,6 +231,78 @@ public class CtContractService {
             throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中或已审批，不可删除");
 
         ctContractMapper.deleteById(id);
+    }
+
+    /**
+     * 复合原子保存：合同头 + 明细项 + 付款条款 在同一事务内创建/更新。
+     * <p>
+     * contract.id == null → 新建（生成合同编号，置 DRAFT）
+     * contract.id != null → 更新已有合同
+     * <p>
+     * 所有子表采用 delete-then-insert 策略，与现有 batchSave 行为一致。
+     */
+    @Transactional
+    public Long compositeSave(ContractSaveRequest request) {
+        CtContract contract = request.getContract();
+
+        if (contract.getId() == null) {
+            // ── 新建 ──
+            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
+            String prefix = "CT-" + today + "-";
+
+            LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
+            wrapper.likeRight(CtContract::getContractCode, prefix)
+                    .orderByDesc(CtContract::getContractCode)
+                    .last("LIMIT 1");
+            CtContract last = ctContractMapper.selectOne(wrapper);
+
+            int seq = 1;
+            if (last != null && last.getContractCode() != null
+                    && last.getContractCode().length() == prefix.length() + 3) {
+                try {
+                    seq = Integer.parseInt(last.getContractCode().substring(prefix.length())) + 1;
+                } catch (NumberFormatException e) {
+                    log.warn("Failed to parse sequence number: {}", last.getContractCode(), e);
+                }
+            }
+            contract.setContractCode(prefix + String.format("%03d", seq));
+            contract.setContractStatus("DRAFT");
+            contract.setApprovalStatus("DRAFT");
+
+            ctContractMapper.insert(contract);
+        } else {
+            // ── 更新 ──
+            CtContract existing = ctContractMapper.selectById(contract.getId());
+            if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+                throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+
+            if (ContractStatusConstants.APPROVAL_APPROVING.equals(existing.getApprovalStatus()))
+                throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中，不可编辑");
+
+            contract.setApprovalStatus(existing.getApprovalStatus());
+            ctContractMapper.updateById(contract);
+        }
+
+        Long contractId = contract.getId();
+
+        // ── 批量保存明细项（delete-then-insert）──
+        List<CtContractItem> items = request.getItems();
+        if (items != null) {
+            itemService.batchSave(contractId, items);
+        }
+
+        // ── 批量保存付款条款（delete-then-insert）──
+        List<CtContractPaymentTerm> terms = request.getPaymentTerms();
+        if (terms != null) {
+            paymentTermService.batchSave(contractId, terms);
+        }
+
+        // ── 可选：立即提交审批 ──
+        if (Boolean.TRUE.equals(request.getSubmitForApproval())) {
+            submitForApproval(contractId);
+        }
+
+        return contractId;
     }
 
     /**

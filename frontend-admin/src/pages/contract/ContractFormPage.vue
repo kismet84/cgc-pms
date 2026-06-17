@@ -7,15 +7,13 @@ import StepWizard, { type StepConfig } from '@/components/StepWizard.vue'
 import ContractItemEditor, { type EditableContractItem } from '@/components/ContractItemEditor.vue'
 import PaymentTermEditor, { type EditablePaymentTerm } from '@/components/PaymentTermEditor.vue'
 import {
-  createContract,
-  updateContract,
   getContractDetail,
   getContractItems,
   getPaymentTerms,
-  saveContractItems,
-  savePaymentTerms,
-  submitForApproval,
+  saveContractDraft,
+  updateContractDraft,
 } from '@/api/modules/contract'
+import type { ContractSaveRequest } from '@/api/modules/contract'
 import { useReferenceStore } from '@/stores/reference'
 import type { ContractType, ContractItem, ContractPaymentTerm } from '@/types/contract'
 
@@ -274,26 +272,18 @@ async function doSubmit(withApproval: boolean) {
   if (!(await validateBasic()) || !validateItems() || !validateTerms()) return
   submitting.value = true
   try {
-    let targetId: string
-    if (isEdit.value) {
-      await updateContract(contractId.value, buildContractPayload())
-      targetId = contractId.value
-    } else {
-      const created = await createContract(buildContractPayload())
-      targetId = created != null ? String(created) : ''
-      if (!targetId) {
-        message.error('合同创建成功但未返回ID，无法保存明细')
-        submitting.value = false
-        return
-      }
+    const payload: ContractSaveRequest = {
+      contract: buildContractPayload(),
+      items: buildItemsPayload(),
+      paymentTerms: buildTermsPayload(),
+      submitForApproval: withApproval,
     }
-    await saveContractItems(targetId, buildItemsPayload())
-    await savePaymentTerms(targetId, buildTermsPayload())
-    if (withApproval) {
-      await submitForApproval(targetId)
-      message.success(isEdit.value ? '合同已更新并提交审批' : '合同已创建并提交审批')
+    if (isEdit.value) {
+      await updateContractDraft(contractId.value, payload)
+      message.success(withApproval ? '合同已更新并提交审批' : '合同已更新')
     } else {
-      message.success(isEdit.value ? '合同已更新' : '合同已保存为草稿')
+      await saveContractDraft(payload)
+      message.success(withApproval ? '合同已创建并提交审批' : '合同已保存为草稿')
     }
     dirty.value = false
     router.push('/contract/ledger')
