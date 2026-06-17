@@ -1,14 +1,14 @@
 package com.cgcpms.inventory.controller;
 
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.inventory.dto.StockTransactionDTO;
 import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.inventory.vo.MatStockLedgerVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/inventory/stock")
@@ -19,18 +19,14 @@ public class MatStockController {
 
     @PostMapping("/in")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
-    public ApiResponse<MatStock> stockIn(@RequestParam Long warehouseId,
-                                          @RequestParam Long materialId,
-                                          @RequestParam BigDecimal quantity) {
-        return ApiResponse.success(matStockService.stockIn(warehouseId, materialId, quantity));
+    public ApiResponse<MatStock> stockIn(@Valid @RequestBody StockTransactionDTO dto) {
+        return ApiResponse.success(matStockService.stockIn(dto.getWarehouseId(), dto.getMaterialId(), dto.getQuantity()));
     }
 
     @PostMapping("/out")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
-    public ApiResponse<MatStock> stockOut(@RequestParam Long warehouseId,
-                                           @RequestParam Long materialId,
-                                           @RequestParam BigDecimal quantity) {
-        return ApiResponse.success(matStockService.stockOut(warehouseId, materialId, quantity));
+    public ApiResponse<MatStock> stockOut(@Valid @RequestBody StockTransactionDTO dto) {
+        return ApiResponse.success(matStockService.stockOut(dto.getWarehouseId(), dto.getMaterialId(), dto.getQuantity()));
     }
 
     @GetMapping("/ledger")

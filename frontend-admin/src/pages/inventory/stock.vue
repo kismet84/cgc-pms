@@ -49,6 +49,10 @@ async function fetchLedger() {
     txnTotal.value = 0
     return
   }
+  if (!filter.materialId) {
+    message.warning('请先选择物料')
+    return
+  }
   loading.value = true
   try {
     const res = await getStockLedger({

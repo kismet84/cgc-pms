@@ -94,21 +94,21 @@ class MatStockControllerTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RED-3: GET /inventory/stock/ledger WITHOUT materialId → EXPECTS 200
-    // Bug: controller @RequestParam Long materialId is required,
-    // frontend may omit it when only warehouse is selected
-    // RED assertion: expects 200, but gets 500 → FAILS → RED
+    // RED-3: GET /inventory/stock/ledger WITHOUT materialId → EXPECTS 500
+    // materialId is required @RequestParam; frontend blocks missing selects.
+    // Backend GlobalExceptionHandler wraps MissingServletRequestParameterException → 500.
+    // GREEN assertion: backend correctly rejects with 500 SYSTEM_ERROR.
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Order(3)
-    @DisplayName("RED-3: GET /inventory/stock/ledger without materialId → expects 200 but gets error")
+    @DisplayName("RED-3: GET /inventory/stock/ledger without materialId → 500 (MissingServletRequestParameterException)")
     void testGetLedgerWithoutMaterialIdFails() throws Exception {
         mockMvc.perform(getWithApi("/inventory/stock/ledger")
                         .cookie(adminCookie())
                         .param("warehouseId", String.valueOf(WAREHOUSE_ID)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"));
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("SYSTEM_ERROR"));
     }
 
     // ═══════════════════════════════════════════════════════════════

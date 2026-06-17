@@ -108,7 +108,7 @@ export interface StockTransactionParams {
 /** 库存台账查询参数 */
 export interface StockLedgerQuery {
   warehouseId: string
-  materialId?: string
+  materialId: string
   pageNo?: number
   pageSize?: number
 }

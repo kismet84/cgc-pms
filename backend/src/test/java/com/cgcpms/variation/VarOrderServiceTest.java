@@ -231,4 +231,70 @@ class VarOrderServiceTest {
         assertEquals("VAR_ORDER_ALREADY_SUBMITTED", ex.getCode(),
                 "错误码应为 VAR_ORDER_ALREADY_SUBMITTED");
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SAFE-GET: Null-safe batch VO mapping tests
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Transactional
+    @DisplayName("SAFE-1: getPage with null contractId/partnerId should not NPE")
+    void testGetPageWithNullRelationIds() {
+        // Create VarOrder with only required projectId, null optional relations
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(null);
+        order.setPartnerId(null);
+        order.setVarName("null-relation 测试");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        order.setReportedAmount(new BigDecimal("10000.00"));
+        order.setApprovalStatus("DRAFT");
+        Long id = varOrderService.create(order);
+        assertNotNull(id);
+
+        // getPage must not throw NPE even when contractIds/partnerIds sets are empty
+        com.baomidou.mybatisplus.core.metadata.IPage<com.cgcpms.variation.vo.VarOrderVO> page =
+                varOrderService.getPage(1, 10, null, null, null, null, null, null);
+        assertNotNull(page);
+        assertTrue(page.getTotal() > 0, "至少应有一条记录");
+
+        com.cgcpms.variation.vo.VarOrderVO vo = page.getRecords().get(0);
+        assertEquals("null-relation 测试", vo.getVarName());
+        assertNotNull(vo.getProjectName(), "projectName 应填充");
+        assertEquals("测试变更新项目", vo.getProjectName());
+        assertNull(vo.getContractName(), "contractName 应为 null");
+        assertNull(vo.getPartnerName(), "partnerName 应为 null");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("SAFE-2: getPage with all relation IDs should populate all names")
+    void testGetPageWithAllRelationIds() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("full-relation 测试");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        order.setReportedAmount(new BigDecimal("20000.00"));
+        order.setApprovalStatus("DRAFT");
+        Long id = varOrderService.create(order);
+        assertNotNull(id);
+
+        com.baomidou.mybatisplus.core.metadata.IPage<com.cgcpms.variation.vo.VarOrderVO> page =
+                varOrderService.getPage(1, 10, null, null, null, null, null, null);
+        assertNotNull(page);
+        assertTrue(page.getTotal() > 0, "至少应有一条记录");
+
+        com.cgcpms.variation.vo.VarOrderVO vo = page.getRecords().get(0);
+        assertEquals("full-relation 测试", vo.getVarName());
+        assertNotNull(vo.getProjectName(), "projectName 应填充");
+        assertEquals("测试变更新项目", vo.getProjectName());
+        assertNotNull(vo.getContractName(), "contractName 应填充");
+        assertEquals("变更测试合同", vo.getContractName());
+        assertNotNull(vo.getPartnerName(), "partnerName 应填充");
+        assertEquals("变更测试合作方", vo.getPartnerName());
+    }
 }

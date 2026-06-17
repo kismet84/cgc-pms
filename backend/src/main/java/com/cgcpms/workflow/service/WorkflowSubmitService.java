@@ -57,6 +57,22 @@ public class WorkflowSubmitService {
         instance.setBusinessSummary(businessSummary);
         instance.setVariables(variables);
         instance.setStartedAt(LocalDateTime.now());
+
+        // Check for duplicate business key — includes logically deleted rows
+        // because uk_wf_instance_business does NOT include deleted_flag
+        List<WfInstance> existing = wfInstanceMapper.selectAllIncludingDeleted(businessType, businessId);
+        if (existing != null && !existing.isEmpty()) {
+            boolean hasActive = existing.stream()
+                    .anyMatch(w -> w.getDeletedFlag() == null || w.getDeletedFlag() == 0);
+            if (hasActive) {
+                throw new BusinessException("WORKFLOW_INSTANCE_EXISTS", "该业务已提交审批，请勿重复提交");
+            }
+            // Hard-delete stale logically-deleted rows to free the unique key slot
+            for (WfInstance w : existing) {
+                wfInstanceMapper.hardDeleteById(w.getId());
+            }
+        }
+
         wfInstanceMapper.insert(instance);
 
         // Create node instances

@@ -1,6 +1,7 @@
 package com.cgcpms.workflow;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -23,19 +24,16 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * TDD RED phase — reproduce workflow duplicate and logical-delete
- * conflicts on the {@code uk_wf_instance_business} unique key.
+ * TDD GREEN phase — workflow duplicate and logical-delete fixes.
  * <p>
- * Known bugs:
+ * Fixes applied:
  * <ul>
- *   <li>Submitting same (businessType, businessId) twice causes
- *       DuplicateKeyException → SYSTEM_ERROR (500) instead of
- *       BUSINESS error</li>
- *   <li>Logically deleting a WfInstance does not free the unique
- *       key slot because uk_wf_instance_business does not include
- *       deleted_flag</li>
+ *   <li>Duplicate (businessType,businessId) now throws
+ *       {@code BusinessException("WORKFLOW_INSTANCE_EXISTS")}
+ *       instead of DuplicateKeyException → SYSTEM_ERROR (500)</li>
+ *   <li>Logically-deleted stale instances are hard-deleted before
+ *       insert, freeing the unique key slot for resubmission</li>
  * </ul>
- * ALL tests expect failure on current code — this is the RED phase.
  */
 @SpringBootTest
 @ActiveProfiles("local")
@@ -134,19 +132,15 @@ class WorkflowSubmitServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RED-1: Duplicate submission produces error
-    // Submitting the same (businessType, businessId) twice via
-    // workflowEngine.submit currently hits uk_wf_instance_business
-    // unique constraint → DuplicateKeyException → SYSTEM_ERROR (500).
-    // Should produce explicit BUSINESS error instead.
-    // This test FAILS because the duplicate insert throws an
-    // unhandled exception (DataIntegrityViolationException wrapping
-    // DuplicateKeyException) which gets wrapped as SYSTEM_ERROR.
+    // GREEN-1: Duplicate submission produces explicit BusinessException
+    // Submitting the same (businessType, businessId) twice now
+    // throws BusinessException with code WORKFLOW_INSTANCE_EXISTS
+    // instead of a raw DuplicateKeyException → SYSTEM_ERROR (500).
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Transactional
-    @DisplayName("RED-1: duplicate (businessType,businessId) submit causes unique key error")
+    @DisplayName("GREEN-1: duplicate (businessType,businessId) submit throws BusinessException")
     void testDuplicateSubmitCausesUniqueError() {
         long businessId = CONTRACT_ID_DUPLICATE;
 
@@ -160,33 +154,26 @@ class WorkflowSubmitServiceTest {
         assertNotNull(first, "首次提交应创建实例");
         assertEquals(WorkflowConstants.INSTANCE_RUNNING, first.getInstanceStatus());
 
-        // Second submit with SAME businessType+businessId → RED indicator
-        // Current code: wfInstanceMapper.insert hits uk_wf_instance_business
-        // → DuplicateKeyException → rollback → SYSTEM_ERROR
-        // This call is EXPECTED to throw an exception on current code.
-        // The test FAILS (RED) because the duplicate insert causes an
-        // unhandled DataIntegrityViolationException.
-        workflowEngine.submit(
-                TestUserContext.USER_ADMIN, "admin", TestUserContext.TENANT_0,
-                BUSINESS_TYPE, businessId,
-                "工作流重复提交测试-第二次", new BigDecimal("640000.00"),
-                PROJECT_ID, businessId,
-                null, null, null);
+        // Second submit with SAME businessType+businessId → BusinessException
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                workflowEngine.submit(
+                        TestUserContext.USER_ADMIN, "admin", TestUserContext.TENANT_0,
+                        BUSINESS_TYPE, businessId,
+                        "工作流重复提交测试-第二次", new BigDecimal("640000.00"),
+                        PROJECT_ID, businessId,
+                        null, null, null));
+        assertEquals("WORKFLOW_INSTANCE_EXISTS", ex.getCode(), "重复提交应返回业务错误码");
+        assertEquals("该业务已提交审批，请勿重复提交", ex.getMessage());
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RED-2: Logically deleted duplicate blocks resubmission
-    // After a WfInstance is logically deleted (deleted_flag=1), the
-    // uk_wf_instance_business unique key STILL prevents a new instance
-    // with the same (businessType, businessId) from being created.
-    // This is a known logical-delete + unique-key trap.
-    // This test FAILS because the insert after logical-delete also
-    // hits the unique constraint.
+    // GREEN-2: Logically deleted stale instances are hard-deleted
+    // before insert, freeing the unique key slot for resubmission.
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Transactional
-    @DisplayName("RED-2: logically deleted instance still blocks new submit (unique key trap)")
+    @DisplayName("GREEN-2: logically deleted instance cleaned up, resubmit succeeds")
     void testDeletedInstanceBlocksResubmission() {
         long businessId = CONTRACT_ID_DELETED;
 
@@ -202,22 +189,21 @@ class WorkflowSubmitServiceTest {
         // Logically delete the instance (set deleted_flag=1 via MyBatis-Plus)
         wfInstanceMapper.deleteById(first.getId());
 
-        // Verify the instance is logically deleted (still exists in DB)
-        // MyBatis-Plus @TableLogic hides deleted rows, so selectById returns null
+        // Verify the instance is logically deleted (MyBatis-Plus hides it)
         WfInstance deleted = wfInstanceMapper.selectById(first.getId());
         assertNull(deleted, "逻辑删除后 MyBatis-Plus 查询应返回 null");
 
-        // Try to submit again with same (businessType, businessId)
-        // RED indicator: Even though the old instance is logically deleted,
-        // the unique constraint uk_wf_instance_business still prevents
-        // the new insert because it does not include deleted_flag.
-        // This call is EXPECTED to throw DataIntegrityViolationException.
-        workflowEngine.submit(
+        // Resubmit with same (businessType, businessId) — should succeed now
+        // because submit() hard-deletes stale logically-deleted rows first
+        WfInstance second = workflowEngine.submit(
                 TestUserContext.USER_ADMIN, "admin", TestUserContext.TENANT_0,
                 BUSINESS_TYPE, businessId,
                 "工作流逻辑删除后重新提交", new BigDecimal("640000.00"),
                 PROJECT_ID, businessId,
                 null, null, null);
+        assertNotNull(second, "清理逻辑删除旧数据后应允许重新提交");
+        assertEquals(WorkflowConstants.INSTANCE_RUNNING, second.getInstanceStatus());
+        assertNotEquals(first.getId(), second.getId(), "新实例应有不同的ID");
     }
 
     // ═══════════════════════════════════════════════════════════════

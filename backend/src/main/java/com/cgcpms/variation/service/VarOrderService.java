@@ -260,12 +260,20 @@ public class VarOrderService {
         return vo;
     }
 
+    /**
+     * Null-safe map lookup that guards against null keys and Map.of().
+     */
+    private String safeGet(Map<Long, String> names, Long id) {
+        if (id == null) return null;
+        return names.get(id);
+    }
+
     private VarOrderVO toVO(VarOrder m, Map<Long, String> projectNames,
                               Map<Long, String> contractNames, Map<Long, String> partnerNames) {
         VarOrderVO vo = buildBaseVO(m);
-        if (m.getProjectId() != null) vo.setProjectName(projectNames.get(m.getProjectId()));
-        if (m.getContractId() != null) vo.setContractName(contractNames.get(m.getContractId()));
-        if (m.getPartnerId() != null) vo.setPartnerName(partnerNames.get(m.getPartnerId()));
+        vo.setProjectName(safeGet(projectNames, m.getProjectId()));
+        vo.setContractName(safeGet(contractNames, m.getContractId()));
+        vo.setPartnerName(safeGet(partnerNames, m.getPartnerId()));
         return vo;
     }
 
