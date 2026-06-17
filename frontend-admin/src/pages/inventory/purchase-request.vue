@@ -245,11 +245,9 @@ async function handleModalOk() {
     if (editingId.value) {
       await updatePurchaseRequest(editingId.value, formData)
       requestId = editingId.value
-      message.success('更新成功')
     } else {
       const result = await createPurchaseRequest(formData)
       requestId = result
-      message.success('创建成功')
     }
 
     // Save line items
@@ -261,6 +259,7 @@ async function handleModalOk() {
       await savePurchaseRequestItems(requestId, items)
     }
 
+    message.success(editingId.value ? '更新成功' : '创建成功')
     modalVisible.value = false
     fetchData()
   } catch (e: unknown) {
@@ -502,7 +501,7 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="计划日期" width="130">
             <template #default="{ record: item }">
-              <a-date-picker v-model:value="item.plannedDate" value-format="YYYY-MM-DD" style="width: 100%" size="small" :get-popup-container="(trigger) => trigger.parentNode" />
+              <a-date-picker v-model:value="item.plannedDate" value-format="YYYY-MM-DD" style="width: 100%" size="small" :get-popup-container="() => document.body" />
             </template>
           </a-table-column>
           <a-table-column title="备注" width="130">
