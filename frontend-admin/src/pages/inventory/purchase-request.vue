@@ -534,29 +534,31 @@ onMounted(() => {
           size="small"
           :scroll="{ y: 250 }"
         >
-          <a-table-column title="物料" width="200">
+          <a-table-column title="物料" width="260">
             <template #default="{ record: item }">
-              <a-select
-                :value="item.materialId"
-                placeholder="选择已有物料"
-                allow-clear
-                style="width: 100%"
-                show-search
-                :filter-option="filterOption"
-                @change="(val: string) => handleMaterialChange(item.key, val)"
-                @clear="handleMaterialClear(item.key)"
-              >
-                <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
-                  {{ m.materialName }}
-                </a-select-option>
-              </a-select>
-              <a-input
-                v-if="!item.materialId"
-                v-model:value="item.materialName"
-                placeholder="或输入自定义物料名称"
-                size="small"
-                style="margin-top: 4px"
-              />
+              <div style="display: flex; gap: 4px">
+                <a-select
+                  :value="item.materialId"
+                  placeholder="选择已有物料"
+                  allow-clear
+                  :style="{ width: item.materialId ? '100%' : '55%', flexShrink: 0 }"
+                  show-search
+                  :filter-option="filterOption"
+                  @change="(val: string) => handleMaterialChange(item.key, val)"
+                  @clear="handleMaterialClear(item.key)"
+                >
+                  <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
+                    {{ m.materialName }}
+                  </a-select-option>
+                </a-select>
+                <a-input
+                  v-if="!item.materialId"
+                  v-model:value="item.materialName"
+                  placeholder="自定义物料"
+                  size="small"
+                  style="flex: 1"
+                />
+              </div>
             </template>
           </a-table-column>
           <a-table-column title="单位" width="80">
