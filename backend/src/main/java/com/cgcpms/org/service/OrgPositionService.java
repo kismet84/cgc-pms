@@ -21,9 +21,10 @@ public class OrgPositionService {
 
     private final OrgPositionMapper orgPositionMapper;
 
-    public IPage<OrgPositionVO> getPage(long pageNo, long pageSize, Long companyId, String positionCode, String positionName, String status) {
+    public IPage<OrgPositionVO> getPage(long pageNo, long pageSize, Long companyId, Long departmentId, String positionCode, String positionName, String status) {
         LambdaQueryWrapper<OrgPosition> wrapper = new LambdaQueryWrapper<>();
         if (companyId != null) wrapper.eq(OrgPosition::getCompanyId, companyId);
+        if (departmentId != null) wrapper.eq(OrgPosition::getDepartmentId, departmentId);
         if (StringUtils.hasText(positionCode)) wrapper.like(OrgPosition::getPositionCode, positionCode);
         if (StringUtils.hasText(positionName)) wrapper.like(OrgPosition::getPositionName, positionName);
         if (StringUtils.hasText(status)) wrapper.eq(OrgPosition::getStatus, status);
@@ -84,6 +85,7 @@ public class OrgPositionService {
         OrgPositionVO vo = new OrgPositionVO();
         vo.setId(p.getId() == null ? null : String.valueOf(p.getId()));
         vo.setCompanyId(p.getCompanyId() != null ? String.valueOf(p.getCompanyId()) : null);
+        vo.setDepartmentId(p.getDepartmentId() != null ? String.valueOf(p.getDepartmentId()) : null);
         vo.setPositionCode(p.getPositionCode());
         vo.setPositionName(p.getPositionName());
         vo.setStatus(p.getStatus());

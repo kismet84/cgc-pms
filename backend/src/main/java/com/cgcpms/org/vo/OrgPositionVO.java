@@ -7,6 +7,7 @@ public class OrgPositionVO {
 
     private String id;
     private String companyId;
+    private String departmentId;
     private String positionCode;
     private String positionName;
     private String status;

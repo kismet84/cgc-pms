@@ -23,6 +23,8 @@ public class OrgPosition extends BaseEntity {
 
     private Long companyId;
 
+    private Long departmentId;
+
     private String positionCode;
 
     private String positionName;

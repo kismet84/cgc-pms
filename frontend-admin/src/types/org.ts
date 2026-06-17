@@ -41,6 +41,7 @@ export interface OrgDepartmentTreeNodeVO {
 export interface OrgPositionVO {
   id: string
   companyId?: string
+  departmentId?: string
   positionCode: string
   positionName: string
   status: string
@@ -72,6 +73,7 @@ export interface OrgDepartmentForm {
 /** 岗位新增/编辑表单 */
 export interface OrgPositionForm {
   companyId?: string
+  departmentId?: string
   positionCode: string
   positionName: string
   status: string

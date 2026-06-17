@@ -85,6 +85,7 @@ const positionPageSize = ref(20)
 
 const positionFilter = reactive({
   companyId: undefined as string | undefined,
+  departmentId: undefined as string | undefined,
   positionCode: '',
   positionName: '',
   status: undefined as string | undefined,
@@ -92,6 +93,7 @@ const positionFilter = reactive({
 
 const positionColumns = [
   { title: '所属公司', dataIndex: 'companyId', width: 100 },
+  { title: '所属部门', dataIndex: 'departmentId', width: 100 },
   { title: '岗位编号', dataIndex: 'positionCode', width: 120 },
   { title: '岗位名称', dataIndex: 'positionName', minWidth: 140 },
   { title: '状态', dataIndex: 'status', width: 80 },
@@ -100,6 +102,21 @@ const positionColumns = [
 ]
 
 // ─── Page metrics ───────────────────────────────────────
+
+/** 将部门树展平为 select 可用的列表（含层级前缀） */
+function flattenDeptTree(nodes: OrgDepartmentTreeNodeVO[], prefix = ''): { id: string; name: string }[] {
+  const result: { id: string; name: string }[] = []
+  for (const node of nodes) {
+    const label = prefix ? `${prefix} / ${node.deptName}` : node.deptName
+    result.push({ id: node.id, name: label })
+    if (node.children?.length) {
+      result.push(...flattenDeptTree(node.children, label))
+    }
+  }
+  return result
+}
+
+const flatDeptList = computed(() => flattenDeptTree(deptTreeData.value))
 
 const selectedCompany = computed(
   () => companyData.value.find((company) => company.id === selectedCompanyId.value) ?? null,
@@ -177,6 +194,7 @@ const positionModalTitle = ref('新增岗位')
 const positionForm = reactive({
   id: '' as string,
   companyId: '' as string,
+  departmentId: '' as string,
   positionCode: '',
   positionName: '',
   status: 'ENABLED',
@@ -447,6 +465,7 @@ async function fetchPositions() {
       pageNum: positionPageNo.value,
       pageSize: positionPageSize.value,
       companyId: positionFilter.companyId || undefined,
+      departmentId: positionFilter.departmentId || undefined,
       positionCode: positionFilter.positionCode || undefined,
       positionName: positionFilter.positionName || undefined,
       status: positionFilter.status,
@@ -470,6 +489,7 @@ function handlePositionSearch() {
 
 function handlePositionReset() {
   positionFilter.companyId = undefined
+  positionFilter.departmentId = undefined
   positionFilter.positionCode = ''
   positionFilter.positionName = ''
   positionFilter.status = undefined
@@ -493,6 +513,7 @@ function handlePositionPageSizeChange(_cur: number, size: number) {
 function openPositionAdd() {
   positionForm.id = ''
   positionForm.companyId = ''
+  positionForm.departmentId = ''
   positionForm.positionCode = ''
   positionForm.positionName = ''
   positionForm.status = 'ENABLED'
@@ -504,6 +525,7 @@ function openPositionAdd() {
 function openPositionEdit(record: OrgPositionVO) {
   positionForm.id = record.id
   positionForm.companyId = record.companyId ?? ''
+  positionForm.departmentId = record.departmentId ?? ''
   positionForm.positionCode = record.positionCode
   positionForm.positionName = record.positionName
   positionForm.status = record.status
@@ -517,6 +539,7 @@ async function handlePositionSave() {
   try {
     const body = {
       companyId: positionForm.companyId || undefined,
+      departmentId: positionForm.departmentId || undefined,
       positionCode: positionForm.positionCode,
       positionName: positionForm.positionName,
       status: positionForm.status,
@@ -814,6 +837,17 @@ onMounted(async () => {
               {{ c.companyName }}
             </a-select-option>
           </a-select>
+          <a-select
+            v-model:value="positionFilter.departmentId"
+            placeholder="所属部门"
+            size="small"
+            allow-clear
+            style="width:160px"
+          >
+            <a-select-option v-for="d in flatDeptList" :key="d.id" :value="d.id">
+              {{ d.name }}
+            </a-select-option>
+          </a-select>
           <a-input
             v-model:value="positionFilter.positionCode"
             placeholder="岗位编号"
@@ -849,11 +883,14 @@ onMounted(async () => {
           :pagination="false"
           row-key="id"
           size="small"
-          :scroll="{ x: 680 }"
+          :scroll="{ x: 780 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.dataIndex === 'companyId'">
               {{ companyData.find(c => c.id === record.companyId)?.companyName ?? '-' }}
+            </template>
+            <template v-else-if="column.dataIndex === 'departmentId'">
+              {{ flatDeptList.find(d => d.id === record.departmentId)?.name ?? '-' }}
             </template>
             <template v-else-if="column.dataIndex === 'status'">
               <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
@@ -971,6 +1008,19 @@ onMounted(async () => {
             >
               <a-select-option v-for="c in companyData" :key="c.id" :value="c.id">
                 {{ c.companyName }}
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="所属部门">
+            <a-select
+              v-model:value="positionForm.departmentId"
+              placeholder="选择部门（可选）"
+              size="small"
+              allow-clear
+              style="width: 100%"
+            >
+              <a-select-option v-for="d in flatDeptList" :key="d.id" :value="d.id">
+                {{ d.name }}
               </a-select-option>
             </a-select>
           </a-form-item>
