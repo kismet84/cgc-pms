@@ -23,10 +23,11 @@ public class OrgPositionController {
     public ApiResponse<PageResult<OrgPositionVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) Long companyId,
             @RequestParam(required = false) String positionCode,
             @RequestParam(required = false) String positionName,
             @RequestParam(required = false) String status) {
-        IPage<OrgPositionVO> page = orgPositionService.getPage(pageNo, pageSize, positionCode, positionName, status);
+        IPage<OrgPositionVO> page = orgPositionService.getPage(pageNo, pageSize, companyId, positionCode, positionName, status);
         return ApiResponse.success(PageResult.of(page));
     }
 

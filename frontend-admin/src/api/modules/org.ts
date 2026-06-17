@@ -127,6 +127,7 @@ export function deleteDepartment(id: string) {
 
 export function getPositionList(
   params: PageParams & {
+    companyId?: string
     positionCode?: string
     positionName?: string
     status?: string
@@ -147,6 +148,7 @@ export function getPositionDetail(id: string) {
 }
 
 export function createPosition(data: {
+  companyId?: string
   positionCode: string
   positionName: string
   status: string
@@ -162,6 +164,7 @@ export function createPosition(data: {
 export function updatePosition(
   id: string,
   data: {
+    companyId?: string
     positionCode: string
     positionName: string
     status: string

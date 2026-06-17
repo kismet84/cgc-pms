@@ -84,12 +84,14 @@ const positionPageNo = ref(1)
 const positionPageSize = ref(20)
 
 const positionFilter = reactive({
+  companyId: undefined as string | undefined,
   positionCode: '',
   positionName: '',
   status: undefined as string | undefined,
 })
 
 const positionColumns = [
+  { title: '所属公司', dataIndex: 'companyId', width: 100 },
   { title: '岗位编号', dataIndex: 'positionCode', width: 120 },
   { title: '岗位名称', dataIndex: 'positionName', minWidth: 140 },
   { title: '状态', dataIndex: 'status', width: 80 },
@@ -174,6 +176,7 @@ const positionModalVisible = ref(false)
 const positionModalTitle = ref('新增岗位')
 const positionForm = reactive({
   id: '' as string,
+  companyId: '' as string,
   positionCode: '',
   positionName: '',
   status: 'ENABLED',
@@ -443,6 +446,7 @@ async function fetchPositions() {
     const res: PageResult<OrgPositionVO> = await getPositionList({
       pageNum: positionPageNo.value,
       pageSize: positionPageSize.value,
+      companyId: positionFilter.companyId || undefined,
       positionCode: positionFilter.positionCode || undefined,
       positionName: positionFilter.positionName || undefined,
       status: positionFilter.status,
@@ -465,6 +469,7 @@ function handlePositionSearch() {
 }
 
 function handlePositionReset() {
+  positionFilter.companyId = undefined
   positionFilter.positionCode = ''
   positionFilter.positionName = ''
   positionFilter.status = undefined
@@ -487,6 +492,7 @@ function handlePositionPageSizeChange(_cur: number, size: number) {
 
 function openPositionAdd() {
   positionForm.id = ''
+  positionForm.companyId = ''
   positionForm.positionCode = ''
   positionForm.positionName = ''
   positionForm.status = 'ENABLED'
@@ -497,6 +503,7 @@ function openPositionAdd() {
 
 function openPositionEdit(record: OrgPositionVO) {
   positionForm.id = record.id
+  positionForm.companyId = record.companyId ?? ''
   positionForm.positionCode = record.positionCode
   positionForm.positionName = record.positionName
   positionForm.status = record.status
@@ -509,6 +516,7 @@ async function handlePositionSave() {
   positionSaving.value = true
   try {
     const body = {
+      companyId: positionForm.companyId || undefined,
       positionCode: positionForm.positionCode,
       positionName: positionForm.positionName,
       status: positionForm.status,
@@ -795,6 +803,17 @@ onMounted(async () => {
         </div>
 
         <div class="org-filter-bar position">
+          <a-select
+            v-model:value="positionFilter.companyId"
+            placeholder="所属公司"
+            size="small"
+            allow-clear
+            style="width:140px"
+          >
+            <a-select-option v-for="c in companyData" :key="c.id" :value="c.id">
+              {{ c.companyName }}
+            </a-select-option>
+          </a-select>
           <a-input
             v-model:value="positionFilter.positionCode"
             placeholder="岗位编号"
@@ -833,7 +852,10 @@ onMounted(async () => {
           :scroll="{ x: 680 }"
         >
           <template #bodyCell="{ column, record }">
-            <template v-if="column.dataIndex === 'status'">
+            <template v-if="column.dataIndex === 'companyId'">
+              {{ companyData.find(c => c.id === record.companyId)?.companyName ?? '-' }}
+            </template>
+            <template v-else-if="column.dataIndex === 'status'">
               <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
                 {{ record.status === 'ENABLED' ? '启用' : '禁用' }}
               </a-tag>
@@ -939,6 +961,19 @@ onMounted(async () => {
         @ok="handlePositionSave"
       >
         <a-form layout="vertical">
+          <a-form-item label="所属公司">
+            <a-select
+              v-model:value="positionForm.companyId"
+              placeholder="选择公司（可选）"
+              size="small"
+              allow-clear
+              style="width: 100%"
+            >
+              <a-select-option v-for="c in companyData" :key="c.id" :value="c.id">
+                {{ c.companyName }}
+              </a-select-option>
+            </a-select>
+          </a-form-item>
           <a-form-item label="岗位编号" required>
             <a-input v-model:value="positionForm.positionCode" placeholder="请输入岗位编号" />
           </a-form-item>
