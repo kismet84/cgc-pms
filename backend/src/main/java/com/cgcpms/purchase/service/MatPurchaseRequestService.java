@@ -17,6 +17,8 @@ import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.purchase.vo.MatPurchaseRequestItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseRequestVO;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.common.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +42,7 @@ public class MatPurchaseRequestService {
     private final MatPurchaseRequestItemMapper requestItemMapper;
     private final PmProjectMapper pmProjectMapper;
     private final MdMaterialMapper mdMaterialMapper;
+    private final CtContractMapper ctContractMapper;
     private final WorkflowEngine workflowEngine;
 
     // ================================================================
@@ -66,7 +69,14 @@ public class MatPurchaseRequestService {
                 : pmProjectMapper.selectBatchIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
 
-        IPage<MatPurchaseRequestVO> voPage = page.convert(r -> toVO(r, projectNames));
+        // Batch-prefetch contract names to avoid N+1
+        Set<Long> contractIds = records.stream().map(MatPurchaseRequest::getContractId)
+                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> contractNames = contractIds.isEmpty() ? Map.of()
+                : ctContractMapper.selectBatchIds(contractIds).stream()
+                        .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
+
+        IPage<MatPurchaseRequestVO> voPage = page.convert(r -> toVO(r, projectNames, contractNames));
         return PageResult.of(voPage);
     }
 
@@ -308,12 +318,17 @@ public class MatPurchaseRequestService {
             PmProject project = pmProjectMapper.selectById(r.getProjectId());
             if (project != null) vo.setProjectName(project.getProjectName());
         }
+        if (r.getContractId() != null) {
+            CtContract contract = ctContractMapper.selectById(r.getContractId());
+            if (contract != null) vo.setContractName(contract.getContractName());
+        }
         return vo;
     }
 
-    private MatPurchaseRequestVO toVO(MatPurchaseRequest r, Map<Long, String> projectNames) {
+    private MatPurchaseRequestVO toVO(MatPurchaseRequest r, Map<Long, String> projectNames, Map<Long, String> contractNames) {
         MatPurchaseRequestVO vo = buildBaseVO(r);
         if (r.getProjectId() != null) vo.setProjectName(projectNames.get(r.getProjectId()));
+        if (r.getContractId() != null) vo.setContractName(contractNames.get(r.getContractId()));
         return vo;
     }
 
@@ -322,6 +337,7 @@ public class MatPurchaseRequestService {
         vo.setId(String.valueOf(r.getId()));
         vo.setTenantId(String.valueOf(r.getTenantId()));
         vo.setProjectId(r.getProjectId() != null ? String.valueOf(r.getProjectId()) : null);
+        vo.setContractId(r.getContractId() != null ? String.valueOf(r.getContractId()) : null);
         vo.setRequestCode(r.getRequestCode());
         vo.setApprovalStatus(r.getApprovalStatus());
         vo.setStatus(r.getStatus());

@@ -10,6 +10,8 @@ public class MatPurchaseRequestVO {
     private String tenantId;
     private String projectId;
     private String projectName;
+    private String contractId;
+    private String contractName;
     private String requestCode;
     private String approvalStatus;
     private String status;

@@ -62,6 +62,8 @@ export interface PurchaseRequestVO {
   tenantId: string
   projectId: string
   projectName?: string
+  contractId?: string
+  contractName?: string
   requestCode: string
   approvalStatus: string
   status: string

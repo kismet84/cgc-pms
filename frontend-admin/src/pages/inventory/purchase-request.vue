@@ -12,6 +12,8 @@ import {
 } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import type { PurchaseRequestVO, PurchaseRequestItemVO } from '@/types/inventory'
+import { getContractLedger } from '@/api/modules/contract'
+import type { ContractVO } from '@/types/contract'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
 
 const filter = reactive({
@@ -29,6 +31,7 @@ const pageSize = ref(20)
 
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
+const contractList = ref<ContractVO[]>([])
 const materialList = computed(() => referenceStore.materials ?? [])
 
 const modalVisible = ref(false)
@@ -37,6 +40,7 @@ const editingId = ref<string | null>(null)
 const submitting = ref(false)
 const formData = reactive<Partial<PurchaseRequestVO>>({
   projectId: undefined,
+  contractId: undefined,
   remark: '',
 })
 
@@ -73,6 +77,7 @@ const filterOption = (input: string, option: any) =>
 const columns = [
   { title: '申请编号', dataIndex: 'requestCode', width: 150 },
   { title: '所属项目', dataIndex: 'projectName', width: 150 },
+  { title: '关联合同', dataIndex: 'contractName', width: 150 },
   { title: '审批状态', dataIndex: 'approvalStatus', width: 100, key: 'approvalStatus' },
   { title: '业务状态', dataIndex: 'status', width: 90, key: 'status' },
   { title: '创建人', dataIndex: 'createdBy', width: 100 },
@@ -133,6 +138,7 @@ function handleAdd() {
   editingId.value = null
   Object.assign(formData, {
     projectId: undefined,
+    contractId: undefined,
     remark: '',
   })
   itemList.value = []
@@ -145,6 +151,7 @@ async function handleEdit(record: PurchaseRequestVO) {
   editingId.value = record.id
   Object.assign(formData, {
     projectId: record.projectId,
+    contractId: record.contractId,
     remark: record.remark,
   })
   itemList.value = []
@@ -322,9 +329,20 @@ function getPopupContainer() {
 const kpiReqTotal = computed(() => tableData.value.length)
 const kpiReqPending = computed(() => tableData.value.filter(r => r.approvalStatus === "DRAFT" || r.approvalStatus === "APPROVING").length)
 
+async function fetchContracts() {
+  try {
+    const res = await getContractLedger({ contractType: 'PURCHASE', pageNo: 1, pageSize: 200 })
+    contractList.value = res.records
+  } catch (e: unknown) {
+    console.error(e)
+    contractList.value = []
+  }
+}
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchMaterials()
+  fetchContracts()
   fetchData()
 })
 </script>
@@ -413,7 +431,7 @@ onMounted(() => {
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 1100 }"
+        :scroll="{ x: 1250 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'approvalStatus'">
@@ -476,6 +494,19 @@ onMounted(() => {
           <a-select v-model:value="formData.projectId" placeholder="请选择项目">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="关联合同">
+          <a-select
+            v-model:value="formData.contractId"
+            placeholder="选择采购合同"
+            allow-clear
+            show-search
+            :filter-option="filterOption"
+          >
+            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+              {{ c.contractName }}
             </a-select-option>
           </a-select>
         </a-form-item>
