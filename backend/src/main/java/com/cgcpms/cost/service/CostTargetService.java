@@ -98,7 +98,12 @@ public class CostTargetService {
     @Transactional
     public void delete(Long id) {
         CostTarget existing = costTargetMapper.selectById(id);
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+        if (existing == null) {
+            // 幂等删除：记录已被逻辑删除或不存在，直接返回成功
+            log.info("目标成本已不存在或已被删除，跳过删除操作 targetId={}", id);
+            return;
+        }
+        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
         }
 
