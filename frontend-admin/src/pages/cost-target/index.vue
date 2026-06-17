@@ -170,7 +170,8 @@ function handleDelete(row: CostTargetVO) {
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('删除失败')
+        // 响应拦截器已弹出后端返回的错误消息，此处刷新列表以移除已删除的记录
+        fetchData()
       }
     },
   })
