@@ -573,7 +573,7 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="验收日期">
-          <a-date-picker v-model:value="formData.receiptDate" style="width: 100%" />
+          <a-date-picker v-model:value="formData.receiptDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="质量状态">
           <a-select v-model:value="formData.qualityStatus" placeholder="请选择质量状态" allow-clear>

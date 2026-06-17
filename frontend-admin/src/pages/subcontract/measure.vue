@@ -585,7 +585,7 @@ onMounted(() => {
           />
         </a-form-item>
         <a-form-item label="计量日期">
-          <a-date-picker v-model:value="formData.measureDate" style="width: 100%" />
+          <a-date-picker v-model:value="formData.measureDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="备注">
           <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />

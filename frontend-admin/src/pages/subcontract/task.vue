@@ -458,16 +458,16 @@ onMounted(() => {
           <a-input v-model:value="formData.workArea" placeholder="请输入施工区域" />
         </a-form-item>
         <a-form-item label="计划开始日期">
-          <a-date-picker v-model:value="formData.plannedStartDate" style="width: 100%" />
+          <a-date-picker v-model:value="formData.plannedStartDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="计划结束日期">
-          <a-date-picker v-model:value="formData.plannedEndDate" style="width: 100%" />
+          <a-date-picker v-model:value="formData.plannedEndDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="实际开始日期">
-          <a-date-picker v-model:value="formData.actualStartDate" style="width: 100%" />
+          <a-date-picker v-model:value="formData.actualStartDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="实际结束日期">
-          <a-date-picker v-model:value="formData.actualEndDate" style="width: 100%" />
+          <a-date-picker v-model:value="formData.actualEndDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="进度百分比">
           <a-input-number

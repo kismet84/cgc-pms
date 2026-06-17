@@ -170,7 +170,7 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
     <a-modal v-model:open="writebackVisible" title="付款回写" :width="480" @ok="handleWritebackOk" @cancel="handleWritebackCancel">
       <a-form :label-col="{span:6}" :wrapper-col="{span:16}">
         <a-form-item label="支付金额" required><a-input-number v-model:value="writebackForm.payAmount" :min="0.01" :precision="2" style="width:100%" placeholder="请输入支付金额" /></a-form-item>
-        <a-form-item label="支付日期" required><a-date-picker v-model:value="writebackForm.payDate" style="width:100%" /></a-form-item>
+        <a-form-item label="支付日期" required><a-date-picker v-model:value="writebackForm.payDate" value-format="YYYY-MM-DD" style="width:100%" /></a-form-item>
         <a-form-item label="支付方式" required><a-select v-model:value="writebackForm.payMethod" placeholder="请选择"><a-select-option value="BANK_TRANSFER">银行转账</a-select-option><a-select-option value="CASH">现金</a-select-option><a-select-option value="CHECK">支票</a-select-option><a-select-option value="OTHER">其他</a-select-option></a-select></a-form-item>
         <a-form-item label="凭证号"><a-input v-model:value="writebackForm.voucherNo" placeholder="请输入凭证号" /></a-form-item>
       </a-form>

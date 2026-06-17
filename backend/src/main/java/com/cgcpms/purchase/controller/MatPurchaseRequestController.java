@@ -43,8 +43,8 @@ public class MatPurchaseRequestController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody MatPurchaseRequest request) {
-        return ApiResponse.success(requestService.create(request));
+    public ApiResponse<String> create(@Valid @RequestBody MatPurchaseRequest request) {
+        return ApiResponse.success(String.valueOf(requestService.create(request)));
     }
 
     @PutMapping("/{id}")

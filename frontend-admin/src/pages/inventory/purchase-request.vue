@@ -502,7 +502,7 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="计划日期" width="130">
             <template #default="{ record: item }">
-              <a-date-picker v-model:value="item.plannedDate" style="width: 100%" size="small" />
+              <a-date-picker v-model:value="item.plannedDate" value-format="YYYY-MM-DD" style="width: 100%" size="small" />
             </template>
           </a-table-column>
           <a-table-column title="备注" width="130">
