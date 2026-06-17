@@ -473,7 +473,6 @@ onMounted(() => {
           <a-breadcrumb-item>首页</a-breadcrumb-item>
           <a-breadcrumb-item>驾驶舱</a-breadcrumb-item>
         </a-breadcrumb>
-        <h1 class="app-page-title">首页</h1>
       </div>
       <div v-if="activeRole !== 'mgmt'" class="project-field">
         <label>选择项目</label>

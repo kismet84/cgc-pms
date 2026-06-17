@@ -60,8 +60,6 @@ export interface ContractVO {
   endDate: string
   paymentMethod: string
   settlementMethod: string
-  warrantyRate: number
-  warrantyAmount: string
   contractStatus: ContractStatus
   approvalStatus: ApprovalStatus
   projectName: string  createdBy: string

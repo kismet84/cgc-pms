@@ -91,8 +91,6 @@ const formData = reactive({
   endDate: '',
   paymentMethod: undefined as string | undefined,
   settlementMethod: undefined as string | undefined,
-  warrantyRate: 0,
-  warrantyAmount: undefined as number | undefined,
   remark: '',
 })
 
@@ -117,16 +115,6 @@ const partyAName = computed(
 const partyBName = computed(
   () => partners.value.find((p) => p.id === formData.partyBId)?.partnerName ?? '-',
 )
-
-// ---- Warranty warning ----
-const warrantyWarning = computed(() => {
-  const hasRate = formData.warrantyRate > 0
-  const hasAmount = formData.warrantyAmount && formData.warrantyAmount > 0
-  if (hasRate !== hasAmount) {
-    return '质保金比例和金额建议同时填写，当前仅填写了一项'
-  }
-  return ''
-})
 
 // ---- Step 1 form & validation ----
 const basicFormRef = ref<FormInstance>()
@@ -225,8 +213,6 @@ function buildContractPayload() {
     endDate: formData.endDate || undefined,
     paymentMethod: formData.paymentMethod ?? '',
     settlementMethod: formData.settlementMethod ?? '',
-    warrantyRate: formData.warrantyRate,
-    warrantyAmount: String(formData.warrantyAmount ?? 0),
     remark: formData.remark,
   }
 }
@@ -336,8 +322,6 @@ async function loadContractDetail() {
     formData.endDate = contract.endDate || ''
     formData.paymentMethod = contract.paymentMethod || undefined
     formData.settlementMethod = contract.settlementMethod || undefined
-    formData.warrantyRate = contract.warrantyRate ?? 0
-    formData.warrantyAmount = Number(contract.warrantyAmount) || undefined
     formData.remark = contract.remark || ''
 
     try {
@@ -570,31 +554,6 @@ function genTermKey(): string {
                   />
                 </a-form-item>
               </a-col>
-              <a-col :span="12">
-                <a-form-item label="质保金比例(%)">
-                  <a-input-number
-                    v-model:value="formData.warrantyRate"
-                    :min="0"
-                    :max="100"
-                    :precision="2"
-                    placeholder="如：5"
-                    style="width: 100%"
-                    @change="dirty = true"
-                  />
-                </a-form-item>
-              </a-col>
-              <a-col :span="12">
-                <a-form-item label="质保金金额(元)">
-                  <a-input-number
-                    v-model:value="formData.warrantyAmount"
-                    :min="0"
-                    :precision="2"
-                    placeholder="如：50000"
-                    style="width: 100%"
-                    @change="dirty = true"
-                  />
-                </a-form-item>
-              </a-col>
               <a-col :span="24">
                 <a-form-item label="备注">
                   <a-textarea
@@ -649,25 +608,10 @@ function genTermKey(): string {
             <a-descriptions-item label="结算方式">{{
               formData.settlementMethod || '-'
             }}</a-descriptions-item>
-            <a-descriptions-item label="质保金比例"
-              >{{ formData.warrantyRate }}%</a-descriptions-item
-            >
-            <a-descriptions-item label="质保金金额">
-              {{ fmtMoney(formData.warrantyAmount) }} 元
-            </a-descriptions-item>
             <a-descriptions-item label="备注" :span="2">{{
               formData.remark || '-'
             }}</a-descriptions-item>
           </a-descriptions>
-
-          <!-- Warranty warning -->
-          <a-alert
-            v-if="warrantyWarning"
-            type="warning"
-            :message="warrantyWarning"
-            show-icon
-            style="margin-top: 12px"
-          />
 
           <div class="cf-review-section">
             <div class="cf-review-title">

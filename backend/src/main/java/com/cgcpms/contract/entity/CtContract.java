@@ -79,12 +79,6 @@ public class CtContract extends BaseEntity {
 
     private String settlementMethod;
 
-    @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal warrantyRate;
-
-    @JsonSerialize(using = ToStringSerializer.class)
-    private BigDecimal warrantyAmount;
-
     private String contractStatus;
 
     private String approvalStatus;

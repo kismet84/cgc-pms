@@ -38,7 +38,7 @@ describe('ContractFormPage edit mode', () => {
     expect(source).toMatch(/formData\.projectId\s*=\s*contract\.projectId/)
     expect(source).toMatch(/formData\.partyAId\s*=\s*contract\.partyAId/)
     expect(source).toMatch(/formData\.contractAmount\s*=\s*Number\(contract\.contractAmount\)/)
-    expect(source).toMatch(/formData\.warrantyRate\s*=\s*contract\.warrantyRate/)
+    expect(source).toMatch(/formData\.settlementMethod\s*=\s*contract\.settlementMethod/)
   })
 
   // ── TEST 5: onMounted triggers loadContractDetail when isEdit ──

@@ -192,10 +192,6 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
             <a-descriptions-item label="不含税金额"
               >{{ formatAmount(contract.amountWithoutTax) }} 元</a-descriptions-item
             >
-            <a-descriptions-item label="质保比例">{{ contract.warrantyRate }}%</a-descriptions-item>
-            <a-descriptions-item label="质保金额"
-              >{{ formatAmount(contract.warrantyAmount) }} 元</a-descriptions-item
-            >
             <a-descriptions-item label="签订日期">{{ contract.signedDate }}</a-descriptions-item>
             <a-descriptions-item label="开始日期">{{ contract.startDate }}</a-descriptions-item>
             <a-descriptions-item label="结束日期">{{ contract.endDate }}</a-descriptions-item>

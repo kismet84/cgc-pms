@@ -394,8 +394,6 @@ public class CtContractService {
         vo.setEndDate(c.getEndDate() != null ? DateTimeUtils.DATE_FMT.format(c.getEndDate()) : null);
         vo.setPaymentMethod(c.getPaymentMethod());
         vo.setSettlementMethod(c.getSettlementMethod());
-        vo.setWarrantyRate(c.getWarrantyRate() != null ? c.getWarrantyRate().toPlainString() : null);
-        vo.setWarrantyAmount(c.getWarrantyAmount() != null ? c.getWarrantyAmount().toPlainString() : null);
         vo.setPaidAmount(c.getPaidAmount() != null ? c.getPaidAmount().toPlainString() : null);
         vo.setSettlementAmount(c.getSettlementAmount() != null ? c.getSettlementAmount().toPlainString() : null);
         vo.setContractStatus(c.getContractStatus());
