@@ -25,7 +25,6 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // expose to Docker network (required for HMR + dev container)
-    watch: { usePolling: true }, // Docker for Windows: filesystem events don't propagate
     proxy: {
       '/api': {
         target: process.env.VITE_API_TARGET || 'http://localhost:8080',
