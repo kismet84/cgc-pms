@@ -252,19 +252,15 @@ public class CtContractService {
             String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
             String prefix = "CT-" + today + "-";
 
-            LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
-            wrapper.likeRight(CtContract::getContractCode, prefix)
-                    .orderByDesc(CtContract::getContractCode)
-                    .last("LIMIT 1");
-            CtContract last = ctContractMapper.selectOne(wrapper);
+            // 含软删除记录查询最大编号，避免 UK 冲突
+            String lastCode = ctContractMapper.selectLastCodeByPrefix(prefix, UserContext.getCurrentTenantId());
 
             int seq = 1;
-            if (last != null && last.getContractCode() != null
-                    && last.getContractCode().length() == prefix.length() + 3) {
+            if (lastCode != null && lastCode.length() == prefix.length() + 3) {
                 try {
-                    seq = Integer.parseInt(last.getContractCode().substring(prefix.length())) + 1;
+                    seq = Integer.parseInt(lastCode.substring(prefix.length())) + 1;
                 } catch (NumberFormatException e) {
-                    log.warn("Failed to parse sequence number: {}", last.getContractCode(), e);
+                    log.warn("Failed to parse sequence number: {}", lastCode, e);
                 }
             }
             contract.setContractCode(prefix + String.format("%03d", seq));

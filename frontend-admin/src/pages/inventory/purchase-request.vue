@@ -71,6 +71,26 @@ const STATUS_COLOR: Record<string, string> = {
   CONVERTED: 'cyan',
 }
 
+const itemColumns = [
+  {
+    title: '物料',
+    dataIndex: 'material',
+    key: 'material',
+    width: 480,
+    customHeaderCell: () => ({
+      style: { width: '480px', minWidth: '480px', maxWidth: '480px' },
+    }),
+    customCell: () => ({
+      style: { width: '480px', minWidth: '480px', maxWidth: '480px' },
+    }),
+  },
+  { title: '单位', dataIndex: 'unit', key: 'unit', width: 120 },
+  { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 120 },
+  { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 160 },
+  { title: '备注', dataIndex: 'remark', key: 'remark', width: 160 },
+  { title: '操作', key: 'action', width: 100 },
+]
+
 const filterOption = (input: string, option: any) =>
   option.label?.toLowerCase().includes(input.toLowerCase())
 
@@ -482,7 +502,7 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="900"
+      :width="1100"
       :confirm-loading="submitting"
       destroy-on-close
       @ok="handleModalOk"
@@ -530,12 +550,14 @@ onMounted(() => {
         <a-table
           :data-source="itemList"
           :pagination="false"
+          table-layout="fixed"
+          :columns="itemColumns"
           row-key="key"
           size="small"
-          :scroll="{ x: 850, y: 250 }"
+          :scroll="{ x: 1020, y: 250 }"
         >
-          <a-table-column title="物料" width="360">
-            <template #default="{ record: item }">
+          <template #bodyCell="{ column, record: item }">
+            <template v-if="column.key === 'material'">
               <div style="display: flex; gap: 4px">
                 <a-select
                   :value="item.materialId"
@@ -560,14 +582,10 @@ onMounted(() => {
                 />
               </div>
             </template>
-          </a-table-column>
-          <a-table-column title="单位" width="60">
-            <template #default="{ record: item }">
+            <template v-else-if="column.key === 'unit'">
               <a-input v-model:value="item.unit" placeholder="单位" size="small" style="width: 100%" />
             </template>
-          </a-table-column>
-          <a-table-column title="数量" width="60">
-            <template #default="{ record: item }">
+            <template v-else-if="column.key === 'quantity'">
               <a-input-number
                 v-model:value="item.quantity"
                 :min="0"
@@ -575,24 +593,24 @@ onMounted(() => {
                 style="width: 100%"
               />
             </template>
-          </a-table-column>
-          <a-table-column title="计划日期" width="130">
-            <template #default="{ record: item }">
-              <a-date-picker v-model:value="item.plannedDate" value-format="YYYY-MM-DD" style="width: 100%" size="small" :get-popup-container="getPopupContainer" />
+            <template v-else-if="column.key === 'plannedDate'">
+              <a-date-picker
+                v-model:value="item.plannedDate"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+                size="small"
+                :get-popup-container="getPopupContainer"
+              />
             </template>
-          </a-table-column>
-          <a-table-column title="备注" width="130">
-            <template #default="{ record: item }">
+            <template v-else-if="column.key === 'remark'">
               <a-input v-model:value="item.remark" placeholder="备注" size="small" />
             </template>
-          </a-table-column>
-          <a-table-column title="操作" width="60">
-            <template #default="{ record: item }">
-              <a-button type="link" size="small" danger @click="handleRemoveItem(item.key)"
-                >删除</a-button
-              >
+            <template v-else-if="column.key === 'action'">
+              <a-button type="link" size="small" danger @click="handleRemoveItem(item.key)">
+                删除
+              </a-button>
             </template>
-          </a-table-column>
+          </template>
         </a-table>
       </div>
     </a-modal>
@@ -623,5 +641,18 @@ onMounted(() => {
   font-weight: 400;
   font-size: 12px;
   margin-left: 6px;
+}
+
+:deep(.pr-items-section .ant-table-thead > tr > th:first-child),
+:deep(.pr-items-section .ant-table-tbody > tr > td:first-child) {
+  width: 480px !important;
+  min-width: 480px !important;
+  max-width: 480px !important;
+}
+
+:deep(.pr-items-section .ant-table colgroup col:first-child) {
+  width: 480px !important;
+  min-width: 480px !important;
+  max-width: 480px !important;
 }
 </style>
