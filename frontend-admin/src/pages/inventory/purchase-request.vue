@@ -272,6 +272,10 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
+function getPopupContainer() {
+  return document.body
+}
+
 const kpiReqTotal = computed(() => tableData.value.length)
 const kpiReqPending = computed(() => tableData.value.filter(r => r.approvalStatus === "DRAFT" || r.approvalStatus === "APPROVING").length)
 
@@ -501,7 +505,7 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="计划日期" width="130">
             <template #default="{ record: item }">
-              <a-date-picker v-model:value="item.plannedDate" value-format="YYYY-MM-DD" style="width: 100%" size="small" :get-popup-container="() => document.body" />
+              <a-date-picker v-model:value="item.plannedDate" value-format="YYYY-MM-DD" style="width: 100%" size="small" :get-popup-container="getPopupContainer" />
             </template>
           </a-table-column>
           <a-table-column title="备注" width="130">
