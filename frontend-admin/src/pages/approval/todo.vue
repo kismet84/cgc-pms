@@ -143,7 +143,6 @@ watch(
         <a-breadcrumb-item>审批中心</a-breadcrumb-item>
         <a-breadcrumb-item>{{ pageHeaderTitle() }}</a-breadcrumb-item>
       </a-breadcrumb>
-      <h1 class="app-page-title">{{ pageHeaderTitle() }}</h1>
       <p class="app-page-subtitle">{{ pageHeaderSubtitle() }}</p>
       <div class="pt-head-actions"></div>
     </div>

@@ -95,7 +95,6 @@ function handleCancel() {
           </a-breadcrumb-item>
           <a-breadcrumb-item>编辑项目</a-breadcrumb-item>
         </a-breadcrumb>
-        <h1 class="app-page-title">编辑项目</h1>
       </div>
       <div class="pt-head-actions">
         <a-button @click="handleCancel">取消</a-button>

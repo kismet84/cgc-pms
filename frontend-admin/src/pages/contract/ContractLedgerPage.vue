@@ -374,7 +374,6 @@ const gridColumns = computed(() => [
           <a-breadcrumb-item>合同管理</a-breadcrumb-item>
           <a-breadcrumb-item>合同台账</a-breadcrumb-item>
         </a-breadcrumb>
-        <h1 class="app-page-title">合同台账</h1>
       </div>
     </div>
 

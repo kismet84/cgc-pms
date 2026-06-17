@@ -350,7 +350,6 @@ onMounted(() => {
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>字典管理</a-breadcrumb-item></a-breadcrumb>
-      <h1 class="app-page-title">字典管理</h1>
     </div>
 
     <div class="pt-panel dc-panel">

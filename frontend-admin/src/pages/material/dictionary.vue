@@ -207,7 +207,6 @@ onMounted(fetchData)
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>基础数据</a-breadcrumb-item><a-breadcrumb-item>材料字典</a-breadcrumb-item></a-breadcrumb>
-      <h1 class="app-page-title">材料字典</h1>
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleAdd">新增材料</a-button>
       </div>

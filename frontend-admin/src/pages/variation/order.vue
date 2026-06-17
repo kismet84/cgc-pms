@@ -150,7 +150,6 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>变更签证</a-breadcrumb-item></a-breadcrumb>
-      <h1 class="app-page-title">变更签证</h1>
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleAdd"><PlusOutlined />新建</a-button>
         <a-button @click="handleSearch"><ReloadOutlined />刷新</a-button>

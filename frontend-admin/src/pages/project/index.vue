@@ -380,7 +380,6 @@ const columns = [
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目列表</a-breadcrumb-item>
         </a-breadcrumb>
-        <h1 class="app-page-title">项目列表</h1>
       </div>
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleCreateModalOpen">

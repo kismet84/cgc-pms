@@ -411,7 +411,6 @@ onMounted(fetchTemplates)
         <a-breadcrumb-item>审批管理</a-breadcrumb-item>
         <a-breadcrumb-item>审批流程管理</a-breadcrumb-item>
       </a-breadcrumb>
-      <h1 class="app-page-title">审批流程管理</h1>
       <div class="pt-head-actions">
         <a-button @click="fetchTemplates">刷新</a-button>
       </div>

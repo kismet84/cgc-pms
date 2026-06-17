@@ -199,7 +199,6 @@ onMounted(fetchData)
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>用户管理</a-breadcrumb-item></a-breadcrumb>
-      <h1 class="app-page-title">用户管理</h1>
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleAdd">新增用户</a-button>
       </div>

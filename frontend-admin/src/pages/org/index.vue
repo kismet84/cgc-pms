@@ -622,7 +622,6 @@ onMounted(async () => {
           <div class="org-title-row">
             <div class="org-title-mark"><ApartmentOutlined /></div>
             <div>
-              <h1 class="app-page-title">组织架构</h1>
               <p>统一维护公司、部门与岗位，为项目成员、审批流和权限体系提供组织基座。</p>
             </div>
           </div>

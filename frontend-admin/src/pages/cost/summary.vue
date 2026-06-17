@@ -268,7 +268,6 @@ onMounted(() => {
         <a-breadcrumb-item>成本管理</a-breadcrumb-item>
         <a-breadcrumb-item>动态成本汇总</a-breadcrumb-item>
       </a-breadcrumb>
-      <h1 class="app-page-title">动态成本汇总</h1>
       <div class="pt-head-actions">
         <a-select
           v-model:value="selectedProjectId"

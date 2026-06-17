@@ -334,7 +334,6 @@ onMounted(() => {
           </a-breadcrumb-item>
           <a-breadcrumb-item>{{ isEdit ? '编辑目标成本' : '新建目标成本' }}</a-breadcrumb-item>
         </a-breadcrumb>
-        <h1 class="app-page-title">{{ isEdit ? '编辑目标成本' : '新建目标成本' }}</h1>
       </div>
       <div class="pt-head-actions">
         <a-button :disabled="saving" @click="handleCancel">取消</a-button>

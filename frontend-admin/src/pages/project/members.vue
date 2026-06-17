@@ -180,7 +180,6 @@ const columns = [
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目成员</a-breadcrumb-item>
         </a-breadcrumb>
-        <h1 class="app-page-title">项目成员</h1>
         <div v-if="store.currentProject" class="pm-title-project">
           {{ store.currentProject.projectName }}
         </div>

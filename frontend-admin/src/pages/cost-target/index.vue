@@ -221,7 +221,6 @@ onMounted(() => {
           <a-breadcrumb-item>目标管理</a-breadcrumb-item>
           <a-breadcrumb-item>目标管理</a-breadcrumb-item>
         </a-breadcrumb>
-        <h1 class="app-page-title">目标管理</h1>
       </div>
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleCreate">

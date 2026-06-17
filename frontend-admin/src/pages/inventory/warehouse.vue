@@ -191,7 +191,6 @@ onMounted(() => {
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>库存管理</a-breadcrumb-item><a-breadcrumb-item>仓库</a-breadcrumb-item></a-breadcrumb>
-      <h1 class="app-page-title">仓库</h1>
       <div class="pt-head-actions"></div>
     </div>
 

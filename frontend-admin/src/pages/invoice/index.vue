@@ -436,7 +436,6 @@ defineExpose({
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>发票管理</a-breadcrumb-item></a-breadcrumb>
-      <h1 class="app-page-title">发票管理</h1>
       <div class="pt-head-actions"></div>
     </div>
 

@@ -229,7 +229,6 @@ onMounted(() => {
         <a-breadcrumb-item>成本管理</a-breadcrumb-item>
         <a-breadcrumb-item>成本科目</a-breadcrumb-item>
       </a-breadcrumb>
-      <h1 class="app-page-title">成本科目</h1>
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleAddRoot">新增根节点</a-button>
         <a-button @click="handleAddChild" :disabled="!selectedNode">新增子节点</a-button>

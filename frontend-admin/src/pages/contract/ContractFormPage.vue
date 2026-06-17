@@ -389,7 +389,6 @@ function genTermKey(): string {
         <a-breadcrumb-item>合同台账</a-breadcrumb-item>
         <a-breadcrumb-item>{{ isEdit ? '编辑合同' : '新建合同' }}</a-breadcrumb-item>
       </a-breadcrumb>
-      <h1 class="app-page-title">{{ isEdit ? '编辑合同' : '新建合同' }}</h1>
     </div>
 
     <div class="pt-panel" style="position: relative; padding-bottom: 12px">

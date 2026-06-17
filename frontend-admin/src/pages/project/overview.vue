@@ -137,7 +137,6 @@ onMounted(() => {
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目总览</a-breadcrumb-item>
         </a-breadcrumb>
-        <h1 class="app-page-title">项目总览</h1>
       </div>
     </div>
 

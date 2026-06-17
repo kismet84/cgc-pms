@@ -316,7 +316,6 @@ onMounted(() => {
         <a-breadcrumb-item>成本管理</a-breadcrumb-item>
         <a-breadcrumb-item>成本台账</a-breadcrumb-item>
       </a-breadcrumb>
-      <h1 class="app-page-title">成本台账</h1>
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleSearch"><SearchOutlined />查询</a-button>
         <a-button @click="handleReset"><ReloadOutlined />重置</a-button>

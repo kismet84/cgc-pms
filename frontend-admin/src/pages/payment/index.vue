@@ -85,7 +85,6 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>付款管理</a-breadcrumb-item><a-breadcrumb-item>付款申请</a-breadcrumb-item></a-breadcrumb>
-      <h1 class="app-page-title">付款申请</h1>
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleAdd"><PlusOutlined />新建申请</a-button>
         <a-button @click="handleSearch"><ReloadOutlined />刷新</a-button>
