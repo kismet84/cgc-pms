@@ -171,8 +171,9 @@ public class CtContractService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
 
-        // 审批中守卫：禁止编辑
-        if (ContractStatusConstants.APPROVAL_APPROVING.equals(existing.getApprovalStatus()))
+        // 审批中守卫：禁止编辑（超管豁免）
+        if (ContractStatusConstants.APPROVAL_APPROVING.equals(existing.getApprovalStatus())
+                && !UserContext.hasRole("SUPER_ADMIN"))
             throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中，不可编辑");
 
         // 禁止通过 update 接口覆盖审批状态
@@ -227,7 +228,8 @@ public class CtContractService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
 
-        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus())
+                && !UserContext.hasRole("SUPER_ADMIN"))
             throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中或已审批，不可删除");
 
         ctContractMapper.deleteById(id);
@@ -276,7 +278,8 @@ public class CtContractService {
             if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
                 throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
 
-            if (ContractStatusConstants.APPROVAL_APPROVING.equals(existing.getApprovalStatus()))
+            if (ContractStatusConstants.APPROVAL_APPROVING.equals(existing.getApprovalStatus())
+                    && !UserContext.hasRole("SUPER_ADMIN"))
                 throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中，不可编辑");
 
             contract.setApprovalStatus(existing.getApprovalStatus());
