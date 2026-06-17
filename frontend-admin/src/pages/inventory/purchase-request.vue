@@ -34,6 +34,7 @@ const materialList = computed(() => referenceStore.materials ?? [])
 const modalVisible = ref(false)
 const modalTitle = ref('新建采购申请')
 const editingId = ref<string | null>(null)
+const submitting = ref(false)
 const formData = reactive<Partial<PurchaseRequestVO>>({
   projectId: undefined,
   remark: '',
@@ -41,7 +42,7 @@ const formData = reactive<Partial<PurchaseRequestVO>>({
 
 // Line items for the modal
 const itemList = ref<(Partial<PurchaseRequestItemVO> & { key: number })[]>([])
-let itemKeyCounter = 0
+const keySeq = ref(0)
 
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
@@ -65,6 +66,9 @@ const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',
   CONVERTED: 'cyan',
 }
+
+const filterOption = (input: string, option: any) =>
+  option.label?.toLowerCase().includes(input.toLowerCase())
 
 const columns = [
   { title: '申请编号', dataIndex: 'requestCode', width: 150 },
@@ -132,7 +136,7 @@ function handleAdd() {
     remark: '',
   })
   itemList.value = []
-  itemKeyCounter = 0
+  keySeq.value = 0
   modalVisible.value = true
 }
 
@@ -144,13 +148,13 @@ async function handleEdit(record: PurchaseRequestVO) {
     remark: record.remark,
   })
   itemList.value = []
-  itemKeyCounter = 0
+  keySeq.value = 0
   // Load existing items
   try {
     const items = await getPurchaseRequestItems(record.id)
     itemList.value = items.map((item) => ({
       ...item,
-      key: itemKeyCounter++,
+      key: keySeq.value++,
     }))
   } catch (e: unknown) {
     console.error(e)
@@ -201,7 +205,7 @@ function handleSubmit(record: PurchaseRequestVO) {
 // --- Line items management ---
 function handleAddItem() {
   itemList.value.push({
-    key: itemKeyCounter++,
+    key: keySeq.value++,
     materialId: '',
     materialName: '',
     quantity: '0',
@@ -211,13 +215,17 @@ function handleAddItem() {
   })
 }
 
-function handleRemoveItem(index: number) {
-  itemList.value.splice(index, 1)
+function handleRemoveItem(key: number) {
+  const idx = itemList.value.findIndex((i) => i.key === key)
+  if (idx !== -1) {
+    itemList.value.splice(idx, 1)
+  }
 }
 
-function handleMaterialChange(index: number, materialId: string | undefined) {
+function handleMaterialChange(key: number, materialId: string | undefined) {
+  const item = itemList.value.find((i) => i.key === key)
+  if (!item) return
   if (!materialId) {
-    const item = itemList.value[index]
     item.materialId = ''
     item.materialName = ''
     item.unit = ''
@@ -225,7 +233,6 @@ function handleMaterialChange(index: number, materialId: string | undefined) {
   }
   const material = materialList.value.find((m) => m.id === materialId)
   if (material) {
-    const item = itemList.value[index]
     item.materialId = material.id
     item.materialName = material.materialName
     item.unit = material.unit || ''
@@ -235,19 +242,36 @@ function handleMaterialChange(index: number, materialId: string | undefined) {
 const itemsCount = computed(() => itemList.value.length)
 
 async function handleModalOk() {
+  if (submitting.value) return
+
+  // --- validation ---
   if (!formData.projectId) {
     message.warning('请选择项目')
     return
   }
+  if (itemList.value.length < 1) {
+    message.warning('请至少添加一个物料明细')
+    return
+  }
+  for (const item of itemList.value) {
+    if (!item.materialId) {
+      message.warning('请为所有明细选择物料')
+      return
+    }
+    if (!item.quantity || Number(item.quantity) <= 0) {
+      message.warning('物料数量必须大于 0')
+      return
+    }
+  }
 
+  submitting.value = true
+  let requestId = ''
   try {
-    let requestId: string
     if (editingId.value) {
       await updatePurchaseRequest(editingId.value, formData)
       requestId = editingId.value
     } else {
-      const result = await createPurchaseRequest(formData)
-      requestId = result
+      requestId = await createPurchaseRequest(formData)
     }
 
     // Save line items
@@ -264,11 +288,22 @@ async function handleModalOk() {
     fetchData()
   } catch (e: unknown) {
     console.error(e)
+    // Clean up orphaned PR when creating new and header saved but items failed
+    if (!editingId.value && requestId) {
+      try {
+        await deletePurchaseRequest(requestId)
+      } catch {
+        // best-effort cleanup
+      }
+    }
     message.error('操作失败，请稍后重试')
+  } finally {
+    submitting.value = false
   }
 }
 
 function handleModalCancel() {
+  if (submitting.value) return
   modalVisible.value = false
 }
 
@@ -310,10 +345,7 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
+            :filter-option="filterOption"
           >
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
@@ -425,6 +457,8 @@ onMounted(() => {
       v-model:open="modalVisible"
       :title="modalTitle"
       :width="900"
+      :confirm-loading="submitting"
+      destroy-on-close
       @ok="handleModalOk"
       @cancel="handleModalCancel"
     >
@@ -443,18 +477,11 @@ onMounted(() => {
       </a-form>
 
       <!-- Line Items Section -->
-      <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-          "
-        >
-          <span style="font-weight: 600; font-size: 14px">
+      <div class="pr-items-section">
+        <div class="pr-items-header">
+          <span class="pr-items-title">
             申请明细
-            <span style="color: #9ca3af; font-weight: 400; font-size: 12px; margin-left: 6px">
+            <span class="pr-items-count">
               {{ itemsCount }} 项
             </span>
           </span>
@@ -469,18 +496,15 @@ onMounted(() => {
           :scroll="{ y: 250 }"
         >
           <a-table-column title="物料" width="200">
-            <template #default="{ record: item, index }">
+            <template #default="{ record: item }">
               <a-select
                 :value="item.materialId"
                 placeholder="请选择物料"
                 allow-clear
                 style="width: 100%"
                 show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-                @change="(val: string) => handleMaterialChange(index, val)"
+                :filter-option="filterOption"
+                @change="(val: string) => handleMaterialChange(item.key, val)"
               >
                 <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
                   {{ m.materialName }}
@@ -514,8 +538,8 @@ onMounted(() => {
             </template>
           </a-table-column>
           <a-table-column title="操作" width="60">
-            <template #default="{ record: _item, index }">
-              <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
+            <template #default="{ record: item }">
+              <a-button type="link" size="small" danger @click="handleRemoveItem(item.key)"
                 >删除</a-button
               >
             </template>
@@ -526,6 +550,29 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.pr-items-section {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 12px;
+  margin-top: 4px;
+}
 
+.pr-items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
 
+.pr-items-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.pr-items-count {
+  color: #9ca3af;
+  font-weight: 400;
+  font-size: 12px;
+  margin-left: 6px;
+}
+</style>
