@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import { useReferenceStore } from '@/stores/reference'
@@ -51,6 +51,9 @@ const formData = reactive<Partial<MatPurchaseOrderVO>>({
   deliveryDate: undefined,
   remark: '',
 })
+const formPartnerName = computed(() => contractList.value?.find(c => c.id === formData.contractId)?.partyBName ?? '')
+function onContractChange(contractId: string) { const c = contractList.value?.find(ct => ct.id === contractId); formData.partnerId = c?.partyBId }
+watch(() => formData.contractId, (val) => { if (!val) formData.partnerId = undefined })
 
 // Line items for the modal
 const itemList = ref<(Partial<MatPurchaseOrderItemVO> & { key: number })[]>([])
@@ -560,6 +563,7 @@ onMounted(() => {
               (input: string, option: any) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
             "
+            @change="onContractChange"
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
@@ -567,20 +571,7 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="供应商">
-          <a-select
-            v-model:value="formData.partnerId"
-            placeholder="请选择供应商"
-            allow-clear
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-              {{ p.partnerName }}
-            </a-select-option>
-          </a-select>
+          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
         </a-form-item>
         <a-form-item label="订单类型">
           <a-select v-model:value="formData.orderType" placeholder="请选择类型" allow-clear>

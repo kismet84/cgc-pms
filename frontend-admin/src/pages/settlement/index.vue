@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from "vue";
+import { ref, reactive, onMounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useReferenceStore } from "@/stores/reference";
 import { storeToRefs } from "pinia";
@@ -34,6 +34,8 @@ const kpi = ref<SettlementKpiVO>({ totalCount:0, totalContractAmount:"0", totalF
 const createModalVisible = ref(false);
 const createLoading = ref(false);
 const createForm = reactive({ contractId: undefined as string | undefined, settlementType: undefined as string | undefined, remark: "" });
+const createFormPartnerName = computed(() => contracts.value?.find(c => c.id === createForm.contractId)?.partyBName ?? "");
+watch(() => createForm.contractId, (val) => { if (!val) createFormPartnerName; });
 
 function onProjectChange(val: string | undefined) { filter.contractId = undefined; if (val) referenceStore.fetchContracts({ projectId: val }); }
 
@@ -124,6 +126,7 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
     <a-modal v-model:open="createModalVisible" title="新建结算单" :confirm-loading="createLoading" @ok="handleCreate">
       <a-form layout="vertical">
         <a-form-item label="关联合同" required><a-select v-model:value="createForm.contractId" placeholder="请选择合同" style="width:100%" show-search option-filter-prop="label"><a-select-option v-for="c in contracts" :key="c.id" :value="c.id" :label="c.contractName">{{ c.contractName }}</a-select-option></a-select></a-form-item>
+        <a-form-item label="合作方"><a-input :value="createFormPartnerName" disabled placeholder="选择合同后自动填充乙方" /></a-form-item>
         <a-form-item label="结算类型"><a-select v-model:value="createForm.settlementType" placeholder="请选择" allow-clear style="width:100%"><a-select-option value="PROGRESS">进度结算</a-select-option><a-select-option value="FINAL">竣工结算</a-select-option><a-select-option value="INTERIM">期中结算</a-select-option></a-select></a-form-item>
         <a-form-item label="备注"><a-textarea v-model:value="createForm.remark" placeholder="备注（选填）" :rows="3" /></a-form-item>
       </a-form>

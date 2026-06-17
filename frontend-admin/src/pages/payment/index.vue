@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from "vue";
+import { ref, reactive, onMounted, computed, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { message, Modal } from "ant-design-vue";
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons-vue";
@@ -19,6 +19,9 @@ const referenceStore = useReferenceStore(); const { projects, contracts, partner
 const receiptList = ref<MatReceiptVO[]>([]); const measureList = ref<SubMeasureVO[]>([]);
 const modalVisible = ref(false); const modalTitle = ref("新建付款申请"); const editingId = ref<string | null>(null);
 const formData = reactive<Partial<PayApplicationVO>>({ projectId: undefined, contractId: undefined, partnerId: undefined, payType: undefined, applyAmount: undefined, applyReason: "" });
+const formPartnerName = computed(() => contracts.value?.find(c => c.id === formData.contractId)?.partyBName ?? "");
+function onContractChange(contractId: string) { const c = contracts.value?.find(ct => ct.id === contractId); formData.partnerId = c?.partyBId; }
+watch(() => formData.contractId, (val) => { if (!val) formData.partnerId = undefined; });
 const basisList = ref<(Partial<PayApplicationBasisVO> & { key: number })[]>([]); let basisKeyCounter = 0;
 const writebackVisible = ref(false); const writebackTargetId = ref("");
 const writebackForm = reactive({ payAmount: undefined as number | undefined, payDate: undefined as string | undefined, payMethod: "BANK_TRANSFER", voucherNo: "" });
@@ -141,10 +144,10 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
       <a-form layout="vertical" :model="formData">
         <a-row :gutter="16">
           <a-col :span="12"><a-form-item label="项目"><a-select v-model:value="formData.projectId" placeholder="请选择项目" style="width:100%" :options="(projects??[]).map(p=>({value:p.id,label:p.projectName}))" /></a-form-item></a-col>
-          <a-col :span="12"><a-form-item label="合同"><a-select v-model:value="formData.contractId" placeholder="请选择合同" style="width:100%" :options="(contracts??[]).map(c=>({value:c.id,label:c.contractName}))" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="合同"><a-select v-model:value="formData.contractId" placeholder="请选择合同" style="width:100%" :options="(contracts??[]).map(c=>({value:c.id,label:c.contractName}))" @change="onContractChange" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="16">
-          <a-col :span="12"><a-form-item label="合作方"><a-select v-model:value="formData.partnerId" placeholder="请选择合作方" style="width:100%" :options="(partners??[]).map(p=>({value:p.id,label:p.partnerName}))" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="合作方"><a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="付款类型"><a-select v-model:value="formData.payType" placeholder="请选择付款类型" style="width:100%"><a-select-option v-for="(label,key) in PAY_TYPE_LABEL" :key="key" :value="key">{{ label }}</a-select-option></a-select></a-form-item></a-col>
         </a-row>
         <a-row :gutter="16">

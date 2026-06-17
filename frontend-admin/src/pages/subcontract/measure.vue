@@ -49,6 +49,7 @@ const formData = reactive<Partial<SubMeasureVO>>({
   measureDate: undefined,
   remark: '',
 })
+const formPartnerName = computed(() => contractList.value?.find(c => c.id === formData.contractId)?.partyBName ?? '')
 
 // Line items
 const itemList = ref<(Partial<SubMeasureItemVO> & { key: number })[]>([])
@@ -290,8 +291,11 @@ const itemsTotalAmount = computed(() => {
 
 async function onContractSelect(contractId: string | undefined) {
   if (contractId) {
+    const c = contractList.value?.find(ct => ct.id === contractId)
+    formData.partnerId = c?.partyBId
     await loadContractItems(contractId)
   } else {
+    formData.partnerId = undefined
     contractItemList.value = []
   }
 }
@@ -570,20 +574,7 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="分包商">
-          <a-select
-            v-model:value="formData.partnerId"
-            placeholder="请选择分包商"
-            allow-clear
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-              {{ p.partnerName }}
-            </a-select-option>
-          </a-select>
+          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
         </a-form-item>
         <a-form-item label="计量期次">
           <a-input

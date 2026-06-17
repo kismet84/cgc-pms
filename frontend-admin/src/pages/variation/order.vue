@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from "vue";
+import { ref, reactive, onMounted, computed, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { message, Modal } from "ant-design-vue";
 import {
@@ -39,6 +39,9 @@ const formData = reactive<Partial<VarOrderVO>>({
   varType: undefined, varName: "", direction: "COST", impactDays: 0,
   ownerConfirmFlag: 0, remark: "",
 });
+const formPartnerName = computed(() => contractList.value?.find(c => c.id === formData.contractId)?.partyBName ?? "");
+function onContractChange(contractId: string) { const c = contractList.value?.find(ct => ct.id === contractId); formData.partnerId = c?.partyBId; }
+watch(() => formData.contractId, (val) => { if (!val) formData.partnerId = undefined; });
 
 const itemList = ref<(Partial<VarOrderItemVO> & { key: number })[]>([]);
 let itemKeyCounter = 0;
@@ -199,8 +202,8 @@ onMounted(() => { referenceStore.fetchProjects(); referenceStore.fetchContracts(
       <a-form layout="vertical" :model="formData">
         <a-row :gutter="16">
           <a-col :span="8"><a-form-item label="项目"><a-select v-model:value="formData.projectId" placeholder="请选择项目" style="width:100%" :options="(projectList??[]).map(p=>({value:p.id,label:p.projectName}))" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="合同"><a-select v-model:value="formData.contractId" placeholder="请选择合同" style="width:100%" :options="(contractList??[]).map(c=>({value:c.id,label:c.contractName}))" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="合作方"><a-select v-model:value="formData.partnerId" placeholder="请选择合作方" style="width:100%" :options="(partnerList??[]).map(p=>({value:p.id,label:p.partnerName}))" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="合同"><a-select v-model:value="formData.contractId" placeholder="请选择合同" style="width:100%" :options="(contractList??[]).map(c=>({value:c.id,label:c.contractName}))" @change="onContractChange" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="合作方"><a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="16">
           <a-col :span="8"><a-form-item label="变更类型"><a-select v-model:value="formData.varType" placeholder="请选择" style="width:100%"><a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">{{ o.label }}</a-select-option></a-select></a-form-item></a-col>

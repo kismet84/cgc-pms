@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -50,6 +50,9 @@ const formData = reactive<Partial<SubTaskVO>>({
   status: 'NOT_STARTED',
   remark: '',
 })
+const formPartnerName = computed(() => contractList.value?.find(c => c.id === formData.contractId)?.partyBName ?? '')
+function onContractChange(contractId: string) { const c = contractList.value?.find(ct => ct.id === contractId); formData.partnerId = c?.partyBId }
+watch(() => formData.contractId, (val) => { if (!val) formData.partnerId = undefined })
 
 const STATUS_LABEL: Record<string, string> = {
   NOT_STARTED: '未开始',
@@ -436,6 +439,7 @@ onMounted(() => {
               (input: string, option: any) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
             "
+            @change="onContractChange"
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
@@ -443,20 +447,7 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="分包商">
-          <a-select
-            v-model:value="formData.partnerId"
-            placeholder="请选择分包商"
-            allow-clear
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-              {{ p.partnerName }}
-            </a-select-option>
-          </a-select>
+          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
         </a-form-item>
         <a-form-item label="任务名称" required>
           <a-input v-model:value="formData.taskName" placeholder="请输入任务名称" />
