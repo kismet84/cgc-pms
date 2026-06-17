@@ -502,7 +502,7 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="1100"
+      :width="900"
       :confirm-loading="submitting"
       destroy-on-close
       @ok="handleModalOk"
@@ -554,7 +554,7 @@ onMounted(() => {
           :columns="itemColumns"
           row-key="key"
           size="small"
-          :scroll="{ x: 1020, y: 250 }"
+          :scroll="{ x: 1140, y: 250 }"
         >
           <template #bodyCell="{ column, record: item }">
             <template v-if="column.key === 'material'">
