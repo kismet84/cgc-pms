@@ -46,6 +46,12 @@ public class OrgPositionService {
 
     @Transactional
     public Long create(OrgPosition position) {
+        if (position.getCompanyId() == null) {
+            throw new BusinessException("ORG_POSITION_COMPANY_REQUIRED", "所属公司不能为空");
+        }
+        if (position.getDepartmentId() == null) {
+            throw new BusinessException("ORG_POSITION_DEPT_REQUIRED", "所属部门不能为空");
+        }
         if (StringUtils.hasText(position.getPositionCode())) {
             Long count = orgPositionMapper.selectCount(new LambdaQueryWrapper<OrgPosition>()
                     .eq(OrgPosition::getPositionCode, position.getPositionCode())
@@ -66,6 +72,12 @@ public class OrgPositionService {
             throw new BusinessException("ORG_POSITION_NOT_FOUND", "岗位不存在");
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("ORG_POSITION_NOT_FOUND", "岗位不存在");
+        }
+        if (position.getCompanyId() == null) {
+            throw new BusinessException("ORG_POSITION_COMPANY_REQUIRED", "所属公司不能为空");
+        }
+        if (position.getDepartmentId() == null) {
+            throw new BusinessException("ORG_POSITION_DEPT_REQUIRED", "所属部门不能为空");
         }
         orgPositionMapper.updateById(position);
     }

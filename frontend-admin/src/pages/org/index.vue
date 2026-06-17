@@ -103,12 +103,12 @@ const positionColumns = [
 
 // ─── Page metrics ───────────────────────────────────────
 
-/** 将部门树展平为 select 可用的列表（含层级前缀） */
-function flattenDeptTree(nodes: OrgDepartmentTreeNodeVO[], prefix = ''): { id: string; name: string }[] {
-  const result: { id: string; name: string }[] = []
+/** 将部门树展平为 select 可用的列表（含层级前缀 + companyId） */
+function flattenDeptTree(nodes: OrgDepartmentTreeNodeVO[], prefix = ''): { id: string; name: string; companyId: string }[] {
+  const result: { id: string; name: string; companyId: string }[] = []
   for (const node of nodes) {
     const label = prefix ? `${prefix} / ${node.deptName}` : node.deptName
-    result.push({ id: node.id, name: label })
+    result.push({ id: node.id, name: label, companyId: node.companyId })
     if (node.children?.length) {
       result.push(...flattenDeptTree(node.children, label))
     }
@@ -117,6 +117,18 @@ function flattenDeptTree(nodes: OrgDepartmentTreeNodeVO[], prefix = ''): { id: s
 }
 
 const flatDeptList = computed(() => flattenDeptTree(deptTreeData.value))
+
+/** 模态框中按所选公司过滤的部门列表 */
+const modalDeptList = computed(() => {
+  if (!positionForm.companyId) return flatDeptList.value
+  return flatDeptList.value.filter(d => d.companyId === positionForm.companyId)
+})
+
+/** 筛选栏中按所选公司过滤的部门列表 */
+const filterDeptList = computed(() => {
+  if (!positionFilter.companyId) return flatDeptList.value
+  return flatDeptList.value.filter(d => d.companyId === positionFilter.companyId)
+})
 
 const selectedCompany = computed(
   () => companyData.value.find((company) => company.id === selectedCompanyId.value) ?? null,
@@ -535,6 +547,14 @@ function openPositionEdit(record: OrgPositionVO) {
 }
 
 async function handlePositionSave() {
+  if (!positionForm.companyId) {
+    message.warning('请选择所属公司')
+    return
+  }
+  if (!positionForm.departmentId) {
+    message.warning('请选择所属部门')
+    return
+  }
   positionSaving.value = true
   try {
     const body = {
@@ -844,7 +864,7 @@ onMounted(async () => {
             allow-clear
             style="width:160px"
           >
-            <a-select-option v-for="d in flatDeptList" :key="d.id" :value="d.id">
+            <a-select-option v-for="d in filterDeptList" :key="d.id" :value="d.id">
               {{ d.name }}
             </a-select-option>
           </a-select>
@@ -998,28 +1018,26 @@ onMounted(async () => {
         @ok="handlePositionSave"
       >
         <a-form layout="vertical">
-          <a-form-item label="所属公司">
+          <a-form-item label="所属公司" required>
             <a-select
               v-model:value="positionForm.companyId"
-              placeholder="选择公司（可选）"
-              size="small"
-              allow-clear
+              placeholder="请选择公司"
               style="width: 100%"
+              @change="positionForm.departmentId = ''"
             >
               <a-select-option v-for="c in companyData" :key="c.id" :value="c.id">
                 {{ c.companyName }}
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="所属部门">
+          <a-form-item label="所属部门" required>
             <a-select
               v-model:value="positionForm.departmentId"
-              placeholder="选择部门（可选）"
-              size="small"
-              allow-clear
+              placeholder="请先选择公司"
               style="width: 100%"
+              :disabled="!positionForm.companyId"
             >
-              <a-select-option v-for="d in flatDeptList" :key="d.id" :value="d.id">
+              <a-select-option v-for="d in modalDeptList" :key="d.id" :value="d.id">
                 {{ d.name }}
               </a-select-option>
             </a-select>
