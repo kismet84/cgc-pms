@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import VChart from 'vue-echarts'
-import { getProjectList, createProject, deleteProject } from '@/api/modules/project'
+import { getProjectList, getProjectDetail, createProject, updateProject, deleteProject } from '@/api/modules/project'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 
@@ -55,6 +55,82 @@ function handleCreateModalOpen() {
 function handleCreateModalClose() {
   createVisible.value = false
   createFormRef.value?.resetFields()
+}
+
+// ── Edit modal ──
+const editVisible = ref(false)
+const editLoading = ref(false)
+const editingId = ref('')
+const editFormRef = ref()
+const editForm = reactive({
+  projectName: '',
+  projectType: undefined as string | undefined,
+  projectAddress: '',
+  ownerUnit: '',
+  supervisorUnit: '',
+  designUnit: '',
+  contractAmount: undefined as number | undefined,
+  plannedStartDate: undefined as string | undefined,
+  plannedEndDate: undefined as string | undefined,
+})
+
+async function handleEditModalOpen(record: ProjectVO) {
+  editingId.value = record.id
+  editVisible.value = true
+  try {
+    const project: ProjectVO = await getProjectDetail(record.id)
+    editForm.projectName = project.projectName
+    editForm.projectType = project.projectType
+    editForm.projectAddress = project.projectAddress || ''
+    editForm.ownerUnit = project.ownerUnit || ''
+    editForm.supervisorUnit = project.supervisorUnit || ''
+    editForm.designUnit = project.designUnit || ''
+    editForm.contractAmount = project.contractAmount
+      ? parseFloat(project.contractAmount) / 10000
+      : undefined
+    editForm.plannedStartDate = project.plannedStartDate
+    editForm.plannedEndDate = project.plannedEndDate
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载项目信息失败')
+    editVisible.value = false
+  }
+}
+
+function handleEditModalClose() {
+  editVisible.value = false
+  editFormRef.value?.resetFields()
+}
+
+async function handleEditSubmit() {
+  try {
+    await editFormRef.value?.validate()
+  } catch (e: unknown) {
+    return
+  }
+  editLoading.value = true
+  try {
+    await updateProject(editingId.value, {
+      projectName: editForm.projectName,
+      projectType: editForm.projectType,
+      projectAddress: editForm.projectAddress || undefined,
+      ownerUnit: editForm.ownerUnit || undefined,
+      supervisorUnit: editForm.supervisorUnit || undefined,
+      designUnit: editForm.designUnit || undefined,
+      contractAmount:
+        editForm.contractAmount != null ? String(editForm.contractAmount * 10000) : undefined,
+      plannedStartDate: editForm.plannedStartDate,
+      plannedEndDate: editForm.plannedEndDate,
+    })
+    message.success('项目更新成功')
+    handleEditModalClose()
+    fetchData()
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('更新项目失败，请稍后重试')
+  } finally {
+    editLoading.value = false
+  }
 }
 
 function handleDelete(record: ProjectVO) {
@@ -471,6 +547,83 @@ const columns = [
       </a-form>
     </a-modal>
 
+    <!-- Edit Modal -->
+    <a-modal
+      v-model:open="editVisible"
+      title="编辑项目"
+      :confirm-loading="editLoading"
+      :mask-closable="false"
+      ok-text="保存"
+      cancel-text="取消"
+      @ok="handleEditSubmit"
+      @cancel="handleEditModalClose"
+    >
+      <a-form
+        ref="editFormRef"
+        :model="editForm"
+        :label-col="{ span: 6 }"
+        :wrapper-col="{ span: 16 }"
+        class="pj-create-form"
+      >
+        <a-form-item
+          label="项目名称"
+          name="projectName"
+          :rules="[{ required: true, message: '请输入项目名称' }]"
+        >
+          <a-input v-model:value="editForm.projectName" placeholder="请输入项目名称" />
+        </a-form-item>
+        <a-form-item
+          label="项目类型"
+          name="projectType"
+          :rules="[{ required: true, message: '请选择项目类型' }]"
+        >
+          <a-select v-model:value="editForm.projectType" placeholder="请选择项目类型">
+            <a-select-option value="施工总承包">施工总承包</a-select-option>
+            <a-select-option value="专业分包">专业分包</a-select-option>
+            <a-select-option value="劳务分包">劳务分包</a-select-option>
+            <a-select-option value="材料采购">材料采购</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="项目地址" name="projectAddress">
+          <a-input v-model:value="editForm.projectAddress" placeholder="请输入项目地址" />
+        </a-form-item>
+        <a-form-item label="建设单位" name="ownerUnit">
+          <a-input v-model:value="editForm.ownerUnit" placeholder="请输入建设单位" />
+        </a-form-item>
+        <a-form-item label="监理单位" name="supervisorUnit">
+          <a-input v-model:value="editForm.supervisorUnit" placeholder="请输入监理单位" />
+        </a-form-item>
+        <a-form-item label="设计单位" name="designUnit">
+          <a-input v-model:value="editForm.designUnit" placeholder="请输入设计单位" />
+        </a-form-item>
+        <a-form-item label="合同金额(万元)" name="contractAmount">
+          <a-input-number
+            v-model:value="editForm.contractAmount"
+            :min="0"
+            :precision="2"
+            placeholder="请输入合同金额"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="计划开工日期" name="plannedStartDate">
+          <a-date-picker
+            v-model:value="editForm.plannedStartDate"
+            placeholder="请选择计划开工日期"
+            style="width: 100%"
+            value-format="YYYY-MM-DD"
+          />
+        </a-form-item>
+        <a-form-item label="计划竣工日期" name="plannedEndDate">
+          <a-date-picker
+            v-model:value="editForm.plannedEndDate"
+            placeholder="请选择计划竣工日期"
+            style="width: 100%"
+            value-format="YYYY-MM-DD"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
     <div class="pt-ledger-layout">
       <main class="pt-panel pt-table-panel">
         <div class="pt-panel-header">项目清单</div>
@@ -511,7 +664,7 @@ const columns = [
             <template v-else-if="column.dataIndex === 'ops'">
               <div class="pj-ops">
                 <a class="pt-link" @click="router.push(`/project/${record.id}/overview`)">查看</a>
-                <a class="pt-link" @click="router.push(`/project/${record.id}/edit`)">编辑</a>
+                <a class="pt-link" @click="handleEditModalOpen(record)">编辑</a>
                 <a class="pt-link pt-danger" @click="handleDelete(record)">删除</a>
               </div>
             </template>
