@@ -31,9 +31,7 @@ import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +51,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 // TODO: 拆分超大文件 (667行) — 拆分为 PayApplicationQueryService + PayApplicationWriteService + PayApplicationAssembler
 public class PayApplicationService {
 
@@ -68,8 +65,34 @@ public class PayApplicationService {
     private final SubMeasureMapper subMeasureMapper;
     private final CtContractPaymentTermMapper contractPaymentTermMapper;
     private final PayRecordMapper payRecordMapper;
-    @Lazy
     private final WorkflowEngine workflowEngine;
+
+    public PayApplicationService(
+            PayApplicationMapper payApplicationMapper,
+            PayApplicationBasisMapper payApplicationBasisMapper,
+            PmProjectMapper pmProjectMapper,
+            CtContractMapper ctContractMapper,
+            MdPartnerMapper mdPartnerMapper,
+            MatReceiptItemMapper matReceiptItemMapper,
+            SubMeasureItemMapper subMeasureItemMapper,
+            MatReceiptMapper matReceiptMapper,
+            SubMeasureMapper subMeasureMapper,
+            CtContractPaymentTermMapper contractPaymentTermMapper,
+            PayRecordMapper payRecordMapper,
+            @org.springframework.context.annotation.Lazy WorkflowEngine workflowEngine) {
+        this.payApplicationMapper = payApplicationMapper;
+        this.payApplicationBasisMapper = payApplicationBasisMapper;
+        this.pmProjectMapper = pmProjectMapper;
+        this.ctContractMapper = ctContractMapper;
+        this.mdPartnerMapper = mdPartnerMapper;
+        this.matReceiptItemMapper = matReceiptItemMapper;
+        this.subMeasureItemMapper = subMeasureItemMapper;
+        this.matReceiptMapper = matReceiptMapper;
+        this.subMeasureMapper = subMeasureMapper;
+        this.contractPaymentTermMapper = contractPaymentTermMapper;
+        this.payRecordMapper = payRecordMapper;
+        this.workflowEngine = workflowEngine;
+    }
 
     // ---- Query ----
 

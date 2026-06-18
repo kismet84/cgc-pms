@@ -27,13 +27,13 @@ public class OrgCompany extends BaseEntity {
 
     private String status;
 
-    /** 数据库审计列 created_time — 由 MyMetaObjectHandler 自动填充 */
-    @TableField("created_time")
+    /** 数据库审计列 created_at — 由 MyMetaObjectHandler 自动填充 */
+    @TableField("created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
-    /** 数据库审计列 updated_time — 由 MyMetaObjectHandler 自动填充 */
-    @TableField("updated_time")
+    /** 数据库审计列 updated_at — 由 MyMetaObjectHandler 自动填充 */
+    @TableField("updated_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 

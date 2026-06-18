@@ -39,21 +39,21 @@ public class MatPurchaseRequest extends BaseEntity {
     /** 业务状态：DRAFT草稿，APPROVED已通过，CONVERTED已转采购订单 */
     private String status;
 
-    // ── V35 使用 created_time / updated_time 列名 ──
+    // ── V35 原使用 created_time / updated_time，V45 统一重命名为 created_at / updated_at ──
 
-    @TableField(value = "created_time", fill = FieldFill.INSERT)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 
-    @TableField(value = "updated_time", fill = FieldFill.INSERT_UPDATE)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 
-    /** 屏蔽 BaseEntity.createdAt（V35 表无 created_at 列） */
+    /** 屏蔽 BaseEntity.createdAt（V35 表无 created_at 列经由 V45 统一重命名，现已有 created_at） */
     @TableField(exist = false)
     private LocalDateTime createdAt;
 
-    /** 屏蔽 BaseEntity.updatedAt（V35 表无 updated_at 列） */
+    /** 屏蔽 BaseEntity.updatedAt（同上） */
     @TableField(exist = false)
     private LocalDateTime updatedAt;
 }

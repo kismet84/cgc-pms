@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  * System notification entity — maps to sys_notification table (V37).
  *
  * <p>Does NOT extend BaseEntity because sys_notification has minimalist columns
- * with {@code created_time} instead of {@code created_at} and no
+ * with {@code created_at} (renamed via V45) and no
  * {@code updated_by/updated_at/deleted_flag/remark} columns.</p>
  */
 @Data
@@ -51,7 +51,7 @@ public class SysNotification implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime readTime;
 
-    @TableField(value = "created_time")
+    @TableField(value = "created_at")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 }
