@@ -8,6 +8,8 @@ import java.io.Serializable;
 
 /**
  * Unified API response envelope.
+ * <p>
+ * 项目中统一使用 ApiResponse；前端 TypeScript 类型定义为 ApiResponse&lt;T&gt;。不再使用早期 R 类名。
  *
  * @param <T> payload type
  */

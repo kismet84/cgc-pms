@@ -72,7 +72,9 @@ public class ContractCostStrategy implements CostGenerationStrategy {
             cost.setOrgId(contract.getOrgId());
             cost.setProjectId(contract.getProjectId());
             cost.setContractId(contractId);
-            cost.setPartnerId(null /* partnerId removed */);
+            // partnerId permanently removed from cost_item as of migration V54;
+            // party fields are now resolved at the contract level via partyAId/partyBId.
+            cost.setPartnerId(null);
             cost.setCostType(DEFAULT_COST_TYPE);
             cost.setCostSubjectId(defaultSubjectId);
             cost.setAmount(nvl(item.getAmount()));

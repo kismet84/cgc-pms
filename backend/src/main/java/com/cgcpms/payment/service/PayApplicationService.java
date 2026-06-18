@@ -31,6 +31,7 @@ import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,8 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
+// TODO: 拆分超大文件 (667行) — 拆分为 PayApplicationQueryService + PayApplicationWriteService + PayApplicationAssembler
 public class PayApplicationService {
 
     private final PayApplicationMapper payApplicationMapper;
@@ -65,35 +68,8 @@ public class PayApplicationService {
     private final SubMeasureMapper subMeasureMapper;
     private final CtContractPaymentTermMapper contractPaymentTermMapper;
     private final PayRecordMapper payRecordMapper;
+    @Lazy
     private final WorkflowEngine workflowEngine;
-
-    @SuppressWarnings("java:S107")
-    public PayApplicationService(
-            PayApplicationMapper payApplicationMapper,
-            PayApplicationBasisMapper payApplicationBasisMapper,
-            PmProjectMapper pmProjectMapper,
-            CtContractMapper ctContractMapper,
-            MdPartnerMapper mdPartnerMapper,
-            MatReceiptItemMapper matReceiptItemMapper,
-            SubMeasureItemMapper subMeasureItemMapper,
-            MatReceiptMapper matReceiptMapper,
-            SubMeasureMapper subMeasureMapper,
-            CtContractPaymentTermMapper contractPaymentTermMapper,
-            PayRecordMapper payRecordMapper,
-            @Lazy WorkflowEngine workflowEngine) {
-        this.payApplicationMapper = payApplicationMapper;
-        this.payApplicationBasisMapper = payApplicationBasisMapper;
-        this.pmProjectMapper = pmProjectMapper;
-        this.ctContractMapper = ctContractMapper;
-        this.mdPartnerMapper = mdPartnerMapper;
-        this.matReceiptItemMapper = matReceiptItemMapper;
-        this.subMeasureItemMapper = subMeasureItemMapper;
-        this.matReceiptMapper = matReceiptMapper;
-        this.subMeasureMapper = subMeasureMapper;
-        this.contractPaymentTermMapper = contractPaymentTermMapper;
-        this.payRecordMapper = payRecordMapper;
-        this.workflowEngine = workflowEngine;
-    }
 
     // ---- Query ----
 
@@ -422,6 +398,16 @@ public class PayApplicationService {
                 null, null);
     }
 
+    /**
+     * 防超付校验（提交/审批通过时调用）。
+     * <p>
+     * 口径：仅含 APPROVED 状态的 PayApplication.applyAmount，不含 SUCCESS 实付金额。
+     * 已付款金额推算为 {@code getApprovedSumForContract(contractId, excludeId)}，
+     * 合同可用余额 = currentAmount - 已 APPROVED 的申请金额合计。
+     *
+     * @param payApp 付款申请单
+     * @throws BusinessException 若申请金额超过合同可用余额或付款比例上限
+     */
     public void validatePaymentAmount(PayApplication payApp) {
         BigDecimal applyAmount = payApp.getApplyAmount() != null ? payApp.getApplyAmount() : BigDecimal.ZERO;
         if (applyAmount.compareTo(BigDecimal.ZERO) <= 0) {

@@ -37,6 +37,7 @@ public class WfTask extends BaseEntity {
 
     private Integer roundNo;
 
+    // 注意: cancelPendingTasksInNode() 使用 setSql 更新，绕过 @Version 乐观锁。这是设计意图（取消操作必须成功）。
     @Version
     private Integer taskVersion;
 

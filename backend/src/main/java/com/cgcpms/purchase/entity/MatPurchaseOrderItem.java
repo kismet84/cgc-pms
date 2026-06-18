@@ -29,6 +29,7 @@ public class MatPurchaseOrderItem extends BaseEntity {
 
     private Long materialId;
 
+    /** 展示用冗余字段（避免每次列表查询都 JOIN material 表），与 MatReceiptItem 设计不同（后者无冗余，走关联查询） */
     private String materialName;
 
     private String specification;

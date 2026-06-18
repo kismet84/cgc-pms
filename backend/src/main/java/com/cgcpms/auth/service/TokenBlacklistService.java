@@ -35,6 +35,11 @@ public class TokenBlacklistService {
         return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + tokenKey(token)));
     }
 
+    /**
+     * 使用 token 后 32 字符作为 Redis key。
+     * 碰撞概率约 1/16^32，生产环境中可忽略。
+     * 长期可考虑改用 SHA-256 哈希以完全消除碰撞风险。
+     */
     private String tokenKey(String token) {
         return token.length() > 32 ? token.substring(token.length() - 32) : token;
     }

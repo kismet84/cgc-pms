@@ -32,6 +32,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
+import com.cgcpms.common.util.CodeGenerationService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,6 +51,7 @@ public class CtContractService {
     private final WorkflowEngine workflowEngine;
     private final WfInstanceMapper wfInstanceMapper;
     private final WfRecordMapper wfRecordMapper;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<CtContractVO> getPage(long pageNo, long pageSize, String contractCode, String contractName,
                                        String contractType, String contractStatus, String approvalStatus,
@@ -140,25 +142,14 @@ public class CtContractService {
 
     @Transactional
     public Long create(CtContract contract) {
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "CT-" + today + "-";
-
-        LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(CtContract::getContractCode, prefix)
-                .orderByDesc(CtContract::getContractCode);
-        Page<CtContract> page = new Page<>(0, 1);
-        Page<CtContract> result = ctContractMapper.selectPage(page, wrapper);
-        CtContract last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1;
-        if (last != null && last.getContractCode() != null && last.getContractCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getContractCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getContractCode(), e);
-            }
-        }
-        contract.setContractCode(prefix + String.format("%03d", seq));
+        String code = codeGenerationService.nextCode(
+                ctContractMapper,
+                CtContract::getContractCode,
+                "CT-",
+                UserContext.getCurrentTenantId(),
+                true  // includeDeleted 避免软删除 UK 冲突
+        );
+        contract.setContractCode(code);
         contract.setContractStatus("DRAFT");
         contract.setApprovalStatus("DRAFT");
         contract.setTenantId(UserContext.getCurrentTenantId());
@@ -269,21 +260,14 @@ public class CtContractService {
 
         if (contract.getId() == null) {
             // ── 新建 ──
-            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-            String prefix = "CT-" + today + "-";
-
-            // 含软删除记录查询最大编号，避免 UK 冲突
-            String lastCode = ctContractMapper.selectLastCodeByPrefix(prefix, UserContext.getCurrentTenantId());
-
-            int seq = 1;
-            if (lastCode != null && lastCode.length() == prefix.length() + 3) {
-                try {
-                    seq = Integer.parseInt(lastCode.substring(prefix.length())) + 1;
-                } catch (NumberFormatException e) {
-                    log.warn("Failed to parse sequence number: {}", lastCode, e);
-                }
-            }
-            contract.setContractCode(prefix + String.format("%03d", seq));
+            String code = codeGenerationService.nextCode(
+                    ctContractMapper,
+                    CtContract::getContractCode,
+                    "CT-",
+                    UserContext.getCurrentTenantId(),
+                    true  // includeDeleted 避免软删除 UK 冲突
+            );
+            contract.setContractCode(code);
             contract.setContractStatus("DRAFT");
             contract.setApprovalStatus("DRAFT");
             contract.setTenantId(UserContext.getCurrentTenantId());

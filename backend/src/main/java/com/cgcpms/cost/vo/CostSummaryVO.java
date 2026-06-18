@@ -2,6 +2,7 @@ package com.cgcpms.cost.vo;
 
 import lombok.Data;
 
+// TODO: 添加 Numeric 字段与 String 字段并存（如 contractAmount+contractAmountStr），避免重复转换开销
 @Data
 public class CostSummaryVO {
     private String id;

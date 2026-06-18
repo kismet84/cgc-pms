@@ -45,7 +45,10 @@ public class AuthController {
                                              HttpServletResponse response) {
         LoginResponse result = authService.login(request);
         setTokenCookies(response, result.getToken(), result.getRefreshToken());
-        // Strip tokens from JSON body — they are now HttpOnly cookies only
+        // Strip tokens from JSON body — they are now HttpOnly cookies only.
+        // This is a security best practice: HttpOnly cookies are inaccessible to
+        // JavaScript (XSS-resistant), and removing tokens from the JSON response
+        // ensures they never appear in browser history/logs/localStorage.
         result.setToken(null);
         result.setRefreshToken(null);
         return ApiResponse.success(result);
@@ -102,7 +105,10 @@ public class AuthController {
         if (svc != null) svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken));
         LoginResponse result = authService.loginById(userId);
         setTokenCookies(response, result.getToken(), result.getRefreshToken());
-        // Strip tokens from JSON body — they are now HttpOnly cookies only
+        // Strip tokens from JSON body — they are now HttpOnly cookies only.
+        // This is a security best practice: HttpOnly cookies are inaccessible to
+        // JavaScript (XSS-resistant), and removing tokens from the JSON response
+        // ensures they never appear in browser history/logs/localStorage.
         result.setToken(null);
         result.setRefreshToken(null);
         return ApiResponse.success(result);

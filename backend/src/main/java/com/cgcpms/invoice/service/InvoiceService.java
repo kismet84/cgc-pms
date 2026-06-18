@@ -182,6 +182,10 @@ public class InvoiceService {
         if (file.getSize() > 50 * 1024 * 1024) {
             throw new BusinessException("FILE_TOO_LARGE", "文件大小不能超过50MB");
         }
+        if (file.getSize() > 10 * 1024 * 1024) {
+            log.warn("Invoice PDF is large ({} MB), this may increase memory pressure",
+                    file.getSize() / 1024 / 1024);
+        }
 
         // PDF text extraction.
         // 发票 PDF 文件通常 < 500KB，全量加载到内存不会造成 OOM。

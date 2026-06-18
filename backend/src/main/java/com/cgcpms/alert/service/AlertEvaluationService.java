@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+// TODO: 拆分超大文件 (567行) — 拆分为 RuleEvaluator 接口 + 各规则实现类 (8个 evaluator)
 public class AlertEvaluationService {
 
     private static final int DEDUP_HOURS = 24;

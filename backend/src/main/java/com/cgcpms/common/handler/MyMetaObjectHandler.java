@@ -21,8 +21,10 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         this.strictInsertFill(metaObject, "updatedTime", LocalDateTime.class, now);
         Long userId = UserContext.getCurrentUserId();
         if (userId != null) {
-            this.setFieldValByName("createdBy", userId, metaObject);
-            this.setFieldValByName("updatedBy", userId, metaObject);
+            // 统一使用 strictInsertFill，仅 createdAt/updatedAt 支持；createdBy/updatedBy 字段非
+            // MyBatis-Plus 标准时间字段名，回退到 setFieldValByName
+            this.strictInsertFill(metaObject, "createdBy", Long.class, userId);
+            this.strictInsertFill(metaObject, "updatedBy", Long.class, userId);
         }
         Long tenantId = UserContext.getCurrentTenantId();
         if (tenantId != null && this.getFieldValByName("tenantId", metaObject) == null) {

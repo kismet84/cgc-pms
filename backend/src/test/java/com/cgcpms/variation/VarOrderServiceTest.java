@@ -10,6 +10,8 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.entity.VarOrderItem;
+import com.cgcpms.variation.mapper.VarOrderItemMapper;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.variation.service.VarOrderService;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -53,6 +55,9 @@ class VarOrderServiceTest {
 
     @Autowired
     private VarOrderMapper varOrderMapper;
+
+    @Autowired
+    private VarOrderItemMapper varOrderItemMapper;
 
     @Autowired
     private PmProjectMapper projectMapper;
@@ -202,6 +207,91 @@ class VarOrderServiceTest {
         }, "重复提交应抛出异常");
         assertEquals("VAR_ORDER_ALREADY_SUBMITTED", ex.getCode(),
                 "错误码应为 VAR_ORDER_ALREADY_SUBMITTED");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // GREEN-4: saveItems — 保存明细后金额映至订单
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Transactional
+    @DisplayName("GREEN-4: saveItems 自动聚合明细金额到订单")
+    void testSaveItemsAggregatesAmountToOrder() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("变更单测-金额聚合");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        order.setReportedAmount(BigDecimal.ZERO);
+        order.setApprovalStatus("DRAFT");
+        Long id = varOrderService.create(order);
+        assertNotNull(id);
+
+        VarOrderItem item1 = new VarOrderItem();
+        item1.setVarOrderId(id);
+        item1.setItemName("条目A");
+        item1.setUnit("m²");
+        item1.setQuantity(new BigDecimal("10"));
+        item1.setUnitPrice(new BigDecimal("200.00"));
+        item1.setAmount(new BigDecimal("2000.00"));
+
+        VarOrderItem item2 = new VarOrderItem();
+        item2.setVarOrderId(id);
+        item2.setItemName("条目B");
+        item2.setUnit("m");
+        item2.setQuantity(new BigDecimal("50"));
+        item2.setUnitPrice(new BigDecimal("60.00"));
+        item2.setAmount(new BigDecimal("3000.00"));
+
+        varOrderService.saveItems(id, java.util.List.of(item1, item2));
+
+        VarOrder updated = varOrderMapper.selectById(id);
+        assertNotNull(updated.getReportedAmount(), "金额应被聚合");
+        assertEquals(0, new BigDecimal("5000.00").compareTo(updated.getReportedAmount()),
+                "聚合金额应为 2000+3000=5000");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // GREEN-5: update draft rejected when in approval
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Transactional
+    @DisplayName("GREEN-5: 审批中的变更签证不可更新")
+    void testUpdateRejectedWhenApproving() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("变更单测-不可编辑");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        order.setReportedAmount(new BigDecimal("10000.00"));
+        order.setApprovalStatus("DRAFT");
+        Long id = varOrderService.create(order);
+        assertNotNull(id);
+
+        // Submit first
+        varOrderService.submitForApproval(id);
+
+        // Verify status is no longer DRAFT
+        VarOrder after = varOrderMapper.selectById(id);
+        String approvalStatus = after.getApprovalStatus();
+        assertNotEquals("DRAFT", approvalStatus, "提交后 status 应非 DRAFT");
+
+        // Attempt update should throw
+        VarOrder update = new VarOrder();
+        update.setId(id);
+        update.setVarName("尝试修改");
+
+        com.cgcpms.common.exception.BusinessException ex =
+                assertThrows(com.cgcpms.common.exception.BusinessException.class, () -> {
+                    varOrderService.update(update);
+                }, "审批中不可编辑");
+        assertTrue(ex.getCode().contains("APPROVAL") || ex.getCode().contains("SUBMIT"),
+                "错误码应提示审批相关");
     }
 
     // ═══════════════════════════════════════════════════════════════

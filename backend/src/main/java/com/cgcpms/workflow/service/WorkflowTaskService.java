@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -130,10 +132,10 @@ public class WorkflowTaskService {
             throw new BusinessException("NODE_NOT_ACTIVE", "只能对当前活动节点加签");
         }
         // Batch-fetch user names for all signees
-        Map<Long, SysUser> signUserMap = java.util.Collections.emptyMap();
+        Map<Long, SysUser> signUserMap = Collections.emptyMap();
         if (!additionalUserIds.isEmpty()) {
             List<SysUser> signUsers = core.sysUserMapper.selectBatchIds(
-                    new java.util.HashSet<>(additionalUserIds));
+                    new HashSet<>(additionalUserIds));
             signUserMap = signUsers.stream()
                     .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
         }

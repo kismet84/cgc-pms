@@ -45,6 +45,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+// TODO: 拆分超大文件 (634行) — 拆分为 CostSummaryQueryService + CostSummaryWriteService + CostSummaryAssembler
 public class CostSummaryService {
 
     private final CostSummaryMapper costSummaryMapper;
@@ -549,6 +550,9 @@ public class CostSummaryService {
      * Compute project-level estimatedRemainingCost:
      * SUM(ct_contract.currentAmount) - SUM(sub_measure.approvedAmount WHERE approved)
      *                                 - SUM(mat_receipt.totalAmount WHERE approved)
+     * <p>
+     * 注意：getBatchProjectSummaries 中有等价的批量内联版本（使用预取数据避免逐项目查询）；
+     * 修改本方法时必须同步更新 getBatchProjectSummaries 中的对应内联逻辑。
      */
     private BigDecimal computeProjectEstimatedRemainingCost(Long tenantId, Long projectId) {
         BigDecimal totalCurrentAmount = ctContractMapper.selectList(
@@ -583,6 +587,9 @@ public class CostSummaryService {
     /**
      * Compute project-level contractIncome:
      * SUM(ct_contract.contractAmount) + SUM(var_order.approvedAmount WHERE direction='INCOME' AND approved)
+     * <p>
+     * 注意：getBatchProjectSummaries 中有等价的批量内联版本（使用预取数据避免逐项目查询）；
+     * 修改本方法时必须同步更新 getBatchProjectSummaries 中的对应内联逻辑。
      */
     private BigDecimal computeProjectContractIncome(Long tenantId, Long projectId) {
         BigDecimal totalContractAmount = ctContractMapper.selectList(

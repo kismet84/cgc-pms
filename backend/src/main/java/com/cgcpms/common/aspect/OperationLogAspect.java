@@ -50,7 +50,9 @@ public class OperationLogAspect {
         } finally {
             long duration = System.currentTimeMillis() - start;
             String params = operationLog.saveParams() ? safeArgs(joinPoint.getArgs()) : "<omitted>";
-            String resultText = operationLog.saveResult() ? String.valueOf(result) : "<omitted>";
+            String resultText = operationLog.saveResult()
+                    ? (result == null ? "<error>" : result.toString())
+                    : "<omitted>";
             if (success) {
                 log.info("operationLog operator={} operation=\"{}\" method={} ip={} traceId={} durationMs={} params={} result={}",
                         operator, operation, method, ip, traceId, duration, params, resultText);
@@ -72,7 +74,9 @@ public class OperationLogAspect {
                         if (arg == null) return "null";
                         String s = arg.toString();
                         // Mask password/token/secret fields that may appear in toString()
-                        return s.replaceAll("(?i)(password|secret|token|accessKey|secretKey|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard|身份证|手机号|银行卡|密码|令牌)=[^,}\\]]+", "$1=***");
+                        // 脱敏正则假设 toString() 输出为 key=value 格式（如 Lombok @Data 默认行为）。
+            // 若 toString() 为 JSON/XML 或其他格式，正则将无法匹配，需调整脱敏策略。
+            return s.replaceAll("(?i)(password|secret|token|accessKey|secretKey|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard|身份证|手机号|银行卡|密码|令牌)=[^,}\\]]+", "$1=***");
                     })
                     .collect(java.util.stream.Collectors.joining(", ", "[", "]"));
         } catch (Exception e) {

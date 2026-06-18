@@ -241,7 +241,7 @@ class InvoiceServiceTest {
 
         invoiceService.delete(id);
 
-        // After logical delete, getById should return null (or tenant check fails)
+        // After physical delete, getById should throw BusinessException
         assertThrows(BusinessException.class, () -> {
             invoiceService.getById(id);
         });

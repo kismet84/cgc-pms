@@ -142,6 +142,7 @@ public class MdPartnerService {
         vo.setBlacklistFlag(p.getBlacklistFlag());
         vo.setRiskLevel(p.getRiskLevel());
         vo.setStatus(p.getStatus());
+        if (p.getCreatedBy() != null) vo.setCreatedBy(String.valueOf(p.getCreatedBy()));
         if (p.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(p.getCreatedAt()));
         if (p.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(p.getUpdatedAt()));
         return vo;

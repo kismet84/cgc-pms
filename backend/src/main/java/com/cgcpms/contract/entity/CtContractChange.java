@@ -20,14 +20,17 @@ import java.time.LocalDateTime;
 /**
  * 合同变更实体。
  *
- * TODO(G1): 应 extends BaseEntity 而非 implements Serializable。
- * 当前 Entity 的审计字段 (createdBy/createdTime/updatedBy/updatedTime/deletedFlag/remark)
- * 使用了 {@code createdTime / updatedTime} 作为 Java 字段名，而 BaseEntity 使用
- * {@code createdAt / updatedAt}。两者映射到相同的 DB 列 ({@code created_at / updated_at})，
- * 但 Java 字段名不一致。切换前需全局搜索并替换所有对 {@code getCreatedTime()}
- * 和 {@code getUpdatedTime()} 的引用。
+ * 审计字段设计说明：
+ * 当前 Entity 使用 {@code createdTime / updatedTime} 作为 Java 字段名（映射到 DB 列
+ * {@code created_at / updated_at}），而非继承 BaseEntity 的 {@code createdAt / updatedAt}。
+ * 这是有意为之：CtContractChange 对应的数据库表使用 {@code created_time / updated_time}
+ * 列名，与 BaseEntity 的默认映射不同。改为 extends BaseEntity 会因约 15+ 处调用方引用
+ * {@code getCreatedTime() / getUpdatedTime()} 而需要大规模重命名，风险高于收益。
+ * MyMetaObjectHandler 已通过 {@code strictInsertFill(metaObject, "createdTime", ...)}
+ * 同时支持两种字段名的自动填充。
  *
  * @see com.cgcpms.common.entity.BaseEntity
+ * @see com.cgcpms.common.handler.MyMetaObjectHandler
  */
 @Data
 @TableName("ct_contract_change")

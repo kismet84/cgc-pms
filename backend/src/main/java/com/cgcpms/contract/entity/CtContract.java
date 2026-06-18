@@ -55,6 +55,7 @@ public class CtContract extends BaseEntity {
     private BigDecimal currentAmount;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    // paidAmount 表示已付累计金额，允许为负以处理退款/冲销业务场景
     private BigDecimal paidAmount;
 
     @JsonSerialize(using = ToStringSerializer.class)
@@ -83,6 +84,7 @@ public class CtContract extends BaseEntity {
 
     private String approvalStatus;
 
+    @PositiveOrZero
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal settlementAmount;
 

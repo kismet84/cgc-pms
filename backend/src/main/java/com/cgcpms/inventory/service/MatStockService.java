@@ -54,6 +54,7 @@ public class MatStockService {
         if (stock == null) {
             // 首次入库：创建库存记录
             // 并发场景下 INSERT 可能因 UNIQUE 约束失败，此时回退到 UPDATE 路径
+            // 首次入库并发保护: mat_stock 表 UNIQUE 约束 (tenant_id, warehouse_id, material_id) 确保只有一条记录被创建
             try {
                 stock = new MatStock();
                 stock.setTenantId(tenantId);

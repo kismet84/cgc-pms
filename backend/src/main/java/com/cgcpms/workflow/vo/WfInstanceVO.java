@@ -16,6 +16,11 @@ public class WfInstanceVO {
     private String projectId;
     private String contractId;
     private String title;
+    /**
+     * 业务金额快照，存储为 BigDecimal.toPlainString() 字符串格式。
+     * 与 WfTemplateVO.amountMin/amountMax 的 BigDecimal + @JsonSerialize 类型不一致
+     * 是有意的：实例快照在创建时已格式化，无需运行时序列化转换。
+     */
     private String amount;
     private String instanceStatus;
     private Integer currentRound;

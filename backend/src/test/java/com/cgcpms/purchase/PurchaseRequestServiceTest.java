@@ -8,6 +8,7 @@ import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.purchase.service.MatPurchaseRequestService;
+import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
 import com.cgcpms.purchase.vo.MatPurchaseRequestItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseRequestVO;
 import io.jsonwebtoken.Jwts;
@@ -367,6 +368,30 @@ class PurchaseRequestServiceTest {
             requestService.delete(requestId);
         }, "审批中不可删除");
         assertEquals("REQUEST_IN_APPROVAL", ex.getCode());
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RED → GREEN: convertToPurchaseOrder — 采购申请转采购订单
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 采购申请转换为采购订单")
+    void testConvertToPurchaseOrder() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+        Long requestId = requestService.create(request);
+
+        // Add items required for conversion
+        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
+        item.setMaterialId(1L);
+        item.setQuantity(new BigDecimal("100.00"));
+        item.setUnit("m³");
+        requestService.saveItemsBatch(requestId, java.util.List.of(item));
+
+        // Convert to purchase order (void, but should not throw)
+        assertDoesNotThrow(() -> {
+            requestService.convertToPurchaseOrder(requestId);
+        }, "转换采购订单不应抛异常");
     }
 
     // ═══════════════════════════════════════════════════════════

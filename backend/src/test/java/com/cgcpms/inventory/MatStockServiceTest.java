@@ -210,6 +210,38 @@ class MatStockServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════
+    // EDGE: stockOut — 出库后刚好清零
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("EDGE: 全部出库后库存刚好为零")
+    void testStockOutAllQuantityToZero() {
+        stockService.stockIn(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("50.0000"));
+
+        MatStock stock = stockService.stockOut(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("50.0000"));
+        assertEquals(0, BigDecimal.ZERO.compareTo(stock.getAvailableQty()),
+                "全部出库后可用量应为0");
+
+        // 流水应包含 IN 和 OUT 两条
+        MatStockLedgerVO ledger = stockService.getLedger(WAREHOUSE_ID, MATERIAL_ID, 1, 20);
+        assertEquals(2, ledger.getTxns().getTotal(), "应有2条流水（1 IN + 1 OUT）");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // EDGE: stockOut — 小数位高精度出库
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("EDGE: 高精度小数出库（4位小数）")
+    void testStockOutHighPrecisionDecimal() {
+        stockService.stockIn(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("100.0000"));
+
+        MatStock stock = stockService.stockOut(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("0.0001"));
+        assertEquals(0, new BigDecimal("99.9999").compareTo(stock.getAvailableQty()),
+                "高精度出库后可用量应为99.9999");
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // RED → GREEN: 并发出库 — 乐观锁保证数据安全
     // 使用独立仓库ID避免与事务性测试冲突
     // ═══════════════════════════════════════════════════════════

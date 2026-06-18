@@ -43,6 +43,14 @@ class MigrationIntegrityTest {
                 "V21 is already in use in deployed databases and must not contain submit permission backfill");
     }
 
+    /**
+     * Java-based migrations (V51/V58/V75) are executed by Flyway at startup
+     * from {@code common/migration/} and do not require SQL-level coverage here —
+     * they apply soft-delete-safe unique constraints and index repairs that are
+     * verified at runtime rather than via static file analysis.
+     */
+    // V51/V58/V75 已转为 Java 迁移 (common/migration/)，H2 下由 Flyway 自动执行。无需额外 SQL 验证。
+
     private static List<Path> migrationFiles() throws IOException {
         try (var stream = Files.list(MIGRATION_DIR)) {
             return stream

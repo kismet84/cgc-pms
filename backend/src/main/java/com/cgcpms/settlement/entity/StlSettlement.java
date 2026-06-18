@@ -56,10 +56,15 @@ public class StlSettlement extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal finalAmount;
 
+    /** 结算生命周期状态: DRAFT(草稿) / SUBMITTED(已提交) / APPROVED(已审批) / REJECTED(已驳回) / CANCELLED(已作废) */
+    private String status;
+
+    /**
+     * 审批流状态: DRAFT(未提交) / APPROVING(审批中) / APPROVED(已通过) / REJECTED(已驳回)。
+     * 由工作流引擎驱动，与 {@link #status} 独立管理。
+     */
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String approvalStatus;
-
-    private String status;
 
     // V24 enhanced fields
     @JsonSerialize(using = ToStringSerializer.class)
@@ -68,6 +73,10 @@ public class StlSettlement extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal warrantyAmount;
 
+    /**
+     * 结算最终归档状态: DRAFT(草稿) / CALCULATED(已计算) / FINALIZED(已定稿)。
+     * 审批通过后自动置为 FINALIZED，代表金额锁定、不可再编辑。
+     */
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String settlementStatus;
 

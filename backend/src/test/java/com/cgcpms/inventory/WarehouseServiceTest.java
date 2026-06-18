@@ -319,6 +319,55 @@ class WarehouseServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════
+    // EDGE: 同名仓库编码在当前无 UNIQUE 约束下可共存
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("EDGE: 同编码仓库可创建（当前无UNIQUE约束）")
+    void testDuplicateWarehouseCodeAccepted() {
+        MatWarehouse w1 = new MatWarehouse();
+        w1.setProjectId(PROJECT_ID);
+        w1.setWarehouseCode("WH-DUP");
+        w1.setWarehouseName("仓库A");
+        w1.setStatus("ENABLE");
+        Long id1 = warehouseService.create(w1);
+        assertNotNull(id1);
+
+        MatWarehouse w2 = new MatWarehouse();
+        w2.setProjectId(PROJECT_ID);
+        w2.setWarehouseCode("WH-DUP");
+        w2.setWarehouseName("仓库B");
+        w2.setStatus("ENABLE");
+
+        // 当前无 UNIQUE(warehouse_code) 约束，同名编码可共存
+        assertDoesNotThrow(() -> {
+            Long id2 = warehouseService.create(w2);
+            assertNotNull(id2);
+            assertNotEquals(id1, id2, "两个仓库 ID 应不同");
+        }, "同编码仓库在当前无唯一约束时不应冲突");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // EDGE: 不同租户边界测试已在 crossTenant 覆盖，添加空仓库名创建
+    // ═══════════════════════════════════════════════════════════
+    @Test
+    @Transactional
+    @DisplayName("EDGE: 创建空名称仓库应成功")
+    void testCreateWarehouseWithEmptyName() {
+        MatWarehouse warehouse = new MatWarehouse();
+        warehouse.setProjectId(PROJECT_ID);
+        warehouse.setWarehouseCode("WH-EMPTY-NAME");
+        warehouse.setWarehouseName(null);
+        warehouse.setStatus("ENABLE");
+        Long id = warehouseService.create(warehouse);
+        assertNotNull(id, "空名称仓库仍应创建成功");
+
+        MatWarehouseVO vo = warehouseService.getById(id);
+        assertNull(vo.getWarehouseName(), "仓库名称应为 null");
+        assertEquals("WH-EMPTY-NAME", vo.getWarehouseCode());
+    }
+
+    // ═══════════════════════════════════════════════════════════
     // RED → GREEN: Delete warehouse — no stock → success
     // ═══════════════════════════════════════════════════════════
     @Test

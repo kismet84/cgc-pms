@@ -63,6 +63,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+// TODO: 拆分超大文件 (744行) — 拆分为 StlSettlementQueryService + StlSettlementWriteService + StlSettlementAssembler
 public class StlSettlementService {
 
     private static final BigDecimal DEFAULT_WARRANTY_RATE = new BigDecimal("0.05");
@@ -404,7 +405,12 @@ public class StlSettlementService {
             throw new BusinessException("STL_ALREADY_SUBMITTED", "结算单已提交审批，不可重复提交");
         }
 
-        // Update status to APPROVING
+        // Recompute amount snapshot before approval — ensures the snapshot
+        // reflects the latest contract data at submission time, not just at creation time.
+        CtContract contract = ctContractMapper.selectById(settlement.getContractId());
+        autoFillAmounts(settlement, contract);
+
+        // Persist updated amounts + status
         stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
                 .set(StlSettlement::getApprovalStatus, "APPROVING"));
