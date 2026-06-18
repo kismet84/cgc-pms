@@ -40,6 +40,7 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+08:00
+      - --require-secure-transport=ON
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
@@ -126,10 +127,10 @@ services:
       # ---- Spring profile ----
       SPRING_PROFILES_ACTIVE: prod
       # ---- Database (service names resolve via Docker network) ----
-      # useSSL=true + requireSSL for production security.
-      # verifyServerCertificate=false is used for the internal Docker network with MySQL self-signed certs.
-      # For external CA-signed MySQL, set verifyServerCertificate=true and mount a truststore.
-      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&verifyServerCertificate=false&allowPublicKeyRetrieval=true"
+      # useSSL=true + requireSSL=true + verifyServerCertificate=true for production security.
+      # MySQL 8.0 auto-generates self-signed certs; JDBC connector 8.0+ trusts them by default.
+      # For external CA-signed MySQL, mount the CA cert as a truststore and set trustCertificateKeyStoreUrl.
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&verifyServerCertificate=true&allowPublicKeyRetrieval=true"
       DB_USERNAME: ${MYSQL_USER:-cgc}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       # ---- Redis ----
