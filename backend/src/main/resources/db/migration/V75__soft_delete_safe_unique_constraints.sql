@@ -83,6 +83,9 @@ ALTER TABLE cost_summary DROP INDEX uk_cost_summary;
 ALTER TABLE cost_summary ADD UNIQUE KEY uk_cost_summary (project_id, summary_date, cost_subject_id, deleted_flag);
 
 -- 20. pay_record: external transaction number uniqueness (V74 added index)
+-- V75 originally missed tenant_id in the unique key; V76 adds it back.
+-- This statement is kept for environments that already applied V75 without V76.
+-- V76 must be applied after V75 to add tenant_id to the unique key.
 DROP INDEX uk_external_txn_no ON pay_record;
 CREATE UNIQUE INDEX uk_external_txn_no ON pay_record(external_txn_no, deleted_flag);
 
