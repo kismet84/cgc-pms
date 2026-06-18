@@ -22,12 +22,26 @@ export interface FetchMaterialsParams {
   status?: string
 }
 
+/** Cache TTL in milliseconds (5 minutes) */
+const CACHE_TTL = 5 * 60 * 1000
+
+function isExpired(ts: number | null): boolean {
+  if (ts == null) return true
+  return Date.now() - ts > CACHE_TTL
+}
+
 export const useReferenceStore = defineStore('reference', () => {
   // ── Data refs ──
   const projects = ref<ProjectVO[] | null>(null)
   const contracts = ref<ContractVO[] | null>(null)
   const partners = ref<PartnerVO[] | null>(null)
   const materials = ref<MaterialVO[] | null>(null)
+
+  // ── Timestamps for TTL ──
+  let projectsFetchedAt: number | null = null
+  let contractsFetchedAt: number | null = null
+  let partnersFetchedAt: number | null = null
+  let materialsFetchedAt: number | null = null
 
   // ── In-flight dedup promises (base queries only) ──
   let projectsPromise: Promise<ProjectVO[]> | null = null
@@ -38,11 +52,12 @@ export const useReferenceStore = defineStore('reference', () => {
   // ── Fetch methods ──
 
   async function fetchProjects(): Promise<ProjectVO[]> {
-    if (projects.value) return projects.value
+    if (projects.value && !isExpired(projectsFetchedAt)) return projects.value
     if (projectsPromise) return projectsPromise
     projectsPromise = getProjectList({ pageNo: 1, pageSize: 50 })
       .then((res) => {
         projects.value = res.records ?? res.data ?? res
+        projectsFetchedAt = Date.now()
         projectsPromise = null
         return projects.value
       })
@@ -61,12 +76,13 @@ export const useReferenceStore = defineStore('reference', () => {
       contracts.value = data
       return data
     }
-    // Base (unfiltered) query — cached + deduped
-    if (contracts.value) return contracts.value
+    // Base (unfiltered) query — cached + deduped + TTL
+    if (contracts.value && !isExpired(contractsFetchedAt)) return contracts.value
     if (contractsPromise) return contractsPromise
     contractsPromise = getContractLedger({ pageNo: 1, pageSize: 50 })
       .then((res) => {
         contracts.value = res.records ?? res.data ?? res
+        contractsFetchedAt = Date.now()
         contractsPromise = null
         return contracts.value
       })
@@ -84,11 +100,12 @@ export const useReferenceStore = defineStore('reference', () => {
       partners.value = data
       return data
     }
-    if (partners.value) return partners.value
+    if (partners.value && !isExpired(partnersFetchedAt)) return partners.value
     if (partnersPromise) return partnersPromise
     partnersPromise = getPartnerList({ pageNum: 1, pageSize: 50 })
       .then((res) => {
         partners.value = res.records ?? res.data ?? res
+        partnersFetchedAt = Date.now()
         partnersPromise = null
         return partners.value
       })
@@ -106,11 +123,12 @@ export const useReferenceStore = defineStore('reference', () => {
       materials.value = data
       return data
     }
-    if (materials.value) return materials.value
+    if (materials.value && !isExpired(materialsFetchedAt)) return materials.value
     if (materialsPromise) return materialsPromise
     materialsPromise = getMaterialList({ pageNum: 1, pageSize: 50 })
       .then((res) => {
         materials.value = res.records ?? res.data ?? res
+        materialsFetchedAt = Date.now()
         materialsPromise = null
         return materials.value
       })
@@ -125,18 +143,22 @@ export const useReferenceStore = defineStore('reference', () => {
 
   function invalidateProjects() {
     projects.value = null
+    projectsFetchedAt = null
   }
 
   function invalidateContracts() {
     contracts.value = null
+    contractsFetchedAt = null
   }
 
   function invalidatePartners() {
     partners.value = null
+    partnersFetchedAt = null
   }
 
   function invalidateMaterials() {
     materials.value = null
+    materialsFetchedAt = null
   }
 
   return {

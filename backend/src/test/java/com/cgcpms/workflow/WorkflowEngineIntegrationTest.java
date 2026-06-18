@@ -586,6 +586,7 @@ class WorkflowEngineIntegrationTest {
                 "同意", "test14-tenantA-" + UUID.randomUUID());
 
         // 租户B：提交并审批一个实例（不同用户）
+        // 注：任务由模板approverConfig分配给USER(1)，故审批也需用USER_ADMIN
         WfInstance instanceB = workflowEngine.submit(
                 USER_MANAGER, "manager", tenantB,
                 "CONTRACT_APPROVAL", RUN_ID + 14,
@@ -595,7 +596,7 @@ class WorkflowEngineIntegrationTest {
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instanceB.getId())
                         .eq(WfTask::getTaskStatus, "PENDING")).get(0);
-        workflowEngine.approve(taskB.getId(), USER_MANAGER, "manager",
+        workflowEngine.approve(taskB.getId(), taskB.getApproverId(), "admin",
                 "同意", "test14-tenantB-" + UUID.randomUUID());
 
         // 查询租户A中 USER_ADMIN 的已办记录

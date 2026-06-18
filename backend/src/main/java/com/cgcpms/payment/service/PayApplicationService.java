@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.HashSet;
@@ -241,6 +242,38 @@ public class PayApplicationService {
         payApplicationMapper.deleteById(id);
     }
 
+    // ---- Contract balance check (called before payment writeback) ----
+
+    /**
+     * Verify that a contract still has enough balance before a payment is written back.
+     * Called from PayRecordService.writeback() as an authoritative gate.
+     */
+    public void checkContractBalance(PayApplication app) {
+        Long contractId = app.getContractId();
+        if (contractId == null) return;
+
+        CtContract contract = ctContractMapper.selectById(contractId);
+        if (contract == null) return;
+
+        BigDecimal currentAmount = contract.getCurrentAmount() != null
+                ? contract.getCurrentAmount() : BigDecimal.ZERO;
+
+        // Sum all SUCCESS pay records across ALL applications for this contract
+        List<PayRecord> allPaid = payRecordMapper.selectList(
+                new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getContractId, contractId)
+                        .eq(PayRecord::getPayStatus, "SUCCESS"));
+        BigDecimal totalPaid = allPaid.stream()
+                .map(r -> r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (totalPaid.compareTo(currentAmount) > 0) {
+            throw new BusinessException("EXCEED_CONTRACT_BALANCE",
+                    "合同(" + contract.getContractName() + ")累计付款(" + totalPaid
+                    + ")超过当前合同金额(" + currentAmount + ")");
+        }
+    }
+
     // ---- Pay status update (called by PayRecordService) ----
 
     @Transactional
@@ -398,7 +431,7 @@ public class PayApplicationService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (totalRatio.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal maxByRatio = currentAmount
-                    .multiply(totalRatio.divide(new BigDecimal("100")))
+                    .multiply(totalRatio.divide(new BigDecimal("100"), 10, RoundingMode.HALF_UP))
                     .subtract(alreadyApprovedSum);
             if (applyAmount.compareTo(maxByRatio) > 0) {
                 throw new BusinessException("PAY_RATIO_EXCEEDED",

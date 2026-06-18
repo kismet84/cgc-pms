@@ -127,11 +127,11 @@ export interface WfTemplateVO {
 
 export interface WorkflowSubmitParams {
   businessType: string
-  businessId: number
+  businessId: string
   title: string
   amount?: string
-  projectId?: number
-  contractId?: number
+  projectId?: string
+  contractId?: string
   businessSummary?: string
   variables?: string
 }

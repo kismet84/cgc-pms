@@ -59,9 +59,16 @@ public class WorkflowWithdrawService {
         core.cancelAllPendingTasks(instanceId);
         core.resetActiveNodes(instanceId);
 
-        instance.setInstanceStatus(WorkflowConstants.INSTANCE_WITHDRAWN);
-        instance.setEndedAt(LocalDateTime.now());
-        wfInstanceMapper.updateById(instance);
+        // CAS: atomically transition instance from RUNNING → WITHDRAWN,
+        // but only if no task has been APPROVED or REJECTED (no concurrent approve won).
+        int updated = wfInstanceMapper.updateInstanceStatusWithCasNoApprovedTasks(
+                instanceId,
+                WorkflowConstants.INSTANCE_RUNNING,
+                WorkflowConstants.INSTANCE_WITHDRAWN,
+                LocalDateTime.now());
+        if (updated != 1) {
+            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更或已有任务被处理，撤回失败");
+        }
 
         core.writeRecord(instance.getTenantId(), instance.getBusinessType(), instance.getBusinessId(),
                 instanceId, null, null, instance.getCurrentRound(),

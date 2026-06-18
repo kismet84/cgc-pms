@@ -9,7 +9,7 @@ const store = useAlertStore()
 
 // ── Filters ──
 const filter = reactive({
-  projectId: undefined as number | undefined,
+  projectId: undefined as string | undefined,
   severity: undefined as string | undefined,
   isRead: undefined as number | undefined,
 })
@@ -119,7 +119,7 @@ const columns = [
   { title: '操作', key: 'action', width: 100, fixed: 'right' },
 ]
 
-function getProjectName(projectId: number): string {
+function getProjectName(projectId: string): string {
   const p = projectOptions.value.find((o) => String(o.id) === String(projectId))
   return p ? `${p.projectCode} ${p.projectName}` : `项目#${projectId}`
 }
@@ -167,7 +167,7 @@ onMounted(async () => {
             <a-select-option
               v-for="p in projectOptions"
               :key="p.id"
-              :value="Number(p.id)"
+              :value="p.id"
               :label="`${p.projectCode} ${p.projectName}`"
             >
               {{ p.projectCode }} {{ p.projectName }}

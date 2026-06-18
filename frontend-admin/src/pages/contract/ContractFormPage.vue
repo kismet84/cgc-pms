@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
@@ -12,6 +12,7 @@ import {
   getPaymentTerms,
   saveContractDraft,
   updateContractDraft,
+  submitForApproval,
 } from '@/api/modules/contract'
 import type { ContractSaveRequest } from '@/api/modules/contract'
 import { useReferenceStore } from '@/stores/reference'
@@ -61,6 +62,18 @@ if (!isEmbedded.value) {
     })
   })
 }
+
+// ---- beforeunload guard (browser tab/window close) ----
+function onWindowBeforeUnload(e: BeforeUnloadEvent) {
+  if (dirty.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+window.addEventListener('beforeunload', onWindowBeforeUnload)
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', onWindowBeforeUnload)
+})
 
 // ---- Steps ----
 const stepConfig: StepConfig[] = [
@@ -286,6 +299,7 @@ function buildTermsPayload(): ContractPaymentTerm[] {
 
 // ---- Submit ----
 async function doSubmit(withApproval: boolean) {
+  if (submitting.value) return
   if (!(await validateBasic()) || !validateItems() || !validateTerms()) return
   submitting.value = true
   try {
@@ -293,17 +307,31 @@ async function doSubmit(withApproval: boolean) {
       contract: buildContractPayload(),
       items: buildItemsPayload(),
       paymentTerms: buildTermsPayload(),
-      submitForApproval: withApproval,
+      submitForApproval: false, // save and submit are decoupled
     }
+    let savedContractId: string
     if (isEdit.value) {
       await updateContractDraft(contractId.value, payload)
-      message.success(withApproval ? '合同已更新并提交审批' : '合同已更新')
+      savedContractId = contractId.value
     } else {
-      await saveContractDraft(payload)
-      message.success(withApproval ? '合同已创建并提交审批' : '合同已保存为草稿')
+      savedContractId = await saveContractDraft(payload)
     }
     dirty.value = false
     emit('saved')
+
+    if (withApproval) {
+      try {
+        await submitForApproval(savedContractId)
+        message.success('合同已保存并提交审批')
+      } catch (e: unknown) {
+        console.error(e)
+        message.success('合同已保存为草稿')
+        message.error('提交审批失败，请稍后重试')
+      }
+    } else {
+      message.success(isEdit.value ? '合同已更新' : '合同已保存为草稿')
+    }
+
     finishClose()
   } catch (e: unknown) {
     console.error(e)

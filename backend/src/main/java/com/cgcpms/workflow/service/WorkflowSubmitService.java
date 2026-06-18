@@ -36,7 +36,7 @@ public class WorkflowSubmitService {
                              String businessSummary, String variables,
                              List<Long> ccUserIds) {
 
-        WfTemplate template = core.findTemplate(businessType);
+        WfTemplate template = core.findTemplate(businessType, tenantId, amount);
         List<WfTemplateNode> templateNodes = core.findTemplateNodes(template.getId());
 
         // Create instance
@@ -58,19 +58,14 @@ public class WorkflowSubmitService {
         instance.setVariables(variables);
         instance.setStartedAt(LocalDateTime.now());
 
-        // Check for duplicate business key — includes logically deleted rows
-        // because uk_wf_instance_business does NOT include deleted_flag
-        List<WfInstance> existing = wfInstanceMapper.selectAllIncludingDeleted(businessType, businessId);
-        if (existing != null && !existing.isEmpty()) {
-            boolean hasActive = existing.stream()
-                    .anyMatch(w -> w.getDeletedFlag() == null || w.getDeletedFlag() == 0);
-            if (hasActive) {
-                throw new BusinessException("WORKFLOW_INSTANCE_EXISTS", "该业务已提交审批，请勿重复提交");
-            }
-            // Hard-delete stale logically-deleted rows to free the unique key slot
-            for (WfInstance w : existing) {
-                wfInstanceMapper.hardDeleteById(w.getId());
-            }
+        // Check for active duplicate business key — V75 added deleted_flag to
+        // uk_wf_instance_business, so soft-deleted rows no longer block new submissions.
+        // Standard MyBatis-Plus query auto-filters deleted_flag=0.
+        long activeCount = wfInstanceMapper.selectCount(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getBusinessType, businessType)
+                .eq(WfInstance::getBusinessId, businessId));
+        if (activeCount > 0) {
+            throw new BusinessException("WORKFLOW_INSTANCE_EXISTS", "该业务已提交审批，请勿重复提交");
         }
 
         wfInstanceMapper.insert(instance);
@@ -155,17 +150,53 @@ public class WorkflowSubmitService {
         instance.setEndedAt(null);
         wfInstanceMapper.updateById(instance);
 
-        // Reactivate the previously rejected node
-        WfNodeInstance rejectedNode = core.findRejectedOrLastNode(instanceId);
-        if (rejectedNode != null) {
-            WfTemplateNode tplNode = core.wfTemplateNodeMapper.selectById(rejectedNode.getTemplateNodeId());
-            core.reactivateNode(rejectedNode, tplNode, userId, username, instance.getTenantId(), newRound);
+        // Cancel any stale pending tasks from previous rounds
+        core.cancelAllPendingTasks(instanceId);
+
+        // Create fresh node instances for the new round
+        List<WfTemplateNode> templateNodes = core.findTemplateNodes(instance.getTemplateId());
+        List<WfNodeInstance> newNodes = new ArrayList<>();
+        for (WfTemplateNode tn : templateNodes) {
+            WfNodeInstance ni = new WfNodeInstance();
+            ni.setTenantId(instance.getTenantId());
+            ni.setInstanceId(instanceId);
+            ni.setTemplateNodeId(tn.getId());
+            ni.setNodeCode(tn.getNodeCode());
+            ni.setNodeName(tn.getNodeName());
+            ni.setNodeOrder(tn.getNodeOrder());
+            ni.setApproveMode(tn.getApproveMode());
+            ni.setNodeStatus(WorkflowConstants.NODE_WAITING);
+            ni.setRoundNo(newRound);
+            ni.setPassRuleJson(tn.getPassRuleJson());
+            ni.setRejectRuleJson(tn.getRejectRuleJson());
+            wfNodeInstanceMapper.insert(ni);
+            newNodes.add(ni);
         }
+
+        // Activate the first node of the new round
+        WfNodeInstance firstNode = newNodes.get(0);
+        core.activateNode(firstNode, templateNodes.get(0), userId, username, instance.getTenantId());
 
         core.writeRecord(instance.getTenantId(), instance.getBusinessType(), instance.getBusinessId(),
                 instanceId, null, null, newRound,
                 null, null, WorkflowConstants.ACTION_RESUBMIT, "重新提交",
                 userId, username, null);
+
+        // Notify approvers for the new round
+        List<WfTask> pendingTasks = wfTaskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instanceId)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+        for (WfTask t : pendingTasks) {
+            try {
+                core.notificationService.create(instance.getTenantId(), t.getApproverId(),
+                        username + "重新提交了审批",
+                        username + "重新提交了审批：" + instance.getTitle(),
+                        "WORKFLOW", instanceId);
+            } catch (Exception e) {
+                log.warn("Failed to create resubmit notification for approver {}: {}", t.getApproverId(), e.getMessage());
+            }
+        }
 
         return instance;
     }

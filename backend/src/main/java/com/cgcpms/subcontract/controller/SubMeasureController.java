@@ -6,6 +6,7 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.service.SubMeasureService;
+import com.cgcpms.subcontract.vo.SubMeasureItemVO;
 import com.cgcpms.subcontract.vo.SubMeasureVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -65,8 +66,9 @@ public class SubMeasureController {
 
     @GetMapping("/{id}/items")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:query')")
-    public ApiResponse<SubMeasureVO> listItems(@PathVariable Long id) {
-        return ApiResponse.success(subMeasureService.getById(id));
+    public ApiResponse<List<SubMeasureItemVO>> listItems(@PathVariable Long id) {
+        SubMeasureVO vo = subMeasureService.getById(id);
+        return ApiResponse.success(vo.getItems());
     }
 
     @PostMapping("/{id}/items/batch")

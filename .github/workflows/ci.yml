@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
@@ -210,6 +210,7 @@ jobs:
 
   deploy:
     name: Deploy to Production
+    needs: [backend-test, frontend-build, flyway-check, docker-build]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     steps:
@@ -256,13 +257,36 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             # Pre-deploy DB backup (uncomment when backup script exists)
-            # docker exec cgc-pms-mysql mysqldump --single-transaction cgc_pms > /tmp/pre-deploy-backup.sql
-            docker pull ${{ secrets.REGISTRY_URL }}/cgc-pms-backend:latest
-            docker pull ${{ secrets.REGISTRY_URL }}/cgc-pms-frontend:latest
+            # docker exec cgc-pms-mysql mysqldump --single-transaction cgc_pms > /tmp/pre-deploy-backup-$(date +%Y%m%d%H%M%S).sql
+            # Pull SHA-pinned images for immutable deployment
+            docker pull ${{ secrets.REGISTRY_URL }}/cgc-pms-backend:${{ github.sha }}
+            docker pull ${{ secrets.REGISTRY_URL }}/cgc-pms-frontend:${{ github.sha }}
+            # Tag images for compose reference (compose uses BACKEND_TAG/FRONTEND_TAG env vars)
+            docker tag ${{ secrets.REGISTRY_URL }}/cgc-pms-backend:${{ github.sha }} cgc-pms-backend:${{ github.sha }}
+            docker tag ${{ secrets.REGISTRY_URL }}/cgc-pms-frontend:${{ github.sha }} cgc-pms-frontend:${{ github.sha }}
+            # Export tags for compose variable substitution
+            export BACKEND_TAG=${{ github.sha }}
+            export FRONTEND_TAG=${{ github.sha }}
             cd /opt/cgc-pms && docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            # M-022: Post-deploy health check
-            echo "Waiting for services to stabilize..."
-            sleep 60
-            curl -f http://localhost/api/actuator/health || { echo "Health check failed"; exit 1; }
-            echo "Health check passed"
-            # Rollback hint: docker compose down && git checkout <previous-tag> && docker compose up -d
+            # Post-deploy readiness check: verify Spring Boot actuator JSON status=UP via HTTPS
+            echo "Waiting for services to stabilize (checking actuator health JSON)..."
+            HEALTH_OK=false
+            for i in $(seq 1 12); do
+              sleep 5
+              HEALTH=$(curl -sS http://localhost/api/actuator/health 2>/dev/null)
+              if echo "$HEALTH" | grep -q '"status":"UP"'; then
+                echo "✅ Readiness check passed ($((i*5))s): $HEALTH"
+                echo "Deployed SHA: ${{ github.sha }}"
+                echo "Deployed at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+                HEALTH_OK=true
+                break
+              fi
+              echo "Attempt $i/12: not ready yet"
+            done
+            if [ "$HEALTH_OK" = false ]; then
+              echo "❌ Readiness check failed after 60s"
+              exit 1
+            fi
+            # Rollback path (documented):
+            #   export BACKEND_TAG=<previous-sha> FRONTEND_TAG=<previous-sha>
+            #   docker compose -f docker-compose.prod.yml up -d --remove-orphans

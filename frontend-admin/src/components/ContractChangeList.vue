@@ -109,7 +109,7 @@ async function fetchData() {
     const res = await getContractChangeList({
       pageNo: pageNo.value,
       pageSize: pageSize.value,
-      contractId: Number(props.contractId),
+      contractId: props.contractId,
     })
     tableData.value = res.records
     total.value = res.total

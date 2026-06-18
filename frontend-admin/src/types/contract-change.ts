@@ -48,8 +48,8 @@ export interface ContractChangeVO {
 export interface ContractChangeQueryParams {
   pageNo: number
   pageSize: number
-  projectId?: number
-  contractId?: number
+  projectId?: string
+  contractId?: string
   changeType?: ChangeType
   approvalStatus?: ChangeApprovalStatus
   changeCode?: string

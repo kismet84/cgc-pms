@@ -63,21 +63,24 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
                 .set(CtContractChange::getApprovalStatus, "APPROVED")
                 .set(CtContractChange::getEffectiveFlag, 1));
 
-        // 2. Update ct_contract.currentAmount += change.changeAmount
+        // 2. Atomic increment: UPDATE ct_contract SET current_amount = current_amount + ?
+        //    WHERE id = ? (read-modify-write eliminated)
         //    (NOT contractAmount — contractAmount is the original signed amount)
         BigDecimal changeAmount = BigDecimalUtils.nvl(change.getChangeAmount());
-        CtContract contract = contractMapper.selectById(change.getContractId());
-        if (contract == null) {
-            throw new IllegalStateException("合同不存在，contractId=" + change.getContractId());
+        if (changeAmount.compareTo(BigDecimal.ZERO) != 0) {
+            // Pessimistic lock: ensure contract exists and prevent concurrent modifications
+            CtContract contract = contractMapper.selectByIdForUpdate(change.getContractId());
+            if (contract == null) {
+                throw new IllegalStateException("合同不存在，contractId=" + change.getContractId());
+            }
+
+            contractMapper.update(null, new LambdaUpdateWrapper<CtContract>()
+                    .eq(CtContract::getId, change.getContractId())
+                    .setSql("current_amount = current_amount + " + changeAmount));
+
+            log.info("合同 currentAmount 原子递增: contractId={}, changeAmount={}, oldCurrentAmount={}",
+                    change.getContractId(), changeAmount, contract.getCurrentAmount());
         }
-
-        BigDecimal newCurrentAmount = BigDecimalUtils.nvl(contract.getCurrentAmount()).add(changeAmount);
-        contractMapper.update(null, new LambdaUpdateWrapper<CtContract>()
-                .eq(CtContract::getId, change.getContractId())
-                .set(CtContract::getCurrentAmount, newCurrentAmount));
-
-        log.info("合同 currentAmount 更新: contractId={}, {} -> {}", change.getContractId(),
-                contract.getCurrentAmount(), newCurrentAmount);
 
         // 3. Generate cost record
         costGenerationService.generateCost("CT_CHANGE", changeId);

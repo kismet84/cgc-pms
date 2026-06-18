@@ -60,8 +60,15 @@ public class PmProjectController {
         return ApiResponse.success();
     }
 
+    @PostMapping("/{id}/archive")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:edit')")
+    public ApiResponse<Void> archive(@PathVariable Long id) {
+        pmProjectService.archive(id);
+        return ApiResponse.success();
+    }
+
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:delete')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         pmProjectService.delete(id);
         return ApiResponse.success();

@@ -108,6 +108,7 @@ public class FileService {
 
             // Persist file record
             SysFile sysFile = new SysFile();
+            sysFile.setTenantId(UserContext.getCurrentTenantId());
             sysFile.setBusinessType(businessType);
             sysFile.setBusinessId(businessId);
             sysFile.setFileName(fileName);

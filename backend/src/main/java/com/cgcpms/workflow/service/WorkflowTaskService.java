@@ -44,14 +44,27 @@ public class WorkflowTaskService {
             throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
         }
 
-        // Mark original task as transferred
-        task.setTaskStatus(WorkflowConstants.TASK_TRANSFERRED);
-        task.setActionType(WorkflowConstants.ACTION_TRANSFER);
-        task.setComment("转办给用户 " + targetUserId + ": " + (comment != null ? comment : ""));
-        task.setHandledAt(LocalDateTime.now());
-        wfTaskMapper.updateById(task);
+        // CAS update: atomically mark original task as TRANSFERRED
+        int updated = wfTaskMapper.updateTaskStatusWithCas(
+                taskId,
+                WorkflowConstants.TASK_PENDING,
+                task.getTaskVersion(),
+                WorkflowConstants.TASK_TRANSFERRED,
+                WorkflowConstants.ACTION_TRANSFER,
+                "转办给用户 " + targetUserId + ": " + (comment != null ? comment : ""),
+                LocalDateTime.now());
+        if (updated != 1) {
+            throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突），无法转办");
+        }
 
-        // Create new task for target
+        // Ping instance to acquire row lock and verify still RUNNING
+        int instanceOk = wfInstanceMapper.pingInstanceRunning(task.getInstanceId(),
+                WorkflowConstants.INSTANCE_RUNNING);
+        if (instanceOk != 1) {
+            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更，无法转办");
+        }
+
+        // Only create new task after CAS confirms original update succeeded
         WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
         WfTask newTask = new WfTask();
         newTask.setTenantId(instance.getTenantId());

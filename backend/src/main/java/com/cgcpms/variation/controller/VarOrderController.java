@@ -6,6 +6,7 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.entity.VarOrderItem;
 import com.cgcpms.variation.service.VarOrderService;
+import com.cgcpms.variation.vo.VarOrderItemVO;
 import com.cgcpms.variation.vo.VarOrderVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -73,8 +74,9 @@ public class VarOrderController {
 
     @GetMapping("/{id}/items")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:query')")
-    public ApiResponse<VarOrderVO> listItems(@PathVariable Long id) {
-        return ApiResponse.success(varOrderService.getById(id));
+    public ApiResponse<List<VarOrderItemVO>> listItems(@PathVariable Long id) {
+        VarOrderVO vo = varOrderService.getById(id);
+        return ApiResponse.success(vo.getItems());
     }
 
     @PostMapping("/{id}/items/batch")

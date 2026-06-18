@@ -112,10 +112,7 @@ services:
   # Backend — Spring Boot 3.3 Java 21 REST API (:8080)
   # ===========================================================================
   backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
-    image: cgc-pms-backend:latest
+    image: ${REGISTRY_URL:-}cgc-pms-backend:${BACKEND_TAG:-latest}
     container_name: cgc-pms-backend
     restart: unless-stopped
     depends_on:
@@ -164,10 +161,7 @@ services:
   # Frontend — Nginx serving Vue 3 SPA + reverse proxy to backend (:80/:443)
   # ===========================================================================
   frontend:
-    build:
-      context: ../frontend-admin
-      dockerfile: Dockerfile
-    image: cgc-pms-frontend:latest
+    image: ${REGISTRY_URL:-}cgc-pms-frontend:${FRONTEND_TAG:-latest}
     container_name: cgc-pms-frontend
     restart: unless-stopped
     depends_on:

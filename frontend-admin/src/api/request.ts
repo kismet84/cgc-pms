@@ -6,36 +6,56 @@ import axios, {
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import type { ApiResponse } from '@/types/api'
-import { refreshTokenApi } from '@/api/modules/auth'
 
-/** 业务成功码 */
+/** Business success code */
 const SUCCESS_CODE = '0'
 
+/** Queue timeout in ms — draining forever-queued requests */
+const REFRESH_QUEUE_TIMEOUT = 15_000
+
+/** Axios instance for normal API calls — carries the 401 interceptor. */
 const service: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
   timeout: 15000,
   withCredentials: true, // send HttpOnly cookies automatically
 })
 
-// 请求拦截器：无需手动附加 Authorization header — HttpOnly Cookie 自动携带
+/**
+ * Isolated Axios instance for token-refresh calls ONLY.
+ * Has NO 401 interceptor, preventing self-waiting deadlocks.
+ */
+export const refreshClient: AxiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
+  timeout: 10_000,
+  withCredentials: true,
+})
+
+// ── Normal request interceptor ──
 service.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    return config
-  },
+  (config: InternalAxiosRequestConfig) => config,
   (error) => Promise.reject(error),
 )
 
-// 是否正在刷新中，防止并发多次刷新
+// ── Refresh state ──
 let isRefreshing = false
-// 刷新期间排队的请求
+let queueTimer: ReturnType<typeof setTimeout> | null = null
 let pendingQueue: Array<{ resolve: (v: void) => void; reject: (e: Error) => void }> = []
 
-function processQueue() {
-  pendingQueue.forEach((entry) => entry.resolve())
+function drainQueue(err?: Error) {
+  if (queueTimer) {
+    clearTimeout(queueTimer)
+    queueTimer = null
+  }
+  if (err) {
+    pendingQueue.forEach((entry) => entry.reject(err))
+  } else {
+    pendingQueue.forEach((entry) => entry.resolve())
+  }
   pendingQueue = []
+  isRefreshing = false
 }
 
-// 响应拦截器：统一解构 data、处理 401 与业务错误
+// ── Response interceptor ──
 service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const res = response.data
@@ -45,7 +65,7 @@ service.interceptors.response.use(
     if (res.code === SUCCESS_CODE) {
       return res.data as never
     }
-    message.error(res.message || '请求失败')
+    message.error(res.message || 'Request failed')
     return Promise.reject(new Error(res.message || 'Error'))
   },
   async (error) => {
@@ -65,28 +85,33 @@ service.interceptors.response.use(
       originalRequest._retry = true
       isRefreshing = true
 
+      // Start a hard timeout so the queue always drains
+      queueTimer = setTimeout(() => {
+        drainQueue(new Error('Token refresh timed out'))
+        const userStore = useUserStore()
+        userStore.logout()
+        message.error('登录已过期，请重新登录')
+        if (window.location.pathname !== '/login') window.location.href = '/login'
+      }, REFRESH_QUEUE_TIMEOUT)
+
       try {
-        // Refresh token is sent via HttpOnly cookie — no manual token needed
-        await refreshTokenApi()
-        processQueue()
+        // Use the isolated refreshClient — no 401 recursion possible
+        await refreshClient.post('/auth/refresh')
+        drainQueue()
         return service(originalRequest)
       } catch (e: unknown) {
-        console.error(e)
-        // Refresh failed — reject all queued requests, then logout
-        pendingQueue.forEach((entry) => entry.reject(new Error('Token refresh failed')))
-        pendingQueue = []
+        console.error('[refresh]', e)
+        drainQueue(new Error('Token refresh failed'))
         const userStore = useUserStore()
         userStore.logout()
         message.error('登录已过期，请重新登录')
         if (window.location.pathname !== '/login') window.location.href = '/login'
         return Promise.reject(error)
-      } finally {
-        isRefreshing = false
       }
     }
 
     if (status !== 401) {
-      const msg = error?.response?.data?.message || error.message || '网络异常'
+      const msg = error?.response?.data?.message || error.message || 'Network error'
       message.error(msg)
     }
     return Promise.reject(error)

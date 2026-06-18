@@ -35,26 +35,14 @@ public class PayRecordController {
         return ApiResponse.success(payRecordService.getById(id));
     }
 
+    /** POST /pay-records now delegates to authoritative writeback */
     @PostMapping
     @PreAuthorize("hasAuthority('payment:record:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Long> create(@Valid @RequestBody PayRecord record) {
-        return ApiResponse.success(payRecordService.create(record));
+    public ApiResponse<PayRecordVO> create(@Valid @RequestBody PayRecord record) {
+        return ApiResponse.success(payRecordService.writeback(record));
     }
 
-    @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('payment:record:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PayRecord record) {
-        record.setId(id);
-        payRecordService.update(record);
-        return ApiResponse.success();
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('payment:record:delete') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> delete(@PathVariable Long id) {
-        payRecordService.delete(id);
-        return ApiResponse.success();
-    }
+    // PUT and DELETE removed — all writes through authoritative writeback
 
     @PostMapping("/writeback")
     @PreAuthorize("hasAuthority('payment:record:writeback') or hasAnyRole('ADMIN','SUPER_ADMIN')")

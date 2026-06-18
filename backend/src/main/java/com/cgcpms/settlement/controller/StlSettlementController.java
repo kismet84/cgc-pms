@@ -11,6 +11,7 @@ import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.service.StlSettlementService;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
+import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
 import com.cgcpms.variation.entity.VarOrder;
 import jakarta.validation.Valid;
@@ -86,8 +87,9 @@ public class StlSettlementController {
 
     @GetMapping("/{id}/items")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
-    public ApiResponse<StlSettlementVO> listItems(@PathVariable Long id) {
-        return ApiResponse.success(stlSettlementService.getById(id));
+    public ApiResponse<List<StlSettlementItemVO>> listItems(@PathVariable Long id) {
+        StlSettlementVO vo = stlSettlementService.getById(id);
+        return ApiResponse.success(vo.getItems());
     }
 
     @PostMapping("/{id}/items/batch")

@@ -124,8 +124,6 @@ class ContractApprovalRollbackTest {
         contract.setSignedDate(LocalDate.now());
         contract.setPaymentMethod("银行转账");
         contract.setSettlementMethod("按进度结算");
-        contract.setWarrantyRate(new BigDecimal("5.00"));
-        contract.setWarrantyAmount(new BigDecimal("32000.00"));
         contract.setContractStatus(ContractStatusConstants.STATUS_PERFORMING);
         contract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
         contract.setCostGeneratedFlag(0);

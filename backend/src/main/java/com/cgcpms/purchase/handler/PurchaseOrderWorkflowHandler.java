@@ -14,6 +14,7 @@ import com.cgcpms.workflow.handler.WorkflowContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -41,6 +42,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
+    @Transactional
     public void onApproved(WorkflowContext context) {
         Long orderId = resolveOrderId(context.getInstance());
         log.info("采购订单审批通过，更新状态 orderId={}", orderId);

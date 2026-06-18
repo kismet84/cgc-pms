@@ -38,6 +38,7 @@ const modalVisible = ref(false)
 const modalTitle = ref('新建采购申请')
 const editingId = ref<string | null>(null)
 const submitting = ref(false)
+const modalDirty = ref(false)
 const formData = reactive<Partial<PurchaseRequestVO>>({
   projectId: undefined,
   contractId: undefined,
@@ -164,6 +165,7 @@ function handleAdd() {
   itemList.value = []
   keySeq.value = 0
   contractList.value = []
+  modalDirty.value = false
   modalVisible.value = true
 }
 
@@ -190,6 +192,7 @@ async function handleEdit(record: PurchaseRequestVO) {
     message.error('加载明细失败')
     itemList.value = []
   }
+  modalDirty.value = false
   modalVisible.value = true
 }
 
@@ -215,6 +218,7 @@ async function loadContractsByProject(projectId?: string) {
 async function handleProjectChange(projectId?: string) {
   formData.projectId = projectId
   formData.contractId = undefined
+  modalDirty.value = true
   await loadContractsByProject(projectId)
 }
 
@@ -258,6 +262,7 @@ function handleSubmit(record: PurchaseRequestVO) {
 
 // --- Line items management ---
 function handleAddItem() {
+  modalDirty.value = true
   itemList.value.push({
     key: keySeq.value++,
     materialId: '',
@@ -270,6 +275,7 @@ function handleAddItem() {
 }
 
 function handleRemoveItem(key: number) {
+  modalDirty.value = true
   const idx = itemList.value.findIndex((i) => i.key === key)
   if (idx !== -1) {
     itemList.value.splice(idx, 1)
@@ -277,6 +283,7 @@ function handleRemoveItem(key: number) {
 }
 
 function handleMaterialClear(key: number) {
+  modalDirty.value = true
   const item = itemList.value.find((i) => i.key === key)
   if (!item) return
   item.materialId = ''
@@ -285,6 +292,7 @@ function handleMaterialClear(key: number) {
 }
 
 function handleMaterialChange(key: number, materialId: string | undefined) {
+  modalDirty.value = true
   const item = itemList.value.find((i) => i.key === key)
   if (!item) return
   if (!materialId) {
@@ -366,6 +374,17 @@ async function handleModalOk() {
 
 function handleModalCancel() {
   if (submitting.value) return
+  if (modalDirty.value) {
+    Modal.confirm({
+      title: '放弃编辑？',
+      content: '当前表单有未保存的修改，确定关闭吗？',
+      okText: '确定关闭',
+      okType: 'danger',
+      cancelText: '继续编辑',
+      onOk: () => { modalVisible.value = false },
+    })
+    return
+  }
   modalVisible.value = false
 }
 
@@ -543,6 +562,7 @@ onMounted(() => {
             allow-clear
             show-search
             :filter-option="filterOption"
+            @change="modalDirty = true"
           >
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
@@ -550,7 +570,7 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="备注">
-          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
+          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" @change="modalDirty = true" />
         </a-form-item>
       </a-form>
 
@@ -598,11 +618,12 @@ onMounted(() => {
                   placeholder="自定义物料"
                   size="small"
                   style="flex: 1"
+                  @change="modalDirty = true"
                 />
               </div>
             </template>
             <template v-else-if="column.key === 'unit'">
-              <a-input v-model:value="item.unit" placeholder="单位" size="small" style="width: 100%" />
+              <a-input v-model:value="item.unit" placeholder="单位" size="small" style="width: 100%" @change="modalDirty = true" />
             </template>
             <template v-else-if="column.key === 'quantity'">
               <a-input-number
@@ -610,6 +631,7 @@ onMounted(() => {
                 :min="0"
                 :precision="4"
                 style="width: 100%"
+                @change="modalDirty = true"
               />
             </template>
             <template v-else-if="column.key === 'plannedDate'">
@@ -619,10 +641,11 @@ onMounted(() => {
                 style="width: 100%"
                 size="small"
                 :get-popup-container="getPopupContainer"
+                @change="modalDirty = true"
               />
             </template>
             <template v-else-if="column.key === 'remark'">
-              <a-input v-model:value="item.remark" placeholder="备注" size="small" />
+              <a-input v-model:value="item.remark" placeholder="备注" size="small" @change="modalDirty = true" />
             </template>
             <template v-else-if="column.key === 'action'">
               <a-button type="link" size="small" danger @click="handleRemoveItem(item.key)">

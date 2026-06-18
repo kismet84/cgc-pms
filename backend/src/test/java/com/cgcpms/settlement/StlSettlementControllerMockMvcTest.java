@@ -133,11 +133,26 @@ class StlSettlementControllerMockMvcTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 4. GET /settlements/{id}/attachments
+    // 3b. GET /settlements/{id}/items (listItems fix — returns array)
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Order(4)
+    @DisplayName("GET /settlements/{id}/items -> 200, data is array (item list, not parent VO)")
+    void testListItemsReturnsArray() throws Exception {
+        mockMvc.perform(getWithApi("/settlements/" + settlementId + "/items")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 4. GET /settlements/{id}/attachments
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Order(5)
     @DisplayName("GET /settlements/{id}/attachments -> 200")
     void testGetAttachments() throws Exception {
         mockMvc.perform(getWithApi("/settlements/" + settlementId + "/attachments")
@@ -152,7 +167,7 @@ class StlSettlementControllerMockMvcTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(5)
+    @Order(6)
     @DisplayName("GET /settlements/{id}/approval-records -> 200")
     void testGetApprovalRecords() throws Exception {
         mockMvc.perform(getWithApi("/settlements/" + settlementId + "/approval-records")
@@ -167,7 +182,7 @@ class StlSettlementControllerMockMvcTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(6)
+    @Order(7)
     @DisplayName("POST /settlements/{id}/submit -> 200")
     void testSubmitForApproval() throws Exception {
         mockMvc.perform(postWithApi("/settlements/" + settlementId + "/submit")
@@ -182,7 +197,7 @@ class StlSettlementControllerMockMvcTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(7)
+    @Order(8)
     @DisplayName("GET without JWT -> 401")
     void testUnauthorized() throws Exception {
         mockMvc.perform(getWithApi("/settlements/" + settlementId + "/variations"))

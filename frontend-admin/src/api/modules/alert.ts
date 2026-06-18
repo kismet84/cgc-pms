@@ -2,19 +2,19 @@ import { request } from '@/api/request'
 import type { AlertLogVO } from '@/types/alert'
 
 export interface AlertListParams {
-  projectId?: number
+  projectId?: string
   severity?: string
   isRead?: number
 }
 
 export interface MarkReadResult {
   success: boolean
-  alertId: number
+  alertId: string
 }
 
 export interface BatchEvaluateResult {
   alertsGenerated: number
-  tenantId: number
+  tenantId: string
 }
 
 /** 预警列表（按项目/严重度/已读状态筛选） */
@@ -27,7 +27,7 @@ export function getAlertList(params: AlertListParams) {
 }
 
 /** 标记单条预警为已读 */
-export function markAlertRead(id: number) {
+export function markAlertRead(id: string) {
   return request<MarkReadResult>({
     url: `/alerts/${id}/read`,
     method: 'put',

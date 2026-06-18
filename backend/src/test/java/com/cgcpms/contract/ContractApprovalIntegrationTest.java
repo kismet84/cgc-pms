@@ -161,8 +161,6 @@ class ContractApprovalIntegrationTest {
         contract.setSignedDate(LocalDate.now());
         contract.setPaymentMethod("银行转账");
         contract.setSettlementMethod("按进度结算");
-        contract.setWarrantyRate(new BigDecimal("5.00"));
-        contract.setWarrantyAmount(new BigDecimal("32000.00"));
         contract.setContractStatus(contractStatus);
         contract.setApprovalStatus(approvalStatus);
         contract.setCostGeneratedFlag(0);
@@ -214,11 +212,11 @@ class ContractApprovalIntegrationTest {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // 场景2: 审批中守卫 — 禁止编辑
+    // 场景2: 审批中守卫 — 非 DRAFT 状态禁止编辑
     // ═══════════════════════════════════════════════════════════
     @Test
     @Transactional
-    @DisplayName("场景2: 审批中合同不可编辑 → 抛出 CONTRACT_IN_APPROVAL")
+    @DisplayName("场景2: 审批中合同不可编辑 → 抛出 CONTRACT_NOT_EDITABLE")
     void test02_approvalStatusGuard() {
         // 先提交审批，使其进入 APPROVING 状态
         contractService.submitForApproval(DRAFT_CONTRACT_ID);
@@ -232,8 +230,8 @@ class ContractApprovalIntegrationTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             contractService.update(editContract);
         }, "审批中合同编辑应抛出异常");
-        assertEquals("CONTRACT_IN_APPROVAL", ex.getCode(), "错误码应为 CONTRACT_IN_APPROVAL");
-        assertTrue(ex.getMessage().contains("审批"), "错误消息应包含'审批'");
+        assertEquals("CONTRACT_NOT_EDITABLE", ex.getCode(), "错误码应为 CONTRACT_NOT_EDITABLE");
+        assertTrue(ex.getMessage().contains("不可编辑"), "错误消息应包含'不可编辑'");
 
         System.out.println("✅ 场景2 通过: 审批中合同编辑被正确拦截, code=" + ex.getCode());
     }

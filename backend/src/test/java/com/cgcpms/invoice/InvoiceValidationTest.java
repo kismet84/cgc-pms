@@ -127,9 +127,9 @@ class InvoiceValidationTest {
                 .andExpect(jsonPath("$.code").value("0"))
                 .andReturn();
 
-        // Extract invoice ID from response
+        // Extract invoice ID from response (handles both numeric and string JSON values)
         String json = result.getResponse().getContentAsString();
-        Long invoiceId = Long.valueOf(json.replaceAll(".*\"data\":(\\d+).*", "$1"));
+        Long invoiceId = Long.valueOf(json.replaceAll(".*\"data\":\"?(\\d+)\"?.*", "$1"));
 
         // Fetch from DB and verify tenantId is NOT 999
         PayInvoice dbInvoice = payInvoiceMapper.selectById(invoiceId);

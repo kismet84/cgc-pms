@@ -12,6 +12,14 @@ import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.settlement.entity.StlSettlement;
+import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.vo.PmProjectVO;
@@ -37,6 +45,10 @@ public class PmProjectService {
     private final CtContractItemMapper ctContractItemMapper;
     private final CtContractPaymentTermMapper ctContractPaymentTermMapper;
     private final SysFileMapper sysFileMapper;
+    private final PayApplicationMapper payApplicationMapper;
+    private final PayRecordMapper payRecordMapper;
+    private final StlSettlementMapper stlSettlementMapper;
+    private final WfInstanceMapper wfInstanceMapper;
 
     public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String projectCode, String projectName, String projectType, String status) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
@@ -116,43 +128,122 @@ public class PmProjectService {
         pmProjectMapper.updateById(project);
     }
 
+    /**
+     * Archive project — set status=ARCHIVED after verifying no active dependencies.
+     * Active contracts, payments, settlements, or running workflows block archiving.
+     */
+    @Transactional
+    public void archive(Long id) {
+        PmProject existing = pmProjectMapper.selectById(id);
+        if (existing == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        if ("ARCHIVED".equals(existing.getStatus())) {
+            throw new BusinessException("PROJECT_ALREADY_ARCHIVED", "项目已归档");
+        }
+
+        Long tenantId = UserContext.getCurrentTenantId();
+
+        // Check for active contracts (not SETTLED/TERMINATED)
+        long activeContracts = ctContractMapper.selectCount(new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getProjectId, id)
+                .eq(CtContract::getTenantId, tenantId)
+                .notIn(CtContract::getContractStatus, "SETTLED", "TERMINATED"));
+        if (activeContracts > 0) {
+            throw new BusinessException("PROJECT_HAS_ACTIVE_CONTRACTS",
+                    "项目存在未完成的合同 (" + activeContracts + " 个)，无法归档");
+        }
+
+        // Check for pending/active payments
+        long activePayments = payApplicationMapper.selectCount(new LambdaQueryWrapper<PayApplication>()
+                .eq(PayApplication::getProjectId, id)
+                .eq(PayApplication::getTenantId, tenantId)
+                .notIn(PayApplication::getPayStatus, "PAID"));
+        if (activePayments > 0) {
+            throw new BusinessException("PROJECT_HAS_ACTIVE_PAYMENTS",
+                    "项目存在未完成的付款申请 (" + activePayments + " 个)，无法归档");
+        }
+
+        // Check for unsettled settlements (not finalized)
+        long activeSettlements = stlSettlementMapper.selectCount(new LambdaQueryWrapper<StlSettlement>()
+                .eq(StlSettlement::getProjectId, id)
+                .eq(StlSettlement::getTenantId, tenantId)
+                .isNull(StlSettlement::getFinalizedAt));
+        if (activeSettlements > 0) {
+            throw new BusinessException("PROJECT_HAS_ACTIVE_SETTLEMENTS",
+                    "项目存在未完成的结算 (" + activeSettlements + " 个)，无法归档");
+        }
+
+        // Check for running workflow instances
+        long runningWorkflows = wfInstanceMapper.selectCount(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getProjectId, id)
+                .eq(WfInstance::getTenantId, tenantId)
+                .eq(WfInstance::getInstanceStatus, "RUNNING"));
+        if (runningWorkflows > 0) {
+            throw new BusinessException("PROJECT_HAS_RUNNING_WORKFLOWS",
+                    "项目存在运行中的审批流程 (" + runningWorkflows + " 个)，无法归档");
+        }
+
+        existing.setStatus("ARCHIVED");
+        pmProjectMapper.updateById(existing);
+        log.info("Project {} archived successfully", id);
+    }
+
+    /**
+     * Physical delete — SUPER_ADMIN only, and only for projects with zero dependencies.
+     * For normal delete, use {@link #archive(Long)} instead.
+     */
     @Transactional
     public void delete(Long id) {
+        if (!UserContext.hasRole("SUPER_ADMIN")) {
+            throw new BusinessException("DELETE_FORBIDDEN",
+                    "物理删除仅限超级管理员。普通管理员请使用归档功能。");
+        }
+
         PmProject existing = pmProjectMapper.selectById(id);
         if (existing == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
 
-        // Cascade: logical-delete associated files
+        Long tenantId = UserContext.getCurrentTenantId();
+
+        // SUPER_ADMIN can only physically delete empty projects (no contracts)
+        long contractCount = ctContractMapper.selectCount(new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getProjectId, id)
+                .eq(CtContract::getTenantId, tenantId));
+        if (contractCount > 0) {
+            throw new BusinessException("PROJECT_HAS_DEPENDENCIES",
+                    "项目存在关联合同 (" + contractCount + " 个)，无法物理删除。请先归档。");
+        }
+        long paymentCount = payRecordMapper.selectCount(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getProjectId, id)
+                .eq(PayRecord::getTenantId, tenantId));
+        if (paymentCount > 0) {
+            throw new BusinessException("PROJECT_HAS_DEPENDENCIES",
+                    "项目存在付款记录 (" + paymentCount + " 条)，无法物理删除。请先归档。");
+        }
+        long workflowCount = wfInstanceMapper.selectCount(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getProjectId, id)
+                .eq(WfInstance::getTenantId, tenantId));
+        if (workflowCount > 0) {
+            throw new BusinessException("PROJECT_HAS_DEPENDENCIES",
+                    "项目存在审批流程 (" + workflowCount + " 条)，无法物理删除。请先归档。");
+        }
+
+        // Cascade: logical-delete associated files (tenant-scoped)
         sysFileMapper.delete(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getBusinessType, "PROJECT")
-                .eq(SysFile::getBusinessId, id));
+                .eq(SysFile::getBusinessId, id)
+                .eq(SysFile::getTenantId, tenantId));
 
-        // Cascade: logical-delete contracts and their children
-        List<CtContract> contracts = ctContractMapper.selectList(
-                new LambdaQueryWrapper<CtContract>().eq(CtContract::getProjectId, id));
-        for (CtContract c : contracts) {
-            ctContractItemMapper.delete(new LambdaQueryWrapper<CtContractItem>()
-                    .eq(CtContractItem::getContractId, c.getId()));
-            ctContractPaymentTermMapper.delete(new LambdaQueryWrapper<CtContractPaymentTerm>()
-                    .eq(CtContractPaymentTerm::getContractId, c.getId()));
-            sysFileMapper.delete(new LambdaQueryWrapper<SysFile>()
-                    .eq(SysFile::getBusinessType, "CONTRACT")
-                    .eq(SysFile::getBusinessId, c.getId()));
-        }
-        if (!contracts.isEmpty()) {
-            ctContractMapper.delete(new LambdaQueryWrapper<CtContract>()
-                    .eq(CtContract::getProjectId, id));
-        }
-
-        // 避免与已删除的同编码项目产生唯一键冲突：
-        // V51 唯一键 uk_pm_project_code (tenant_id, project_code, deleted_flag)
-        // 当已存在 deleted_flag=1 的同编码项目时，将当前项目编码追加唯一后缀
+        // Avoid unique key collision with previously deleted projects sharing the same code
         existing.setProjectCode(existing.getProjectCode() + "-DEL-" + id);
         pmProjectMapper.updateById(existing);
 
         pmProjectMapper.deleteById(id);
+        log.info("Project {} physically deleted by SUPER_ADMIN", id);
     }
 
     private PmProjectVO toVO(PmProject p) {

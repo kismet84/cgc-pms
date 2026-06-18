@@ -12,7 +12,7 @@ export const useAlertStore = defineStore('alert', () => {
   const alerts = ref<AlertLogVO[]>([])
   const loading = ref(false)
   const evaluating = ref(false)
-  const markingRead = ref<Set<number>>(new Set())
+  const markingRead = ref<Set<string>>(new Set())
 
   async function fetchAlerts(params: AlertListParams) {
     loading.value = true
@@ -29,7 +29,7 @@ export const useAlertStore = defineStore('alert', () => {
     }
   }
 
-  async function markRead(id: number) {
+  async function markRead(id: string) {
     markingRead.value.add(id)
     try {
       const result = await markAlertRead(id)

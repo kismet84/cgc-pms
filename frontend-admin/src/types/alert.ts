@@ -1,10 +1,10 @@
 /** 预警日志 VO — 对应后端 AlertLog 实体 */
 export interface AlertLogVO {
-  id: number
-  tenantId: number
-  projectId: number
+  id: string
+  tenantId: string
+  projectId: string
   /** 关联合同ID（部分预警按合同维度） */
-  contractId?: number
+  contractId?: string
   /** 规则类型: DYNAMIC_COST_EXCEEDS_TARGET / MATERIAL_EXCEEDS_BUDGET / ... */
   ruleType: string
   /** 严重度: HIGH / MEDIUM / LOW */

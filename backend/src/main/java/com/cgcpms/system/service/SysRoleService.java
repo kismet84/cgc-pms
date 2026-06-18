@@ -1,6 +1,7 @@
 package com.cgcpms.system.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysRoleMenu;
@@ -26,12 +27,16 @@ public class SysRoleService {
     private final SysRoleMenuMapper sysRoleMenuMapper;
 
     public List<SysRoleVO> getList() {
-        return sysRoleMapper.selectList(null).stream().map(this::toVO).collect(Collectors.toList());
+        return sysRoleMapper.selectList(
+                new LambdaQueryWrapper<SysRole>()
+                        .eq(SysRole::getTenantId, UserContext.getCurrentTenantId()))
+                .stream().map(this::toVO).collect(Collectors.toList());
     }
 
     public SysRoleVO getById(Long id) {
         SysRole role = sysRoleMapper.selectById(id);
-        if (role == null) throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
+        if (role == null || !role.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
         return toVO(role);
     }
 
@@ -42,6 +47,7 @@ public class SysRoleService {
             throw new BusinessException("ROLE_CODE_EXISTS", "角色编码已存在");
         }
         if (role.getStatus() == null) role.setStatus("ENABLE");
+        role.setTenantId(UserContext.getCurrentTenantId());
         sysRoleMapper.insert(role);
         log.info("Creating role: {}", role.getRoleCode());
         return role.getId();
@@ -49,16 +55,26 @@ public class SysRoleService {
 
     @Transactional
     public void update(SysRole role) {
+        SysRole existing = sysRoleMapper.selectById(role.getId());
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
         sysRoleMapper.updateById(role);
     }
 
     @Transactional
     public void delete(Long id) {
+        SysRole existing = sysRoleMapper.selectById(id);
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
         sysRoleMapper.deleteById(id);
     }
 
     @Transactional
     public void assignMenus(Long roleId, List<Long> menuIds) {
+        // Tenant isolation: verify role belongs to current tenant
+        SysRole role = sysRoleMapper.selectById(roleId);
+        if (role == null || !role.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
         sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenu>()
                 .eq(SysRoleMenu::getRoleId, roleId));
         if (menuIds != null) {

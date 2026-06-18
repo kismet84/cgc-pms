@@ -74,7 +74,7 @@ async function handleSave() {
   if (!props.role) return
   saving.value = true
   try {
-    const menuIds = checkedKeys.value.map((k) => Number(k))
+    const menuIds = checkedKeys.value.map((k) => k)
     await updateRoleMenus(props.role.id, menuIds)
     message.success('权限保存成功')
     emit('update:open', false)

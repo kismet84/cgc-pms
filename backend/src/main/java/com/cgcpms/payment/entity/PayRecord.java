@@ -50,4 +50,7 @@ public class PayRecord extends BaseEntity {
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String payStatus;
+
+    /** 外部交易流水号（唯一，用于幂等） */
+    private String externalTxnNo;
 }

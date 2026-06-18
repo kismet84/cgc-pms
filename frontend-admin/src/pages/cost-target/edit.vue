@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import type { TreeSelectProps } from 'ant-design-vue'
@@ -45,6 +45,39 @@ const isEdit = computed(() => (props.mode ? props.mode === 'edit' : !!route.para
 const loading = ref(false)
 const saving = ref(false)
 const submitting = ref(false)
+const dirty = ref(false)
+let initialLoadDone = false
+
+// ---- beforeRouteLeave guard ----
+if (!isEmbedded.value) {
+  onBeforeRouteLeave((_to, _from, next) => {
+    if (!dirty.value) {
+      next()
+      return
+    }
+    Modal.confirm({
+      title: '未保存的更改',
+      content: '当前目标成本有未保存的修改，确定离开吗？',
+      okText: '确定离开',
+      okType: 'danger',
+      cancelText: '继续编辑',
+      onOk: () => next(),
+      onCancel: () => next(false),
+    })
+  })
+}
+
+// ---- beforeunload guard ----
+function onWindowBeforeUnload(e: BeforeUnloadEvent) {
+  if (dirty.value) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+window.addEventListener('beforeunload', onWindowBeforeUnload)
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', onWindowBeforeUnload)
+})
 
 // ---- Reference data ----
 const referenceStore = useReferenceStore()
@@ -78,6 +111,14 @@ interface EditableItem {
   targetAmount: number | undefined
   sortOrder: number
 }
+
+// ---- Dirty tracking ----
+watch(
+  () => [formData.projectId, formData.versionNo, formData.versionName, formData.effectiveDate, formData.totalTargetAmount, formData.remark],
+  () => { if (initialLoadDone) dirty.value = true },
+  { deep: false },
+)
+watch(items, () => { if (initialLoadDone) dirty.value = true }, { deep: true })
 
 function genKey(): string {
   return `cti_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -189,6 +230,7 @@ async function loadExisting() {
     finishClose()
   } finally {
     loading.value = false
+    initialLoadDone = true
   }
 }
 
@@ -259,6 +301,7 @@ function buildItemsPayload(): CostTargetItemVO[] {
 
 // ---- Submit ----
 async function doSubmit(withApproval: boolean) {
+  if (saving.value) return
   if (!(await validateForm())) return
 
   saving.value = true
@@ -282,6 +325,7 @@ async function doSubmit(withApproval: boolean) {
       message.success('目标成本已保存')
     }
     emit('saved')
+    dirty.value = false
     finishClose()
   } catch (e: unknown) {
     console.error(e)
@@ -347,6 +391,7 @@ onMounted(() => {
   referenceStore.fetchProjects()
   fetchSubjectTree()
   if (isEdit.value && editId.value) loadExisting()
+  else initialLoadDone = true
 })
 </script>
 

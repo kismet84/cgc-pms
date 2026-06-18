@@ -40,19 +40,37 @@ class WorkflowCoreService {
     final SysUserMapper sysUserMapper;
     final WorkflowBusinessHandlerRegistry handlerRegistry;
     final NotificationService notificationService;
+    final ApproverResolver approverResolver;
 
     // ── Template lookup ──
 
-    WfTemplate findTemplate(String businessType) {
-        List<WfTemplate> templates = wfTemplateMapper.selectList(
-                new LambdaQueryWrapper<WfTemplate>()
-                        .eq(WfTemplate::getBusinessType, businessType)
-                        .eq(WfTemplate::getEnabled, 1));
-        if (templates.isEmpty()) {
+    WfTemplate findTemplate(String businessType, Long tenantId, java.math.BigDecimal amount) {
+        // First try the specific tenant, then fall back to tenant 0 (default templates)
+        WfTemplate template = queryTemplate(businessType, tenantId, amount);
+        if (template == null && tenantId != null && tenantId != 0L) {
+            template = queryTemplate(businessType, 0L, amount);
+        }
+        if (template == null) {
             throw new BusinessException("TEMPLATE_NOT_FOUND",
                     "未找到业务类型 [" + businessType + "] 的审批模板");
         }
-        return templates.get(0);
+        return template;
+    }
+
+    private WfTemplate queryTemplate(String businessType, Long tenantId, java.math.BigDecimal amount) {
+        LambdaQueryWrapper<WfTemplate> wrapper = new LambdaQueryWrapper<WfTemplate>()
+                .eq(WfTemplate::getBusinessType, businessType)
+                .eq(WfTemplate::getTenantId, tenantId)
+                .eq(WfTemplate::getEnabled, 1);
+        // Filter by amount thresholds when amount is provided
+        if (amount != null) {
+            wrapper.and(w -> w.isNull(WfTemplate::getAmountMin)
+                    .or().le(WfTemplate::getAmountMin, amount))
+                    .and(w -> w.isNull(WfTemplate::getAmountMax)
+                            .or().ge(WfTemplate::getAmountMax, amount));
+        }
+        List<WfTemplate> templates = wfTemplateMapper.selectList(wrapper);
+        return templates.isEmpty() ? null : templates.get(0);
     }
 
     List<WfTemplateNode> findTemplateNodes(Long templateId) {
@@ -90,21 +108,29 @@ class WorkflowCoreService {
                             Long userId, String username, Long tenantId) {
         WfInstance instance = wfInstanceMapper.selectById(node.getInstanceId());
 
-        // Parse approver config: for POC, use the demo data approach - single approver
-        // In production, approverConfig JSON would be parsed to resolve actual users
-        // For POC, create a task for the current user (initiator's manager or self)
-        WfTask task = new WfTask();
-        task.setTenantId(tenantId);
-        task.setInstanceId(node.getInstanceId());
-        task.setNodeInstanceId(node.getId());
-        task.setBusinessType(instance.getBusinessType());
-        task.setBusinessId(instance.getBusinessId());
-        task.setApproverId(userId);
-        task.setApproverName(username);
-        task.setTaskStatus(WorkflowConstants.TASK_PENDING);
-        task.setRoundNo(node.getRoundNo());
-        task.setReceivedAt(LocalDateTime.now());
-        wfTaskMapper.insert(task);
+        // Resolve approvers from template node approverConfig JSON
+        List<Long> approverIds = approverResolver.resolve(
+                tplNode.getApproverConfig(), tenantId, instance.getProjectId());
+
+        for (Long approverId : approverIds) {
+            SysUser approverUser = sysUserMapper.selectById(approverId);
+            String approverName = approverUser != null
+                    ? (approverUser.getRealName() != null ? approverUser.getRealName() : approverUser.getUsername())
+                    : "";
+
+            WfTask task = new WfTask();
+            task.setTenantId(tenantId);
+            task.setInstanceId(node.getInstanceId());
+            task.setNodeInstanceId(node.getId());
+            task.setBusinessType(instance.getBusinessType());
+            task.setBusinessId(instance.getBusinessId());
+            task.setApproverId(approverId);
+            task.setApproverName(approverName);
+            task.setTaskStatus(WorkflowConstants.TASK_PENDING);
+            task.setRoundNo(node.getRoundNo());
+            task.setReceivedAt(LocalDateTime.now());
+            wfTaskMapper.insert(task);
+        }
     }
 
     // ── Node completion ──
@@ -163,36 +189,29 @@ class WorkflowCoreService {
     // ── Task cancellation ──
 
     void cancelPendingTasksInNode(Long nodeInstanceId, Long excludeTaskId) {
-        LambdaQueryWrapper<WfTask> wrapper = new LambdaQueryWrapper<WfTask>()
+        // Direct SQL update: only cancel tasks that are still PENDING at the moment of update.
+        // This avoids the select-then-update TOCTOU race with concurrent approve/transfer.
+        LambdaUpdateWrapper<WfTask> wrapper = new LambdaUpdateWrapper<WfTask>()
                 .eq(WfTask::getNodeInstanceId, nodeInstanceId)
                 .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING);
         if (excludeTaskId != null) {
             wrapper.ne(WfTask::getId, excludeTaskId);
         }
-        List<WfTask> tasks = wfTaskMapper.selectList(wrapper);
-        // M-010: Batch update instead of loop
-        if (!tasks.isEmpty()) {
-            List<Long> taskIds = tasks.stream().map(WfTask::getId).collect(Collectors.toList());
-            wfTaskMapper.update(null, new LambdaUpdateWrapper<WfTask>()
-                    .in(WfTask::getId, taskIds)
-                    .set(WfTask::getTaskStatus, WorkflowConstants.TASK_CANCELLED)
-                    .set(WfTask::getHandledAt, LocalDateTime.now()));
-        }
+        wfTaskMapper.update(null, wrapper
+                .set(WfTask::getTaskStatus, WorkflowConstants.TASK_CANCELLED)
+                .set(WfTask::getHandledAt, LocalDateTime.now())
+                .setSql("task_version = task_version + 1"));
     }
 
     void cancelAllPendingTasks(Long instanceId) {
-        List<WfTask> tasks = wfTaskMapper.selectList(
-                new LambdaQueryWrapper<WfTask>()
-                        .eq(WfTask::getInstanceId, instanceId)
-                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
-        // M-010: Batch update instead of loop
-        if (!tasks.isEmpty()) {
-            List<Long> taskIds = tasks.stream().map(WfTask::getId).collect(Collectors.toList());
-            wfTaskMapper.update(null, new LambdaUpdateWrapper<WfTask>()
-                    .in(WfTask::getId, taskIds)
-                    .set(WfTask::getTaskStatus, WorkflowConstants.TASK_CANCELLED)
-                    .set(WfTask::getHandledAt, LocalDateTime.now()));
-        }
+        // Direct SQL update: only cancel tasks that are still PENDING at the moment of update.
+        // This avoids the select-then-update TOCTOU race with concurrent approve/transfer.
+        wfTaskMapper.update(null, new LambdaUpdateWrapper<WfTask>()
+                .eq(WfTask::getInstanceId, instanceId)
+                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                .set(WfTask::getTaskStatus, WorkflowConstants.TASK_CANCELLED)
+                .set(WfTask::getHandledAt, LocalDateTime.now())
+                .setSql("task_version = task_version + 1"));
     }
 
     void resetActiveNodes(Long instanceId) {

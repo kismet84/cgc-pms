@@ -2,9 +2,13 @@ package com.cgcpms.contract.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.constant.ContractStatusConstants;
+import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,8 +20,30 @@ import java.util.List;
 public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtContractItem> {
 
     private final CtContractItemMapper mapper;
+    private final CtContractMapper ctContractMapper;
+
+    /**
+     * Verify parent contract belongs to current tenant and is in DRAFT status (editable).
+     */
+    private CtContract requireDraftParentContract(Long contractId) {
+        CtContract contract = requireParentContract(contractId);
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus()))
+            throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
+        return contract;
+    }
+
+    /**
+     * Verify parent contract belongs to current tenant.
+     */
+    private CtContract requireParentContract(Long contractId) {
+        CtContract contract = ctContractMapper.selectById(contractId);
+        if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        return contract;
+    }
 
     public List<CtContractItem> getByContractId(Long contractId) {
+        requireParentContract(contractId);
         LambdaQueryWrapper<CtContractItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CtContractItem::getContractId, contractId)
                .orderByAsc(CtContractItem::getSortOrder);
@@ -26,19 +52,24 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
 
     @Transactional
     public Long create(CtContractItem item) {
+        requireParentContract(item.getContractId());
+        item.setTenantId(UserContext.getCurrentTenantId());
         mapper.insert(item);
         return item.getId();
     }
 
     @Transactional
     public void batchSave(Long contractId, List<CtContractItem> items) {
+        requireDraftParentContract(contractId);
         LambdaQueryWrapper<CtContractItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CtContractItem::getContractId, contractId);
         mapper.delete(wrapper);
         if (items != null && !items.isEmpty()) {
+            Long tenantId = UserContext.getCurrentTenantId();
             items.forEach(i -> {
                 i.setId(null);            // 清空ID，让ASSIGN_ID自动生成新ID，避免与软删除记录主键冲突
                 i.setContractId(contractId);
+                i.setTenantId(tenantId);
             });
             saveBatch(items);
         }
@@ -46,15 +77,18 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
 
     @Transactional
     public void update(CtContractItem item) {
+        requireDraftParentContract(item.getContractId());
         CtContractItem existing = mapper.selectById(item.getId());
         if (existing == null || !existing.getContractId().equals(item.getContractId())) {
             throw new BusinessException("ITEM_NOT_FOUND", "合同清单项不存在");
         }
+        item.setTenantId(UserContext.getCurrentTenantId());
         mapper.updateById(item);
     }
 
     @Transactional
     public void delete(Long contractId, Long id) {
+        requireDraftParentContract(contractId);
         CtContractItem existing = mapper.selectById(id);
         if (existing == null || !existing.getContractId().equals(contractId)) {
             throw new BusinessException("ITEM_NOT_FOUND", "合同清单项不存在");

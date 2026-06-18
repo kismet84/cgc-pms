@@ -165,10 +165,14 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
             orderItemMapper.insert(orderItem);
         }
 
-        // Mark request as CONVERTED
-        requestMapper.update(null, new LambdaUpdateWrapper<MatPurchaseRequest>()
+        // Mark request as CONVERTED with atomic CAS: only update if status is NOT already CONVERTED
+        int rows = requestMapper.update(null, new LambdaUpdateWrapper<MatPurchaseRequest>()
                 .eq(MatPurchaseRequest::getId, requestId)
+                .ne(MatPurchaseRequest::getStatus, "CONVERTED")
                 .set(MatPurchaseRequest::getStatus, "CONVERTED"));
+        if (rows == 0) {
+            log.info("采购申请 CONVERTED CAS 未更新（已被其他事务转换），requestId={}", requestId);
+        }
 
         log.info("采购申请转换采购订单完成 requestId={} -> orderId={} poCode={}",
                 requestId, order.getId(), poCode);

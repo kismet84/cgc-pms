@@ -2,6 +2,7 @@ package com.cgcpms.contract;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.TestUserContext;
+import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.dto.ContractSaveRequest;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
@@ -9,7 +10,9 @@ import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
+import com.cgcpms.contract.service.CtContractItemService;
 import com.cgcpms.contract.service.CtContractService;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
@@ -42,6 +45,9 @@ class ContractCompositeSaveTest {
 
     @Autowired
     private CtContractService contractService;
+
+    @Autowired
+    private CtContractItemService contractItemService;
 
     @Autowired
     private CtContractMapper contractMapper;
@@ -123,8 +129,6 @@ class ContractCompositeSaveTest {
         contract.setSignedDate(LocalDate.now());
         contract.setPaymentMethod("银行转账");
         contract.setSettlementMethod("按进度结算");
-        contract.setWarrantyRate(new BigDecimal("5.00"));
-        contract.setWarrantyAmount(new BigDecimal("32000.00"));
         contract.setContractStatus("DRAFT");
         contract.setApprovalStatus("DRAFT");
         return contract;
@@ -283,5 +287,90 @@ class ContractCompositeSaveTest {
         assertEquals("首付款", terms.get(0).getTermName());
         assertEquals("验收款", terms.get(1).getTermName());
         assertEquals("质保金", terms.get(2).getTermName());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // GREEN-4: 复合保存不触发审批 — submitForApproval 标志被忽略
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("GREEN-4: compositeSave never triggers approval — submitForApproval flag ignored")
+    void testCompositeSaveNeverTriggersApproval() {
+        CtContractItem item = buildItem("CI-GRN4-001", "测试清单项-装饰",
+                new BigDecimal("80.00"), new BigDecimal("200.00"));
+        CtContractPaymentTerm term = buildTerm("进度款", new BigDecimal("50.00"), 1);
+
+        // 即使 submitForApproval=true，也不会触发审批
+        ContractSaveRequest request = buildRequest("原子保存测试-GREEN4-无审批",
+                List.of(item), List.of(term), true);
+
+        Long contractId = contractService.compositeSave(request);
+        assertNotNull(contractId);
+
+        // 验证合同状态仍为 DRAFT
+        CtContract saved = contractMapper.selectById(contractId);
+        assertNotNull(saved);
+        assertEquals(ContractStatusConstants.APPROVAL_DRAFT, saved.getApprovalStatus(),
+                "compositeSave 不应触发审批，状态应为 DRAFT");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // GREEN-5: APPROVED 合同拒绝编辑 — compositeSave + item update
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("GREEN-5: editing approved contract via compositeSave throws CONTRACT_NOT_EDITABLE")
+    void testApprovedContractRejectsCompositeEdit() {
+        // 创建并插入一个 APPROVED 状态的合同
+        CtContract approvedContract = buildContract(null, "已审批合同-禁止编辑测试");
+        approvedContract.setContractCode("CT-TEST-APPROVED-NOEDIT");
+        approvedContract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
+        approvedContract.setTenantId(TestUserContext.TENANT_0);
+        contractMapper.insert(approvedContract);
+        Long approvedId = approvedContract.getId();
+
+        // 尝试通过 compositeSave 编辑
+        CtContract editContract = buildContract(null, "尝试修改已审批合同");
+        editContract.setId(approvedId);
+
+        ContractSaveRequest request = new ContractSaveRequest();
+        request.setContract(editContract);
+        request.setSubmitForApproval(false);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            contractService.compositeSave(request);
+        }, "已审批合同编辑应抛出异常");
+        assertEquals("CONTRACT_NOT_EDITABLE", ex.getCode(), "错误码应为 CONTRACT_NOT_EDITABLE");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // GREEN-6: APPROVED 合同清单项更新拒绝
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("GREEN-6: approved contract item update returns CONTRACT_NOT_EDITABLE")
+    void testApprovedContractItemUpdateRejected() {
+        // 创建并插入一个 APPROVED 状态的合同
+        CtContract approvedContract = buildContract(null, "已审批合同-清单项禁止编辑");
+        approvedContract.setContractCode("CT-TEST-APPROVED-ITEM-NOEDIT");
+        approvedContract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
+        approvedContract.setTenantId(TestUserContext.TENANT_0);
+        contractMapper.insert(approvedContract);
+        Long approvedId = approvedContract.getId();
+
+        // 插入一个清单项
+        CtContractItem item = buildItem("CI-TEST-LOCKED", "锁定清单项",
+                new BigDecimal("10.00"), new BigDecimal("100.00"));
+        item.setContractId(approvedId);
+        item.setTenantId(TestUserContext.TENANT_0);
+        contractItemMapper.insert(item);
+
+        // 尝试更新该清单项
+        item.setItemName("尝试修改锁定合同的清单项");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            contractItemService.update(item);
+        }, "已审批合同的清单项更新应抛出异常");
+        assertEquals("CONTRACT_NOT_EDITABLE", ex.getCode(), "错误码应为 CONTRACT_NOT_EDITABLE");
     }
 }

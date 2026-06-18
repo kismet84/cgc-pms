@@ -39,14 +39,24 @@ public class WorkflowApprovalService {
         }
         core.checkIdempotency(task.getTenantId(), userId, idempotencyKey, WorkflowConstants.ACTION_APPROVE);
 
-        // Update task
-        task.setTaskStatus(WorkflowConstants.TASK_APPROVED);
-        task.setActionType(WorkflowConstants.ACTION_APPROVE);
-        task.setComment(comment);
-        task.setHandledAt(LocalDateTime.now());
-        int updated = wfTaskMapper.updateById(task);
-        if (updated == 0) {
+        // CAS update: atomically check PENDING + version, bump version
+        int updated = wfTaskMapper.updateTaskStatusWithCas(
+                taskId,
+                WorkflowConstants.TASK_PENDING,
+                task.getTaskVersion(),
+                WorkflowConstants.TASK_APPROVED,
+                WorkflowConstants.ACTION_APPROVE,
+                comment,
+                LocalDateTime.now());
+        if (updated != 1) {
             throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突），请刷新后重试");
+        }
+
+        // Ping instance to acquire row lock and verify still RUNNING
+        int instanceOk = wfInstanceMapper.pingInstanceRunning(task.getInstanceId(),
+                WorkflowConstants.INSTANCE_RUNNING);
+        if (instanceOk != 1) {
+            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更，无法审批");
         }
 
         // Write record
@@ -118,13 +128,24 @@ public class WorkflowApprovalService {
         }
         core.checkIdempotency(task.getTenantId(), userId, idempotencyKey, WorkflowConstants.ACTION_REJECT);
 
-        task.setTaskStatus(WorkflowConstants.TASK_REJECTED);
-        task.setActionType(WorkflowConstants.ACTION_REJECT);
-        task.setComment(comment);
-        task.setHandledAt(LocalDateTime.now());
-        int updated = wfTaskMapper.updateById(task);
-        if (updated == 0) {
+        // CAS update: atomically check PENDING + version, bump version
+        int updated = wfTaskMapper.updateTaskStatusWithCas(
+                taskId,
+                WorkflowConstants.TASK_PENDING,
+                task.getTaskVersion(),
+                WorkflowConstants.TASK_REJECTED,
+                WorkflowConstants.ACTION_REJECT,
+                comment,
+                LocalDateTime.now());
+        if (updated != 1) {
             throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突）");
+        }
+
+        // Ping instance to acquire row lock and verify still RUNNING
+        int instanceOk = wfInstanceMapper.pingInstanceRunning(task.getInstanceId(),
+                WorkflowConstants.INSTANCE_RUNNING);
+        if (instanceOk != 1) {
+            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更，无法驳回");
         }
 
         // Cancel other pending tasks in the same node

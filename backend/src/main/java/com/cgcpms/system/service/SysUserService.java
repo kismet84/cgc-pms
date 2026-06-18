@@ -3,6 +3,7 @@ package com.cgcpms.system.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.entity.*;
 import com.cgcpms.system.mapper.*;
@@ -33,6 +34,7 @@ public class SysUserService {
 
     public IPage<SysUserVO> getPage(long pageNo, long pageSize, String username, String realName, String status) {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysUser::getTenantId, UserContext.getCurrentTenantId());
         if (StringUtils.hasText(username)) {
             wrapper.like(SysUser::getUsername, username);
         }
@@ -69,7 +71,8 @@ public class SysUserService {
 
     public SysUserVO getById(Long id) {
         SysUser user = sysUserMapper.selectById(id);
-        if (user == null) throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         SysUserVO vo = new SysUserVO();
         vo.setId(user.getId());
         vo.setUsername(user.getUsername());
@@ -94,6 +97,7 @@ public class SysUserService {
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         if (user.getStatus() == null) user.setStatus("ENABLE");
+        user.setTenantId(UserContext.getCurrentTenantId());
         sysUserMapper.insert(user);
         log.info("Creating user: {}", user.getUsername());
         return user.getId();
@@ -102,7 +106,8 @@ public class SysUserService {
     @Transactional
     public void update(SysUser user) {
         SysUser existing = sysUserMapper.selectById(user.getId());
-        if (existing == null) throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         if (user.getPassword() == null || user.getPassword().isBlank()) {
             user.setPassword(null); // don't update password
         } else {
@@ -114,13 +119,17 @@ public class SysUserService {
     @Transactional
     public void updateStatus(Long id, String status) {
         SysUser user = sysUserMapper.selectById(id);
-        if (user == null) throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         user.setStatus(status);
         sysUserMapper.updateById(user);
     }
 
     @Transactional
     public void delete(Long id) {
+        SysUser user = sysUserMapper.selectById(id);
+        if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
                 .eq(SysUserRole::getUserId, id));
         sysUserMapper.deleteById(id);
@@ -128,6 +137,23 @@ public class SysUserService {
 
     @Transactional
     public void assignRoles(Long userId, List<Long> roleIds) {
+        // Tenant isolation: verify user belongs to current tenant
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+
+        // Verify all roles belong to current tenant
+        if (roleIds != null && !roleIds.isEmpty()) {
+            List<SysRole> roles = sysRoleMapper.selectBatchIds(roleIds);
+            if (roles.size() != roleIds.size())
+                throw new BusinessException("ROLE_NOT_FOUND", "部分角色不存在");
+            Long currentTenantId = UserContext.getCurrentTenantId();
+            for (SysRole role : roles) {
+                if (!currentTenantId.equals(role.getTenantId()))
+                    throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
+            }
+        }
+
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
                 .eq(SysUserRole::getUserId, userId));
         if (roleIds != null) {

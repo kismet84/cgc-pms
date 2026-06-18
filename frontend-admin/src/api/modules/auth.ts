@@ -1,5 +1,6 @@
-import { request } from '@/api/request'
+import { request, refreshClient } from '@/api/request'
 import type { LoginParams, LoginResult, UserInfo } from '@/types/user'
+import type { ApiResponse } from '@/types/api'
 
 export function login(params: LoginParams) {
   return request<LoginResult>({ url: '/auth/login', method: 'post', data: params })
@@ -13,12 +14,16 @@ export function logout() {
   return request<void>({ url: '/auth/logout', method: 'post' })
 }
 
-/** Refresh tokens via HttpOnly cookie — no manual token needed. */
-export function refreshTokenApi() {
-  return request<LoginResult>({
-    url: '/auth/refresh',
-    method: 'post',
-  })
+/**
+ * Refresh tokens via HttpOnly cookie.
+ * Uses isolated refreshClient to avoid 401-interceptor recursion.
+ */
+export async function refreshTokenApi(): Promise<LoginResult> {
+  const res = await refreshClient.post<ApiResponse<LoginResult>>('/auth/refresh')
+  if (res.data?.code === '0') {
+    return res.data.data as LoginResult
+  }
+  throw new Error(res.data?.message || 'Token refresh failed')
 }
 
 export function updateProfile(data: {

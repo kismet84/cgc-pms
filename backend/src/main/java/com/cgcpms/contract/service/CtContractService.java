@@ -160,6 +160,7 @@ public class CtContractService {
         contract.setContractCode(prefix + String.format("%03d", seq));
         contract.setContractStatus("DRAFT");
         contract.setApprovalStatus("DRAFT");
+        contract.setTenantId(UserContext.getCurrentTenantId());
 
         ctContractMapper.insert(contract);
         return contract.getId();
@@ -171,13 +172,16 @@ public class CtContractService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
 
-        // 审批中守卫：禁止编辑（超管豁免）
-        if (ContractStatusConstants.APPROVAL_APPROVING.equals(existing.getApprovalStatus())
-                && !UserContext.hasRole("SUPER_ADMIN"))
-            throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中，不可编辑");
+        // 编辑守卫：只允许 DRAFT 状态编辑
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
+            throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
 
-        // 禁止通过 update 接口覆盖审批状态
+        // 禁止通过 update 接口覆盖受保护字段
         contract.setApprovalStatus(existing.getApprovalStatus());
+        contract.setTenantId(existing.getTenantId());
+        contract.setPaidAmount(existing.getPaidAmount());
+        contract.setCreatedBy(existing.getCreatedBy());
+        contract.setCreatedAt(existing.getCreatedAt());
 
         ctContractMapper.updateById(contract);
     }
@@ -266,6 +270,7 @@ public class CtContractService {
             contract.setContractCode(prefix + String.format("%03d", seq));
             contract.setContractStatus("DRAFT");
             contract.setApprovalStatus("DRAFT");
+            contract.setTenantId(UserContext.getCurrentTenantId());
 
             ctContractMapper.insert(contract);
         } else {
@@ -274,11 +279,16 @@ public class CtContractService {
             if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
                 throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
 
-            if (ContractStatusConstants.APPROVAL_APPROVING.equals(existing.getApprovalStatus())
-                    && !UserContext.hasRole("SUPER_ADMIN"))
-                throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中，不可编辑");
+            // 编辑守卫：只允许 DRAFT 状态编辑
+            if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
+                throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
 
+            // 禁止通过更新接口覆盖受保护字段
             contract.setApprovalStatus(existing.getApprovalStatus());
+            contract.setTenantId(existing.getTenantId());
+            contract.setPaidAmount(existing.getPaidAmount());
+            contract.setCreatedBy(existing.getCreatedBy());
+            contract.setCreatedAt(existing.getCreatedAt());
             ctContractMapper.updateById(contract);
         }
 
@@ -294,12 +304,6 @@ public class CtContractService {
         List<CtContractPaymentTerm> terms = request.getPaymentTerms();
         if (terms != null) {
             paymentTermService.batchSave(contractId, terms);
-        }
-
-        // ── 可选：立即提交审批（仅草稿状态可提交）──
-        if (Boolean.TRUE.equals(request.getSubmitForApproval())
-                && ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus())) {
-            submitForApproval(contractId);
         }
 
         return contractId;

@@ -54,8 +54,12 @@ public class PayRecordService {
         return toVO(record);
     }
 
-    // ---- Writeback (mock) ----
+    // ---- Authoritative Writeback (single entry point) ----
 
+    /**
+     * Authoritative payment writeback — the ONLY path to create a pay_record.
+     * Idempotent by externalTxnNo: duplicate returns existing record without double-posting.
+     */
     @Transactional
     public PayRecordVO writeback(PayRecord input) {
         Long payApplicationId = input.getPayApplicationId();
@@ -66,6 +70,22 @@ public class PayRecordService {
         PayApplication app = payApplicationMapper.selectById(payApplicationId);
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+
+        // Idempotency: if external_txn_no provided, check for existing record
+        if (input.getExternalTxnNo() != null && !input.getExternalTxnNo().isBlank()) {
+            List<PayRecord> existing = payRecordMapper.selectList(
+                new LambdaQueryWrapper<PayRecord>()
+                    .eq(PayRecord::getTenantId, UserContext.getCurrentTenantId())
+                    .eq(PayRecord::getExternalTxnNo, input.getExternalTxnNo()));
+            if (!existing.isEmpty()) {
+                log.info("Idempotent writeback: external_txn_no={} already exists, returning existing record id={}",
+                    input.getExternalTxnNo(), existing.get(0).getId());
+                return toVO(existing.get(0));
+            }
+        }
+
+        // Check contract balance before payment
+        payApplicationService.checkContractBalance(app);
 
         // Check overpayment: sum of existing SUCCESS pay_records for this application
         List<PayRecord> existingRecords = payRecordMapper.selectList(
@@ -92,10 +112,12 @@ public class PayRecordService {
         record.setPayDate(input.getPayDate());
         record.setPayMethod(input.getPayMethod());
         record.setVoucherNo(input.getVoucherNo());
+        record.setExternalTxnNo(input.getExternalTxnNo());
         record.setPayStatus("SUCCESS");
 
         payRecordMapper.insert(record);
-        log.info("Mock writeback: pay_record created, id={}, amount={}", record.getId(), record.getPayAmount());
+        log.info("Authoritative writeback: pay_record created, id={}, amount={}, externalTxnNo={}",
+            record.getId(), record.getPayAmount(), record.getExternalTxnNo());
 
         // D4 linkage: cascade updates
         updateContractPaidAmount(app.getContractId());
@@ -128,33 +150,7 @@ public class PayRecordService {
         }
     }
 
-    // ---- CRUD (basic) ----
-
-    @Transactional
-    public Long create(PayRecord record) {
-        record.setTenantId(UserContext.getCurrentTenantId());
-        if (record.getPayStatus() == null || record.getPayStatus().isBlank()) {
-            record.setPayStatus("SUCCESS");
-        }
-        payRecordMapper.insert(record);
-        return record.getId();
-    }
-
-    @Transactional
-    public void update(PayRecord record) {
-        PayRecord existing = payRecordMapper.selectById(record.getId());
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
-            throw new BusinessException("PAY_RECORD_NOT_FOUND", "付款记录不存在");
-        payRecordMapper.updateById(record);
-    }
-
-    @Transactional
-    public void delete(Long id) {
-        PayRecord existing = payRecordMapper.selectById(id);
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
-            throw new BusinessException("PAY_RECORD_NOT_FOUND", "付款记录不存在");
-        payRecordMapper.deleteById(id);
-    }
+    // ---- CRUD removed — all writes MUST go through authoritative writeback() ----
 
     // ---- VO conversion ----
 
