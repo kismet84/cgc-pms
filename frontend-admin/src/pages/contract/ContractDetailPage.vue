@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { useContractStore } from '@/stores/contract'
@@ -138,11 +138,20 @@ const loading = computed(() => contractStore.loading)
 const itemsLoading = computed(() => contractStore.itemsLoading)
 const termsLoading = computed(() => contractStore.termsLoading)
 const recordsLoading = computed(() => contractStore.recordsLoading)
+
+// ---- Mobile detection ----
+const MOBILE_BP = 768
+const isMobile = ref(window.innerWidth < MOBILE_BP)
+function onResize() {
+  isMobile.value = window.innerWidth < MOBILE_BP
+}
+onMounted(() => window.addEventListener('resize', onResize))
+onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="contract-detail-page">
-    <a-page-header title="合同详情" @back="goBack">
+  <div class="contract-detail-page" :class="{ 'is-mobile': isMobile }">
+    <a-page-header title="合同详情" @back="goBack" :class="{ 'cd-header-mobile': isMobile }">
       <template #tags>
         <ContractStatusTag v-if="contract" :status="contract.contractStatus" />
         <ApprovalStatusTag v-if="contract" :status="contract.approvalStatus" />
@@ -162,8 +171,8 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
 
     <a-spin :spinning="loading">
       <div v-if="contract" class="contract-detail-content">
-        <!-- Basic Info Card -->
-        <a-card title="基本信息" :bordered="false" class="info-card">
+        <!-- Basic Info: desktop -->
+        <a-card v-if="!isMobile" title="基本信息" :bordered="false" class="info-card">
           <a-descriptions :column="3" size="small" bordered>
             <a-descriptions-item label="合同名称" :span="3">{{
               contract.contractName
@@ -213,13 +222,108 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
           </a-descriptions>
         </a-card>
 
+        <!-- Basic Info: mobile (vertical card) -->
+        <div v-else class="cd-info-mobile">
+          <div class="cd-info-mobile-title">基本信息</div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">合同名称</span>
+            <span class="cd-info-value cd-info-name">{{ contract.contractName }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">合同编号</span>
+            <span class="cd-info-value">{{ contract.contractCode }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">合同类型</span>
+            <span class="cd-info-value">
+              <a-tag :color="TYPE_COLOR[contract.contractType as ContractType]">
+                {{ TYPE_LABEL[contract.contractType as ContractType] }}
+              </a-tag>
+            </span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">项目名称</span>
+            <span class="cd-info-value">{{ contract.projectName }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">甲方</span>
+            <span class="cd-info-value">{{ contract.partyAName || '-' }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">乙方</span>
+            <span class="cd-info-value">{{ contract.partyBName || '-' }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">合同金额(含税)</span>
+            <span class="cd-info-value cd-info-money">{{ formatAmount(contract.contractAmount) }} 元</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">当前金额</span>
+            <span class="cd-info-value">{{ formatAmount(contract.currentAmount) }} 元</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">税率</span>
+            <span class="cd-info-value">{{ contract.taxRate }}%</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">税额</span>
+            <span class="cd-info-value">{{ formatAmount(contract.taxAmount) }} 元</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">不含税金额</span>
+            <span class="cd-info-value">{{ formatAmount(contract.amountWithoutTax) }} 元</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">签订日期</span>
+            <span class="cd-info-value">{{ contract.signedDate }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">开始日期</span>
+            <span class="cd-info-value">{{ contract.startDate }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">结束日期</span>
+            <span class="cd-info-value">{{ contract.endDate }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">付款方式</span>
+            <span class="cd-info-value">{{ contract.paymentMethod }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">结算方式</span>
+            <span class="cd-info-value">{{ contract.settlementMethod }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">创建人</span>
+            <span class="cd-info-value">{{ contract.createdBy }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">创建时间</span>
+            <span class="cd-info-value">{{ contract.createdAt }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">更新人</span>
+            <span class="cd-info-value">{{ contract.updatedBy }}</span>
+          </div>
+          <div class="cd-info-row">
+            <span class="cd-info-label">更新时间</span>
+            <span class="cd-info-value">{{ contract.updatedAt }}</span>
+          </div>
+          <div v-if="contract.remark" class="cd-info-row">
+            <span class="cd-info-label">备注</span>
+            <span class="cd-info-value">{{ contract.remark }}</span>
+          </div>
+        </div>
+
         <!-- Tabs -->
         <a-card :bordered="false" class="tabs-card">
           <a-tabs v-model:activeKey="activeTab">
             <!-- Items Tab -->
             <a-tab-pane key="items" tab="合同清单">
               <a-spin :spinning="itemsLoading">
+                <!-- desktop table -->
                 <a-table
+                  v-if="!isMobile"
                   :columns="itemColumns"
                   :data-source="items"
                   :pagination="false"
@@ -249,6 +353,56 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
                     </template>
                   </template>
                 </a-table>
+                <!-- mobile: item cards -->
+                <div v-else class="cd-mobile-list">
+                  <div v-for="(row, idx) in items" :key="row.id ?? idx" class="cd-mobile-card">
+                    <div class="cd-mc-head">
+                      <span class="cd-mc-code">{{ row.itemCode }}</span>
+                      <span class="cd-mc-name">{{ row.itemName }}</span>
+                    </div>
+                    <div class="cd-mc-body">
+                      <div class="cd-mc-field">
+                        <span class="cd-mc-label">规格型号</span>
+                        <span class="cd-mc-val">{{ row.itemSpec || '-' }}</span>
+                      </div>
+                      <div class="cd-mc-row">
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">单位</span>
+                          <span class="cd-mc-val">{{ row.unit }}</span>
+                        </div>
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">数量</span>
+                          <span class="cd-mc-val">{{ row.quantity }}</span>
+                        </div>
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">单价</span>
+                          <span class="cd-mc-val">{{ formatAmount(row.unitPrice) }}</span>
+                        </div>
+                      </div>
+                      <div class="cd-mc-row">
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">金额</span>
+                          <span class="cd-mc-val cd-mc-money">{{ formatAmount(row.amount) }}</span>
+                        </div>
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">税率</span>
+                          <span class="cd-mc-val">{{ row.taxRate }}%</span>
+                        </div>
+                      </div>
+                      <div class="cd-mc-row">
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">税额</span>
+                          <span class="cd-mc-val">{{ formatAmount(row.taxAmount) }}</span>
+                        </div>
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">不含税金额</span>
+                          <span class="cd-mc-val">{{ formatAmount(row.amountWithoutTax) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <a-empty v-if="!items.length" description="暂无清单数据" />
+                </div>
               </a-spin>
             </a-tab-pane>
 
@@ -256,6 +410,7 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
             <a-tab-pane key="payment-terms" tab="付款条件">
               <a-spin :spinning="termsLoading">
                 <a-table
+                  v-if="!isMobile"
                   :columns="termColumns"
                   :data-source="paymentTerms"
                   :pagination="false"
@@ -273,25 +428,61 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
                     </template>
                   </template>
                 </a-table>
+                <!-- mobile: term cards -->
+                <div v-else class="cd-mobile-list">
+                  <div v-for="(row, idx) in paymentTerms" :key="row.id ?? idx" class="cd-mobile-card">
+                    <div class="cd-mc-head">
+                      <span class="cd-mc-name">{{ row.termName }}</span>
+                      <a-tag v-if="row.termStatus" size="small">{{ row.termStatus }}</a-tag>
+                    </div>
+                    <div class="cd-mc-body">
+                      <div class="cd-mc-row">
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">付款比例</span>
+                          <span class="cd-mc-val">{{ row.paymentRatio }}%</span>
+                        </div>
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">付款金额</span>
+                          <span class="cd-mc-val cd-mc-money">{{ formatAmount(row.paymentAmount) }}</span>
+                        </div>
+                      </div>
+                      <div class="cd-mc-field">
+                        <span class="cd-mc-label">付款条件</span>
+                        <span class="cd-mc-val">{{ row.paymentCondition || '-' }}</span>
+                      </div>
+                      <div class="cd-mc-row">
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">计划日期</span>
+                          <span class="cd-mc-val">{{ row.plannedDate || '-' }}</span>
+                        </div>
+                        <div class="cd-mc-field">
+                          <span class="cd-mc-label">实际日期</span>
+                          <span class="cd-mc-val">{{ row.actualDate || '-' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <a-empty v-if="!paymentTerms.length" description="暂无付款条件数据" />
+                </div>
               </a-spin>
             </a-tab-pane>
 
             <!-- Approval History Tab -->
             <a-tab-pane key="approval-history" tab="审批记录">
               <a-spin :spinning="recordsLoading">
-                <a-timeline v-if="approvalRecords.length > 0">
+                <a-timeline v-if="approvalRecords.length > 0" :class="{ 'cd-timeline-mobile': isMobile }">
                   <a-timeline-item v-for="record in approvalRecords" :key="record.id">
                     <div>
                       <strong>{{ record.operatorName }}</strong>
                       <a-tag style="margin-left: 8px">
                         {{ actionNameMap[record.actionType] || record.actionName }}
                       </a-tag>
-                      <span
-                        v-if="record.nodeName"
-                        style="margin-left: 8px; color: #999; font-size: 13px"
-                      >
-                        {{ record.nodeName }}
-                      </span>
+                    </div>
+                    <div
+                      v-if="record.nodeName"
+                      style="color: #888; font-size: 13px; margin-top: 2px"
+                    >
+                      {{ record.nodeName }}
                     </div>
                     <div
                       v-if="record.comment"
@@ -336,5 +527,138 @@ const recordsLoading = computed(() => contractStore.recordsLoading)
 
 .tabs-card {
   margin-bottom: 16px;
+}
+
+/* ---- Mobile: basic info vertical card ---- */
+.cd-info-mobile {
+  background: var(--surface, #fff);
+  border-radius: var(--radius-md, 8px);
+  padding: 14px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-soft, 0 1px 4px rgba(0,0,0,.04));
+}
+.cd-info-mobile-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+.cd-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-subtle, #f0f0f0);
+}
+.cd-info-row:last-of-type {
+  border-bottom: none;
+}
+.cd-info-label {
+  color: var(--text-secondary, #888);
+  white-space: nowrap;
+  min-width: 88px;
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+.cd-info-value {
+  color: var(--text, #333);
+  word-break: break-all;
+}
+.cd-info-name {
+  font-weight: 600;
+}
+.cd-info-money {
+  font-weight: 700;
+  color: #1890ff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Mobile: header tweaks ---- */
+.cd-header-mobile :deep(.ant-page-header-heading-left) {
+  flex-wrap: wrap;
+}
+.cd-header-mobile :deep(.ant-page-header-heading-extra) {
+  white-space: normal;
+  margin-top: 8px;
+}
+
+/* ---- Mobile: content padding ---- */
+.contract-detail-page.is-mobile .contract-detail-content {
+  padding: 10px;
+}
+.contract-detail-page.is-mobile .info-card,
+.contract-detail-page.is-mobile .tabs-card {
+  margin-bottom: 10px;
+}
+
+/* ---- Mobile: list cards (items / terms) ---- */
+.cd-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cd-mobile-card {
+  background: var(--surface, #fff);
+  border: 1px solid var(--border-subtle, #f0f0f0);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.cd-mc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle, #f0f0f0);
+  margin-bottom: 8px;
+}
+.cd-mc-code {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  font-family: monospace;
+}
+.cd-mc-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+}
+.cd-mc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cd-mc-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+}
+.cd-mc-label {
+  color: var(--text-secondary, #888);
+  white-space: nowrap;
+  min-width: 64px;
+  flex-shrink: 0;
+}
+.cd-mc-val {
+  color: var(--text, #333);
+}
+.cd-mc-money {
+  font-weight: 600;
+  color: #1890ff;
+  font-variant-numeric: tabular-nums;
+}
+.cd-mc-row {
+  display: flex;
+  gap: 12px;
+}
+.cd-mc-row .cd-mc-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Mobile: timeline tighter ---- */
+.cd-timeline-mobile :deep(.ant-timeline-item-content) {
+  margin-left: 0;
 }
 </style>

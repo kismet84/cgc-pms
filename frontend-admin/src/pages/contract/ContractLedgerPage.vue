@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import VChart from 'vue-echarts'
 import {
@@ -291,7 +291,9 @@ const statusDistribution = computed(() => {
     .filter((item) => item.value > 0)
 })
 
-const statusTotal = computed(() => statusDistribution.value.reduce((sum, item) => sum + item.value, 0) || 1)
+const statusTotal = computed(
+  () => statusDistribution.value.reduce((sum, item) => sum + item.value, 0) || 1,
+)
 
 const statusBars = computed(() =>
   statusDistribution.value.map((item) => ({
@@ -317,6 +319,15 @@ const warningRows = computed(() => {
     .sort((a, b) => b.days - a.days)
     .slice(0, 5)
 })
+
+// ---- Mobile detection ----
+const MOBILE_BP = 768
+const isMobile = ref(window.innerWidth < MOBILE_BP)
+function onResize() {
+  isMobile.value = window.innerWidth < MOBILE_BP
+}
+onMounted(() => window.addEventListener('resize', onResize))
+onUnmounted(() => window.removeEventListener('resize', onResize))
 
 const donutOption = computed(() => ({
   color: typeDistribution.value.map((item) => item.color),
@@ -349,8 +360,6 @@ const statusDonutOption = computed(() => ({
     },
   ],
 }))
-
-
 
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
@@ -409,7 +418,7 @@ const gridColumns = computed(() => [
                 placeholder="请选择项目"
                 allow-clear
                 style="width: 160px"
-                :options="projects.map(p => ({ value: p.id, label: p.projectName }))"
+                :options="projects.map((p) => ({ value: p.id, label: p.projectName }))"
               />
             </div>
             <div class="cl-field">
@@ -443,8 +452,7 @@ const gridColumns = computed(() => [
             </div>
           </div>
           <div class="cl-filter-row cl-filter-row--last">
-            <div class="cl-field">
-            </div>
+            <div class="cl-field"></div>
             <div class="cl-field">
               <label>合同编号：</label>
               <a-input
@@ -460,13 +468,15 @@ const gridColumns = computed(() => [
             <div class="cl-filter-actions">
               <a-button type="primary" @click="handleSearch">查询</a-button>
               <a-button @click="handleReset">重置</a-button>
-              <a-button type="text" @click="toggleFilterExpand">{{ filterExpanded ? '收起 ↑' : '展开 ↓' }}</a-button>
+              <a-button type="text" @click="toggleFilterExpand">{{
+                filterExpanded ? '收起 ↑' : '展开 ↓'
+              }}</a-button>
             </div>
           </div>
         </div>
 
-        <!-- KPI cards -->
-        <div class="cl-kpis">
+        <!-- KPI cards: desktop / tablet -->
+        <div v-if="!isMobile" class="cl-kpis">
           <div class="cl-kpi">
             <div class="cl-kpi-icon" style="background: #3b82f6"><FileTextOutlined /></div>
             <div>
@@ -504,19 +514,33 @@ const gridColumns = computed(() => [
           </div>
         </div>
 
+        <!-- KPI card: mobile (single card) -->
+        <div v-else class="cl-kpi-single">
+          <div class="cl-kpi-single-row" v-for="item in [
+            { icon: FileTextOutlined, bg: '#3b82f6', label: '合同总数', value: kpi.totalCount, unit: '份' },
+            { icon: DollarOutlined, bg: '#36c267', label: '合同总金额(含税)', value: fmtAmount(kpi.totalAmount), unit: '万元' },
+            { icon: PayCircleOutlined, bg: '#f59e0b', label: '已付款金额', value: fmtAmount(kpi.paidAmount), unit: '万元' },
+            { icon: WalletOutlined, bg: '#7c3aed', label: '未付款金额', value: fmtAmount(kpi.unpaidAmount), unit: '万元' },
+            { icon: ClockCircleOutlined, bg: '#31c7cf', label: '逾期合同数', value: kpi.overdueCount, unit: '份' },
+          ]" :key="item.label">
+            <div class="cl-kpi-single-icon" :style="{ background: item.bg }">
+              <component :is="item.icon" />
+            </div>
+            <span class="cl-kpi-single-label">{{ item.label }}</span>
+            <span class="cl-kpi-single-value">{{ item.value }} <small>{{ item.unit }}</small></span>
+          </div>
+        </div>
+
         <!-- Toolbar -->
         <div class="cl-toolbar">
           <div class="cl-toolbar-left">
             <a-button type="primary" @click="handleCreate"
               ><template #icon><PlusOutlined /></template>新建合同</a-button
             >
-            <a-button
-              :disabled="true"
-              title="即将上线"
-              @click="handleExport"
+            <a-button :disabled="true" title="即将上线" @click="handleExport"
               ><template #icon><DownloadOutlined /></template>导出</a-button
             >
-            <a-dropdown>
+            <a-dropdown v-if="!isMobile">
               <a-button
                 ><template #icon><SettingOutlined /></template>列设置</a-button
               >
@@ -548,8 +572,8 @@ const gridColumns = computed(() => [
           </div>
         </div>
 
-        <!-- Table -->
-        <div class="cl-card cl-table-wrap">
+        <!-- Table: desktop / tablet -->
+        <div v-if="!isMobile" class="cl-card cl-table-wrap">
           <vxe-grid
             :data="tableData"
             :columns="gridColumns"
@@ -585,6 +609,70 @@ const gridColumns = computed(() => [
               </div>
             </template>
           </vxe-grid>
+        </div>
+
+        <!-- Table: mobile cards -->
+        <div v-else class="cl-card-list">
+          <div v-if="loading" class="cl-card-list-loading">
+            <a-spin size="large" />
+          </div>
+          <div v-else-if="!tableData.length" class="cl-card-list-empty">
+            <a-empty />
+          </div>
+          <div v-for="row in tableData" :key="row.id" class="cl-card-item">
+            <div class="cl-card-item-head">
+              <span class="cl-card-code">
+                <a class="cl-link" @click="handleView(row)">{{ row.contractCode }}</a>
+              </span>
+              <span class="cl-card-head-right">
+                <a-tag
+                  v-if="colVisible.contractType"
+                  :color="TYPE_COLOR[row.contractType as ContractType]"
+                >
+                  {{ TYPE_LABEL[row.contractType as ContractType] }}
+                </a-tag>
+                <ContractStatusTag
+                  v-if="colVisible.contractStatus"
+                  :status="row.contractStatus as ContractStatus"
+                />
+              </span>
+            </div>
+            <div class="cl-card-item-body">
+              <div v-if="colVisible.contractName" class="cl-card-field">
+                <span class="cl-card-label">合同名称</span>
+                <span class="cl-card-value">{{ row.contractName }}</span>
+              </div>
+              <div v-if="colVisible.partyAName || colVisible.partyBName" class="cl-card-field">
+                <span class="cl-card-label">签约双方</span>
+                <span class="cl-card-value">
+                  <template v-if="colVisible.partyAName">{{ row.partyAName }}</template>
+                  <template v-if="colVisible.partyAName && colVisible.partyBName"> · </template>
+                  <template v-if="colVisible.partyBName">{{ row.partyBName }}</template>
+                </span>
+              </div>
+              <div class="cl-card-field-row">
+                <div v-if="colVisible.contractAmount" class="cl-card-field">
+                  <span class="cl-card-label">合同金额(含税)</span>
+                  <span class="cl-card-value cl-card-money">{{
+                    parseFloat(row.contractAmount).toLocaleString('zh-CN', {
+                      minimumFractionDigits: 2,
+                    })
+                  }}</span>
+                </div>
+                <div v-if="colVisible.signedDate" class="cl-card-field">
+                  <span class="cl-card-label">签订日期</span>
+                  <span class="cl-card-value">{{ row.signedDate }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="cl-card-item-foot">
+              <a-space :size="4">
+                <a-button size="small" type="link" @click="handleView(row)">查看</a-button>
+                <a-button size="small" type="link" @click="handleEdit(row)">编辑</a-button>
+                <a-button size="small" type="link" danger @click="handleDelete(row)">删除</a-button>
+              </a-space>
+            </div>
+          </div>
         </div>
 
         <!-- Pagination -->
@@ -629,7 +717,9 @@ const gridColumns = computed(() => [
               <div v-for="item in statusBars" :key="item.key" class="cl-status-line">
                 <span>{{ item.label }}</span>
                 <b>{{ item.value }}</b>
-                <span class="cl-bar"><span :style="{ width: `${item.percent}%`, background: item.color }"></span></span>
+                <span class="cl-bar"
+                  ><span :style="{ width: `${item.percent}%`, background: item.color }"></span
+                ></span>
                 <em>{{ item.percent }}%</em>
               </div>
             </div>
@@ -642,7 +732,11 @@ const gridColumns = computed(() => [
             <a-button type="link" size="small" @click="handleAllAlerts">查看全部</a-button>
           </div>
           <div class="cl-warning-list">
-            <div v-for="row in warningRows" :key="`${row.project}-${row.title}`" class="cl-warning-item">
+            <div
+              v-for="row in warningRows"
+              :key="`${row.project}-${row.title}`"
+              class="cl-warning-item"
+            >
               <i class="cl-red-dot"></i>
               <span>{{ row.project }}</span>
               <span>{{ row.title }}</span>
@@ -811,6 +905,51 @@ const gridColumns = computed(() => [
   color: #16a34a;
 }
 
+/* KPI single card (mobile) */
+.cl-kpi-single {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  padding: 8px 0;
+  margin-bottom: 10px;
+}
+.cl-kpi-single-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+.cl-kpi-single-row + .cl-kpi-single-row {
+  border-top: 1px solid var(--border-subtle);
+}
+.cl-kpi-single-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.cl-kpi-single-label {
+  flex: 1;
+  color: var(--text-secondary);
+}
+.cl-kpi-single-value {
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cl-kpi-single-value small {
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
 /* Toolbar */
 .cl-toolbar {
   display: flex;
@@ -869,6 +1008,91 @@ const gridColumns = computed(() => [
 }
 .cl-table-wrap :deep(.vxe-body--row:hover) {
   background: #f8fbff;
+}
+
+/* Card list (mobile) */
+.cl-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cl-card-list-loading,
+.cl-card-list-empty {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.cl-card-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 13px 14px;
+  box-shadow: var(--shadow-soft);
+}
+.cl-card-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.cl-card-code {
+  font-size: 14px;
+  font-weight: 700;
+}
+.cl-card-head-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.cl-card-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.cl-card-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+.cl-card-label {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 88px;
+  flex-shrink: 0;
+}
+.cl-card-value {
+  color: var(--text);
+  word-break: break-all;
+}
+.cl-card-money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.cl-card-field-row {
+  display: flex;
+  gap: 16px;
+}
+.cl-card-field-row .cl-card-field {
+  flex: 1;
+  min-width: 0;
+}
+.cl-card-field-row .cl-card-label {
+  min-width: 0;
+}
+.cl-card-item-foot {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* Pagination */
