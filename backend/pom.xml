@@ -25,6 +25,7 @@
         <springdoc.version>2.6.0</springdoc.version>
         <jjwt.version>0.12.6</jjwt.version>
         <minio.version>8.5.13</minio.version>
+        <jasypt.version>3.0.5</jasypt.version>
     </properties>
 
     <dependencies>
@@ -163,6 +164,13 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Jasypt configuration encryption -->
+        <dependency>
+            <groupId>com.github.ulisesbocchio</groupId>
+            <artifactId>jasypt-spring-boot-starter</artifactId>
+            <version>${jasypt.version}</version>
+        </dependency>
+
         <!-- PDFBox for invoice PDF recognition -->
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
@@ -196,6 +204,11 @@
                         </exclude>
                     </excludes>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.github.ulisesbocchio</groupId>
+                <artifactId>jasypt-maven-plugin</artifactId>
+                <version>${jasypt.version}</version>
             </plugin>
         </plugins>
     </build>
