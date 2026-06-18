@@ -124,6 +124,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-do-not-use-in-production}
+      JASYPT_ENCRYPTOR_PASSWORD: ${JASYPT_ENCRYPTOR_PASSWORD:-dev-jasypt-key}
     command: java -jar target/cgc-pms-backend.jar
     networks:
       - cgc-pms-dev-net
