@@ -126,8 +126,10 @@ services:
       # ---- Spring profile ----
       SPRING_PROFILES_ACTIVE: prod
       # ---- Database (service names resolve via Docker network) ----
-      # useSSL=true + requireSSL + verifyServerCertificate for production security
-      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&verifyServerCertificate=true&allowPublicKeyRetrieval=true"
+      # useSSL=true + requireSSL for production security.
+      # verifyServerCertificate=false is used for the internal Docker network with MySQL self-signed certs.
+      # For external CA-signed MySQL, set verifyServerCertificate=true and mount a truststore.
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&verifyServerCertificate=false&allowPublicKeyRetrieval=true"
       DB_USERNAME: ${MYSQL_USER:-cgc}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       # ---- Redis ----
