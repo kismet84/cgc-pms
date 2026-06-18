@@ -335,7 +335,7 @@ export const routes: RouteRecordRaw[] = [
         path: 'system',
         name: 'System',
         redirect: '/system/dict',
-        meta: { title: '系统设置', icon: 'SettingOutlined' },
+        meta: { title: '系统设置', icon: 'SettingOutlined', adminOnly: true },
         children: [
           {
             path: 'dict',

@@ -113,6 +113,7 @@ export const navigationItems: NavigationItem[] = [
     key: '/system-management',
     label: '系统管理',
     icon: 'SettingOutlined',
+    adminOnly: true,
     matchPrefixes: ['/system'],
     children: [
       { key: '/system/users', label: '用户管理' },
