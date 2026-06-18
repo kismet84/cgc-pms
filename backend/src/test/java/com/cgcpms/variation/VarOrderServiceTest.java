@@ -27,23 +27,26 @@ import java.math.BigDecimal;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * TDD RED phase — reproduce variation order submit failures.
+ * VarOrder submit and template verification — GREEN phase.
  * <p>
- * Known bugs:
+ * Changes since the RED phase:
  * <ul>
- *   <li>VAR_ORDER workflow template may be missing in MySQL (V17 migration data drift)</li>
- *   <li>Duplicate workflow instances block resubmission (logical-delete + unique key)</li>
+ *   <li>VAR_ORDER workflow template has been seeded in H2 (V70 + V71 repair).</li>
+ *   <li>V75 added deleted_flag to uk_wf_instance_business, allowing soft-deleted rows
+ *       and active rows to coexist without a unique-key conflict.</li>
  * </ul>
- * ALL tests expect failure on current code — this is the RED phase.
+ * Tests now validate correct behaviour when the template IS present.
  */
 @SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("VarOrderService — VAR_ORDER submit and template verification")
 class VarOrderServiceTest {
 
-    private static final long PROJECT_ID = 10001L;
-    private static final long PARTNER_ID = 20001L;
-    private static final long CONTRACT_ID = 30001L;
+    // Use unique IDs to avoid collisions with ContractCompositeSaveTest
+    // which seeds PmProject(id=10001) with a different name.
+    private static final long PROJECT_ID  = 10018L;
+    private static final long PARTNER_ID  = 20018L;
+    private static final long CONTRACT_ID = 30018L;
 
     @Autowired
     private VarOrderService varOrderService;
@@ -66,8 +69,6 @@ class VarOrderServiceTest {
     @Autowired
     private WfTemplateMapper wfTemplateMapper;
 
-    private Long varOrderId;
-
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
@@ -83,8 +84,8 @@ class VarOrderServiceTest {
         if (projectMapper.selectById(PROJECT_ID) == null) {
             PmProject project = new PmProject();
             project.setId(PROJECT_ID);
-            project.setProjectCode("PRJ-TEST-VAR");
-            project.setProjectName("测试变更新项目");
+            project.setProjectCode("PRJ-TEST-VAR-018");
+            project.setProjectName("变更单测专用项目");
             project.setProjectType("CONSTRUCTION");
             project.setContractAmount(new BigDecimal("5000000.00"));
             project.setTargetCost(new BigDecimal("4200000.00"));
@@ -96,8 +97,8 @@ class VarOrderServiceTest {
         if (partnerMapper.selectById(PARTNER_ID) == null) {
             MdPartner partner = new MdPartner();
             partner.setId(PARTNER_ID);
-            partner.setPartnerCode("PT-TEST-VAR");
-            partner.setPartnerName("变更测试合作方");
+            partner.setPartnerCode("PT-TEST-VAR-018");
+            partner.setPartnerName("变更单测合作方");
             partner.setPartnerType("PARTY_A");
             partner.setBlacklistFlag(0);
             partner.setStatus("ENABLE");
@@ -108,8 +109,8 @@ class VarOrderServiceTest {
             CtContract contract = new CtContract();
             contract.setId(CONTRACT_ID);
             contract.setProjectId(PROJECT_ID);
-            contract.setContractCode("CT-TEST-VAR-001");
-            contract.setContractName("变更测试合同");
+            contract.setContractCode("CT-TEST-VAR-018");
+            contract.setContractName("变更单测合同");
             contract.setContractType("SUB");
             contract.setPartyAId(PARTNER_ID);
             contract.setPartyBId(PARTNER_ID);
@@ -123,129 +124,99 @@ class VarOrderServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RED-1: Verify VAR_ORDER template EXISTS
-    // This test FAILS if the template is missing (known MySQL bug).
-    // In H2 local profile, V17 migration may or may not seed it
-    // (depends on JSON_OBJECT support). If missing, this test
-    // documents the TemplateNotFoundException.
+    // GREEN-1: VAR_ORDER template EXISTS (V70+V71 seeded it)
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Transactional
-    @DisplayName("RED-1: VAR_ORDER workflow template should exist (enabled)")
+    @DisplayName("GREEN-1: VAR_ORDER workflow template exists and is enabled")
     void testVarOrderTemplateExists() {
         WfTemplate template = wfTemplateMapper.selectOne(
                 new LambdaQueryWrapper<WfTemplate>()
                         .eq(WfTemplate::getBusinessType, "VAR_ORDER")
                         .eq(WfTemplate::getEnabled, 1));
         assertNotNull(template,
-                "VAR_ORDER审批模板应存在且启用 — 当前缺失表示 V17 迁移数据异常");
+                "VAR_ORDER审批模板应存在且启用");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RED-2: Create and submit VarOrder → FAILS if template missing
-    // Current code: submitForApproval calls workflowEngine.submit
-    // which calls core.findTemplate("VAR_ORDER").
-    // If template is missing → BusinessException("TEMPLATE_NOT_FOUND")
-    // This test FAILS (unexpected success) if the template IS present,
-    // which is the RED indicator for the missing-template bug.
+    // GREEN-2: Submit succeeds because template is now present
+    // (Previously RED-2 expected TEMPLATE_NOT_FOUND)
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Transactional
-    @DisplayName("RED-2: submitForApproval fails when VAR_ORDER template is missing")
-    void testSubmitFailsOnMissingTemplate() {
+    @DisplayName("GREEN-2: submitForApproval succeeds when VAR_ORDER template is present")
+    void testSubmitSucceedsWithTemplate() {
         VarOrder order = new VarOrder();
         order.setProjectId(PROJECT_ID);
         order.setContractId(CONTRACT_ID);
         order.setPartnerId(PARTNER_ID);
-        order.setVarName("测试变更签证-RED2");
+        order.setVarName("变更单测-GREEN2");
         order.setVarType("DESIGN_CHANGE");
         order.setDirection("COST");
         order.setReportedAmount(new BigDecimal("50000.00"));
         order.setApprovalStatus("DRAFT");
-        varOrderId = varOrderService.create(order);
-        assertNotNull(varOrderId, "创建VarOrder应返回ID");
+        Long id = varOrderService.create(order);
+        assertNotNull(id, "创建VarOrder应返回ID");
 
-        // Attempt submit — expect failure due to missing template
-        // RED assertion: the submit SHOULD throw TEMPLATE_NOT_FOUND
-        BusinessException ex = assertThrows(BusinessException.class, () -> {
-            varOrderService.submitForApproval(varOrderId);
-        }, "提交审批应因缺少VAR_ORDER模板而失败");
-        assertEquals("TEMPLATE_NOT_FOUND", ex.getCode(),
-                "错误码应为 TEMPLATE_NOT_FOUND，表明模板缺失");
+        // Submit must succeed now — template is present
+        assertDoesNotThrow(() ->
+                varOrderService.submitForApproval(id),
+                "提交审批应成功，临时模板已存在");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // RED-3: Duplicate submit should be rejected
-    // Even if RED-2 eventually passes (template exists), submitting
-    // the same VarOrder twice must throw VAR_ORDER_ALREADY_SUBMITTED.
-    // This test verifies the duplicate-submit guard works.
-    // NOTE: This test depends on the template existing to test
-    // the duplicate guard. If template is missing, this test will
-    // also fail with TEMPLATE_NOT_FOUND (still RED).
+    // GREEN-3: Duplicate submit is rejected
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Transactional
-    @DisplayName("RED-3: duplicate submit of same VarOrder throws VAR_ORDER_ALREADY_SUBMITTED")
+    @DisplayName("GREEN-3: duplicate submit of same VarOrder throws VAR_ORDER_ALREADY_SUBMITTED")
     void testDuplicateSubmitRejected() {
         VarOrder order = new VarOrder();
         order.setProjectId(PROJECT_ID);
         order.setContractId(CONTRACT_ID);
         order.setPartnerId(PARTNER_ID);
-        order.setVarName("测试变更签证-RED3");
+        order.setVarName("变更单测-GREEN3");
         order.setVarType("DESIGN_CHANGE");
         order.setDirection("COST");
         order.setReportedAmount(new BigDecimal("30000.00"));
         order.setApprovalStatus("DRAFT");
-        varOrderId = varOrderService.create(order);
-        assertNotNull(varOrderId);
+        Long id = varOrderService.create(order);
+        assertNotNull(id);
 
-        // First submit — may succeed if template exists, or fail if not
-        // Either way, the second submit should fail if first succeeded
-        try {
-            varOrderService.submitForApproval(varOrderId);
-        } catch (BusinessException e) {
-            // Template not found — this is the RED-2 scenario
-            // In this case RED-3 cannot test duplicate guard fully,
-            // but the test still fails (RED) because we could not
-            // complete the first submit.
-            if ("TEMPLATE_NOT_FOUND".equals(e.getCode())) {
-                fail("RED-3: 无法测试重复提交，因为模板缺失导致首次提交失败（TEMPLATE_NOT_FOUND）");
-            }
-            throw e;
-        }
+        // First submit succeeds (template exists)
+        varOrderService.submitForApproval(id);
 
         // Verify first submit created wf_instance
         WfInstance instance = wfInstanceMapper.selectOne(
                 new LambdaQueryWrapper<WfInstance>()
                         .eq(WfInstance::getBusinessType, "VAR_ORDER")
-                        .eq(WfInstance::getBusinessId, varOrderId));
+                        .eq(WfInstance::getBusinessId, id));
         assertNotNull(instance, "首次提交应创建审批实例");
 
         // Second submit must be rejected
         BusinessException ex = assertThrows(BusinessException.class, () -> {
-            varOrderService.submitForApproval(varOrderId);
+            varOrderService.submitForApproval(id);
         }, "重复提交应抛出异常");
         assertEquals("VAR_ORDER_ALREADY_SUBMITTED", ex.getCode(),
                 "错误码应为 VAR_ORDER_ALREADY_SUBMITTED");
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // SAFE-GET: Null-safe batch VO mapping tests
+    // SAFE: Null-safe batch VO mapping tests
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Transactional
     @DisplayName("SAFE-1: getPage with null contractId/partnerId should not NPE")
     void testGetPageWithNullRelationIds() {
-        // Create VarOrder with only required projectId, null optional relations
         VarOrder order = new VarOrder();
         order.setProjectId(PROJECT_ID);
         order.setContractId(null);
         order.setPartnerId(null);
-        order.setVarName("null-relation 测试");
+        order.setVarName("null-relation 单测");
         order.setVarType("DESIGN_CHANGE");
         order.setDirection("COST");
         order.setReportedAmount(new BigDecimal("10000.00"));
@@ -253,16 +224,15 @@ class VarOrderServiceTest {
         Long id = varOrderService.create(order);
         assertNotNull(id);
 
-        // getPage must not throw NPE even when contractIds/partnerIds sets are empty
         com.baomidou.mybatisplus.core.metadata.IPage<com.cgcpms.variation.vo.VarOrderVO> page =
                 varOrderService.getPage(1, 10, null, null, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() > 0, "至少应有一条记录");
 
         com.cgcpms.variation.vo.VarOrderVO vo = page.getRecords().get(0);
-        assertEquals("null-relation 测试", vo.getVarName());
+        assertEquals("null-relation 单测", vo.getVarName());
         assertNotNull(vo.getProjectName(), "projectName 应填充");
-        assertEquals("测试变更新项目", vo.getProjectName());
+        assertEquals("变更单测专用项目", vo.getProjectName());
         assertNull(vo.getContractName(), "contractName 应为 null");
         assertNull(vo.getPartnerName(), "partnerName 应为 null");
     }
@@ -275,7 +245,7 @@ class VarOrderServiceTest {
         order.setProjectId(PROJECT_ID);
         order.setContractId(CONTRACT_ID);
         order.setPartnerId(PARTNER_ID);
-        order.setVarName("full-relation 测试");
+        order.setVarName("full-relation 单测");
         order.setVarType("DESIGN_CHANGE");
         order.setDirection("COST");
         order.setReportedAmount(new BigDecimal("20000.00"));
@@ -289,12 +259,12 @@ class VarOrderServiceTest {
         assertTrue(page.getTotal() > 0, "至少应有一条记录");
 
         com.cgcpms.variation.vo.VarOrderVO vo = page.getRecords().get(0);
-        assertEquals("full-relation 测试", vo.getVarName());
+        assertEquals("full-relation 单测", vo.getVarName());
         assertNotNull(vo.getProjectName(), "projectName 应填充");
-        assertEquals("测试变更新项目", vo.getProjectName());
+        assertEquals("变更单测专用项目", vo.getProjectName());
         assertNotNull(vo.getContractName(), "contractName 应填充");
-        assertEquals("变更测试合同", vo.getContractName());
+        assertEquals("变更单测合同", vo.getContractName());
         assertNotNull(vo.getPartnerName(), "partnerName 应填充");
-        assertEquals("变更测试合作方", vo.getPartnerName());
+        assertEquals("变更单测合作方", vo.getPartnerName());
     }
 }
