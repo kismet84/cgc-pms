@@ -55,11 +55,12 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: test
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
+          JASYPT_ENCRYPTOR_PASSWORD: dev-jasypt-key
         run: ./mvnw clean test -B
 
   frontend-build:
@@ -142,11 +143,12 @@ jobs:
       - name: Flyway migration check (startup triggers auto-migration)
         working-directory: backend
         env:
-          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: test
           SPRING_DATA_REDIS_HOST: localhost
           SPRING_DATA_REDIS_PORT: 6379
+          JASYPT_ENCRYPTOR_PASSWORD: dev-jasypt-key
         run: |
           echo "Starting Spring Boot to trigger Flyway migrations..."
           timeout 60 ./mvnw spring-boot:run -B > /tmp/app.log 2>&1 &
