@@ -27,30 +27,8 @@ public class WorkflowApprovalService {
     @Transactional
     public void approve(Long taskId, Long userId, String username,
                         String comment, String idempotencyKey) {
-        WfTask task = wfTaskMapper.selectById(taskId);
-        if (task == null) {
-            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
-        }
-        if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())) {
-            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
-        }
-        if (!task.getApproverId().equals(userId)) {
-            throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
-        }
-        core.checkIdempotency(task.getTenantId(), userId, idempotencyKey, WorkflowConstants.ACTION_APPROVE);
-
-        // CAS update: atomically check PENDING + version, bump version
-        int updated = wfTaskMapper.updateTaskStatusWithCas(
-                taskId,
-                WorkflowConstants.TASK_PENDING,
-                task.getTaskVersion(),
-                WorkflowConstants.TASK_APPROVED,
-                WorkflowConstants.ACTION_APPROVE,
-                comment,
-                LocalDateTime.now());
-        if (updated != 1) {
-            throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突），请刷新后重试");
-        }
+        WfTask task = validateAndCasUpdateTask(taskId, userId, idempotencyKey,
+                WorkflowConstants.ACTION_APPROVE, WorkflowConstants.TASK_APPROVED, comment);
 
         // Ping instance to acquire row lock and verify still RUNNING
         int instanceOk = wfInstanceMapper.pingInstanceRunning(task.getInstanceId(),
@@ -84,6 +62,11 @@ public class WorkflowApprovalService {
         // Check if node is complete
         String approveMode = nodeInstance != null ? nodeInstance.getApproveMode() : WorkflowConstants.MODE_SEQUENTIAL;
         if (core.isNodeComplete(task.getNodeInstanceId(), approveMode)) {
+            // For OR_SIGN: cancel remaining pending tasks before proceeding
+            if (WorkflowConstants.MODE_OR_SIGN.equals(approveMode)) {
+                core.cancelOrSignPendingTasks(task.getNodeInstanceId(), taskId);
+            }
+
             // Mark node completed
             core.completeNode(task.getNodeInstanceId());
 
@@ -116,30 +99,8 @@ public class WorkflowApprovalService {
     @Transactional
     public void reject(Long taskId, Long userId, String username,
                        String comment, String idempotencyKey) {
-        WfTask task = wfTaskMapper.selectById(taskId);
-        if (task == null) {
-            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
-        }
-        if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())) {
-            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
-        }
-        if (!task.getApproverId().equals(userId)) {
-            throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
-        }
-        core.checkIdempotency(task.getTenantId(), userId, idempotencyKey, WorkflowConstants.ACTION_REJECT);
-
-        // CAS update: atomically check PENDING + version, bump version
-        int updated = wfTaskMapper.updateTaskStatusWithCas(
-                taskId,
-                WorkflowConstants.TASK_PENDING,
-                task.getTaskVersion(),
-                WorkflowConstants.TASK_REJECTED,
-                WorkflowConstants.ACTION_REJECT,
-                comment,
-                LocalDateTime.now());
-        if (updated != 1) {
-            throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突）");
-        }
+        WfTask task = validateAndCasUpdateTask(taskId, userId, idempotencyKey,
+                WorkflowConstants.ACTION_REJECT, WorkflowConstants.TASK_REJECTED, comment);
 
         // Ping instance to acquire row lock and verify still RUNNING
         int instanceOk = wfInstanceMapper.pingInstanceRunning(task.getInstanceId(),
@@ -184,5 +145,42 @@ public class WorkflowApprovalService {
         } catch (Exception e) {
             log.warn("Failed to create reject notification: {}", e.getMessage());
         }
+    }
+
+    // ──────────────────────── Extracted helpers ────────────────────────
+
+    /**
+     * Validates task: existence, PENDING status, ownership, idempotency.
+     * Performs CAS update to atomically claim the task.
+     * Returns the freshly-loaded task for downstream use.
+     */
+    private WfTask validateAndCasUpdateTask(Long taskId, Long userId, String idempotencyKey,
+                                             String actionType, String targetStatus, String comment) {
+        WfTask task = wfTaskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
+        }
+        if (!WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())) {
+            throw new BusinessException("TASK_ALREADY_HANDLED", "该任务已被处理");
+        }
+        if (!task.getApproverId().equals(userId)) {
+            throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
+        }
+        core.checkIdempotency(task.getTenantId(), userId, idempotencyKey, actionType);
+
+        // CAS update: atomically check PENDING + version, bump version
+        int updated = wfTaskMapper.updateTaskStatusWithCas(
+                taskId,
+                WorkflowConstants.TASK_PENDING,
+                task.getTaskVersion(),
+                targetStatus,
+                actionType,
+                comment,
+                LocalDateTime.now());
+        if (updated != 1) {
+            throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突），请刷新后重试");
+        }
+
+        return task;
     }
 }

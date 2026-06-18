@@ -51,6 +51,13 @@ public class MdPartnerService {
         return toVO(partner);
     }
 
+    /**
+     * 创建合作伙伴。
+     *
+     * <p>编号策略：当 {@code partnerCode} 为 {@code null} 或空时自动生成 "PTN-yyyyMMdd-NNN" 前缀编号；
+     * 当手动指定 {@code partnerCode} 时不自动添加前缀，调用方负责保证编码格式和唯一性。
+     * 此设计允许外部系统导入时保留原始编码。
+     */
     @Transactional
     public Long create(MdPartner partner) {
         // Auto-generate partner code: PTN-yyyyMMdd-NNN
@@ -61,9 +68,10 @@ public class MdPartnerService {
             LambdaQueryWrapper<MdPartner> codeWrapper = new LambdaQueryWrapper<>();
             codeWrapper.eq(MdPartner::getTenantId, tenantId)
                     .likeRight(MdPartner::getPartnerCode, prefix)
-                    .orderByDesc(MdPartner::getPartnerCode)
-                    .last("LIMIT 1");
-            List<MdPartner> list = mdPartnerMapper.selectList(codeWrapper);
+                    .orderByDesc(MdPartner::getPartnerCode);
+            Page<MdPartner> page = new Page<>(0, 1);
+            Page<MdPartner> result = mdPartnerMapper.selectPage(page, codeWrapper);
+            List<MdPartner> list = result.getRecords();
             int seq = 1;
             if (!list.isEmpty()) {
                 MdPartner last = list.get(0);

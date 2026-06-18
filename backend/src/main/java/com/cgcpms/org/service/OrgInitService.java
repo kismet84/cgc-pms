@@ -12,7 +12,10 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
@@ -40,13 +43,18 @@ public class OrgInitService {
     private final OrgDepartmentMapper orgDepartmentMapper;
     private final PmProjectMapper pmProjectMapper;
     private final CtContractMapper ctContractMapper;
+    @Lazy
+    @Autowired
+    private OrgInitService self;
 
     /**
      * For every tenant that has at least one pm_project or ct_contract with a
      * NULL org_id: create the root company/department if missing, then set the
      * NULL org_id rows to the root company id.
+     * <p>
+     * 每个租户独立事务：通过 self 代理调用 backfillTenant，
+     * 确保 REQUIRES_NEW 传播级别生效，一个租户的失败不会回滚其他已完成的租户。
      */
-    @Transactional
     public void initOrgAndBackfill() {
         Set<Long> tenantIds = collectTenantsNeedingBackfill();
 
@@ -58,7 +66,7 @@ public class OrgInitService {
         log.info("Found {} tenant(s) needing org backfill: {}", tenantIds.size(), tenantIds);
 
         for (Long tenantId : tenantIds) {
-            backfillTenant(tenantId);
+            self.backfillTenant(tenantId);
         }
     }
 
@@ -90,7 +98,8 @@ public class OrgInitService {
 
     // ── per-tenant backfill ───────────────────────────────────────
 
-    private void backfillTenant(Long tenantId) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void backfillTenant(Long tenantId) {
         OrgCompany rootCompany = getOrCreateRootCompany(tenantId);
         getOrCreateRootDepartment(tenantId, rootCompany.getId());
 

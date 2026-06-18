@@ -1,5 +1,6 @@
 package com.cgcpms.cost.service;
 
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.strategy.CostGenerationStrategy;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -52,7 +53,7 @@ public class CostGenerationService {
         CostGenerationStrategy strategy = strategyMap.get(sourceType);
         if (strategy == null) {
             log.error("未找到成本生成策略: sourceType={}", sourceType);
-            throw new IllegalArgumentException("Unsupported source type: " + sourceType);
+            throw new BusinessException("COST_STRATEGY_NOT_FOUND", "未找到成本生成策略: " + sourceType);
         }
         strategy.generateCost(sourceId);
     }

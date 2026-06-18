@@ -40,7 +40,21 @@ public class WorkflowWithdrawService {
             throw new BusinessException("NOT_INITIATOR", "只有发起人可以撤回");
         }
 
-        // Notify pending approvers before cancelling tasks
+        // CAS: atomically transition instance from RUNNING → WITHDRAWN first,
+        // but only if no task has been APPROVED or REJECTED (no concurrent approve won).
+        int updated = wfInstanceMapper.updateInstanceStatusWithCasNoApprovedTasks(
+                instanceId,
+                WorkflowConstants.INSTANCE_RUNNING,
+                WorkflowConstants.INSTANCE_WITHDRAWN,
+                LocalDateTime.now());
+        if (updated != 1) {
+            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更或已有任务被处理，撤回失败");
+        }
+
+        // Now safe to cancel tasks and notify: CAS has already won, no spurious notifications
+        core.cancelAllPendingTasks(instanceId);
+        core.resetActiveNodes(instanceId);
+
         List<WfTask> pendingTasks = wfTaskMapper.selectList(
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instanceId)
@@ -54,20 +68,6 @@ public class WorkflowWithdrawService {
             } catch (Exception e) {
                 log.warn("Failed to create withdraw notification for approver {}: {}", t.getApproverId(), e.getMessage());
             }
-        }
-
-        core.cancelAllPendingTasks(instanceId);
-        core.resetActiveNodes(instanceId);
-
-        // CAS: atomically transition instance from RUNNING → WITHDRAWN,
-        // but only if no task has been APPROVED or REJECTED (no concurrent approve won).
-        int updated = wfInstanceMapper.updateInstanceStatusWithCasNoApprovedTasks(
-                instanceId,
-                WorkflowConstants.INSTANCE_RUNNING,
-                WorkflowConstants.INSTANCE_WITHDRAWN,
-                LocalDateTime.now());
-        if (updated != 1) {
-            throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更或已有任务被处理，撤回失败");
         }
 
         core.writeRecord(instance.getTenantId(), instance.getBusinessType(), instance.getBusinessId(),

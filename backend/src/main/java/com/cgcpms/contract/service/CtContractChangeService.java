@@ -64,22 +64,18 @@ public class CtContractChangeService {
             throw new BusinessException("CONTRACT_STATUS_INVALID",
                     "DRAFT 或 TERMINATED 状态的合同禁止创建变更");
 
-        // 自动编号: CC-yyyyMMdd-XXX
+        // 自动编号: CC-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "CC-" + today + "-";
 
-        LambdaQueryWrapper<CtContractChange> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(CtContractChange::getChangeCode, prefix)
-                .orderByDesc(CtContractChange::getChangeCode)
-                .last("LIMIT 1");
-        CtContractChange last = ctContractChangeMapper.selectOne(wrapper);
+        String lastCode = ctContractChangeMapper.selectLastCodeByPrefix(prefix, UserContext.getCurrentTenantId());
 
         int seq = 1;
-        if (last != null && last.getChangeCode() != null && last.getChangeCode().startsWith(prefix)) {
+        if (lastCode != null && lastCode.startsWith(prefix)) {
             try {
-                seq = Integer.parseInt(last.getChangeCode().substring(last.getChangeCode().lastIndexOf('-') + 1)) + 1;
+                seq = Integer.parseInt(lastCode.substring(prefix.length())) + 1;
             } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getChangeCode(), e);
+                log.warn("Failed to parse sequence number: {}", lastCode, e);
             }
         }
         change.setChangeCode(prefix + String.format("%03d", seq));

@@ -110,9 +110,10 @@ public class SubMeasureService {
 
         LambdaQueryWrapper<SubMeasure> wrapper = new LambdaQueryWrapper<>();
         wrapper.likeRight(SubMeasure::getMeasureCode, prefix)
-                .orderByDesc(SubMeasure::getMeasureCode)
-                .last("LIMIT 1");
-        SubMeasure last = subMeasureMapper.selectOne(wrapper);
+                .orderByDesc(SubMeasure::getMeasureCode);
+        Page<SubMeasure> page = new Page<>(0, 1);
+        Page<SubMeasure> result = subMeasureMapper.selectPage(page, wrapper);
+        SubMeasure last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
 
         int seq = 1;
         if (last != null && last.getMeasureCode() != null && last.getMeasureCode().startsWith(prefix)) {

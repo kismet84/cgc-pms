@@ -42,6 +42,9 @@ public class MatStockService {
      * 入库：增加指定仓库+物料的可用库存。
      * 如该组合尚无库存记录则自动创建；已存在则在现有记录上累加。
      * 每次入库生成一条 txn_type='IN' 的流水。
+     * <p>
+     * TODO: stockIn/stockOut 返回 MatStock 实体会暴露 version 内部字段给前端，
+     * 应在 Controller 层转换为 VO（如 MatStockVO）或过滤 version/txnCount 等内部字段。
      */
     @Transactional
     public MatStock stockIn(Long warehouseId, Long materialId, BigDecimal quantity) {
@@ -83,20 +86,32 @@ public class MatStockService {
 
     /**
      * 乐观锁累加库存：最多重试 MAX_RETRIES 次。
+     * <p>
+     * 每次迭代从 DB 最新数据出发重新计算，避免基于过期快照累加。
+     * 流程：load current → add quantity → updateById（@Version 乐观锁）→
+     * 冲突时 reload from DB → 重新计算 → retry。
+     *
+     * @param tenantId   租户ID
+     * @param warehouseId 仓库ID
+     * @param materialId 物料ID
+     * @param quantity   增量数量（正数入库，负数出库）
+     * @param stock      当前持有的库存快照（首次调用时为最新 DB 记录，重试时为 reload 后的记录）
      * @return 更新后的最新库存实体
      */
     private MatStock doUpdateIncrement(Long tenantId, Long warehouseId, Long materialId,
                                        BigDecimal quantity, MatStock stock) {
         int retries = 0;
         while (true) {
+            // 基于当前最新 stock 快照累加 availableQty
             stock.setAvailableQty(stock.getAvailableQty().add(quantity));
+            // @Version 乐观锁：若版本冲突则 updateById 返回 0
             int updated = matStockMapper.updateById(stock);
             if (updated > 0) return stock;
             if (++retries >= MAX_RETRIES) {
                 throw new BusinessException("STOCK_CONCURRENT_CONFLICT",
                         "库存并发冲突，请稍后重试");
             }
-            // 版本冲突：重新加载最新数据
+            // 版本冲突：从 DB 重新加载最新数据，下一次迭代基于最新值重新计算
             stock = findStock(tenantId, warehouseId, materialId);
         }
     }

@@ -130,6 +130,32 @@ public class SysUserService {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+
+        // 检查是否是 ADMIN 用户，如果是则检查是否还有其他 ADMIN（不能删除最后一个管理员）
+        Long currentTenantId = UserContext.getCurrentTenantId();
+        List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, id));
+        boolean isAdmin = userRoles.stream().anyMatch(ur -> {
+            SysRole role = sysRoleMapper.selectById(ur.getRoleId());
+            return role != null && "ADMIN".equals(role.getRoleCode());
+        });
+        if (isAdmin) {
+            // 统计当前租户下还有多少 ADMIN 用户
+            List<SysUserRole> allUserRoles = sysUserRoleMapper.selectList(
+                    new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId,
+                            sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                                    .eq(SysUser::getTenantId, currentTenantId)
+                                    .ne(SysUser::getId, id))
+                                    .stream().map(SysUser::getId).toList()));
+            long adminCount = allUserRoles.stream().filter(ur -> {
+                SysRole role = sysRoleMapper.selectById(ur.getRoleId());
+                return role != null && "ADMIN".equals(role.getRoleCode());
+            }).count();
+            if (adminCount == 0) {
+                throw new BusinessException("LAST_ADMIN", "不能删除最后一个管理员用户");
+            }
+        }
+
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
                 .eq(SysUserRole::getUserId, id));
         sysUserMapper.deleteById(id);

@@ -41,7 +41,7 @@ public class RateLimitAspect {
      * so different annotated methods can have different {@code windowSeconds}.
      */
     private final Cache<String, long[]> counterCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(MAX_IDLE_SECONDS, TimeUnit.SECONDS)
+            .expireAfterWrite(MAX_IDLE_SECONDS, TimeUnit.SECONDS)
             .maximumSize(MAX_CACHE_SIZE)
             .build();
 

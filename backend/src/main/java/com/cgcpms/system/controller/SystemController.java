@@ -42,28 +42,29 @@ public class SystemController {
     public ApiResponse<String> clearDatabase() {
         log.warn("SUPER_ADMIN clearing database...");
 
-        // Disable FK checks for TRUNCATE
+        // Disable FK checks for TRUNCATE — ensure re-enable in finally
         jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
-
         int cleared = 0;
-        List<String> tables = jdbcTemplate.queryForList(
-                "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()", String.class);
+        try {
+            List<String> tables = jdbcTemplate.queryForList(
+                    "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()", String.class);
 
-        for (String table : tables) {
-            if (PROTECTED_TABLES.contains(table)) {
-                log.info("Skipping protected table: {}", table);
-                continue;
+            for (String table : tables) {
+                if (PROTECTED_TABLES.contains(table)) {
+                    log.info("Skipping protected table: {}", table);
+                    continue;
+                }
+                try {
+                    jdbcTemplate.execute("TRUNCATE TABLE `" + table + "`");
+                    cleared++;
+                    log.info("Truncated table: {}", table);
+                } catch (Exception e) {
+                    log.warn("Failed to truncate table {}: {}", table, e.getMessage());
+                }
             }
-            try {
-                jdbcTemplate.execute("TRUNCATE TABLE `" + table + "`");
-                cleared++;
-                log.info("Truncated table: {}", table);
-            } catch (Exception e) {
-                log.warn("Failed to truncate table {}: {}", table, e.getMessage());
-            }
+        } finally {
+            jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
         }
-
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
 
         String msg = "已清空 " + cleared + " 张业务数据表，系统表已保留";
         log.info(msg);

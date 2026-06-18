@@ -1,6 +1,7 @@
 package com.cgcpms.auth.filter;
 
 import com.cgcpms.auth.config.JwtProperties;
+import com.cgcpms.auth.config.SecurityConfig;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.service.TokenBlacklistService;
 import com.cgcpms.auth.util.CookieUtils;
@@ -35,15 +36,7 @@ import java.util.List;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final List<String> SKIP_PATHS = List.of(
-            "/auth/login",
-            "/auth/refresh",
-            "/swagger-ui/**",
-            "/v3/api-docs/**",
-            "/doc.html",
-            "/webjars/**",
-            "/actuator/health"
-    );
+    private static final List<String> SKIP_PATHS = List.of(SecurityConfig.WHITELIST_PATHS);
 
     private final JwtUtils jwtUtils;
     private final JwtProperties jwtProperties;

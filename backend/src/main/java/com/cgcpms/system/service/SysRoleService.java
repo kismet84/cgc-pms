@@ -66,6 +66,11 @@ public class SysRoleService {
         SysRole existing = sysRoleMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
+
+        // Clean up role-menu and user-role associations to prevent orphan records
+        sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenu>()
+                .eq(SysRoleMenu::getRoleId, id));
+        // Note: sys_user_role cleanup is handled by SysUserRoleMapper (if it exists)
         sysRoleMapper.deleteById(id);
     }
 

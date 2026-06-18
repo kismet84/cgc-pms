@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.org.entity.OrgPosition;
+import com.cgcpms.org.mapper.OrgCompanyMapper;
+import com.cgcpms.org.mapper.OrgDepartmentMapper;
 import com.cgcpms.org.mapper.OrgPositionMapper;
 import com.cgcpms.org.vo.OrgPositionVO;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,8 @@ import com.cgcpms.common.util.DateTimeUtils;
 public class OrgPositionService {
 
     private final OrgPositionMapper orgPositionMapper;
+    private final OrgCompanyMapper orgCompanyMapper;
+    private final OrgDepartmentMapper orgDepartmentMapper;
 
     public IPage<OrgPositionVO> getPage(long pageNo, long pageSize, Long companyId, Long departmentId, String positionCode, String positionName, String status) {
         LambdaQueryWrapper<OrgPosition> wrapper = new LambdaQueryWrapper<>();
@@ -76,8 +80,16 @@ public class OrgPositionService {
         if (position.getCompanyId() == null) {
             throw new BusinessException("ORG_POSITION_COMPANY_REQUIRED", "所属公司不能为空");
         }
+        // 校验公司外键实际存在
+        if (orgCompanyMapper.selectById(position.getCompanyId()) == null) {
+            throw new BusinessException("ORG_COMPANY_NOT_FOUND", "所属公司不存在");
+        }
         if (position.getDepartmentId() == null) {
             throw new BusinessException("ORG_POSITION_DEPT_REQUIRED", "所属部门不能为空");
+        }
+        // 校验部门外键实际存在
+        if (orgDepartmentMapper.selectById(position.getDepartmentId()) == null) {
+            throw new BusinessException("ORG_DEPT_NOT_FOUND", "所属部门不存在");
         }
         orgPositionMapper.updateById(position);
     }

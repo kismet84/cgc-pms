@@ -1,6 +1,7 @@
 package com.cgcpms.cost.strategy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -48,8 +49,9 @@ public class CostSubjectResolver {
         wrapper.eq(CostSubject::getStatus, "ENABLE");
         wrapper.eq(CostSubject::getDeletedFlag, 0);
         wrapper.orderByAsc(CostSubject::getLevel);
-        wrapper.last("LIMIT 1");
-        CostSubject subject = costSubjectMapper.selectOne(wrapper);
+        Page<CostSubject> page1 = new Page<>(0, 1);
+        Page<CostSubject> result1 = costSubjectMapper.selectPage(page1, wrapper);
+        CostSubject subject = result1.getRecords().isEmpty() ? null : result1.getRecords().get(0);
         if (subject != null) {
             return subject.getId();
         }
@@ -61,8 +63,9 @@ public class CostSubjectResolver {
         wrapper.eq(CostSubject::getStatus, "ENABLE");
         wrapper.eq(CostSubject::getDeletedFlag, 0);
         wrapper.orderByAsc(CostSubject::getSortOrder);
-        wrapper.last("LIMIT 1");
-        subject = costSubjectMapper.selectOne(wrapper);
+        Page<CostSubject> page2 = new Page<>(0, 1);
+        Page<CostSubject> result2 = costSubjectMapper.selectPage(page2, wrapper);
+        subject = result2.getRecords().isEmpty() ? null : result2.getRecords().get(0);
         if (subject != null) {
             log.warn("未找到 subject_type={} 对应的科目，使用根科目 subjectId={}", subjectType, subject.getId());
             return subject.getId();
@@ -74,8 +77,9 @@ public class CostSubjectResolver {
         wrapper.eq(CostSubject::getStatus, "ENABLE");
         wrapper.eq(CostSubject::getDeletedFlag, 0);
         wrapper.orderByAsc(CostSubject::getLevel, CostSubject::getSortOrder);
-        wrapper.last("LIMIT 1");
-        subject = costSubjectMapper.selectOne(wrapper);
+        Page<CostSubject> page3 = new Page<>(0, 1);
+        Page<CostSubject> result3 = costSubjectMapper.selectPage(page3, wrapper);
+        subject = result3.getRecords().isEmpty() ? null : result3.getRecords().get(0);
         if (subject != null) {
             log.warn("未找到 subject_type={} 对应的科目且无根科目，使用第一个可用科目 subjectId={}", subjectType, subject.getId());
             return subject.getId();
@@ -111,8 +115,9 @@ public class CostSubjectResolver {
         wrapper.eq(CostSubject::getStatus, "ENABLE");
         wrapper.eq(CostSubject::getDeletedFlag, 0);
         wrapper.orderByAsc(CostSubject::getSortOrder);
-        wrapper.last("LIMIT 1");
-        CostSubject subject = costSubjectMapper.selectOne(wrapper);
+        Page<CostSubject> page4 = new Page<>(0, 1);
+        Page<CostSubject> result4 = costSubjectMapper.selectPage(page4, wrapper);
+        CostSubject subject = result4.getRecords().isEmpty() ? null : result4.getRecords().get(0);
         if (subject != null) {
             log.warn("未找到 subject_type=变更/合同 对应的科目，使用根科目 subjectId={}", subject.getId());
             return subject.getId();
@@ -124,8 +129,9 @@ public class CostSubjectResolver {
         wrapper.eq(CostSubject::getStatus, "ENABLE");
         wrapper.eq(CostSubject::getDeletedFlag, 0);
         wrapper.orderByAsc(CostSubject::getLevel, CostSubject::getSortOrder);
-        wrapper.last("LIMIT 1");
-        subject = costSubjectMapper.selectOne(wrapper);
+        Page<CostSubject> page5 = new Page<>(0, 1);
+        Page<CostSubject> result5 = costSubjectMapper.selectPage(page5, wrapper);
+        subject = result5.getRecords().isEmpty() ? null : result5.getRecords().get(0);
         if (subject != null) {
             log.warn("未找到 subject_type=变更/合同 对应的科目且无根科目，使用第一个可用科目 subjectId={}", subject.getId());
             return subject.getId();
@@ -145,8 +151,9 @@ public class CostSubjectResolver {
         wrapper.eq(CostSubject::getStatus, "ENABLE");
         wrapper.eq(CostSubject::getDeletedFlag, 0);
         wrapper.orderByAsc(CostSubject::getLevel);
-        wrapper.last("LIMIT 1");
-        CostSubject subject = costSubjectMapper.selectOne(wrapper);
+        Page<CostSubject> page6 = new Page<>(0, 1);
+        Page<CostSubject> result6 = costSubjectMapper.selectPage(page6, wrapper);
+        CostSubject subject = result6.getRecords().isEmpty() ? null : result6.getRecords().get(0);
         return subject != null ? subject.getId() : null;
     }
 }

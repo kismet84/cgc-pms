@@ -12,7 +12,10 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 字典数据实体 — 映射 sys_dict_data 表 (V5 migration)
+ * 字典数据实体 -- 映射 sys_dict_data 表 (V5 migration)
+ *
+ * <p>注意: 此实体使用物理删除而非软删除。字典数据通常数据量小且变动不频繁，
+ * 物理删除简化了唯一约束设计。若需要审计轨迹，请在后续版本中考虑统一继承 BaseEntity。</p>
  */
 @Data
 @TableName("sys_dict_data")

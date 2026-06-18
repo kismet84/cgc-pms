@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.toolkit.Db;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
@@ -105,22 +106,18 @@ public class VarOrderService {
 
     @Transactional
     public Long create(VarOrder order) {
-        // Auto-generate var code: VO-yyyyMMdd-XXX
+        // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "VO-" + today + "-";
 
-        LambdaQueryWrapper<VarOrder> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(VarOrder::getVarCode, prefix)
-                .orderByDesc(VarOrder::getVarCode)
-                .last("LIMIT 1");
-        VarOrder last = varOrderMapper.selectOne(wrapper);
+        String lastCode = varOrderMapper.selectLastCodeByPrefix(prefix, UserContext.getCurrentTenantId());
 
         int seq = 1;
-        if (last != null && last.getVarCode() != null && last.getVarCode().startsWith(prefix)) {
+        if (lastCode != null && lastCode.startsWith(prefix)) {
             try {
-                seq = Integer.parseInt(last.getVarCode().substring(last.getVarCode().lastIndexOf('-') + 1)) + 1;
+                seq = Integer.parseInt(lastCode.substring(prefix.length())) + 1;
             } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getVarCode(), e);
+                log.warn("Failed to parse sequence number: {}", lastCode, e);
             }
         }
         order.setVarCode(prefix + String.format("%03d", seq));
@@ -187,9 +184,9 @@ public class VarOrderService {
                 item.setVarOrderId(varOrderId);
                 item.setTenantId(UserContext.getCurrentTenantId());
                 item.setId(null);
-                varOrderItemMapper.insert(item);
                 totalAmount = totalAmount.add(item.getAmount() == null ? BigDecimal.ZERO : item.getAmount());
             }
+            Db.saveBatch(items, 50);
         }
 
         // Update header reported amount

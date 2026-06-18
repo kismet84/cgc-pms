@@ -38,22 +38,23 @@ public class VarOrderWorkflowHandler implements WorkflowBusinessHandler {
     @Override
     public void onApproved(WorkflowContext context) {
         Long varOrderId = resolveVarOrderId(context.getInstance());
-        log.info("签证变更审批通过，更新状态并生成成本 varOrderId={}", varOrderId);
+        log.info("签证变更审批通过，先生成本再更新状态 varOrderId={}", varOrderId);
 
         VarOrder order = varOrderMapper.selectById(varOrderId);
         if (order == null) {
             throw new IllegalStateException("签证变更不存在，varOrderId=" + varOrderId);
         }
 
-        varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
-                .eq(VarOrder::getId, varOrderId)
-                .set(VarOrder::getApprovalStatus, "APPROVED"));
-
+        // 先生成本，再更新状态 — 若 generateCost 失败抛异常，事务回滚，状态不会被错误更新
         if ("COST".equals(order.getDirection())) {
             costGenerationService.generateCost("VAR_ORDER", varOrderId);
         } else {
             log.info("收入向签证暂不处理（第3阶段） varOrderId={}", varOrderId);
         }
+
+        varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
+                .eq(VarOrder::getId, varOrderId)
+                .set(VarOrder::getApprovalStatus, "APPROVED"));
     }
 
     @Override

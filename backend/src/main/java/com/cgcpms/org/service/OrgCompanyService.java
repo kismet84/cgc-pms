@@ -65,6 +65,16 @@ public class OrgCompanyService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("ORG_COMPANY_NOT_FOUND", "公司不存在");
         }
+        // 编码唯一性校验：更新后的 companyCode 不得与同租户下其他记录重复
+        if (StringUtils.hasText(company.getCompanyCode())
+                && !company.getCompanyCode().equals(existing.getCompanyCode())) {
+            Long count = orgCompanyMapper.selectCount(new LambdaQueryWrapper<OrgCompany>()
+                    .eq(OrgCompany::getCompanyCode, company.getCompanyCode())
+                    .eq(OrgCompany::getTenantId, UserContext.getCurrentTenantId()));
+            if (count > 0) {
+                throw new BusinessException("ORG_COMPANY_CODE_EXISTS", "公司编码已存在");
+            }
+        }
         orgCompanyMapper.updateById(company);
     }
 

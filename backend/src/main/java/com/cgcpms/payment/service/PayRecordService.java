@@ -66,8 +66,8 @@ public class PayRecordService {
         if (payApplicationId == null)
             throw new BusinessException("MISSING_APP_ID", "付款申请ID不能为空");
 
-        // Lookup the pay application to get contractId, partnerId, projectId
-        PayApplication app = payApplicationMapper.selectById(payApplicationId);
+        // Lookup and lock the pay application to prevent concurrent writeback TOCTOU
+        PayApplication app = payApplicationMapper.selectByIdForUpdate(payApplicationId);
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
 

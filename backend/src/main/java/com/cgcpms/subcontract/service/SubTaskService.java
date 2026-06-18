@@ -94,9 +94,10 @@ public class SubTaskService {
 
         LambdaQueryWrapper<SubTask> wrapper = new LambdaQueryWrapper<>();
         wrapper.likeRight(SubTask::getTaskCode, prefix)
-                .orderByDesc(SubTask::getTaskCode)
-                .last("LIMIT 1");
-        SubTask last = subTaskMapper.selectOne(wrapper);
+                .orderByDesc(SubTask::getTaskCode);
+        Page<SubTask> page = new Page<>(0, 1);
+        Page<SubTask> result = subTaskMapper.selectPage(page, wrapper);
+        SubTask last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
 
         int seq = 1;
         if (last != null && last.getTaskCode() != null && last.getTaskCode().length() == prefix.length() + 3) {

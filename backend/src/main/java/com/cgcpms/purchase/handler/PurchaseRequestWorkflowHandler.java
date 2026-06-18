@@ -142,13 +142,10 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
         order.setOrderDate(LocalDate.now());
         order.setApprovalStatus("APPROVED");
         order.setOrderStatus("APPROVED");
+        order.setContractId(request.getContractId());
 
-        // Calculate total amount from items
-        BigDecimal totalAmount = requestItems.stream()
-                .map(MatPurchaseRequestItem::getQuantity)
-                .filter(java.util.Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        order.setTotalAmount(totalAmount);
+        // totalAmount set to null — no unit price on request items; will be populated when order items are finalized
+        order.setTotalAmount(null);
 
         orderMapper.insert(order);
 

@@ -165,7 +165,7 @@ public class NotificationService {
             }
         }
 
-        SseEmitter emitter = new SseEmitter(0L); // No timeout
+        SseEmitter emitter = new SseEmitter(30 * 60 * 1000L); // 30-minute timeout
         emitters.put(userId, emitter);
 
         // Cleanup on completion/error/timeout

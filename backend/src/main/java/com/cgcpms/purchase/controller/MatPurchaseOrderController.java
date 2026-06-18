@@ -9,6 +9,7 @@ import com.cgcpms.purchase.service.MatPurchaseOrderService;
 import com.cgcpms.purchase.vo.MatPurchaseOrderItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,7 @@ import java.util.List;
 public class MatPurchaseOrderController {
 
     private final MatPurchaseOrderService matPurchaseOrderService;
+    private final Validator validator;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:query')")
@@ -82,6 +84,13 @@ public class MatPurchaseOrderController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:edit')")
     public ApiResponse<Void> saveItemsBatch(@PathVariable Long id,
                                              @Valid @RequestBody List<MatPurchaseOrderItem> items) {
+        for (int i = 0; i < items.size(); i++) {
+            var violations = validator.validate(items.get(i));
+            if (!violations.isEmpty()) {
+                return ApiResponse.fail("400", "第" + (i + 1) + "条记录校验失败: " +
+                        violations.iterator().next().getMessage());
+            }
+        }
         matPurchaseOrderService.saveItemsBatch(id, items);
         return ApiResponse.success();
     }

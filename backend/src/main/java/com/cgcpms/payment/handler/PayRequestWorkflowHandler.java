@@ -1,6 +1,7 @@
 package com.cgcpms.payment.handler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.service.PayApplicationService;
@@ -46,10 +47,14 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
         }
         payApplicationService.validatePaymentAmount(app);
 
-        payApplicationMapper.update(null, new LambdaUpdateWrapper<PayApplication>()
+        int rows = payApplicationMapper.update(null, new LambdaUpdateWrapper<PayApplication>()
                 .eq(PayApplication::getId, payAppId)
                 .set(PayApplication::getApprovalStatus, "APPROVED")
                 .set(PayApplication::getPayStatus, "APPROVED"));
+        if (rows != 1) {
+            throw new BusinessException("PAY_APP_STATUS_CONFLICT",
+                    "付款申请记录不存在或已被并发更新，请刷新后重试");
+        }
     }
 
     @Override

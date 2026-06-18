@@ -36,14 +36,7 @@ public class PayRecordController {
     }
 
     /** POST /pay-records now delegates to authoritative writeback */
-    @PostMapping
-    @PreAuthorize("hasAuthority('payment:record:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<PayRecordVO> create(@Valid @RequestBody PayRecord record) {
-        return ApiResponse.success(payRecordService.writeback(record));
-    }
-
-    // PUT and DELETE removed — all writes through authoritative writeback
-
+    // 已移除重复的 POST /pay-records 端点，统一使用 /pay-records/writeback
     @PostMapping("/writeback")
     @PreAuthorize("hasAuthority('payment:record:writeback') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PayRecordVO> writeback(@Valid @RequestBody PayRecord input) {

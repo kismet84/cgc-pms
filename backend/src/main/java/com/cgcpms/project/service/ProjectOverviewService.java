@@ -1,6 +1,7 @@
 package com.cgcpms.project.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
@@ -82,12 +83,13 @@ public class ProjectOverviewService {
 
         // ── 2. Dynamic cost from cost_summary (single batch query) ──
         // Use the latest summary_date for this project
-        CostSummary latest = costSummaryMapper.selectOne(
+        Page<CostSummary> page = new Page<>(0, 1);
+        Page<CostSummary> result = costSummaryMapper.selectPage(page,
                 new LambdaQueryWrapper<CostSummary>()
                         .eq(CostSummary::getTenantId, tenantId)
                         .eq(CostSummary::getProjectId, projectId)
-                        .orderByDesc(CostSummary::getSummaryDate)
-                        .last("LIMIT 1"));
+                        .orderByDesc(CostSummary::getSummaryDate));
+        CostSummary latest = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
 
         BigDecimal dynamicCost = BigDecimal.ZERO;
         if (latest != null) {

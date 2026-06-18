@@ -34,6 +34,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -185,9 +187,10 @@ public class PayApplicationService {
 
         LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
         wrapper.likeRight(PayApplication::getApplyCode, prefix)
-                .orderByDesc(PayApplication::getApplyCode)
-                .last("LIMIT 1");
-        PayApplication last = payApplicationMapper.selectOne(wrapper);
+                .orderByDesc(PayApplication::getApplyCode);
+        Page<PayApplication> page = new Page<>(0, 1);
+        Page<PayApplication> result = payApplicationMapper.selectPage(page, wrapper);
+        PayApplication last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
 
         int seq = 1;
         if (last != null && last.getApplyCode() != null && last.getApplyCode().startsWith(prefix)) {
@@ -255,7 +258,7 @@ public class PayApplicationService {
         Long contractId = app.getContractId();
         if (contractId == null) return;
 
-        CtContract contract = ctContractMapper.selectById(contractId);
+        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId);
         if (contract == null) return;
 
         BigDecimal currentAmount = contract.getCurrentAmount() != null
@@ -358,7 +361,19 @@ public class PayApplicationService {
 
     // ---- Approval ----
 
-    @Transactional
+    /**
+     * 提交审批。REPEATABLE_READ 隔离级别防止并发提交时的幻读绕过余额检查。
+     * <p>
+     * 防超付双重校验：
+     * <ol>
+     *   <li>validatePaymentAmount（本方法内）：用"已 APPROVED 的申请金额"推算可用余额。
+     *       口径：仅含 APPROVED 状态的 PayApplication.applyAmount，不含 SUCCESS 实付金额。</li>
+     *   <li>checkContractBalance（writeback 时，PayRecordService 调用）：用"已 SUCCESS 的实付金额"推算余额。
+     *       口径：含所有 SUCCESS 状态的 PayRecord.payAmount 累加，不含待付/审批中记录。</li>
+     * </ol>
+     * 两个方法共同构成双层防线：submit 时预判可支付余额，writeback 时以实付口径二次确认。
+     */
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public void submitForApproval(Long id) {
         PayApplication payApp = payApplicationMapper.selectById(id);
         if (payApp == null || !payApp.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -373,6 +388,11 @@ public class PayApplicationService {
         }
 
         validatePaymentAmount(payApp);
+
+        // 合同余额双重校验（与 writeback 时 checkContractBalance 互补）
+        if (payApp.getContractId() != null) {
+            checkContractBalance(payApp, payApp.getApplyAmount() != null ? payApp.getApplyAmount() : BigDecimal.ZERO);
+        }
 
         // Re-validate M1: header amount == sum of basis amounts
         List<PayApplicationBasis> basisList = payApplicationBasisMapper.selectList(
@@ -450,8 +470,14 @@ public class PayApplicationService {
                 new LambdaQueryWrapper<PayApplicationBasis>()
                         .eq(PayApplicationBasis::getPayApplicationId, payApp.getId()));
         if (basisList != null && !basisList.isEmpty()) {
+            // Batch-load source items to avoid N+1 selects
+            Map<Long, MatReceiptItem> receiptItemMap = batchLoadReceiptItems(basisList);
+            Map<Long, SubMeasureItem> subMeasureItemMap = batchLoadSubMeasureItems(basisList);
+            Map<Long, MatReceipt> receiptMap = batchLoadReceipts(receiptItemMap);
+            Map<Long, SubMeasure> subMeasureMap = batchLoadSubMeasures(subMeasureItemMap);
+
             for (PayApplicationBasis basis : basisList) {
-                validateBasisAmount(basis, contractId);
+                validateBasisAmount(basis, contractId, receiptItemMap, subMeasureItemMap, receiptMap, subMeasureMap);
             }
         }
     }
@@ -469,7 +495,11 @@ public class PayApplicationService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private void validateBasisAmount(PayApplicationBasis basis, Long payContractId) {
+    private void validateBasisAmount(PayApplicationBasis basis, Long payContractId,
+                                       Map<Long, MatReceiptItem> receiptItemMap,
+                                       Map<Long, SubMeasureItem> subMeasureItemMap,
+                                       Map<Long, MatReceipt> receiptMap,
+                                       Map<Long, SubMeasure> subMeasureMap) {
         BigDecimal basisAmount = basis.getBasisAmount() != null ? basis.getBasisAmount() : BigDecimal.ZERO;
         String basisType = basis.getBasisType();
         Long basisId = basis.getBasisId();
@@ -477,7 +507,7 @@ public class PayApplicationService {
         if (basisId == null) return;
 
         if ("MAT_RECEIPT".equals(basisType)) {
-            MatReceiptItem item = matReceiptItemMapper.selectById(basisId);
+            MatReceiptItem item = receiptItemMap.get(basisId);
             if (item == null) {
                 throw new BusinessException("RECEIPT_ITEM_NOT_FOUND",
                         "依据项(验收明细)不存在: id=" + basisId);
@@ -489,14 +519,14 @@ public class PayApplicationService {
             }
             // M3: Verify basis item belongs to same contract as payment
             if (item.getReceiptId() != null) {
-                MatReceipt receipt = matReceiptMapper.selectById(item.getReceiptId());
+                MatReceipt receipt = receiptMap.get(item.getReceiptId());
                 if (receipt != null && !Objects.equals(receipt.getContractId(), payContractId)) {
                     throw new BusinessException("BASIS_CONTRACT_MISMATCH",
                             "依据单据(" + basisId + ")不属于付款申请合同");
                 }
             }
         } else if ("SUB_MEASURE".equals(basisType)) {
-            SubMeasureItem item = subMeasureItemMapper.selectById(basisId);
+            SubMeasureItem item = subMeasureItemMap.get(basisId);
             if (item == null) {
                 throw new BusinessException("MEASURE_ITEM_NOT_FOUND",
                         "依据项(计量明细)不存在: id=" + basisId);
@@ -508,7 +538,7 @@ public class PayApplicationService {
             }
             // M3: Verify basis item belongs to same contract as payment
             if (item.getMeasureId() != null) {
-                SubMeasure measure = subMeasureMapper.selectById(item.getMeasureId());
+                SubMeasure measure = subMeasureMap.get(item.getMeasureId());
                 if (measure != null && !Objects.equals(measure.getContractId(), payContractId)) {
                     throw new BusinessException("BASIS_CONTRACT_MISMATCH",
                             "依据单据(" + basisId + ")不属于付款申请合同");
@@ -517,8 +547,61 @@ public class PayApplicationService {
         }
     }
 
+    private Map<Long, MatReceiptItem> batchLoadReceiptItems(List<PayApplicationBasis> basisList) {
+        List<Long> ids = basisList.stream()
+                .filter(b -> "MAT_RECEIPT".equals(b.getBasisType()))
+                .map(PayApplicationBasis::getBasisId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) return Map.of();
+        return matReceiptItemMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(MatReceiptItem::getId, Function.identity()));
+    }
+
+    private Map<Long, SubMeasureItem> batchLoadSubMeasureItems(List<PayApplicationBasis> basisList) {
+        List<Long> ids = basisList.stream()
+                .filter(b -> "SUB_MEASURE".equals(b.getBasisType()))
+                .map(PayApplicationBasis::getBasisId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) return Map.of();
+        return subMeasureItemMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(SubMeasureItem::getId, Function.identity()));
+    }
+
+    private Map<Long, MatReceipt> batchLoadReceipts(Map<Long, MatReceiptItem> itemMap) {
+        if (itemMap.isEmpty()) return Map.of();
+        List<Long> receiptIds = itemMap.values().stream()
+                .map(MatReceiptItem::getReceiptId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (receiptIds.isEmpty()) return Map.of();
+        return matReceiptMapper.selectBatchIds(receiptIds).stream()
+                .collect(Collectors.toMap(MatReceipt::getId, Function.identity()));
+    }
+
+    private Map<Long, SubMeasure> batchLoadSubMeasures(Map<Long, SubMeasureItem> itemMap) {
+        if (itemMap.isEmpty()) return Map.of();
+        List<Long> measureIds = itemMap.values().stream()
+                .map(SubMeasureItem::getMeasureId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (measureIds.isEmpty()) return Map.of();
+        return subMeasureMapper.selectBatchIds(measureIds).stream()
+                .collect(Collectors.toMap(SubMeasure::getId, Function.identity()));
+    }
+
     // ---- VO conversion helpers ----
 
+    /**
+     * @deprecated 此单参数重载每次调用会产生 N+1 查询（逐个查询 project/contract/partner），
+     *             请优先使用 {@link #toVO(PayApplication, Map, Map, Map)} 批量预取版本。
+     */
+    @Deprecated
     private PayApplicationVO toVO(PayApplication app) {
         PayApplicationVO vo = buildBaseVO(app);
         if (app.getProjectId() != null) {

@@ -60,7 +60,7 @@ public class PmProjectController {
         return ApiResponse.success();
     }
 
-    @PostMapping("/{id}/archive")
+    @PutMapping("/{id}/archive")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:edit')")
     public ApiResponse<Void> archive(@PathVariable Long id) {
         pmProjectService.archive(id);

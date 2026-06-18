@@ -6,8 +6,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a method whose invocation should be recorded as an operation log entry.
+ * 操作日志注解 — 当前未被使用。
+ * @deprecated 计划在下一个主要版本中删除，或与审计日志框架集成。
  */
+@Deprecated
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface OperationLog {

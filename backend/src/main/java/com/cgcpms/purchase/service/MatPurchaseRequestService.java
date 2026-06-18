@@ -120,9 +120,10 @@ public class MatPurchaseRequestService {
         LambdaQueryWrapper<MatPurchaseRequest> wrapper = new LambdaQueryWrapper<>();
         wrapper.likeRight(MatPurchaseRequest::getRequestCode, prefix)
                 .eq(MatPurchaseRequest::getTenantId, UserContext.getCurrentTenantId())
-                .orderByDesc(MatPurchaseRequest::getRequestCode)
-                .last("LIMIT 1");
-        MatPurchaseRequest last = requestMapper.selectOne(wrapper);
+                .orderByDesc(MatPurchaseRequest::getRequestCode);
+        Page<MatPurchaseRequest> page = new Page<>(0, 1);
+        Page<MatPurchaseRequest> result = requestMapper.selectPage(page, wrapper);
+        MatPurchaseRequest last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
 
         int seq = 1;
         if (last != null && last.getRequestCode() != null && last.getRequestCode().length() == prefix.length() + 3) {

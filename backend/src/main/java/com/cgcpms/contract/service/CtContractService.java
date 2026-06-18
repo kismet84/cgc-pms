@@ -145,9 +145,10 @@ public class CtContractService {
 
         LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
         wrapper.likeRight(CtContract::getContractCode, prefix)
-                .orderByDesc(CtContract::getContractCode)
-                .last("LIMIT 1");
-        CtContract last = ctContractMapper.selectOne(wrapper);
+                .orderByDesc(CtContract::getContractCode);
+        Page<CtContract> page = new Page<>(0, 1);
+        Page<CtContract> result = ctContractMapper.selectPage(page, wrapper);
+        CtContract last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
 
         int seq = 1;
         if (last != null && last.getContractCode() != null && last.getContractCode().length() == prefix.length() + 3) {
@@ -176,14 +177,29 @@ public class CtContractService {
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
             throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
 
-        // 禁止通过 update 接口覆盖受保护字段
-        contract.setApprovalStatus(existing.getApprovalStatus());
-        contract.setTenantId(existing.getTenantId());
-        contract.setPaidAmount(existing.getPaidAmount());
-        contract.setCreatedBy(existing.getCreatedBy());
-        contract.setCreatedAt(existing.getCreatedAt());
-
-        ctContractMapper.updateById(contract);
+        // 使用字段白名单更新，禁止通过 update 接口覆盖受保护字段
+        ctContractMapper.update(null,
+                new LambdaUpdateWrapper<CtContract>()
+                        .eq(CtContract::getId, contract.getId())
+                        .set(CtContract::getContractName, contract.getContractName())
+                        .set(CtContract::getContractType, contract.getContractType())
+                        .set(CtContract::getProjectId, contract.getProjectId())
+                        .set(CtContract::getOrgId, contract.getOrgId())
+                        .set(CtContract::getPartyAId, contract.getPartyAId())
+                        .set(CtContract::getPartyBId, contract.getPartyBId())
+                        .set(CtContract::getContractAmount, contract.getContractAmount())
+                        .set(CtContract::getCurrentAmount, contract.getCurrentAmount())
+                        .set(CtContract::getTaxRate, contract.getTaxRate())
+                        .set(CtContract::getTaxAmount, contract.getTaxAmount())
+                        .set(CtContract::getAmountWithoutTax, contract.getAmountWithoutTax())
+                        .set(CtContract::getSignedDate, contract.getSignedDate())
+                        .set(CtContract::getStartDate, contract.getStartDate())
+                        .set(CtContract::getEndDate, contract.getEndDate())
+                        .set(CtContract::getPaymentMethod, contract.getPaymentMethod())
+                        .set(CtContract::getSettlementMethod, contract.getSettlementMethod())
+                        .set(CtContract::getContractStatus, contract.getContractStatus())
+                        .set(CtContract::getRemark, contract.getRemark())
+        );
     }
 
     /**

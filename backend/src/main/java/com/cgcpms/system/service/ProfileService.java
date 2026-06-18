@@ -1,15 +1,11 @@
 package com.cgcpms.system.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.dto.UserInfo;
+import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.dto.ChangePasswordRequest;
 import com.cgcpms.system.dto.UpdateProfileRequest;
-import com.cgcpms.system.entity.SysMenu;
-import com.cgcpms.system.entity.SysRole;
-import com.cgcpms.system.entity.SysRoleMenu;
 import com.cgcpms.system.entity.SysUser;
-import com.cgcpms.system.entity.SysUserRole;
 import com.cgcpms.system.mapper.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,9 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Self-service profile management for the currently authenticated user.
@@ -31,11 +25,8 @@ import java.util.stream.Collectors;
 public class ProfileService {
 
     private final SysUserMapper sysUserMapper;
-    private final SysUserRoleMapper sysUserRoleMapper;
-    private final SysRoleMapper sysRoleMapper;
-    private final SysRoleMenuMapper sysRoleMenuMapper;
-    private final SysMenuMapper sysMenuMapper;
     private final PasswordEncoder passwordEncoder;
+    private final AuthService authService;
 
     /**
      * Update the current user's own profile fields.
@@ -107,8 +98,8 @@ public class ProfileService {
      * NEVER exposes the password hash.
      */
     private UserInfo buildUserInfo(SysUser user) {
-        List<String> roleCodes = getRoleCodes(user.getId());
-        List<String> permCodes = getPermissionCodes(user.getId());
+        List<String> roleCodes = authService.getRoleCodes(user.getId());
+        List<String> permCodes = authService.getPermissionCodes(user.getId());
         return UserInfo.builder()
                 .userId(String.valueOf(user.getId()))
                 .username(user.getUsername())
@@ -120,48 +111,5 @@ public class ProfileService {
                 .permissions(permCodes)
                 .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
                 .build();
-    }
-
-    private List<String> getRoleCodes(Long userId) {
-        var userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getUserId, userId));
-        if (userRoles.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<Long> roleIds = userRoles.stream()
-                .map(SysUserRole::getRoleId)
-                .toList();
-        return sysRoleMapper.selectBatchIds(roleIds).stream()
-                .map(SysRole::getRoleCode)
-                .collect(Collectors.toList());
-    }
-
-    private List<String> getPermissionCodes(Long userId) {
-        var userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getUserId, userId));
-        if (userRoles.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<Long> roleIds = userRoles.stream()
-                .map(SysUserRole::getRoleId)
-                .toList();
-
-        var roleMenus = sysRoleMenuMapper.selectList(
-                new LambdaQueryWrapper<SysRoleMenu>()
-                        .in(SysRoleMenu::getRoleId, roleIds));
-        if (roleMenus.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<Long> menuIds = roleMenus.stream()
-                .map(SysRoleMenu::getMenuId)
-                .distinct()
-                .toList();
-
-        return sysMenuMapper.selectBatchIds(menuIds).stream()
-                .map(SysMenu::getPerms)
-                .filter(p -> p != null && !p.isBlank())
-                .collect(Collectors.toList());
     }
 }

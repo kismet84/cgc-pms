@@ -6,6 +6,7 @@ import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.service.MdMaterialService;
 import com.cgcpms.material.vo.MdMaterialVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -52,7 +53,8 @@ public class MdMaterialController {
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:edit')")
-    public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestParam String status) {
+    public ApiResponse<Void> updateStatus(@PathVariable Long id,
+                                          @RequestParam @Pattern(regexp = "^(ENABLE|DISABLE)$") String status) {
         mdMaterialService.updateStatus(id, status);
         return ApiResponse.success();
     }

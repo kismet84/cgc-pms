@@ -10,11 +10,13 @@ import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CtContractPaymentTermService {
@@ -58,13 +60,27 @@ public class CtContractPaymentTermService {
         return term.getId();
     }
 
+    /**
+     * 批量保存付款条款（全量替换模式）。
+     * <p>
+     * 数据完整性说明：此方法遵循"先删后插"的全量替换策略。
+     * <ol>
+     *   <li>先物理删除合同下所有旧条款（含已被软删除的记录，确保主键不冲突）</li>
+     *   <li>再批量插入新条款列表（如果非空）</li>
+     * </ol>
+     * 调用方应保证 newTerms 包含完整的最新条款集合，避免数据丢失。
+     * <p>
+     * 使用 {@link Db#saveBatch} 而非实例方法：此 Service 未继承 MyBatis-Plus 的
+     * {@code ServiceImpl}，因此没有 {@code this.saveBatch()} 实例方法可用。
+     * {@code Db.saveBatch()} 是 MyBatis-Plus 提供的静态工具方法，功能等价。
+     */
     @Transactional
     public void batchSave(Long contractId, List<CtContractPaymentTerm> newTerms) {
         requireDraftParentContract(contractId);
         LambdaQueryWrapper<CtContractPaymentTerm> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(CtContractPaymentTerm::getContractId, contractId);
         ctContractPaymentTermMapper.delete(deleteWrapper);
-        if (!newTerms.isEmpty()) {
+        if (newTerms != null && !newTerms.isEmpty()) {
             Long tenantId = UserContext.getCurrentTenantId();
             newTerms.forEach(t -> {
                 t.setId(null);            // 清空ID，让ASSIGN_ID自动生成新ID，避免与软删除记录主键冲突
@@ -72,6 +88,8 @@ public class CtContractPaymentTermService {
                 t.setTenantId(tenantId);
             });
             Db.saveBatch(newTerms);
+        } else {
+            log.info("batchSave: deleted all payment terms for contract {}, no new terms to insert", contractId);
         }
     }
 

@@ -18,6 +18,7 @@ import com.cgcpms.workflow.vo.WfRecordVO;
 import com.cgcpms.workflow.vo.WfTaskVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -25,6 +26,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/workflow")
 @RequiredArgsConstructor
@@ -61,7 +63,12 @@ public class WorkflowController {
         }
         for (GrantedAuthority authority : auth.getAuthorities()) {
             String authStr = authority.getAuthority();
-            if ("ROLE_ADMIN".equals(authStr) || requiredPermission.equals(authStr)) {
+            if ("ROLE_ADMIN".equals(authStr)) {
+                log.warn("ADMIN bypass submitting businessType={}, userId={}",
+                    businessType, UserContext.getCurrentUserId());
+                return;
+            }
+            if (requiredPermission.equals(authStr)) {
                 return;
             }
         }

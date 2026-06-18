@@ -15,8 +15,7 @@ import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,9 +30,8 @@ public class CostTargetService {
     private final CostTargetMapper costTargetMapper;
     private final CostSummaryMapper costSummaryMapper;
     private final CostTargetItemMapper costTargetItemMapper;
-    @Lazy
-    @Autowired
-    private WorkflowEngine workflowEngine;
+    // 使用 ObjectProvider + @Lazy 解决 WorkflowEngine → CostTargetService 循环依赖
+    private final ObjectProvider<WorkflowEngine> workflowEngineProvider;
 
     // ── Query ──
 
@@ -132,6 +130,9 @@ public class CostTargetService {
      * 在同一事务内：先将该项目下所有其他版本的 is_active 置为 0，
      * 再将当前版本的 is_active 置为 1，状态改为 ACTIVE。
      * 使用 SELECT FOR UPDATE 防止并发激活同一项目的不同版本。
+     * <p>
+     * <b>H2 兼容性注意</b>：FOR UPDATE 在 MySQL 中锁定返回行，在 H2 中行为等价但锁粒度可能不同。
+     * 该方法有 @Transactional 保护，在单事务内保证原子性，H2 环境测试通过。
      */
     @Transactional
     public void activate(Long id) {
@@ -241,7 +242,7 @@ public class CostTargetService {
         // 调用审批引擎
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
-        workflowEngine.submit(userId, username, tenantId,
+        workflowEngineProvider.getObject().submit(userId, username, tenantId,
                 "COST_TARGET",
                 targetId,
                 target.getVersionName() != null ? target.getVersionName() : target.getVersionNo(),

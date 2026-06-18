@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -112,27 +113,27 @@ public class StlSettlementService {
         if (StringUtils.hasText(settlementType)) wrapper.eq(StlSettlement::getSettlementType, settlementType);
 
         List<StlSettlement> settlements = stlSettlementMapper.selectList(wrapper);
-        BigDecimal totalContractAmount = settlements.stream()
-                .map(settlement -> nullToZero(settlement.getContractAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalFinalAmount = settlements.stream()
-                .map(settlement -> nullToZero(settlement.getFinalAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalChangeAmount = settlements.stream()
-                .map(settlement -> nullToZero(settlement.getChangeAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalPaidAmount = settlements.stream()
-                .map(settlement -> nullToZero(settlement.getPaidAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalUnpaidAmount = settlements.stream()
-                .map(settlement -> nullToZero(settlement.getUnpaidAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        long draftCount = settlements.stream()
-                .filter(settlement -> "DRAFT".equals(settlement.getSettlementStatus()))
-                .count();
-        long finalizedCount = settlements.stream()
-                .filter(settlement -> "FINALIZED".equals(settlement.getSettlementStatus()))
-                .count();
+        // Single-pass accumulation: 5 fields + 2 counters in one loop
+        BigDecimal totalContractAmount = BigDecimal.ZERO;
+        BigDecimal totalFinalAmount = BigDecimal.ZERO;
+        BigDecimal totalChangeAmount = BigDecimal.ZERO;
+        BigDecimal totalPaidAmount = BigDecimal.ZERO;
+        BigDecimal totalUnpaidAmount = BigDecimal.ZERO;
+        long draftCount = 0;
+        long finalizedCount = 0;
+
+        for (StlSettlement settlement : settlements) {
+            totalContractAmount = totalContractAmount.add(nullToZero(settlement.getContractAmount()));
+            totalFinalAmount = totalFinalAmount.add(nullToZero(settlement.getFinalAmount()));
+            totalChangeAmount = totalChangeAmount.add(nullToZero(settlement.getChangeAmount()));
+            totalPaidAmount = totalPaidAmount.add(nullToZero(settlement.getPaidAmount()));
+            totalUnpaidAmount = totalUnpaidAmount.add(nullToZero(settlement.getUnpaidAmount()));
+            if ("DRAFT".equals(settlement.getSettlementStatus())) {
+                draftCount++;
+            } else if ("FINALIZED".equals(settlement.getSettlementStatus())) {
+                finalizedCount++;
+            }
+        }
 
         return Map.of(
                 "totalCount", (long) settlements.size(),
@@ -192,9 +193,10 @@ public class StlSettlementService {
         LambdaQueryWrapper<StlSettlement> codeWrapper = new LambdaQueryWrapper<>();
         codeWrapper.eq(StlSettlement::getTenantId, tenantId)
                 .likeRight(StlSettlement::getSettlementCode, prefix)
-                .orderByDesc(StlSettlement::getSettlementCode)
-                .last("LIMIT 1");
-        StlSettlement last = stlSettlementMapper.selectOne(codeWrapper);
+                .orderByDesc(StlSettlement::getSettlementCode);
+        Page<StlSettlement> page = new Page<>(0, 1);
+        Page<StlSettlement> result = stlSettlementMapper.selectPage(page, codeWrapper);
+        StlSettlement last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
         int seq = 1;
         if (last != null && last.getSettlementCode() != null && last.getSettlementCode().startsWith(prefix)) {
             try {
@@ -265,7 +267,10 @@ public class StlSettlementService {
             throw new BusinessException("STL_SETTLEMENT_IN_APPROVAL", "结算单审批中或已审批，不可删除");
         }
 
-        // Delete items first
+        // 先删明细，再删主记录。
+        // 注意：数据库层 stl_settlement_item.settlement_id 需设置 ON DELETE CASCADE 外键约束，
+        // 以确保数据一致性。当前应用层显式删除明细作为双重保护。
+        // 如果外键未配置 CASCADE，仅依赖应用层删除存在事务回滚时的不一致风险。
         stlSettlementItemMapper.delete(new LambdaQueryWrapper<StlSettlementItem>()
                 .eq(StlSettlementItem::getTenantId, tenantId)
                 .eq(StlSettlementItem::getSettlementId, id));

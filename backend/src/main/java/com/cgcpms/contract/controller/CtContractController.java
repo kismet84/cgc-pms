@@ -64,8 +64,8 @@ public class CtContractController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
-    public ApiResponse<String> create(@Valid @RequestBody CtContract contract) {
-        return ApiResponse.success(ctContractService.create(contract).toString());
+    public ApiResponse<Long> create(@Valid @RequestBody CtContract contract) {
+        return ApiResponse.success(ctContractService.create(contract));
     }
 
     @PutMapping("/{id}")
@@ -92,10 +92,15 @@ public class CtContractController {
 
     @PostMapping("/composite")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
-    public ApiResponse<String> compositeCreate(@Valid @RequestBody ContractSaveRequest request) {
-        return ApiResponse.success(ctContractService.compositeSave(request).toString());
+    public ApiResponse<Long> compositeCreate(@Valid @RequestBody ContractSaveRequest request) {
+        return ApiResponse.success(ctContractService.compositeSave(request));
     }
 
+    /**
+     * Upsert endpoint: creates a new contract if the id does not exist,
+     * or fully replaces the existing contract (including items and payment terms) if it does.
+     * This is an intentional design choice — POST for create, PUT for create-or-update (upsert).
+     */
     @PutMapping("/{id}/composite")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:edit')")
     public ApiResponse<Void> compositeUpdate(@PathVariable Long id, @Valid @RequestBody ContractSaveRequest request) {

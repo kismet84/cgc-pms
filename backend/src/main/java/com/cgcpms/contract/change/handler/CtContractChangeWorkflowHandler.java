@@ -47,6 +47,11 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
         return true;
     }
 
+    /**
+     * 审批通过回调。事务性操作：update change 状态 → update contract currentAmount → generateCost。
+     * 若 generateCost 抛出 RuntimeException（含 BusinessException），整个事务回滚，
+     * change 状态和 contract currentAmount 均不会生效。
+     */
     @Override
     public void onApproved(WorkflowContext context) {
         Long changeId = resolveChangeId(context.getInstance());
@@ -76,7 +81,7 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
 
             contractMapper.update(null, new LambdaUpdateWrapper<CtContract>()
                     .eq(CtContract::getId, change.getContractId())
-                    .setSql("current_amount = current_amount + " + changeAmount));
+                    .setIncrBy(CtContract::getCurrentAmount, changeAmount));
 
             log.info("合同 currentAmount 原子递增: contractId={}, changeAmount={}, oldCurrentAmount={}",
                     change.getContractId(), changeAmount, contract.getCurrentAmount());

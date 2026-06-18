@@ -86,7 +86,12 @@ public class PayInvoice extends BaseEntity {
     private String buyerTaxNo;
     private String sellerTaxNo;
 
-    /** Override BaseEntity.deletedFlag — physical delete for invoices (avoid unique constraint conflicts) */
+    /** Override BaseEntity.deletedFlag — physical delete for invoices (avoid unique constraint conflicts).
+     * <p>
+     * 发票实体。使用物理删除（verifyStatus 确认前可删）。
+     * 注意：@TableLogic 被 @TableField(exist=false) 覆盖，delete() 执行物理删除。
+     * 若需要审计轨迹，请在未来版本中改为软删除，并在唯一约束中加入 deleted_flag。
+     */
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private Integer deletedFlag;

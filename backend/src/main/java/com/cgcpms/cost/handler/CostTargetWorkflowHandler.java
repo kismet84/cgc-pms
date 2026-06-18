@@ -17,6 +17,7 @@ import com.cgcpms.workflow.handler.WorkflowContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -78,6 +79,7 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
+    @Transactional
     public void onApproved(WorkflowContext context) {
         Long targetId = resolveTargetId(context.getInstance());
         log.info("目标成本审批通过，激活版本并更新成本汇总 targetId={}", targetId);

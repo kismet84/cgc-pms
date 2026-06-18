@@ -51,6 +51,8 @@ public class PayRecord extends BaseEntity {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String payStatus;
 
-    /** 外部交易流水号（唯一，用于幂等） */
+    /** 外部交易流水号（唯一，用于幂等）。
+     * 数据库层唯一约束已由 V76__fix_pay_record_external_txn_no_unique.sql 添加：
+     * UNIQUE KEY uk_external_txn_no (tenant_id, external_txn_no, deleted_flag)。 */
     private String externalTxnNo;
 }

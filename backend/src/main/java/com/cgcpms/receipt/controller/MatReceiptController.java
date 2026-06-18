@@ -9,6 +9,7 @@ import com.cgcpms.receipt.service.MatReceiptService;
 import com.cgcpms.receipt.vo.MatReceiptItemVO;
 import com.cgcpms.receipt.vo.MatReceiptVO;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,7 @@ import java.util.List;
 public class MatReceiptController {
 
     private final MatReceiptService matReceiptService;
+    private final Validator validator;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:query')")
@@ -82,6 +84,13 @@ public class MatReceiptController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:edit')")
     public ApiResponse<Void> saveItemsBatch(@PathVariable Long id,
                                              @Valid @RequestBody List<MatReceiptItem> items) {
+        for (int i = 0; i < items.size(); i++) {
+            var violations = validator.validate(items.get(i));
+            if (!violations.isEmpty()) {
+                return ApiResponse.fail("400", "第" + (i + 1) + "条记录校验失败: " +
+                        violations.iterator().next().getMessage());
+            }
+        }
         matReceiptService.saveItemsBatch(id, items);
         return ApiResponse.success();
     }

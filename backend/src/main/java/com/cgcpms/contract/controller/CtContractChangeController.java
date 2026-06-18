@@ -32,6 +32,7 @@ public class CtContractChangeController {
         return ApiResponse.success(PageResult.of(page));
     }
 
+    // TODO: 创建 CtContractChangeVO 替代直接暴露 Entity（当前 CtContractChange 无对应 VO）
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:query')")
     public ApiResponse<CtContractChange> getById(@PathVariable Long id) {

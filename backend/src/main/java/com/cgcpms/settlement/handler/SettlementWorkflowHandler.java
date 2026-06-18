@@ -104,12 +104,16 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
 
         // Lock settlement: FINALIZED + set finalizedAt
         // Status guard: only finalize if still in DRAFT (prevents double-finalization via concurrent approvals)
-        stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
+        int rows = stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
                 .eq(StlSettlement::getSettlementStatus, "DRAFT")
                 .set(StlSettlement::getApprovalStatus, "APPROVED")
                 .set(StlSettlement::getSettlementStatus, "FINALIZED")
                 .set(StlSettlement::getFinalizedAt, LocalDateTime.now()));
+        if (rows != 1) {
+            throw new BusinessException("SETTLEMENT_STATUS_CONFLICT",
+                    "结算单状态冲突：已被并发操作或已审批，请刷新后重试");
+        }
 
         // Write back to contract: settlementAmount = finalAmount
         // NEVER calls CostGenerationService — settlement is pure read-only aggregation

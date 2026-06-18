@@ -2,7 +2,9 @@ package com.cgcpms.system.service;
 
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.entity.SysMenu;
+import com.cgcpms.system.entity.SysRoleMenu;
 import com.cgcpms.system.mapper.SysMenuMapper;
+import com.cgcpms.system.mapper.SysRoleMenuMapper;
 import com.cgcpms.system.vo.MenuTreeVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 public class SysMenuService {
 
     private final SysMenuMapper sysMenuMapper;
+    private final SysRoleMenuMapper sysRoleMenuMapper;
 
     public List<MenuTreeVO> getTree() {
         List<SysMenu> allMenus = sysMenuMapper.selectList(null);
@@ -54,6 +57,20 @@ public class SysMenuService {
 
     @Transactional
     public void delete(Long id) {
+        // Check for child menus
+        long childCount = sysMenuMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysMenu>()
+                        .eq(SysMenu::getParentId, id));
+        if (childCount > 0) {
+            throw new BusinessException("MENU_HAS_CHILDREN", "菜单存在子菜单，请先删除子菜单");
+        }
+        // Check for role references
+        long roleRefCount = sysRoleMenuMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysRoleMenu>()
+                        .eq(SysRoleMenu::getMenuId, id));
+        if (roleRefCount > 0) {
+            throw new BusinessException("MENU_REFERENCED_BY_ROLES", "菜单被角色引用，请先解除角色授权");
+        }
         sysMenuMapper.deleteById(id);
     }
 

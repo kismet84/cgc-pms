@@ -3,8 +3,12 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.entity.CostTargetItem;
+import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
+import com.cgcpms.cost.mapper.CostTargetItemMapper;
 import com.cgcpms.cost.vo.CostSubjectTreeNodeVO;
 import com.cgcpms.cost.vo.CostSubjectVO;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,8 @@ import java.util.stream.Collectors;
 public class CostSubjectService {
 
     private final CostSubjectMapper costSubjectMapper;
+    private final CostItemMapper costItemMapper;
+    private final CostTargetItemMapper costTargetItemMapper;
 
     public List<CostSubjectTreeNodeVO> getTree() {
         LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
@@ -165,6 +171,22 @@ public class CostSubjectService {
         Long childCount = costSubjectMapper.selectCount(wrapper);
         if (childCount > 0) {
             throw new BusinessException("HAS_CHILDREN", "该科目下存在子科目，无法删除");
+        }
+
+        // Check no cost item references exist
+        long costItemCount = costItemMapper.selectCount(
+                new LambdaQueryWrapper<CostItem>().eq(CostItem::getCostSubjectId, id));
+        if (costItemCount > 0) {
+            throw new BusinessException("COST_SUBJECT_REFERENCED",
+                    "该成本科目被 " + costItemCount + " 条成本明细引用，无法删除");
+        }
+
+        // Check no cost target item references exist
+        long targetItemCount = costTargetItemMapper.selectCount(
+                new LambdaQueryWrapper<CostTargetItem>().eq(CostTargetItem::getCostSubjectId, id));
+        if (targetItemCount > 0) {
+            throw new BusinessException("COST_SUBJECT_REFERENCED",
+                    "该成本科目被 " + targetItemCount + " 条目标成本明细引用，无法删除");
         }
 
         costSubjectMapper.deleteById(id);

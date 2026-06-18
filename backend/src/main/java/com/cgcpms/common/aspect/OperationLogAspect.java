@@ -17,8 +17,10 @@ import org.springframework.stereotype.Component;
 import java.util.Arrays;
 
 /**
- * Records execution of methods annotated with {@link OperationLog}.
+ * 操作日志切面 — 当前未被使用。
+ * @deprecated 计划在下一个主要版本中删除，或与审计日志框架集成。
  */
+@Deprecated
 @Aspect
 @Component
 public class OperationLogAspect {

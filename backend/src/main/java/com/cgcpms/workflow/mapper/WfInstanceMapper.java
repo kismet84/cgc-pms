@@ -46,7 +46,7 @@ public interface WfInstanceMapper extends BaseMapper<WfInstance> {
      * Returns 1 if the instance is still in the expected status, 0 otherwise.
      * Used by approve/transfer to serialize with concurrent withdraw.
      */
-    @Update("UPDATE wf_instance SET updated_at = NOW() " +
+    @Update("UPDATE wf_instance SET updated_at = CURRENT_TIMESTAMP " +
             "WHERE id = #{instanceId} AND instance_status = #{expectedStatus} AND deleted_flag = 0")
     int pingInstanceRunning(@Param("instanceId") Long instanceId,
                             @Param("expectedStatus") String expectedStatus);

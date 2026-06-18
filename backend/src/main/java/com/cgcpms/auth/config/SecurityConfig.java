@@ -21,14 +21,14 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
-    private static final String[] WHITELIST = {
+    public static final String[] WHITELIST_PATHS = {
             "/auth/login",
             "/auth/refresh",
             "/swagger-ui/**",
             "/v3/api-docs/**",
             "/doc.html",
             "/webjars/**",
-            "/actuator/health"
+            "/actuator/health/**"
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -47,7 +47,7 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(WHITELIST).permitAll()
+                        .requestMatchers(WHITELIST_PATHS).permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

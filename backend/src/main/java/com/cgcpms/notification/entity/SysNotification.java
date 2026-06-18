@@ -51,7 +51,7 @@ public class SysNotification implements Serializable {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime readTime;
 
-    @TableField(value = "created_at")
+    @TableField(value = "created_time")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdTime;
 }

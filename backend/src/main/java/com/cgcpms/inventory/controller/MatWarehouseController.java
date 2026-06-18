@@ -6,6 +6,7 @@ import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.service.MatWarehouseService;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -52,7 +53,8 @@ public class MatWarehouseController {
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:warehouse:edit')")
-    public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestParam String status) {
+    public ApiResponse<Void> updateStatus(@PathVariable Long id,
+                                          @RequestParam @Pattern(regexp = "^(ENABLE|DISABLE)$") String status) {
         matWarehouseService.updateStatus(id, status);
         return ApiResponse.success();
     }

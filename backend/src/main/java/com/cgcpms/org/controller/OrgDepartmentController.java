@@ -23,8 +23,8 @@ public class OrgDepartmentController {
 
     @GetMapping("/tree")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:list')")
-    public ApiResponse<List<OrgDepartmentTreeNodeVO>> getTree() {
-        return ApiResponse.success(orgDepartmentService.getTree());
+    public ApiResponse<List<OrgDepartmentTreeNodeVO>> getTree(@RequestParam(required = false) Long companyId) {
+        return ApiResponse.success(orgDepartmentService.getTree(companyId));
     }
 
     @GetMapping

@@ -90,23 +90,23 @@ public class MatPurchaseOrderService {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(id);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
-        
+
         MatPurchaseOrderVO vo = toVO(order);
-        
+
         // Load items
         LambdaQueryWrapper<MatPurchaseOrderItem> itemWrapper = new LambdaQueryWrapper<>();
         itemWrapper.eq(MatPurchaseOrderItem::getOrderId, id)
                 .eq(MatPurchaseOrderItem::getTenantId, UserContext.getCurrentTenantId())
                 .orderByAsc(MatPurchaseOrderItem::getCreatedAt);
         List<MatPurchaseOrderItem> items = matPurchaseOrderItemMapper.selectList(itemWrapper);
-        
+
         // Resolve material names
         Set<Long> materialIds = items.stream().map(MatPurchaseOrderItem::getMaterialId)
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> materialNames = materialIds.isEmpty() ? Map.of()
                 : mdMaterialMapper.selectBatchIds(materialIds).stream()
                         .collect(Collectors.toMap(MdMaterial::getId, MdMaterial::getMaterialName, (a, b) -> a));
-        
+
         vo.setItems(items.stream().map(i -> toItemVO(i, materialNames)).toList());
         return vo;
     }
@@ -139,9 +139,11 @@ public class MatPurchaseOrderService {
 
         LambdaQueryWrapper<MatPurchaseOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.likeRight(MatPurchaseOrder::getOrderCode, prefix)
-                .orderByDesc(MatPurchaseOrder::getOrderCode)
-                .last("LIMIT 1");
-        MatPurchaseOrder last = matPurchaseOrderMapper.selectOne(wrapper);
+                .eq(MatPurchaseOrder::getTenantId, UserContext.getCurrentTenantId())
+                .orderByDesc(MatPurchaseOrder::getOrderCode);
+        Page<MatPurchaseOrder> page = new Page<>(0, 1);
+        Page<MatPurchaseOrder> result = matPurchaseOrderMapper.selectPage(page, wrapper);
+        MatPurchaseOrder last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
 
         int seq = 1;
         if (last != null && last.getOrderCode() != null && last.getOrderCode().length() == prefix.length() + 3) {
@@ -239,11 +241,8 @@ public class MatPurchaseOrderService {
         if (!"DRAFT".equals(order.getApprovalStatus()))
             throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可删除");
 
-        // Soft delete
-        LambdaUpdateWrapper<MatPurchaseOrder> wrapper = new LambdaUpdateWrapper<>();
-        wrapper.eq(MatPurchaseOrder::getId, id)
-                .set(MatPurchaseOrder::getDeletedFlag, 1);
-        matPurchaseOrderMapper.update(null, wrapper);
+        // @TableLogic on BaseEntity handles soft-delete automatically
+        matPurchaseOrderMapper.deleteById(id);
     }
 
     @Transactional

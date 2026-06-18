@@ -76,45 +76,41 @@ public class PmProjectService {
     public Long create(PmProject project) {
         log.info("Creating project: {}", project.getProjectName());
 
-        try {
-            // Auto-generate project code: XM-yyyyMMdd-XXX
-            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-            String prefix = "XM-" + today + "-";
+        // Auto-generate project code: XM-yyyyMMdd-XXX
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
+        String prefix = "XM-" + today + "-";
 
-            Long tenantId = UserContext.getCurrentTenantId();
-            if (tenantId == null) {
-                tenantId = 0L;
-            }
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) {
+            tenantId = 0L;
+        }
 
-            LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(PmProject::getTenantId, tenantId)
-                    .likeRight(PmProject::getProjectCode, prefix)
-                    .orderByDesc(PmProject::getProjectCode)
-                    .last("LIMIT 1");
-            List<PmProject> list = pmProjectMapper.selectList(wrapper);
+        LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PmProject::getTenantId, tenantId)
+                .likeRight(PmProject::getProjectCode, prefix)
+                .orderByDesc(PmProject::getProjectCode);
+        Page<PmProject> page = new Page<>(0, 1);
+        Page<PmProject> result = pmProjectMapper.selectPage(page, wrapper);
+        List<PmProject> list = result.getRecords();
 
-            int seq = 1;
-            if (!list.isEmpty()) {
-                PmProject last = list.get(0);
-                if (last.getProjectCode() != null
-                        && last.getProjectCode().length() == prefix.length() + 3) {
-                    try {
-                        seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1;
-                    } catch (NumberFormatException ex) {
-                        log.warn("Failed to parse sequence number: {}", last.getProjectCode(), ex);
-                    }
+        int seq = 1;
+        if (!list.isEmpty()) {
+            PmProject last = list.get(0);
+            if (last.getProjectCode() != null
+                    && last.getProjectCode().length() == prefix.length() + 3) {
+                try {
+                    seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1;
+                } catch (NumberFormatException ex) {
+                    log.warn("Failed to parse sequence number: {}", last.getProjectCode(), ex);
                 }
             }
-            project.setProjectCode(prefix + String.format("%03d", seq));
-            project.setStatus("DRAFT");
-            project.setTenantId(tenantId);
-
-            pmProjectMapper.insert(project);
-            return project.getId();
-        } catch (Exception e) {
-            log.error("Failed to create project: {}", project.getProjectName(), e);
-            throw e;
         }
+        project.setProjectCode(prefix + String.format("%03d", seq));
+        project.setStatus("DRAFT");
+        project.setTenantId(tenantId);
+
+        pmProjectMapper.insert(project);
+        return project.getId();
     }
 
     @Transactional
@@ -238,8 +234,13 @@ public class PmProjectService {
                 .eq(SysFile::getBusinessId, id)
                 .eq(SysFile::getTenantId, tenantId));
 
-        // Avoid unique key collision with previously deleted projects sharing the same code
-        existing.setProjectCode(existing.getProjectCode() + "-DEL-" + id);
+        // Avoid unique key collision with previously deleted projects sharing the same code.
+        // project_code 列长度限制为 50 字符，超出时截断以避免 DB 错误。
+        String delCode = existing.getProjectCode() + "-DEL-" + id;
+        if (delCode.length() > 50) {
+            delCode = delCode.substring(0, 50);
+        }
+        existing.setProjectCode(delCode);
         pmProjectMapper.updateById(existing);
 
         pmProjectMapper.deleteById(id);

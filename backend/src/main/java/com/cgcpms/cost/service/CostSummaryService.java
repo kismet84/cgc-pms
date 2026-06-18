@@ -2,6 +2,7 @@ package com.cgcpms.cost.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
@@ -29,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
@@ -36,6 +38,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -53,13 +57,54 @@ public class CostSummaryService {
     private final MatReceiptMapper matReceiptMapper;
     private final VarOrderMapper varOrderMapper;
 
+    /**
+     * Per-project locks to serialize concurrent {@link #refreshSummary(Long, Long)} calls
+     * for the same project. The scheduled task and manual refresh endpoint can both fire
+     * simultaneously; without this lock, two refreshes would interleave DELETE+INSERT
+     * and produce incorrect or duplicate data.
+     */
+    private final ConcurrentHashMap<Long, ReentrantLock> refreshLocks = new ConcurrentHashMap<>();
+
     @Transactional
     public CostProjectSummaryVO refreshSummary(Long projectId) {
         return refreshSummary(UserContext.getCurrentTenantId(), projectId);
     }
 
-    @Transactional
+    /**
+     * Refresh cost summary for a given project.
+     * <p>
+     * <b>Concurrency protection:</b>
+     * <ul>
+     *   <li>{@link Isolation#REPEATABLE_READ} ensures concurrent readers see a consistent
+     *       snapshot — either all old rows or all new rows, never an empty/partial set.</li>
+     *   <li>Per-project {@link ReentrantLock} serializes concurrent refresh calls for the
+     *       same project (scheduled task + manual endpoint), preventing interleaved
+     *       DELETE+INSERT sequences that would produce duplicate or incorrect data.</li>
+     *   <li>If any INSERT fails, the entire transaction rolls back including the DELETE,
+     *       so data integrity is preserved.</li>
+     * </ul>
+     *
+     * @param tenantId  tenant ID
+     * @param projectId project ID
+     * @return refreshed project summary
+     */
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public CostProjectSummaryVO refreshSummary(Long tenantId, Long projectId) {
+        // Serialize concurrent refresh for the same project
+        ReentrantLock lock = refreshLocks.computeIfAbsent(projectId, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            return doRefreshSummary(tenantId, projectId);
+        } finally {
+            lock.unlock();
+            // Clean up lock if no longer contended (avoid unbounded map growth)
+            if (!lock.isLocked() && !lock.hasQueuedThreads()) {
+                refreshLocks.remove(projectId, lock);
+            }
+        }
+    }
+
+    private CostProjectSummaryVO doRefreshSummary(Long tenantId, Long projectId) {
         log.info("Refreshing cost summary for projectId={}, tenantId={}", projectId, tenantId);
 
         PmProject project = requireProjectInTenant(tenantId, projectId);
@@ -100,6 +145,7 @@ public class CostSummaryService {
         // 5. Compute project-level values (same for all subjects)
         BigDecimal projectEstimatedRemainingCost = computeProjectEstimatedRemainingCost(tenantId, projectId);
         BigDecimal projectContractIncome = computeProjectContractIncome(tenantId, projectId);
+        BigDecimal projectPaidAmount = computeProjectPaidAmount(tenantId, projectId);
 
         // 6. For each cost subject, calculate and insert summary
         LocalDate today = LocalDate.now();
@@ -122,7 +168,7 @@ public class CostSummaryService {
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            BigDecimal paidAmount = BigDecimal.ZERO;
+            BigDecimal paidAmount = projectPaidAmount;
             BigDecimal estimatedRemainingCost = projectEstimatedRemainingCost;
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal costDeviation = dynamicCost.subtract(targetCost);
@@ -167,8 +213,9 @@ public class CostSummaryService {
         dateWrapper.eq(CostSummary::getTenantId, tenantId);
         dateWrapper.eq(CostSummary::getProjectId, projectId);
         dateWrapper.orderByDesc(CostSummary::getSummaryDate);
-        dateWrapper.last("LIMIT 1");
-        CostSummary latest = costSummaryMapper.selectOne(dateWrapper);
+        Page<CostSummary> page = new Page<>(0, 1);
+        Page<CostSummary> result = costSummaryMapper.selectPage(page, dateWrapper);
+        CostSummary latest = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
 
         if (latest == null) {
             return Collections.emptyList();
@@ -557,6 +604,21 @@ public class CostSummaryService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return totalContractAmount.add(incomeVarAmount);
+    }
+
+    /**
+     * Compute project-level paidAmount:
+     * SUM(pay_record.payAmount WHERE payStatus='SUCCESS')
+     */
+    private BigDecimal computeProjectPaidAmount(Long tenantId, Long projectId) {
+        List<PayRecord> records = payRecordMapper.selectList(
+                new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getTenantId, tenantId)
+                        .eq(PayRecord::getProjectId, projectId)
+                        .eq(PayRecord::getPayStatus, "SUCCESS"));
+        return records.stream()
+                .map(r -> r.getPayAmount() == null ? BigDecimal.ZERO : r.getPayAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private PmProject requireProjectInTenant(Long tenantId, Long projectId) {

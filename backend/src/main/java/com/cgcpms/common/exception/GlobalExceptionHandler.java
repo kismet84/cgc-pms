@@ -10,6 +10,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
+import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -109,5 +111,19 @@ public class GlobalExceptionHandler {
 
     private static ApiResponse<Void> forbiddenResponse() {
         return ApiResponse.fail("AUTH_FORBIDDEN", "权限不足");
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleConstraintViolation(ConstraintViolationException e) {
+        log.warn("参数校验失败: {}", e.getMessage());
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "参数校验失败: " + e.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ApiResponse<Void> handleDataIntegrity(DataIntegrityViolationException e) {
+        log.error("数据完整性冲突", e);
+        return ApiResponse.fail("DATA_CONFLICT", "数据冲突，请刷新后重试");
     }
 }

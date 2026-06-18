@@ -112,7 +112,11 @@ public class AuthService {
                 .build();
     }
 
-    private List<String> getRoleCodes(Long userId) {
+    /**
+     * 根据 userId 查询角色编码列表。
+     * 供 {@link com.cgcpms.system.service.ProfileService} 等内部调用。
+     */
+    public List<String> getRoleCodes(Long userId) {
         var userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
                 .eq(com.cgcpms.system.entity.SysUserRole::getUserId, userId));
         if (userRoles.isEmpty()) {
@@ -126,7 +130,11 @@ public class AuthService {
                 .collect(Collectors.toList());
     }
 
-    private List<String> getPermissionCodes(Long userId) {
+    /**
+     * 根据 userId 查询权限编码列表。
+     * 供 {@link com.cgcpms.system.service.ProfileService} 等内部调用。
+     */
+    public List<String> getPermissionCodes(Long userId) {
         var userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
                 .eq(com.cgcpms.system.entity.SysUserRole::getUserId, userId));
         if (userRoles.isEmpty()) {

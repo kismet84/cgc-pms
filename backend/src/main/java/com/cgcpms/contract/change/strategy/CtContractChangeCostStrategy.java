@@ -93,13 +93,17 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
             costItemMapper.insert(cost);
         } catch (DuplicateKeyException e) {
             // uk_cost_source_item already present — idempotent skip.
-            log.info("成本已存在，跳过 changeId={}", changeId);
-            // Still mark flag so we don't retry forever
-            if (!Integer.valueOf(1).equals(change.getCostGeneratedFlag())) {
-                change.setCostGeneratedFlag(1);
-                changeMapper.updateById(change);
+            // Re-query to get the current costGeneratedFlag (may have been set by another thread).
+            CtContractChange fresh = changeMapper.selectById(changeId);
+            if (fresh != null && Integer.valueOf(1).equals(fresh.getCostGeneratedFlag())) {
+                log.info("成本已存在且 flag 已置，幂等跳过 changeId={}", changeId);
+                return;
             }
-            return;
+            // costGeneratedFlag is NOT set, but a duplicate record exists.
+            // This is a real conflict — throw to roll back the transaction.
+            log.warn("DuplicateKeyException 但 costGeneratedFlag 未置为 1，回滚事务 changeId={}", changeId, e);
+            throw new RuntimeException(
+                    "Cost generation conflict: duplicate key but costGeneratedFlag not set for changeId=" + changeId, e);
         }
 
         // Update cost_generated_flag

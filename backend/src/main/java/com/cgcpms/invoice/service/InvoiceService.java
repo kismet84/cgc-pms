@@ -31,6 +31,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+// TODO: 后续版本可将 8 个 extract* 方法的重叠正则模式提取为 RegexExtractor 接口
 public class InvoiceService {
 
     private final PayInvoiceMapper payInvoiceMapper;
@@ -69,12 +70,7 @@ public class InvoiceService {
         if (invoice.getVerifyStatus() == null || invoice.getVerifyStatus().isBlank()) {
             invoice.setVerifyStatus("PENDING");
         }
-        try {
-            payInvoiceMapper.insert(invoice);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("INVOICE_NO_DUPLICATE",
-                    "发票号码(" + invoice.getInvoiceNo() + ")已存在，同一租户下发票号码不可重复");
-        }
+        checkAndThrowDuplicate(invoice.getInvoiceNo(), () -> payInvoiceMapper.insert(invoice));
         log.info("Invoice created: id={}, invoiceNo={}", invoice.getId(), invoice.getInvoiceNo());
         return invoice.getId();
     }
@@ -98,12 +94,7 @@ public class InvoiceService {
             }
         }
 
-        try {
-            payInvoiceMapper.updateById(invoice);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("INVOICE_NO_DUPLICATE",
-                    "发票号码(" + invoice.getInvoiceNo() + ")已存在，同一租户下发票号码不可重复");
-        }
+        checkAndThrowDuplicate(invoice.getInvoiceNo(), () -> payInvoiceMapper.updateById(invoice));
     }
 
     @Transactional
@@ -192,7 +183,9 @@ public class InvoiceService {
             throw new BusinessException("FILE_TOO_LARGE", "文件大小不能超过50MB");
         }
 
-        // PDF text extraction
+        // PDF text extraction.
+        // 发票 PDF 文件通常 < 500KB，全量加载到内存不会造成 OOM。
+        // 如果后续支持大附件（如合同扫描件 > 10MB），需改为流式解析。
         PDDocument document = null;
         String text;
         try {
@@ -203,7 +196,8 @@ public class InvoiceService {
         } catch (InvalidPasswordException e) {
             throw new BusinessException("PDF_ENCRYPTED", "PDF文件已加密，无法识别");
         } catch (Exception e) {
-            throw new BusinessException("PDF_RECOGNIZE_FAILED", "PDF识别失败: " + e.getMessage());
+            log.error("PDF recognize failed for invoice file", e);
+            throw new BusinessException("PDF_RECOGNIZE_FAILED", "PDF识别失败: " + e.getMessage(), e);
         } finally {
             if (document != null) {
                 try {
@@ -242,6 +236,21 @@ public class InvoiceService {
                 text.length() > 500 ? text.substring(0, 500) + "..." : text);
 
         return result;
+    }
+
+    // ── Internal helpers ──
+
+    /**
+     * Execute a database write operation and translate DuplicateKeyException
+     * to a user-friendly BusinessException for duplicate invoice numbers.
+     */
+    private void checkAndThrowDuplicate(String invoiceNo, Runnable dbWrite) {
+        try {
+            dbWrite.run();
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("INVOICE_NO_DUPLICATE",
+                    "发票号码(" + invoiceNo + ")已存在，同一租户下发票号码不可重复");
+        }
     }
 
     // ── Regex helpers ──

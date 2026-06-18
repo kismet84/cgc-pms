@@ -8,6 +8,7 @@ import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -64,7 +65,7 @@ public class InvoiceController {
 
     @PutMapping("/{id}/verify")
     @PreAuthorize("hasAuthority('invoice:verify') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> verify(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ApiResponse<Void> verify(@PathVariable Long id, @Valid @NotEmpty @RequestBody Map<String, String> body) {
         String targetStatus = body.get("verifyStatus");
         invoiceService.verify(id, targetStatus);
         return ApiResponse.success();

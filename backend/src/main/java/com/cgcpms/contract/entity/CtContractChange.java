@@ -17,6 +17,18 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * 合同变更实体。
+ *
+ * TODO(G1): 应 extends BaseEntity 而非 implements Serializable。
+ * 当前 Entity 的审计字段 (createdBy/createdTime/updatedBy/updatedTime/deletedFlag/remark)
+ * 使用了 {@code createdTime / updatedTime} 作为 Java 字段名，而 BaseEntity 使用
+ * {@code createdAt / updatedAt}。两者映射到相同的 DB 列 ({@code created_at / updated_at})，
+ * 但 Java 字段名不一致。切换前需全局搜索并替换所有对 {@code getCreatedTime()}
+ * 和 {@code getUpdatedTime()} 的引用。
+ *
+ * @see com.cgcpms.common.entity.BaseEntity
+ */
 @Data
 @TableName("ct_contract_change")
 public class CtContractChange implements Serializable {

@@ -27,8 +27,15 @@ public class OrgDepartmentService {
     private final OrgDepartmentMapper orgDepartmentMapper;
 
     public List<OrgDepartmentTreeNodeVO> getTree() {
+        return getTree(null);
+    }
+
+    public List<OrgDepartmentTreeNodeVO> getTree(Long companyId) {
         LambdaQueryWrapper<OrgDepartment> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(OrgDepartment::getTenantId, UserContext.getCurrentTenantId());
+        if (companyId != null) {
+            wrapper.eq(OrgDepartment::getCompanyId, companyId);
+        }
         wrapper.orderByAsc(OrgDepartment::getOrderNum, OrgDepartment::getId);
 
         List<OrgDepartment> allDepts = orgDepartmentMapper.selectList(wrapper);
@@ -113,6 +120,10 @@ public class OrgDepartmentService {
             throw new BusinessException("ORG_DEPT_NOT_FOUND", "部门不存在");
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("ORG_DEPT_NOT_FOUND", "部门不存在");
+        }
+        // 与 create() 一致：parentId=0L 视为无父部门，转为 null
+        if (dept.getParentId() != null && dept.getParentId() == 0L) {
+            dept.setParentId(null);
         }
         orgDepartmentMapper.updateById(dept);
     }

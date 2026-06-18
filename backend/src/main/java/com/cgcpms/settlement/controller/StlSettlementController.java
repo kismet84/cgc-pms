@@ -115,18 +115,21 @@ public class StlSettlementController {
 
     // ---- Related data queries (read-only) ----
 
+    // TODO: 返回 VarOrderVO 而非直接暴露 Entity（前端已定义 SettlementVariationItemVO）
     @GetMapping("/{id}/variations")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<List<VarOrder>> getVariations(@PathVariable Long id) {
         return ApiResponse.success(stlSettlementService.getVariations(id));
     }
 
+    // TODO: 返回 PayRecordVO 而非直接暴露 Entity（前端已定义 SettlementPaymentItemVO）
     @GetMapping("/{id}/payments")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<List<PayRecord>> getPayments(@PathVariable Long id) {
         return ApiResponse.success(stlSettlementService.getPayments(id));
     }
 
+    // TODO: 返回 CostItemVO 而非直接暴露 Entity（前端已定义 SettlementCostItemVO）
     @GetMapping("/{id}/costs")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<List<CostItem>> getCosts(@PathVariable Long id) {

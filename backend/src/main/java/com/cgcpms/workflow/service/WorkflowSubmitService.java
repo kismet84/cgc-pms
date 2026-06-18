@@ -71,23 +71,7 @@ public class WorkflowSubmitService {
         wfInstanceMapper.insert(instance);
 
         // Create node instances
-        List<WfNodeInstance> nodeInstances = new ArrayList<>();
-        for (WfTemplateNode tn : templateNodes) {
-            WfNodeInstance ni = new WfNodeInstance();
-            ni.setTenantId(tenantId);
-            ni.setInstanceId(instance.getId());
-            ni.setTemplateNodeId(tn.getId());
-            ni.setNodeCode(tn.getNodeCode());
-            ni.setNodeName(tn.getNodeName());
-            ni.setNodeOrder(tn.getNodeOrder());
-            ni.setApproveMode(tn.getApproveMode());
-            ni.setNodeStatus(WorkflowConstants.NODE_WAITING);
-            ni.setRoundNo(1);
-            ni.setPassRuleJson(tn.getPassRuleJson());
-            ni.setRejectRuleJson(tn.getRejectRuleJson());
-            wfNodeInstanceMapper.insert(ni);
-            nodeInstances.add(ni);
-        }
+        List<WfNodeInstance> nodeInstances = createNodeInstances(templateNodes, instance.getId(), tenantId, 1);
 
         // Activate first node and create tasks
         if (!nodeInstances.isEmpty()) {
@@ -110,20 +94,8 @@ public class WorkflowSubmitService {
         }
 
         // Notify approvers
-        List<WfTask> pendingTasks = wfTaskMapper.selectList(
-                new LambdaQueryWrapper<WfTask>()
-                        .eq(WfTask::getInstanceId, instance.getId())
-                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
-        for (WfTask t : pendingTasks) {
-            try {
-                core.notificationService.create(tenantId, t.getApproverId(),
-                        username + "提交了审批",
-                        username + "提交了审批：" + instance.getTitle(),
-                        "WORKFLOW", instance.getId());
-            } catch (Exception e) {
-                log.warn("Failed to create submit notification for approver {}: {}", t.getApproverId(), e.getMessage());
-            }
-        }
+        notifyApprovers(instance.getId(), tenantId,
+                username + "提交了审批", username + "提交了审批：" + instance.getTitle());
 
         return instance;
     }
@@ -155,23 +127,7 @@ public class WorkflowSubmitService {
 
         // Create fresh node instances for the new round
         List<WfTemplateNode> templateNodes = core.findTemplateNodes(instance.getTemplateId());
-        List<WfNodeInstance> newNodes = new ArrayList<>();
-        for (WfTemplateNode tn : templateNodes) {
-            WfNodeInstance ni = new WfNodeInstance();
-            ni.setTenantId(instance.getTenantId());
-            ni.setInstanceId(instanceId);
-            ni.setTemplateNodeId(tn.getId());
-            ni.setNodeCode(tn.getNodeCode());
-            ni.setNodeName(tn.getNodeName());
-            ni.setNodeOrder(tn.getNodeOrder());
-            ni.setApproveMode(tn.getApproveMode());
-            ni.setNodeStatus(WorkflowConstants.NODE_WAITING);
-            ni.setRoundNo(newRound);
-            ni.setPassRuleJson(tn.getPassRuleJson());
-            ni.setRejectRuleJson(tn.getRejectRuleJson());
-            wfNodeInstanceMapper.insert(ni);
-            newNodes.add(ni);
-        }
+        List<WfNodeInstance> newNodes = createNodeInstances(templateNodes, instanceId, instance.getTenantId(), newRound);
 
         // Activate the first node of the new round
         WfNodeInstance firstNode = newNodes.get(0);
@@ -183,21 +139,49 @@ public class WorkflowSubmitService {
                 userId, username, null);
 
         // Notify approvers for the new round
+        notifyApprovers(instanceId, instance.getTenantId(),
+                username + "重新提交了审批", username + "重新提交了审批：" + instance.getTitle());
+
+        return instance;
+    }
+
+    // ──────────────────────── Extracted helpers ────────────────────────
+
+    private List<WfNodeInstance> createNodeInstances(List<WfTemplateNode> nodes, Long instanceId,
+                                                     Long tenantId, int roundNo) {
+        List<WfNodeInstance> nodeInstances = new ArrayList<>();
+        for (WfTemplateNode tn : nodes) {
+            WfNodeInstance ni = new WfNodeInstance();
+            ni.setTenantId(tenantId);
+            ni.setInstanceId(instanceId);
+            ni.setTemplateNodeId(tn.getId());
+            ni.setNodeCode(tn.getNodeCode());
+            ni.setNodeName(tn.getNodeName());
+            ni.setNodeOrder(tn.getNodeOrder());
+            ni.setApproveMode(tn.getApproveMode());
+            ni.setNodeStatus(WorkflowConstants.NODE_WAITING);
+            ni.setRoundNo(roundNo);
+            ni.setPassRuleJson(tn.getPassRuleJson());
+            ni.setRejectRuleJson(tn.getRejectRuleJson());
+            wfNodeInstanceMapper.insert(ni);
+            nodeInstances.add(ni);
+        }
+        return nodeInstances;
+    }
+
+    private void notifyApprovers(Long instanceId, Long tenantId, String title, String content) {
         List<WfTask> pendingTasks = wfTaskMapper.selectList(
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instanceId)
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
         for (WfTask t : pendingTasks) {
             try {
-                core.notificationService.create(instance.getTenantId(), t.getApproverId(),
-                        username + "重新提交了审批",
-                        username + "重新提交了审批：" + instance.getTitle(),
+                core.notificationService.create(tenantId, t.getApproverId(),
+                        title, content,
                         "WORKFLOW", instanceId);
             } catch (Exception e) {
-                log.warn("Failed to create resubmit notification for approver {}: {}", t.getApproverId(), e.getMessage());
+                log.warn("Failed to create notification for approver {}: {}", t.getApproverId(), e.getMessage());
             }
         }
-
-        return instance;
     }
 }

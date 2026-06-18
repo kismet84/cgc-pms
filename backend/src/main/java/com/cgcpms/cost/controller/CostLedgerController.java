@@ -23,7 +23,7 @@ public class CostLedgerController {
     @GetMapping
     @PreAuthorize("hasAuthority('cost:ledger:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PageResult<CostLedgerVO>> getPage(
-            @RequestParam(defaultValue = "1") long pageNum,
+            @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) Long contractId,
@@ -35,7 +35,7 @@ public class CostLedgerController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String keyword) {
-        IPage<CostLedgerVO> page = costLedgerService.getPage(pageNum, pageSize,
+        IPage<CostLedgerVO> page = costLedgerService.getPage(pageNo, pageSize,
                 projectId, contractId, partnerId, costSubjectId,
                 costType, sourceType, costStatus,
                 startDate, endDate, keyword);

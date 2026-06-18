@@ -11,6 +11,7 @@ import com.cgcpms.workflow.handler.WorkflowContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Business handler for material receipt approval workflows.
@@ -36,6 +37,7 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
+    @Transactional
     public void onApproved(WorkflowContext context) {
         Long receiptId = resolveReceiptId(context.getInstance());
         log.info("材料验收审批通过，更新状态并生成成本 receiptId={}", receiptId);

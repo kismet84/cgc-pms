@@ -37,6 +37,7 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
     private final VarOrderMapper varOrderMapper;
     private final VarOrderItemMapper varOrderItemMapper;
     private final CostItemMapper costItemMapper;
+    private final CostSubjectResolver costSubjectResolver;
 
     @Override
     public String supportSourceType() {
@@ -78,7 +79,11 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
             cost.setContractId(varOrder.getContractId());
             cost.setPartnerId(varOrder.getPartnerId());
             cost.setCostType(COST_TYPE);
-            cost.setCostSubjectId(item.getCostSubjectId());
+            // 优先使用明细中的 costSubjectId，为空时通过 Resolver 统一解析
+            cost.setCostSubjectId(
+                    item.getCostSubjectId() != null
+                            ? item.getCostSubjectId()
+                            : costSubjectResolver.resolveDefaultSubjectId(varOrder.getTenantId(), "变更"));
             cost.setAmount(nvl(item.getAmount()));
             // Source item does not provide tax breakdown; assume full amount without tax
             cost.setTaxAmount(BigDecimal.ZERO);
