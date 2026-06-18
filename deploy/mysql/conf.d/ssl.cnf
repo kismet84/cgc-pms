@@ -1,0 +1,8 @@
+# deploy/mysql/conf.d/ssl.cnf
+# MySQL 8.0 automatically generates self-signed certs in /var/lib/mysql/.
+# This file enables them for client connections.
+
+[mysqld]
+ssl-ca=/var/lib/mysql/ca.pem
+ssl-cert=/var/lib/mysql/server-cert.pem
+ssl-key=/var/lib/mysql/server-key.pem
