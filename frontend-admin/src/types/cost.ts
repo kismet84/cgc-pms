@@ -43,7 +43,7 @@ export interface CostLedgerVO {
 
 /** Cost ledger query parameters */
 export interface CostLedgerQueryParams {
-  pageNum: number
+  pageNo: number
   pageSize: number
   projectId?: string
   contractId?: string
