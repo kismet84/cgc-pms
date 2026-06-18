@@ -251,7 +251,7 @@ ALTER TABLE wf_template ADD UNIQUE KEY uk_wf_template_code (tenant_id, template_
 CREATE ALIAS IF NOT EXISTS DROP_WF_INSTANCE_UNIQUE AS $$
 String dropUnique(java.sql.Connection conn) throws Exception {
     java.sql.ResultSet rs = conn.createStatement().executeQuery(
-        "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_NAME='WF_INSTANCE' AND CONSTRAINT_TYPE='UNIQUE'");
+        "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA='PUBLIC' AND TABLE_NAME='WF_INSTANCE' AND CONSTRAINT_TYPE='UNIQUE'");
     if (rs.next()) {
         conn.createStatement().execute("ALTER TABLE wf_instance DROP CONSTRAINT " + rs.getString(1));
     }
