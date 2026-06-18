@@ -84,8 +84,9 @@ public class PayRecordService {
             }
         }
 
-        // Check contract balance before payment
-        payApplicationService.checkContractBalance(app);
+        // Check contract balance before payment — include pendingAmount to prevent concurrent overpay
+        BigDecimal pendingAmount = input.getPayAmount() != null ? input.getPayAmount() : BigDecimal.ZERO;
+        payApplicationService.checkContractBalance(app, pendingAmount);
 
         // Check overpayment: sum of existing SUCCESS pay_records for this application
         List<PayRecord> existingRecords = payRecordMapper.selectList(

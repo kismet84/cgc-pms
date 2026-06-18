@@ -70,7 +70,15 @@ class WorkflowCoreService {
                             .or().ge(WfTemplate::getAmountMax, amount));
         }
         List<WfTemplate> templates = wfTemplateMapper.selectList(wrapper);
-        return templates.isEmpty() ? null : templates.get(0);
+        if (templates.isEmpty()) return null;
+        // Deterministic ordering: prefer most specific interval (smallest amountMin first,
+        // then largest amountMax first so narrower intervals beat wider ones).
+        // When amounts are identical, prefer the earliest-created template.
+        templates.sort(java.util.Comparator
+                .comparing(WfTemplate::getAmountMin, java.util.Comparator.nullsFirst(java.math.BigDecimal::compareTo))
+                .thenComparing(WfTemplate::getAmountMax, java.util.Comparator.nullsLast(java.math.BigDecimal::compareTo).reversed())
+                .thenComparing(WfTemplate::getCreatedAt, java.util.Comparator.nullsLast(LocalDateTime::compareTo)));
+        return templates.get(0);
     }
 
     List<WfTemplateNode> findTemplateNodes(Long templateId) {

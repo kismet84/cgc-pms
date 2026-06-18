@@ -247,8 +247,11 @@ public class PayApplicationService {
     /**
      * Verify that a contract still has enough balance before a payment is written back.
      * Called from PayRecordService.writeback() as an authoritative gate.
+     *
+     * @param app the pay application being written back
+     * @param pendingAmount the amount about to be written (checked against remaining balance)
      */
-    public void checkContractBalance(PayApplication app) {
+    public void checkContractBalance(PayApplication app, BigDecimal pendingAmount) {
         Long contractId = app.getContractId();
         if (contractId == null) return;
 
@@ -267,9 +270,12 @@ public class PayApplicationService {
                 .map(r -> r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        if (totalPaid.compareTo(currentAmount) > 0) {
+        // Include the pending amount in the total to prevent concurrent overpay
+        BigDecimal effectiveTotal = totalPaid.add(pendingAmount != null ? pendingAmount : BigDecimal.ZERO);
+        if (effectiveTotal.compareTo(currentAmount) > 0) {
             throw new BusinessException("EXCEED_CONTRACT_BALANCE",
                     "合同(" + contract.getContractName() + ")累计付款(" + totalPaid
+                    + ") + 本次付款(" + (pendingAmount != null ? pendingAmount : BigDecimal.ZERO)
                     + ")超过当前合同金额(" + currentAmount + ")");
         }
     }
