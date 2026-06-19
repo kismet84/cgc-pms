@@ -122,9 +122,15 @@ public class CtContractService {
 
         List<CtContract> contracts = ctContractMapper.selectList(wrapper);
         BigDecimal totalAmount = contracts.stream()
-                .map(contract -> contract.getCurrentAmount() != null
-                        ? contract.getCurrentAmount()
-                        : nullToZero(contract.getContractAmount()))
+                .map(contract -> {
+                    BigDecimal current = contract.getCurrentAmount();
+                    // currentAmount 默认值为 0（非 null），无法区分"未设"和"真的为 0"
+                    // 当 currentAmount 为 0 或 null 时回退到 contractAmount
+                    if (current != null && current.compareTo(BigDecimal.ZERO) != 0) {
+                        return current;
+                    }
+                    return nullToZero(contract.getContractAmount());
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal paidAmount = contracts.stream()
                 .map(contract -> nullToZero(contract.getPaidAmount()))

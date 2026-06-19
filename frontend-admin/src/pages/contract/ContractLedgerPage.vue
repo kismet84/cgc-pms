@@ -370,40 +370,38 @@ const gridColumns = computed(() => [
         {
           field: 'contractCode',
           title: '合同编号',
-          width: 140,
-          ellipsis: true,
-          slots: { default: 'contractCode' },
+          width: 150,
         },
       ]
     : []),
   ...(colVisible.contractName
-    ? [{ field: 'contractName', title: '合同名称', minWidth: 140, ellipsis: true }]
+    ? [{ field: 'contractName', title: '合同名称', minWidth: 120 }]
     : []),
   ...(colVisible.contractType
-    ? [{ field: 'contractType', title: '合同类型', width: 90, slots: { default: 'contractType' } }]
+    ? [{ field: 'contractType', title: '合同类型', width: 100, slots: { default: 'contractType' } }]
     : []),
   ...(colVisible.partyAName
-    ? [{ field: 'partyAName', title: '甲方', width: 120, ellipsis: true }]
+    ? [{ field: 'partyAName', title: '甲方', minWidth: 100, ellipsis: true }]
     : []),
   ...(colVisible.partyBName
-    ? [{ field: 'partyBName', title: '乙方', width: 120, ellipsis: true }]
+    ? [{ field: 'partyBName', title: '乙方', minWidth: 100, ellipsis: true }]
     : []),
   ...(colVisible.contractAmount
     ? [
         {
           field: 'contractAmount',
           title: '合同金额(含税)',
-          width: 130,
+          width: 140,
           align: 'right' as const,
           slots: { default: 'amount' },
         },
       ]
     : []),
-  ...(colVisible.signedDate ? [{ field: 'signedDate', title: '签订日期', width: 100 }] : []),
+  ...(colVisible.signedDate ? [{ field: 'signedDate', title: '签订日期', width: 110 }] : []),
   ...(colVisible.contractStatus
-    ? [{ field: 'contractStatus', title: '合同状态', width: 90, slots: { default: 'status' } }]
+    ? [{ field: 'contractStatus', title: '合同状态', width: 100, slots: { default: 'status' } }]
     : []),
-  ...(colVisible.ops ? [{ title: '操作', width: 120, slots: { default: 'ops' } }] : []),
+  ...(colVisible.ops ? [{ title: '操作', width: 130, slots: { default: 'ops' } }] : []),
 ])
 </script>
 
@@ -421,26 +419,23 @@ const gridColumns = computed(() => [
     <div class="cl-grid">
       <!-- Left column -->
       <div class="cl-left">
-        <!-- Filter card -->
-        <div class="cl-card cl-filter">
-          <!-- 全局搜索卡片 -->
-          <div class="pj-search-card">
-            <div class="pj-search-row">
-              <a-input
-                v-model:value="filter.keyword"
-                placeholder="输入合同编号、合同名称、合同类型、甲方名称、乙方名称等任意关键词"
-                allow-clear
-                size="large"
-                @press-enter="handleSearch"
-              >
-                <template #prefix><SearchOutlined style="color: #9ca3af" /></template>
-              </a-input>
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-            </div>
+        <!-- 全局搜索卡片 -->
+        <div class="pj-search-card">
+          <div class="pj-search-row">
+            <a-input
+              v-model:value="filter.keyword"
+              placeholder="输入合同编号、合同名称、合同类型、甲方名称、乙方名称等任意关键词"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined style="color: #9ca3af" /></template>
+            </a-input>
+            <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+            <a-button size="large" @click="handleReset">
+              <template #icon><ReloadOutlined /></template>
+              重置
+            </a-button>
           </div>
         </div>
 
@@ -574,6 +569,22 @@ const gridColumns = computed(() => [
             <a-button @click="fetchData"
               ><template #icon><ReloadOutlined /></template
             ></a-button>
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              style="width: 180px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option
+                v-for="p in projects"
+                :key="p.id"
+                :value="p.id"
+              >
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
           </div>
         </div>
 
@@ -700,34 +711,15 @@ const gridColumns = computed(() => [
       <aside class="cl-analysis-rail">
         <section class="cl-panel">
           <div class="cl-panel-title">合同类型分布</div>
-          <div class="cl-chart-row">
+          <div class="cl-chart-center">
             <VChart :option="donutOption" autoresize class="cl-donut" />
-            <div class="cl-legend">
-              <div v-for="item in typeDistribution" :key="item.key" class="cl-legend-item">
-                <span class="cl-legend-left">
-                  <i class="cl-dot" :style="{ background: item.color }"></i>
-                  {{ item.label }}
-                </span>
-                <b>{{ item.value }}</b>
-              </div>
-            </div>
           </div>
         </section>
 
         <section class="cl-panel">
           <div class="cl-panel-title">合同状态统计</div>
-          <div class="cl-status-chart-row">
+          <div class="cl-chart-center">
             <VChart :option="statusDonutOption" autoresize class="cl-donut" />
-            <div class="cl-status-list">
-              <div v-for="item in statusBars" :key="item.key" class="cl-status-line">
-                <span>{{ item.label }}</span>
-                <b>{{ item.value }}</b>
-                <span class="cl-bar"
-                  ><span :style="{ width: `${item.percent}%`, background: item.color }"></span
-                ></span>
-                <em>{{ item.percent }}%</em>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -1137,6 +1129,10 @@ const gridColumns = computed(() => [
   align-items: center;
   gap: 10px;
 }
+.cl-chart-center {
+  display: flex;
+  justify-content: center;
+}
 .cl-donut {
   width: 118px;
   height: 118px;
@@ -1243,8 +1239,9 @@ const gridColumns = computed(() => [
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 12px 14px;
+  padding: 14px 20px;
   margin-bottom: 10px;
+  box-shadow: var(--shadow-soft);
 }
 .pj-search-label {
   font-size: 13px;
@@ -1256,8 +1253,12 @@ const gridColumns = computed(() => [
   gap: 10px;
   align-items: center;
 }
-.pj-search-row .ant-input-affix-wrapper {
+.pj-search-row :deep(.ant-input-affix-wrapper) {
   flex: 1;
+  height: 44px;
+}
+.pj-search-row :deep(.ant-input-affix-wrapper .ant-input) {
+  font-size: 15px;
 }
 
 @media (max-width: 1280px) {
