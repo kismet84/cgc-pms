@@ -389,7 +389,6 @@ const columns = [
 
     <!-- 全局搜索卡片 -->
     <div class="pj-search-card">
-      <div class="pj-search-label">输入查询信息</div>
       <div class="pj-search-row">
         <a-input
           v-model:value="filter.keyword"
