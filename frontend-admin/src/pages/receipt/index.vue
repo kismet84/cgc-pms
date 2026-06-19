@@ -95,23 +95,23 @@ function fmtAmount(val: string): string {
 }
 // ---- End KPI ----
 
-const columns = [
-  { title: '验收单号', dataIndex: 'receiptCode', width: 140, ellipsis: true },
-  { title: '采购订单', dataIndex: 'orderCode', width: 130, ellipsis: true },
-  { title: '项目', dataIndex: 'projectName', width: 120, ellipsis: true },
-  { title: '供应商', dataIndex: 'partnerName', width: 120, ellipsis: true },
-  { title: '验收日期', dataIndex: 'receiptDate', width: 100 },
+const gridColumns = computed(() => [
+  { field: 'receiptCode', title: '验收单号', width: 140, ellipsis: true },
+  { field: 'orderCode', title: '采购订单', width: 130, ellipsis: true },
+  { field: 'projectName', title: '项目', width: 120, ellipsis: true },
+  { field: 'partnerName', title: '供应商', width: 120, ellipsis: true },
+  { field: 'receiptDate', title: '验收日期', width: 100 },
   {
+    field: 'totalAmount',
     title: '总金额',
-    dataIndex: 'totalAmount',
     width: 110,
-    key: 'totalAmount',
     align: 'right' as const,
+    slots: { default: 'totalAmount' },
   },
-  { title: '质量状态', dataIndex: 'qualityStatus', width: 100, key: 'qualityStatus' },
-  { title: '审批状态', dataIndex: 'approvalStatus', width: 100, key: 'approvalStatus' },
-  { title: '操作', key: 'action', width: 180, fixed: 'right' as const },
-]
+  { field: 'qualityStatus', title: '质量状态', width: 100, slots: { default: 'qualityStatus' } },
+  { field: 'approvalStatus', title: '审批状态', width: 100, slots: { default: 'approvalStatus' } },
+  { title: '操作', width: 180, slots: { default: 'action' } },
+])
 
 async function fetchData() {
   loading.value = true
@@ -505,43 +505,42 @@ onMounted(() => {
 
     <!-- 表格 -->
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="false"
-        row-key="id"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
         size="small"
-        :scroll="{ x: 1100 }"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'totalAmount'">
-            <span v-if="record.totalAmount" class="lg-money">
-              {{ Number(record.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
-            </span>
-            <span v-else class="lg-none">-</span>
-          </template>
-          <template v-else-if="column.key === 'qualityStatus'">
-            <a-tag :color="QUALITY_STATUS_COLOR[record.qualityStatus] || 'default'">
-              {{ (QUALITY_STATUS_LABEL[record.qualityStatus] ?? record.qualityStatus) || '-' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'approvalStatus'">
-            <ApprovalStatusTag :status="record.approvalStatus" />
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <div class="lg-ops">
-              <a class="lg-link" @click="handleEdit(record)">编辑</a>
-              <a class="lg-link lg-del" @click="handleDelete(record)">删除</a>
-              <a
-                v-if="record.approvalStatus === 'DRAFT'"
-                class="lg-link"
-                @click="handleSubmitApproval(record)"
-              >提交审批</a>
-            </div>
-          </template>
+        <template #totalAmount="{ row }">
+          <span v-if="row.totalAmount" class="lg-money">
+            {{ Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+          </span>
+          <span v-else class="lg-none">-</span>
         </template>
-      </a-table>
+        <template #qualityStatus="{ row }">
+          <a-tag :color="QUALITY_STATUS_COLOR[row.qualityStatus] || 'default'">
+            {{ (QUALITY_STATUS_LABEL[row.qualityStatus] ?? row.qualityStatus) || '-' }}
+          </a-tag>
+        </template>
+        <template #approvalStatus="{ row }">
+          <ApprovalStatusTag :status="row.approvalStatus" />
+        </template>
+        <template #action="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+            <a
+              v-if="row.approvalStatus === 'DRAFT'"
+              class="lg-link"
+              @click="handleSubmitApproval(row)"
+            >提交审批</a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <!-- 分页 -->
