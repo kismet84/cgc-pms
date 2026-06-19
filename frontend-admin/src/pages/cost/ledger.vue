@@ -127,7 +127,7 @@ async function fetchData() {
   try {
     const res: PageResult<CostLedgerVO> = await getCostLedger(params)
     tableData.value = res.records
-    total.value = res.total
+    total.value = Number(res.total) || 0
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []

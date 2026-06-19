@@ -196,7 +196,7 @@ async function fetchData() {
       keyword: filter.keyword || undefined,
     })
     tableData.value = res.records
-    total.value = res.total
+    total.value = Number(res.total) || 0
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -575,7 +575,7 @@ const gridColumns = computed(() => [
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">合同总金额</span>
-            <span class="lg-kpi-card-value">{{ kpiMax.amount > 1 ? fmtAmount(String(kpiMax.amount)) : '-' }} <small>万元</small></span>
+            <span class="lg-kpi-card-value">{{ (parseFloat(String(kpiMax.amount)) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }} <small>万元</small></span>
             <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
           </div>
           <div class="lg-kpi-card">

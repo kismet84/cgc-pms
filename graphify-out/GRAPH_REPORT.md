@@ -1,7 +1,7 @@
-# Graph Report - cgc-pms  (2026-06-19)
+# Graph Report - cgc-pms  (2026-06-20)
 
 ## Corpus Check
-- 816 files · ~281,145 words
+- 816 files · ~278,897 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2cef1dad`
+- Built from commit: `b1c69b6a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -544,60 +544,60 @@
 ## Communities (555 total, 246 thin omitted)
 
 ### Community 0 - "Controller"
-Cohesion: 0.19
-Nodes (18): Long, ApiResponse, GetMapping, Long, PageResult, PostMapping, PreAuthorize, String (+10 more)
+Cohesion: 0.05
+Nodes (56): Claims, List, Long, String, SuppressWarnings, Override, ApiResponse, Boolean (+48 more)
 
 ### Community 1 - "Exception"
 Cohesion: 0.06
-Nodes (39): AccessDeniedException, RateLimitAspect, AuthorizationDeniedException, Around, HttpServletRequest, Object, ProceedingJoinPoint, RateLimit (+31 more)
+Nodes (40): AccessDeniedException, RateLimitAspect, AuthorizationDeniedException, Around, HttpServletRequest, Object, ProceedingJoinPoint, RateLimit (+32 more)
 
 ### Community 2 - "Workflow"
 Cohesion: 0.06
 Nodes (42): ApiResponse, DeleteMapping, GetMapping, Integer, Long, PageResult, PostMapping, PutMapping (+34 more)
 
 ### Community 3 - "Contract"
-Cohesion: 0.06
-Nodes (42): ApiResponse, ContractApprovalRecordVO, ContractSaveRequest, CtContract, CtContractVO, DeleteMapping, GetMapping, List (+34 more)
+Cohesion: 0.08
+Nodes (35): ApiResponse, ContractApprovalRecordVO, ContractSaveRequest, CtContract, CtContractVO, DeleteMapping, GetMapping, List (+27 more)
 
 ### Community 4 - "Mapper"
-Cohesion: 0.12
-Nodes (14): AfterEach, Bean, BeforeEach, DisplayName, Object, Override, Test, Transactional (+6 more)
+Cohesion: 0.05
+Nodes (43): BidCost, IPage, Long, String, Transactional, BigDecimal, IPage, List (+35 more)
 
 ### Community 5 - "Auth"
-Cohesion: 0.06
-Nodes (38): Claims, CookieUtils, FilterChain, HttpServletRequest, HttpServletResponse, JwtProperties, JwtUtils, List (+30 more)
+Cohesion: 0.11
+Nodes (20): Claims, CookieUtils, FilterChain, HttpServletRequest, HttpServletResponse, JwtProperties, JwtUtils, List (+12 more)
 
 ### Community 6 - "Frontend"
 Cohesion: 0.04
 Nodes (48): dependencies, @ant-design/icons-vue, ant-design-vue, axios, dayjs, echarts, pinia, vue (+40 more)
 
 ### Community 7 - "Contract"
-Cohesion: 0.14
-Nodes (16): Long, OrgCompany, OrgDepartment, Set, Transactional, AfterEach, BeforeEach, CtContract (+8 more)
+Cohesion: 0.25
+Nodes (10): AfterEach, BeforeEach, CtContract, DisplayName, Long, Order, PmProject, String (+2 more)
 
 ### Community 8 - "Project"
-Cohesion: 0.26
-Nodes (7): IPage, Long, PmProject, PmProjectVO, String, Transactional, PmProjectService
+Cohesion: 0.12
+Nodes (21): ApiResponse, DeleteMapping, GetMapping, Long, PageResult, PmProject, PmProjectVO, PostMapping (+13 more)
 
 ### Community 9 - "Payment"
 Cohesion: 0.12
 Nodes (21): BigDecimal, CostItem, CtContract, IPage, List, Long, Map, Object (+13 more)
 
 ### Community 10 - "Notification"
-Cohesion: 0.12
-Nodes (17): Boolean, Long, NotificationVO, PageResult, SseEmitter, String, SysNotification, Transactional (+9 more)
+Cohesion: 0.13
+Nodes (16): Boolean, Long, NotificationVO, PageResult, SseEmitter, String, SysNotification, Transactional (+8 more)
 
 ### Community 11 - "User"
-Cohesion: 0.19
-Nodes (10): AfterEach, BeforeEach, DisplayName, Long, String, Test, Transactional, ContractApprovalIntegrationTest (+2 more)
+Cohesion: 0.41
+Nodes (6): CtContract, CtContractPaymentTerm, List, Long, Transactional, CtContractPaymentTermService
 
 ### Community 12 - "Payment"
-Cohesion: 0.15
+Cohesion: 0.16
 Nodes (24): ApiResponse, CostItem, DeleteMapping, GetMapping, List, Long, Map, Object (+16 more)
 
 ### Community 13 - "Workflow"
-Cohesion: 0.20
-Nodes (7): AfterAll, AfterEach, BeforeEach, DisplayName, Order, Test, WorkflowEngineIntegrationTest
+Cohesion: 0.13
+Nodes (13): BigDecimal, List, Long, String, WfInstance, AfterAll, AfterEach, BeforeEach (+5 more)
 
 ### Community 14 - "Service"
 Cohesion: 0.11
@@ -612,8 +612,8 @@ Cohesion: 0.21
 Nodes (11): AfterEach, BeforeEach, DisplayName, Long, Order, String, SuppressWarnings, Test (+3 more)
 
 ### Community 17 - "Service"
-Cohesion: 0.20
-Nodes (14): AfterEach, BeforeEach, BigDecimal, DisplayName, Long, MatPurchaseOrderItem, MatReceiptItem, Order (+6 more)
+Cohesion: 0.21
+Nodes (13): AfterEach, BeforeEach, BigDecimal, DisplayName, Long, MatPurchaseOrderItem, MatReceiptItem, Order (+5 more)
 
 ### Community 18 - "Service"
 Cohesion: 0.16
@@ -629,7 +629,7 @@ Nodes (30): [], buildContractPayload(), buildItemsPayload(), buildTermsPayload()
 
 ### Community 21 - "Dashboard"
 Cohesion: 0.11
-Nodes (18): AlertLog, BusinessManagerDashboardVO, CostBreakdownVO, CostManagerDashboardVO, CtContract, FinanceDashboardVO, List, Long (+10 more)
+Nodes (19): AlertLog, BusinessManagerDashboardVO, CostBreakdownVO, CostManagerDashboardVO, CtContract, FinanceDashboardVO, List, Long (+11 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.28
@@ -644,8 +644,8 @@ Cohesion: 0.07
 Nodes (29): addSignTask(), approveTask(), createWorkflowTemplateNode(), deleteWorkflowTemplateNode(), getInstanceDetail(), getMyCc(), getMyDone(), getMyTodos() (+21 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.10
-Nodes (27): ApiResponse, DeleteMapping, GetMapping, Long, PageResult, PmProject, PmProjectVO, PostMapping (+19 more)
+Cohesion: 0.17
+Nodes (14): Long, PmProject, ProjectOverviewVO, AfterEach, BeforeEach, DisplayName, Long, Order (+6 more)
 
 ### Community 26 - "Payment"
 Cohesion: 0.16
@@ -664,7 +664,7 @@ Cohesion: 0.27
 Nodes (7): AfterEach, BeforeEach, DisplayName, Order, Test, Transactional, OrgServiceTest
 
 ### Community 30 - "Cost"
-Cohesion: 0.24
+Cohesion: 0.23
 Nodes (15): ApiResponse, CostTarget, CostTargetItem, DeleteMapping, GetMapping, Integer, List, Long (+7 more)
 
 ### Community 31 - "Controller"
@@ -672,8 +672,8 @@ Cohesion: 0.22
 Nodes (16): ApiResponse, DeleteMapping, GetMapping, List, Long, MatReceipt, MatReceiptItem, MatReceiptItemVO (+8 more)
 
 ### Community 32 - "Project"
-Cohesion: 0.31
-Nodes (8): AfterEach, DisplayName, Long, Order, String, Test, Transactional, PmProjectArchiveTest
+Cohesion: 0.25
+Nodes (9): AfterEach, BeforeEach, DisplayName, Long, Order, String, Test, Transactional (+1 more)
 
 ### Community 33 - "Test"
 Cohesion: 0.25
@@ -696,7 +696,7 @@ Cohesion: 0.21
 Nodes (16): ApiResponse, DeleteMapping, GetMapping, List, Long, MatPurchaseRequest, MatPurchaseRequestItem, MatPurchaseRequestItemVO (+8 more)
 
 ### Community 38 - "Service"
-Cohesion: 0.22
+Cohesion: 0.21
 Nodes (11): List, Long, Map, MatPurchaseRequest, MatPurchaseRequestItem, MatPurchaseRequestItemVO, MatPurchaseRequestVO, PageResult (+3 more)
 
 ### Community 39 - "Controller"
@@ -724,7 +724,7 @@ Cohesion: 0.17
 Nodes (13): Long, Select, String, CostSubject, CostSubjectTreeNodeVO, CostSubjectVO, List, Long (+5 more)
 
 ### Community 45 - "Service"
-Cohesion: 0.24
+Cohesion: 0.25
 Nodes (10): IPage, List, Long, MatReceipt, MatReceiptItem, MatReceiptItemVO, MatReceiptVO, String (+2 more)
 
 ### Community 46 - "User"
@@ -732,12 +732,12 @@ Cohesion: 0.21
 Nodes (16): ApiResponse, DeleteMapping, GetMapping, List, Long, Map, PageResult, PostMapping (+8 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.31
+Cohesion: 0.33
 Nodes (4): DisplayName, Test, Transactional, CostSummaryServiceTest
 
 ### Community 48 - "Community 48"
 Cohesion: 0.32
-Nodes (7): BigDecimal, DisplayName, PayRecord, String, Test, Transactional, PaymentWritebackTest
+Nodes (6): AfterEach, DisplayName, String, Test, Transactional, PaymentWritebackTest
 
 ### Community 49 - "Service"
 Cohesion: 0.25
@@ -748,8 +748,8 @@ Cohesion: 0.23
 Nodes (11): IPage, List, Long, Map, String, Transactional, VarOrder, VarOrderItem (+3 more)
 
 ### Community 51 - "Dashboard"
-Cohesion: 0.22
-Nodes (11): IPage, List, Long, Map, String, SubMeasure, SubMeasureItem, SubMeasureItemVO (+3 more)
+Cohesion: 0.32
+Nodes (6): Long, OrgCompany, OrgDepartment, Set, Transactional, OrgInitService
 
 ### Community 52 - "Inventory"
 Cohesion: 0.23
@@ -760,7 +760,7 @@ Cohesion: 0.28
 Nodes (8): BeforeAll, Cookie, DisplayName, MockHttpServletRequestBuilder, Order, String, Test, StlSettlementControllerMockMvcTest
 
 ### Community 54 - "Service"
-Cohesion: 0.24
+Cohesion: 0.22
 Nodes (10): BigDecimal, CostProjectSummaryVO, CostSummaryVO, List, Long, Map, PmProject, Scheduled (+2 more)
 
 ### Community 55 - "Controller"
@@ -800,7 +800,7 @@ Cohesion: 0.22
 Nodes (11): AfterEach, BeforeEach, DisplayName, Long, MatPurchaseOrderItem, MatReceiptItem, Order, String (+3 more)
 
 ### Community 64 - "Cost"
-Cohesion: 0.25
+Cohesion: 0.27
 Nodes (9): CostTarget, CostTargetItem, Integer, IPage, List, Long, String, Transactional (+1 more)
 
 ### Community 65 - "Controller"
@@ -852,8 +852,8 @@ Cohesion: 0.22
 Nodes (13): ApiResponse, DeleteMapping, GetMapping, Long, PageResult, PostMapping, PreAuthorize, PutMapping (+5 more)
 
 ### Community 77 - "Payment"
-Cohesion: 0.26
-Nodes (8): AfterEach, BigDecimal, DisplayName, PayRecord, String, Test, Transactional, PaymentFinancialConsistencyTest
+Cohesion: 0.22
+Nodes (9): AfterEach, BeforeEach, BigDecimal, DisplayName, PayRecord, String, Test, Transactional (+1 more)
 
 ### Community 78 - "Controller"
 Cohesion: 0.25
@@ -864,8 +864,8 @@ Cohesion: 0.21
 Nodes (16): BaseMapper, Function, List, Long, Map, MatPurchaseOrderItem, MatReceipt, MatReceiptItem (+8 more)
 
 ### Community 80 - "Contract"
-Cohesion: 0.22
-Nodes (11): BigDecimal, IPage, List, LocalDate, Long, Map, OverheadAllocationRule, PmProject (+3 more)
+Cohesion: 0.36
+Nodes (7): Long, Map, Object, String, SysUserPreferenceMapper, PreferenceService, SysUserPreference
 
 ### Community 81 - "Contract"
 Cohesion: 0.12
@@ -896,8 +896,8 @@ Cohesion: 0.40
 Nodes (7): Cookie, DisplayName, MockHttpServletRequestBuilder, Order, String, Test, PreferenceControllerTest
 
 ### Community 88 - "Frontend"
-Cohesion: 0.24
-Nodes (13): ApiResponse, Boolean, GetMapping, Long, Map, NotificationVO, Object, PageResult (+5 more)
+Cohesion: 0.49
+Nodes (5): List, Long, String, JsonNode, ApproverResolver
 
 ### Community 89 - "Payment"
 Cohesion: 0.12
@@ -912,8 +912,8 @@ Cohesion: 0.24
 Nodes (8): Long, MatPurchaseRequest, Override, String, Transactional, WfInstance, WorkflowContext, PurchaseRequestWorkflowHandler
 
 ### Community 92 - "Service"
-Cohesion: 0.35
-Nodes (6): BidCost, IPage, Long, String, Transactional, BidCostService
+Cohesion: 0.39
+Nodes (6): FilterChain, HttpServletRequest, HttpServletResponse, Override, TraceIdFilter, OncePerRequestFilter
 
 ### Community 93 - "Service"
 Cohesion: 0.24
@@ -924,8 +924,8 @@ Cohesion: 0.26
 Nodes (8): IPage, List, Long, String, SysDictData, SysDictDataVO, Transactional, SysDictDataService
 
 ### Community 95 - "Community 95"
-Cohesion: 0.31
-Nodes (6): BigDecimal, List, Long, String, WfInstance, WorkflowEngine
+Cohesion: 0.32
+Nodes (5): Long, Override, String, Transactional, ContractCostStrategy
 
 ### Community 96 - "Contract"
 Cohesion: 0.22
@@ -968,12 +968,12 @@ Cohesion: 0.12
 Nodes (13): columns, fetchData(), filteredAlerts, handleBatchEvaluate(), handleReset(), handleSearch(), kpi, kpiMax (+5 more)
 
 ### Community 106 - "Payment"
-Cohesion: 0.24
-Nodes (5): Claims, List, String, SuppressWarnings, UserContext
+Cohesion: 0.32
+Nodes (5): Long, Override, String, Transactional, VarOrderCostStrategy
 
 ### Community 107 - "Contract"
-Cohesion: 0.33
-Nodes (6): CtContractChange, IPage, Long, String, Transactional, CtContractChangeService
+Cohesion: 0.27
+Nodes (7): CtContractChange, IPage, Long, String, Transactional, CtContractChangeService, WorkflowEngine
 
 ### Community 108 - "Service"
 Cohesion: 0.30
@@ -992,7 +992,7 @@ Cohesion: 0.24
 Nodes (12): ApiResponse, DeleteMapping, GetMapping, Long, OverheadAllocationRule, PageResult, PostMapping, PreAuthorize (+4 more)
 
 ### Community 112 - "Workflow"
-Cohesion: 0.21
+Cohesion: 0.20
 Nodes (8): AfterEach, BeforeEach, DisplayName, Long, String, Test, Transactional, WorkflowSubmitServiceTest
 
 ### Community 114 - "Frontend"
@@ -1009,7 +1009,7 @@ Nodes (6): Claims, JwtProperties, List, Long, String, JwtUtils
 
 ### Community 117 - "Community 117"
 Cohesion: 0.33
-Nodes (8): ApiResponse, GetMapping, Map, Object, PreAuthorize, PutMapping, String, PreferenceController
+Nodes (3): List, String, TestUserContext
 
 ### Community 118 - "Controller"
 Cohesion: 0.33
@@ -1040,8 +1040,8 @@ Cohesion: 0.32
 Nodes (9): ApiResponse, GetMapping, Long, PageResult, PayRecord, PayRecordVO, PostMapping, PreAuthorize (+1 more)
 
 ### Community 125 - "Workflow"
-Cohesion: 0.29
-Nodes (6): Long, Override, String, WfInstance, WorkflowContext, PayRequestWorkflowHandler
+Cohesion: 0.26
+Nodes (7): Long, Override, String, WfInstance, WorkflowContext, PayRequestWorkflowHandler, PayApplicationMapper
 
 ### Community 126 - "Workflow"
 Cohesion: 0.27
@@ -1072,8 +1072,8 @@ Cohesion: 0.36
 Nodes (7): List, LoginRequest, LoginResponse, Long, String, UserInfo, AuthService
 
 ### Community 134 - "Contract"
-Cohesion: 0.29
-Nodes (6): Long, Override, String, WfInstance, WorkflowContext, CtContractChangeWorkflowHandler
+Cohesion: 0.27
+Nodes (7): Long, Override, String, WfInstance, WorkflowContext, WorkflowBusinessHandler, CtContractChangeWorkflowHandler
 
 ### Community 135 - "Workflow"
 Cohesion: 0.09
@@ -1092,16 +1092,16 @@ Cohesion: 0.29
 Nodes (6): Long, Override, String, WfInstance, WorkflowContext, SubMeasureWorkflowHandler
 
 ### Community 139 - "Workflow"
-Cohesion: 0.27
-Nodes (7): Long, Override, String, WfInstance, WorkflowContext, WorkflowBusinessHandler, VarOrderWorkflowHandler
+Cohesion: 0.29
+Nodes (6): Long, Override, String, WfInstance, WorkflowContext, VarOrderWorkflowHandler
 
 ### Community 140 - "Community 140"
 Cohesion: 0.27
 Nodes (6): AfterEach, BeforeEach, DisplayName, Order, Test, StlSettlementServiceTest
 
 ### Community 141 - "Workflow"
-Cohesion: 0.12
-Nodes (12): IPage, List, T, List, String, BeforeEach, BeforeEach, DisplayName (+4 more)
+Cohesion: 0.26
+Nodes (7): IPage, List, T, DisplayName, Test, PageResult, ContractSettlementKpiRouteTest
 
 ### Community 142 - "User"
 Cohesion: 0.67
@@ -1112,8 +1112,8 @@ Cohesion: 0.32
 Nodes (9): ApiResponse, CostProjectSummaryVO, CostSummaryVO, GetMapping, List, Long, PostMapping, PreAuthorize (+1 more)
 
 ### Community 145 - "Payment"
-Cohesion: 0.21
-Nodes (10): Long, PayApplication, Select, IPage, Long, PayRecord, PayRecordVO, Transactional (+2 more)
+Cohesion: 0.36
+Nodes (6): IPage, Long, PayRecord, PayRecordVO, Transactional, PayRecordService
 
 ### Community 146 - "Workflow"
 Cohesion: 0.20
@@ -1124,8 +1124,8 @@ Cohesion: 0.41
 Nodes (5): DisplayName, MockHttpServletRequestBuilder, String, Test, NotificationControllerIntegrationTest
 
 ### Community 149 - "Community 149"
-Cohesion: 0.33
-Nodes (8): ApiResponse, ChangePasswordRequest, PreAuthorize, PutMapping, UpdateProfileRequest, UserInfo, Void, ProfileController
+Cohesion: 0.47
+Nodes (4): Long, PayApplication, Select, PayApplicationMapper
 
 ### Community 150 - "Frontend"
 Cohesion: 0.17
@@ -1216,7 +1216,7 @@ Cohesion: 0.11
 Nodes (25): ApiResponse, ContractRevenue, ContractRevenueBalanceVO, ContractRevenueVO, DeleteMapping, GetMapping, Long, PageResult (+17 more)
 
 ### Community 174 - "Service"
-Cohesion: 0.17
+Cohesion: 0.16
 Nodes (15): Function, IPage, List, Long, Map, T, WfCcVO, WfInstance (+7 more)
 
 ### Community 175 - "Workflow"
@@ -1224,8 +1224,8 @@ Cohesion: 0.36
 Nodes (4): List, String, WorkflowBusinessHandler, WorkflowBusinessHandlerRegistry
 
 ### Community 176 - "Community 176"
-Cohesion: 0.48
-Nodes (4): Override, MyMetaObjectHandler, MetaObject, MetaObjectHandler
+Cohesion: 0.40
+Nodes (4): BigDecimal, PayRecord, MdPartnerMapper, PayRecordMapper
 
 ### Community 177 - "Workflow"
 Cohesion: 0.20
@@ -1272,12 +1272,12 @@ Cohesion: 0.38
 Nodes (5): ApiResponse, DeleteMapping, PreAuthorize, String, SystemController
 
 ### Community 193 - "Community 193"
-Cohesion: 0.27
+Cohesion: 0.25
 Nodes (6): AlertEvaluationServiceTest, AfterEach, BeforeEach, DisplayName, Test, Transactional
 
 ### Community 194 - "User"
-Cohesion: 0.20
-Nodes (12): BigDecimal, ContractApprovalRecordVO, CtContract, CtContractVO, IPage, List, Long, Map (+4 more)
+Cohesion: 0.16
+Nodes (15): BigDecimal, ContractApprovalRecordVO, ContractSaveRequest, CtContract, CtContractVO, IPage, List, Long (+7 more)
 
 ### Community 195 - "Service"
 Cohesion: 0.43
@@ -1448,8 +1448,8 @@ Cohesion: 0.40
 Nodes (7): BigDecimal, Long, MatStock, MatStockLedgerVO, String, Transactional, MatStockService
 
 ### Community 306 - "Community 306"
-Cohesion: 0.16
-Nodes (10): Long, PostConstruct, String, AfterEach, BeforeEach, DisplayName, Test, Transactional (+2 more)
+Cohesion: 0.10
+Nodes (18): Long, PostConstruct, String, AfterEach, BeforeEach, DisplayName, Long, String (+10 more)
 
 ### Community 309 - "Community 309"
 Cohesion: 0.29
@@ -1472,7 +1472,7 @@ Cohesion: 0.41
 Nodes (6): CtContract, CtContractItem, List, Long, Transactional, CtContractItemService
 
 ### Community 324 - "Community 324"
-Cohesion: 0.28
+Cohesion: 0.26
 Nodes (6): AfterEach, BeforeEach, DisplayName, Test, Transactional, VarOrderServiceTest
 
 ### Community 325 - "Community 325"
@@ -1492,16 +1492,16 @@ Cohesion: 0.29
 Nodes (7): OperationLogAspect, Around, HttpServletRequest, Object, ProceedingJoinPoint, String, OperationLog
 
 ### Community 492 - "Community 492"
-Cohesion: 0.17
-Nodes (15): BigDecimal, CtContract, Scheduled, CostSummary, CtContractMapper, CtContractPaymentTermMapper, MatReceiptItemMapper, MatReceiptMapper (+7 more)
+Cohesion: 0.28
+Nodes (6): CtContractPaymentTermMapper, MatReceiptItemMapper, MatReceiptMapper, PayApplicationBasisMapper, SubMeasureItemMapper, SubMeasureMapper
 
 ### Community 493 - "Community 493"
-Cohesion: 0.05
-Nodes (31): Long, Override, String, Transactional, Long, Override, String, Transactional (+23 more)
+Cohesion: 0.08
+Nodes (21): Long, Override, String, Transactional, Long, String, Long, String (+13 more)
 
 ### Community 496 - "Community 496"
-Cohesion: 0.26
-Nodes (9): AlertLog, Integer, List, Long, Map, Set, String, Transactional (+1 more)
+Cohesion: 0.21
+Nodes (12): AlertLog, BigDecimal, CtContract, Integer, List, Long, Map, Scheduled (+4 more)
 
 ### Community 497 - "Community 497"
 Cohesion: 0.60
@@ -1516,11 +1516,11 @@ Cohesion: 0.39
 Nodes (4): AfterEach, DisplayName, Test, CostSubjectServiceTest
 
 ### Community 564 - "Community 564"
-Cohesion: 0.25
-Nodes (5): Delete, Long, AfterEach, AfterEach, CostSummaryMapper
+Cohesion: 0.33
+Nodes (4): Delete, Long, AfterEach, CostSummaryMapper
 
 ## Knowledge Gaps
-- **905 isolated node(s):** `Project Overview`, `Development Environment`, `Backend`, `Frontend`, `Infrastructure` (+900 more)
+- **905 isolated node(s):** `String`, `Object`, `PostMapping`, `AccountingEntryLineMapper`, `AccountingEntryMapper` (+900 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **246 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -1528,16 +1528,16 @@ Nodes (5): Delete, Long, AfterEach, AfterEach, CostSummaryMapper
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `request()` connect `Frontend` to `Contract`, `Frontend`, `Community 279`, `Workflow`, `Project`, `Workflow`, `Invoice`, `Payment`, `Frontend`, `Frontend`, `Dashboard`, `Community 311`, `Alert`, `Auth`, `Contract`, `Frontend`, `Contract`, `Frontend`, `Frontend`, `Notification`, `Frontend`, `Community 218`, `Frontend`, `Payment`?**
-  _High betweenness centrality (0.073) - this node is a cross-community bridge._
+  _High betweenness centrality (0.057) - this node is a cross-community bridge._
 - **Why does `File` connect `Invoice` to `Frontend`?**
-  _High betweenness centrality (0.072) - this node is a cross-community bridge._
+  _High betweenness centrality (0.057) - this node is a cross-community bridge._
 - **Are the 234 inferred relationships involving `request()` (e.g. with `batchEvaluate()` and `getAlertList()`) actually correct?**
   _`request()` has 234 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `Project Overview`, `Development Environment`, `Backend` to the rest of the system?**
+- **What connects `String`, `Object`, `PostMapping` to the rest of the system?**
   _905 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `Controller` be split into smaller, more focused modules?**
+  _Cohesion score 0.051839464882943144 - nodes in this community are weakly interconnected._
 - **Should `Exception` be split into smaller, more focused modules?**
-  _Cohesion score 0.060455486542443065 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.057902973395931145 - nodes in this community are weakly interconnected._
 - **Should `Workflow` be split into smaller, more focused modules?**
   _Cohesion score 0.05851619644723093 - nodes in this community are weakly interconnected._
-- **Should `Contract` be split into smaller, more focused modules?**
-  _Cohesion score 0.06491398896462187 - nodes in this community are weakly interconnected._
