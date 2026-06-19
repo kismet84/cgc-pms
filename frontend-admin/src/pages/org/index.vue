@@ -53,13 +53,13 @@ const companyFilter = reactive({
   status: undefined as string | undefined,
 })
 
-const companyColumns = [
-  { title: '公司编号', dataIndex: 'companyCode', width: 120 },
-  { title: '公司名称', dataIndex: 'companyName', minWidth: 140 },
-  { title: '状态', dataIndex: 'status', width: 80 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
-  { title: '操作', dataIndex: 'ops', width: 120, align: 'right' as const },
-]
+const companyGridColumns = computed(() => [
+  { field: 'companyCode', title: '公司编号', width: 120 },
+  { field: 'companyName', title: '公司名称', minWidth: 140 },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'companyStatus' } },
+  { field: 'createdAt', title: '创建时间', width: 150 },
+  { title: '操作', width: 120, align: 'right' as const, slots: { default: 'companyOps' } },
+])
 
 // ─── Department tree state ───────────────────────────────
 
@@ -90,15 +90,15 @@ const positionFilter = reactive({
   status: undefined as string | undefined,
 })
 
-const positionColumns = [
-  { title: '所属公司', dataIndex: 'companyId', width: 100 },
-  { title: '所属部门', dataIndex: 'departmentId', width: 100 },
-  { title: '岗位编号', dataIndex: 'positionCode', width: 120 },
-  { title: '岗位名称', dataIndex: 'positionName', minWidth: 140 },
-  { title: '状态', dataIndex: 'status', width: 80 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
-  { title: '操作', dataIndex: 'ops', width: 120, align: 'right' as const },
-]
+const positionGridColumns = computed(() => [
+  { field: 'companyId', title: '所属公司', width: 100, slots: { default: 'posCompanyId' } },
+  { field: 'departmentId', title: '所属部门', width: 100, slots: { default: 'posDeptId' } },
+  { field: 'positionCode', title: '岗位编号', width: 120 },
+  { field: 'positionName', title: '岗位名称', minWidth: 140 },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'posStatus' } },
+  { field: 'createdAt', title: '创建时间', width: 150 },
+  { title: '操作', width: 120, align: 'right' as const, slots: { default: 'posOps' } },
+])
 
 // ─── Page metrics ───────────────────────────────────────
 
@@ -266,10 +266,6 @@ function handleCompanyPageSizeChange(_cur: number, size: number) {
 
 function handleCompanyRowClick(record: OrgCompanyVO) {
   selectedCompanyId.value = record.id
-}
-
-function getCompanyRowClass(record: OrgCompanyVO) {
-  return record.id === selectedCompanyId.value ? 'org-row-selected' : ''
 }
 
 // ─── Department tree ─────────────────────────────────────
@@ -696,46 +692,41 @@ onMounted(async () => {
             <a-button size="small" @click="handleCompanyReset">重置</a-button>
           </div>
 
-          <a-table
+          <vxe-grid
             class="org-table"
-            :columns="companyColumns"
-            :data-source="companyData"
+            :data="companyData"
+            :columns="companyGridColumns"
             :loading="companyLoading"
-            :pagination="false"
-            row-key="id"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
             size="small"
-            :custom-row="
-              (record: OrgCompanyVO) => ({
-                onClick: () => handleCompanyRowClick(record),
-                class: getCompanyRowClass(record),
-              })
-            "
+            max-height="480"
+            @row-click="({ row }: any) => handleCompanyRowClick(row)"
           >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.dataIndex === 'status'">
-                <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
-                  {{ record.status === 'ENABLED' ? '启用' : '禁用' }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.dataIndex === 'ops'">
-                <a-button
-                  v-if="canEdit"
-                  size="small"
-                  type="link"
-                  @click.stop="openCompanyEdit(record)"
-                  >编辑</a-button
-                >
-                <a-button
-                  v-if="canDelete"
-                  size="small"
-                  type="link"
-                  danger
-                  @click.stop="handleCompanyDelete(record)"
-                  >删除</a-button
-                >
-              </template>
+            <template #companyStatus="{ row }">
+              <a-tag :color="row.status === 'ENABLED' ? 'success' : 'default'">
+                {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
+              </a-tag>
             </template>
-          </a-table>
+            <template #companyOps="{ row }">
+              <a-button
+                v-if="canEdit"
+                size="small"
+                type="link"
+                @click="openCompanyEdit(row)"
+                >编辑</a-button
+              >
+              <a-button
+                v-if="canDelete"
+                size="small"
+                type="link"
+                danger
+                @click="handleCompanyDelete(row)"
+                >删除</a-button
+              >
+            </template>
+          </vxe-grid>
 
           <div class="org-panel-footer">
             <span>共 {{ companyTotal }} 条</span>
@@ -882,42 +873,42 @@ onMounted(async () => {
           <a-button size="small" @click="handlePositionReset">重置</a-button>
         </div>
 
-        <a-table
+        <vxe-grid
           class="org-table"
-          :columns="positionColumns"
-          :data-source="positionData"
+          :data="positionData"
+          :columns="positionGridColumns"
           :loading="positionLoading"
-          :pagination="false"
-          row-key="id"
+          :column-config="{ resizable: true }"
+          stripe
+          border="inner"
           size="small"
+          max-height="480"
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.dataIndex === 'companyId'">
-              {{ companyData.find((c) => c.id === record.companyId)?.companyName ?? '-' }}
-            </template>
-            <template v-else-if="column.dataIndex === 'departmentId'">
-              {{ flatDeptList.find((d) => d.id === record.departmentId)?.name ?? '-' }}
-            </template>
-            <template v-else-if="column.dataIndex === 'status'">
-              <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
-                {{ record.status === 'ENABLED' ? '启用' : '禁用' }}
-              </a-tag>
-            </template>
-            <template v-else-if="column.dataIndex === 'ops'">
-              <a-button v-if="canEdit" size="small" type="link" @click="openPositionEdit(record)"
-                >编辑</a-button
-              >
-              <a-button
-                v-if="canDelete"
-                size="small"
-                type="link"
-                danger
-                @click="handlePositionDelete(record)"
-                >删除</a-button
-              >
-            </template>
+          <template #posCompanyId="{ row }">
+            {{ companyData.find((c) => c.id === row.companyId)?.companyName ?? '-' }}
           </template>
-        </a-table>
+          <template #posDeptId="{ row }">
+            {{ flatDeptList.find((d) => d.id === row.departmentId)?.name ?? '-' }}
+          </template>
+          <template #posStatus="{ row }">
+            <a-tag :color="row.status === 'ENABLED' ? 'success' : 'default'">
+              {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
+            </a-tag>
+          </template>
+          <template #posOps="{ row }">
+            <a-button v-if="canEdit" size="small" type="link" @click="openPositionEdit(row)"
+              >编辑</a-button
+            >
+            <a-button
+              v-if="canDelete"
+              size="small"
+              type="link"
+              danger
+              @click="handlePositionDelete(row)"
+              >删除</a-button
+            >
+          </template>
+        </vxe-grid>
 
         <div class="org-panel-footer">
           <span>共 {{ positionTotal }} 条</span>
