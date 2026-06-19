@@ -32,11 +32,12 @@ public class PmProjectController {
     public ApiResponse<PageResult<PmProjectVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String projectCode,
             @RequestParam(required = false) String projectName,
             @RequestParam(required = false) String projectType,
             @RequestParam(required = false) String status) {
-        IPage<PmProjectVO> page = pmProjectService.getPage(pageNo, pageSize, projectCode, projectName, projectType, status);
+        IPage<PmProjectVO> page = pmProjectService.getPage(pageNo, pageSize, keyword, projectCode, projectName, projectType, status);
         return ApiResponse.success(PageResult.of(page));
     }
 

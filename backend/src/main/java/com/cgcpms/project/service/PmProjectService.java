@@ -50,9 +50,22 @@ public class PmProjectService {
     private final StlSettlementMapper stlSettlementMapper;
     private final WfInstanceMapper wfInstanceMapper;
 
-    public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String projectCode, String projectName, String projectType, String status) {
+    public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String keyword, String projectCode, String projectName, String projectType, String status) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PmProject::getTenantId, UserContext.getCurrentTenantId());
+        // keyword 全局搜索：匹配项目编号、项目名称、项目类型、合同金额、项目地址等字段
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w ->
+                w.like(PmProject::getProjectCode, keyword)
+                    .or().like(PmProject::getProjectName, keyword)
+                    .or().like(PmProject::getProjectType, keyword)
+                    .or().like(PmProject::getContractAmount, keyword)
+                    .or().like(PmProject::getProjectAddress, keyword)
+                    .or().like(PmProject::getOwnerUnit, keyword)
+                    .or().like(PmProject::getSupervisorUnit, keyword)
+                    .or().like(PmProject::getDesignUnit, keyword)
+            );
+        }
         if (StringUtils.hasText(projectCode)) wrapper.like(PmProject::getProjectCode, projectCode);
         if (StringUtils.hasText(projectName)) wrapper.like(PmProject::getProjectName, projectName);
         if (StringUtils.hasText(projectType)) wrapper.eq(PmProject::getProjectType, projectType);

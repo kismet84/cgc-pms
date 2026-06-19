@@ -2,7 +2,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import VChart from 'vue-echarts'
 import {
   getProjectList,
@@ -15,10 +15,7 @@ import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 
 const filter = reactive({
-  projectCode: '',
-  projectName: '',
-  projectType: undefined as string | undefined,
-  status: undefined as string | undefined,
+  keyword: '',
 })
 
 const loading = ref(false)
@@ -196,10 +193,7 @@ async function fetchData() {
     const res: PageResult<ProjectVO> = await getProjectList({
       pageNum: pageNo.value,
       pageSize: pageSize.value,
-      projectCode: filter.projectCode || undefined,
-      projectName: filter.projectName || undefined,
-      projectType: filter.projectType,
-      status: filter.status,
+      keyword: filter.keyword || undefined,
     })
     tableData.value = res.records
     total.value = res.total
@@ -218,10 +212,7 @@ function handleSearch() {
   fetchData()
 }
 function handleReset() {
-  filter.projectCode = ''
-  filter.projectName = ''
-  filter.projectType = undefined
-  filter.status = undefined
+  filter.keyword = ''
   pageNo.value = 1
   fetchData()
 }
@@ -396,64 +387,24 @@ const columns = [
       </div>
     </div>
 
-    <!-- Filter -->
-    <div class="pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label for="filter-project-code">项目编号：</label>
-          <a-input
-            id="filter-project-code"
-            v-model:value="filter.projectCode"
-            placeholder="请输入项目编号"
-            style="width: 160px"
-            allow-clear
-          />
-        </div>
-        <div class="pt-field">
-          <label for="filter-project-name">项目名称：</label>
-          <a-input
-            id="filter-project-name"
-            v-model:value="filter.projectName"
-            placeholder="请输入项目名称"
-            style="width: 180px"
-            allow-clear
-          />
-        </div>
-        <div class="pt-field">
-          <label for="filter-project-type">项目类型：</label>
-          <a-select
-            id="filter-project-type"
-            v-model:value="filter.projectType"
-            placeholder="全部"
-            allow-clear
-            style="width: 140px"
-          >
-            <a-select-option value="施工总承包">施工总承包</a-select-option>
-            <a-select-option value="专业分包">专业分包</a-select-option>
-            <a-select-option value="劳务分包">劳务分包</a-select-option>
-            <a-select-option value="材料采购">材料采购</a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label for="filter-status">状态：</label>
-          <a-select
-            id="filter-status"
-            v-model:value="filter.status"
-            placeholder="全部"
-            allow-clear
-            style="width: 120px"
-          >
-            <a-select-option value="DRAFT">前期</a-select-option>
-            <a-select-option value="ONGOING">在建</a-select-option>
-            <a-select-option value="COMPLETED">已竣工</a-select-option>
-            <a-select-option value="SUSPENDED">已暂停</a-select-option>
-            <a-select-option value="CLOSED">已关闭</a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-filter-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-        </div>
+    <!-- 全局搜索卡片 -->
+    <div class="pj-search-card">
+      <div class="pj-search-label">输入查询信息</div>
+      <div class="pj-search-row">
+        <a-input
+          v-model:value="filter.keyword"
+          placeholder="输入项目编号、项目名称、项目类型、合同金额、建设单位等任意关键词"
+          allow-clear
+          size="large"
+          @press-enter="handleSearch"
+        >
+          <template #prefix><SearchOutlined style="color: #9ca3af" /></template>
+        </a-input>
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
       </div>
     </div>
 
@@ -739,5 +690,28 @@ const columns = [
 }
 .pj-create-form {
   padding-top: 16px;
+}
+
+/* 全局搜索卡片 */
+.pj-search-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.pj-search-label {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.pj-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.pj-search-row .ant-input-affix-wrapper {
+  flex: 1;
 }
 </style>
