@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
@@ -228,6 +228,14 @@ function handlePageSizeChange(_cur: number, size: number) {
 
 onMounted(fetchData)
 
+const MOBILE_BP = 768
+const isMobile = ref(window.innerWidth < MOBILE_BP)
+function onResize() {
+  isMobile.value = window.innerWidth < MOBILE_BP
+}
+onMounted(() => window.addEventListener('resize', onResize))
+onUnmounted(() => window.removeEventListener('resize', onResize))
+
 function fmtAmount(val: string): string {
   const n = parseFloat(val)
   if (isNaN(n)) return '-'
@@ -273,6 +281,7 @@ const projectStats = computed(() => {
     total: total.value || rows.length,
     ongoing: rows.filter((item) => item.status === 'ONGOING').length,
     completed: rows.filter((item) => item.status === 'COMPLETED').length,
+    draft: rows.filter((item) => item.status === 'DRAFT').length,
     risk: rows.filter((item) => ['SUSPENDED', 'CLOSED'].includes(item.status)).length,
   }
 })
@@ -336,94 +345,68 @@ const recentProjects = computed(() =>
     .concat(tableData.value.length ? [] : [{ name: '等待项目数据加载', status: '空状态' }]),
 )
 
-const columns = [
-  { title: '项目编号', dataIndex: 'projectCode', width: 140, ellipsis: true },
+function kpiPct(val: number, max: number): number {
+  if (!max || max <= 0) return 0
+  return Math.round((val / max) * 100)
+}
+
+const kpiMax = computed(() => ({
+  total: total.value || 1,
+  amount: tableData.value.reduce((m, r) => Math.max(m, parseFloat(r.contractAmount) || 0), 0) || 1,
+}))
+
+// ---- VxeGrid columns ----
+const gridColumns = computed(() => [
+  { field: 'projectCode', title: '项目编号', width: 140, ellipsis: true },
+  { field: 'projectName', title: '项目名称', minWidth: 160, slots: { default: 'projectName' } },
+  { field: 'projectType', title: '项目类型', width: 110, slots: { default: 'projectType' } },
   {
-    title: '项目名称',
-    dataIndex: 'projectName',
-    minWidth: 160,
-    ellipsis: true,
-  },
-  {
-    title: '项目类型',
-    dataIndex: 'projectType',
-    width: 110,
-  },
-  {
+    field: 'contractAmount',
     title: '合同金额',
-    dataIndex: 'contractAmount',
-    width: 120,
+    width: 130,
     align: 'right' as const,
+    slots: { default: 'contractAmount' },
   },
   {
+    field: 'plannedStartDate',
     title: '计划工期',
-    dataIndex: 'plannedStartDate',
     width: 200,
+    slots: { default: 'plannedDuration' },
   },
-  { title: '状态', dataIndex: 'status', width: 80 },
-  {
-    title: '审批状态',
-    dataIndex: 'approvalStatus',
-    width: 90,
-  },
-  { title: '操作', dataIndex: 'ops', width: 100 },
-]
+  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
+  { title: '操作', width: 120, slots: { default: 'ops' } },
+])
 </script>
 
 <template>
-  <div class="pj-page app-page project-target-redesign">
-    <div class="pt-page-head">
+  <div class="lg-page app-page">
+    <!-- 页面头部 -->
+    <div class="lg-page-head">
       <div>
-        <a-breadcrumb class="pt-breadcrumb">
+        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目列表</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
-      <div class="pt-head-actions">
-        <a-button type="primary" @click="handleCreateModalOpen">
-          <PlusOutlined />
-          新建项目
-        </a-button>
-      </div>
     </div>
 
-    <!-- 全局搜索卡片 -->
-    <div class="pj-search-card">
-      <div class="pj-search-row">
-        <a-input
-          v-model:value="filter.keyword"
-          placeholder="输入项目编号、项目名称、项目类型、合同金额、建设单位等任意关键词"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix><SearchOutlined style="color: #9ca3af" /></template>
-        </a-input>
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
-    </div>
-
-    <div class="pt-kpi-strip">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">项目总数</div>
-        <div class="pt-kpi-value">{{ projectStats.total }} <small>个</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">在建项目</div>
-        <div class="pt-kpi-value">{{ projectStats.ongoing }} <small>个</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">已完工项目</div>
-        <div class="pt-kpi-value">{{ projectStats.completed }} <small>个</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">风险项目</div>
-        <div class="pt-kpi-value">{{ projectStats.risk }} <small>个</small></div>
-      </div>
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.keyword"
+        placeholder="搜索项目编号、名称、类型、建设单位…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
     <!-- Create Modal -->
@@ -580,55 +563,105 @@ const columns = [
       </a-form>
     </a-modal>
 
-    <div class="pt-ledger-layout">
-      <main class="pt-panel pt-table-panel">
-        <div class="pt-panel-header">项目清单</div>
-        <a-table
-          :data-source="tableData"
-          :columns="columns"
-          :loading="loading"
-          :pagination="false"
-          row-key="id"
-          size="small"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.dataIndex === 'projectName'">
-              <a class="pt-link" @click="router.push(`/project/${record.id}/overview`)">{{
-                record.projectName
+    <div class="lg-grid">
+      <!-- 左列 -->
+      <div class="lg-left">
+        <!-- KPI 横条 -->
+        <div v-if="!isMobile" class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">项目总数</span>
+            <span class="lg-kpi-card-value">{{ projectStats.total }} <small>个</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">合同总金额</span>
+            <span class="lg-kpi-card-value">{{ kpiMax.amount > 1 ? fmtAmount(String(kpiMax.amount)) : '-' }} <small>万元</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">在建项目</span>
+            <span class="lg-kpi-card-value">{{ projectStats.ongoing }} <small>个</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(projectStats.ongoing, kpiMax.total) + '%', background: 'var(--kpi-paid)' }"></span></span>
+            <span class="lg-kpi-card-hint">{{ kpiPct(projectStats.ongoing, kpiMax.total) }}%</span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">已完工项目</span>
+            <span class="lg-kpi-card-value">{{ projectStats.completed }} <small>个</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(projectStats.completed, kpiMax.total) + '%', background: 'var(--kpi-paid)' }"></span></span>
+            <span class="lg-kpi-card-hint">{{ kpiPct(projectStats.completed, kpiMax.total) }}%</span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">风险项目</span>
+            <span class="lg-kpi-card-value">{{ projectStats.risk }} <small>个</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(projectStats.risk, kpiMax.total) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+            <span class="lg-kpi-card-hint" v-if="projectStats.risk">{{ kpiPct(projectStats.risk, kpiMax.total) }}%</span>
+          </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleCreateModalOpen">
+              <template #icon><PlusOutlined /></template>
+              新建项目
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
+          </div>
+        </div>
+
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #projectName="{ row }">
+              <a class="lg-link" @click="router.push(`/project/${row.id}/overview`)">{{
+                row.projectName
               }}</a>
             </template>
-            <template v-else-if="column.dataIndex === 'projectType'">
-              <a-tag :color="TYPE_COLOR[record.projectType] ?? 'default'">{{
-                record.projectType
+            <template #projectType="{ row }">
+              <a-tag :color="TYPE_COLOR[row.projectType] ?? 'default'">{{
+                row.projectType
               }}</a-tag>
             </template>
-            <template v-else-if="column.dataIndex === 'contractAmount'">
-              <span class="pj-money">{{ fmtAmount(record.contractAmount) }}</span>
+            <template #contractAmount="{ row }">
+              <span class="lg-money">{{ fmtAmount(row.contractAmount) }}</span>
             </template>
-            <template v-else-if="column.dataIndex === 'plannedStartDate'">
-              <span>{{ record.plannedStartDate }} ~ {{ record.plannedEndDate }}</span>
+            <template #plannedDuration="{ row }">
+              <span>{{ row.plannedStartDate }} ~ {{ row.plannedEndDate }}</span>
             </template>
-            <template v-else-if="column.dataIndex === 'status'">
-              <a-tag :color="STATUS_COLOR[record.status] ?? 'default'">{{
-                STATUS_LABEL[record.status] ?? record.status
+            <template #status="{ row }">
+              <a-tag :color="STATUS_COLOR[row.status] ?? 'default'">{{
+                STATUS_LABEL[row.status] ?? row.status
               }}</a-tag>
             </template>
-            <template v-else-if="column.dataIndex === 'approvalStatus'">
-              <a-tag :color="APPROVAL_COLOR[record.approvalStatus] ?? 'default'">{{
-                record.approvalStatus
+            <template #approvalStatus="{ row }">
+              <a-tag :color="APPROVAL_COLOR[row.approvalStatus] ?? 'default'">{{
+                row.approvalStatus
               }}</a-tag>
             </template>
-            <template v-else-if="column.dataIndex === 'ops'">
-              <div class="pj-ops">
-                <a class="pt-link" @click="router.push(`/project/${record.id}/overview`)">查看</a>
-                <a class="pt-link" @click="handleEditModalOpen(record)">编辑</a>
-                <a class="pt-link pt-danger" @click="handleDelete(record)">删除</a>
+            <template #ops="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="router.push(`/project/${row.id}/overview`)">查看</a>
+                <a class="lg-link" @click="handleEditModalOpen(row)">编辑</a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
               </div>
             </template>
-          </template>
-        </a-table>
-        <div class="pt-pagination">
-          <span class="pt-total">共 {{ total }} 条</span>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
           <a-pagination
             v-model:current="pageNo"
             v-model:page-size="pageSize"
@@ -640,36 +673,31 @@ const columns = [
             @show-size-change="handlePageSizeChange"
           />
         </div>
-      </main>
+      </div>
 
-      <aside class="pt-analysis-rail">
-        <section class="pt-panel">
-          <div class="pt-panel-header">项目状态分布</div>
-          <div class="pt-panel-body">
-            <VChart :option="statusOption" autoresize class="pt-chart" />
-          </div>
+      <!-- 右侧分析面板 -->
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">项目状态分布</div>
+          <VChart :option="statusOption" autoresize class="pt-chart" />
         </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">项目风险提示</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="item in riskProjects" :key="item.name" class="pt-compact-row">
-                <span>{{ item.name }}</span>
-                <b>{{ item.status }}</b>
-              </li>
-            </ul>
-          </div>
+        <section class="lg-panel">
+          <div class="lg-panel-title">项目风险提示</div>
+          <ul class="pt-compact-list">
+            <li v-for="item in riskProjects" :key="item.name" class="pt-compact-row">
+              <span>{{ item.name }}</span>
+              <b>{{ item.status }}</b>
+            </li>
+          </ul>
         </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">近期项目</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="item in recentProjects" :key="item.name" class="pt-compact-row">
-                <span>{{ item.name }}</span>
-                <b>{{ item.status }}</b>
-              </li>
-            </ul>
-          </div>
+        <section class="lg-panel">
+          <div class="lg-panel-title">近期项目</div>
+          <ul class="pt-compact-list">
+            <li v-for="item in recentProjects" :key="item.name" class="pt-compact-row">
+              <span>{{ item.name }}</span>
+              <b>{{ item.status }}</b>
+            </li>
+          </ul>
         </section>
       </aside>
     </div>
@@ -677,40 +705,34 @@ const columns = [
 </template>
 
 <style scoped>
-.pj-page {
-  padding: 4px 0;
-}
-.pj-money {
-  font-variant-numeric: tabular-nums;
-}
-.pj-ops {
-  display: flex;
-  gap: 10px;
-}
 .pj-create-form {
   padding-top: 16px;
 }
 
-/* 全局搜索卡片 */
-.pj-search-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-  padding: 14px 16px;
-  margin-bottom: 10px;
+.pt-chart {
+  height: 176px;
 }
-.pj-search-label {
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-.pj-search-row {
+
+.pt-compact-list {
   display: flex;
-  gap: 10px;
-  align-items: center;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.pj-search-row .ant-input-affix-wrapper {
-  flex: 1;
+
+.pt-compact-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.pt-compact-row b {
+  color: var(--text);
+  font-weight: 700;
 }
 </style>
