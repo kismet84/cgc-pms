@@ -183,15 +183,15 @@ const STATUS_LABEL: Record<string, string> = {
   DISABLED: '禁用',
 }
 
-const dataColumns = [
-  { title: '字典标签', dataIndex: 'dictLabel', minWidth: 140 },
-  { title: '字典键值', dataIndex: 'dictValue', width: 140 },
-  { title: '排序', dataIndex: 'orderNum', width: 80, align: 'right' as const },
-  { title: '样式类名', dataIndex: 'cssClass', width: 120 },
-  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '创建时间', dataIndex: 'createdAt', width: 170 },
-  { title: '操作', dataIndex: 'ops', width: 120, key: 'ops' },
-]
+const dataGridColumns = computed(() => [
+  { field: 'dictLabel', title: '字典标签', minWidth: 140 },
+  { field: 'dictValue', title: '字典键值', width: 140 },
+  { field: 'orderNum', title: '排序', width: 80, align: 'right' as const },
+  { field: 'cssClass', title: '样式类名', width: 120 },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'createdAt', title: '创建时间', width: 170 },
+  { title: '操作', width: 120, slots: { default: 'ops' } },
+])
 
 async function fetchDataList() {
   if (!selectedTypeId.value) {
@@ -434,28 +434,28 @@ onMounted(() => {
 
           <!-- 数据表格 -->
           <div class="lg-table-wrap">
-            <a-table
-              :columns="dataColumns"
-              :data-source="dataTableData"
+            <vxe-grid
+              :data="dataTableData"
+              :columns="dataGridColumns"
               :loading="dataLoading"
-              :pagination="false"
-              row-key="id"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
               size="small"
+              max-height="480"
             >
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'status'">
-                  <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">
-                    {{ STATUS_LABEL[record.status] ?? record.status }}
-                  </a-tag>
-                </template>
-                <template v-else-if="column.key === 'ops'">
-                  <div class="lg-ops">
-                    <a class="lg-link" @click="handleEditData(record)">编辑</a>
-                    <a class="lg-link lg-del" @click="handleDeleteData(record)">删除</a>
-                  </div>
-                </template>
+              <template #status="{ row }">
+                <a-tag :color="row.status === 'ENABLED' ? 'success' : 'default'">
+                  {{ STATUS_LABEL[row.status] ?? row.status }}
+                </a-tag>
               </template>
-            </a-table>
+              <template #ops="{ row }">
+                <div class="lg-ops">
+                  <a class="lg-link" @click="handleEditData(row)">编辑</a>
+                  <a class="lg-link lg-del" @click="handleDeleteData(row)">删除</a>
+                </div>
+              </template>
+            </vxe-grid>
           </div>
 
           <!-- 分页 -->
