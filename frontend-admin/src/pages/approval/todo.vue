@@ -150,71 +150,67 @@ watch(
       <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label" />
     </a-tabs>
 
-    <div class="lg-grid">
-      <div class="lg-left">
-        <div class="lg-table-wrap">
-          <a-table
-            :columns="columns"
-            :data-source="tableData"
-            :loading="loading"
-            :pagination="{
-              current: pageNo,
-              pageSize,
-              total,
-              showSizeChanger: true,
-              showTotal: (t: number) => `共 ${t} 条`,
-            }"
-            row-key="id"
-            @change="({ current, pageSize: ps }: any) => handlePageChange(current, ps)"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'title'">
-                <a class="lg-link" @click="handleDetail(record as { instanceId: string })">{{ record.title }}</a>
-              </template>
-              <template v-else-if="column.key === 'businessType'">
-                <a-tag>{{
-                  businessTypeMap[record.businessType as string] ||
-                  (record.businessType as string) ||
-                  '—'
-                }}</a-tag>
-              </template>
-              <template v-else-if="column.key === 'timeCol'">
-                {{ getTimeCol(record) }}
-              </template>
-              <template v-else-if="column.key === 'instanceStatus'">
-                <a-tag v-if="record.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>
-                <a-tag v-else-if="record.instanceStatus === 'APPROVED'" color="success">已通过</a-tag>
-                <a-tag v-else-if="record.instanceStatus === 'REJECTED'" color="error">已驳回</a-tag>
-                <a-tag v-else>{{ record.instanceStatus }}</a-tag>
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <div class="lg-ops">
-                  <a-button
-                    type="link"
-                    size="small"
-                    @click="handleDetail(record as { instanceId: string })"
-                  >
-                    {{ getActionLabel() }}
-                  </a-button>
-                </div>
-              </template>
-            </template>
-          </a-table>
-        </div>
+    <div class="lg-table-wrap">
+      <a-table
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="{
+          current: pageNo,
+          pageSize,
+          total,
+          showSizeChanger: true,
+          showTotal: (t: number) => `共 ${t} 条`,
+        }"
+        row-key="id"
+        @change="({ current, pageSize: ps }: any) => handlePageChange(current, ps)"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'title'">
+            <a class="lg-link" @click="handleDetail(record as { instanceId: string })">{{ record.title }}</a>
+          </template>
+          <template v-else-if="column.key === 'businessType'">
+            <a-tag>{{
+              businessTypeMap[record.businessType as string] ||
+              (record.businessType as string) ||
+              '—'
+            }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'timeCol'">
+            {{ getTimeCol(record) }}
+          </template>
+          <template v-else-if="column.key === 'instanceStatus'">
+            <a-tag v-if="record.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>
+            <a-tag v-else-if="record.instanceStatus === 'APPROVED'" color="success">已通过</a-tag>
+            <a-tag v-else-if="record.instanceStatus === 'REJECTED'" color="error">已驳回</a-tag>
+            <a-tag v-else>{{ record.instanceStatus }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <div class="lg-ops">
+              <a-button
+                type="link"
+                size="small"
+                @click="handleDetail(record as { instanceId: string })"
+              >
+                {{ getActionLabel() }}
+              </a-button>
+            </div>
+          </template>
+        </template>
+      </a-table>
+    </div>
 
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="(p: number, ps: number) => handlePageChange(p, ps)"
-          />
-        </div>
-      </div>
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
+      <a-pagination
+        v-model:current="pageNo"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-size-options="['10', '20', '50', '100']"
+        show-size-changer
+        show-quick-jumper
+        @change="(p: number, ps: number) => handlePageChange(p, ps)"
+      />
     </div>
   </div>
 </template>
