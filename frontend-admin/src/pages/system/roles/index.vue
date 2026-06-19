@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message } from 'ant-design-vue'
+import { SearchOutlined, ReloadOutlined, KeyOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
 import { getRoles } from '@/api/modules/system'
 import type { SysRoleVO } from '@/types/system'
@@ -89,44 +90,42 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>系统设置</a-breadcrumb-item
-        ><a-breadcrumb-item>角色管理</a-breadcrumb-item></a-breadcrumb
-      >
-    </div>
-
-    <!-- Filter -->
-    <div class="pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>角色名称：</label>
-          <a-input
-            v-model:value="filter.roleName"
-            placeholder="角色名称"
-            allow-clear
-            style="width: 150px"
-          />
-        </div>
-        <div class="pt-field">
-          <label>角色编码：</label>
-          <a-input
-            v-model:value="filter.roleCode"
-            placeholder="角色编码"
-            allow-clear
-            style="width: 150px"
-          />
-        </div>
-        <div class="pt-filter-surface-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-        </div>
+  <div class="lg-page">
+    <div class="lg-page-head">
+      <div>
+        <a-page-header title="角色管理" style="padding: 0; background: transparent" />
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="pt-table-panel">
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.roleName"
+        placeholder="搜索角色名称…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="lg-toolbar">
+      <div class="lg-toolbar-left">
+        <a-button type="primary" ghost @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+      </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="lg-table-wrap">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -142,8 +141,9 @@ onMounted(fetchData)
             </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <div class="pt-link">
+            <div class="lg-ops">
               <a-button type="link" size="small" @click="handleEditPermission(record)">
+                <template #icon><KeyOutlined /></template>
                 编辑权限
               </a-button>
             </div>
@@ -152,9 +152,9 @@ onMounted(fetchData)
       </a-table>
     </div>
 
-    <!-- Pagination -->
-    <div class="pt-pagination">
-      <span class="pt-pagination-total">共 {{ total }} 条</span>
+    <!-- 分页 -->
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
