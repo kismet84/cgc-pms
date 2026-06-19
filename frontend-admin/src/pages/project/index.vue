@@ -679,25 +679,25 @@ const gridColumns = computed(() => [
       <aside class="lg-analysis-rail">
         <section class="lg-panel">
           <div class="lg-panel-title">项目状态分布</div>
-          <VChart :option="statusOption" autoresize class="pt-chart" />
+          <VChart :option="statusOption" autoresize style="height: 176px" />
         </section>
         <section class="lg-panel">
           <div class="lg-panel-title">项目风险提示</div>
-          <ul class="pt-compact-list">
-            <li v-for="item in riskProjects" :key="item.name" class="pt-compact-row">
-              <span>{{ item.name }}</span>
-              <b>{{ item.status }}</b>
-            </li>
-          </ul>
+          <div class="lg-type-list">
+            <div v-for="item in riskProjects" :key="item.name" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.status === '平稳' ? 'var(--kpi-paid)' : 'var(--kpi-overdue)' }"></span>
+              <span class="lg-type-label" style="grid-column: 2 / span 4">{{ item.name }}</span>
+            </div>
+          </div>
         </section>
         <section class="lg-panel">
           <div class="lg-panel-title">近期项目</div>
-          <ul class="pt-compact-list">
-            <li v-for="item in recentProjects" :key="item.name" class="pt-compact-row">
-              <span>{{ item.name }}</span>
-              <b>{{ item.status }}</b>
-            </li>
-          </ul>
+          <div class="lg-type-list">
+            <div v-for="item in recentProjects" :key="item.name" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
+              <span class="lg-type-label" style="grid-column: 2 / span 4">{{ item.name }}</span>
+            </div>
+          </div>
         </section>
       </aside>
     </div>
@@ -707,32 +707,5 @@ const gridColumns = computed(() => [
 <style scoped>
 .pj-create-form {
   padding-top: 16px;
-}
-
-.pt-chart {
-  height: 176px;
-}
-
-.pt-compact-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pt-compact-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.pt-compact-row b {
-  color: var(--text);
-  font-weight: 700;
 }
 </style>
