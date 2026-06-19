@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
 import {
   getUserList,
@@ -217,22 +218,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>系统设置</a-breadcrumb-item
-        ><a-breadcrumb-item>用户管理</a-breadcrumb-item></a-breadcrumb
-      >
-      <div class="pt-head-actions">
-        <a-button type="primary" @click="handleAdd">新增用户</a-button>
-      </div>
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb-item>系统设置</a-breadcrumb-item>
+        <a-breadcrumb-item>用户管理</a-breadcrumb-item>
+      </a-breadcrumb>
     </div>
 
-    <!-- Filter -->
-    <div class="pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>用户名：</label>
+    <div class="lg-search-bar">
+      <div class="lg-filter-row">
+        <div class="lg-filter-item">
+          <label class="lg-label">用户名：</label>
           <a-input
             v-model:value="filter.username"
             placeholder="用户名"
@@ -240,8 +237,8 @@ onMounted(() => {
             style="width: 150px"
           />
         </div>
-        <div class="pt-field">
-          <label>姓名：</label>
+        <div class="lg-filter-item">
+          <label class="lg-label">姓名：</label>
           <a-input
             v-model:value="filter.realName"
             placeholder="姓名"
@@ -249,15 +246,24 @@ onMounted(() => {
             style="width: 150px"
           />
         </div>
-        <div class="pt-filter-surface-actions">
+        <div class="lg-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="pt-table-panel">
+    <div class="lg-toolbar">
+      <a-button type="primary" @click="handleAdd">
+        <template #icon><PlusOutlined /></template>
+        新增用户
+      </a-button>
+      <a-button @click="fetchData">
+        <template #icon><ReloadOutlined /></template>
+      </a-button>
+    </div>
+
+    <div class="lg-table-wrap">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -273,7 +279,7 @@ onMounted(() => {
                 r
               }}</a-tag>
             </template>
-            <span v-else class="pt-muted">-</span>
+            <span v-else style="color: var(--muted)">-</span>
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="record.status === 'ENABLE' ? 'success' : 'error'">
@@ -281,28 +287,24 @@ onMounted(() => {
             </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <div class="pt-link">
-              <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-              <a-button
-                type="link"
-                size="small"
-                :danger="record.status === 'ENABLE'"
+            <div class="lg-ops">
+              <a class="lg-link" @click="handleEdit(record)">编辑</a>
+              <a
+                class="lg-link"
+                :class="{ 'lg-del': record.status === 'ENABLE' }"
                 @click="handleToggleStatus(record)"
               >
                 {{ record.status === 'ENABLE' ? '禁用' : '启用' }}
-              </a-button>
-              <a-button type="link" size="small" danger @click="handleDelete(record)"
-                >删除</a-button
-              >
+              </a>
+              <a class="lg-link lg-del" @click="handleDelete(record)">删除</a>
             </div>
           </template>
         </template>
       </a-table>
     </div>
 
-    <!-- Pagination -->
-    <div class="pt-pagination">
-      <span class="pt-pagination-total">共 {{ total }} 条</span>
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -310,7 +312,6 @@ onMounted(() => {
         :page-size-options="['10', '20', '50']"
         show-size-changer
         show-quick-jumper
-        size="small"
         @change="handlePageChange"
       />
     </div>
