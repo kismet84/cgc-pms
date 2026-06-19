@@ -560,35 +560,37 @@ onMounted(() => {
 
       <!-- 右侧分析面板 -->
       <aside class="lg-analysis-rail">
-        <section class="pt-panel">
-          <div class="pt-panel-header">付款状态统计</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="it in statusBreakdown" :key="it.label" class="pt-compact-row">
-                <span>{{ it.label }}</span
-                ><b>{{ it.count }} 条</b>
-              </li>
-            </ul>
+        <section class="lg-panel">
+          <div class="lg-panel-title">付款状态统计</div>
+          <div class="lg-type-list">
+            <div v-for="it in statusBreakdown" :key="it.label" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
+              <span class="lg-type-label">{{ it.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span class="lg-type-bar" :style="{ width: kpiPct(it.count, total || 1) + '%', background: 'var(--kpi-paid)' }"></span>
+              </span>
+              <span class="lg-type-num">{{ it.count }}</span>
+              <span class="lg-type-pct">{{ kpiPct(it.count, total || 1) }}%</span>
+            </div>
           </div>
         </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">资金风险</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li class="pt-compact-row">
-                <span>待付款总额</span
-                ><b style="color: #ef4444">{{ kpiUnpaid.toLocaleString() }} 元</b>
-              </li>
-            </ul>
+        <section class="lg-panel">
+          <div class="lg-panel-title">资金风险</div>
+          <div class="lg-type-list">
+            <div class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: '#ef4444' }"></span>
+              <span class="lg-type-label">待付款总额</span>
+              <span class="lg-type-bar-wrap">
+                <span class="lg-type-bar" style="width: 100%; background: #ef4444"></span>
+              </span>
+              <span class="lg-type-num" style="color: #ef4444">{{ kpiUnpaid.toLocaleString() }}</span>
+              <span class="lg-type-pct">元</span>
+            </div>
           </div>
         </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">临期付款</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li class="pt-compact-row"><span>暂无临期付款</span></li>
-            </ul>
-          </div>
+        <section class="lg-panel">
+          <div class="lg-panel-title">临期付款</div>
+          暂无临期付款
         </section>
       </aside>
     </div>
