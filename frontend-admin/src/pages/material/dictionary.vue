@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   getMaterialList,
@@ -10,9 +11,7 @@ import {
 import type { MaterialVO } from '@/types/material'
 
 const filter = reactive({
-  materialCode: '',
-  materialName: '',
-  categoryId: undefined as string | undefined,
+  keyword: '',
   status: undefined as string | undefined,
 })
 
@@ -72,9 +71,7 @@ async function fetchData() {
     const res = await getMaterialList({
       pageNum: pageNo.value,
       pageSize: pageSize.value,
-      materialCode: filter.materialCode || undefined,
-      materialName: filter.materialName || undefined,
-      categoryId: filter.categoryId,
+      keyword: filter.keyword || undefined,
       status: filter.status,
     })
     tableData.value = res.records
@@ -95,9 +92,7 @@ function handleSearch() {
 }
 
 function handleReset() {
-  filter.materialCode = ''
-  filter.materialName = ''
-  filter.categoryId = undefined
+  filter.keyword = ''
   filter.status = undefined
   pageNo.value = 1
   fetchData()
@@ -204,59 +199,62 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>基础数据</a-breadcrumb-item
-        ><a-breadcrumb-item>材料字典</a-breadcrumb-item></a-breadcrumb
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="lg-breadcrumb">
+          <a-breadcrumb-item>基础数据</a-breadcrumb-item>
+          <a-breadcrumb-item>材料字典</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.keyword"
+        placeholder="搜索材料编码、材料名称…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
       >
-      <div class="pt-head-actions">
-        <a-button type="primary" @click="handleAdd">新增材料</a-button>
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="lg-toolbar">
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleAdd">
+          <template #icon><PlusOutlined /></template>
+          新增材料
+        </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+      </div>
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.status"
+          placeholder="全部状态"
+          allow-clear
+          style="width: 120px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option value="ENABLE">启用</a-select-option>
+          <a-select-option value="DISABLE">禁用</a-select-option>
+        </a-select>
       </div>
     </div>
 
-    <!-- Filter -->
-    <div class="pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>材料编码：</label>
-          <a-input
-            v-model:value="filter.materialCode"
-            placeholder="请输入材料编码"
-            style="width: 160px"
-            allow-clear
-          />
-        </div>
-        <div class="pt-field">
-          <label>材料名称：</label>
-          <a-input
-            v-model:value="filter.materialName"
-            placeholder="请输入材料名称"
-            style="width: 160px"
-            allow-clear
-          />
-        </div>
-        <div class="pt-field">
-          <label>状态：</label>
-          <a-select
-            v-model:value="filter.status"
-            placeholder="全部"
-            allow-clear
-            style="width: 110px"
-          >
-            <a-select-option value="ENABLE">启用</a-select-option>
-            <a-select-option value="DISABLE">禁用</a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-filter-surface-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Table -->
-    <div class="pt-table-panel">
+    <!-- 表格 -->
+    <div class="lg-table-wrap">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -275,9 +273,9 @@ onMounted(fetchData)
             </a-tag>
           </template>
           <template v-else-if="column.key === 'ops'">
-            <div class="pt-link">
-              <a class="pt-link" @click="handleEdit(record)">编辑</a>
-              <a class="pt-link" @click="handleToggleStatus(record)">
+            <div class="lg-ops">
+              <a class="lg-link" @click="handleEdit(record)">编辑</a>
+              <a class="lg-link lg-del" @click="handleToggleStatus(record)">
                 {{ record.status === 'ENABLE' ? '禁用' : '启用' }}
               </a>
             </div>
@@ -286,9 +284,9 @@ onMounted(fetchData)
       </a-table>
     </div>
 
-    <!-- Pagination -->
-    <div class="pt-pagination">
-      <span class="pt-total">共 {{ total }} 条</span>
+    <!-- 分页 -->
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -347,4 +345,10 @@ onMounted(fetchData)
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+/* 页面专属样式 — 其余已由 lg-* 全局类覆盖 */
+.lg-breadcrumb {
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+</style>
