@@ -2,6 +2,11 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import {
+  SearchOutlined,
+  ReloadOutlined,
+  PlusOutlined,
+} from '@ant-design/icons-vue'
+import {
   getWarehouseList,
   createWarehouse,
   updateWarehouse,
@@ -178,8 +183,12 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
-const kpiWhTotal = computed(() => tableData.value.length)
+const kpiWhTotal = computed(() => total.value)
 const kpiWhEnabled = computed(() => tableData.value.filter((r) => r.status === 'ENABLE').length)
+
+function filterOption(input: string, option: any) {
+  return option.label?.toLowerCase().includes(input.toLowerCase())
+}
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -188,82 +197,91 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>库存管理</a-breadcrumb-item
-        ><a-breadcrumb-item>仓库</a-breadcrumb-item></a-breadcrumb
+  <div class="lg-page app-page">
+    <!-- Page head -->
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+          <a-breadcrumb-item>库存管理</a-breadcrumb-item>
+          <a-breadcrumb-item>仓库</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+    </div>
+
+    <!-- KPI strip -->
+    <div class="lg-kpi-strip" style="grid-template-columns: repeat(2, minmax(136px, 1fr))">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">仓库总数</span>
+        <span class="lg-kpi-card-value">{{ kpiWhTotal }} <small>个</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">启用仓库</span>
+        <span class="lg-kpi-card-value" style="color: #22c55e">{{ kpiWhEnabled }} <small>个</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-paid)"></span></span>
+      </div>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-select
+        v-model:value="filter.projectId"
+        placeholder="全部项目"
+        allow-clear
+        style="width: 180px"
+        show-search
+        :filter-option="filterOption"
       >
-      <div class="pt-head-actions"></div>
+        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+          {{ p.projectName }}
+        </a-select-option>
+      </a-select>
+      <a-input
+        v-model:value="filter.warehouseCode"
+        placeholder="仓库编号"
+        style="width: 140px"
+        allow-clear
+        @press-enter="handleSearch"
+      />
+      <a-input
+        v-model:value="filter.warehouseName"
+        placeholder="仓库名称"
+        style="width: 140px"
+        allow-clear
+        @press-enter="handleSearch"
+      />
+      <a-select
+        v-model:value="filter.status"
+        placeholder="全部状态"
+        allow-clear
+        style="width: 110px"
+      >
+        <a-select-option value="ENABLE">启用</a-select-option>
+        <a-select-option value="DISABLE">停用</a-select-option>
+      </a-select>
+      <a-button type="primary" @click="handleSearch">
+        <template #icon><SearchOutlined /></template>
+        查询
+      </a-button>
+      <a-button @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
-    <div class="pt-kpi-strip" style="grid-template-columns: repeat(2, 1fr)">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">仓库总数</div>
-        <div class="pt-kpi-value">{{ kpiWhTotal }}<small>个</small></div>
+    <!-- 工具栏 -->
+    <div class="lg-toolbar">
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleAdd">
+          <template #icon><PlusOutlined /></template>
+          新建仓库
+        </a-button>
       </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">启用仓库</div>
-        <div class="pt-kpi-value" style="color: #22c55e">{{ kpiWhEnabled }}<small>个</small></div>
-      </div>
+      <div class="lg-toolbar-right" />
     </div>
 
-    <!-- Filter -->
-    <div class="pt-panel pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>所属项目：</label>
-          <a-select
-            v-model:value="filter.projectId"
-            placeholder="全部"
-            allow-clear
-            style="width: 180px"
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-              {{ p.projectName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>仓库编号：</label>
-          <a-input
-            v-model:value="filter.warehouseCode"
-            placeholder="请输入编号"
-            style="width: 140px"
-            allow-clear
-          />
-        </div>
-        <div class="pt-field">
-          <label>仓库名称：</label>
-          <a-input
-            v-model:value="filter.warehouseName"
-            placeholder="请输入名称"
-            style="width: 140px"
-            allow-clear
-          />
-        </div>
-        <div class="pt-field">
-          <label>状态：</label>
-          <a-select
-            v-model:value="filter.status"
-            placeholder="全部"
-            allow-clear
-            style="width: 100px"
-          >
-            <a-select-option value="ENABLE">启用</a-select-option>
-            <a-select-option value="DISABLE">停用</a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-filter-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-          <a-button type="primary" @click="handleAdd">新建仓库</a-button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Table -->
-    <div class="pt-panel pt-table-panel">
+    <!-- 表格 -->
+    <div class="lg-table-wrap">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -286,9 +304,9 @@ onMounted(() => {
       </a-table>
     </div>
 
-    <!-- Pagination -->
-    <div class="pt-pagination">
-      <span class="pt-total">共 {{ total }} 条</span>
+    <!-- 分页 -->
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
