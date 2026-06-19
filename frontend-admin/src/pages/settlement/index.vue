@@ -208,6 +208,28 @@ function kpiPct(value: number, max: number): number {
   return Math.min(Math.round((value / max) * 100), 100)
 }
 
+// ---- VxeGrid columns ----
+const gridColumns = computed(() => [
+  { field: 'settlementCode', title: '结算编号', width: 160 },
+  { field: 'projectName', title: '项目', width: 140 },
+  { field: 'contractName', title: '合同', width: 140 },
+  {
+    field: 'settlementAmount',
+    title: '结算金额(万)',
+    width: 140,
+    align: 'right' as const,
+    slots: { default: 'settlementAmount' },
+  },
+  {
+    field: 'settlementStatus',
+    title: '状态',
+    width: 100,
+    slots: { default: 'settlementStatus' },
+  },
+  { field: 'createdAt', title: '创建时间', width: 160 },
+  { title: '操作', width: 120, slots: { default: 'ops' } },
+])
+
 // ---- Mobile detection ----
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
@@ -357,46 +379,38 @@ const colorMap: Record<string, string> = {
 
         <!-- 表格 -->
         <div class="lg-table-wrap">
-          <a-table
-            :columns="[
-              { title: '结算编号', dataIndex: 'settlementCode', width: 160 },
-              { title: '项目', dataIndex: 'projectName', width: 140 },
-              { title: '合同', dataIndex: 'contractName', width: 140 },
-              { title: '结算金额(万)', dataIndex: 'settlementAmount', width: 140, key: 'settlementAmount' },
-              { title: '状态', dataIndex: 'settlementStatus', width: 100, key: 'settlementStatus' },
-              { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-              { title: '操作', key: 'ops', width: 120 },
-            ]"
-            :data-source="tableData"
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
             :loading="loading"
-            :pagination="false"
-            row-key="id"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
             size="small"
+            max-height="480"
           >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'settlementAmount'">
-                <span>{{ fmtWan(record.settlementAmount) }}</span>
-              </template>
-              <template v-else-if="column.key === 'settlementStatus'">
-                <a-tag
-                  :color="SETTLEMENT_STATUS_COLOR[record.settlementStatus as SettlementStatus] || 'default'"
-                  size="small"
-                >
-                  {{ SETTLEMENT_STATUS_LABEL[record.settlementStatus as SettlementStatus] ?? record.settlementStatus }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'ops'">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleView(record)">查看</a>
-                  <a
-                    v-if="record.settlementStatus !== 'FINALIZED'"
-                    class="lg-link lg-del"
-                    @click="handleDelete(record)"
-                  >删除</a>
-                </div>
-              </template>
+            <template #settlementAmount="{ row }">
+              <span>{{ fmtWan(row.settlementAmount) }}</span>
             </template>
-          </a-table>
+            <template #settlementStatus="{ row }">
+              <a-tag
+                :color="SETTLEMENT_STATUS_COLOR[row.settlementStatus as SettlementStatus] || 'default'"
+                size="small"
+              >
+                {{ SETTLEMENT_STATUS_LABEL[row.settlementStatus as SettlementStatus] ?? row.settlementStatus }}
+              </a-tag>
+            </template>
+            <template #ops="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleView(row)">查看</a>
+                <a
+                  v-if="row.settlementStatus !== 'FINALIZED'"
+                  class="lg-link lg-del"
+                  @click="handleDelete(row)"
+                >删除</a>
+              </div>
+            </template>
+          </vxe-grid>
         </div>
 
         <!-- 分页 -->
