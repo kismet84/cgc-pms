@@ -232,6 +232,14 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
+// ---- KPI ----
+const kpiInProgress = computed(
+  () => tableData.value.filter((r) => r.status === 'IN_PROGRESS').length,
+)
+const kpiCompleted = computed(() => tableData.value.filter((r) => r.status === 'COMPLETED').length)
+const kpiPending = computed(() => tableData.value.filter((r) => r.status === 'NOT_STARTED').length)
+const kpiSuspended = computed(() => tableData.value.filter((r) => r.status === 'SUSPENDED').length)
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({ contractType: 'SUB' })
@@ -327,6 +335,30 @@ onMounted(() => {
       />
       <a-button type="primary" @click="handleSearch">查询</a-button>
       <a-button @click="handleReset">重置</a-button>
+    </div>
+
+    <!-- KPI 横条 -->
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">进行中</span>
+        <span class="lg-kpi-card-value">{{ kpiInProgress }} <small>条</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">已完成</span>
+        <span class="lg-kpi-card-value">{{ kpiCompleted }} <small>条</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-paid)"></span></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">待开始</span>
+        <span class="lg-kpi-card-value">{{ kpiPending }} <small>条</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+      </div>
+      <div class="lg-kpi-card" :class="{ 'is-warn': kpiSuspended > 0 }">
+        <span class="lg-kpi-card-label">已暂停</span>
+        <span class="lg-kpi-card-value">{{ kpiSuspended }} <small>条</small></span>
+        <span class="lg-kpi-card-bar"><span :style="{ width: (kpiSuspended > 0 ? 100 : 0) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+      </div>
     </div>
 
     <!-- 工具栏 -->
