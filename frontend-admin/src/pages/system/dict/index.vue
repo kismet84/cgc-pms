@@ -346,15 +346,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <a-breadcrumb class="lg-breadcrumb"
         ><a-breadcrumb-item>系统设置</a-breadcrumb-item
         ><a-breadcrumb-item>字典管理</a-breadcrumb-item></a-breadcrumb
       >
     </div>
 
-    <div class="pt-panel dc-panel">
+    <div class="dc-panel">
       <!-- 左侧：字典类型列表 -->
       <div class="dc-left">
         <div class="dc-left-header">
@@ -404,39 +404,36 @@ onMounted(() => {
             <a-button type="primary" size="small" @click="handleAddData">新增数据</a-button>
           </div>
 
-          <!-- 数据筛选 -->
-          <div class="pt-filter-surface">
-            <div class="pt-filter-row">
-              <div class="pt-field">
-                <label>字典标签：</label>
-                <a-input
-                  v-model:value="dataFilter.dictLabel"
-                  placeholder="请输入标签"
-                  style="width: 160px"
-                  allow-clear
-                />
-              </div>
-              <div class="pt-field">
-                <label>状态：</label>
-                <a-select
-                  v-model:value="dataFilter.status"
-                  placeholder="全部"
-                  allow-clear
-                  style="width: 110px"
-                >
-                  <a-select-option value="ENABLED">启用</a-select-option>
-                  <a-select-option value="DISABLED">禁用</a-select-option>
-                </a-select>
-              </div>
-              <div class="pt-filter-surface-actions">
-                <a-button type="primary" size="small" @click="handleDataSearch">查询</a-button>
-                <a-button size="small" @click="handleDataReset">重置</a-button>
-              </div>
+          <!-- 数据筛选工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-input
+                v-model:value="dataFilter.dictLabel"
+                placeholder="搜索字典标签"
+                style="width: 160px"
+                allow-clear
+                size="small"
+                @press-enter="handleDataSearch"
+              />
+              <a-select
+                v-model:value="dataFilter.status"
+                placeholder="全部状态"
+                allow-clear
+                style="width: 110px"
+                size="small"
+              >
+                <a-select-option value="ENABLED">启用</a-select-option>
+                <a-select-option value="DISABLED">禁用</a-select-option>
+              </a-select>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-button type="primary" size="small" @click="handleDataSearch">查询</a-button>
+              <a-button size="small" @click="handleDataReset">重置</a-button>
             </div>
           </div>
 
           <!-- 数据表格 -->
-          <div class="pt-table-panel">
+          <div class="lg-table-wrap">
             <a-table
               :columns="dataColumns"
               :data-source="dataTableData"
@@ -452,9 +449,9 @@ onMounted(() => {
                   </a-tag>
                 </template>
                 <template v-else-if="column.key === 'ops'">
-                  <div class="pt-link">
-                    <a class="pt-link" @click="handleEditData(record)">编辑</a>
-                    <a class="pt-link-danger" @click="handleDeleteData(record)">删除</a>
+                  <div class="lg-ops">
+                    <a class="lg-link" @click="handleEditData(record)">编辑</a>
+                    <a class="lg-link lg-del" @click="handleDeleteData(record)">删除</a>
                   </div>
                 </template>
               </template>
@@ -462,8 +459,8 @@ onMounted(() => {
           </div>
 
           <!-- 分页 -->
-          <div class="pt-pagination">
-            <span class="pt-total">共 {{ dataTotal }} 条</span>
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ dataTotal }} 条</span>
             <a-pagination
               v-model:current="dataPageNo"
               v-model:page-size="dataPageSize"
@@ -551,10 +548,20 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* 页面专属样式 — 左右分栏 + 类型列表交互 */
+.lg-breadcrumb {
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
 .dc-panel {
   display: flex;
   min-height: 500px;
   overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .dc-left {
