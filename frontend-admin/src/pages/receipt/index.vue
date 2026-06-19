@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
+import {
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   getReceiptList,
@@ -69,6 +74,27 @@ const QUALITY_STATUS_COLOR: Record<string, string> = {
   PENDING: 'processing',
 }
 
+// ---- KPI computeds ----
+const kpiTotalCount = computed(() => total.value)
+const kpiTotalAmount = computed(() => {
+  return tableData.value
+    .reduce((sum, r) => sum + parseFloat(r.totalAmount || '0'), 0)
+    .toFixed(2)
+})
+const kpiQualifiedCount = computed(() => {
+  return tableData.value.filter((r) => r.qualityStatus === 'QUALIFIED').length
+})
+const kpiUnqualifiedCount = computed(() => {
+  return tableData.value.filter((r) => r.qualityStatus === 'UNQUALIFIED').length
+})
+
+function fmtAmount(val: string): string {
+  const n = parseFloat(val)
+  if (isNaN(n)) return '0.00'
+  return (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+// ---- End KPI ----
+
 const columns = [
   { title: '验收单号', dataIndex: 'receiptCode', width: 140, ellipsis: true },
   { title: '采购订单', dataIndex: 'orderCode', width: 130, ellipsis: true },
@@ -82,9 +108,9 @@ const columns = [
     key: 'totalAmount',
     align: 'right' as const,
   },
-  { title: '质量状态', dataIndex: 'qualityStatus', width: 90, key: 'qualityStatus' },
-  { title: '审批状态', dataIndex: 'approvalStatus', width: 90, key: 'approvalStatus' },
-  { title: '操作', key: 'action', width: 140 },
+  { title: '质量状态', dataIndex: 'qualityStatus', width: 100, key: 'qualityStatus' },
+  { title: '审批状态', dataIndex: 'approvalStatus', width: 100, key: 'approvalStatus' },
+  { title: '操作', key: 'action', width: 180, fixed: 'right' as const },
 ]
 
 async function fetchData() {
@@ -367,123 +393,118 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="pm-page">
-    <a-page-header title="材料验收" class="pm-header" />
-
-    <!-- Filter -->
-    <div class="pm-card pm-filter">
-      <div class="pm-filter-row">
-        <div class="pm-field">
-          <label>项目：</label>
-          <a-select
-            v-model:value="filter.projectId"
-            placeholder="全部"
-            allow-clear
-            style="width: 180px"
-            show-search
-            @change="
-              (v: string | undefined) => {
-                filter.contractId = undefined
-                if (v) referenceStore.fetchContracts({ projectId: v })
-              }
-            "
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-              {{ p.projectName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pm-field">
-          <label>采购订单：</label>
-          <a-select
-            v-model:value="filter.orderId"
-            placeholder="全部"
-            allow-clear
-            style="width: 180px"
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="o in orderList" :key="o.id" :value="o.id">
-              {{ o.orderCode }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pm-field">
-          <label>采购合同：</label>
-          <a-select
-            v-model:value="filter.contractId"
-            placeholder="全部"
-            allow-clear
-            style="width: 180px"
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-              {{ c.contractName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pm-field">
-          <label>供应商：</label>
-          <a-select
-            v-model:value="filter.partnerId"
-            placeholder="全部"
-            allow-clear
-            style="width: 160px"
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-              {{ p.partnerName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pm-field">
-          <label>质量状态：</label>
-          <a-select
-            v-model:value="filter.qualityStatus"
-            placeholder="全部"
-            allow-clear
-            style="width: 130px"
-          >
-            <a-select-option value="QUALIFIED">合格</a-select-option>
-            <a-select-option value="PARTIAL">部分合格</a-select-option>
-            <a-select-option value="UNQUALIFIED">不合格</a-select-option>
-            <a-select-option value="PENDING">待检验</a-select-option>
-          </a-select>
-        </div>
-        <div class="pm-field">
-          <label>验收单号：</label>
-          <a-input
-            v-model:value="filter.receiptCode"
-            placeholder="请输入单号"
-            style="width: 150px"
-            allow-clear
-          />
-        </div>
-        <div class="pm-filter-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-          <a-button type="primary" @click="handleAdd">新建验收</a-button>
-        </div>
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="lg-breadcrumb">
+          <a-breadcrumb-item>采购管理</a-breadcrumb-item>
+          <a-breadcrumb-item>材料验收</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="pm-card pm-table-wrap">
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.receiptCode"
+        placeholder="搜索验收单号…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
+    </div>
+
+    <!-- KPI 横条 -->
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">验收总数</span>
+        <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>单</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">验收总金额(含税)</span>
+        <span class="lg-kpi-card-value">{{ fmtAmount(kpiTotalAmount) }} <small>万元</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">合格批次</span>
+        <span class="lg-kpi-card-value">{{ kpiQualifiedCount }} <small>单</small></span>
+        <span class="lg-kpi-card-bar"><span :style="{ width: (kpiTotalCount ? Math.round((kpiQualifiedCount / kpiTotalCount) * 100) : 0) + '%', background: 'var(--kpi-paid)' }"></span></span>
+        <span class="lg-kpi-card-hint" v-if="kpiTotalCount">{{ kpiTotalCount ? Math.round((kpiQualifiedCount / kpiTotalCount) * 100) : 0 }}%</span>
+      </div>
+      <div class="lg-kpi-card is-warn" v-if="kpiUnqualifiedCount > 0">
+        <span class="lg-kpi-card-label">不合格批次</span>
+        <span class="lg-kpi-card-value">{{ kpiUnqualifiedCount }} <small>单</small></span>
+        <span class="lg-kpi-card-bar"><span :style="{ width: (kpiTotalCount ? Math.round((kpiUnqualifiedCount / kpiTotalCount) * 100) : 0) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+        <span class="lg-kpi-card-hint" v-if="kpiTotalCount">{{ kpiTotalCount ? Math.round((kpiUnqualifiedCount / kpiTotalCount) * 100) : 0 }}%</span>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="lg-toolbar">
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleAdd">
+          <template #icon><PlusOutlined /></template>
+          新建验收
+        </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+      </div>
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.projectId"
+          placeholder="全部项目"
+          allow-clear
+          style="width: 160px"
+          size="small"
+          show-search
+          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+          @change="(v: string | undefined) => { filter.contractId = undefined; if (v) referenceStore.fetchContracts({ projectId: v }); handleSearch() }"
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.orderId"
+          placeholder="全部订单"
+          allow-clear
+          style="width: 160px"
+          size="small"
+          show-search
+          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="o in orderList" :key="o.id" :value="o.id">
+            {{ o.orderCode }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.qualityStatus"
+          placeholder="全部质量状态"
+          allow-clear
+          style="width: 140px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option value="QUALIFIED">合格</a-select-option>
+          <a-select-option value="PARTIAL">部分合格</a-select-option>
+          <a-select-option value="UNQUALIFIED">不合格</a-select-option>
+          <a-select-option value="PENDING">待检验</a-select-option>
+        </a-select>
+      </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="lg-table-wrap">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -491,15 +512,14 @@ onMounted(() => {
         :pagination="false"
         row-key="id"
         size="small"
+        :scroll="{ x: 1100 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'totalAmount'">
-            <span v-if="record.totalAmount"
-              >¥{{
-                Number(record.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-              }}</span
-            >
-            <span v-else class="pm-none">-</span>
+            <span v-if="record.totalAmount" class="lg-money">
+              {{ Number(record.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+            </span>
+            <span v-else class="lg-none">-</span>
           </template>
           <template v-else-if="column.key === 'qualityStatus'">
             <a-tag :color="QUALITY_STATUS_COLOR[record.qualityStatus] || 'default'">
@@ -510,23 +530,23 @@ onMounted(() => {
             <ApprovalStatusTag :status="record.approvalStatus" />
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-            <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
-            <a-button
-              v-if="record.approvalStatus === 'DRAFT'"
-              type="link"
-              size="small"
-              @click="handleSubmitApproval(record)"
-              >提交审批</a-button
-            >
+            <div class="lg-ops">
+              <a class="lg-link" @click="handleEdit(record)">编辑</a>
+              <a class="lg-link lg-del" @click="handleDelete(record)">删除</a>
+              <a
+                v-if="record.approvalStatus === 'DRAFT'"
+                class="lg-link"
+                @click="handleSubmitApproval(record)"
+              >提交审批</a>
+            </div>
           </template>
         </template>
       </a-table>
     </div>
 
-    <!-- Pagination -->
-    <div class="pm-pagination">
-      <span class="pm-total">共 {{ total }} 条</span>
+    <!-- 分页 -->
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -724,9 +744,7 @@ onMounted(() => {
 
         <div style="text-align: right; margin-top: 8px; font-size: 14px">
           合计：<span style="font-weight: 600; color: #1677ff"
-            >¥{{
-              Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-            }}</span
+            >{{ Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span
           >
         </div>
       </div>
@@ -735,62 +753,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.pm-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.pm-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.pm-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.pm-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.pm-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.pm-field label {
-  color: #374151;
-}
-.pm-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.pm-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.pm-none {
-  color: #9ca3af;
-}
-.pm-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.pm-total {
+/* 页面专属样式 — 其余已由 lg-* 全局类覆盖 */
+.lg-breadcrumb {
+  margin-bottom: 5px;
   font-size: 13px;
-  color: #4b5563;
 }
 </style>
