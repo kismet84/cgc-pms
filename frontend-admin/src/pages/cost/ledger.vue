@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message } from 'ant-design-vue'
 import {
@@ -25,6 +25,10 @@ import type {
 import { SOURCE_TYPE_LABEL, SOURCE_TYPE_COLOR } from '@/types/cost'
 import type { PageResult } from '@/types/api'
 import { useReferenceStore } from '@/stores/reference'
+
+const MOBILE_BP = 768
+const isMobile = ref(window.innerWidth < MOBILE_BP)
+function onResize() { isMobile.value = window.innerWidth < MOBILE_BP }
 
 // ---- Reference store ----
 const referenceStore = useReferenceStore()
@@ -300,257 +304,286 @@ const columns = [
 
 // ---- Init ----
 onMounted(() => {
+  window.addEventListener('resize', onResize)
   referenceStore.fetchProjects()
   referenceStore.fetchPartners()
   fetchSubjectTree()
   fetchData()
   fetchSummary()
 })
+onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
+  <div class="lg-page app-page">
     <!-- Page head -->
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb">
-        <a-breadcrumb-item>成本管理</a-breadcrumb-item>
-        <a-breadcrumb-item>成本台账</a-breadcrumb-item>
-      </a-breadcrumb>
-      <div class="pt-head-actions">
-        <a-button type="primary" @click="handleSearch"><SearchOutlined />查询</a-button>
-        <a-button @click="handleReset"><ReloadOutlined />重置</a-button>
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="cl-breadcrumb">
+          <a-breadcrumb-item>成本管理</a-breadcrumb-item>
+          <a-breadcrumb-item>成本台账</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
-    <!-- KPI strip -->
-    <div class="pt-kpi-strip">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">成本总额</div>
-        <div class="pt-kpi-value">{{ fmtWan(String(kpiStats.total)) }} <small>万元</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">锁定成本</div>
-        <div class="pt-kpi-value">{{ fmtWan(String(kpiStats.locked)) }} <small>万元</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">动态成本</div>
-        <div class="pt-kpi-value">{{ fmtWan(String(kpiStats.dynamic)) }} <small>万元</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">偏差金额</div>
-        <div class="pt-kpi-value">{{ fmtWan(String(kpiStats.deviation)) }} <small>万元</small></div>
-      </div>
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.keyword"
+        placeholder="搜索编号、科目名…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
-    <!-- Filter surface -->
-    <div class="pt-panel pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>项目：</label>
-          <a-select
-            v-model:value="filter.projectId"
-            placeholder="全部项目"
-            allow-clear
-            style="width: 180px"
-            @change="onProjectChange"
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-              {{ p.projectName }}
-            </a-select-option>
-          </a-select>
+    <div class="lg-grid">
+      <!-- 左列 -->
+      <div class="lg-left">
+        <!-- KPI strip -->
+        <div v-if="!isMobile" class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">成本总额</span>
+            <span class="lg-kpi-card-value">{{ fmtWan(String(kpiStats.total)) }} <small>万元</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">锁定成本</span>
+            <span class="lg-kpi-card-value">{{ fmtWan(String(kpiStats.locked)) }} <small>万元</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">动态成本</span>
+            <span class="lg-kpi-card-value">{{ fmtWan(String(kpiStats.dynamic)) }} <small>万元</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-paid)"></span></span>
+          </div>
+          <div class="lg-kpi-card is-warn" v-if="kpiStats.deviation !== 0">
+            <span class="lg-kpi-card-label">偏差金额</span>
+            <span class="lg-kpi-card-value">{{ fmtWan(String(kpiStats.deviation)) }} <small>万元</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: Math.min(100, Math.abs(kpiStats.deviation) / Math.max(kpiStats.total, 1) * 100) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+          </div>
         </div>
-        <div class="pt-field">
-          <label>合同：</label>
-          <a-select
-            v-model:value="filter.contractId"
-            placeholder="全部合同"
-            allow-clear
-            style="width: 180px"
-          >
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-              {{ c.contractName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>供应商：</label>
-          <a-select
-            v-model:value="filter.partnerId"
-            placeholder="全部供应商"
-            allow-clear
-            style="width: 160px"
-          >
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-              {{ p.partnerName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>来源类型：</label>
-          <a-select
-            v-model:value="filter.sourceType"
-            placeholder="全部来源"
-            allow-clear
-            style="width: 150px"
-          >
-            <a-select-option v-for="(label, key) in SOURCE_TYPE_LABEL" :key="key" :value="key">
-              {{ label }}
-            </a-select-option>
-          </a-select>
-        </div>
-      </div>
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>成本科目：</label>
-          <a-tree-select
-            v-model:value="filter.costSubjectId"
-            :tree-data="subjectTree"
-            placeholder="全部科目"
-            allow-clear
-            style="width: 200px"
-            tree-default-expand-all
-          />
-        </div>
-        <div class="pt-field">
-          <label>日期范围：</label>
-          <a-range-picker v-model:value="filter.dateRange" style="width: 240px" />
-        </div>
-        <div class="pt-field">
-          <label>关键词：</label>
-          <a-input
-            v-model:value="filter.keyword"
-            placeholder="编号/科目名"
-            allow-clear
-            style="width: 180px"
-            @press-enter="handleSearch"
-          />
-        </div>
-        <div class="pt-filter-actions">
-          <a-button @click="handleSearch" type="primary" size="small">
-            <SearchOutlined />
-          </a-button>
-          <a-button @click="handleReset" size="small">
-            <ReloadOutlined />
-          </a-button>
-        </div>
-      </div>
-    </div>
 
-    <!-- Ledger layout -->
-    <div class="pt-ledger-layout">
-      <main class="pt-panel pt-table-panel">
-        <div class="pt-panel-header">成本清单</div>
-        <a-table
-          :columns="columns"
-          :data-source="tableData"
-          :loading="loading"
-          :pagination="false"
-          row-key="id"
-          size="small"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.dataIndex === 'sourceType'">
-              <a-tag
-                :color="SOURCE_TYPE_COLOR[record.sourceType as SourceType] || 'default'"
-                size="small"
+        <!-- KPI 移动端 -->
+        <div v-else class="lg-kpi-single">
+          <div
+            class="lg-kpi-single-row"
+            v-for="item in [
+              { icon: DollarOutlined, bg: 'var(--kpi-total)', label: '成本总额', value: fmtWan(String(kpiStats.total)), unit: '万元' },
+              { icon: LockOutlined, bg: 'var(--kpi-amount)', label: '锁定成本', value: fmtWan(String(kpiStats.locked)), unit: '万元' },
+              { icon: ToolOutlined, bg: 'var(--kpi-paid)', label: '动态成本', value: fmtWan(String(kpiStats.dynamic)), unit: '万元' },
+              { icon: AlertOutlined, bg: 'var(--kpi-overdue)', label: '偏差金额', value: fmtWan(String(kpiStats.deviation)), unit: '万元' },
+            ]"
+            :key="item.label"
+          >
+            <div class="lg-kpi-single-icon" :style="{ background: item.bg }">
+              <component :is="item.icon" />
+            </div>
+            <span class="lg-kpi-single-label">{{ item.label }}</span>
+            <span class="lg-kpi-single-value">{{ item.value }} <small>{{ item.unit }}</small></span>
+          </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <!-- 成本台账无新建按钮 -->
+          </div>
+          <div class="lg-toolbar-right">
+            <span class="pt-field">
+              <label>项目：</label>
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部项目"
+                allow-clear
+                style="width: 150px"
+                @change="onProjectChange"
               >
-                {{ SOURCE_TYPE_LABEL[record.sourceType as SourceType] || record.sourceType }}
-              </a-tag>
-            </template>
-            <template v-else-if="column.dataIndex === 'amount'">
-              <span class="cl-money">{{ fmtWan(record.amount) }}</span>
-            </template>
-            <template v-else-if="column.dataIndex === 'costStatus'">
-              <a-tag
-                :color="
-                  record.costStatus === '已确认'
-                    ? 'success'
-                    : record.costStatus === '待确认'
-                      ? 'processing'
-                      : 'default'
-                "
-                size="small"
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </span>
+            <span class="pt-field">
+              <label>合同：</label>
+              <a-select
+                v-model:value="filter.contractId"
+                placeholder="全部合同"
+                allow-clear
+                style="width: 150px"
               >
-                {{ record.costStatus || '-' }}
-              </a-tag>
-            </template>
-            <template v-else-if="column.dataIndex === 'ops'">
-              <a class="pt-link" @click="showDetail(record)">详情</a>
-            </template>
-          </template>
-        </a-table>
-        <a-empty
-          v-if="!loading && tableData.length === 0"
-          description="暂无成本台账记录"
-          style="padding: 48px 0"
-        />
-        <div class="pt-pagination">
-          <span class="pt-total">共 {{ total }} 条</span>
-          <a-pagination
-            :current="pageNum"
-            :total="total"
-            :page-size="pageSize"
-            :show-size-changer="true"
-            :page-size-options="['10', '20', '50']"
-            show-quick-jumper
+                <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+                  {{ c.contractName }}
+                </a-select-option>
+              </a-select>
+            </span>
+            <span class="pt-field">
+              <label>供应商：</label>
+              <a-select
+                v-model:value="filter.partnerId"
+                placeholder="全部供应商"
+                allow-clear
+                style="width: 140px"
+              >
+                <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
+                  {{ p.partnerName }}
+                </a-select-option>
+              </a-select>
+            </span>
+            <span class="pt-field">
+              <label>来源类型：</label>
+              <a-select
+                v-model:value="filter.sourceType"
+                placeholder="全部来源"
+                allow-clear
+                style="width: 130px"
+              >
+                <a-select-option v-for="(label, key) in SOURCE_TYPE_LABEL" :key="key" :value="key">
+                  {{ label }}
+                </a-select-option>
+              </a-select>
+            </span>
+          </div>
+        </div>
+
+        <!-- 第二行工具栏：成本科目 + 日期范围 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left"></div>
+          <div class="lg-toolbar-right">
+            <span class="pt-field">
+              <label>成本科目：</label>
+              <a-tree-select
+                v-model:value="filter.costSubjectId"
+                :tree-data="subjectTree"
+                placeholder="全部科目"
+                allow-clear
+                style="width: 180px"
+                tree-default-expand-all
+              />
+            </span>
+            <span class="pt-field">
+              <label>日期范围：</label>
+              <a-range-picker v-model:value="filter.dateRange" style="width: 220px" />
+            </span>
+          </div>
+        </div>
+
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <a-table
+            :columns="columns"
+            :data-source="tableData"
+            :loading="loading"
+            :pagination="false"
+            row-key="id"
             size="small"
-            @change="handlePageChange"
-            @showSizeChange="handleShowSizeChange"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.dataIndex === 'sourceType'">
+                <a-tag
+                  :color="SOURCE_TYPE_COLOR[record.sourceType as SourceType] || 'default'"
+                  size="small"
+                >
+                  {{ SOURCE_TYPE_LABEL[record.sourceType as SourceType] || record.sourceType }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.dataIndex === 'amount'">
+                <span class="cl-money">{{ fmtWan(record.amount) }}</span>
+              </template>
+              <template v-else-if="column.dataIndex === 'costStatus'">
+                <a-tag
+                  :color="
+                    record.costStatus === '已确认'
+                      ? 'success'
+                      : record.costStatus === '待确认'
+                        ? 'processing'
+                        : 'default'
+                  "
+                  size="small"
+                >
+                  {{ record.costStatus || '-' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.dataIndex === 'ops'">
+                <a class="cl-link" @click="showDetail(record)">详情</a>
+              </template>
+            </template>
+          </a-table>
+          <a-empty
+            v-if="!loading && tableData.length === 0"
+            description="暂无成本台账记录"
+            style="padding: 48px 0"
           />
         </div>
-      </main>
 
-      <!-- Analysis rail -->
-      <aside class="pt-analysis-rail">
-        <section class="pt-panel">
-          <div class="pt-panel-header">成本科目占比</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="item in subjectBreakdown" :key="item.label" class="pt-compact-row">
-                <span>{{ item.label }}</span>
-                <b>{{ fmtWan(item.amount) }} 万</b>
-              </li>
-            </ul>
-          </div>
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNum"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handleShowSizeChange"
+          />
+        </div>
+      </div>
+
+      <!-- 右侧分析面板 -->
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">成本科目占比</div>
+          <ul class="cl-compact-list">
+            <li v-for="item in subjectBreakdown" :key="item.label" class="cl-compact-row">
+              <span>{{ item.label }}</span>
+              <b>{{ fmtWan(item.amount) }} 万</b>
+            </li>
+          </ul>
         </section>
 
-        <section class="pt-panel">
-          <div class="pt-panel-header">来源类型分布</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="item in sourceBreakdown" :key="item.label" class="pt-compact-row">
-                <span>{{ item.label }}</span>
-                <b>{{ fmtWan(item.amount) }} 万</b>
-              </li>
-            </ul>
-          </div>
+        <section class="lg-panel">
+          <div class="lg-panel-title">来源类型分布</div>
+          <ul class="cl-compact-list">
+            <li v-for="item in sourceBreakdown" :key="item.label" class="cl-compact-row">
+              <span>{{ item.label }}</span>
+              <b>{{ fmtWan(item.amount) }} 万</b>
+            </li>
+          </ul>
         </section>
 
-        <section class="pt-panel">
-          <div class="pt-panel-header">超预算预警</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li
-                v-for="item in sourceBreakdown.filter((i) => parseFloat(i.amount) > 0).slice(0, 5)"
-                :key="'warn-' + item.label"
-                class="pt-compact-row"
-              >
-                <span>{{ item.label }}</span>
-                <b style="color: #ef4444">{{ fmtWan(item.amount) }} 万</b>
-              </li>
-              <li
-                v-if="sourceBreakdown.every((i) => parseFloat(i.amount) === 0)"
-                class="pt-compact-row"
-              >
-                <span>暂无超预算项</span>
-              </li>
-            </ul>
-          </div>
+        <section class="lg-panel">
+          <div class="lg-panel-title">超预算预警</div>
+          <ul class="cl-compact-list">
+            <li
+              v-for="item in sourceBreakdown.filter((i) => parseFloat(i.amount) > 0).slice(0, 5)"
+              :key="'warn-' + item.label"
+              class="cl-compact-row"
+            >
+              <span>{{ item.label }}</span>
+              <b style="color: #ef4444">{{ fmtWan(item.amount) }} 万</b>
+            </li>
+            <li
+              v-if="sourceBreakdown.every((i) => parseFloat(i.amount) === 0)"
+              class="cl-compact-row"
+            >
+              <span>暂无超预算项</span>
+            </li>
+          </ul>
         </section>
       </aside>
     </div>
 
-    <!-- Detail drawer (unchanged) -->
+    <!-- Detail drawer -->
     <a-drawer
       :open="detailVisible"
       title="成本明细"
@@ -607,5 +640,25 @@ onMounted(() => {
 <style scoped>
 .cl-money {
   font-variant-numeric: tabular-nums;
+}
+.cl-link {
+  color: var(--primary);
+  cursor: pointer;
+}
+.cl-compact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cl-compact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+.cl-compact-row:last-child {
+  border-bottom: none;
 }
 </style>
