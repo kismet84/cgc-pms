@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import VChart from 'vue-echarts'
 import {
   FileTextOutlined,
   DollarOutlined,
@@ -9,7 +8,6 @@ import {
   WalletOutlined,
   ClockCircleOutlined,
   PlusOutlined,
-  DownloadOutlined,
   SettingOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -70,9 +68,6 @@ function handleDelete(row: ContractVO) {
     },
   })
 }
-function handleExport() {
-  message.info('导出功能即将上线')
-}
 function handleAllAlerts() {
   router.push('/alert')
 }
@@ -88,10 +83,6 @@ function handleContractClose() {
 }
 
 // ---- Filter state ----
-const filterExpanded = ref(false)
-function toggleFilterExpand() {
-  filterExpanded.value = !filterExpanded.value
-}
 const filter = reactive({
   keyword: '',
   projectId: undefined as string | undefined,
@@ -161,7 +152,7 @@ async function fetchData() {
   try {
     const res: PageResult<ContractVO> = await getContractLedger(params)
     tableData.value = res.records
-    total.value = res.total
+    total.value = Number(res.total) || 0
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -240,7 +231,14 @@ const TYPE_COLOR: Record<ContractType, string> = {
   SERVICE: 'cyan',
 }
 
-const CHART_COLORS = ['#2f7df6', '#31c48d', '#f59e0b', '#8b5cf6', '#22c7d7']
+const TYPE_COLOR_HEX: Record<ContractType, string> = {
+  MAIN: '#2f7df6',
+  SUB: '#31c48d',
+  PURCHASE: '#f59e0b',
+  LEASE: '#8b5cf6',
+  SERVICE: '#22c7d7',
+}
+
 const STATUS_LABEL: Record<ContractStatus, string> = {
   DRAFT: '草稿',
   PERFORMING: '履约中',
@@ -264,16 +262,32 @@ const typeDistribution = computed(() => {
     { MAIN: 0, SUB: 0, PURCHASE: 0, LEASE: 0, SERVICE: 0 },
   )
   return (Object.keys(TYPE_LABEL) as ContractType[])
-    .map((key, index) => ({
+    .map((key) => ({
       key,
       label: TYPE_LABEL[key],
       value: counts[key],
-      color: CHART_COLORS[index],
+      color: TYPE_COLOR_HEX[key],
     }))
     .filter((item) => item.value > 0)
 })
 
-const statusDistribution = computed(() => {
+const totalCount = computed(() => tableData.value.length || 1)
+function typePercent(value: number): number {
+  return Math.round((value / totalCount.value) * 100)
+}
+
+// ---- KPI 最大值归一化 ----
+const kpiMax = computed(() => ({
+  totalCount: Math.max(kpi.value.totalCount, 1),
+  totalAmount: Math.max(parseFloat(kpi.value.totalAmount), 1),
+  overdueCount: Math.max(kpi.value.overdueCount, 1),
+}))
+function kpiPct(value: number, max: number): number {
+  if (max === 0) return 0
+  return Math.min(Math.round((value / max) * 100), 100)
+}
+
+const statusBars = computed(() => {
   if (!tableData.value.length) return []
   const counts = tableData.value.reduce<Record<ContractStatus, number>>(
     (acc, item) => {
@@ -282,26 +296,17 @@ const statusDistribution = computed(() => {
     },
     { DRAFT: 0, PERFORMING: 0, SETTLED: 0, TERMINATED: 0 },
   )
+  const total = Object.values(counts).reduce((s, v) => s + v, 0) || 1
   return (Object.keys(STATUS_LABEL) as ContractStatus[])
+    .filter((key) => counts[key] > 0)
     .map((key) => ({
       key,
       label: STATUS_LABEL[key],
       value: counts[key],
       color: STATUS_COLOR[key],
+      percent: Math.round((counts[key] / total) * 100),
     }))
-    .filter((item) => item.value > 0)
 })
-
-const statusTotal = computed(
-  () => statusDistribution.value.reduce((sum, item) => sum + item.value, 0) || 1,
-)
-
-const statusBars = computed(() =>
-  statusDistribution.value.map((item) => ({
-    ...item,
-    percent: Math.round((item.value / statusTotal.value) * 100),
-  })),
-)
 
 const warningRows = computed(() => {
   const now = new Date()
@@ -329,38 +334,6 @@ function onResize() {
 }
 onMounted(() => window.addEventListener('resize', onResize))
 onUnmounted(() => window.removeEventListener('resize', onResize))
-
-const donutOption = computed(() => ({
-  color: typeDistribution.value.map((item) => item.color),
-  tooltip: { trigger: 'item' },
-  legend: { show: false },
-  series: [
-    {
-      type: 'pie',
-      radius: ['54%', '78%'],
-      center: ['50%', '50%'],
-      avoidLabelOverlap: true,
-      label: { show: false },
-      data: typeDistribution.value.map((item) => ({ name: item.label, value: item.value })),
-    },
-  ],
-}))
-
-const statusDonutOption = computed(() => ({
-  color: statusDistribution.value.map((item) => item.color),
-  tooltip: { trigger: 'item' },
-  legend: { show: false },
-  series: [
-    {
-      type: 'pie',
-      radius: ['54%', '78%'],
-      center: ['50%', '50%'],
-      avoidLabelOverlap: true,
-      label: { show: false },
-      data: statusDistribution.value.map((item) => ({ name: item.label, value: item.value })),
-    },
-  ],
-}))
 
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
@@ -406,8 +379,8 @@ const gridColumns = computed(() => [
 </script>
 
 <template>
-  <div class="cl-page app-page">
-    <div class="cl-page-head">
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
       <div>
         <a-breadcrumb class="cl-breadcrumb">
           <a-breadcrumb-item>合同管理</a-breadcrumb-item>
@@ -416,104 +389,95 @@ const gridColumns = computed(() => [
       </div>
     </div>
 
-    <div class="cl-grid">
-      <!-- Left column -->
-      <div class="cl-left">
-        <!-- 全局搜索卡片 -->
-        <div class="pj-search-card">
-          <div class="pj-search-row">
-            <a-input
-              v-model:value="filter.keyword"
-              placeholder="输入合同编号、合同名称、合同类型、甲方名称、乙方名称等任意关键词"
-              allow-clear
-              size="large"
-              @press-enter="handleSearch"
-            >
-              <template #prefix><SearchOutlined style="color: #9ca3af" /></template>
-            </a-input>
-            <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-            <a-button size="large" @click="handleReset">
-              <template #icon><ReloadOutlined /></template>
-              重置
-            </a-button>
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.keyword"
+        placeholder="搜索合同编号、名称、甲方、乙方…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
+    </div>
+
+    <div class="lg-grid">
+      <!-- 左列 -->
+      <div class="lg-left">
+        <!-- KPI 横条：桌面/平板 -->
+        <div v-if="!isMobile" class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">合同总数</span>
+            <span class="lg-kpi-card-value">{{ kpi.totalCount }} <small>份</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">合同总金额(含税)</span>
+            <span class="lg-kpi-card-value">{{ fmtAmount(kpi.totalAmount) }} <small>万元</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">已付款</span>
+            <span class="lg-kpi-card-value">{{ fmtAmount(kpi.paidAmount) }} <small>万元</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(parseFloat(kpi.paidAmount), kpiMax.totalAmount) + '%', background: 'var(--kpi-paid)' }"></span></span>
+            <span class="lg-kpi-card-hint">{{ kpiPct(parseFloat(kpi.paidAmount), kpiMax.totalAmount) }}%</span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">未付款</span>
+            <span class="lg-kpi-card-value">{{ fmtAmount(kpi.unpaidAmount) }} <small>万元</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(parseFloat(kpi.unpaidAmount), kpiMax.totalAmount) + '%', background: 'var(--kpi-unpaid)' }"></span></span>
+            <span class="lg-kpi-card-hint">{{ kpiPct(parseFloat(kpi.unpaidAmount), kpiMax.totalAmount) }}%</span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">逾期合同</span>
+            <span class="lg-kpi-card-value">{{ kpi.overdueCount }} <small>份</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpi.overdueCount, kpiMax.overdueCount) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+            <span class="lg-kpi-card-hint" v-if="kpi.overdueCount">占 {{ kpiPct(kpi.overdueCount, kpiMax.totalCount) }}%</span>
           </div>
         </div>
 
-        <!-- KPI cards: desktop / tablet -->
-        <div v-if="!isMobile" class="cl-kpis">
-          <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background: #3b82f6"><FileTextOutlined /></div>
-            <div>
-              <div class="cl-kpi-title">合同总数</div>
-              <div class="cl-kpi-value">{{ kpi.totalCount }} <small>份</small></div>
-            </div>
-          </div>
-          <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background: #36c267"><DollarOutlined /></div>
-            <div>
-              <div class="cl-kpi-title">合同总金额(含税)</div>
-              <div class="cl-kpi-value">{{ fmtAmount(kpi.totalAmount) }} <small>万元</small></div>
-            </div>
-          </div>
-          <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background: #f59e0b"><PayCircleOutlined /></div>
-            <div>
-              <div class="cl-kpi-title">已付款金额</div>
-              <div class="cl-kpi-value">{{ fmtAmount(kpi.paidAmount) }} <small>万元</small></div>
-            </div>
-          </div>
-          <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background: #7c3aed"><WalletOutlined /></div>
-            <div>
-              <div class="cl-kpi-title">未付款金额</div>
-              <div class="cl-kpi-value">{{ fmtAmount(kpi.unpaidAmount) }} <small>万元</small></div>
-            </div>
-          </div>
-          <div class="cl-kpi">
-            <div class="cl-kpi-icon" style="background: #31c7cf"><ClockCircleOutlined /></div>
-            <div>
-              <div class="cl-kpi-title">逾期合同数</div>
-              <div class="cl-kpi-value">{{ kpi.overdueCount }} <small>份</small></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- KPI card: mobile (single card) -->
-        <div v-else class="cl-kpi-single">
+        <!-- KPI 移动端：单条卡片 -->
+        <div v-else class="lg-kpi-single">
           <div
-            class="cl-kpi-single-row"
+            class="lg-kpi-single-row"
             v-for="item in [
               {
                 icon: FileTextOutlined,
-                bg: '#3b82f6',
+                bg: 'var(--kpi-total)',
                 label: '合同总数',
                 value: kpi.totalCount,
                 unit: '份',
               },
               {
                 icon: DollarOutlined,
-                bg: '#36c267',
+                bg: 'var(--kpi-amount)',
                 label: '合同总金额(含税)',
                 value: fmtAmount(kpi.totalAmount),
                 unit: '万元',
               },
               {
                 icon: PayCircleOutlined,
-                bg: '#f59e0b',
+                bg: 'var(--kpi-paid)',
                 label: '已付款金额',
                 value: fmtAmount(kpi.paidAmount),
                 unit: '万元',
               },
               {
                 icon: WalletOutlined,
-                bg: '#7c3aed',
+                bg: 'var(--kpi-unpaid)',
                 label: '未付款金额',
                 value: fmtAmount(kpi.unpaidAmount),
                 unit: '万元',
               },
               {
                 icon: ClockCircleOutlined,
-                bg: '#31c7cf',
+                bg: 'var(--kpi-overdue)',
                 label: '逾期合同数',
                 value: kpi.overdueCount,
                 unit: '份',
@@ -521,29 +485,31 @@ const gridColumns = computed(() => [
             ]"
             :key="item.label"
           >
-            <div class="cl-kpi-single-icon" :style="{ background: item.bg }">
+            <div class="lg-kpi-single-icon" :style="{ background: item.bg }">
               <component :is="item.icon" />
             </div>
-            <span class="cl-kpi-single-label">{{ item.label }}</span>
-            <span class="cl-kpi-single-value"
+            <span class="lg-kpi-single-label">{{ item.label }}</span>
+            <span class="lg-kpi-single-value"
               >{{ item.value }} <small>{{ item.unit }}</small></span
             >
           </div>
         </div>
 
-        <!-- Toolbar -->
-        <div class="cl-toolbar">
-          <div class="cl-toolbar-left">
-            <a-button type="primary" @click="handleCreate"
-              ><template #icon><PlusOutlined /></template>新建合同</a-button
-            >
-            <a-button :disabled="true" title="即将上线" @click="handleExport"
-              ><template #icon><DownloadOutlined /></template>导出</a-button
-            >
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleCreate">
+              <template #icon><PlusOutlined /></template>
+              新建合同
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
             <a-dropdown v-if="!isMobile">
-              <a-button
-                ><template #icon><SettingOutlined /></template>列设置</a-button
-              >
+              <a-button>
+                <template #icon><SettingOutlined /></template>
+                列设置
+              </a-button>
               <template #overlay>
                 <a-menu>
                   <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
@@ -566,30 +532,49 @@ const gridColumns = computed(() => [
                 </a-menu>
               </template>
             </a-dropdown>
-            <a-button @click="fetchData"
-              ><template #icon><ReloadOutlined /></template
-            ></a-button>
+          </div>
+          <div class="lg-toolbar-right">
             <a-select
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
-              style="width: 180px"
+              style="width: 160px"
               size="small"
               @change="handleSearch"
             >
-              <a-select-option
-                v-for="p in projects"
-                :key="p.id"
-                :value="p.id"
-              >
+              <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
                 {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.contractType"
+              placeholder="全部类型"
+              allow-clear
+              style="width: 120px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="(label, key) in TYPE_LABEL" :key="key" :value="key">
+                {{ label }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.contractStatus"
+              placeholder="全部状态"
+              allow-clear
+              style="width: 120px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="(label, key) in STATUS_LABEL" :key="key" :value="key">
+                {{ label }}
               </a-select-option>
             </a-select>
           </div>
         </div>
 
-        <!-- Table: desktop / tablet -->
-        <div v-if="!isMobile" class="cl-card cl-table-wrap">
+        <!-- 表格：桌面/平板 -->
+        <div v-if="!isMobile" class="lg-table-wrap">
           <vxe-grid
             :data="tableData"
             :columns="gridColumns"
@@ -602,7 +587,7 @@ const gridColumns = computed(() => [
             max-height="480"
           >
             <template #contractCode="{ row }">
-              <a class="cl-link">{{ row.contractCode }}</a>
+              <a class="lg-link">{{ row.contractCode }}</a>
             </template>
             <template #contractType="{ row }">
               <a-tag :color="TYPE_COLOR[row.contractType as ContractType]">
@@ -610,7 +595,7 @@ const gridColumns = computed(() => [
               </a-tag>
             </template>
             <template #amount="{ row }">
-              <span class="cl-money">{{
+              <span class="lg-money">{{
                 parseFloat(row.contractAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
               }}</span>
             </template>
@@ -618,29 +603,29 @@ const gridColumns = computed(() => [
               <ContractStatusTag :status="row.contractStatus as ContractStatus" />
             </template>
             <template #ops="{ row }">
-              <div class="cl-ops">
-                <a class="cl-link" @click="handleView(row)">查看</a>
-                <a class="cl-link" @click="handleEdit(row)">编辑</a>
-                <a class="cl-link cl-del" @click="handleDelete(row)">删除</a>
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleView(row)">查看</a>
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
               </div>
             </template>
           </vxe-grid>
         </div>
 
-        <!-- Table: mobile cards -->
-        <div v-else class="cl-card-list">
-          <div v-if="loading" class="cl-card-list-loading">
+        <!-- 移动端卡片列表 -->
+        <div v-else class="lg-card-list">
+          <div v-if="loading" class="lg-card-list-loading">
             <a-spin size="large" />
           </div>
-          <div v-else-if="!tableData.length" class="cl-card-list-empty">
+          <div v-else-if="!tableData.length" class="lg-card-list-empty">
             <a-empty />
           </div>
-          <div v-for="row in tableData" :key="row.id" class="cl-card-item">
-            <div class="cl-card-item-head">
-              <span class="cl-card-code">
-                <a class="cl-link" @click="handleView(row)">{{ row.contractCode }}</a>
+          <div v-for="row in tableData" :key="row.id" class="lg-card-item">
+            <div class="lg-card-item-head">
+              <span class="lg-card-code">
+                <a class="lg-link" @click="handleView(row)">{{ row.contractCode }}</a>
               </span>
-              <span class="cl-card-head-right">
+              <span class="lg-card-head-right">
                 <a-tag
                   v-if="colVisible.contractType"
                   :color="TYPE_COLOR[row.contractType as ContractType]"
@@ -653,35 +638,35 @@ const gridColumns = computed(() => [
                 />
               </span>
             </div>
-            <div class="cl-card-item-body">
-              <div v-if="colVisible.contractName" class="cl-card-field">
-                <span class="cl-card-label">合同名称</span>
-                <span class="cl-card-value">{{ row.contractName }}</span>
+            <div class="lg-card-item-body">
+              <div v-if="colVisible.contractName" class="lg-card-field">
+                <span class="lg-card-label">合同名称</span>
+                <span class="lg-card-value">{{ row.contractName }}</span>
               </div>
-              <div v-if="colVisible.partyAName || colVisible.partyBName" class="cl-card-field">
-                <span class="cl-card-label">签约双方</span>
-                <span class="cl-card-value">
+              <div v-if="colVisible.partyAName || colVisible.partyBName" class="lg-card-field">
+                <span class="lg-card-label">签约双方</span>
+                <span class="lg-card-value">
                   <template v-if="colVisible.partyAName">{{ row.partyAName }}</template>
                   <template v-if="colVisible.partyAName && colVisible.partyBName"> · </template>
                   <template v-if="colVisible.partyBName">{{ row.partyBName }}</template>
                 </span>
               </div>
-              <div class="cl-card-field-row">
-                <div v-if="colVisible.contractAmount" class="cl-card-field">
-                  <span class="cl-card-label">合同金额(含税)</span>
-                  <span class="cl-card-value cl-card-money">{{
+              <div class="lg-card-field-row">
+                <div v-if="colVisible.contractAmount" class="lg-card-field">
+                  <span class="lg-card-label">合同金额(含税)</span>
+                  <span class="lg-card-value lg-card-money">{{
                     parseFloat(row.contractAmount).toLocaleString('zh-CN', {
                       minimumFractionDigits: 2,
                     })
                   }}</span>
                 </div>
-                <div v-if="colVisible.signedDate" class="cl-card-field">
-                  <span class="cl-card-label">签订日期</span>
-                  <span class="cl-card-value">{{ row.signedDate }}</span>
+                <div v-if="colVisible.signedDate" class="lg-card-field">
+                  <span class="lg-card-label">签订日期</span>
+                  <span class="lg-card-value">{{ row.signedDate }}</span>
                 </div>
               </div>
             </div>
-            <div class="cl-card-item-foot">
+            <div class="lg-card-item-foot">
               <a-space :size="4">
                 <a-button size="small" type="link" @click="handleView(row)">查看</a-button>
                 <a-button size="small" type="link" @click="handleEdit(row)">编辑</a-button>
@@ -691,9 +676,9 @@ const gridColumns = computed(() => [
           </div>
         </div>
 
-        <!-- Pagination -->
-        <div class="cl-pagination">
-          <span class="cl-total">共 {{ total }} 条</span>
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
           <a-pagination
             v-model:current="pageNo"
             v-model:page-size="pageSize"
@@ -707,37 +692,55 @@ const gridColumns = computed(() => [
         </div>
       </div>
 
-      <!-- Right analysis rail -->
-      <aside class="cl-analysis-rail">
-        <section class="cl-panel">
-          <div class="cl-panel-title">合同类型分布</div>
-          <div class="cl-chart-center">
-            <VChart :option="donutOption" autoresize class="cl-donut" />
+      <!-- 右侧分析面板 -->
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">合同类型分布</div>
+          <div class="lg-type-list">
+            <div v-for="item in typeDistribution" :key="item.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span class="lg-type-bar" :style="{ width: typePercent(item.value) + '%', background: item.color }"></span>
+              </span>
+              <span class="lg-type-num">{{ item.value }}</span>
+              <span class="lg-type-pct">{{ typePercent(item.value) }}%</span>
+            </div>
           </div>
         </section>
 
-        <section class="cl-panel">
-          <div class="cl-panel-title">合同状态统计</div>
-          <div class="cl-chart-center">
-            <VChart :option="statusDonutOption" autoresize class="cl-donut" />
+        <section class="lg-panel">
+          <div class="lg-panel-title">合同状态</div>
+          <div class="lg-type-list">
+            <div v-for="item in statusBars" :key="item.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span class="lg-type-bar" :style="{ width: item.percent + '%', background: item.color }"></span>
+              </span>
+              <span class="lg-type-num">{{ item.value }}</span>
+              <span class="lg-type-pct">{{ item.percent }}%</span>
+            </div>
           </div>
         </section>
 
-        <section class="cl-panel">
-          <div class="cl-warning-head">
-            <div class="cl-panel-title">逾期预警</div>
+        <section class="lg-panel">
+          <div class="lg-warning-head">
+            <div class="lg-panel-title" style="margin-bottom:0">逾期预警</div>
             <a-button type="link" size="small" @click="handleAllAlerts">查看全部</a-button>
           </div>
-          <div class="cl-warning-list">
+          <div class="lg-warning-list">
             <div
               v-for="row in warningRows"
               :key="`${row.project}-${row.title}`"
-              class="cl-warning-item"
+              class="lg-warning-item"
             >
-              <i class="cl-red-dot"></i>
-              <span>{{ row.project }}</span>
-              <span>{{ row.title }}</span>
-              <b class="cl-overdue">{{ row.days }}天</b>
+              <span class="lg-warning-project">{{ row.project }}</span>
+              <span class="lg-warning-title">{{ row.title }}</span>
+              <span class="lg-warning-days">{{ row.days }}天</span>
+            </div>
+            <div v-if="!warningRows.length" class="lg-warning-empty">
+              暂无逾期合同
             </div>
           </div>
         </section>
@@ -767,541 +770,14 @@ const gridColumns = computed(() => [
 </template>
 
 <style scoped>
-.cl-page {
-  background: var(--bg);
-  min-height: 100%;
-  padding: 2px 0;
-}
+/* 仅保留页面专属样式 — 其余已由 lg-* 全局类覆盖 */
+
 .cl-contract-modal :deep(.ant-modal-body) {
   max-height: 82vh;
   overflow: auto;
 }
-.cl-page-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
 .cl-breadcrumb {
   margin-bottom: 5px;
   font-size: 13px;
-}
-.cl-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 336px;
-  gap: 16px;
-  align-items: start;
-}
-.cl-left {
-  min-width: 0;
-}
-.cl-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-}
-
-/* Filter */
-.cl-filter {
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-}
-.cl-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  align-items: center;
-  margin-bottom: 10px;
-}
-.cl-filter-row--last {
-  margin-bottom: 0;
-}
-.cl-field {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-.cl-field label {
-  color: var(--text-secondary);
-  min-width: 56px;
-}
-.cl-filter :deep(.ant-select-selector),
-.cl-filter :deep(.ant-picker),
-.cl-filter :deep(.ant-input),
-.cl-filter :deep(.ant-btn) {
-  font-size: 13px;
-}
-.cl-filter-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-  align-items: center;
-}
-
-/* KPI */
-.cl-kpis {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(132px, 1fr));
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.cl-kpi {
-  min-height: 78px;
-  padding: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  box-shadow: var(--shadow-soft);
-}
-.cl-kpi-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-size: 15px;
-  flex-shrink: 0;
-}
-.cl-kpi-title {
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-.cl-kpi-value {
-  font-size: 19px;
-  font-weight: 800;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-}
-.cl-kpi-value small {
-  font-size: 13px;
-  font-weight: 500;
-  margin-left: 4px;
-}
-.cl-kpi-change {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 3px;
-}
-.up {
-  color: #ef4444;
-}
-.down {
-  color: #16a34a;
-}
-
-/* KPI single card (mobile) */
-.cl-kpi-single {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-  padding: 8px 0;
-  margin-bottom: 10px;
-}
-.cl-kpi-single-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  font-size: 13px;
-}
-.cl-kpi-single-row + .cl-kpi-single-row {
-  border-top: 1px solid var(--border-subtle);
-}
-.cl-kpi-single-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  color: #fff;
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  flex-shrink: 0;
-}
-.cl-kpi-single-label {
-  flex: 1;
-  color: var(--text-secondary);
-}
-.cl-kpi-single-value {
-  font-weight: 700;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.cl-kpi-single-value small {
-  font-size: 12px;
-  font-weight: 500;
-  margin-left: 2px;
-}
-
-/* Toolbar */
-.cl-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  padding: 10px 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-}
-.cl-toolbar-left {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* Table */
-.cl-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
-}
-.cl-link {
-  color: var(--primary);
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
-}
-.cl-money {
-  font-variant-numeric: tabular-nums;
-}
-.cl-ops {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-}
-.cl-del {
-  color: var(--error);
-}
-.cl-table-wrap :deep(.vxe-table--header-wrapper) {
-  background: var(--surface-subtle);
-}
-.cl-table-wrap :deep(.vxe-header--column) {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-}
-.cl-table-wrap :deep(.vxe-body--column) {
-  color: var(--text);
-  font-size: 13px;
-}
-.cl-table-wrap :deep(.vxe-body--row:hover) {
-  background: #f8fbff;
-}
-
-/* Card list (mobile) */
-.cl-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.cl-card-list-loading,
-.cl-card-list-empty {
-  display: flex;
-  justify-content: center;
-  padding: 48px 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-}
-.cl-card-item {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 13px 14px;
-  box-shadow: var(--shadow-soft);
-}
-.cl-card-item-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.cl-card-code {
-  font-size: 14px;
-  font-weight: 700;
-}
-.cl-card-head-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.cl-card-item-body {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.cl-card-field {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 13px;
-}
-.cl-card-label {
-  color: var(--text-secondary);
-  white-space: nowrap;
-  min-width: 88px;
-  flex-shrink: 0;
-}
-.cl-card-value {
-  color: var(--text);
-  word-break: break-all;
-}
-.cl-card-money {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-.cl-card-field-row {
-  display: flex;
-  gap: 16px;
-}
-.cl-card-field-row .cl-card-field {
-  flex: 1;
-  min-width: 0;
-}
-.cl-card-field-row .cl-card-label {
-  min-width: 0;
-}
-.cl-card-item-foot {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  justify-content: flex-end;
-}
-
-/* Pagination */
-.cl-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.cl-total {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-/* Right analysis rail */
-.cl-analysis-rail {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.cl-panel {
-  padding: 13px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-}
-.cl-panel-title {
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 12px;
-  color: var(--text);
-}
-.cl-chart-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.cl-chart-center {
-  display: flex;
-  justify-content: center;
-}
-.cl-donut {
-  width: 118px;
-  height: 118px;
-  flex-shrink: 0;
-}
-.cl-legend {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.cl-legend-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.cl-legend-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.cl-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-/* Status bars */
-.cl-status-list {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  font-size: 12px;
-  min-width: 0;
-  flex: 1;
-}
-.cl-status-chart-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.cl-status-line {
-  display: grid;
-  grid-template-columns: 46px 22px 1fr 42px;
-  gap: 7px;
-  align-items: center;
-}
-.cl-bar {
-  height: 7px;
-  border-radius: 99px;
-  background: var(--border-subtle);
-  overflow: hidden;
-}
-.cl-bar span {
-  height: 100%;
-  display: block;
-  border-radius: 99px;
-}
-
-/* Overdue */
-.cl-warning-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.cl-warning-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 12px;
-}
-.cl-warning-item {
-  display: grid;
-  grid-template-columns: 8px 92px minmax(0, 1fr) 58px;
-  gap: 7px;
-  align-items: center;
-}
-.cl-warning-item span:nth-child(3) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cl-red-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--error);
-  border-radius: 50%;
-  display: inline-block;
-}
-.cl-overdue {
-  color: var(--error);
-  font-weight: 600;
-  text-align: right;
-}
-
-/* 全局搜索卡片（与项目管理一致） */
-.pj-search-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 14px 20px;
-  margin-bottom: 10px;
-  box-shadow: var(--shadow-soft);
-}
-.pj-search-label {
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-.pj-search-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.pj-search-row :deep(.ant-input-affix-wrapper) {
-  flex: 1;
-  height: 44px;
-}
-.pj-search-row :deep(.ant-input-affix-wrapper .ant-input) {
-  font-size: 15px;
-}
-
-@media (max-width: 1280px) {
-  .cl-grid {
-    grid-template-columns: 1fr;
-  }
-  .cl-analysis-rail {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 1100px) {
-  .cl-kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .cl-analysis-rail {
-    grid-template-columns: 1fr;
-  }
-  .cl-filter-actions {
-    margin-left: 0;
-  }
-}
-
-@media (max-width: 520px) {
-  .cl-kpis {
-    grid-template-columns: 1fr;
-  }
-  .cl-page-head {
-    display: block;
-  }
-  .cl-filter {
-    padding: 12px;
-  }
-  .cl-field,
-  .cl-filter-actions,
-  .cl-toolbar-left,
-  .cl-pagination {
-    width: 100%;
-    flex-wrap: wrap;
-  }
 }
 </style>
