@@ -3175,7 +3175,7 @@
     "semantic_hash": "ebd2c97f7a8627c869ab7a1c2a73eda5"
   },
   "frontend-admin/src/components.d.ts": {
-    "mtime": 1781877503.6167243,
+    "mtime": 1781878764.7625773,
     "ast_hash": "29c54745473ed5f74ba4278cc368a3a7",
     "semantic_hash": ""
   },
@@ -3440,8 +3440,8 @@
     "semantic_hash": ""
   },
   "frontend-admin/src/pages/org/index.vue": {
-    "mtime": 1781826479.4942853,
-    "ast_hash": "52f30a648990b5a070af669b018f9a9c",
+    "mtime": 1781878713.3586385,
+    "ast_hash": "46f235e42a1c98647ceee8576652e3aa",
     "semantic_hash": ""
   },
   "frontend-admin/src/pages/partner/index.vue": {
