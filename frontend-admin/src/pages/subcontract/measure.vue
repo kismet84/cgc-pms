@@ -3,6 +3,11 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from '@ant-design/icons-vue'
+import {
   getMeasureList,
   createMeasure,
   updateMeasure,
@@ -72,7 +77,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 const columns = [
   { title: '计量编号', dataIndex: 'measureCode', width: 140, ellipsis: true },
-  { title: '计量期次', dataIndex: 'measurePeriod', width: 100, key: 'measurePeriod' },
+  { title: '计量期次', dataIndex: 'measurePeriod', width: 100 },
   { title: '项目名称', dataIndex: 'projectName', width: 120, ellipsis: true },
   { title: '合同名称', dataIndex: 'contractName', width: 120, ellipsis: true },
   { title: '分包商', dataIndex: 'partnerName', width: 120, ellipsis: true },
@@ -353,6 +358,7 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
+const kpiTotalCount = computed(() => total.value)
 const kpiMeasureTotal = computed(() =>
   tableData.value.reduce((s, r) => s + (parseFloat(r.reportedAmount) || 0), 0),
 )
@@ -364,13 +370,9 @@ const kpiApproved = computed(() =>
 const kpiMeasurePending = computed(
   () => tableData.value.filter((r) => r.status === 'DRAFT' || r.status === 'APPROVING').length,
 )
-const measureStatusBreakdown = computed(() => {
-  const m: Record<string, number> = {}
-  tableData.value.forEach((r) => {
-    m[STATUS_LABEL[r.status] ?? r.status] = (m[STATUS_LABEL[r.status] ?? r.status] || 0) + 1
-  })
-  return Object.entries(m).map(([k, v]) => ({ label: k, count: v }))
-})
+function fmtAmount(val: number): string {
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -381,387 +383,366 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>分包管理</a-breadcrumb-item
-        ><a-breadcrumb-item>分包计量</a-breadcrumb-item></a-breadcrumb
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="lg-breadcrumb">
+          <a-breadcrumb-item>分包管理</a-breadcrumb-item>
+          <a-breadcrumb-item>分包计量</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.measureCode"
+        placeholder="搜索计量编号…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
       >
-      <div class="pt-head-actions"></div>
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
-    <div class="pt-kpi-strip" style="grid-template-columns: repeat(3, 1fr)">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">计量总额</div>
-        <div class="pt-kpi-value">{{ kpiMeasureTotal.toLocaleString() }}<small>元</small></div>
+    <!-- KPI 横条 -->
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">计量总数</span>
+        <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>条</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
       </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">已审核</div>
-        <div class="pt-kpi-value">{{ kpiApproved.toLocaleString() }}<small>元</small></div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">申报总额</span>
+        <span class="lg-kpi-card-value">{{ fmtAmount(kpiMeasureTotal) }} <small>元</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
       </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">待审核</div>
-        <div class="pt-kpi-value">{{ kpiMeasurePending }}<small>条</small></div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">已审核金额</span>
+        <span class="lg-kpi-card-value">{{ fmtAmount(kpiApproved) }} <small>元</small></span>
+        <span class="lg-kpi-card-bar"><span :style="{ width: (kpiMeasureTotal ? Math.round((kpiApproved / kpiMeasureTotal) * 100) : 0) + '%', background: 'var(--kpi-paid)' }"></span></span>
+        <span class="lg-kpi-card-hint" v-if="kpiMeasureTotal">{{ kpiMeasureTotal ? Math.round((kpiApproved / kpiMeasureTotal) * 100) : 0 }}%</span>
+      </div>
+      <div class="lg-kpi-card is-warn" v-if="kpiMeasurePending > 0">
+        <span class="lg-kpi-card-label">待审核</span>
+        <span class="lg-kpi-card-value">{{ kpiMeasurePending }} <small>条</small></span>
+        <span class="lg-kpi-card-bar"><span :style="{ width: (kpiTotalCount ? Math.round((kpiMeasurePending / kpiTotalCount) * 100) : 0) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+        <span class="lg-kpi-card-hint" v-if="kpiTotalCount">{{ kpiTotalCount ? Math.round((kpiMeasurePending / kpiTotalCount) * 100) : 0 }}%</span>
       </div>
     </div>
 
-    <!-- Filter -->
-    <div class="pt-ledger-layout">
-      <main style="flex: 1; min-width: 0">
-        <div class="pt-panel pt-filter-surface">
-          <div class="pt-filter-row">
-            <div class="pt-field">
-              <label>项目：</label>
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部"
-                allow-clear
-                style="width: 180px"
-                show-search
-                @change="
-                  (v: string | undefined) => {
-                    filter.contractId = undefined
-                    if (v) referenceStore.fetchContracts({ projectId: v })
-                  }
-                "
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-              >
-                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
-            </div>
-            <div class="pt-field">
-              <label>分包合同：</label>
-              <a-select
-                v-model:value="filter.contractId"
-                placeholder="全部"
-                allow-clear
-                style="width: 180px"
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-              >
-                <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-                  {{ c.contractName }}
-                </a-select-option>
-              </a-select>
-            </div>
-            <div class="pt-field">
-              <label>分包商：</label>
-              <a-select
-                v-model:value="filter.partnerId"
-                placeholder="全部"
-                allow-clear
-                style="width: 160px"
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-              >
-                <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-                  {{ p.partnerName }}
-                </a-select-option>
-              </a-select>
-            </div>
-            <div class="pt-field">
-              <label>状态：</label>
-              <a-select
-                v-model:value="filter.status"
-                placeholder="全部"
-                allow-clear
-                style="width: 110px"
-              >
-                <a-select-option value="DRAFT">草稿</a-select-option>
-                <a-select-option value="APPROVING">审批中</a-select-option>
-                <a-select-option value="CONFIRMED">已确认</a-select-option>
-                <a-select-option value="COMPLETED">已完成</a-select-option>
-              </a-select>
-            </div>
-            <div class="pt-field">
-              <label>计量编号：</label>
-              <a-input
-                v-model:value="filter.measureCode"
-                placeholder="请输入编号"
-                style="width: 150px"
-                allow-clear
-              />
-            </div>
-            <div class="pt-filter-actions">
-              <a-button type="primary" @click="handleSearch">查询</a-button>
-              <a-button @click="handleReset">重置</a-button>
-              <a-button type="primary" @click="handleAdd">新建计量</a-button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Table -->
-        <div class="pt-panel pt-table-panel">
-          <a-table
-            :columns="columns"
-            :data-source="tableData"
-            :loading="loading"
-            :pagination="false"
-            row-key="id"
-            size="small"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'measurePeriod'">
-                <a class="pt-link">{{ record.measurePeriod }}</a>
-              </template>
-              <template v-else-if="column.key === 'reportedAmount'">
-                <span v-if="record.reportedAmount"
-                  >¥{{
-                    Number(record.reportedAmount).toLocaleString('zh-CN', {
-                      minimumFractionDigits: 2,
-                    })
-                  }}</span
-                >
-                <span v-else class="pm-none">-</span>
-              </template>
-              <template v-else-if="column.key === 'approvedAmount'">
-                <span v-if="record.approvedAmount"
-                  >¥{{
-                    Number(record.approvedAmount).toLocaleString('zh-CN', {
-                      minimumFractionDigits: 2,
-                    })
-                  }}</span
-                >
-                <span v-else class="pm-none">-</span>
-              </template>
-              <template v-else-if="column.key === 'netAmount'">
-                <span v-if="record.netAmount !== undefined && record.netAmount !== null"
-                  >¥{{
-                    Number(record.netAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-                  }}</span
-                >
-                <span v-else class="pm-none">-</span>
-              </template>
-              <template v-else-if="column.key === 'status'">
-                <a-tag :color="STATUS_COLOR[record.status]">
-                  {{ STATUS_LABEL[record.status] ?? record.status }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'approvalStatus'">
-                <ApprovalStatusTag :status="record.approvalStatus" />
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-                <a-button type="link" size="small" danger @click="handleDelete(record)"
-                  >删除</a-button
-                >
-                <a-button
-                  v-if="record.approvalStatus === 'DRAFT'"
-                  type="link"
-                  size="small"
-                  @click="handleSubmitApproval(record)"
-                  >提交审批</a-button
-                >
-              </template>
-            </template>
-          </a-table>
-        </div>
-
-        <!-- Pagination -->
-        <div class="pt-pagination">
-          <span class="pt-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
-
-        <!-- Add/Edit Modal -->
-        <a-modal
-          v-model:open="modalVisible"
-          :title="modalTitle"
-          :width="900"
-          @ok="handleModalOk"
-          @cancel="handleModalCancel"
+    <!-- 工具栏 -->
+    <div class="lg-toolbar">
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleAdd">
+          <template #icon><PlusOutlined /></template>
+          新建计量
+        </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+      </div>
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.projectId"
+          placeholder="全部项目"
+          allow-clear
+          style="width: 160px"
+          size="small"
+          show-search
+          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+          @change="(v: string | undefined) => { filter.contractId = undefined; if (v) referenceStore.fetchContracts({ projectId: v }); handleSearch() }"
         >
-          <!-- Header Form -->
-          <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
-            <a-form-item label="项目" required>
-              <a-select
-                v-model:value="formData.projectId"
-                placeholder="请选择项目"
-                show-search
-                @change="
-                  (v: string) => {
-                    formData.contractId = undefined
-                    formData.partnerId = undefined
-                    referenceStore.fetchContracts({ projectId: v })
-                  }
-                "
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-              >
-                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="分包合同">
-              <a-select
-                v-model:value="formData.contractId"
-                placeholder="请选择合同"
-                allow-clear
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-                @change="(val: string) => onContractSelect(val)"
-              >
-                <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-                  {{ c.contractName }}
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="分包商">
-              <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
-            </a-form-item>
-            <a-form-item label="计量期次">
-              <a-input
-                v-model:value="formData.measurePeriod"
-                placeholder="请输入计量期次（如：第1期）"
-              />
-            </a-form-item>
-            <a-form-item label="计量日期">
-              <a-date-picker
-                v-model:value="formData.measureDate"
-                value-format="YYYY-MM-DD"
-                style="width: 100%"
-              />
-            </a-form-item>
-            <a-form-item label="备注">
-              <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
-            </a-form-item>
-          </a-form>
-
-          <!-- Line Items Section -->
-          <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-            <div
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 10px;
-              "
-            >
-              <span style="font-weight: 600; font-size: 14px">计量明细</span>
-              <a-button type="dashed" size="small" @click="handleAddItem">+ 添加明细</a-button>
-            </div>
-
-            <a-table
-              :data-source="itemList"
-              :pagination="false"
-              row-key="key"
-              size="small"
-              :scroll="{ y: 250 }"
-            >
-              <a-table-column title="合同清单项" width="200">
-                <template #default="{ record: item, index }">
-                  <a-select
-                    :value="item.contractItemId"
-                    placeholder="请选择清单项"
-                    allow-clear
-                    style="width: 100%"
-                    @change="(val: string) => handleContractItemChange(index, val)"
-                  >
-                    <a-select-option v-for="ci in contractItemList" :key="ci.id" :value="ci.id">
-                      {{ ci.itemName }}
-                    </a-select-option>
-                  </a-select>
-                </template>
-              </a-table-column>
-              <a-table-column title="单位" width="70">
-                <template #default="{ record: item }">
-                  <span>{{ item.unit || '-' }}</span>
-                </template>
-              </a-table-column>
-              <a-table-column title="合同量" width="100">
-                <template #default="{ record: item }">
-                  <span>{{ item.contractQuantity || '-' }}</span>
-                </template>
-              </a-table-column>
-              <a-table-column title="本期量" width="120">
-                <template #default="{ record: item, index }">
-                  <a-input-number
-                    v-model:value="item.currentQuantity"
-                    :min="0"
-                    :precision="4"
-                    style="width: 100%"
-                    @change="handleItemQtyChange(index)"
-                  />
-                </template>
-              </a-table-column>
-              <a-table-column title="单价(元)" width="130">
-                <template #default="{ record: item, index }">
-                  <a-input-number
-                    v-model:value="item.unitPrice"
-                    :min="0"
-                    :precision="4"
-                    style="width: 100%"
-                    @change="handleItemPriceChange(index)"
-                  />
-                </template>
-              </a-table-column>
-              <a-table-column title="金额(元)" width="130">
-                <template #default="{ record: item }">
-                  <span>{{
-                    Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-                  }}</span>
-                </template>
-              </a-table-column>
-              <a-table-column title="操作" width="60">
-                <template #default="{ record: _item, index }">
-                  <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
-                    >删除</a-button
-                  >
-                </template>
-              </a-table-column>
-            </a-table>
-
-            <div style="text-align: right; margin-top: 8px; font-size: 14px">
-              合计：<span style="font-weight: 600; color: #1677ff"
-                >¥{{
-                  Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-                }}</span
-              >
-            </div>
-          </div>
-        </a-modal>
-      </main>
-      <aside class="pt-analysis-rail">
-        <section class="pt-panel">
-          <div class="pt-panel-header">计量状态分布</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="it in measureStatusBreakdown" :key="it.label" class="pt-compact-row">
-                <span>{{ it.label }}</span
-                ><b>{{ it.count }} 条</b>
-              </li>
-            </ul>
-          </div>
-        </section>
-      </aside>
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.contractId"
+          placeholder="全部分包合同"
+          allow-clear
+          style="width: 160px"
+          size="small"
+          show-search
+          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+            {{ c.contractName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.partnerId"
+          placeholder="全部分包商"
+          allow-clear
+          style="width: 140px"
+          size="small"
+          show-search
+          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
+            {{ p.partnerName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.status"
+          placeholder="全部状态"
+          allow-clear
+          style="width: 110px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option value="DRAFT">草稿</a-select-option>
+          <a-select-option value="APPROVING">审批中</a-select-option>
+          <a-select-option value="CONFIRMED">已确认</a-select-option>
+          <a-select-option value="COMPLETED">已完成</a-select-option>
+        </a-select>
+      </div>
     </div>
+
+    <!-- 表格 -->
+    <div class="lg-table-wrap">
+      <a-table
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        size="small"
+        :scroll="{ x: 1100 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'reportedAmount'">
+            <span v-if="record.reportedAmount" class="lg-money">
+              {{ Number(record.reportedAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+            </span>
+            <span v-else class="lg-none">-</span>
+          </template>
+          <template v-else-if="column.key === 'approvedAmount'">
+            <span v-if="record.approvedAmount" class="lg-money">
+              {{ Number(record.approvedAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+            </span>
+            <span v-else class="lg-none">-</span>
+          </template>
+          <template v-else-if="column.key === 'netAmount'">
+            <span v-if="record.netAmount !== undefined && record.netAmount !== null" class="lg-money">
+              {{ Number(record.netAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+            </span>
+            <span v-else class="lg-none">-</span>
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="STATUS_COLOR[record.status]">
+              {{ STATUS_LABEL[record.status] ?? record.status }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'approvalStatus'">
+            <ApprovalStatusTag :status="record.approvalStatus" />
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <div class="lg-ops">
+              <a class="lg-link" @click="handleEdit(record)">编辑</a>
+              <a class="lg-link lg-del" @click="handleDelete(record)">删除</a>
+              <a
+                v-if="record.approvalStatus === 'DRAFT'"
+                class="lg-link"
+                @click="handleSubmitApproval(record)"
+              >提交审批</a>
+            </div>
+          </template>
+        </template>
+      </a-table>
+    </div>
+
+    <!-- 分页 -->
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
+      <a-pagination
+        v-model:current="pageNo"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-size-options="['10', '20', '50', '100']"
+        show-size-changer
+        show-quick-jumper
+        @change="handlePageChange"
+        @show-size-change="handlePageSizeChange"
+      />
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <a-modal
+      v-model:open="modalVisible"
+      :title="modalTitle"
+      :width="900"
+      @ok="handleModalOk"
+      @cancel="handleModalCancel"
+    >
+      <!-- Header Form -->
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
+        <a-form-item label="项目" required>
+          <a-select
+            v-model:value="formData.projectId"
+            placeholder="请选择项目"
+            show-search
+            @change="
+              (v: string) => {
+                formData.contractId = undefined
+                formData.partnerId = undefined
+                referenceStore.fetchContracts({ projectId: v })
+              }
+            "
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
+          >
+            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+              {{ p.projectName }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="分包合同">
+          <a-select
+            v-model:value="formData.contractId"
+            placeholder="请选择合同"
+            allow-clear
+            show-search
+            :filter-option="
+              (input: string, option: any) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
+            @change="(val: string) => onContractSelect(val)"
+          >
+            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+              {{ c.contractName }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="分包商">
+          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
+        </a-form-item>
+        <a-form-item label="计量期次">
+          <a-input
+            v-model:value="formData.measurePeriod"
+            placeholder="请输入计量期次（如：第1期）"
+          />
+        </a-form-item>
+        <a-form-item label="计量日期">
+          <a-date-picker
+            v-model:value="formData.measureDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
+        </a-form-item>
+      </a-form>
+
+      <!-- Line Items Section -->
+      <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          "
+        >
+          <span style="font-weight: 600; font-size: 14px">计量明细</span>
+          <a-button type="dashed" size="small" @click="handleAddItem">+ 添加明细</a-button>
+        </div>
+
+        <a-table
+          :data-source="itemList"
+          :pagination="false"
+          row-key="key"
+          size="small"
+          :scroll="{ y: 250 }"
+        >
+          <a-table-column title="合同清单项" width="200">
+            <template #default="{ record: item, index }">
+              <a-select
+                :value="item.contractItemId"
+                placeholder="请选择清单项"
+                allow-clear
+                style="width: 100%"
+                @change="(val: string) => handleContractItemChange(index, val)"
+              >
+                <a-select-option v-for="ci in contractItemList" :key="ci.id" :value="ci.id">
+                  {{ ci.itemName }}
+                </a-select-option>
+              </a-select>
+            </template>
+          </a-table-column>
+          <a-table-column title="单位" width="70">
+            <template #default="{ record: item }">
+              <span>{{ item.unit || '-' }}</span>
+            </template>
+          </a-table-column>
+          <a-table-column title="合同量" width="100">
+            <template #default="{ record: item }">
+              <span>{{ item.contractQuantity || '-' }}</span>
+            </template>
+          </a-table-column>
+          <a-table-column title="本期量" width="120">
+            <template #default="{ record: item, index }">
+              <a-input-number
+                v-model:value="item.currentQuantity"
+                :min="0"
+                :precision="4"
+                style="width: 100%"
+                @change="handleItemQtyChange(index)"
+              />
+            </template>
+          </a-table-column>
+          <a-table-column title="单价(元)" width="130">
+            <template #default="{ record: item, index }">
+              <a-input-number
+                v-model:value="item.unitPrice"
+                :min="0"
+                :precision="4"
+                style="width: 100%"
+                @change="handleItemPriceChange(index)"
+              />
+            </template>
+          </a-table-column>
+          <a-table-column title="金额(元)" width="130">
+            <template #default="{ record: item }">
+              <span>{{
+                Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+              }}</span>
+            </template>
+          </a-table-column>
+          <a-table-column title="操作" width="60">
+            <template #default="{ record: _item, index }">
+              <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
+                >删除</a-button
+              >
+            </template>
+          </a-table-column>
+        </a-table>
+
+        <div style="text-align: right; margin-top: 8px; font-size: 14px">
+          合计：<span style="font-weight: 600; color: #1677ff"
+            >{{ Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span
+          >
+        </div>
+      </div>
+    </a-modal>
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+/* 页面专属样式 — 其余已由 lg-* 全局类覆盖 */
+.lg-breadcrumb {
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+</style>
