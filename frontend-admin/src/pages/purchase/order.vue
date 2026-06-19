@@ -96,24 +96,24 @@ const ORDER_STATUS_COLOR: Record<string, string> = {
   CANCELLED: 'error',
 }
 
-const columns = [
-  { title: '订单编号', dataIndex: 'orderCode', width: 140, ellipsis: true },
-  { title: '订单类型', dataIndex: 'orderType', width: 90, key: 'orderType' },
-  { title: '项目名称', dataIndex: 'projectName', width: 120, ellipsis: true },
-  { title: '合同名称', dataIndex: 'contractName', width: 120, ellipsis: true },
-  { title: '供应商', dataIndex: 'partnerName', width: 120, ellipsis: true },
+const gridColumns = computed(() => [
+  { field: 'orderCode', title: '订单编号', width: 140, ellipsis: true },
+  { field: 'orderType', title: '订单类型', width: 90, slots: { default: 'orderType' } },
+  { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
+  { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
+  { field: 'partnerName', title: '供应商', width: 120, ellipsis: true },
   {
+    field: 'totalAmount',
     title: '总金额',
-    dataIndex: 'totalAmount',
     width: 110,
-    key: 'totalAmount',
     align: 'right' as const,
+    slots: { default: 'totalAmount' },
   },
-  { title: '交货日期', dataIndex: 'deliveryDate', width: 100 },
-  { title: '订单状态', dataIndex: 'orderStatus', width: 90, key: 'orderStatus' },
-  { title: '审批状态', dataIndex: 'approvalStatus', width: 90, key: 'approvalStatus' },
-  { title: '操作', key: 'action', width: 160 },
-]
+  { field: 'deliveryDate', title: '交货日期', width: 100 },
+  { field: 'orderStatus', title: '订单状态', width: 90, slots: { default: 'orderStatus' } },
+  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
+  { title: '操作', width: 160, slots: { default: 'action' } },
+])
 
 async function fetchData() {
   loading.value = true
@@ -512,51 +512,47 @@ onMounted(() => {
 
         <!-- 表格 -->
         <div class="lg-table-wrap">
-          <a-table
-            :columns="columns"
-            :data-source="tableData"
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
             :loading="loading"
-            :pagination="false"
-            row-key="id"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
             size="small"
+            max-height="480"
           >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'orderType'">
-                <a-tag :color="ORDER_TYPE_COLOR[record.orderType]">
-                  {{ ORDER_TYPE_LABEL[record.orderType] ?? record.orderType }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'totalAmount'">
-                <span v-if="record.totalAmount" class="lg-money"
-                  >¥{{
-                    Number(record.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-                  }}</span
-                >
-                <span v-else class="pm-none">-</span>
-              </template>
-              <template v-else-if="column.key === 'orderStatus'">
-                <a-tag :color="ORDER_STATUS_COLOR[record.orderStatus]">
-                  {{ ORDER_STATUS_LABEL[record.orderStatus] ?? record.orderStatus }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'approvalStatus'">
-                <ApprovalStatusTag :status="record.approvalStatus" />
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-                <a-button type="link" size="small" danger @click="handleDelete(record)"
-                  >删除</a-button
-                >
-                <a-button
-                  v-if="record.approvalStatus === 'DRAFT'"
-                  type="link"
-                  size="small"
-                  @click="handleSubmitApproval(record)"
-                  >提交审批</a-button
-                >
-              </template>
+            <template #orderType="{ row }">
+              <a-tag :color="ORDER_TYPE_COLOR[row.orderType]">
+                {{ ORDER_TYPE_LABEL[row.orderType] ?? row.orderType }}
+              </a-tag>
             </template>
-          </a-table>
+            <template #totalAmount="{ row }">
+              <span v-if="row.totalAmount" class="lg-money"
+                >{{ Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span
+              >
+              <span v-else :style="{ color: 'var(--muted)' }">-</span>
+            </template>
+            <template #orderStatus="{ row }">
+              <a-tag :color="ORDER_STATUS_COLOR[row.orderStatus]">
+                {{ ORDER_STATUS_LABEL[row.orderStatus] ?? row.orderStatus }}
+              </a-tag>
+            </template>
+            <template #approvalStatus="{ row }">
+              <ApprovalStatusTag :status="row.approvalStatus" />
+            </template>
+            <template #action="{ row }">
+              <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>
+              <a-button type="link" size="small" danger @click="handleDelete(row)">删除</a-button>
+              <a-button
+                v-if="row.approvalStatus === 'DRAFT'"
+                type="link"
+                size="small"
+                @click="handleSubmitApproval(row)"
+                >提交审批</a-button
+              >
+            </template>
+          </vxe-grid>
         </div>
 
         <!-- 分页 -->
