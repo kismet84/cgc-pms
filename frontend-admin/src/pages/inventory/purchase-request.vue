@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   getPurchaseRequestList,
   createPurchaseRequest,
@@ -49,20 +50,6 @@ const formData = reactive<Partial<PurchaseRequestVO>>({
 const itemList = ref<(Partial<PurchaseRequestItemVO> & { key: number })[]>([])
 const keySeq = ref(0)
 
-const APPROVAL_STATUS_LABEL: Record<string, string> = {
-  DRAFT: '草稿',
-  APPROVING: '审批中',
-  APPROVED: '已通过',
-  REJECTED: '已驳回',
-  WITHDRAWN: '已撤回',
-}
-const APPROVAL_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'default',
-  APPROVING: 'processing',
-  APPROVED: 'success',
-  REJECTED: 'error',
-  WITHDRAWN: 'warning',
-}
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
   CONVERTED: '已转PO',
@@ -401,6 +388,15 @@ const kpiReqPending = computed(
       .length,
 )
 
+const statusBreakdown = computed(() => {
+  const m: Record<string, number> = {}
+  tableData.value.forEach((r) => {
+    const label = STATUS_LABEL[r.status] ?? r.status
+    m[label] = (m[label] || 0) + 1
+  })
+  return Object.entries(m).map(([label, count]) => ({ label, count }))
+})
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchMaterials()
@@ -409,141 +405,162 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>库存管理</a-breadcrumb-item
-        ><a-breadcrumb-item>采购申请</a-breadcrumb-item></a-breadcrumb
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="cl-breadcrumb">
+          <a-breadcrumb-item>库存管理</a-breadcrumb-item>
+          <a-breadcrumb-item>采购申请</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-select
+        v-model:value="filter.projectId"
+        placeholder="全部项目"
+        allow-clear
+        style="width: 180px"
+        show-search
+        :filter-option="filterOption"
       >
-      <div class="pt-head-actions"></div>
+        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+          {{ p.projectName }}
+        </a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.approvalStatus"
+        placeholder="全部审批状态"
+        allow-clear
+        style="width: 130px"
+      >
+        <a-select-option value="DRAFT">草稿</a-select-option>
+        <a-select-option value="APPROVING">审批中</a-select-option>
+        <a-select-option value="APPROVED">已通过</a-select-option>
+        <a-select-option value="REJECTED">已驳回</a-select-option>
+        <a-select-option value="WITHDRAWN">已撤回</a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.status"
+        placeholder="全部业务状态"
+        allow-clear
+        style="width: 130px"
+      >
+        <a-select-option value="DRAFT">草稿</a-select-option>
+        <a-select-option value="CONVERTED">已转PO</a-select-option>
+      </a-select>
+      <a-input
+        v-model:value="filter.requestCode"
+        placeholder="搜索申请编号"
+        style="width: 170px"
+        allow-clear
+        @press-enter="handleSearch"
+      />
+      <a-button type="primary" @click="handleSearch">
+        <template #icon><SearchOutlined /></template>
+        查询
+      </a-button>
+      <a-button @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
-    <div class="pt-kpi-strip" style="grid-template-columns: repeat(2, 1fr)">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">申请数</div>
-        <div class="pt-kpi-value">{{ kpiReqTotal }}<small>条</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">待审批</div>
-        <div class="pt-kpi-value">{{ kpiReqPending }}<small>条</small></div>
-      </div>
-    </div>
+    <div class="lg-grid">
+      <div class="lg-left">
+        <!-- KPI 横条 -->
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">申请数</span>
+            <span class="lg-kpi-card-value">{{ kpiReqTotal }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">待审批</span>
+            <span class="lg-kpi-card-value">{{ kpiReqPending }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:#f59e0b"></span></span>
+          </div>
+        </div>
 
-    <!-- Filter -->
-    <div class="pt-panel pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>项目：</label>
-          <a-select
-            v-model:value="filter.projectId"
-            placeholder="全部"
-            allow-clear
-            style="width: 180px"
-            show-search
-            :filter-option="filterOption"
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-              {{ p.projectName }}
-            </a-select-option>
-          </a-select>
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">新建申请</a-button>
+          </div>
+          <div class="lg-toolbar-right" />
         </div>
-        <div class="pt-field">
-          <label>审批状态：</label>
-          <a-select
-            v-model:value="filter.approvalStatus"
-            placeholder="全部"
-            allow-clear
-            style="width: 110px"
+
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <a-table
+            :columns="columns"
+            :data-source="tableData"
+            :loading="loading"
+            :pagination="false"
+            row-key="id"
+            size="small"
           >
-            <a-select-option value="DRAFT">草稿</a-select-option>
-            <a-select-option value="APPROVING">审批中</a-select-option>
-            <a-select-option value="APPROVED">已通过</a-select-option>
-            <a-select-option value="REJECTED">已驳回</a-select-option>
-            <a-select-option value="WITHDRAWN">已撤回</a-select-option>
-          </a-select>
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'approvalStatus'">
+                <ApprovalStatusTag :status="record.approvalStatus" />
+              </template>
+              <template v-else-if="column.key === 'status'">
+                <a-tag :color="STATUS_COLOR[record.status]">
+                  {{ STATUS_LABEL[record.status] ?? record.status }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
+                <a-button
+                  v-if="record.approvalStatus === 'DRAFT'"
+                  type="link"
+                  size="small"
+                  style="color: #1677ff"
+                  @click="handleSubmit(record)"
+                >
+                  提交审批
+                </a-button>
+                <a-button type="link" size="small" danger @click="handleDelete(record)"
+                  >删除</a-button
+                >
+              </template>
+            </template>
+          </a-table>
         </div>
-        <div class="pt-field">
-          <label>业务状态：</label>
-          <a-select
-            v-model:value="filter.status"
-            placeholder="全部"
-            allow-clear
-            style="width: 110px"
-          >
-            <a-select-option value="DRAFT">草稿</a-select-option>
-            <a-select-option value="CONVERTED">已转PO</a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>申请编号：</label>
-          <a-input
-            v-model:value="filter.requestCode"
-            placeholder="请输入编号"
-            style="width: 150px"
-            allow-clear
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
           />
         </div>
-        <div class="pt-filter-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-          <a-button type="primary" @click="handleAdd">新建申请</a-button>
-        </div>
       </div>
-    </div>
 
-    <!-- Table -->
-    <div class="pt-panel pt-table-panel">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
-        :loading="loading"
-        :pagination="false"
-        row-key="id"
-        size="small"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'approvalStatus'">
-            <ApprovalStatusTag :status="record.approvalStatus" />
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status]">
-              {{ STATUS_LABEL[record.status] ?? record.status }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-              <a-button
-                v-if="record.approvalStatus === 'DRAFT'"
-                type="link"
-                size="small"
-                style="color: #1677ff"
-                @click="handleSubmit(record)"
-              >
-                提交审批
-              </a-button>
-              <a-button type="link" size="small" danger @click="handleDelete(record)"
-                >删除</a-button
-              >
-            </a-space>
-          </template>
-        </template>
-      </a-table>
-    </div>
-
-    <!-- Pagination -->
-    <div class="pt-pagination">
-      <span class="pt-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+      <!-- 右侧分析面板 -->
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">业务状态分布</div>
+          <div class="lg-type-list">
+            <div v-for="it in statusBreakdown" :key="it.label" class="lg-type-row">
+              <span class="lg-type-label">{{ it.label }}</span>
+              <span class="lg-type-num">{{ it.count }}</span>
+              <span class="lg-type-pct">条</span>
+            </div>
+            <div v-if="statusBreakdown.length === 0" class="lg-type-row">
+              <span class="lg-type-label" style="color: #9ca3af">暂无数据</span>
+            </div>
+          </div>
+        </section>
+      </aside>
     </div>
 
     <!-- Add/Edit Modal -->
