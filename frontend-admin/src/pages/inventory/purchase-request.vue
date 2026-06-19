@@ -82,16 +82,16 @@ const itemColumns = [
 const filterOption = (input: string, option: any) =>
   option.label?.toLowerCase().includes(input.toLowerCase())
 
-const columns = [
-  { title: '申请编号', dataIndex: 'requestCode', width: 140, ellipsis: true },
-  { title: '所属项目', dataIndex: 'projectName', width: 130, ellipsis: true },
-  { title: '关联合同', dataIndex: 'contractName', width: 130, ellipsis: true },
-  { title: '审批状态', dataIndex: 'approvalStatus', width: 90, key: 'approvalStatus' },
-  { title: '业务状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '创建人', dataIndex: 'createdBy', width: 90 },
-  { title: '创建时间', dataIndex: 'createdTime', width: 140 },
-  { title: '操作', key: 'action', width: 190 },
-]
+const gridColumns = computed(() => [
+  { field: 'requestCode', title: '申请编号', width: 140, ellipsis: true },
+  { field: 'projectName', title: '所属项目', width: 130, ellipsis: true },
+  { field: 'contractName', title: '关联合同', width: 130, ellipsis: true },
+  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
+  { field: 'status', title: '业务状态', width: 80, slots: { default: 'status' } },
+  { field: 'createdBy', title: '创建人', width: 90 },
+  { field: 'createdTime', title: '创建时间', width: 140 },
+  { title: '操作', width: 190, slots: { default: 'ops' } },
+])
 
 async function fetchData() {
   loading.value = true
@@ -482,40 +482,37 @@ onMounted(() => {
 
     <!-- 表格 -->
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="false"
-        row-key="id"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
         size="small"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'approvalStatus'">
-            <ApprovalStatusTag :status="record.approvalStatus" />
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status]">
-              {{ STATUS_LABEL[record.status] ?? record.status }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-            <a-button
-              v-if="record.approvalStatus === 'DRAFT'"
-              type="link"
-              size="small"
-              style="color: #1677ff"
-              @click="handleSubmit(record)"
-            >
-              提交审批
-            </a-button>
-            <a-button type="link" size="small" danger @click="handleDelete(record)"
-              >删除</a-button
-            >
-          </template>
+        <template #approvalStatus="{ row }">
+          <ApprovalStatusTag :status="row.approvalStatus" />
         </template>
-      </a-table>
+        <template #status="{ row }">
+          <a-tag :color="STATUS_COLOR[row.status]">
+            {{ STATUS_LABEL[row.status] ?? row.status }}
+          </a-tag>
+        </template>
+        <template #ops="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a
+              v-if="row.approvalStatus === 'DRAFT'"
+              class="lg-link"
+              style="color: #1677ff"
+              @click="handleSubmit(row)"
+            >提交审批</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <!-- 分页 -->
