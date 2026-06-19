@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { DollarOutlined } from '@ant-design/icons-vue'
 import { stockIn, stockOut, getWarehouseList } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import type { WarehouseVO } from '@/types/inventory'
@@ -112,180 +111,185 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>库存管理</a-breadcrumb-item
-        ><a-breadcrumb-item>库存交易</a-breadcrumb-item></a-breadcrumb
-      >
-      <div class="pt-head-actions"></div>
-    </div>
-
-    <div class="pt-kpi-strip" style="grid-template-columns: repeat(2, 1fr)">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">入库操作</div>
-        <div class="pt-kpi-value" style="color: #22c55e"><DollarOutlined /> 快捷</div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">出库操作</div>
-        <div class="pt-kpi-value" style="color: #ef4444"><DollarOutlined /> 快捷</div>
+  <div class="lg-page app-page">
+    <!-- 页面头部 -->
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+          <a-breadcrumb-item>库存管理</a-breadcrumb-item>
+          <a-breadcrumb-item>库存交易</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
-    <div class="pt-panel" style="padding: 0">
-      <a-tabs v-model:activeKey="activeTab" style="padding: 0 22px">
+    <!-- KPI 横条 -->
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">入库操作</span>
+        <span class="lg-kpi-card-value" style="color:#22c55e">快捷</span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:#22c55e"></span></span>
+      </div>
+      <div class="lg-kpi-card is-warn">
+        <span class="lg-kpi-card-label">出库操作</span>
+        <span class="lg-kpi-card-value" style="color:#ef4444">快捷</span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:#ef4444"></span></span>
+      </div>
+    </div>
+
+    <div class="lg-toolbar" style="margin-bottom:0">
+      <a-tabs v-model:activeKey="activeTab">
         <a-tab-pane key="in" tab="入库" />
         <a-tab-pane key="out" tab="出库" />
       </a-tabs>
+    </div>
 
-      <div style="padding: 0 22px 24px">
-        <!-- Stock In Form -->
-        <div v-if="activeTab === 'in'">
-          <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
-            <a-form-item label="仓库" required>
-              <a-select
-                v-model:value="inForm.warehouseId"
-                placeholder="请选择仓库"
-                style="width: 300px"
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
+    <div class="lg-panel" style="padding:24px 28px">
+      <!-- Stock In Form -->
+      <div v-if="activeTab === 'in'">
+        <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
+          <a-form-item label="仓库" required>
+            <a-select
+              v-model:value="inForm.warehouseId"
+              placeholder="请选择仓库"
+              style="width: 300px"
+              show-search
+              :filter-option="
+                (input: string, option: any) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+            >
+              <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
+                {{ w.warehouseName }}
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="物料" required>
+            <a-select
+              v-model:value="inForm.materialId"
+              placeholder="请选择物料"
+              style="width: 300px"
+              show-search
+              :filter-option="
+                (input: string, option: any) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+            >
+              <a-select-option
+                v-for="m in materialList"
+                :key="m.id"
+                :value="m.id"
+                :label="m.materialName"
               >
-                <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-                  {{ w.warehouseName }}
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="物料" required>
-              <a-select
-                v-model:value="inForm.materialId"
-                placeholder="请选择物料"
-                style="width: 300px"
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-              >
-                <a-select-option
-                  v-for="m in materialList"
-                  :key="m.id"
-                  :value="m.id"
-                  :label="m.materialName"
-                >
-                  <div>
-                    <span>{{ m.materialName }}</span>
-                    <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{
-                      m.materialCode
-                    }}</span>
-                  </div>
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="入库数量" required>
-              <a-input-number
-                v-model:value="inForm.quantity"
-                :min="0.0001"
-                :precision="4"
-                style="width: 200px"
-                placeholder="请输入数量"
-                addon-after=""
-              >
-                <template #addonAfter>
-                  <span style="min-width: 30px; display: inline-block">
-                    {{ getMaterialInfo(inForm.materialId ?? '')?.unit ?? '' }}
-                  </span>
-                </template>
-              </a-input-number>
-            </a-form-item>
-            <a-form-item :wrapper-col="{ offset: 4 }">
-              <a-button
-                type="primary"
-                :loading="inSubmitting"
-                @click="handleStockIn"
-                style="width: 120px"
-              >
-                确认入库
-              </a-button>
-            </a-form-item>
-          </a-form>
-        </div>
+                <div>
+                  <span>{{ m.materialName }}</span>
+                  <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{
+                    m.materialCode
+                  }}</span>
+                </div>
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="入库数量" required>
+            <a-input-number
+              v-model:value="inForm.quantity"
+              :min="0.0001"
+              :precision="4"
+              style="width: 200px"
+              placeholder="请输入数量"
+              addon-after=""
+            >
+              <template #addonAfter>
+                <span style="min-width: 30px; display: inline-block">
+                  {{ getMaterialInfo(inForm.materialId ?? '')?.unit ?? '' }}
+                </span>
+              </template>
+            </a-input-number>
+          </a-form-item>
+          <a-form-item :wrapper-col="{ offset: 4 }">
+            <a-button
+              type="primary"
+              :loading="inSubmitting"
+              @click="handleStockIn"
+              style="width: 120px"
+            >
+              确认入库
+            </a-button>
+          </a-form-item>
+        </a-form>
+      </div>
 
-        <!-- Stock Out Form -->
-        <div v-else>
-          <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
-            <a-form-item label="仓库" required>
-              <a-select
-                v-model:value="outForm.warehouseId"
-                placeholder="请选择仓库"
-                style="width: 300px"
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
+      <!-- Stock Out Form -->
+      <div v-else>
+        <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
+          <a-form-item label="仓库" required>
+            <a-select
+              v-model:value="outForm.warehouseId"
+              placeholder="请选择仓库"
+              style="width: 300px"
+              show-search
+              :filter-option="
+                (input: string, option: any) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+            >
+              <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
+                {{ w.warehouseName }}
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="物料" required>
+            <a-select
+              v-model:value="outForm.materialId"
+              placeholder="请选择物料"
+              style="width: 300px"
+              show-search
+              :filter-option="
+                (input: string, option: any) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+            >
+              <a-select-option
+                v-for="m in materialList"
+                :key="m.id"
+                :value="m.id"
+                :label="m.materialName"
               >
-                <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-                  {{ w.warehouseName }}
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="物料" required>
-              <a-select
-                v-model:value="outForm.materialId"
-                placeholder="请选择物料"
-                style="width: 300px"
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-              >
-                <a-select-option
-                  v-for="m in materialList"
-                  :key="m.id"
-                  :value="m.id"
-                  :label="m.materialName"
-                >
-                  <div>
-                    <span>{{ m.materialName }}</span>
-                    <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{
-                      m.materialCode
-                    }}</span>
-                  </div>
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="出库数量" required>
-              <a-input-number
-                v-model:value="outForm.quantity"
-                :min="0.0001"
-                :precision="4"
-                style="width: 200px"
-                placeholder="请输入数量"
-              >
-                <template #addonAfter>
-                  <span style="min-width: 30px; display: inline-block">
-                    {{ getMaterialInfo(outForm.materialId ?? '')?.unit ?? '' }}
-                  </span>
-                </template>
-              </a-input-number>
-            </a-form-item>
-            <a-form-item :wrapper-col="{ offset: 4 }">
-              <a-button
-                type="primary"
-                danger
-                :loading="outSubmitting"
-                @click="handleStockOut"
-                style="width: 120px"
-              >
-                确认出库
-              </a-button>
-            </a-form-item>
-          </a-form>
-        </div>
+                <div>
+                  <span>{{ m.materialName }}</span>
+                  <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{
+                    m.materialCode
+                  }}</span>
+                </div>
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="出库数量" required>
+            <a-input-number
+              v-model:value="outForm.quantity"
+              :min="0.0001"
+              :precision="4"
+              style="width: 200px"
+              placeholder="请输入数量"
+            >
+              <template #addonAfter>
+                <span style="min-width: 30px; display: inline-block">
+                  {{ getMaterialInfo(outForm.materialId ?? '')?.unit ?? '' }}
+                </span>
+              </template>
+            </a-input-number>
+          </a-form-item>
+          <a-form-item :wrapper-col="{ offset: 4 }">
+            <a-button
+              type="primary"
+              danger
+              :loading="outSubmitting"
+              @click="handleStockOut"
+              style="width: 120px"
+            >
+              确认出库
+            </a-button>
+          </a-form-item>
+        </a-form>
       </div>
     </div>
   </div>
