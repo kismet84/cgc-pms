@@ -203,6 +203,17 @@ public class CostSubjectService {
                     "该成本科目被 " + targetItemCount + " 条目标成本明细引用，无法删除");
         }
 
+        // 检查是否已存在相同编码的已删除记录，避免唯一键冲突
+        long existingDeletedCount = costSubjectMapper.selectCount(
+                new LambdaQueryWrapper<CostSubject>()
+                        .eq(CostSubject::getTenantId, existing.getTenantId())
+                        .eq(CostSubject::getSubjectCode, existing.getSubjectCode())
+                        .eq(CostSubject::getDeletedFlag, 1));
+        if (existingDeletedCount > 0) {
+            // 将 subject_code 重命名为唯一值以释放唯一键
+            existing.setSubjectCode(existing.getSubjectCode() + "_DEL_" + id);
+            costSubjectMapper.updateById(existing);
+        }
         costSubjectMapper.deleteById(id);
     }
 

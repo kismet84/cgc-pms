@@ -177,6 +177,17 @@
             <artifactId>pdfbox</artifactId>
             <version>3.0.4</version>
         </dependency>
+
+        <!-- JAXB (needed for XML bind annotations on JDK 21) -->
+        <dependency>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
 
     <build>

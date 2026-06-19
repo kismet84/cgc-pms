@@ -16,51 +16,83 @@ CGC-PMS is a construction general-contracting project management system with a S
 
 ## Common Commands
 
-### Backend
+### Development Environment
 
-Run commands from `backend/` unless noted.
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local -Djasypt.encryptor.password=dev-jasypt-key   # H2, no Redis/MinIO required
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev -Djasypt.encryptor.password=dev-jasypt-key     # MySQL/Redis/MinIO on local ports
-./mvnw test -Djasypt.encryptor.password=dev-jasypt-key
-./mvnw -Dtest=ClassName test
-./mvnw -Dtest=ClassName#methodName test
-./mvnw clean package -DskipTests
-```
-
-The backend context path is `/api`; Swagger is available at `http://localhost:8080/api/swagger-ui.html` when enabled by the active profile.
-
-### Frontend
-
-Run commands from `frontend-admin/`.
+一键启动全部服务（推荐），在**仓库根目录**执行：
 
 ```bash
-pnpm install
-pnpm dev
-pnpm build              # vue-tsc --noEmit + vite build
-pnpm type-check
-pnpm lint               # runs eslint with --fix
-pnpm format
-pnpm test:unit
-pnpm test:unit -- src/path/to/file.test.ts
-pnpm exec playwright test
-pnpm exec playwright test e2e/path/to/spec.ts
-```
-
-The Vite dev server runs on `http://localhost:5173` and proxies `/api` to `VITE_API_TARGET` or `http://localhost:8080`.
-
-### Infrastructure
-
-Run from the repository root unless noted.
-
-```bash
-cd deploy && cp .env.example .env && docker compose up -d
-cd deploy && docker compose -f docker-compose.dev.yml up -d
 scripts/start-dev.bat
 ```
 
-`docker-compose.dev.yml` runs MySQL on host port `3307`, Redis on `6379`, MinIO on `9000/9001`, backend on `8080`, and frontend on `5173`.
+这会先检查后端 JAR（首次自动构建），然后通过 `docker compose -f docker-compose.dev.yml up -d` 启动全部 5 个容器：MySQL、Redis、MinIO、Backend、Frontend。所有服务在 Docker 内运行，宿主机无需安装 Java、Node 或 pnpm。
+
+启动后访问：
+- 前端：`http://localhost:5173`
+- 后端 API：`http://localhost:8080/api`
+- Swagger UI：`http://localhost:8080/api/swagger-ui.html`
+- MinIO 控制台：`http://localhost:9001`
+
+常用 Docker 命令（在 `deploy/` 下执行）：
+
+```bash
+docker compose -f docker-compose.dev.yml logs -f    # 查看所有日志
+docker compose -f docker-compose.dev.yml restart      # 重启全部服务
+docker compose -f docker-compose.dev.yml down         # 停止并移除容器
+docker compose -f docker-compose.dev.yml up -d --build  # 重新构建并启动
+```
+
+### Backend
+
+构建和测试命令在 `backend/` 下执行（这些在**宿主机**运行，不需要 Docker）：
+
+```bash
+./mvnw clean package -DskipTests                                    # 构建 JAR（首次或代码变更后）
+./mvnw test -Djasypt.encryptor.password=dev-jasypt-key               # 运行全部测试
+./mvnw -Dtest=ClassName test                                        # 运行单个测试类
+./mvnw -Dtest=ClassName#methodName test                             # 运行单个测试方法
+```
+
+> 代码变更后，先 `./mvnw clean package -DskipTests`，再 `docker compose -f docker-compose.dev.yml restart backend` 即可生效。
+> `spring-boot:run` 已被 Docker Compose 替代，无需在宿主机运行。
+
+### Frontend
+
+检查、测试、格式化命令在 `frontend-admin/` 下执行（这些在**宿主机**运行，不需要 Docker）：
+
+```bash
+pnpm install               # 首次安装依赖（Docker 容器会自动执行）
+pnpm build                 # vue-tsc --noEmit + vite build
+pnpm type-check            # TypeScript 类型检查
+pnpm lint                  # ESLint 修复
+pnpm format                # Prettier 格式化
+pnpm test:unit             # 运行全部单元测试
+pnpm test:unit -- src/path/to/file.test.ts  # 运行单个测试
+pnpm exec playwright test                   # E2E 测试
+pnpm exec playwright test e2e/path/to/spec.ts
+```
+
+> `pnpm dev` 已被 Docker Compose 替代（Vite dev server + HMR 在 Docker 容器内运行）。如需在宿主机运行前端调试，仍需 `pnpm dev`，但通常不需要。
+
+### Infrastructure
+
+```bash
+cd deploy && docker compose -f docker-compose.dev.yml up -d     # 启动全部服务
+cd deploy && docker compose -f docker-compose.dev.yml down      # 停止全部服务
+cd deploy && docker compose -f docker-compose.dev.yml restart frontend  # 仅重启前端
+```
+
+`docker-compose.dev.yml` 端口映射：MySQL `3307`、Redis `6379`、MinIO `9000/9001`、Backend `8080`、Frontend `5173`。
+
+### Docker 故障恢复
+
+如果 Docker Desktop 无法正常启动（例如 `docker ps` 报错、容器启动失败），使用 WSL2 + Docker 完全重启脚本：
+
+```bash
+scripts/restart-docker.bat    # Windows 直接双击
+scripts/restart-docker.sh     # Git Bash
+```
+
+此脚本会依次：关闭 Docker Desktop → 终止所有 WSL 发行版 → 等待 VM 释放 → 重新启动 Docker Desktop → 等待引擎就绪。重启完成后运行 `scripts/start-dev.bat` 即可恢复开发环境。
 
 ## Backend Architecture
 
