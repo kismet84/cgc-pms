@@ -443,67 +443,6 @@ const gridColumns = computed(() => [
               </a-button>
             </div>
           </div>
-          <div class="cl-filter-row">
-            <div class="cl-field">
-              <label>项目名称：</label>
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="请选择项目"
-                allow-clear
-                style="width: 160px"
-                :options="projects.map((p) => ({ value: p.id, label: p.projectName }))"
-              />
-            </div>
-            <div class="cl-field">
-              <label>合同类型：</label>
-              <a-select
-                v-model:value="filter.contractType"
-                placeholder="全部"
-                allow-clear
-                style="width: 140px"
-              >
-                <a-select-option value="MAIN">总包</a-select-option>
-                <a-select-option value="SUB">分包</a-select-option>
-                <a-select-option value="PURCHASE">采购</a-select-option>
-                <a-select-option value="LEASE">租赁</a-select-option>
-                <a-select-option value="SERVICE">服务</a-select-option>
-              </a-select>
-            </div>
-            <div class="cl-field">
-              <label>合同状态：</label>
-              <a-select
-                v-model:value="filter.contractStatus"
-                placeholder="全部"
-                allow-clear
-                style="width: 140px"
-              >
-                <a-select-option value="PERFORMING">履约中</a-select-option>
-                <a-select-option value="SETTLED">已结算</a-select-option>
-                <a-select-option value="TERMINATED">已终止</a-select-option>
-                <a-select-option value="DRAFT">草稿</a-select-option>
-              </a-select>
-            </div>
-          </div>
-          <div class="cl-filter-row cl-filter-row--last">
-            <div class="cl-field"></div>
-            <div class="cl-field">
-              <label>合同编号：</label>
-              <a-input
-                v-model:value="filter.contractCode"
-                placeholder="请输入合同编号"
-                style="width: 160px"
-              />
-            </div>
-            <div class="cl-field">
-              <label>签订日期：</label>
-              <a-range-picker v-model:value="filter.dateRange" style="width: 220px" />
-            </div>
-            <div class="cl-filter-actions">
-              <a-button type="text" @click="toggleFilterExpand">{{
-                filterExpanded ? '收起 ↑' : '展开 ↓'
-              }}</a-button>
-            </div>
-          </div>
         </div>
 
         <!-- KPI cards: desktop / tablet -->
