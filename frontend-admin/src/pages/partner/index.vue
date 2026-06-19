@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { getDictDataByCode } from '@/api/modules/dict'
@@ -79,24 +79,18 @@ const RISK_LABEL: Record<string, string> = {
   HIGH: '高',
 }
 
-const columns = [
-  { title: '合作方编号', dataIndex: 'partnerCode', width: 130, ellipsis: true },
-  {
-    title: '合作方名称',
-    dataIndex: 'partnerName',
-    minWidth: 140,
-    key: 'partnerName',
-    ellipsis: true,
-  },
-  { title: '类型', dataIndex: 'partnerType', width: 80, key: 'partnerType' },
-  { title: '联系人', dataIndex: 'contactName', width: 90 },
-  { title: '联系电话', dataIndex: 'contactPhone', width: 120 },
-  { title: '资质等级', dataIndex: 'qualificationLevel', width: 90 },
-  { title: '黑名单', dataIndex: 'blacklistFlag', width: 80, key: 'blacklistFlag' },
-  { title: '风险等级', dataIndex: 'riskLevel', width: 90, key: 'riskLevel' },
-  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '操作', dataIndex: 'ops', width: 110 },
-]
+const gridColumns = computed(() => [
+  { field: 'partnerCode', title: '合作方编号', width: 130, ellipsis: true },
+  { field: 'partnerName', title: '合作方名称', minWidth: 140, ellipsis: true },
+  { field: 'partnerType', title: '类型', width: 80, slots: { default: 'partnerType' } },
+  { field: 'contactName', title: '联系人', width: 90 },
+  { field: 'contactPhone', title: '联系电话', width: 120 },
+  { field: 'qualificationLevel', title: '资质等级', width: 90 },
+  { field: 'blacklistFlag', title: '黑名单', width: 80, slots: { default: 'blacklistFlag' } },
+  { field: 'riskLevel', title: '风险等级', width: 90, slots: { default: 'riskLevel' } },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { title: '操作', width: 110, slots: { default: 'ops' } },
+])
 
 async function fetchData() {
   loading.value = true
@@ -250,10 +244,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page">
+  <div class="lg-page app-page">
     <div class="lg-page-head">
       <div>
-        <a-page-header title="合作方管理" style="padding: 0; background: transparent" />
+        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+          <a-breadcrumb-item>合作方管理</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
@@ -319,45 +315,42 @@ onMounted(() => {
 
     <!-- 表格 -->
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="false"
-        row-key="id"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
         size="small"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'partnerName'">
-            <span>{{ record.partnerName }}</span>
-          </template>
-          <template v-else-if="column.key === 'partnerType'">
-            <a-tag :color="partnerTypeColor(record.partnerType)">
-              {{ partnerTypeLabel(record.partnerType) }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'blacklistFlag'">
-            <a-tag v-if="record.blacklistFlag" color="error">黑名单</a-tag>
-            <span v-else class="lg-none">-</span>
-          </template>
-          <template v-else-if="column.key === 'riskLevel'">
-            <a-tag :color="RISK_COLOR[record.riskLevel]">
-              {{ RISK_LABEL[record.riskLevel] ?? record.riskLevel }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="record.status === 'ENABLE' ? 'success' : 'default'">
-              {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'ops'">
-            <div class="lg-ops">
-              <a class="lg-link" @click="handleEdit(record)">编辑</a>
-              <a class="lg-link lg-del" @click="handleDelete(record)">删除</a>
-            </div>
-          </template>
+        <template #partnerType="{ row }">
+          <a-tag :color="partnerTypeColor(row.partnerType)">
+            {{ partnerTypeLabel(row.partnerType) }}
+          </a-tag>
         </template>
-      </a-table>
+        <template #blacklistFlag="{ row }">
+          <a-tag v-if="row.blacklistFlag" color="error">黑名单</a-tag>
+          <span v-else class="lg-none">-</span>
+        </template>
+        <template #riskLevel="{ row }">
+          <a-tag :color="RISK_COLOR[row.riskLevel]">
+            {{ RISK_LABEL[row.riskLevel] ?? row.riskLevel }}
+          </a-tag>
+        </template>
+        <template #status="{ row }">
+          <a-tag :color="row.status === 'ENABLE' ? 'success' : 'default'">
+            {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+          </a-tag>
+        </template>
+        <template #ops="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <!-- 分页 -->
