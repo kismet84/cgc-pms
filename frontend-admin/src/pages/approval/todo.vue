@@ -137,66 +137,84 @@ watch(
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb">
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <a-breadcrumb style="margin-bottom:5px;font-size:13px">
         <a-breadcrumb-item>审批中心</a-breadcrumb-item>
         <a-breadcrumb-item>{{ pageHeaderTitle() }}</a-breadcrumb-item>
       </a-breadcrumb>
-      <p class="app-page-subtitle">{{ pageHeaderSubtitle() }}</p>
-      <div class="pt-head-actions"></div>
+      <p style="margin:0;color:var(--subtext);font-size:13px">{{ pageHeaderSubtitle() }}</p>
     </div>
 
     <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
       <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label" />
     </a-tabs>
 
-    <div class="pt-panel">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
-        :loading="loading"
-        :pagination="{
-          current: pageNo,
-          pageSize,
-          total,
-          showSizeChanger: true,
-          showTotal: (t: number) => `共 ${t} 条`,
-        }"
-        row-key="id"
-        @change="({ current, pageSize: ps }: any) => handlePageChange(current, ps)"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'title'">
-            <a @click="handleDetail(record as { instanceId: string })">{{ record.title }}</a>
-          </template>
-          <template v-else-if="column.key === 'businessType'">
-            <a-tag>{{
-              businessTypeMap[record.businessType as string] ||
-              (record.businessType as string) ||
-              '—'
-            }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'timeCol'">
-            {{ getTimeCol(record) }}
-          </template>
-          <template v-else-if="column.key === 'instanceStatus'">
-            <a-tag v-if="record.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>
-            <a-tag v-else-if="record.instanceStatus === 'APPROVED'" color="success">已通过</a-tag>
-            <a-tag v-else-if="record.instanceStatus === 'REJECTED'" color="error">已驳回</a-tag>
-            <a-tag v-else>{{ record.instanceStatus }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button
-              type="link"
-              size="small"
-              @click="handleDetail(record as { instanceId: string })"
-            >
-              {{ getActionLabel() }}
-            </a-button>
-          </template>
-        </template>
-      </a-table>
+    <div class="lg-grid">
+      <div class="lg-left">
+        <div class="lg-table-wrap">
+          <a-table
+            :columns="columns"
+            :data-source="tableData"
+            :loading="loading"
+            :pagination="{
+              current: pageNo,
+              pageSize,
+              total,
+              showSizeChanger: true,
+              showTotal: (t: number) => `共 ${t} 条`,
+            }"
+            row-key="id"
+            @change="({ current, pageSize: ps }: any) => handlePageChange(current, ps)"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'title'">
+                <a class="lg-link" @click="handleDetail(record as { instanceId: string })">{{ record.title }}</a>
+              </template>
+              <template v-else-if="column.key === 'businessType'">
+                <a-tag>{{
+                  businessTypeMap[record.businessType as string] ||
+                  (record.businessType as string) ||
+                  '—'
+                }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'timeCol'">
+                {{ getTimeCol(record) }}
+              </template>
+              <template v-else-if="column.key === 'instanceStatus'">
+                <a-tag v-if="record.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>
+                <a-tag v-else-if="record.instanceStatus === 'APPROVED'" color="success">已通过</a-tag>
+                <a-tag v-else-if="record.instanceStatus === 'REJECTED'" color="error">已驳回</a-tag>
+                <a-tag v-else>{{ record.instanceStatus }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <div class="lg-ops">
+                  <a-button
+                    type="link"
+                    size="small"
+                    @click="handleDetail(record as { instanceId: string })"
+                  >
+                    {{ getActionLabel() }}
+                  </a-button>
+                </div>
+              </template>
+            </template>
+          </a-table>
+        </div>
+
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="(p: number, ps: number) => handlePageChange(p, ps)"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
