@@ -114,36 +114,15 @@ function kpiPct(value: number, max: number): number {
 }
 
 // ── Columns ──
-const columns = [
-  { title: '预警内容', dataIndex: 'message', key: 'message', ellipsis: true, minWidth: 260 },
-  {
-    title: '项目',
-    dataIndex: 'projectId',
-    key: 'projectId',
-    width: 130,
-    ellipsis: true,
-  },
-  {
-    title: '严重度',
-    dataIndex: 'severity',
-    key: 'severity',
-    width: 80,
-  },
-  {
-    title: '规则类型',
-    dataIndex: 'ruleType',
-    key: 'ruleType',
-    width: 110,
-  },
-  { title: '触发时间', dataIndex: 'triggeredAt', key: 'triggeredAt', width: 160 },
-  {
-    title: '状态',
-    dataIndex: 'isRead',
-    key: 'isRead',
-    width: 70,
-  },
-  { title: '操作', key: 'action', width: 80 },
-]
+const gridColumns = computed(() => [
+  { field: 'message', title: '预警内容', ellipsis: true, minWidth: 260 },
+  { field: 'projectId', title: '项目', width: 130, ellipsis: true, slots: { default: 'projectId' } },
+  { field: 'severity', title: '严重度', width: 80, slots: { default: 'severity' } },
+  { field: 'ruleType', title: '规则类型', width: 110, slots: { default: 'ruleType' } },
+  { field: 'triggeredAt', title: '触发时间', width: 160 },
+  { field: 'isRead', title: '状态', width: 70, slots: { default: 'isRead' } },
+  { title: '操作', width: 80, slots: { default: 'action' } },
+])
 
 function getProjectName(projectId: string): string {
   const p = projectOptions.value.find((o) => String(o.id) === String(projectId))
@@ -278,44 +257,44 @@ onMounted(async () => {
 
         <!-- 表格 -->
         <div class="lg-table-wrap">
-          <a-table
-            :data-source="filteredAlerts"
-            :columns="columns"
+          <vxe-grid
+            :data="filteredAlerts"
+            :columns="gridColumns"
             :loading="store.loading"
-            :pagination="false"
-            row-key="id"
-            size="middle"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
           >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'projectId'">
-                <span class="al-muted">{{ getProjectName(record.projectId) }}</span>
-              </template>
-              <template v-else-if="column.key === 'severity'">
-                <a-tag :color="SEVERITY_COLOR[record.severity] ?? 'default'">
-                  {{ record.severity === 'HIGH' ? '高' : record.severity === 'MEDIUM' ? '中' : '低' }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'ruleType'">
-                <a-tag>{{ RULE_TYPE_LABELS[record.ruleType] || record.ruleType }}</a-tag>
-              </template>
-              <template v-else-if="column.key === 'isRead'">
-                <a-badge v-if="record.isRead === 0" status="processing" text="未读" />
-                <span v-else class="al-muted">已读</span>
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <a-button
-                  v-if="record.isRead === 0"
-                  type="link"
-                  size="small"
-                  :loading="store.markingRead.has(record.id)"
-                  @click="handleMarkRead(record)"
-                >
-                  标为已读
-                </a-button>
-                <span v-else class="al-muted">—</span>
-              </template>
+            <template #projectId="{ row }">
+              <span class="al-muted">{{ getProjectName(row.projectId) }}</span>
             </template>
-          </a-table>
+            <template #severity="{ row }">
+              <a-tag :color="SEVERITY_COLOR[row.severity] ?? 'default'">
+                {{ row.severity === 'HIGH' ? '高' : row.severity === 'MEDIUM' ? '中' : '低' }}
+              </a-tag>
+            </template>
+            <template #ruleType="{ row }">
+              <a-tag>{{ RULE_TYPE_LABELS[row.ruleType] || row.ruleType }}</a-tag>
+            </template>
+            <template #isRead="{ row }">
+              <a-badge v-if="row.isRead === 0" status="processing" text="未读" />
+              <span v-else class="al-muted">已读</span>
+            </template>
+            <template #action="{ row }">
+              <a-button
+                v-if="row.isRead === 0"
+                type="link"
+                size="small"
+                :loading="store.markingRead.has(row.id)"
+                @click="handleMarkRead(row)"
+              >
+                标为已读
+              </a-button>
+              <span v-else class="al-muted">—</span>
+            </template>
+          </vxe-grid>
         </div>
 
         <!-- 分页 -->
