@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>合同台账 - 建筑工程总包项目管理系统</title>
+<style>
+/* ===== Design Tokens ===== */
+:root {
+  --primary: #1668dc;
+  --primary-light: #e8f1fd;
+  --primary-muted: #5b8def;
+  --bg: #f3f5f9;
+  --surface: #ffffff;
+  --surface-raised: #fafbfd;
+  --border: #e3e8f0;
+  --border-light: #eef2f7;
+  --text: #121926;
+  --text-secondary: #4a5568;
+  --muted: #8796a8;
+  --success: #0e9f6e;
+  --warning: #e3a008;
+  --danger: #e02424;
+  --info: #3f83f8;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
+  --shadow-md: 0 4px 12px rgba(15,23,42,0.06);
+  --shadow-lg: 0 8px 24px rgba(15,23,42,0.08);
+  --font-display: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ===== Shell (simulated) ===== */
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 216px;
+  flex-shrink: 0;
+  background: #0f172a;
+  color: #94a3b8;
+  padding: 20px 0;
+  font-size: 13px;
+}
+.side-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px 24px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.side-logo-icon {
+  width: 32px; height: 32px;
+  background: var(--primary);
+  border-radius: 8px;
+  display: grid; place-items: center;
+  font-size: 16px; font-weight: 800;
+}
+.side-section {
+  padding: 6px 18px 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #475569;
+  margin-top: 8px;
+}
+.side-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 18px;
+  cursor: default;
+  transition: all 0.15s;
+  border-radius: 0;
+  margin: 1px 8px;
+  border-radius: 6px;
+}
+.side-item:hover { background: rgba(255,255,255,0.06); color: #cbd5e1; }
+.side-item.active { background: rgba(59,130,246,0.18); color: #fff; font-weight: 600; }
+.side-item .icon { width: 18px; text-align: center; font-size: 15px; opacity: 0.8; }
+.side-sub { padding-left: 46px; font-size: 13px; color: #64748b; margin: 0; }
+.side-sub.active { color: #93c5fd; background: none; }
+
+/* ===== Header ===== */
+.header {
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  font-size: 13px;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-breadcrumb { color: var(--muted); font-size: 13px; }
+.header-breadcrumb span { color: var(--text-secondary); }
+.header-right { display: flex; align-items: center; gap: 14px; color: var(--muted); }
+.header-avatar {
+  width: 30px; height: 30px;
+  background: var(--primary);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  color: #fff; font-size: 13px; font-weight: 600;
+}
+
+/* ===== Main Content ===== */
+.main { flex: 1; min-width: 0; }
+.content { padding: 18px 22px 32px; }
+
+/* ===== Page Header ===== */
+.page-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.page-title {
+  font-size: 22px; font-weight: 700;
+  font-family: var(--font-display);
+  letter-spacing: -0.3px;
+}
+
+/* ===== Search ===== */
+.search-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 20px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.search-row {
+  display: flex; gap: 10px; align-items: center;
+}
+.search-input {
+  flex: 1;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 16px 0 42px;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--surface-raised);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(22,104,220,0.1); }
+.search-input::placeholder { color: #b0bec5; }
+.search-input-wrap { position: relative; flex: 1; }
+.search-input-wrap svg {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; color: var(--muted); pointer-events: none;
+}
+.btn {
+  height: 44px; padding: 0 20px;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: all 0.15s;
+  font-family: var(--font-body);
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #155bd4; }
+.btn-ghost {
+  background: transparent; color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: var(--bg); border-color: #cdd5e0; }
+
+/* ===== KPI Strip ===== */
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex; align-items: center; gap: 14px;
+  transition: box-shadow 0.2s;
+  cursor: default;
+}
+.kpi-card:hover { box-shadow: var(--shadow-md); }
+.kpi-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.kpi-icon svg { width: 22px; height: 22px; }
+.kpi-label { font-size: 13px; color: var(--muted); margin-bottom: 3px; }
+.kpi-value {
+  font-size: 24px; font-weight: 800;
+  font-family: var(--font-display);
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-value span { font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 4px; }
+.kpi-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+/* ===== Toolbar ===== */
+.toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; }
+.btn-sm { height: 34px; padding: 0 14px; font-size: 13px; border-radius: var(--radius-sm); }
+
+/* ===== Table ===== */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 0;
+}
+table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px;
+}
+thead th {
+  background: #f8fafc;
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 11px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+thead th:first-child { padding-left: 16px; width: 40px; text-align: center; }
+thead th:last-child { text-align: center; }
+tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text);
+  vertical-align: middle;
+}
+tbody td:first-child { padding-left: 16px; text-align: center; }
+tbody td:last-child { text-align: center; }
+tbody tr:hover { background: #f8fbff; }
+tbody tr:last-child td { border-bottom: none; }
+
+.table-code { color: var(--primary); font-weight: 600; cursor: pointer; }
+.table-code:hover { text-decoration: underline; }
+.table-amount { font-variant-numeric: tabular-nums; font-weight: 500; text-align: right; display: block; padding-right: 0; }
+th:has(+ th + th + th + th + th + .col-amount) { text-align: right; }
+.col-amount { text-align: right !important; }
+.col-amount .table-amount { padding-right: 0; }
+
+.tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.tag-blue { background: #eff6ff; color: #1d4ed8; }
+.tag-green { background: #ecfdf5; color: #047857; }
+.tag-orange { background: #fffbeb; color: #b45309; }
+.tag-purple { background: #f5f3ff; color: #6d28d9; }
+.tag-cyan { background: #ecfeff; color: #0e7490; }
+.tag-gray { background: #f1f5f9; color: #64748b; }
+.tag-default { background: #eff6ff; color: #2563eb; }
+.tag-success { background: #ecfdf5; color: #047857; }
+.tag-danger { background: #fef2f2; color: #b91c1c; }
+
+.ops { display: flex; gap: 12px; justify-content: center; }
+.ops a { color: var(--primary); font-weight: 500; cursor: pointer; font-size: 13px; }
+.ops a:hover { text-decoration: underline; }
+.ops .del { color: var(--danger); }
+.ops .del:hover { color: #c81e1e; }
+
+.checkbox {
+  width: 16px; height: 16px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-block;
+  position: relative;
+  vertical-align: middle;
+}
+.checkbox:hover { border-color: var(--primary); }
+
+/* ===== Pagination ===== */
+.pagination-bar {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 14px; padding: 14px 0 0;
+  font-size: 13px; color: var(--text-secondary);
+}
+.pagination-bar .total { color: var(--muted); }
+.pg-btn {
+  width: 34px; height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  display: inline-grid; place-items: center;
+  cursor: pointer; color: var(--text-secondary); font-size: 13px;
+}
+.pg-btn:hover { border-color: var(--primary); color: var(--primary); }
+.pg-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.pg-btn:disabled { opacity: 0.4; cursor: default; }
+.pg-info { color: var(--muted); }
+.pg-select {
+  height: 34px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0 8px; font-size: 13px; color: var(--text); background: var(--surface);
+  cursor: pointer;
+}
+
+/* ===== Two-column layout ===== */
+.ledger-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 18px;
+  align-items: start;
+}
+.left-col { min-width: 0; }
+.right-col { display: flex; flex-direction: column; gap: 12px; }
+
+/* ===== Analysis Panels ===== */
+.analysis-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.panel-title {
+  font-size: 14px; font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+  letter-spacing: -0.2px;
+}
+
+/* ===== Donut chart (simulated) ===== */
+.chart-center {
+  display: flex; justify-content: center;
+  margin-bottom: 14px;
+}
+.donut-placeholder {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  position: relative;
+}
+.donut-hole {
+  position: absolute;
+  inset: 32%;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.legend-list { flex: 1; display: flex; flex-direction: column; gap: 10px; font-size: 12px; color: var(--text-secondary); }
+.legend-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.legend-left { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.legend-item b { color: var(--text); font-weight: 700; }
+
+/* ===== Status Bars ===== */
+.status-list { display: flex; flex-direction: column; gap: 11px; font-size: 12px; flex: 1; }
+.status-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 48px;
+  gap: 10px; align-items: center;
+}
+.status-row .label { color: var(--text-secondary); white-space: nowrap; }
+.status-row .count { color: var(--text); font-weight: 700; text-align: right; }
+.bar-track { height: 7px; border-radius: 99px; background: #eef2f7; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 99px; display: block; }
+.status-pct { color: var(--muted); font-weight: 500; text-align: right; font-style: normal; }
+
+/* ===== Warning list ===== */
+.warn-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.warn-link { color: var(--primary); font-weight: 500; font-size: 13px; cursor: pointer; }
+.warn-link:hover { text-decoration: underline; }
+.warn-list { display: flex; flex-direction: column; gap: 11px; }
+.warn-item {
+  display: grid;
+  grid-template-columns: 8px 96px minmax(0,1fr) 54px;
+  gap: 8px; align-items: center;
+  font-size: 12px;
+}
+.warn-dot { width: 6px; height: 6px; background: var(--danger); border-radius: 50%; flex-shrink: 0; }
+.warn-item .warn-project { color: var(--text-secondary); white-space: nowrap; }
+.warn-item .warn-title {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text);
+}
+.warn-days { color: var(--danger); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ===== Empty state ===== */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1280px) {
+  .ledger-layout { grid-template-columns: 1fr; }
+  .right-col { display: grid; grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 1100px) {
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .kpi-strip .kpi-card:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 900px) {
+  .right-col { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .content { padding: 14px; }
+}
+@media (max-width: 520px) {
+  .kpi-strip { grid-template-columns: 1fr; }
+  .kpi-strip .kpi-card:last-child { grid-column: auto; }
+  .search-row { flex-wrap: wrap; }
+  .search-row .btn { flex: 1; justify-content: center; }
+}
+
+/* ===== Subtle animations ===== */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.kpi-card { animation: fadeUp 0.4s ease backwards; }
+.kpi-card:nth-child(1) { animation-delay: 0.00s; }
+.kpi-card:nth-child(2) { animation-delay: 0.05s; }
+.kpi-card:nth-child(3) { animation-delay: 0.10s; }
+.kpi-card:nth-child(4) { animation-delay: 0.15s; }
+.kpi-card:nth-child(5) { animation-delay: 0.20s; }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="side-logo">
+      <div class="side-logo-icon">建</div>
+      <span>建筑工程总包<br>项目管理系统</span>
+    </div>
+    <div class="side-section">主导航</div>
+    <div class="side-item"><span class="icon">🏠</span> 工作台</div>
+    <div class="side-item"><span class="icon">📁</span> 项目与主数据</div>
+    <div class="side-item active"><span class="icon">📄</span> 合同管理</div>
+    <div class="side-item side-sub active">合同台账</div>
+    <div class="side-item side-sub">变更签证</div>
+    <div class="side-item"><span class="icon">💰</span> 成本管理</div>
+    <div class="side-item"><span class="icon">🛒</span> 采购与库存</div>
+    <div class="side-item"><span class="icon">🔀</span> 分包管理</div>
+    <div class="side-item"><span class="icon">💳</span> 付款与发票</div>
+    <div class="side-item"><span class="icon">📊</span> 结算管理</div>
+    <div class="side-item"><span class="icon">✅</span> 审批中心</div>
+    <div class="side-section">系统</div>
+    <div class="side-item"><span class="icon">⚙️</span> 系统管理</div>
+  </aside>
+
+  <!-- Main area -->
+  <div class="main">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <span style="font-size:18px; cursor:pointer;">☰</span>
+        <span class="header-breadcrumb">合同管理 / <span>合同台账</span></span>
+      </div>
+      <div class="header-right">
+        <span>🔔</span>
+        <span>❓</span>
+        <div class="header-avatar">系</div>
+        <span style="color:var(--text);font-weight:500;">系统管理员</span>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- Page title row -->
+      <div class="page-head">
+        <h1 class="page-title">合同台账</h1>
+      </div>
+
+      <!-- Search -->
+      <div class="search-card">
+        <div class="search-row">
+          <div class="search-input-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input class="search-input" placeholder="输入合同编号、合同名称、合同类型、甲方名称、乙方名称等任意关键词" value="">
+          </div>
+          <button class="btn btn-primary">查询</button>
+          <button class="btn btn-ghost">↻ 重置</button>
+        </div>
+      </div>
+
+      <!-- KPI Cards -->
+      <div class="kpi-strip">
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#eff6ff; color:#2563eb;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">合同总数</div>
+            <div class="kpi-value">2 <span>份</span></div>
+            <div class="kpi-sub">履约中 1 份</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#ecfdf5; color:#059669;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">合同总金额 (含税)</div>
+            <div class="kpi-value">20.00 <span>万元</span></div>
+            <div class="kpi-sub">2 份合同</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#fffbeb; color:#d97706;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">已付款金额</div>
+            <div class="kpi-value">5.00 <span>万元</span></div>
+            <div class="kpi-sub">付款比例 25%</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#f5f3ff; color:#7c3aed;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">未付款金额</div>
+            <div class="kpi-value">15.00 <span>万元</span></div>
+          </div>
+        </div>
+
+        <div class="kpi-card" style="position:relative;">
+          <div class="kpi-icon" style="background:#fef2f2; color:#dc2626;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">逾期合同</div>
+            <div class="kpi-value">0 <span>份</span></div>
+            <div class="kpi-sub" style="color:#0e9f6e;">✓ 暂无逾期</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <button class="btn btn-primary btn-sm">+ 新建合同</button>
+          <button class="btn btn-ghost btn-sm" style="opacity:0.5; cursor:default;">↓ 导出</button>
+          <button class="btn btn-ghost btn-sm">⚙ 列设置 ▾</button>
+        </div>
+        <div class="toolbar-right">
+          <button class="btn btn-ghost btn-sm">↻ 刷新</button>
+        </div>
+      </div>
+
+      <!-- Main two-col -->
+      <div class="ledger-layout">
+        <div class="left-col">
+
+          <!-- Table -->
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th><span class="checkbox"></span></th>
+                  <th>合同编号</th>
+                  <th>合同名称</th>
+                  <th>合同类型</th>
+                  <th>甲方</th>
+                  <th>乙方</th>
+                  <th class="col-amount">合同金额 (含税)</th>
+                  <th>签订日期</th>
+                  <th>合同状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="checkbox"></span></td>
+                  <td><span class="table-code">CT-20260617-003</span></td>
+                  <td>采购合同</td>
+                  <td><span class="tag tag-orange">采购合同</span></td>
+                  <td>百丈雅文化创意有限公司</td>
+                  <td>材料供应商</td>
+                  <td class="col-amount"><span class="table-amount">100,000.00</span></td>
+                  <td>2026-06-17</td>
+                  <td><span class="tag tag-gray">草稿</span></td>
+                  <td>
+                    <div class="ops">
+                      <a>查看</a> <a>编辑</a> <a class="del">删除</a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="checkbox"></span></td>
+                  <td><span class="table-code">CT-20260616-001</span></td>
+                  <td>劳务分包合同</td>
+                  <td><span class="tag tag-green">分包合同</span></td>
+                  <td>百丈雅文化创意有限公司</td>
+                  <td>劳务分包</td>
+                  <td class="col-amount"><span class="table-amount">100,000.00</span></td>
+                  <td>2026-06-16</td>
+                  <td><span class="tag tag-default">履约中</span></td>
+                  <td>
+                    <div class="ops">
+                      <a>查看</a> <a>编辑</a> <a class="del">删除</a>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination-bar">
+            <span class="total">共 2 条</span>
+            <button class="pg-btn" disabled>‹</button>
+            <button class="pg-btn active">1</button>
+            <button class="pg-btn" disabled>›</button>
+            <select class="pg-select">
+              <option>10 条/页</option>
+              <option selected>20 条/页</option>
+              <option>50 条/页</option>
+              <option>100 条/页</option>
+            </select>
+          </div>
+
+        </div>
+
+        <!-- Right: Analysis Rail -->
+        <div class="right-col">
+
+          <!-- Type Distribution -->
+          <div class="analysis-panel">
+            <div class="panel-title">合同类型分布</div>
+            <div class="chart-center">
+              <div class="donut-placeholder" style="background: conic-gradient(#31c48d 0deg 180deg, #f59e0b 180deg 360deg);">
+                <div class="donut-hole"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status Stats -->
+          <div class="analysis-panel">
+            <div class="panel-title">合同状态统计</div>
+            <div class="chart-center">
+              <div class="donut-placeholder" style="background: conic-gradient(#94a3b8 0deg 180deg, #2f7df6 180deg 360deg);">
+                <div class="donut-hole"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Overdue Warning -->
+          <div class="analysis-panel">
+            <div class="warn-head">
+              <span class="panel-title" style="margin-bottom:0;">逾期预警</span>
+              <span class="warn-link">查看全部 →</span>
+            </div>
+            <div class="warn-list">
+              <div style="text-align:center;padding:20px 0;color:var(--muted);font-size:13px;">
+                ✓ 暂无逾期合同
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
