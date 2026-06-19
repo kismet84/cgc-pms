@@ -53,10 +53,19 @@ public class CtContractService {
     private final WfRecordMapper wfRecordMapper;
     private final CodeGenerationService codeGenerationService;
 
-    public IPage<CtContractVO> getPage(long pageNo, long pageSize, String contractCode, String contractName,
+    public IPage<CtContractVO> getPage(long pageNo, long pageSize, String keyword,
+                                       String contractCode, String contractName,
                                        String contractType, String contractStatus, String approvalStatus,
                                        Long projectId, Long partyAId, Long partyBId) {
         LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
+        // keyword 全局搜索：匹配合同编号、合同名称、合同类型、甲方名称、乙方名称等字段
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w ->
+                w.like(CtContract::getContractCode, keyword)
+                    .or().like(CtContract::getContractName, keyword)
+                    .or().like(CtContract::getContractType, keyword)
+            );
+        }
         if (StringUtils.hasText(contractCode)) wrapper.like(CtContract::getContractCode, contractCode);
         if (StringUtils.hasText(contractName)) wrapper.like(CtContract::getContractName, contractName);
         if (StringUtils.hasText(contractType)) wrapper.eq(CtContract::getContractType, contractType);

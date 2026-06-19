@@ -12,6 +12,7 @@ import {
   DownloadOutlined,
   SettingOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useReferenceStore } from '@/stores/reference'
@@ -92,10 +93,10 @@ function toggleFilterExpand() {
   filterExpanded.value = !filterExpanded.value
 }
 const filter = reactive({
+  keyword: '',
   projectId: undefined as string | undefined,
   contractType: undefined as ContractType | undefined,
   contractStatus: undefined as ContractStatus | undefined,
-
   contractCode: '',
   dateRange: [] as string[],
 })
@@ -150,7 +151,7 @@ async function fetchData() {
     projectId: filter.projectId,
     contractType: filter.contractType,
     contractStatus: filter.contractStatus,
-
+    keyword: filter.keyword || undefined,
     contractCode: filter.contractCode || undefined,
     startDate: filter.dateRange[0],
     endDate: filter.dateRange[1],
@@ -192,10 +193,10 @@ function handleSearch() {
   fetchData()
 }
 function handleReset() {
+  filter.keyword = ''
   filter.projectId = undefined
   filter.contractType = undefined
   filter.contractStatus = undefined
-
   filter.contractCode = ''
   filter.dateRange = []
   pageNo.value = 1
@@ -422,6 +423,26 @@ const gridColumns = computed(() => [
       <div class="cl-left">
         <!-- Filter card -->
         <div class="cl-card cl-filter">
+          <!-- 全局搜索卡片 -->
+          <div class="pj-search-card">
+            <div class="pj-search-label">输入查询信息</div>
+            <div class="pj-search-row">
+              <a-input
+                v-model:value="filter.keyword"
+                placeholder="输入合同编号、合同名称、合同类型、甲方名称、乙方名称等任意关键词"
+                allow-clear
+                size="large"
+                @press-enter="handleSearch"
+              >
+                <template #prefix><SearchOutlined style="color: #9ca3af" /></template>
+              </a-input>
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </div>
+          </div>
           <div class="cl-filter-row">
             <div class="cl-field">
               <label>项目名称：</label>
@@ -478,8 +499,6 @@ const gridColumns = computed(() => [
               <a-range-picker v-model:value="filter.dateRange" style="width: 220px" />
             </div>
             <div class="cl-filter-actions">
-              <a-button type="primary" @click="handleSearch">查询</a-button>
-              <a-button @click="handleReset">重置</a-button>
               <a-button type="text" @click="toggleFilterExpand">{{
                 filterExpanded ? '收起 ↑' : '展开 ↓'
               }}</a-button>
@@ -1279,6 +1298,28 @@ const gridColumns = computed(() => [
   color: var(--error);
   font-weight: 600;
   text-align: right;
+}
+
+/* 全局搜索卡片（与项目管理一致） */
+.pj-search-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.pj-search-label {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.pj-search-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.pj-search-row .ant-input-affix-wrapper {
+  flex: 1;
 }
 
 @media (max-width: 1280px) {

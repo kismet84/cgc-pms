@@ -28,6 +28,7 @@ public class CtContractController {
     public ApiResponse<PageResult<CtContractVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String contractCode,
             @RequestParam(required = false) String contractName,
             @RequestParam(required = false) String contractType,
@@ -36,7 +37,7 @@ public class CtContractController {
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) Long partyAId,
             @RequestParam(required = false) Long partyBId) {
-        IPage<CtContractVO> page = ctContractService.getPage(pageNo, pageSize, contractCode, contractName,
+        IPage<CtContractVO> page = ctContractService.getPage(pageNo, pageSize, keyword, contractCode, contractName,
                 contractType, contractStatus, approvalStatus, projectId, partyAId, partyBId);
         return ApiResponse.success(PageResult.of(page));
     }
