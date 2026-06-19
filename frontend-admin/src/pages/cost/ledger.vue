@@ -330,7 +330,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.keyword"
-        placeholder="搜索编号、科目名…"
+        placeholder="搜索编号、科目名、类型、项目、合同…"
         allow-clear
         size="large"
         @press-enter="handleSearch"
@@ -403,7 +403,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
-              style="width: 140px"
+              style="width: 160px"
               size="small"
               @change="onProjectChange"
             >
@@ -411,49 +411,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 {{ p.projectName }}
               </a-select-option>
             </a-select>
-            <a-select
-              v-model:value="filter.contractId"
-              placeholder="全部合同"
-              allow-clear
-              style="width: 140px"
-              size="small"
-            >
-              <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-                {{ c.contractName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.partnerId"
-              placeholder="全部供应商"
-              allow-clear
-              style="width: 130px"
-              size="small"
-            >
-              <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-                {{ p.partnerName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.sourceType"
-              placeholder="全部来源"
-              allow-clear
-              style="width: 120px"
-              size="small"
-            >
-              <a-select-option v-for="(label, key) in SOURCE_TYPE_LABEL" :key="key" :value="key">
-                {{ label }}
-              </a-select-option>
-            </a-select>
-            <a-tree-select
-              v-model:value="filter.costSubjectId"
-              :tree-data="subjectTree"
-              placeholder="全部科目"
-              allow-clear
-              style="width: 180px"
-              size="small"
-              tree-default-expand-all
-            />
-            <a-range-picker v-model:value="filter.dateRange" style="width: 220px" size="small" />
           </div>
         </div>
 
