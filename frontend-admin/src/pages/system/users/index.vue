@@ -51,6 +51,17 @@ const columns = [
   { title: '操作', key: 'action', width: 180 },
 ]
 
+const gridColumns = computed(() => [
+  { field: 'username', title: '用户名', width: 120 },
+  { field: 'realName', title: '姓名', width: 100 },
+  { field: 'roleNames', title: '角色', width: 120, slots: { default: 'roleNames' } },
+  { field: 'phone', title: '手机号', width: 130 },
+  { field: 'email', title: '邮箱', width: 180, ellipsis: true },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'createdAt', title: '创建时间', width: 160 },
+  { title: '操作', width: 180, slots: { default: 'action' } },
+])
+
 async function fetchData() {
   loading.value = true
   try {
@@ -258,43 +269,43 @@ onMounted(() => {
     </div>
 
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="false"
-        row-key="id"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
         size="small"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'roleNames'">
-            <template v-if="record.roleNames && record.roleNames.length">
-              <a-tag v-for="(r, i) in record.roleNames" :key="i" style="margin-right: 4px">{{
-                r
-              }}</a-tag>
-            </template>
-            <span v-else style="color: var(--muted)">-</span>
+        <template #roleNames="{ row }">
+          <template v-if="row.roleNames && row.roleNames.length">
+            <a-tag v-for="(r, i) in row.roleNames" :key="i" style="margin-right: 4px">{{
+              r
+            }}</a-tag>
           </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="record.status === 'ENABLE' ? 'success' : 'error'">
-              {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <div class="lg-ops">
-              <a class="lg-link" @click="handleEdit(record)">编辑</a>
-              <a
-                class="lg-link"
-                :class="{ 'lg-del': record.status === 'ENABLE' }"
-                @click="handleToggleStatus(record)"
-              >
-                {{ record.status === 'ENABLE' ? '禁用' : '启用' }}
-              </a>
-              <a class="lg-link lg-del" @click="handleDelete(record)">删除</a>
-            </div>
-          </template>
+          <span v-else style="color: var(--muted)">-</span>
         </template>
-      </a-table>
+        <template #status="{ row }">
+          <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
+            {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+          </a-tag>
+        </template>
+        <template #action="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a
+              class="lg-link"
+              :class="{ 'lg-del': row.status === 'ENABLE' }"
+              @click="handleToggleStatus(row)"
+            >
+              {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
+            </a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <div class="lg-pagination">
