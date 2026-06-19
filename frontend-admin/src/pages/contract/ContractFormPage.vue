@@ -39,7 +39,7 @@ const router = useRouter()
 const route = useRoute()
 
 const isEmbedded = computed(() => props.embedded)
-const isEdit = computed(() => props.mode ? props.mode === 'edit' : !!route.params.id)
+const isEdit = computed(() => (props.mode ? props.mode === 'edit' : !!route.params.id))
 const contractId = computed(() => props.contractId || String(route.params.id || ''))
 const loadingDetail = ref(false)
 const dirty = ref(false)
@@ -442,9 +442,7 @@ function genTermKey(): string {
 </script>
 
 <template>
-  <div
-    :class="['project-target-redesign app-page', { 'cf-embedded': isEmbedded }]"
-  >
+  <div :class="['project-target-redesign app-page', { 'cf-embedded': isEmbedded }]">
     <div v-if="!isEmbedded" class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb">
         <a-breadcrumb-item>合同管理</a-breadcrumb-item>
@@ -562,7 +560,7 @@ function genTermKey(): string {
                   </a-select>
                 </a-form-item>
               </a-col>
-              
+
               <a-col :span="12">
                 <a-form-item label="签订日期" name="signedDate">
                   <a-date-picker
@@ -688,12 +686,12 @@ function genTermKey(): string {
               size="small"
               bordered
               :columns="[
-                { title: '名称', dataIndex: 'itemName' },
-                { title: '规格', dataIndex: 'itemSpec' },
-                { title: '单位', dataIndex: 'unit' },
-                { title: '数量', dataIndex: 'quantity', align: 'right' },
-                { title: '单价', dataIndex: 'unitPrice', align: 'right' },
-                { title: '金额', dataIndex: 'amount', align: 'right' },
+                { title: '名称', dataIndex: 'itemName', width: 160, ellipsis: true },
+                { title: '规格', dataIndex: 'itemSpec', width: 120, ellipsis: true },
+                { title: '单位', dataIndex: 'unit', width: 70 },
+                { title: '数量', dataIndex: 'quantity', width: 90, align: 'right' },
+                { title: '单价', dataIndex: 'unitPrice', width: 110, align: 'right' },
+                { title: '金额', dataIndex: 'amount', width: 120, align: 'right' },
               ]"
             />
           </div>
@@ -712,11 +710,11 @@ function genTermKey(): string {
               size="small"
               bordered
               :columns="[
-                { title: '付款节点', dataIndex: 'termName' },
-                { title: '比例(%)', dataIndex: 'paymentRatio', align: 'right' },
-                { title: '金额', dataIndex: 'paymentAmount', align: 'right' },
-                { title: '付款条件', dataIndex: 'paymentCondition' },
-                { title: '计划日期', dataIndex: 'plannedDate' },
+                { title: '付款节点', dataIndex: 'termName', width: 160, ellipsis: true },
+                { title: '比例(%)', dataIndex: 'paymentRatio', width: 90, align: 'right' },
+                { title: '金额', dataIndex: 'paymentAmount', width: 120, align: 'right' },
+                { title: '付款条件', dataIndex: 'paymentCondition', width: 160, ellipsis: true },
+                { title: '计划日期', dataIndex: 'plannedDate', width: 120 },
               ]"
             />
           </div>

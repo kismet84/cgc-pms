@@ -90,33 +90,34 @@ async function handleBatchEvaluate() {
 
 // ── Columns ──
 const columns = [
-  { title: '预警内容', dataIndex: 'message', key: 'message', ellipsis: true, width: 320 },
+  { title: '预警内容', dataIndex: 'message', key: 'message', ellipsis: true, minWidth: 260 },
   {
     title: '项目',
     dataIndex: 'projectId',
     key: 'projectId',
-    width: 140,
+    width: 130,
+    ellipsis: true,
   },
   {
     title: '严重度',
     dataIndex: 'severity',
     key: 'severity',
-    width: 90,
+    width: 80,
   },
   {
     title: '规则类型',
     dataIndex: 'ruleType',
     key: 'ruleType',
-    width: 130,
+    width: 110,
   },
-  { title: '触发时间', dataIndex: 'triggeredAt', key: 'triggeredAt', width: 170 },
+  { title: '触发时间', dataIndex: 'triggeredAt', key: 'triggeredAt', width: 160 },
   {
     title: '状态',
     dataIndex: 'isRead',
     key: 'isRead',
-    width: 80,
+    width: 70,
   },
-  { title: '操作', key: 'action', width: 100, fixed: 'right' },
+  { title: '操作', key: 'action', width: 80 },
 ]
 
 function getProjectName(projectId: string): string {
@@ -139,7 +140,9 @@ onMounted(async () => {
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>预警中心</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>预警中心</a-breadcrumb-item></a-breadcrumb
+      >
       <div class="pt-head-actions">
         <a-button type="primary" danger :loading="store.evaluating" @click="handleBatchEvaluate">
           触发评估
@@ -215,7 +218,6 @@ onMounted(async () => {
         :pagination="false"
         row-key="id"
         size="middle"
-        :scroll="{ x: 1050 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'projectId'">
@@ -267,5 +269,3 @@ onMounted(async () => {
 </template>
 
 <style scoped></style>
-
-

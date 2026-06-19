@@ -96,14 +96,14 @@ const filterOption = (input: string, option: any) =>
   option.label?.toLowerCase().includes(input.toLowerCase())
 
 const columns = [
-  { title: '申请编号', dataIndex: 'requestCode', width: 150 },
-  { title: '所属项目', dataIndex: 'projectName', width: 150 },
-  { title: '关联合同', dataIndex: 'contractName', width: 150 },
-  { title: '审批状态', dataIndex: 'approvalStatus', width: 100, key: 'approvalStatus' },
-  { title: '业务状态', dataIndex: 'status', width: 90, key: 'status' },
-  { title: '创建人', dataIndex: 'createdBy', width: 100 },
-  { title: '创建时间', dataIndex: 'createdTime', width: 150 },
-  { title: '操作', key: 'action', width: 240, fixed: 'right' },
+  { title: '申请编号', dataIndex: 'requestCode', width: 140, ellipsis: true },
+  { title: '所属项目', dataIndex: 'projectName', width: 130, ellipsis: true },
+  { title: '关联合同', dataIndex: 'contractName', width: 130, ellipsis: true },
+  { title: '审批状态', dataIndex: 'approvalStatus', width: 90, key: 'approvalStatus' },
+  { title: '业务状态', dataIndex: 'status', width: 80, key: 'status' },
+  { title: '创建人', dataIndex: 'createdBy', width: 90 },
+  { title: '创建时间', dataIndex: 'createdTime', width: 140 },
+  { title: '操作', key: 'action', width: 190 },
 ]
 
 async function fetchData() {
@@ -381,7 +381,9 @@ function handleModalCancel() {
       okText: '确定关闭',
       okType: 'danger',
       cancelText: '继续编辑',
-      onOk: () => { modalVisible.value = false },
+      onOk: () => {
+        modalVisible.value = false
+      },
     })
     return
   }
@@ -393,7 +395,11 @@ function getPopupContainer() {
 }
 
 const kpiReqTotal = computed(() => tableData.value.length)
-const kpiReqPending = computed(() => tableData.value.filter(r => r.approvalStatus === "DRAFT" || r.approvalStatus === "APPROVING").length)
+const kpiReqPending = computed(
+  () =>
+    tableData.value.filter((r) => r.approvalStatus === 'DRAFT' || r.approvalStatus === 'APPROVING')
+      .length,
+)
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -405,13 +411,22 @@ onMounted(() => {
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>库存管理</a-breadcrumb-item><a-breadcrumb-item>采购申请</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>库存管理</a-breadcrumb-item
+        ><a-breadcrumb-item>采购申请</a-breadcrumb-item></a-breadcrumb
+      >
       <div class="pt-head-actions"></div>
     </div>
 
-    <div class="pt-kpi-strip" style="grid-template-columns:repeat(2,1fr)">
-      <div class="pt-kpi"><div class="pt-kpi-label">申请数</div><div class="pt-kpi-value">{{ kpiReqTotal }}<small>条</small></div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">待审批</div><div class="pt-kpi-value">{{ kpiReqPending }}<small>条</small></div></div>
+    <div class="pt-kpi-strip" style="grid-template-columns: repeat(2, 1fr)">
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">申请数</div>
+        <div class="pt-kpi-value">{{ kpiReqTotal }}<small>条</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">待审批</div>
+        <div class="pt-kpi-value">{{ kpiReqPending }}<small>条</small></div>
+      </div>
     </div>
 
     <!-- Filter -->
@@ -485,7 +500,6 @@ onMounted(() => {
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 1250 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'approvalStatus'">
@@ -570,7 +584,12 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="备注">
-          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" @change="modalDirty = true" />
+          <a-textarea
+            v-model:value="formData.remark"
+            :rows="2"
+            placeholder="请输入备注"
+            @change="modalDirty = true"
+          />
         </a-form-item>
       </a-form>
 
@@ -579,9 +598,7 @@ onMounted(() => {
         <div class="pr-items-header">
           <span class="pr-items-title">
             申请明细
-            <span class="pr-items-count">
-              {{ itemsCount }} 项
-            </span>
+            <span class="pr-items-count"> {{ itemsCount }} 项 </span>
           </span>
           <a-button type="dashed" size="small" @click="handleAddItem">+ 添加物料</a-button>
         </div>
@@ -593,7 +610,7 @@ onMounted(() => {
           :columns="itemColumns"
           row-key="key"
           size="small"
-          :scroll="{ x: 900, y: 250 }"
+          :scroll="{ y: 250 }"
         >
           <template #bodyCell="{ column, record: item }">
             <template v-if="column.key === 'material'">
@@ -623,7 +640,13 @@ onMounted(() => {
               </div>
             </template>
             <template v-else-if="column.key === 'unit'">
-              <a-input v-model:value="item.unit" placeholder="单位" size="small" style="width: 100%" @change="modalDirty = true" />
+              <a-input
+                v-model:value="item.unit"
+                placeholder="单位"
+                size="small"
+                style="width: 100%"
+                @change="modalDirty = true"
+              />
             </template>
             <template v-else-if="column.key === 'quantity'">
               <a-input-number
@@ -645,7 +668,12 @@ onMounted(() => {
               />
             </template>
             <template v-else-if="column.key === 'remark'">
-              <a-input v-model:value="item.remark" placeholder="备注" size="small" @change="modalDirty = true" />
+              <a-input
+                v-model:value="item.remark"
+                placeholder="备注"
+                size="small"
+                @change="modalDirty = true"
+              />
             </template>
             <template v-else-if="column.key === 'action'">
               <a-button type="link" size="small" danger @click="handleRemoveItem(item.key)">

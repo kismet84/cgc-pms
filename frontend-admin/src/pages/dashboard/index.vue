@@ -268,7 +268,10 @@ const bmChangeOption = computed(() =>
 )
 
 const bmSettlementOption = computed(() =>
-  axisOption(['立项', '审核', '结算', '支付'], [compactLine('结算收付', [28, 42, 58, 72], '#14b8c7')]),
+  axisOption(
+    ['立项', '审核', '结算', '支付'],
+    [compactLine('结算收付', [28, 42, 58, 72], '#14b8c7')],
+  ),
 )
 
 const costExecutionOption = computed(() =>
@@ -341,7 +344,10 @@ const financeStructureOption = computed(() =>
 )
 
 const financeRiskOption = computed(() =>
-  axisOption(['本周', '下周', '本月', '下月'], [compactLine('资金风险', [12, 18, 10, 22], '#ef4444')]),
+  axisOption(
+    ['本周', '下周', '本月', '下月'],
+    [compactLine('资金风险', [12, 18, 10, 22], '#ef4444')],
+  ),
 )
 
 const mgmtOverviewOption = computed(() =>
@@ -367,14 +373,17 @@ const mgmtRiskOption = computed(() =>
 )
 
 const mgmtTrendOption = computed(() =>
-  axisOption(['收入', '成本', '利润', '付款'], [
-    compactLine('经营趋势', [
-      toNum(mgmtData.value?.totalContractAmount),
-      toNum(mgmtData.value?.totalDynamicCost),
-      toNum(mgmtData.value?.totalExpectedProfit),
-      toNum(mgmtData.value?.totalPaidAmount),
-    ]),
-  ]),
+  axisOption(
+    ['收入', '成本', '利润', '付款'],
+    [
+      compactLine('经营趋势', [
+        toNum(mgmtData.value?.totalContractAmount),
+        toNum(mgmtData.value?.totalDynamicCost),
+        toNum(mgmtData.value?.totalExpectedProfit),
+        toNum(mgmtData.value?.totalPaidAmount),
+      ]),
+    ],
+  ),
 )
 
 const costBarOption = computed(() => {
@@ -518,7 +527,9 @@ onMounted(() => {
           <div class="kpi-icon" style="background: #ef4444"><FileTextOutlined /></div>
           <div class="kpi-body">
             <div class="kpi-title">临期合同</div>
-            <div class="kpi-value">{{ fmtNum(pmData.expiringContractCount) }} <small>份</small></div>
+            <div class="kpi-value">
+              {{ fmtNum(pmData.expiringContractCount) }} <small>份</small>
+            </div>
             <div class="kpi-delta danger">30天内到期</div>
           </div>
         </div>
@@ -542,15 +553,36 @@ onMounted(() => {
       <div class="pm-bottom-grid">
         <div class="panel pm-table-panel">
           <div class="panel-header">待办任务</div>
-          <a-table :columns="pmTaskCols" :data-source="pmData.pendingTasks" :loading="loading" :pagination="false" size="small" row-key="taskId" />
+          <a-table
+            :columns="pmTaskCols"
+            :data-source="pmData.pendingTasks"
+            :loading="loading"
+            :pagination="false"
+            size="small"
+            row-key="taskId"
+          />
         </div>
         <div class="panel pm-table-panel">
           <div class="panel-header">滞后项目</div>
-          <a-table :columns="pmProjectCols" :data-source="pmData.laggingProjects" :loading="loading" :pagination="false" size="small" row-key="projectId" />
+          <a-table
+            :columns="pmProjectCols"
+            :data-source="pmData.laggingProjects"
+            :loading="loading"
+            :pagination="false"
+            size="small"
+            row-key="projectId"
+          />
         </div>
         <div class="panel pm-table-panel">
           <div class="panel-header">临期合同（30天内到期）</div>
-          <a-table :columns="pmContractCols" :data-source="pmData.expiringContracts" :loading="loading" :pagination="false" size="small" row-key="contractId" />
+          <a-table
+            :columns="pmContractCols"
+            :data-source="pmData.expiringContracts"
+            :loading="loading"
+            :pagination="false"
+            size="small"
+            row-key="contractId"
+          />
         </div>
       </div>
     </template>
@@ -559,20 +591,83 @@ onMounted(() => {
     <template v-if="activeRole === 'bm' && bmData">
       <div class="role-dashboard-grid">
         <div class="role-metric-strip">
-          <div class="kpi-card"><div class="kpi-icon" style="background: #3b82f6"><DollarOutlined /></div><div class="kpi-body"><div class="kpi-title">合同总额</div><div class="kpi-value">{{ fmtWan(bmData.totalContractAmount) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #f59e0b"><SwapOutlined /></div><div class="kpi-body"><div class="kpi-title">合同变更</div><div class="kpi-value">{{ fmtWan(bmData.contractChangeAmount) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #8b5cf6"><FileTextOutlined /></div><div class="kpi-body"><div class="kpi-title">签证变更</div><div class="kpi-value">{{ fmtWan(bmData.varOrderAmount) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #22c55e"><FundOutlined /></div><div class="kpi-body"><div class="kpi-title">结算进度</div><div class="kpi-value">{{ bmData.settlementProgress }}</div></div></div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #3b82f6"><DollarOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">合同总额</div>
+              <div class="kpi-value">
+                {{ fmtWan(bmData.totalContractAmount) }} <small>万元</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #f59e0b"><SwapOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">合同变更</div>
+              <div class="kpi-value">
+                {{ fmtWan(bmData.contractChangeAmount) }} <small>万元</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #8b5cf6"><FileTextOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">签证变更</div>
+              <div class="kpi-value">{{ fmtWan(bmData.varOrderAmount) }} <small>万元</small></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #22c55e"><FundOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">结算进度</div>
+              <div class="kpi-value">{{ bmData.settlementProgress }}</div>
+            </div>
+          </div>
         </div>
         <div class="role-analysis-grid">
-          <div class="panel role-panel"><div class="panel-header">合同经营概览</div><v-chart :option="bmBusinessOption" autoresize class="role-chart" /></div>
-          <div class="panel role-panel"><div class="panel-header">变更签证分析</div><v-chart :option="bmChangeOption" autoresize class="role-chart" /></div>
-          <div class="panel role-panel"><div class="panel-header">结算收付概览</div><v-chart :option="bmSettlementOption" autoresize class="role-chart" /></div>
+          <div class="panel role-panel">
+            <div class="panel-header">合同经营概览</div>
+            <v-chart :option="bmBusinessOption" autoresize class="role-chart" />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">变更签证分析</div>
+            <v-chart :option="bmChangeOption" autoresize class="role-chart" />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">结算收付概览</div>
+            <v-chart :option="bmSettlementOption" autoresize class="role-chart" />
+          </div>
         </div>
         <div class="role-table-grid">
-          <div class="panel role-panel"><div class="panel-header">近期合同变更</div><a-table :columns="bmChangeCols" :data-source="bmData.recentChanges" :loading="loading" :pagination="false" size="small" row-key="contractId" /></div>
-          <div class="panel role-panel"><div class="panel-header">待结算事项</div><a-table :columns="bmSettleCols" :data-source="bmData.settlementItems" :loading="loading" :pagination="false" size="small" row-key="projectId" /></div>
-          <div class="panel role-panel"><div class="panel-header">收付款关注</div><div class="role-summary-strip"><span>付款比例</span><b>{{ bmData.paidRatio }}</b><span>分包计量</span><b>{{ fmtWan(bmData.subMeasureAmount) }} 万元</b></div></div>
+          <div class="panel role-panel">
+            <div class="panel-header">近期合同变更</div>
+            <a-table
+              :columns="bmChangeCols"
+              :data-source="bmData.recentChanges"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="contractId"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">待结算事项</div>
+            <a-table
+              :columns="bmSettleCols"
+              :data-source="bmData.settlementItems"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="projectId"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">收付款关注</div>
+            <div class="role-summary-strip">
+              <span>付款比例</span><b>{{ bmData.paidRatio }}</b
+              ><span>分包计量</span><b>{{ fmtWan(bmData.subMeasureAmount) }} 万元</b>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -581,20 +676,88 @@ onMounted(() => {
     <template v-if="activeRole === 'cost' && costData">
       <div class="role-dashboard-grid">
         <div class="role-metric-strip">
-          <div class="kpi-card"><div class="kpi-icon" style="background: #3b82f6"><AimOutlined /></div><div class="kpi-body"><div class="kpi-title">目标成本</div><div class="kpi-value">{{ fmtWan(costData.targetCost) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #f59e0b"><LineChartOutlined /></div><div class="kpi-body"><div class="kpi-title">动态成本</div><div class="kpi-value">{{ fmtWan(costData.dynamicCost) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" :style="{ background: devColor(costData.costDeviation) }"><RiseOutlined /></div><div class="kpi-body"><div class="kpi-title">成本偏差</div><div class="kpi-value" :style="{ color: devColor(costData.costDeviation) }">{{ devSign(costData.costDeviation) }}{{ fmtDeviation(costData.costDeviation) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #22c55e"><DollarOutlined /></div><div class="kpi-body"><div class="kpi-title">预计利润</div><div class="kpi-value">{{ fmtWan(costData.expectedProfit) }} <small>万元</small></div></div></div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #3b82f6"><AimOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">目标成本</div>
+              <div class="kpi-value">{{ fmtWan(costData.targetCost) }} <small>万元</small></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #f59e0b"><LineChartOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">动态成本</div>
+              <div class="kpi-value">{{ fmtWan(costData.dynamicCost) }} <small>万元</small></div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" :style="{ background: devColor(costData.costDeviation) }">
+              <RiseOutlined />
+            </div>
+            <div class="kpi-body">
+              <div class="kpi-title">成本偏差</div>
+              <div class="kpi-value" :style="{ color: devColor(costData.costDeviation) }">
+                {{ devSign(costData.costDeviation) }}{{ fmtDeviation(costData.costDeviation) }}
+                <small>万元</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #22c55e"><DollarOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">预计利润</div>
+              <div class="kpi-value">{{ fmtWan(costData.expectedProfit) }} <small>万元</small></div>
+            </div>
+          </div>
         </div>
         <div class="role-analysis-grid">
-          <div class="panel role-panel"><div class="panel-header">成本执行概览</div><v-chart :option="costExecutionOption" autoresize class="role-chart" /></div>
-          <div class="panel role-panel"><div class="panel-header">成本构成分析 <span class="panel-hint">点击柱体可下钻</span></div><v-chart :option="costCompositionOption" autoresize class="role-chart" @click="handleBarClick" /></div>
-          <div class="panel role-panel"><div class="panel-header">偏差趋势分析</div><v-chart :option="costDeviationTrendOption" autoresize class="role-chart" /></div>
+          <div class="panel role-panel">
+            <div class="panel-header">成本执行概览</div>
+            <v-chart :option="costExecutionOption" autoresize class="role-chart" />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">
+              成本构成分析 <span class="panel-hint">点击柱体可下钻</span>
+            </div>
+            <v-chart
+              :option="costCompositionOption"
+              autoresize
+              class="role-chart"
+              @click="handleBarClick"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">偏差趋势分析</div>
+            <v-chart :option="costDeviationTrendOption" autoresize class="role-chart" />
+          </div>
         </div>
         <div class="role-table-grid">
-          <div class="panel role-panel"><div class="panel-header">超预算预警</div><a-table :columns="alertCols" :data-source="costData.overBudgetAlerts" :pagination="false" size="small" row-key="message" /></div>
-          <div class="panel role-panel"><div class="panel-header">成本科目排行</div><v-chart :option="costBarOption" autoresize class="role-mini-chart" @click="handleBarClick" /></div>
-          <div class="panel role-panel"><div class="panel-header">成本偏差明细</div><div class="role-summary-strip"><span>合同锁定成本</span><b>{{ fmtWan(costData.contractLockedCost) }} 万元</b><span>实际成本</span><b>{{ fmtWan(costData.actualCost) }} 万元</b></div></div>
+          <div class="panel role-panel">
+            <div class="panel-header">超预算预警</div>
+            <a-table
+              :columns="alertCols"
+              :data-source="costData.overBudgetAlerts"
+              :pagination="false"
+              size="small"
+              row-key="message"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">成本科目排行</div>
+            <v-chart
+              :option="costBarOption"
+              autoresize
+              class="role-mini-chart"
+              @click="handleBarClick"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">成本偏差明细</div>
+            <div class="role-summary-strip">
+              <span>合同锁定成本</span><b>{{ fmtWan(costData.contractLockedCost) }} 万元</b
+              ><span>实际成本</span><b>{{ fmtWan(costData.actualCost) }} 万元</b>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -603,20 +766,87 @@ onMounted(() => {
     <template v-if="activeRole === 'finance' && financeData">
       <div class="role-dashboard-grid">
         <div class="role-metric-strip">
-          <div class="kpi-card"><div class="kpi-icon" style="background: #ef4444"><PayCircleOutlined /></div><div class="kpi-body"><div class="kpi-title">待付款金额</div><div class="kpi-value">{{ fmtWan(financeData.pendingPaymentAmount) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #f59e0b"><ClockCircleOutlined /></div><div class="kpi-body"><div class="kpi-title">待付款笔数</div><div class="kpi-value">{{ fmtNum(financeData.pendingPaymentCount) }} <small>笔</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #3b82f6"><AuditOutlined /></div><div class="kpi-body"><div class="kpi-title">已审批未支付</div><div class="kpi-value">{{ fmtWan(financeData.approvedUnpaidAmount) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #14b8c7"><WarningOutlined /></div><div class="kpi-body"><div class="kpi-title">质保金到期</div><div class="kpi-value">{{ fmtWan(financeData.warrantyExpiringAmount) }} <small>万元</small></div></div></div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #ef4444"><PayCircleOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">待付款金额</div>
+              <div class="kpi-value">
+                {{ fmtWan(financeData.pendingPaymentAmount) }} <small>万元</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #f59e0b"><ClockCircleOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">待付款笔数</div>
+              <div class="kpi-value">
+                {{ fmtNum(financeData.pendingPaymentCount) }} <small>笔</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #3b82f6"><AuditOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">已审批未支付</div>
+              <div class="kpi-value">
+                {{ fmtWan(financeData.approvedUnpaidAmount) }} <small>万元</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #14b8c7"><WarningOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">质保金到期</div>
+              <div class="kpi-value">
+                {{ fmtWan(financeData.warrantyExpiringAmount) }} <small>万元</small>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="role-analysis-grid">
-          <div class="panel role-panel"><div class="panel-header">资金支付概览</div><v-chart :option="financePaymentOption" autoresize class="role-chart" /></div>
-          <div class="panel role-panel"><div class="panel-header">付款结构分析</div><v-chart :option="financeStructureOption" autoresize class="role-chart" /></div>
-          <div class="panel role-panel"><div class="panel-header">资金风险概览</div><v-chart :option="financeRiskOption" autoresize class="role-chart" /></div>
+          <div class="panel role-panel">
+            <div class="panel-header">资金支付概览</div>
+            <v-chart :option="financePaymentOption" autoresize class="role-chart" />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">付款结构分析</div>
+            <v-chart :option="financeStructureOption" autoresize class="role-chart" />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">资金风险概览</div>
+            <v-chart :option="financeRiskOption" autoresize class="role-chart" />
+          </div>
         </div>
         <div class="role-table-grid">
-          <div class="panel role-panel"><div class="panel-header">待付款明细</div><a-table :columns="financePayCols" :data-source="financeData.pendingPayments" :loading="loading" :pagination="false" size="small" row-key="payRecordId" /></div>
-          <div class="panel role-panel"><div class="panel-header">超比例付款</div><a-table :columns="financePayCols" :data-source="financeData.overRatioPayments" :loading="loading" :pagination="false" size="small" row-key="payRecordId" /></div>
-          <div class="panel role-panel"><div class="panel-header">质保金到期</div><div class="role-summary-strip"><span>到期金额</span><b>{{ fmtWan(financeData.warrantyExpiringAmount) }} 万元</b><span>风险金额</span><b>{{ fmtWan(financeData.overRatioAmount) }} 万元</b></div></div>
+          <div class="panel role-panel">
+            <div class="panel-header">待付款明细</div>
+            <a-table
+              :columns="financePayCols"
+              :data-source="financeData.pendingPayments"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="payRecordId"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">超比例付款</div>
+            <a-table
+              :columns="financePayCols"
+              :data-source="financeData.overRatioPayments"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="payRecordId"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">质保金到期</div>
+            <div class="role-summary-strip">
+              <span>到期金额</span><b>{{ fmtWan(financeData.warrantyExpiringAmount) }} 万元</b
+              ><span>风险金额</span><b>{{ fmtWan(financeData.overRatioAmount) }} 万元</b>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -625,20 +855,87 @@ onMounted(() => {
     <template v-if="activeRole === 'mgmt' && mgmtData">
       <div class="role-dashboard-grid">
         <div class="role-metric-strip">
-          <div class="kpi-card"><div class="kpi-icon" style="background: #3b82f6"><ProjectOutlined /></div><div class="kpi-body"><div class="kpi-title">在建项目</div><div class="kpi-value">{{ fmtNum(mgmtData.activeProjectCount) }} <small>个</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #22c55e"><DollarOutlined /></div><div class="kpi-body"><div class="kpi-title">合同总额</div><div class="kpi-value">{{ fmtWan(mgmtData.totalContractAmount) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #f59e0b"><LineChartOutlined /></div><div class="kpi-body"><div class="kpi-title">动态成本</div><div class="kpi-value">{{ fmtWan(mgmtData.totalDynamicCost) }} <small>万元</small></div></div></div>
-          <div class="kpi-card"><div class="kpi-icon" style="background: #ef4444"><WarningOutlined /></div><div class="kpi-body"><div class="kpi-title">风险预警</div><div class="kpi-value">{{ fmtNum(mgmtData.totalRiskCount) }} <small>项</small></div></div></div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #3b82f6"><ProjectOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">在建项目</div>
+              <div class="kpi-value">
+                {{ fmtNum(mgmtData.activeProjectCount) }} <small>个</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #22c55e"><DollarOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">合同总额</div>
+              <div class="kpi-value">
+                {{ fmtWan(mgmtData.totalContractAmount) }} <small>万元</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #f59e0b"><LineChartOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">动态成本</div>
+              <div class="kpi-value">
+                {{ fmtWan(mgmtData.totalDynamicCost) }} <small>万元</small>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: #ef4444"><WarningOutlined /></div>
+            <div class="kpi-body">
+              <div class="kpi-title">风险预警</div>
+              <div class="kpi-value">{{ fmtNum(mgmtData.totalRiskCount) }} <small>项</small></div>
+            </div>
+          </div>
         </div>
         <div class="role-analysis-grid">
-          <div class="panel role-panel"><div class="panel-header">项目经营总览</div><v-chart :option="mgmtOverviewOption" autoresize class="role-chart" /></div>
-          <div class="panel role-panel"><div class="panel-header">项目风险分布</div><v-chart :option="mgmtRiskOption" autoresize class="role-chart" /></div>
-          <div class="panel role-panel"><div class="panel-header">经营趋势概览</div><v-chart :option="mgmtTrendOption" autoresize class="role-chart" /></div>
+          <div class="panel role-panel">
+            <div class="panel-header">项目经营总览</div>
+            <v-chart :option="mgmtOverviewOption" autoresize class="role-chart" />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">项目风险分布</div>
+            <v-chart :option="mgmtRiskOption" autoresize class="role-chart" />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">经营趋势概览</div>
+            <v-chart :option="mgmtTrendOption" autoresize class="role-chart" />
+          </div>
         </div>
         <div class="role-table-grid">
-          <div class="panel role-panel"><div class="panel-header">项目经营排名</div><a-table :columns="mgmtRankCols" :data-source="mgmtData.projectRankings" :loading="loading" :pagination="false" size="small" row-key="projectId" /></div>
-          <div class="panel role-panel"><div class="panel-header">重大风险</div><a-table :columns="alertCols" :data-source="mgmtData.majorRisks" :pagination="false" size="small" row-key="message" /></div>
-          <div class="panel role-panel"><div class="panel-header">逾期事项（&gt;7天）</div><a-table :columns="pmTaskCols" :data-source="mgmtData.overdueItems" :pagination="false" size="small" row-key="taskId" /></div>
+          <div class="panel role-panel">
+            <div class="panel-header">项目经营排名</div>
+            <a-table
+              :columns="mgmtRankCols"
+              :data-source="mgmtData.projectRankings"
+              :loading="loading"
+              :pagination="false"
+              size="small"
+              row-key="projectId"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">重大风险</div>
+            <a-table
+              :columns="alertCols"
+              :data-source="mgmtData.majorRisks"
+              :pagination="false"
+              size="small"
+              row-key="message"
+            />
+          </div>
+          <div class="panel role-panel">
+            <div class="panel-header">逾期事项（&gt;7天）</div>
+            <a-table
+              :columns="pmTaskCols"
+              :data-source="mgmtData.overdueItems"
+              :pagination="false"
+              size="small"
+              row-key="taskId"
+            />
+          </div>
         </div>
       </div>
     </template>
@@ -657,11 +954,16 @@ onMounted(() => {
     >
       <template v-if="drillSubject">
         <div class="drill-summary">
-          <span>目标成本：<b>{{ fmtWan(drillSubject.targetCost) }}</b> 万元</span>
-          <span>实际成本：<b>{{ fmtWan(drillSubject.actualCost) }}</b> 万元</span>
+          <span
+            >目标成本：<b>{{ fmtWan(drillSubject.targetCost) }}</b> 万元</span
+          >
+          <span
+            >实际成本：<b>{{ fmtWan(drillSubject.actualCost) }}</b> 万元</span
+          >
           <span>
             成本偏差：<b :style="{ color: devColor(drillSubject.costDeviation) }">
-              {{ devSign(drillSubject.costDeviation) }}{{ fmtDeviation(drillSubject.costDeviation) }} 万元
+              {{ devSign(drillSubject.costDeviation)
+              }}{{ fmtDeviation(drillSubject.costDeviation) }} 万元
             </b>
           </span>
         </div>

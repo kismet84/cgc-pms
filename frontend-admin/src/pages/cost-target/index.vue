@@ -71,7 +71,10 @@ const warningRows = computed(() => {
     .slice(0, 3)
     .map((item) => ({
       name: item.versionName,
-      status: APPROVAL_STATUS_LABEL[item.approvalStatus] ?? TARGET_STATUS_LABEL[item.status] ?? item.status,
+      status:
+        APPROVAL_STATUS_LABEL[item.approvalStatus] ??
+        TARGET_STATUS_LABEL[item.status] ??
+        item.status,
     }))
   return rows.length ? rows : [{ name: '暂无偏差预警', status: '平稳' }]
 })
@@ -218,7 +221,7 @@ const columns = [
   { field: 'approvalStatus', title: '审批状态', width: 100, slots: { default: 'approvalStatus' } },
   { field: 'status', title: '业务状态', width: 100, slots: { default: 'status' } },
   { field: 'isActive', title: '版本标识', width: 100, slots: { default: 'isActive' } },
-  { title: '操作', width: 200, fixed: 'right' as const, slots: { default: 'ops' } },
+  { title: '操作', width: 160, slots: { default: 'ops' } },
 ]
 
 onMounted(() => {
@@ -312,19 +315,27 @@ onMounted(() => {
     <div class="pt-kpi-strip">
       <div class="pt-kpi">
         <div class="pt-kpi-label">目标总额</div>
-        <div class="pt-kpi-value">{{ fmtAmount(String(targetStats.totalTarget)) }} <small>万元</small></div>
+        <div class="pt-kpi-value">
+          {{ fmtAmount(String(targetStats.totalTarget)) }} <small>万元</small>
+        </div>
       </div>
       <div class="pt-kpi">
         <div class="pt-kpi-label">已锁定成本</div>
-        <div class="pt-kpi-value">{{ fmtAmount(String(targetStats.locked)) }} <small>万元</small></div>
+        <div class="pt-kpi-value">
+          {{ fmtAmount(String(targetStats.locked)) }} <small>万元</small>
+        </div>
       </div>
       <div class="pt-kpi">
         <div class="pt-kpi-label">动态成本</div>
-        <div class="pt-kpi-value">{{ fmtAmount(String(targetStats.dynamic)) }} <small>万元</small></div>
+        <div class="pt-kpi-value">
+          {{ fmtAmount(String(targetStats.dynamic)) }} <small>万元</small>
+        </div>
       </div>
       <div class="pt-kpi">
         <div class="pt-kpi-label">偏差金额</div>
-        <div class="pt-kpi-value">{{ fmtAmount(String(targetStats.deviation)) }} <small>万元</small></div>
+        <div class="pt-kpi-value">
+          {{ fmtAmount(String(targetStats.deviation)) }} <small>万元</small>
+        </div>
       </div>
     </div>
 
@@ -398,8 +409,14 @@ onMounted(() => {
           <div class="pt-panel-header">目标占比</div>
           <div class="pt-panel-body">
             <ul class="pt-compact-list">
-              <li class="pt-compact-row"><span>当前版本</span><b>{{ tableData.filter((i) => i.isActive === 1).length }} 个</b></li>
-              <li class="pt-compact-row"><span>历史版本</span><b>{{ tableData.filter((i) => i.isActive !== 1).length }} 个</b></li>
+              <li class="pt-compact-row">
+                <span>当前版本</span
+                ><b>{{ tableData.filter((i) => i.isActive === 1).length }} 个</b>
+              </li>
+              <li class="pt-compact-row">
+                <span>历史版本</span
+                ><b>{{ tableData.filter((i) => i.isActive !== 1).length }} 个</b>
+              </li>
             </ul>
           </div>
         </section>

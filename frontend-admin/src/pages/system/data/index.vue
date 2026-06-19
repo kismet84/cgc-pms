@@ -32,7 +32,10 @@ function handleClearDatabase() {
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>数据管理</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>系统设置</a-breadcrumb-item
+        ><a-breadcrumb-item>数据管理</a-breadcrumb-item></a-breadcrumb
+      >
     </div>
 
     <a-card :bordered="false">
@@ -45,4 +48,3 @@ function handleClearDatabase() {
     </a-card>
   </div>
 </template>
-

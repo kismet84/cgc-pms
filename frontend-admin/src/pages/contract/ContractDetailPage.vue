@@ -34,44 +34,50 @@ const TYPE_COLOR: Record<ContractType, string> = {
 }
 
 const itemColumns = [
-  { title: '清单编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
-  { title: '清单名称', dataIndex: 'itemName', key: 'itemName', width: 180 },
-  { title: '规格型号', dataIndex: 'itemSpec', key: 'itemSpec', width: 140 },
-  { title: '单位', dataIndex: 'unit', key: 'unit', width: 80, align: 'center' as const },
-  { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 100, align: 'right' as const },
-  { title: '单价', dataIndex: 'unitPrice', key: 'unitPrice', width: 120, align: 'right' as const },
-  { title: '金额', dataIndex: 'amount', key: 'amount', width: 140, align: 'right' as const },
-  { title: '税率(%)', dataIndex: 'taxRate', key: 'taxRate', width: 100, align: 'right' as const },
-  { title: '税额', dataIndex: 'taxAmount', key: 'taxAmount', width: 120, align: 'right' as const },
+  { title: '清单编码', dataIndex: 'itemCode', key: 'itemCode', width: 110, ellipsis: true },
+  { title: '清单名称', dataIndex: 'itemName', key: 'itemName', width: 160, ellipsis: true },
+  { title: '规格型号', dataIndex: 'itemSpec', key: 'itemSpec', width: 120, ellipsis: true },
+  { title: '单位', dataIndex: 'unit', key: 'unit', width: 70, align: 'center' as const },
+  { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 90, align: 'right' as const },
+  { title: '单价', dataIndex: 'unitPrice', key: 'unitPrice', width: 100, align: 'right' as const },
+  { title: '金额', dataIndex: 'amount', key: 'amount', width: 120, align: 'right' as const },
+  { title: '税率(%)', dataIndex: 'taxRate', key: 'taxRate', width: 80, align: 'right' as const },
+  { title: '税额', dataIndex: 'taxAmount', key: 'taxAmount', width: 100, align: 'right' as const },
   {
     title: '不含税金额',
     dataIndex: 'amountWithoutTax',
     key: 'amountWithoutTax',
-    width: 140,
+    width: 120,
     align: 'right' as const,
   },
 ]
 
 const termColumns = [
-  { title: '条款名称', dataIndex: 'termName', key: 'termName', width: 180 },
+  { title: '条款名称', dataIndex: 'termName', key: 'termName', width: 160, ellipsis: true },
   {
     title: '付款比例(%)',
     dataIndex: 'paymentRatio',
     key: 'paymentRatio',
-    width: 120,
+    width: 100,
     align: 'right' as const,
   },
   {
     title: '付款金额',
     dataIndex: 'paymentAmount',
     key: 'paymentAmount',
-    width: 140,
+    width: 120,
     align: 'right' as const,
   },
-  { title: '付款条件', dataIndex: 'paymentCondition', key: 'paymentCondition', width: 200 },
-  { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 120 },
-  { title: '实际日期', dataIndex: 'actualDate', key: 'actualDate', width: 120 },
-  { title: '状态', dataIndex: 'termStatus', key: 'termStatus', width: 100 },
+  {
+    title: '付款条件',
+    dataIndex: 'paymentCondition',
+    key: 'paymentCondition',
+    width: 160,
+    ellipsis: true,
+  },
+  { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 110 },
+  { title: '实际日期', dataIndex: 'actualDate', key: 'actualDate', width: 110 },
+  { title: '状态', dataIndex: 'termStatus', key: 'termStatus', width: 80 },
 ]
 
 const actionNameMap: Record<string, string> = {
@@ -255,7 +261,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
           <div class="cd-info-row">
             <span class="cd-info-label">合同金额(含税)</span>
-            <span class="cd-info-value cd-info-money">{{ formatAmount(contract.contractAmount) }} 元</span>
+            <span class="cd-info-value cd-info-money"
+              >{{ formatAmount(contract.contractAmount) }} 元</span
+            >
           </div>
           <div class="cd-info-row">
             <span class="cd-info-label">当前金额</span>
@@ -327,7 +335,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                   :columns="itemColumns"
                   :data-source="items"
                   :pagination="false"
-                  :scroll="{ x: 1200 }"
                   size="small"
                   bordered
                   row-key="id"
@@ -414,7 +421,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                   :columns="termColumns"
                   :data-source="paymentTerms"
                   :pagination="false"
-                  :scroll="{ x: 1000 }"
                   size="small"
                   bordered
                   row-key="id"
@@ -430,7 +436,11 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 </a-table>
                 <!-- mobile: term cards -->
                 <div v-else class="cd-mobile-list">
-                  <div v-for="(row, idx) in paymentTerms" :key="row.id ?? idx" class="cd-mobile-card">
+                  <div
+                    v-for="(row, idx) in paymentTerms"
+                    :key="row.id ?? idx"
+                    class="cd-mobile-card"
+                  >
                     <div class="cd-mc-head">
                       <span class="cd-mc-name">{{ row.termName }}</span>
                       <a-tag v-if="row.termStatus" size="small">{{ row.termStatus }}</a-tag>
@@ -443,7 +453,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                         </div>
                         <div class="cd-mc-field">
                           <span class="cd-mc-label">付款金额</span>
-                          <span class="cd-mc-val cd-mc-money">{{ formatAmount(row.paymentAmount) }}</span>
+                          <span class="cd-mc-val cd-mc-money">{{
+                            formatAmount(row.paymentAmount)
+                          }}</span>
                         </div>
                       </div>
                       <div class="cd-mc-field">
@@ -470,7 +482,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <!-- Approval History Tab -->
             <a-tab-pane key="approval-history" tab="审批记录">
               <a-spin :spinning="recordsLoading">
-                <a-timeline v-if="approvalRecords.length > 0" :class="{ 'cd-timeline-mobile': isMobile }">
+                <a-timeline
+                  v-if="approvalRecords.length > 0"
+                  :class="{ 'cd-timeline-mobile': isMobile }"
+                >
                   <a-timeline-item v-for="record in approvalRecords" :key="record.id">
                     <div>
                       <strong>{{ record.operatorName }}</strong>
@@ -535,7 +550,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   border-radius: var(--radius-md, 8px);
   padding: 14px;
   margin-bottom: 12px;
-  box-shadow: var(--shadow-soft, 0 1px 4px rgba(0,0,0,.04));
+  box-shadow: var(--shadow-soft, 0 1px 4px rgba(0, 0, 0, 0.04));
 }
 .cd-info-mobile-title {
   font-size: 14px;

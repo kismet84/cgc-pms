@@ -49,7 +49,10 @@ async function selectAntdOption(select: Locator, preferredText?: string): Promis
       if (searchVisible) {
         await searchInput.fill(preferredText)
         await page.waitForTimeout(800)
-        option = dropdown.locator('.ant-select-item-option').filter({ hasText: preferredText }).first()
+        option = dropdown
+          .locator('.ant-select-item-option')
+          .filter({ hasText: preferredText })
+          .first()
         found = await option.isVisible().catch(() => false)
       }
     }
@@ -58,13 +61,17 @@ async function selectAntdOption(select: Locator, preferredText?: string): Promis
       selectedText = (await option.textContent())?.trim() ?? ''
     } else {
       // Fallback: pick first visible non-disabled option
-      option = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)').first()
+      option = dropdown
+        .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
+        .first()
       selectedText = (await option.textContent())?.trim() ?? '(first available)'
       console.log(`selectAntdOption: "${preferredText}" not found, using "${selectedText}"`)
     }
   } else {
     // No preferred text, just pick the first visible option
-    option = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)').first()
+    option = dropdown
+      .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
+      .first()
     selectedText = (await option.textContent())?.trim() ?? '(first available)'
   }
 
@@ -92,7 +99,9 @@ test.describe('Variation original submit regression', () => {
     // Fill modal form: select first available for each required relation
     await selectAntdOption(modal.locator('.ant-form-item:has(label:has-text("项目")) .ant-select'))
     await selectAntdOption(modal.locator('.ant-form-item:has(label:has-text("合同")) .ant-select'))
-    await selectAntdOption(modal.locator('.ant-form-item:has(label:has-text("合作方")) .ant-select'))
+    await selectAntdOption(
+      modal.locator('.ant-form-item:has(label:has-text("合作方")) .ant-select'),
+    )
     await selectAntdOption(
       modal.locator('.ant-form-item:has(label:has-text("变更类型")) .ant-select'),
       '现场签证',
@@ -128,22 +137,32 @@ test.describe('Variation original submit regression', () => {
 
     // Verify the variation appears in the table, even if submit has issues
     await expect(page.getByText(SYSTEM_ERROR)).toHaveCount(0)
-    await expect(page.getByText(variationName)).toBeVisible({ timeout: 15000 }).catch(() => {
-      console.log('Variation name not visible in table after create — may need data refresh')
-    })
+    await expect(page.getByText(variationName))
+      .toBeVisible({ timeout: 15000 })
+      .catch(() => {
+        console.log('Variation name not visible in table after create — may need data refresh')
+      })
 
     // Try to submit for approval
-    const createdRow = page.locator('.ant-table-tbody tr.ant-table-row').filter({ hasText: variationName }).first()
-    const submitBtnVisible = await createdRow.getByText('提交审批').isVisible({ timeout: 5000 }).catch(() => false)
+    const createdRow = page
+      .locator('.ant-table-tbody tr.ant-table-row')
+      .filter({ hasText: variationName })
+      .first()
+    const submitBtnVisible = await createdRow
+      .getByText('提交审批')
+      .isVisible({ timeout: 5000 })
+      .catch(() => false)
     if (submitBtnVisible) {
       await createdRow.getByText('提交审批').click()
       const confirm = page.locator('.ant-modal-confirm').filter({ hasText: '提交审批' })
       const confirmVisible = await confirm.isVisible({ timeout: 5000 }).catch(() => false)
       if (confirmVisible) {
         await confirm.getByRole('button', { name: '确定' }).click()
-        await expect(page.getByText('已提交审批')).toBeVisible({ timeout: 15000 }).catch(() => {
-          console.log('Submit approval success message not detected — checking error state')
-        })
+        await expect(page.getByText('已提交审批'))
+          .toBeVisible({ timeout: 15000 })
+          .catch(() => {
+            console.log('Submit approval success message not detected — checking error state')
+          })
       }
     }
 

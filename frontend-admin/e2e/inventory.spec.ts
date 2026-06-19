@@ -53,7 +53,10 @@ async function selectAntdOption(select: Locator, preferredText?: string): Promis
       if (searchVisible) {
         await searchInput.fill(preferredText)
         await page.waitForTimeout(800)
-        option = dropdown.locator('.ant-select-item-option').filter({ hasText: preferredText }).first()
+        option = dropdown
+          .locator('.ant-select-item-option')
+          .filter({ hasText: preferredText })
+          .first()
         found = await option.isVisible().catch(() => false)
       }
     }
@@ -62,13 +65,17 @@ async function selectAntdOption(select: Locator, preferredText?: string): Promis
       selectedText = (await option.textContent())?.trim() ?? ''
     } else {
       // Fallback: pick first visible non-disabled option
-      option = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)').first()
+      option = dropdown
+        .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
+        .first()
       selectedText = (await option.textContent())?.trim() ?? '(first available)'
       console.log(`selectAntdOption: "${preferredText}" not found, using "${selectedText}"`)
     }
   } else {
     // No preferred text, just pick the first visible option
-    option = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)').first()
+    option = dropdown
+      .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
+      .first()
     selectedText = (await option.textContent())?.trim() ?? '(first available)'
   }
 
@@ -95,13 +102,17 @@ async function clickAndCaptureResponse(
     await page.getByRole('button', { name: buttonName }).click({ force: true })
     const response = await responsePromise
     if (!response) {
-      console.log(`clickAndCaptureResponse: ${buttonName} -> ${urlPart} timed out (no matching response)`)
+      console.log(
+        `clickAndCaptureResponse: ${buttonName} -> ${urlPart} timed out (no matching response)`,
+      )
       return null
     }
     console.log(`clickAndCaptureResponse: ${buttonName} -> ${urlPart} ${response.status()}`)
     return response
   } catch {
-    console.log(`clickAndCaptureResponse: ${buttonName} -> ${urlPart} timed out (no matching response)`)
+    console.log(
+      `clickAndCaptureResponse: ${buttonName} -> ${urlPart} timed out (no matching response)`,
+    )
     return null
   }
 }

@@ -50,9 +50,19 @@ const formData = reactive<Partial<SubTaskVO>>({
   status: 'NOT_STARTED',
   remark: '',
 })
-const formPartnerName = computed(() => contractList.value?.find(c => c.id === formData.contractId)?.partyBName ?? '')
-function onContractChange(contractId: string) { const c = contractList.value?.find(ct => ct.id === contractId); formData.partnerId = c?.partyBId }
-watch(() => formData.contractId, (val) => { if (!val) formData.partnerId = undefined })
+const formPartnerName = computed(
+  () => contractList.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
+)
+function onContractChange(contractId: string) {
+  const c = contractList.value?.find((ct) => ct.id === contractId)
+  formData.partnerId = c?.partyBId
+}
+watch(
+  () => formData.contractId,
+  (val) => {
+    if (!val) formData.partnerId = undefined
+  },
+)
 
 const STATUS_LABEL: Record<string, string> = {
   NOT_STARTED: '未开始',
@@ -68,17 +78,17 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 const columns = [
-  { title: '任务编号', dataIndex: 'taskCode', width: 150 },
-  { title: '任务名称', dataIndex: 'taskName', minWidth: 160, key: 'taskName' },
-  { title: '项目名称', dataIndex: 'projectName', width: 140 },
-  { title: '合同名称', dataIndex: 'contractName', width: 140 },
-  { title: '分包商', dataIndex: 'partnerName', width: 140 },
-  { title: '施工区域', dataIndex: 'workArea', width: 120 },
-  { title: '进度', dataIndex: 'progressPercent', width: 100, key: 'progressPercent' },
-  { title: '状态', dataIndex: 'status', width: 100, key: 'status' },
-  { title: '计划开始', dataIndex: 'plannedStartDate', width: 110 },
-  { title: '计划结束', dataIndex: 'plannedEndDate', width: 110 },
-  { title: '操作', key: 'action', width: 140, fixed: 'right' },
+  { title: '任务编号', dataIndex: 'taskCode', width: 130, ellipsis: true },
+  { title: '任务名称', dataIndex: 'taskName', minWidth: 140, key: 'taskName', ellipsis: true },
+  { title: '项目名称', dataIndex: 'projectName', width: 120, ellipsis: true },
+  { title: '合同名称', dataIndex: 'contractName', width: 120, ellipsis: true },
+  { title: '分包商', dataIndex: 'partnerName', width: 120, ellipsis: true },
+  { title: '施工区域', dataIndex: 'workArea', width: 100, ellipsis: true },
+  { title: '进度', dataIndex: 'progressPercent', width: 90, key: 'progressPercent' },
+  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
+  { title: '计划开始', dataIndex: 'plannedStartDate', width: 100 },
+  { title: '计划结束', dataIndex: 'plannedEndDate', width: 100 },
+  { title: '操作', key: 'action', width: 110 },
 ]
 
 async function fetchData() {
@@ -223,14 +233,24 @@ function handleModalCancel() {
 }
 
 // ---- KPI ----
-const kpiInProgress = computed(() => tableData.value.filter(r => r.status === "IN_PROGRESS").length)
-const kpiCompleted = computed(() => tableData.value.filter(r => r.status === "COMPLETED").length)
-const kpiPending = computed(() => tableData.value.filter(r => r.status === "NOT_STARTED").length)
-const kpiSuspended = computed(() => tableData.value.filter(r => r.status === "SUSPENDED").length)
+const kpiInProgress = computed(
+  () => tableData.value.filter((r) => r.status === 'IN_PROGRESS').length,
+)
+const kpiCompleted = computed(() => tableData.value.filter((r) => r.status === 'COMPLETED').length)
+const kpiPending = computed(() => tableData.value.filter((r) => r.status === 'NOT_STARTED').length)
+const kpiSuspended = computed(() => tableData.value.filter((r) => r.status === 'SUSPENDED').length)
 
 // ---- Analysis ----
-const taskStatusBreakdown = computed(() => { const m: Record<string,number> = {}; tableData.value.forEach(r => { m[STATUS_LABEL[r.status] ?? r.status] = (m[STATUS_LABEL[r.status] ?? r.status] || 0) + 1 }); return Object.entries(m).map(([k,v]) => ({label:k,count:v})) })
-const suspendedTasks = computed(() => tableData.value.filter(r => r.status === "SUSPENDED").slice(0,5))
+const taskStatusBreakdown = computed(() => {
+  const m: Record<string, number> = {}
+  tableData.value.forEach((r) => {
+    m[STATUS_LABEL[r.status] ?? r.status] = (m[STATUS_LABEL[r.status] ?? r.status] || 0) + 1
+  })
+  return Object.entries(m).map(([k, v]) => ({ label: k, count: v }))
+})
+const suspendedTasks = computed(() =>
+  tableData.value.filter((r) => r.status === 'SUSPENDED').slice(0, 5),
+)
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -243,256 +263,328 @@ onMounted(() => {
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>分包管理</a-breadcrumb-item><a-breadcrumb-item>分包任务</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>分包管理</a-breadcrumb-item
+        ><a-breadcrumb-item>分包任务</a-breadcrumb-item></a-breadcrumb
+      >
       <div class="pt-head-actions"></div>
     </div>
 
     <div class="pt-kpi-strip">
-      <div class="pt-kpi"><div class="pt-kpi-label">进行中</div><div class="pt-kpi-value">{{ kpiInProgress }}<small>条</small></div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">已完成</div><div class="pt-kpi-value">{{ kpiCompleted }}<small>条</small></div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">待开始</div><div class="pt-kpi-value">{{ kpiPending }}<small>条</small></div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">已暂停</div><div class="pt-kpi-value" style="color:#ef4444">{{ kpiSuspended }}<small>条</small></div></div>
-    </div>
-
-    <!-- Filter -->
-    <div class="pt-ledger-layout"><main style="flex:1;min-width:0"><div class="pt-panel pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>项目：</label>
-          <a-select
-            v-model:value="filter.projectId"
-            placeholder="全部"
-            allow-clear
-            style="width: 180px"
-            show-search
-            @change="(v: string|undefined) => { filter.contractId = undefined; if(v) referenceStore.fetchContracts({projectId:v}) }"
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-              {{ p.projectName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>合同：</label>
-          <a-select
-            v-model:value="filter.contractId"
-            placeholder="全部"
-            allow-clear
-            style="width: 180px"
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-              {{ c.contractName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>分包商：</label>
-          <a-select
-            v-model:value="filter.partnerId"
-            placeholder="全部"
-            allow-clear
-            style="width: 160px"
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-              {{ p.partnerName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>状态：</label>
-          <a-select
-            v-model:value="filter.status"
-            placeholder="全部"
-            allow-clear
-            style="width: 110px"
-          >
-            <a-select-option value="NOT_STARTED">未开始</a-select-option>
-            <a-select-option value="IN_PROGRESS">进行中</a-select-option>
-            <a-select-option value="COMPLETED">已完成</a-select-option>
-            <a-select-option value="SUSPENDED">已暂停</a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>任务编号：</label>
-          <a-input
-            v-model:value="filter.taskCode"
-            placeholder="请输入编号"
-            style="width: 140px"
-            allow-clear
-          />
-        </div>
-        <div class="pt-field">
-          <label>任务名称：</label>
-          <a-input
-            v-model:value="filter.taskName"
-            placeholder="请输入名称"
-            style="width: 140px"
-            allow-clear
-          />
-        </div>
-        <div class="pt-filter-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-          <a-button type="primary" @click="handleAdd">新建任务</a-button>
-        </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">进行中</div>
+        <div class="pt-kpi-value">{{ kpiInProgress }}<small>条</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">已完成</div>
+        <div class="pt-kpi-value">{{ kpiCompleted }}<small>条</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">待开始</div>
+        <div class="pt-kpi-value">{{ kpiPending }}<small>条</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">已暂停</div>
+        <div class="pt-kpi-value" style="color: #ef4444">{{ kpiSuspended }}<small>条</small></div>
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="pt-panel pt-table-panel" style="margin-bottom:0">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
-        :loading="loading"
-        :pagination="false"
-        row-key="id"
-        size="small"
-        :scroll="{ x: 1400 }"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'taskName'">
-            <a class="pt-link">{{ record.taskName }}</a>
-          </template>
-          <template v-else-if="column.key === 'progressPercent'">
-            <a-progress
-              v-if="record.progressPercent"
-              :percent="parseFloat(record.progressPercent)"
-              :stroke-width="8"
-              size="small"
-              :show-info="true"
-            />
-            <span v-else class="pm-none">-</span>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status]">
-              {{ STATUS_LABEL[record.status] ?? record.status }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-            <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
-          </template>
-        </template>
-      </a-table>
-    </div>
+    <!-- Filter -->
+    <div class="pt-ledger-layout">
+      <main style="flex: 1; min-width: 0">
+        <div class="pt-panel pt-filter-surface">
+          <div class="pt-filter-row">
+            <div class="pt-field">
+              <label>项目：</label>
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部"
+                allow-clear
+                style="width: 180px"
+                show-search
+                @change="
+                  (v: string | undefined) => {
+                    filter.contractId = undefined
+                    if (v) referenceStore.fetchContracts({ projectId: v })
+                  }
+                "
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
+              >
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </div>
+            <div class="pt-field">
+              <label>合同：</label>
+              <a-select
+                v-model:value="filter.contractId"
+                placeholder="全部"
+                allow-clear
+                style="width: 180px"
+                show-search
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
+              >
+                <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+                  {{ c.contractName }}
+                </a-select-option>
+              </a-select>
+            </div>
+            <div class="pt-field">
+              <label>分包商：</label>
+              <a-select
+                v-model:value="filter.partnerId"
+                placeholder="全部"
+                allow-clear
+                style="width: 160px"
+                show-search
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
+              >
+                <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
+                  {{ p.partnerName }}
+                </a-select-option>
+              </a-select>
+            </div>
+            <div class="pt-field">
+              <label>状态：</label>
+              <a-select
+                v-model:value="filter.status"
+                placeholder="全部"
+                allow-clear
+                style="width: 110px"
+              >
+                <a-select-option value="NOT_STARTED">未开始</a-select-option>
+                <a-select-option value="IN_PROGRESS">进行中</a-select-option>
+                <a-select-option value="COMPLETED">已完成</a-select-option>
+                <a-select-option value="SUSPENDED">已暂停</a-select-option>
+              </a-select>
+            </div>
+            <div class="pt-field">
+              <label>任务编号：</label>
+              <a-input
+                v-model:value="filter.taskCode"
+                placeholder="请输入编号"
+                style="width: 140px"
+                allow-clear
+              />
+            </div>
+            <div class="pt-field">
+              <label>任务名称：</label>
+              <a-input
+                v-model:value="filter.taskName"
+                placeholder="请输入名称"
+                style="width: 140px"
+                allow-clear
+              />
+            </div>
+            <div class="pt-filter-actions">
+              <a-button type="primary" @click="handleSearch">查询</a-button>
+              <a-button @click="handleReset">重置</a-button>
+              <a-button type="primary" @click="handleAdd">新建任务</a-button>
+            </div>
+          </div>
+        </div>
 
-    <!-- Pagination -->
-    <div class="pt-pagination">
-      <span class="pt-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
-    </div>
+        <!-- Table -->
+        <div class="pt-panel pt-table-panel" style="margin-bottom: 0">
+          <a-table
+            :columns="columns"
+            :data-source="tableData"
+            :loading="loading"
+            :pagination="false"
+            row-key="id"
+            size="small"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'taskName'">
+                <a class="pt-link">{{ record.taskName }}</a>
+              </template>
+              <template v-else-if="column.key === 'progressPercent'">
+                <a-progress
+                  v-if="record.progressPercent"
+                  :percent="parseFloat(record.progressPercent)"
+                  :stroke-width="8"
+                  size="small"
+                  :show-info="true"
+                />
+                <span v-else class="pm-none">-</span>
+              </template>
+              <template v-else-if="column.key === 'status'">
+                <a-tag :color="STATUS_COLOR[record.status]">
+                  {{ STATUS_LABEL[record.status] ?? record.status }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
+                <a-button type="link" size="small" danger @click="handleDelete(record)"
+                  >删除</a-button
+                >
+              </template>
+            </template>
+          </a-table>
+        </div>
 
-    <!-- Add/Edit Modal -->
-    <a-modal
-      v-model:open="modalVisible"
-      :title="modalTitle"
-      :width="720"
-      @ok="handleModalOk"
-      @cancel="handleModalCancel"
-    >
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
-        <a-form-item label="项目" required>
-          <a-select
-            v-model:value="formData.projectId"
-            placeholder="请选择项目"
-            show-search
-            @change="(v: string) => { formData.contractId = undefined; formData.partnerId = undefined; referenceStore.fetchContracts({ projectId: v }); }"
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-              {{ p.projectName }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="分包合同">
-          <a-select
-            v-model:value="formData.contractId"
-            placeholder="请选择合同"
-            allow-clear
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-            @change="onContractChange"
-          >
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-              {{ c.contractName }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="分包商">
-          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
-        </a-form-item>
-        <a-form-item label="任务名称" required>
-          <a-input v-model:value="formData.taskName" placeholder="请输入任务名称" />
-        </a-form-item>
-        <a-form-item label="施工区域">
-          <a-input v-model:value="formData.workArea" placeholder="请输入施工区域" />
-        </a-form-item>
-        <a-form-item label="计划开始日期">
-          <a-date-picker v-model:value="formData.plannedStartDate" value-format="YYYY-MM-DD" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="计划结束日期">
-          <a-date-picker v-model:value="formData.plannedEndDate" value-format="YYYY-MM-DD" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="实际开始日期">
-          <a-date-picker v-model:value="formData.actualStartDate" value-format="YYYY-MM-DD" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="实际结束日期">
-          <a-date-picker v-model:value="formData.actualEndDate" value-format="YYYY-MM-DD" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="进度百分比">
-          <a-input-number
-            v-model:value="formData.progressPercent"
-            :min="0"
-            :max="100"
-            :precision="2"
-            style="width: 100%"
+        <!-- Pagination -->
+        <div class="pt-pagination">
+          <span class="pt-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
           />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="formData.status" placeholder="请选择状态">
-            <a-select-option value="NOT_STARTED">未开始</a-select-option>
-            <a-select-option value="IN_PROGRESS">进行中</a-select-option>
-            <a-select-option value="COMPLETED">已完成</a-select-option>
-            <a-select-option value="SUSPENDED">已暂停</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea v-model:value="formData.remark" :rows="3" placeholder="请输入备注" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
-  </main><aside class="pt-analysis-rail"><section class="pt-panel"><div class="pt-panel-header">任务状态分布</div><div class="pt-panel-body"><ul class="pt-compact-list"><li v-for="it in taskStatusBreakdown" :key="it.label" class="pt-compact-row"><span>{{ it.label }}</span><b>{{ it.count }} 条</b></li></ul></div></section><section class="pt-panel"><div class="pt-panel-header">已暂停任务</div><div class="pt-panel-body"><ul class="pt-compact-list"><li v-for="t in suspendedTasks" :key="t.id" class="pt-compact-row"><span>{{ t.taskName }}</span><b style="color:#ef4444">{{ t.workArea || "-" }}</b></li><li v-if="suspendedTasks.length===0" class="pt-compact-row"><span>无暂停任务</span></li></ul></div></section></aside></div></div>
+        </div>
+
+        <!-- Add/Edit Modal -->
+        <a-modal
+          v-model:open="modalVisible"
+          :title="modalTitle"
+          :width="720"
+          @ok="handleModalOk"
+          @cancel="handleModalCancel"
+        >
+          <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+            <a-form-item label="项目" required>
+              <a-select
+                v-model:value="formData.projectId"
+                placeholder="请选择项目"
+                show-search
+                @change="
+                  (v: string) => {
+                    formData.contractId = undefined
+                    formData.partnerId = undefined
+                    referenceStore.fetchContracts({ projectId: v })
+                  }
+                "
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
+              >
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="分包合同">
+              <a-select
+                v-model:value="formData.contractId"
+                placeholder="请选择合同"
+                allow-clear
+                show-search
+                :filter-option="
+                  (input: string, option: any) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
+                @change="onContractChange"
+              >
+                <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+                  {{ c.contractName }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="分包商">
+              <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
+            </a-form-item>
+            <a-form-item label="任务名称" required>
+              <a-input v-model:value="formData.taskName" placeholder="请输入任务名称" />
+            </a-form-item>
+            <a-form-item label="施工区域">
+              <a-input v-model:value="formData.workArea" placeholder="请输入施工区域" />
+            </a-form-item>
+            <a-form-item label="计划开始日期">
+              <a-date-picker
+                v-model:value="formData.plannedStartDate"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
+            </a-form-item>
+            <a-form-item label="计划结束日期">
+              <a-date-picker
+                v-model:value="formData.plannedEndDate"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
+            </a-form-item>
+            <a-form-item label="实际开始日期">
+              <a-date-picker
+                v-model:value="formData.actualStartDate"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
+            </a-form-item>
+            <a-form-item label="实际结束日期">
+              <a-date-picker
+                v-model:value="formData.actualEndDate"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
+            </a-form-item>
+            <a-form-item label="进度百分比">
+              <a-input-number
+                v-model:value="formData.progressPercent"
+                :min="0"
+                :max="100"
+                :precision="2"
+                style="width: 100%"
+              />
+            </a-form-item>
+            <a-form-item label="状态">
+              <a-select v-model:value="formData.status" placeholder="请选择状态">
+                <a-select-option value="NOT_STARTED">未开始</a-select-option>
+                <a-select-option value="IN_PROGRESS">进行中</a-select-option>
+                <a-select-option value="COMPLETED">已完成</a-select-option>
+                <a-select-option value="SUSPENDED">已暂停</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="备注">
+              <a-textarea v-model:value="formData.remark" :rows="3" placeholder="请输入备注" />
+            </a-form-item>
+          </a-form>
+        </a-modal>
+      </main>
+      <aside class="pt-analysis-rail">
+        <section class="pt-panel">
+          <div class="pt-panel-header">任务状态分布</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li v-for="it in taskStatusBreakdown" :key="it.label" class="pt-compact-row">
+                <span>{{ it.label }}</span
+                ><b>{{ it.count }} 条</b>
+              </li>
+            </ul>
+          </div>
+        </section>
+        <section class="pt-panel">
+          <div class="pt-panel-header">已暂停任务</div>
+          <div class="pt-panel-body">
+            <ul class="pt-compact-list">
+              <li v-for="t in suspendedTasks" :key="t.id" class="pt-compact-row">
+                <span>{{ t.taskName }}</span
+                ><b style="color: #ef4444">{{ t.workArea || '-' }}</b>
+              </li>
+              <li v-if="suspendedTasks.length === 0" class="pt-compact-row">
+                <span>无暂停任务</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
 </template>
 
 <style scoped></style>
-
-

@@ -10,9 +10,13 @@ describe('ContractLedgerPage modal flows', () => {
   it('opens the contract form inside an a-modal for create and edit', () => {
     expect(source).toMatch(/import\s+ContractFormPage\s+from\s+['"]\.\/ContractFormPage\.vue['"]/)
     expect(source).toMatch(/const\s+contractModalVisible\s*=\s*ref\(false\)/)
-    expect(source).toMatch(/const\s+contractModalMode\s*=\s*ref<'create'\s*\|\s*'edit'>\('create'\)/)
+    expect(source).toMatch(
+      /const\s+contractModalMode\s*=\s*ref<'create'\s*\|\s*'edit'>\('create'\)/,
+    )
     expect(source).toMatch(/const\s+contractModalId\s*=\s*ref\(''\)/)
-    expect(source).toMatch(/function\s+handleCreate\(\)[\s\S]*?contractModalVisible\.value\s*=\s*true/)
+    expect(source).toMatch(
+      /function\s+handleCreate\(\)[\s\S]*?contractModalVisible\.value\s*=\s*true/,
+    )
     expect(source).toMatch(/function\s+handleEdit[\s\S]*?contractModalMode\.value\s*=\s*'edit'/)
     expect(source).toMatch(/<a-modal[\s\S]*v-model:open="contractModalVisible"/)
     expect(source).toMatch(/<ContractFormPage[\s\S]*:embedded="true"/)
@@ -26,7 +30,9 @@ describe('ContractLedgerPage modal flows', () => {
   })
 
   it('keeps existing detail and delete actions routed through the list page', () => {
-    expect(source).toMatch(/function handleView[\s\S]*?router\.push\('\/contract\/'\s*\+\s*row\.id\)/)
+    expect(source).toMatch(
+      /function handleView[\s\S]*?router\.push\('\/contract\/'\s*\+\s*row\.id\)/,
+    )
     expect(source).toMatch(/function handleDelete[\s\S]*?Modal\.confirm\(/)
   })
 })

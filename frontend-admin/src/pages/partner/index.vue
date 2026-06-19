@@ -39,14 +39,13 @@ const formData = reactive<Partial<PartnerVO>>({
   status: 'ENABLE',
 })
 
-
 const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([
   { dictLabel: '甲方', dictValue: 'PARTY_A' },
   { dictLabel: '乙方', dictValue: 'PARTY_B' },
   { dictLabel: '其他', dictValue: 'OTHER' },
 ])
 const partnerTypeLabel = (val: string) => {
-  const fromDict = partnerTypeOptions.value.find(o => o.dictValue === val)
+  const fromDict = partnerTypeOptions.value.find((o) => o.dictValue === val)
   if (fromDict) return fromDict.dictLabel
   // Static fallback in case dict not loaded yet
   const fallback: Record<string, string> = { PARTY_A: '甲方', PARTY_B: '乙方', OTHER: '其他' }
@@ -70,7 +69,6 @@ async function fetchPartnerTypes() {
   }
 }
 
-
 const RISK_COLOR: Record<string, string> = {
   LOW: 'success',
   MEDIUM: 'warning',
@@ -83,16 +81,22 @@ const RISK_LABEL: Record<string, string> = {
 }
 
 const columns = [
-  { title: '合作方编号', dataIndex: 'partnerCode', width: 150 },
-  { title: '合作方名称', dataIndex: 'partnerName', minWidth: 160, key: 'partnerName' },
-  { title: '类型', dataIndex: 'partnerType', width: 110, key: 'partnerType' },
-  { title: '联系人', dataIndex: 'contactName', width: 100 },
-  { title: '联系电话', dataIndex: 'contactPhone', width: 130 },
-  { title: '资质等级', dataIndex: 'qualificationLevel', width: 100 },
-  { title: '黑名单', dataIndex: 'blacklistFlag', width: 90, key: 'blacklistFlag' },
-  { title: '风险等级', dataIndex: 'riskLevel', width: 100, key: 'riskLevel' },
-  { title: '状态', dataIndex: 'status', width: 90, key: 'status' },
-  { title: '操作', dataIndex: 'ops', width: 140, fixed: 'right' as const },
+  { title: '合作方编号', dataIndex: 'partnerCode', width: 130, ellipsis: true },
+  {
+    title: '合作方名称',
+    dataIndex: 'partnerName',
+    minWidth: 140,
+    key: 'partnerName',
+    ellipsis: true,
+  },
+  { title: '类型', dataIndex: 'partnerType', width: 80, key: 'partnerType' },
+  { title: '联系人', dataIndex: 'contactName', width: 90 },
+  { title: '联系电话', dataIndex: 'contactPhone', width: 120 },
+  { title: '资质等级', dataIndex: 'qualificationLevel', width: 90 },
+  { title: '黑名单', dataIndex: 'blacklistFlag', width: 80, key: 'blacklistFlag' },
+  { title: '风险等级', dataIndex: 'riskLevel', width: 90, key: 'riskLevel' },
+  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
+  { title: '操作', dataIndex: 'ops', width: 110 },
 ]
 
 async function fetchData() {
@@ -106,7 +110,10 @@ async function fetchData() {
       partnerType: filter.partnerType,
       status: filter.status,
     })
-    tableData.value = res.records; tableData.value.sort((a, b) => (a.partnerType === "PARTY_A" ? -1 : b.partnerType === "PARTY_A" ? 1 : 0))
+    tableData.value = res.records
+    tableData.value.sort((a, b) =>
+      a.partnerType === 'PARTY_A' ? -1 : b.partnerType === 'PARTY_A' ? 1 : 0,
+    )
     total.value = res.total
   } catch (e: unknown) {
     console.error(e)
@@ -144,10 +151,19 @@ function handleAdd() {
   modalTitle.value = '新建合作方'
   editingId.value = null
   Object.assign(formData, {
-    partnerCode: '', partnerName: '', partnerType: undefined, creditCode: '',
-    legalPerson: '', contactName: '', contactPhone: '', bankName: '',
-    bankAccount: '', qualificationLevel: '', blacklistFlag: false,
-    riskLevel: undefined, status: 'ENABLE',
+    partnerCode: '',
+    partnerName: '',
+    partnerType: undefined,
+    creditCode: '',
+    legalPerson: '',
+    contactName: '',
+    contactPhone: '',
+    bankName: '',
+    bankAccount: '',
+    qualificationLevel: '',
+    blacklistFlag: false,
+    riskLevel: undefined,
+    status: 'ENABLE',
   })
   modalVisible.value = true
 }
@@ -156,12 +172,18 @@ function handleEdit(record: PartnerVO) {
   modalTitle.value = '编辑合作方'
   editingId.value = record.id
   Object.assign(formData, {
-    partnerCode: record.partnerCode || '', partnerName: record.partnerName || '',
-    partnerType: record.partnerType || undefined, creditCode: record.creditCode || '',
-    legalPerson: record.legalPerson || '', contactName: record.contactName || '',
-    contactPhone: record.contactPhone || '', bankName: record.bankName || '',
-    bankAccount: record.bankAccount || '', qualificationLevel: record.qualificationLevel || '',
-    blacklistFlag: record.blacklistFlag, riskLevel: record.riskLevel || undefined,
+    partnerCode: record.partnerCode || '',
+    partnerName: record.partnerName || '',
+    partnerType: record.partnerType || undefined,
+    creditCode: record.creditCode || '',
+    legalPerson: record.legalPerson || '',
+    contactName: record.contactName || '',
+    contactPhone: record.contactPhone || '',
+    bankName: record.bankName || '',
+    bankAccount: record.bankAccount || '',
+    qualificationLevel: record.qualificationLevel || '',
+    blacklistFlag: record.blacklistFlag,
+    riskLevel: record.riskLevel || undefined,
     status: record.status || 'ENABLE',
   })
   modalVisible.value = true
@@ -222,7 +244,10 @@ function handleModalCancel() {
   modalVisible.value = false
 }
 
-onMounted(() => { fetchData(); fetchPartnerTypes() })
+onMounted(() => {
+  fetchData()
+  fetchPartnerTypes()
+})
 </script>
 
 <template>
@@ -258,13 +283,14 @@ onMounted(() => { fetchData(); fetchPartnerTypes() })
             allow-clear
             style="width: 130px"
           >
-                        <a-select-option
+            <a-select-option
               v-for="opt in partnerTypeOptions"
               :key="opt.dictValue"
               :value="opt.dictValue"
             >
               {{ opt.dictLabel }}
-            </a-select-option></a-select>
+            </a-select-option></a-select
+          >
         </div>
         <div class="pm-field">
           <label>状态：</label>
@@ -295,7 +321,6 @@ onMounted(() => { fetchData(); fetchPartnerTypes() })
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 1200 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'partnerName'">
@@ -363,13 +388,14 @@ onMounted(() => { fetchData(); fetchPartnerTypes() })
         </a-form-item>
         <a-form-item label="合作方类型" required>
           <a-select v-model:value="formData.partnerType" placeholder="请选择合作方类型">
-                        <a-select-option
+            <a-select-option
               v-for="opt in partnerTypeOptions"
               :key="opt.dictValue"
               :value="opt.dictValue"
             >
               {{ opt.dictLabel }}
-            </a-select-option></a-select>
+            </a-select-option></a-select
+          >
         </a-form-item>
         <a-form-item label="统一信用代码">
           <a-input v-model:value="formData.creditCode" placeholder="请输入统一社会信用代码" />

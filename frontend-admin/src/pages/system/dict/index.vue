@@ -190,7 +190,7 @@ const dataColumns = [
   { title: '样式类名', dataIndex: 'cssClass', width: 120 },
   { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
   { title: '创建时间', dataIndex: 'createdAt', width: 170 },
-  { title: '操作', dataIndex: 'ops', width: 140, fixed: 'right' as const, key: 'ops' },
+  { title: '操作', dataIndex: 'ops', width: 120, key: 'ops' },
 ]
 
 async function fetchDataList() {
@@ -345,11 +345,13 @@ onMounted(() => {
 })
 </script>
 
-
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>字典管理</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>系统设置</a-breadcrumb-item
+        ><a-breadcrumb-item>字典管理</a-breadcrumb-item></a-breadcrumb
+      >
     </div>
 
     <div class="pt-panel dc-panel">
@@ -370,9 +372,7 @@ onMounted(() => {
         </div>
 
         <div class="dc-left-list" v-loading="typeLoading">
-          <div v-if="typeList.length === 0 && !typeLoading" class="dc-left-empty">
-            暂无字典类型
-          </div>
+          <div v-if="typeList.length === 0 && !typeLoading" class="dc-left-empty">暂无字典类型</div>
           <div
             v-for="item in typeList"
             :key="item.id"
@@ -444,7 +444,6 @@ onMounted(() => {
               :pagination="false"
               row-key="id"
               size="small"
-              :scroll="{ x: 900 }"
             >
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'status'">

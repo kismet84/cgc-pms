@@ -24,6 +24,12 @@
 # Required ENV vars:
 # ------------------
 #   JAVA_HOME - location of a JDK home dir
+#   Maven Wrapper auto-detect: if JAVA_HOME is not set and javac is not on PATH,
+#   fall back to the project-local JDK (if present).
+if [ -z "$JAVA_HOME" ] && [ -x /d/projects-test/jdk-21/jdk-21.0.11+10/bin/javac ]; then
+  JAVA_HOME=/d/projects-test/jdk-21/jdk-21.0.11+10
+  export JAVA_HOME
+fi
 #
 # Optional ENV vars
 # -----------------

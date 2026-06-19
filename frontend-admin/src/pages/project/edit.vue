@@ -181,7 +181,9 @@ function handleCancel() {
           <section class="pt-panel pj-form-panel">
             <div class="pt-panel-header">备注与附件</div>
             <div class="pt-panel-body">
-              <div class="pj-quiet-note">当前接口暂未提供附件字段，本页保留项目信息编辑和后续附件扩展位置。</div>
+              <div class="pj-quiet-note">
+                当前接口暂未提供附件字段，本页保留项目信息编辑和后续附件扩展位置。
+              </div>
             </div>
           </section>
         </a-form>

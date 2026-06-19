@@ -103,7 +103,7 @@ const templateColumns = [
   { title: '金额范围', key: 'amountRange', width: 180 },
   { title: '状态', dataIndex: 'enabled', key: 'enabled', width: 90 },
   { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 170 },
-  { title: '操作', key: 'action', width: 100, fixed: 'right' },
+  { title: '操作', key: 'action', width: 100 },
 ]
 
 const nodeColumns = [
@@ -114,7 +114,7 @@ const nodeColumns = [
   { title: '审批人配置', dataIndex: 'approverConfig', key: 'approverConfig', ellipsis: true },
   { title: '转办', dataIndex: 'allowTransfer', key: 'allowTransfer', width: 80 },
   { title: '加签', dataIndex: 'allowAddSign', key: 'allowAddSign', width: 80 },
-  { title: '操作', key: 'action', width: 190, fixed: 'right' },
+  { title: '操作', key: 'action', width: 190 },
 ]
 
 const nodes = computed(() => currentTemplate.value?.nodes ?? [])
@@ -462,7 +462,6 @@ onMounted(fetchTemplates)
         :loading="loading"
         row-key="id"
         size="small"
-        :scroll="{ x: 1120 }"
         :pagination="{
           current: pageNo,
           pageSize,
@@ -531,7 +530,11 @@ onMounted(fetchTemplates)
               </a-form-item>
             </div>
             <a-form-item label="匹配条件 JSON">
-              <a-textarea v-model:value="templateForm.conditionRule" :rows="2" placeholder="可为空" />
+              <a-textarea
+                v-model:value="templateForm.conditionRule"
+                :rows="2"
+                placeholder="可为空"
+              />
             </a-form-item>
             <a-form-item label="备注">
               <a-textarea v-model:value="templateForm.remark" :rows="2" placeholder="备注" />
@@ -559,7 +562,6 @@ onMounted(fetchTemplates)
             row-key="id"
             size="small"
             :pagination="false"
-            :scroll="{ x: 980 }"
           >
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'approveMode'">
@@ -577,7 +579,12 @@ onMounted(fetchTemplates)
               </template>
               <template v-else-if="column.key === 'action'">
                 <a-space>
-                  <a-button type="link" size="small" :disabled="index === 0" @click="moveNode(record, -1)">
+                  <a-button
+                    type="link"
+                    size="small"
+                    :disabled="index === 0"
+                    @click="moveNode(record, -1)"
+                  >
                     上移
                   </a-button>
                   <a-button

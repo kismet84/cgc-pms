@@ -25,7 +25,7 @@ const columns = [
   { title: '角色类型', dataIndex: 'roleType', width: 120 },
   { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '操作', key: 'action', width: 120, fixed: 'right' },
+  { title: '操作', key: 'action', width: 100 },
 ]
 
 const filteredRoles = computed(() => {
@@ -91,7 +91,10 @@ onMounted(fetchData)
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>角色管理</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>系统设置</a-breadcrumb-item
+        ><a-breadcrumb-item>角色管理</a-breadcrumb-item></a-breadcrumb
+      >
     </div>
 
     <!-- Filter -->
@@ -99,11 +102,21 @@ onMounted(fetchData)
       <div class="pt-filter-row">
         <div class="pt-field">
           <label>角色名称：</label>
-          <a-input v-model:value="filter.roleName" placeholder="角色名称" allow-clear style="width: 150px" />
+          <a-input
+            v-model:value="filter.roleName"
+            placeholder="角色名称"
+            allow-clear
+            style="width: 150px"
+          />
         </div>
         <div class="pt-field">
           <label>角色编码：</label>
-          <a-input v-model:value="filter.roleCode" placeholder="角色编码" allow-clear style="width: 150px" />
+          <a-input
+            v-model:value="filter.roleCode"
+            placeholder="角色编码"
+            allow-clear
+            style="width: 150px"
+          />
         </div>
         <div class="pt-filter-surface-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -121,7 +134,6 @@ onMounted(fetchData)
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 900 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
@@ -163,4 +175,3 @@ onMounted(fetchData)
     />
   </div>
 </template>
-

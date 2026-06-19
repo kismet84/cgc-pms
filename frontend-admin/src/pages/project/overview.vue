@@ -145,7 +145,9 @@ onMounted(() => {
         <div class="pt-kpi-strip">
           <div class="pt-kpi">
             <div class="pt-kpi-label">合同总额</div>
-            <div class="pt-kpi-value">{{ fmtWan(data.totalContractAmount) }} <small>万元</small></div>
+            <div class="pt-kpi-value">
+              {{ fmtWan(data.totalContractAmount) }} <small>万元</small>
+            </div>
           </div>
           <div class="pt-kpi">
             <div class="pt-kpi-label">动态成本</div>
@@ -185,11 +187,29 @@ onMounted(() => {
             <div class="pt-panel-header">项目经营概览</div>
             <div class="pt-panel-body">
               <ul class="pt-compact-list">
-                <li class="pt-compact-row"><span>合同总额</span><b>{{ fmtWan(data.totalContractAmount) }} 万元</b></li>
-                <li class="pt-compact-row"><span>已付金额</span><b>{{ fmtWan(data.paidAmount) }} 万元</b></li>
-                <li class="pt-compact-row"><span>未付金额</span><b>{{
-                  fmtWan(String(Math.max(0, (parseFloat(data.totalContractAmount) || 0) - (parseFloat(data.paidAmount) || 0))))
-                }} 万元</b></li>
+                <li class="pt-compact-row">
+                  <span>合同总额</span><b>{{ fmtWan(data.totalContractAmount) }} 万元</b>
+                </li>
+                <li class="pt-compact-row">
+                  <span>已付金额</span><b>{{ fmtWan(data.paidAmount) }} 万元</b>
+                </li>
+                <li class="pt-compact-row">
+                  <span>未付金额</span
+                  ><b
+                    >{{
+                      fmtWan(
+                        String(
+                          Math.max(
+                            0,
+                            (parseFloat(data.totalContractAmount) || 0) -
+                              (parseFloat(data.paidAmount) || 0),
+                          ),
+                        ),
+                      )
+                    }}
+                    万元</b
+                  >
+                </li>
               </ul>
             </div>
           </section>
@@ -201,9 +221,15 @@ onMounted(() => {
             <div class="pt-panel-header">关键风险</div>
             <div class="pt-panel-body">
               <ul class="pt-compact-list">
-                <li class="pt-compact-row"><span>本月预警</span><b>{{ fmtNum(data.warningCount) }} 条</b></li>
-                <li class="pt-compact-row"><span>成本偏差</span><b>{{ fmtWan(data.dynamicCost) }} 万元</b></li>
-                <li class="pt-compact-row"><span>成员覆盖</span><b>{{ fmtNum(data.memberCount) }} 人</b></li>
+                <li class="pt-compact-row">
+                  <span>本月预警</span><b>{{ fmtNum(data.warningCount) }} 条</b>
+                </li>
+                <li class="pt-compact-row">
+                  <span>成本偏差</span><b>{{ fmtWan(data.dynamicCost) }} 万元</b>
+                </li>
+                <li class="pt-compact-row">
+                  <span>成员覆盖</span><b>{{ fmtNum(data.memberCount) }} 人</b>
+                </li>
               </ul>
             </div>
           </section>
@@ -213,13 +239,17 @@ onMounted(() => {
           <section class="pt-panel">
             <div class="pt-panel-header">合同清单</div>
             <div class="pt-panel-body">
-              <div class="summary-cell compact"><span>合同数量</span><b>{{ fmtNum(data.contractCount) }} 份</b></div>
+              <div class="summary-cell compact">
+                <span>合同数量</span><b>{{ fmtNum(data.contractCount) }} 份</b>
+              </div>
             </div>
           </section>
           <section class="pt-panel">
             <div class="pt-panel-header">待办事项</div>
             <div class="pt-panel-body">
-              <div class="summary-cell compact"><span>预警待处理</span><b>{{ fmtNum(data.warningCount) }} 条</b></div>
+              <div class="summary-cell compact">
+                <span>预警待处理</span><b>{{ fmtNum(data.warningCount) }} 条</b>
+              </div>
             </div>
           </section>
           <section class="pt-panel">

@@ -47,12 +47,12 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 const columns = [
-  { title: '仓库编号', dataIndex: 'warehouseCode', width: 130 },
-  { title: '仓库名称', dataIndex: 'warehouseName', width: 160 },
-  { title: '所属项目', dataIndex: 'projectName', width: 160 },
+  { title: '仓库编号', dataIndex: 'warehouseCode', width: 120, ellipsis: true },
+  { title: '仓库名称', dataIndex: 'warehouseName', width: 140, ellipsis: true },
+  { title: '所属项目', dataIndex: 'projectName', width: 140, ellipsis: true },
   { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
-  { title: '操作', key: 'action', width: 160, fixed: 'right' },
+  { title: '创建时间', dataIndex: 'createdAt', width: 140 },
+  { title: '操作', key: 'action', width: 130 },
 ]
 
 async function fetchData() {
@@ -179,7 +179,7 @@ function handleModalCancel() {
 }
 
 const kpiWhTotal = computed(() => tableData.value.length)
-const kpiWhEnabled = computed(() => tableData.value.filter(r => r.status === "ENABLE").length)
+const kpiWhEnabled = computed(() => tableData.value.filter((r) => r.status === 'ENABLE').length)
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -190,13 +190,22 @@ onMounted(() => {
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>库存管理</a-breadcrumb-item><a-breadcrumb-item>仓库</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>库存管理</a-breadcrumb-item
+        ><a-breadcrumb-item>仓库</a-breadcrumb-item></a-breadcrumb
+      >
       <div class="pt-head-actions"></div>
     </div>
 
-    <div class="pt-kpi-strip" style="grid-template-columns:repeat(2,1fr)">
-      <div class="pt-kpi"><div class="pt-kpi-label">仓库总数</div><div class="pt-kpi-value">{{ kpiWhTotal }}<small>个</small></div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">启用仓库</div><div class="pt-kpi-value" style="color:#22c55e">{{ kpiWhEnabled }}<small>个</small></div></div>
+    <div class="pt-kpi-strip" style="grid-template-columns: repeat(2, 1fr)">
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">仓库总数</div>
+        <div class="pt-kpi-value">{{ kpiWhTotal }}<small>个</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">启用仓库</div>
+        <div class="pt-kpi-value" style="color: #22c55e">{{ kpiWhEnabled }}<small>个</small></div>
+      </div>
     </div>
 
     <!-- Filter -->
@@ -262,7 +271,6 @@ onMounted(() => {
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 1000 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
@@ -334,5 +342,3 @@ onMounted(() => {
 </template>
 
 <style scoped></style>
-
-

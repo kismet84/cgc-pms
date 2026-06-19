@@ -39,9 +39,7 @@ const iconMap: Record<string, MenuItem['icon']> = {
 }
 
 const menuItems = computed(() => {
-  return navigationItems
-    .filter((item) => isMenuVisible(item))
-    .map((item) => buildMenuItem(item))
+  return navigationItems.filter((item) => isMenuVisible(item)).map((item) => buildMenuItem(item))
 })
 
 const isAdmin = computed(() => {

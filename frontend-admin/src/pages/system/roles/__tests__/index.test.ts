@@ -53,7 +53,15 @@ const ATableStub = defineComponent({
       const cols = (props.columns as Record<string, unknown>[]) ?? []
       const rows = (props.dataSource as Record<string, unknown>[]) ?? []
       return h('table', { class: 'mock-table' }, [
-        h('thead', {}, h('tr', {}, cols.map((col) => h('th', {}, col.title as string)))),
+        h(
+          'thead',
+          {},
+          h(
+            'tr',
+            {},
+            cols.map((col) => h('th', {}, col.title as string)),
+          ),
+        ),
         h(
           'tbody',
           {},
@@ -219,16 +227,38 @@ const stubs = {
 
 // ── Mock data ──
 const mockRoles = [
-  { id: 1, roleName: '管理员', roleCode: 'ADMIN', roleType: '系统角色', status: 'ENABLE', createdAt: '2025-01-01 00:00:00', menuIds: [1, 2] },
-  { id: 2, roleName: '普通用户', roleCode: 'USER', roleType: '业务角色', status: 'ENABLE', createdAt: '2025-01-02 00:00:00', menuIds: [3] },
-  { id: 3, roleName: '审计员', roleCode: 'AUDITOR', roleType: '系统角色', status: 'DISABLE', createdAt: '2025-01-03 00:00:00', menuIds: [] },
+  {
+    id: 1,
+    roleName: '管理员',
+    roleCode: 'ADMIN',
+    roleType: '系统角色',
+    status: 'ENABLE',
+    createdAt: '2025-01-01 00:00:00',
+    menuIds: [1, 2],
+  },
+  {
+    id: 2,
+    roleName: '普通用户',
+    roleCode: 'USER',
+    roleType: '业务角色',
+    status: 'ENABLE',
+    createdAt: '2025-01-02 00:00:00',
+    menuIds: [3],
+  },
+  {
+    id: 3,
+    roleName: '审计员',
+    roleCode: 'AUDITOR',
+    roleType: '系统角色',
+    status: 'DISABLE',
+    createdAt: '2025-01-03 00:00:00',
+    menuIds: [],
+  },
 ]
 
 const mockMenuTree = [
   { id: 1, menuName: '首页', children: [] },
-  { id: 2, menuName: '系统管理', children: [
-    { id: 3, menuName: '用户管理', children: [] },
-  ]},
+  { id: 2, menuName: '系统管理', children: [{ id: 3, menuName: '用户管理', children: [] }] },
 ]
 
 // ── Tests ──

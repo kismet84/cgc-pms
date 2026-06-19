@@ -197,10 +197,22 @@ const columns = [
     </div>
 
     <div class="pt-kpi-strip">
-      <div class="pt-kpi"><div class="pt-kpi-label">成员总数</div><div class="pt-kpi-value">{{ memberStats.total }} <small>人</small></div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">项目经理</div><div class="pt-kpi-value">{{ memberStats.manager }} <small>人</small></div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">业务人员</div><div class="pt-kpi-value">{{ memberStats.business }} <small>人</small></div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">待确认</div><div class="pt-kpi-value">{{ memberStats.pending }} <small>人</small></div></div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">成员总数</div>
+        <div class="pt-kpi-value">{{ memberStats.total }} <small>人</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">项目经理</div>
+        <div class="pt-kpi-value">{{ memberStats.manager }} <small>人</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">业务人员</div>
+        <div class="pt-kpi-value">{{ memberStats.business }} <small>人</small></div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">待确认</div>
+        <div class="pt-kpi-value">{{ memberStats.pending }} <small>人</small></div>
+      </div>
     </div>
 
     <div class="pt-ledger-layout">
@@ -213,7 +225,6 @@ const columns = [
           :pagination="false"
           row-key="id"
           size="small"
-          :scroll="{ x: 740 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.dataIndex === 'userId'">

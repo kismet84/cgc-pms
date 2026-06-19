@@ -114,11 +114,26 @@ interface EditableItem {
 
 // ---- Dirty tracking ----
 watch(
-  () => [formData.projectId, formData.versionNo, formData.versionName, formData.effectiveDate, formData.totalTargetAmount, formData.remark],
-  () => { if (initialLoadDone) dirty.value = true },
+  () => [
+    formData.projectId,
+    formData.versionNo,
+    formData.versionName,
+    formData.effectiveDate,
+    formData.totalTargetAmount,
+    formData.remark,
+  ],
+  () => {
+    if (initialLoadDone) dirty.value = true
+  },
   { deep: false },
 )
-watch(items, () => { if (initialLoadDone) dirty.value = true }, { deep: true })
+watch(
+  items,
+  () => {
+    if (initialLoadDone) dirty.value = true
+  },
+  { deep: true },
+)
 
 function genKey(): string {
   return `cti_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -396,9 +411,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    :class="['cte-page app-page project-target-redesign', { 'cte-embedded': isEmbedded }]"
-  >
+  <div :class="['cte-page app-page project-target-redesign', { 'cte-embedded': isEmbedded }]">
     <div v-if="!isEmbedded" class="pt-page-head">
       <div>
         <a-breadcrumb class="pt-breadcrumb">
@@ -442,7 +455,11 @@ onMounted(() => {
               </a-select>
             </a-form-item>
             <a-form-item label="版本号" name="versionNo">
-              <a-input v-model:value="formData.versionNo" placeholder="如 V1.0、2024Q1" allow-clear />
+              <a-input
+                v-model:value="formData.versionNo"
+                placeholder="如 V1.0、2024Q1"
+                allow-clear
+              />
             </a-form-item>
             <a-form-item label="版本名称" name="versionName">
               <a-input
@@ -484,7 +501,6 @@ onMounted(() => {
               row-key="_key"
               size="small"
               bordered
-              :scroll="{ x: 800 }"
             >
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.dataIndex === 'index'">

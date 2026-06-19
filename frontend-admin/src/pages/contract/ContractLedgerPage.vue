@@ -363,34 +363,46 @@ const statusDonutOption = computed(() => ({
 
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
-  { type: 'checkbox', width: 46, fixed: 'left' as const },
+  { type: 'checkbox', width: 42 },
   ...(colVisible.contractCode
-    ? [{ field: 'contractCode', title: '合同编号', width: 160, slots: { default: 'contractCode' } }]
+    ? [
+        {
+          field: 'contractCode',
+          title: '合同编号',
+          width: 140,
+          ellipsis: true,
+          slots: { default: 'contractCode' },
+        },
+      ]
     : []),
-  ...(colVisible.contractName ? [{ field: 'contractName', title: '合同名称', minWidth: 160 }] : []),
+  ...(colVisible.contractName
+    ? [{ field: 'contractName', title: '合同名称', minWidth: 140, ellipsis: true }]
+    : []),
   ...(colVisible.contractType
-    ? [{ field: 'contractType', title: '合同类型', width: 110, slots: { default: 'contractType' } }]
+    ? [{ field: 'contractType', title: '合同类型', width: 90, slots: { default: 'contractType' } }]
     : []),
-  ...(colVisible.partyAName ? [{ field: 'partyAName', title: '甲方', width: 140 }] : []),
-  ...(colVisible.partyBName ? [{ field: 'partyBName', title: '乙方', width: 140 }] : []),
+  ...(colVisible.partyAName
+    ? [{ field: 'partyAName', title: '甲方', width: 120, ellipsis: true }]
+    : []),
+  ...(colVisible.partyBName
+    ? [{ field: 'partyBName', title: '乙方', width: 120, ellipsis: true }]
+    : []),
   ...(colVisible.contractAmount
     ? [
         {
           field: 'contractAmount',
           title: '合同金额(含税)',
-          width: 140,
+          width: 130,
           align: 'right' as const,
           slots: { default: 'amount' },
         },
       ]
     : []),
-  ...(colVisible.signedDate ? [{ field: 'signedDate', title: '签订日期', width: 110 }] : []),
+  ...(colVisible.signedDate ? [{ field: 'signedDate', title: '签订日期', width: 100 }] : []),
   ...(colVisible.contractStatus
-    ? [{ field: 'contractStatus', title: '合同状态', width: 100, slots: { default: 'status' } }]
+    ? [{ field: 'contractStatus', title: '合同状态', width: 90, slots: { default: 'status' } }]
     : []),
-  ...(colVisible.ops
-    ? [{ title: '操作', width: 140, fixed: 'right' as const, slots: { default: 'ops' } }]
-    : []),
+  ...(colVisible.ops ? [{ title: '操作', width: 120, slots: { default: 'ops' } }] : []),
 ])
 </script>
 
@@ -516,18 +528,54 @@ const gridColumns = computed(() => [
 
         <!-- KPI card: mobile (single card) -->
         <div v-else class="cl-kpi-single">
-          <div class="cl-kpi-single-row" v-for="item in [
-            { icon: FileTextOutlined, bg: '#3b82f6', label: '合同总数', value: kpi.totalCount, unit: '份' },
-            { icon: DollarOutlined, bg: '#36c267', label: '合同总金额(含税)', value: fmtAmount(kpi.totalAmount), unit: '万元' },
-            { icon: PayCircleOutlined, bg: '#f59e0b', label: '已付款金额', value: fmtAmount(kpi.paidAmount), unit: '万元' },
-            { icon: WalletOutlined, bg: '#7c3aed', label: '未付款金额', value: fmtAmount(kpi.unpaidAmount), unit: '万元' },
-            { icon: ClockCircleOutlined, bg: '#31c7cf', label: '逾期合同数', value: kpi.overdueCount, unit: '份' },
-          ]" :key="item.label">
+          <div
+            class="cl-kpi-single-row"
+            v-for="item in [
+              {
+                icon: FileTextOutlined,
+                bg: '#3b82f6',
+                label: '合同总数',
+                value: kpi.totalCount,
+                unit: '份',
+              },
+              {
+                icon: DollarOutlined,
+                bg: '#36c267',
+                label: '合同总金额(含税)',
+                value: fmtAmount(kpi.totalAmount),
+                unit: '万元',
+              },
+              {
+                icon: PayCircleOutlined,
+                bg: '#f59e0b',
+                label: '已付款金额',
+                value: fmtAmount(kpi.paidAmount),
+                unit: '万元',
+              },
+              {
+                icon: WalletOutlined,
+                bg: '#7c3aed',
+                label: '未付款金额',
+                value: fmtAmount(kpi.unpaidAmount),
+                unit: '万元',
+              },
+              {
+                icon: ClockCircleOutlined,
+                bg: '#31c7cf',
+                label: '逾期合同数',
+                value: kpi.overdueCount,
+                unit: '份',
+              },
+            ]"
+            :key="item.label"
+          >
             <div class="cl-kpi-single-icon" :style="{ background: item.bg }">
               <component :is="item.icon" />
             </div>
             <span class="cl-kpi-single-label">{{ item.label }}</span>
-            <span class="cl-kpi-single-value">{{ item.value }} <small>{{ item.unit }}</small></span>
+            <span class="cl-kpi-single-value"
+              >{{ item.value }} <small>{{ item.unit }}</small></span
+            >
           </div>
         </div>
 

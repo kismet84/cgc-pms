@@ -104,7 +104,10 @@ const positionColumns = [
 // ─── Page metrics ───────────────────────────────────────
 
 /** 将部门树展平为 select 可用的列表（含层级前缀 + companyId） */
-function flattenDeptTree(nodes: OrgDepartmentTreeNodeVO[], prefix = ''): { id: string; name: string; companyId: string }[] {
+function flattenDeptTree(
+  nodes: OrgDepartmentTreeNodeVO[],
+  prefix = '',
+): { id: string; name: string; companyId: string }[] {
   const result: { id: string; name: string; companyId: string }[] = []
   for (const node of nodes) {
     const label = prefix ? `${prefix} / ${node.deptName}` : node.deptName
@@ -121,13 +124,13 @@ const flatDeptList = computed(() => flattenDeptTree(deptTreeData.value))
 /** 模态框中按所选公司过滤的部门列表 */
 const modalDeptList = computed(() => {
   if (!positionForm.companyId) return flatDeptList.value
-  return flatDeptList.value.filter(d => d.companyId === positionForm.companyId)
+  return flatDeptList.value.filter((d) => d.companyId === positionForm.companyId)
 })
 
 /** 筛选栏中按所选公司过滤的部门列表 */
 const filterDeptList = computed(() => {
   if (!positionFilter.companyId) return flatDeptList.value
-  return flatDeptList.value.filter(d => d.companyId === positionFilter.companyId)
+  return flatDeptList.value.filter((d) => d.companyId === positionFilter.companyId)
 })
 
 const selectedCompany = computed(
@@ -715,7 +718,6 @@ onMounted(async () => {
             :pagination="false"
             row-key="id"
             size="small"
-            :scroll="{ x: 680 }"
             :custom-row="
               (record: OrgCompanyVO) => ({
                 onClick: () => handleCompanyRowClick(record),
@@ -850,7 +852,7 @@ onMounted(async () => {
             placeholder="所属公司"
             size="small"
             allow-clear
-            style="width:140px"
+            style="width: 140px"
           >
             <a-select-option v-for="c in companyData" :key="c.id" :value="c.id">
               {{ c.companyName }}
@@ -861,7 +863,7 @@ onMounted(async () => {
             placeholder="所属部门"
             size="small"
             allow-clear
-            style="width:160px"
+            style="width: 160px"
           >
             <a-select-option v-for="d in filterDeptList" :key="d.id" :value="d.id">
               {{ d.name }}
@@ -902,14 +904,13 @@ onMounted(async () => {
           :pagination="false"
           row-key="id"
           size="small"
-          :scroll="{ x: 780 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.dataIndex === 'companyId'">
-              {{ companyData.find(c => c.id === record.companyId)?.companyName ?? '-' }}
+              {{ companyData.find((c) => c.id === record.companyId)?.companyName ?? '-' }}
             </template>
             <template v-else-if="column.dataIndex === 'departmentId'">
-              {{ flatDeptList.find(d => d.id === record.departmentId)?.name ?? '-' }}
+              {{ flatDeptList.find((d) => d.id === record.departmentId)?.name ?? '-' }}
             </template>
             <template v-else-if="column.dataIndex === 'status'">
               <a-tag :color="record.status === 'ENABLED' ? 'success' : 'default'">

@@ -49,21 +49,21 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const columns = [
-  { title: '材料编码', dataIndex: 'materialCode', width: 150 },
-  { title: '材料名称', dataIndex: 'materialName', minWidth: 180 },
-  { title: '规格型号', dataIndex: 'specification', width: 150 },
-  { title: '单位', dataIndex: 'unit', width: 80 },
-  { title: '品牌', dataIndex: 'brand', width: 120 },
+  { title: '材料编码', dataIndex: 'materialCode', width: 130, ellipsis: true },
+  { title: '材料名称', dataIndex: 'materialName', minWidth: 150, ellipsis: true },
+  { title: '规格型号', dataIndex: 'specification', width: 120, ellipsis: true },
+  { title: '单位', dataIndex: 'unit', width: 70 },
+  { title: '品牌', dataIndex: 'brand', width: 100, ellipsis: true },
   {
     title: '默认税率(%)',
     dataIndex: 'defaultTaxRate',
-    width: 120,
-    align: 'right',
+    width: 100,
+    align: 'right' as const,
     key: 'defaultTaxRate',
   },
-  { title: '状态', dataIndex: 'status', width: 90, key: 'status' },
-  { title: '创建时间', dataIndex: 'createdAt', width: 170 },
-  { title: '操作', dataIndex: 'ops', width: 160, fixed: 'right', key: 'ops' },
+  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
+  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
+  { title: '操作', dataIndex: 'ops', width: 130, key: 'ops' },
 ]
 
 async function fetchData() {
@@ -206,7 +206,10 @@ onMounted(fetchData)
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>基础数据</a-breadcrumb-item><a-breadcrumb-item>材料字典</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>基础数据</a-breadcrumb-item
+        ><a-breadcrumb-item>材料字典</a-breadcrumb-item></a-breadcrumb
+      >
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleAdd">新增材料</a-button>
       </div>
@@ -261,7 +264,6 @@ onMounted(fetchData)
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 1200 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'defaultTaxRate'">
@@ -346,5 +348,3 @@ onMounted(fetchData)
 </template>
 
 <style scoped></style>
-
-

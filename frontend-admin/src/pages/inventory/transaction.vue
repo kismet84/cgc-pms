@@ -114,13 +114,22 @@ onMounted(() => {
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>库存管理</a-breadcrumb-item><a-breadcrumb-item>库存交易</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>库存管理</a-breadcrumb-item
+        ><a-breadcrumb-item>库存交易</a-breadcrumb-item></a-breadcrumb
+      >
       <div class="pt-head-actions"></div>
     </div>
 
-    <div class="pt-kpi-strip" style="grid-template-columns:repeat(2,1fr)">
-      <div class="pt-kpi"><div class="pt-kpi-label">入库操作</div><div class="pt-kpi-value" style="color:#22c55e"><DollarOutlined /> 快捷</div></div>
-      <div class="pt-kpi"><div class="pt-kpi-label">出库操作</div><div class="pt-kpi-value" style="color:#ef4444"><DollarOutlined /> 快捷</div></div>
+    <div class="pt-kpi-strip" style="grid-template-columns: repeat(2, 1fr)">
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">入库操作</div>
+        <div class="pt-kpi-value" style="color: #22c55e"><DollarOutlined /> 快捷</div>
+      </div>
+      <div class="pt-kpi">
+        <div class="pt-kpi-label">出库操作</div>
+        <div class="pt-kpi-value" style="color: #ef4444"><DollarOutlined /> 快捷</div>
+      </div>
     </div>
 
     <div class="pt-panel" style="padding: 0">
@@ -283,6 +292,3 @@ onMounted(() => {
 </template>
 
 <style scoped></style>
-
-
-

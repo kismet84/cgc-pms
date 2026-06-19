@@ -21,9 +21,13 @@ describe('ContractFormPage modal-aware editing', () => {
 
   it('keeps route-driven edit mode working when not embedded', () => {
     expect(source).toMatch(/import\s+\{[^}]*useRoute[^}]*\}\s+from\s+['"]vue-router['"]/)
-    expect(source).toMatch(/const\s+contractId\s*=\s*computed\(\(\)\s*=>\s*props\.contractId\s*\|\|\s*String\(route\.params\.id\s*\|\|\s*''\)\)/)
+    expect(source).toMatch(
+      /const\s+contractId\s*=\s*computed\(\(\)\s*=>\s*props\.contractId\s*\|\|\s*String\(route\.params\.id\s*\|\|\s*''\)\)/,
+    )
     expect(source).toMatch(/if\s*\(!isEmbedded\.value\)\s*\{\s*onBeforeRouteLeave/)
-    expect(source).toMatch(/if\s*\(isEdit\.value\s*&&\s*contractId\.value\)\s*\{\s*await\s+loadContractDetail\(\)\s*\}/)
+    expect(source).toMatch(
+      /if\s*\(isEdit\.value\s*&&\s*contractId\.value\)\s*\{\s*await\s+loadContractDetail\(\)\s*\}/,
+    )
   })
 
   it('renders the wizard and hides the outer shell in embedded mode', () => {

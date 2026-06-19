@@ -12,7 +12,10 @@ async function loginAsAdmin(page: Page) {
 
 async function selectFirstOption(select: Locator) {
   await select.click()
-  const dropdown = select.page().locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+  const dropdown = select
+    .page()
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
   await expect(dropdown).toBeVisible({ timeout: 10000 })
   const option = dropdown.locator('.ant-select-item-option').first()
   await expect(option).toBeVisible({ timeout: 10000 })
@@ -21,21 +24,31 @@ async function selectFirstOption(select: Locator) {
 
 async function selectOptionByText(select: Locator, text: string) {
   await select.click()
-  const dropdown = select.page().locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+  const dropdown = select
+    .page()
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
   await expect(dropdown).toBeVisible({ timeout: 10000 })
   const options = dropdown.locator('.ant-select-item-option')
   const preferredOption = options.filter({ hasText: text }).first()
-  const option = (await preferredOption.isVisible().catch(() => false)) ? preferredOption : options.first()
+  const option = (await preferredOption.isVisible().catch(() => false))
+    ? preferredOption
+    : options.first()
   await expect(option).toBeVisible({ timeout: 10000 })
   await option.click()
 }
 
 async function selectTodayFromPicker(picker: Locator) {
   await picker.click()
-  const pickerDropdown = picker.page().locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last()
+  const pickerDropdown = picker
+    .page()
+    .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+    .last()
   await expect(pickerDropdown).toBeVisible({ timeout: 10000 })
   await pickerDropdown.locator('.ant-picker-cell-today .ant-picker-cell-inner').first().click()
-  await expect(pickerDropdown).toBeHidden({ timeout: 10000 }).catch(() => {})
+  await expect(pickerDropdown)
+    .toBeHidden({ timeout: 10000 })
+    .catch(() => {})
 }
 
 async function selectTodayFromDatePicker(page: Page, label: string) {
@@ -54,7 +67,9 @@ async function fillContractBasicInfo(page: Page) {
     page.locator('.ant-form-item:has(.ant-form-item-label:has-text("所属项目")) .ant-select'),
   )
   await page
-    .locator('.ant-form-item:has(.ant-form-item-label:has-text("合同金额")) .ant-input-number-input')
+    .locator(
+      '.ant-form-item:has(.ant-form-item-label:has-text("合同金额")) .ant-input-number-input',
+    )
     .fill('1000')
   await selectTodayFromDatePicker(page, '签订日期')
 }
@@ -64,7 +79,9 @@ test.describe('Contract original draft-save regression', () => {
     await loginAsAdmin(page)
   })
 
-  test('saves draft with one detail and one payment term through composite endpoint', async ({ page }) => {
+  test('saves draft with one detail and one payment term through composite endpoint', async ({
+    page,
+  }) => {
     await page.goto('/contract/create')
     await expect(page.getByRole('heading', { name: '新建合同' })).toBeVisible({ timeout: 10000 })
 

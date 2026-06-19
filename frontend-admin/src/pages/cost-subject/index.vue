@@ -279,21 +279,28 @@ onMounted(() => {
               >
                 {{ selectedNode.status === 'ENABLE' ? '停用' : '启用' }}
               </a-button>
-               <a-button
-                 size="small"
-                 danger
-                 :disabled="(selectedNode.children?.length ?? 0) > 0"
-                 @click="handleDelete"
-               >
-                 删除
-               </a-button>
+              <a-button
+                size="small"
+                danger
+                :disabled="(selectedNode.children?.length ?? 0) > 0"
+                @click="handleDelete"
+              >
+                删除
+              </a-button>
             </a-space>
           </div>
           <a-descriptions :column="2" size="small" bordered>
-            <a-descriptions-item label="科目编码">{{ selectedNode.subjectCode }}</a-descriptions-item>
-            <a-descriptions-item label="科目名称">{{ selectedNode.subjectName }}</a-descriptions-item>
+            <a-descriptions-item label="科目编码">{{
+              selectedNode.subjectCode
+            }}</a-descriptions-item>
+            <a-descriptions-item label="科目名称">{{
+              selectedNode.subjectName
+            }}</a-descriptions-item>
             <a-descriptions-item label="科目类型">
-              <a-tag>{{ subjectTypeOptions.find(o => o.dictValue === selectedNode.subjectType)?.dictLabel ?? selectedNode.subjectType }}</a-tag>
+              <a-tag>{{
+                subjectTypeOptions.find((o) => o.dictValue === selectedNode.subjectType)
+                  ?.dictLabel ?? selectedNode.subjectType
+              }}</a-tag>
             </a-descriptions-item>
             <a-descriptions-item label="层级">{{ selectedNode.level }}</a-descriptions-item>
             <a-descriptions-item label="排序">{{ selectedNode.sortOrder }}</a-descriptions-item>
@@ -302,8 +309,12 @@ onMounted(() => {
                 {{ selectedNode.status === 'ENABLE' ? '启用' : '停用' }}
               </a-tag>
             </a-descriptions-item>
-            <a-descriptions-item label="父节点ID">{{ selectedNode.parentId || '无（根节点）' }}</a-descriptions-item>
-            <a-descriptions-item label="子节点数">{{ selectedNode.children?.length ?? 0 }}</a-descriptions-item>
+            <a-descriptions-item label="父节点ID">{{
+              selectedNode.parentId || '无（根节点）'
+            }}</a-descriptions-item>
+            <a-descriptions-item label="子节点数">{{
+              selectedNode.children?.length ?? 0
+            }}</a-descriptions-item>
           </a-descriptions>
         </template>
         <template v-else>
@@ -338,7 +349,9 @@ onMounted(() => {
             <a-form-item label="科目类型">
               <a-select
                 v-model:value="formData.subjectType"
-                :options="subjectTypeOptions.map(o => ({ value: o.dictValue, label: o.dictLabel }))"
+                :options="
+                  subjectTypeOptions.map((o) => ({ value: o.dictValue, label: o.dictLabel }))
+                "
                 placeholder="请选择类型"
               />
             </a-form-item>
@@ -355,7 +368,12 @@ onMounted(() => {
           </a-col>
           <a-col :span="12">
             <a-form-item label="层级">
-              <a-input-number v-model:value="formData.level" :min="1" disabled style="width: 100%" />
+              <a-input-number
+                v-model:value="formData.level"
+                :min="1"
+                disabled
+                style="width: 100%"
+              />
             </a-form-item>
           </a-col>
         </a-row>

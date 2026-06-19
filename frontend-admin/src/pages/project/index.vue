@@ -4,7 +4,13 @@ import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import VChart from 'vue-echarts'
-import { getProjectList, getProjectDetail, createProject, updateProject, deleteProject } from '@/api/modules/project'
+import {
+  getProjectList,
+  getProjectDetail,
+  createProject,
+  updateProject,
+  deleteProject,
+} from '@/api/modules/project'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 
@@ -340,35 +346,36 @@ const recentProjects = computed(() =>
 )
 
 const columns = [
-  { title: '项目编号', dataIndex: 'projectCode', width: 150 },
+  { title: '项目编号', dataIndex: 'projectCode', width: 140, ellipsis: true },
   {
     title: '项目名称',
     dataIndex: 'projectName',
-    minWidth: 180,
+    minWidth: 160,
+    ellipsis: true,
   },
   {
     title: '项目类型',
     dataIndex: 'projectType',
-    width: 120,
+    width: 110,
   },
   {
     title: '合同金额',
     dataIndex: 'contractAmount',
-    width: 140,
-    align: 'right',
+    width: 120,
+    align: 'right' as const,
   },
   {
     title: '计划工期',
     dataIndex: 'plannedStartDate',
     width: 200,
   },
-  { title: '状态', dataIndex: 'status', width: 90 },
+  { title: '状态', dataIndex: 'status', width: 80 },
   {
     title: '审批状态',
     dataIndex: 'approvalStatus',
-    width: 100,
+    width: 90,
   },
-  { title: '操作', dataIndex: 'ops', width: 120, fixed: 'right' },
+  { title: '操作', dataIndex: 'ops', width: 100 },
 ]
 </script>
 
@@ -633,11 +640,12 @@ const columns = [
           :pagination="false"
           row-key="id"
           size="small"
-          :scroll="{ x: 1100 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.dataIndex === 'projectName'">
-              <a class="pt-link" @click="router.push(`/project/${record.id}/overview`)">{{ record.projectName }}</a>
+              <a class="pt-link" @click="router.push(`/project/${record.id}/overview`)">{{
+                record.projectName
+              }}</a>
             </template>
             <template v-else-if="column.dataIndex === 'projectType'">
               <a-tag :color="TYPE_COLOR[record.projectType] ?? 'default'">{{

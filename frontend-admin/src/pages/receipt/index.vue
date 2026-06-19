@@ -70,15 +70,21 @@ const QUALITY_STATUS_COLOR: Record<string, string> = {
 }
 
 const columns = [
-  { title: '验收单号', dataIndex: 'receiptCode', width: 160 },
-  { title: '采购订单', dataIndex: 'orderCode', width: 150 },
-  { title: '项目', dataIndex: 'projectName', width: 140 },
-  { title: '供应商', dataIndex: 'partnerName', width: 140 },
-  { title: '验收日期', dataIndex: 'receiptDate', width: 110 },
-  { title: '总金额', dataIndex: 'totalAmount', width: 130, key: 'totalAmount' },
-  { title: '质量状态', dataIndex: 'qualityStatus', width: 100, key: 'qualityStatus' },
-  { title: '审批状态', dataIndex: 'approvalStatus', width: 100, key: 'approvalStatus' },
-  { title: '操作', key: 'action', width: 140, fixed: 'right' },
+  { title: '验收单号', dataIndex: 'receiptCode', width: 140, ellipsis: true },
+  { title: '采购订单', dataIndex: 'orderCode', width: 130, ellipsis: true },
+  { title: '项目', dataIndex: 'projectName', width: 120, ellipsis: true },
+  { title: '供应商', dataIndex: 'partnerName', width: 120, ellipsis: true },
+  { title: '验收日期', dataIndex: 'receiptDate', width: 100 },
+  {
+    title: '总金额',
+    dataIndex: 'totalAmount',
+    width: 110,
+    key: 'totalAmount',
+    align: 'right' as const,
+  },
+  { title: '质量状态', dataIndex: 'qualityStatus', width: 90, key: 'qualityStatus' },
+  { title: '审批状态', dataIndex: 'approvalStatus', width: 90, key: 'approvalStatus' },
+  { title: '操作', key: 'action', width: 140 },
 ]
 
 async function fetchData() {
@@ -375,7 +381,12 @@ onMounted(() => {
             allow-clear
             style="width: 180px"
             show-search
-            @change="(v: string|undefined) => { filter.contractId = undefined; if(v) referenceStore.fetchContracts({projectId:v}) }"
+            @change="
+              (v: string | undefined) => {
+                filter.contractId = undefined
+                if (v) referenceStore.fetchContracts({ projectId: v })
+              }
+            "
             :filter-option="
               (input: string, option: any) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
@@ -480,7 +491,6 @@ onMounted(() => {
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 1200 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'totalAmount'">
@@ -573,7 +583,11 @@ onMounted(() => {
           </a-select>
         </a-form-item>
         <a-form-item label="验收日期">
-          <a-date-picker v-model:value="formData.receiptDate" value-format="YYYY-MM-DD" style="width: 100%" />
+          <a-date-picker
+            v-model:value="formData.receiptDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
         </a-form-item>
         <a-form-item label="质量状态">
           <a-select v-model:value="formData.qualityStatus" placeholder="请选择质量状态" allow-clear>

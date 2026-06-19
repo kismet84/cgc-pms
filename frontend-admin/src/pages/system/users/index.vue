@@ -41,7 +41,7 @@ const columns = [
   { title: '邮箱', dataIndex: 'email', width: 180, ellipsis: true },
   { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
   { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '操作', key: 'action', width: 220, fixed: 'right' },
+  { title: '操作', key: 'action', width: 180 },
 ]
 
 async function fetchData() {
@@ -198,7 +198,10 @@ onMounted(fetchData)
 <template>
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"><a-breadcrumb-item>系统设置</a-breadcrumb-item><a-breadcrumb-item>用户管理</a-breadcrumb-item></a-breadcrumb>
+      <a-breadcrumb class="pt-breadcrumb"
+        ><a-breadcrumb-item>系统设置</a-breadcrumb-item
+        ><a-breadcrumb-item>用户管理</a-breadcrumb-item></a-breadcrumb
+      >
       <div class="pt-head-actions">
         <a-button type="primary" @click="handleAdd">新增用户</a-button>
       </div>
@@ -209,11 +212,21 @@ onMounted(fetchData)
       <div class="pt-filter-row">
         <div class="pt-field">
           <label>用户名：</label>
-          <a-input v-model:value="filter.username" placeholder="用户名" allow-clear style="width: 150px" />
+          <a-input
+            v-model:value="filter.username"
+            placeholder="用户名"
+            allow-clear
+            style="width: 150px"
+          />
         </div>
         <div class="pt-field">
           <label>姓名：</label>
-          <a-input v-model:value="filter.realName" placeholder="姓名" allow-clear style="width: 150px" />
+          <a-input
+            v-model:value="filter.realName"
+            placeholder="姓名"
+            allow-clear
+            style="width: 150px"
+          />
         </div>
         <div class="pt-filter-surface-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -231,7 +244,6 @@ onMounted(fetchData)
         :pagination="false"
         row-key="id"
         size="small"
-        :scroll="{ x: 1000 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
@@ -242,10 +254,17 @@ onMounted(fetchData)
           <template v-else-if="column.key === 'action'">
             <div class="pt-link">
               <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-              <a-button type="link" size="small" :danger="record.status === 'ENABLE'" @click="handleToggleStatus(record)">
+              <a-button
+                type="link"
+                size="small"
+                :danger="record.status === 'ENABLE'"
+                @click="handleToggleStatus(record)"
+              >
                 {{ record.status === 'ENABLE' ? '禁用' : '启用' }}
               </a-button>
-              <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
+              <a-button type="link" size="small" danger @click="handleDelete(record)"
+                >删除</a-button
+              >
             </div>
           </template>
         </template>
@@ -277,7 +296,11 @@ onMounted(fetchData)
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
         <a-form-item label="用户名" required>
-          <a-input v-model:value="formData.username" placeholder="请输入用户名" :disabled="!!editingId" />
+          <a-input
+            v-model:value="formData.username"
+            placeholder="请输入用户名"
+            :disabled="!!editingId"
+          />
         </a-form-item>
         <a-form-item label="密码" :required="!editingId">
           <a-input-password v-model:value="formData.password" placeholder="留空则不修改密码" />
@@ -295,4 +318,3 @@ onMounted(fetchData)
     </a-modal>
   </div>
 </template>
-
