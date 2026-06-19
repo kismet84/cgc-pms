@@ -1,10 +1,22 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { message } from 'ant-design-vue'
+import {
+  SearchOutlined,
+  ReloadOutlined,
+  InboxOutlined,
+  FallOutlined,
+  RiseOutlined,
+  AlertOutlined,
+} from '@ant-design/icons-vue'
 import { getStockLedger } from '@/api/modules/inventory'
 import { getWarehouseList } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import type { WarehouseVO, MatStockVO, MatStockTxnVO } from '@/types/inventory'
+
+const MOBILE_BP = 768
+const isMobile = ref(window.innerWidth < MOBILE_BP)
+function onResize() { isMobile.value = window.innerWidth < MOBILE_BP }
 
 const filter = reactive({
   warehouseId: undefined as string | undefined,
@@ -135,95 +147,116 @@ const lowStockWarn = computed(() =>
 )
 
 onMounted(() => {
+  window.addEventListener('resize', onResize)
   fetchWarehouses()
   referenceStore.fetchMaterials()
 })
+onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>库存管理</a-breadcrumb-item
-        ><a-breadcrumb-item>库存台账</a-breadcrumb-item></a-breadcrumb
+  <div class="lg-page app-page">
+    <!-- Page head -->
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="cl-breadcrumb">
+          <a-breadcrumb-item>库存管理</a-breadcrumb-item>
+          <a-breadcrumb-item>库存台账</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-select
+        v-model:value="filter.warehouseId"
+        placeholder="请选择仓库"
+        allow-clear
+        size="large"
+        style="min-width: 200px"
+        show-search
+        :filter-option="
+          (input: string, option: any) =>
+            option.label?.toLowerCase().includes(input.toLowerCase())
+        "
       >
-      <div class="pt-head-actions"></div>
+        <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
+          {{ w.warehouseName }}
+        </a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.materialId"
+        placeholder="选择物料"
+        allow-clear
+        size="large"
+        style="min-width: 240px"
+        show-search
+        :filter-option="
+          (input: string, option: any) =>
+            option.label?.toLowerCase().includes(input.toLowerCase())
+        "
+      >
+        <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
+          {{ m.materialName }} <span style="color: #9ca3af">({{ m.materialCode }})</span>
+        </a-select-option>
+      </a-select>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
-    <div class="pt-kpi-strip" style="grid-template-columns: repeat(4, 1fr)">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">当前库存量</div>
-        <div class="pt-kpi-value">
-          {{ kpiStockValue }}<small>{{ stock?.unit || '' }}</small>
+    <div class="lg-grid">
+      <!-- 左列 -->
+      <div class="lg-left">
+        <!-- KPI strip -->
+        <div v-if="!isMobile" class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">当前库存量</span>
+            <span class="lg-kpi-card-value">{{ kpiStockValue }} <small>{{ stock?.unit || '' }}</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">低库存物料</span>
+            <span class="lg-kpi-card-value">{{ lowStockWarn.length }} <small>种</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: lowStockWarn.length ? '100%' : '0%', background: 'var(--kpi-overdue)' }"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">入库记录</span>
+            <span class="lg-kpi-card-value">{{ kpiTxnIn }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-paid)"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">出库记录</span>
+            <span class="lg-kpi-card-value">{{ kpiTxnOut }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-unpaid)"></span></span>
+          </div>
         </div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">低库存物料</div>
-        <div class="pt-kpi-value" style="color: #ef4444">
-          {{ lowStockWarn.length }}<small>种</small>
-        </div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">入库记录</div>
-        <div class="pt-kpi-value">{{ kpiTxnIn }}<small>条</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">出库记录</div>
-        <div class="pt-kpi-value">{{ kpiTxnOut }}<small>条</small></div>
-      </div>
-    </div>
 
-    <!-- Filter -->
-    <div class="pt-ledger-layout">
-      <main style="flex: 1; min-width: 0">
-        <div class="pt-panel pt-filter-surface">
-          <div class="pt-filter-row">
-            <div class="pt-field">
-              <label>仓库：</label>
-              <a-select
-                v-model:value="filter.warehouseId"
-                placeholder="请选择仓库"
-                allow-clear
-                style="width: 200px"
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-              >
-                <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-                  {{ w.warehouseName }}
-                </a-select-option>
-              </a-select>
+        <!-- KPI 移动端 -->
+        <div v-else class="lg-kpi-single">
+          <div
+            class="lg-kpi-single-row"
+            v-for="item in [
+              { icon: InboxOutlined, bg: 'var(--kpi-total)', label: '当前库存量', value: kpiStockValue, unit: stock?.unit || '' },
+              { icon: AlertOutlined, bg: 'var(--kpi-overdue)', label: '低库存物料', value: lowStockWarn.length, unit: '种' },
+              { icon: RiseOutlined, bg: 'var(--kpi-paid)', label: '入库记录', value: kpiTxnIn, unit: '条' },
+              { icon: FallOutlined, bg: 'var(--kpi-unpaid)', label: '出库记录', value: kpiTxnOut, unit: '条' },
+            ]"
+            :key="item.label"
+          >
+            <div class="lg-kpi-single-icon" :style="{ background: item.bg }">
+              <component :is="item.icon" />
             </div>
-            <div class="pt-field">
-              <label>物料：</label>
-              <a-select
-                v-model:value="filter.materialId"
-                placeholder="全部物料"
-                allow-clear
-                style="width: 200px"
-                show-search
-                :filter-option="
-                  (input: string, option: any) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-              >
-                <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
-                  {{ m.materialName }} <span style="color: #9ca3af">({{ m.materialCode }})</span>
-                </a-select-option>
-              </a-select>
-            </div>
-            <div class="pt-filter-actions">
-              <a-button type="primary" @click="handleSearch">查询</a-button>
-              <a-button @click="handleReset">重置</a-button>
-            </div>
+            <span class="lg-kpi-single-label">{{ item.label }}</span>
+            <span class="lg-kpi-single-value">{{ item.value }} <small>{{ item.unit }}</small></span>
           </div>
         </div>
 
         <!-- Stock Balance Card -->
-        <div v-if="stock" class="pt-panel" style="padding: 20px 22px; margin-bottom: 14px">
-          <div style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap">
+        <div v-if="stock" class="lg-panel" style="margin-bottom: 12px">
+          <div style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap; padding: 4px 0">
             <div>
               <span style="font-size: 13px; color: #6b7280">仓库：</span>
               <span style="font-weight: 600">{{ getWarehouseName(stock.warehouseId) }}</span>
@@ -247,15 +280,15 @@ onMounted(() => {
         </div>
         <div
           v-else-if="filter.warehouseId"
-          class="pt-panel"
-          style="padding: 20px 22px; margin-bottom: 14px; color: #9ca3af"
+          class="lg-panel"
+          style="margin-bottom: 12px; color: #9ca3af; padding: 16px 22px"
         >
           该仓库暂无选中物料库存记录
         </div>
 
-        <!-- Transaction Ledger -->
-        <div class="pt-panel pt-table-panel">
-          <div style="padding: 16px 22px 0; font-weight: 600; font-size: 14px; color: #374151">
+        <!-- Transaction Ledger Table -->
+        <div class="lg-table-wrap">
+          <div style="padding: 0 0 12px; font-weight: 600; font-size: 14px; color: #374151">
             出入库流水
           </div>
           <a-table
@@ -265,7 +298,6 @@ onMounted(() => {
             :pagination="false"
             row-key="id"
             size="small"
-            style="margin-top: 8px"
           >
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'txnType'">
@@ -303,8 +335,8 @@ onMounted(() => {
         </div>
 
         <!-- Pagination -->
-        <div class="pt-pagination">
-          <span class="pt-total">共 {{ txnTotal }} 条流水</span>
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ txnTotal }} 条流水</span>
           <a-pagination
             v-model:current="txnPageNo"
             v-model:page-size="txnPageSize"
@@ -316,36 +348,57 @@ onMounted(() => {
             @show-size-change="handleTxnPageSizeChange"
           />
         </div>
-      </main>
-      <aside class="pt-analysis-rail">
-        <section class="pt-panel">
-          <div class="pt-panel-header">低库存预警</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="w in lowStockWarn" :key="w.name" class="pt-compact-row">
-                <span>{{ w.name }}</span
-                ><b style="color: #ef4444">{{ w.qty }}</b>
-              </li>
-              <li v-if="lowStockWarn.length === 0" class="pt-compact-row"><span>库存正常</span></li>
-            </ul>
-          </div>
+      </div>
+
+      <!-- 右侧分析面板 -->
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">低库存预警</div>
+          <ul class="cl-compact-list">
+            <li v-for="w in lowStockWarn" :key="w.name" class="cl-compact-row">
+              <span>{{ w.name }}</span>
+              <b style="color: #ef4444">{{ w.qty }}</b>
+            </li>
+            <li v-if="lowStockWarn.length === 0" class="cl-compact-row">
+              <span>库存正常</span>
+            </li>
+          </ul>
         </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">出入库统计</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li class="pt-compact-row">
-                <span>入库次数</span><b style="color: #22c55e">{{ kpiTxnIn }} 次</b>
-              </li>
-              <li class="pt-compact-row">
-                <span>出库次数</span><b style="color: #ef4444">{{ kpiTxnOut }} 次</b>
-              </li>
-            </ul>
-          </div>
+        <section class="lg-panel">
+          <div class="lg-panel-title">出入库统计</div>
+          <ul class="cl-compact-list">
+            <li class="cl-compact-row">
+              <span>入库次数</span><b style="color: #22c55e">{{ kpiTxnIn }} 次</b>
+            </li>
+            <li class="cl-compact-row">
+              <span>出库次数</span><b style="color: #ef4444">{{ kpiTxnOut }} 次</b>
+            </li>
+          </ul>
         </section>
       </aside>
     </div>
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.cl-breadcrumb {
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+.cl-compact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cl-compact-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+.cl-compact-row:last-child {
+  border-bottom: none;
+}
+</style>
