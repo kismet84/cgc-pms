@@ -159,7 +159,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
     <!-- Page head -->
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb class="cl-breadcrumb">
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>库存台账</a-breadcrumb-item>
         </a-breadcrumb>
@@ -354,26 +354,44 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       <aside class="lg-analysis-rail">
         <section class="lg-panel">
           <div class="lg-panel-title">低库存预警</div>
-          <ul class="cl-compact-list">
-            <li v-for="w in lowStockWarn" :key="w.name" class="cl-compact-row">
-              <span>{{ w.name }}</span>
-              <b style="color: #ef4444">{{ w.qty }}</b>
-            </li>
-            <li v-if="lowStockWarn.length === 0" class="cl-compact-row">
-              <span>库存正常</span>
-            </li>
-          </ul>
+          <div class="lg-type-list">
+            <div v-for="w in lowStockWarn" :key="w.name" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: w.qty < 5 ? '#ef4444' : 'var(--kpi-overdue)' }"></span>
+              <span class="lg-type-label">{{ w.name }}</span>
+              <span class="lg-type-bar-wrap">
+                <span class="lg-type-bar" :style="{ width: Math.min(100, (Number(w.qty) / 10) * 100) + '%', background: w.qty < 5 ? '#ef4444' : 'var(--kpi-overdue)' }"></span>
+              </span>
+              <span class="lg-type-num" style="color: #ef4444">{{ w.qty }}</span>
+              <span class="lg-type-pct"></span>
+            </div>
+            <div v-if="lowStockWarn.length === 0" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
+              <span class="lg-type-label" style="grid-column: 2 / span 4">库存正常</span>
+            </div>
+          </div>
         </section>
         <section class="lg-panel">
           <div class="lg-panel-title">出入库统计</div>
-          <ul class="cl-compact-list">
-            <li class="cl-compact-row">
-              <span>入库次数</span><b style="color: #22c55e">{{ kpiTxnIn }} 次</b>
-            </li>
-            <li class="cl-compact-row">
-              <span>出库次数</span><b style="color: #ef4444">{{ kpiTxnOut }} 次</b>
-            </li>
-          </ul>
+          <div class="lg-type-list">
+            <div class="lg-type-row">
+              <span class="lg-type-dot" style="background: #22c55e"></span>
+              <span class="lg-type-label">入库次数</span>
+              <span class="lg-type-bar-wrap">
+                <span class="lg-type-bar" :style="{ width: kpiTxnIn + kpiTxnOut > 0 ? Math.round((kpiTxnIn / (kpiTxnIn + kpiTxnOut)) * 100) + '%' : '0%', background: '#22c55e' }"></span>
+              </span>
+              <span class="lg-type-num" style="color: #22c55e">{{ kpiTxnIn }}</span>
+              <span class="lg-type-pct">{{ kpiTxnIn + kpiTxnOut > 0 ? Math.round((kpiTxnIn / (kpiTxnIn + kpiTxnOut)) * 100) : 0 }}%</span>
+            </div>
+            <div class="lg-type-row">
+              <span class="lg-type-dot" style="background: #ef4444"></span>
+              <span class="lg-type-label">出库次数</span>
+              <span class="lg-type-bar-wrap">
+                <span class="lg-type-bar" :style="{ width: kpiTxnIn + kpiTxnOut > 0 ? Math.round((kpiTxnOut / (kpiTxnIn + kpiTxnOut)) * 100) + '%' : '0%', background: '#ef4444' }"></span>
+              </span>
+              <span class="lg-type-num" style="color: #ef4444">{{ kpiTxnOut }}</span>
+              <span class="lg-type-pct">{{ kpiTxnIn + kpiTxnOut > 0 ? Math.round((kpiTxnOut / (kpiTxnIn + kpiTxnOut)) * 100) : 0 }}%</span>
+            </div>
+          </div>
         </section>
       </aside>
     </div>
@@ -381,24 +399,4 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </template>
 
 <style scoped>
-.cl-breadcrumb {
-  margin-bottom: 5px;
-  font-size: 13px;
-}
-.cl-compact-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.cl-compact-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border-subtle);
-  font-size: 13px;
-}
-.cl-compact-row:last-child {
-  border-bottom: none;
-}
 </style>
