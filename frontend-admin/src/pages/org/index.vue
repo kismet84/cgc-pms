@@ -2,7 +2,6 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import {
-  ApartmentOutlined,
   BankOutlined,
   ClusterOutlined,
   PlusOutlined,
@@ -615,26 +614,13 @@ onMounted(async () => {
 
 <template>
   <a-spin :spinning="loading">
-    <div class="org-redesign app-page">
-      <div class="org-page-head">
+    <div class="lg-page app-page">
+      <div class="lg-page-head">
         <div>
-          <a-breadcrumb class="org-breadcrumb">
-            <a-breadcrumb-item>基础组织</a-breadcrumb-item>
+          <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+            <a-breadcrumb-item>系统管理</a-breadcrumb-item>
             <a-breadcrumb-item>组织架构</a-breadcrumb-item>
           </a-breadcrumb>
-          <div class="org-title-row">
-            <div class="org-title-mark"><ApartmentOutlined /></div>
-            <div>
-              <p>统一维护公司、部门与岗位，为项目成员、审批流和权限体系提供组织基座。</p>
-            </div>
-          </div>
-        </div>
-        <div class="org-head-actions">
-          <a-button v-if="canAdd" @click="openDeptAdd">新增部门</a-button>
-          <a-button v-if="canAdd" type="primary" @click="openCompanyAdd">
-            <template #icon><PlusOutlined /></template>
-            新增公司
-          </a-button>
         </div>
       </div>
 
@@ -682,7 +668,7 @@ onMounted(async () => {
             </a-button>
           </div>
 
-          <div class="org-filter-bar">
+          <div class="lg-search-bar">
             <a-input
               v-model:value="companyFilter.companyCode"
               placeholder="公司编号"
@@ -807,7 +793,7 @@ onMounted(async () => {
             </a-button>
           </div>
 
-          <div class="org-filter-bar one-line">
+          <div class="lg-search-bar one-line">
             <a-input
               v-model:value="deptKeyword"
               placeholder="搜索部门名称 / 编号"
@@ -846,7 +832,7 @@ onMounted(async () => {
           </a-button>
         </div>
 
-        <div class="org-filter-bar position">
+        <div class="lg-search-bar position">
           <a-select
             v-model:value="positionFilter.companyId"
             placeholder="所属公司"
@@ -1064,56 +1050,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.org-redesign {
-  min-height: 100%;
-  padding: 2px 0 18px;
-  color: var(--text);
-}
 
-.org-page-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 14px;
-  padding: 18px 20px;
-  background:
-    linear-gradient(135deg, rgba(22, 104, 220, 0.08), rgba(20, 184, 166, 0.08)), var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow-soft);
-}
-
-.org-breadcrumb {
-  margin-bottom: 10px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.org-title-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.org-title-mark,
-.org-metric-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.org-title-mark {
-  width: 42px;
-  height: 42px;
-  color: #fff;
-  font-size: 19px;
-  background: #1668dc;
-  border-radius: 8px;
-  box-shadow: 0 10px 22px rgba(22, 104, 220, 0.2);
-}
-
-.org-title-row p,
 .org-panel-header p {
   margin: 4px 0 0;
   color: var(--muted);
@@ -1121,15 +1058,12 @@ onMounted(async () => {
   line-height: 1.45;
 }
 
-.org-head-actions,
 .org-panel-actions,
-.org-filter-bar,
 .org-panel-footer {
   display: flex;
   align-items: center;
 }
 
-.org-head-actions,
 .org-panel-actions {
   gap: 8px;
   justify-content: flex-end;
@@ -1155,6 +1089,9 @@ onMounted(async () => {
 }
 
 .org-metric-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
   width: 34px;
   height: 34px;
   color: #fff;
@@ -1239,24 +1176,25 @@ onMounted(async () => {
   letter-spacing: 0;
 }
 
-.org-filter-bar {
+/* ---- Search bars inside org panels (overrides for panel context) ---- */
+.lg-search-bar {
   gap: 8px;
   padding: 10px 12px;
   background: #fbfdff;
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.org-filter-bar :deep(.ant-input-affix-wrapper),
-.org-filter-bar :deep(.ant-select) {
+.lg-search-bar :deep(.ant-input-affix-wrapper),
+.lg-search-bar :deep(.ant-select) {
   width: 130px;
 }
 
-.org-filter-bar.one-line :deep(.ant-input-affix-wrapper) {
+.lg-search-bar.one-line :deep(.ant-input-affix-wrapper) {
   width: 100%;
 }
 
-.org-filter-bar.position :deep(.ant-input-affix-wrapper),
-.org-filter-bar.position :deep(.ant-select) {
+.lg-search-bar.position :deep(.ant-input-affix-wrapper),
+.lg-search-bar.position :deep(.ant-select) {
   width: 150px;
 }
 
@@ -1375,25 +1313,23 @@ onMounted(async () => {
 }
 
 @media (max-width: 760px) {
-  .org-page-head,
   .org-panel-header,
   .org-panel-footer {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .org-head-actions,
   .org-panel-actions,
-  .org-filter-bar {
+  .lg-search-bar {
     width: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
   }
 
-  .org-filter-bar :deep(.ant-input-affix-wrapper),
-  .org-filter-bar :deep(.ant-select),
-  .org-filter-bar.position :deep(.ant-input-affix-wrapper),
-  .org-filter-bar.position :deep(.ant-select) {
+  .lg-search-bar :deep(.ant-input-affix-wrapper),
+  .lg-search-bar :deep(.ant-select),
+  .lg-search-bar.position :deep(.ant-input-affix-wrapper),
+  .lg-search-bar.position :deep(.ant-select) {
     width: calc(50% - 4px);
   }
 
@@ -1404,19 +1340,10 @@ onMounted(async () => {
 }
 
 @media (max-width: 520px) {
-  .org-title-row {
-    align-items: flex-start;
-  }
-
-  .org-title-mark {
-    width: 36px;
-    height: 36px;
-  }
-
-  .org-filter-bar :deep(.ant-input-affix-wrapper),
-  .org-filter-bar :deep(.ant-select),
-  .org-filter-bar.position :deep(.ant-input-affix-wrapper),
-  .org-filter-bar.position :deep(.ant-select) {
+  .lg-search-bar :deep(.ant-input-affix-wrapper),
+  .lg-search-bar :deep(.ant-select),
+  .lg-search-bar.position :deep(.ant-input-affix-wrapper),
+  .lg-search-bar.position :deep(.ant-select) {
     width: 100%;
   }
 }
