@@ -77,19 +77,20 @@ const STATUS_COLOR: Record<string, string> = {
   SUSPENDED: 'warning',
 }
 
-const columns = [
-  { title: '任务编号', dataIndex: 'taskCode', width: 130, ellipsis: true },
-  { title: '任务名称', dataIndex: 'taskName', minWidth: 140, key: 'taskName', ellipsis: true },
-  { title: '项目名称', dataIndex: 'projectName', width: 120, ellipsis: true },
-  { title: '合同名称', dataIndex: 'contractName', width: 120, ellipsis: true },
-  { title: '分包商', dataIndex: 'partnerName', width: 120, ellipsis: true },
-  { title: '施工区域', dataIndex: 'workArea', width: 100, ellipsis: true },
-  { title: '进度', dataIndex: 'progressPercent', width: 90, key: 'progressPercent' },
-  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '计划开始', dataIndex: 'plannedStartDate', width: 100 },
-  { title: '计划结束', dataIndex: 'plannedEndDate', width: 100 },
-  { title: '操作', key: 'action', width: 110 },
-]
+// ---- vxe-grid columns ----
+const gridColumns = computed(() => [
+  { field: 'taskCode', title: '任务编号', width: 130, ellipsis: true },
+  { field: 'taskName', title: '任务名称', minWidth: 140, slots: { default: 'taskName' }, ellipsis: true },
+  { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
+  { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
+  { field: 'partnerName', title: '分包商', width: 120, ellipsis: true },
+  { field: 'workArea', title: '施工区域', width: 100, ellipsis: true },
+  { field: 'progressPercent', title: '进度', width: 90, slots: { default: 'progressPercent' } },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'plannedStartDate', title: '计划开始', width: 100 },
+  { field: 'plannedEndDate', title: '计划结束', width: 100 },
+  { title: '操作', width: 110, slots: { default: 'action' } },
+])
 
 async function fetchData() {
   loading.value = true
@@ -371,41 +372,41 @@ onMounted(() => {
 
     <!-- 表格 -->
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="false"
-        row-key="id"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
         size="small"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'taskName'">
-            <a class="lg-link">{{ record.taskName }}</a>
-          </template>
-          <template v-else-if="column.key === 'progressPercent'">
-            <a-progress
-              v-if="record.progressPercent"
-              :percent="parseFloat(record.progressPercent)"
-              :stroke-width="8"
-              size="small"
-              :show-info="true"
-            />
-            <span v-else class="pm-none">-</span>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status]">
-              {{ STATUS_LABEL[record.status] ?? record.status }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-            <a-button type="link" size="small" danger @click="handleDelete(record)"
-              >删除</a-button
-            >
-          </template>
+        <template #taskName="{ row }">
+          <a class="lg-link">{{ row.taskName }}</a>
         </template>
-      </a-table>
+        <template #progressPercent="{ row }">
+          <a-progress
+            v-if="row.progressPercent"
+            :percent="parseFloat(row.progressPercent)"
+            :stroke-width="8"
+            size="small"
+            :show-info="true"
+          />
+          <span v-else style="color: var(--muted)">-</span>
+        </template>
+        <template #status="{ row }">
+          <a-tag :color="STATUS_COLOR[row.status]">
+            {{ STATUS_LABEL[row.status] ?? row.status }}
+          </a-tag>
+        </template>
+        <template #action="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <!-- 分页 -->
