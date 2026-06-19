@@ -36,49 +36,6 @@ const targetModalVisible = ref(false)
 const targetModalMode = ref<'create' | 'edit'>('create')
 const targetModalId = ref('')
 
-const targetStats = computed(() => {
-  const rows = tableData.value
-  const totalTarget = rows.reduce((sum, item) => sum + (parseFloat(item.totalTargetAmount) || 0), 0)
-  const locked = rows
-    .filter((item) => item.isActive === 1 || item.approvalStatus === 'APPROVED')
-    .reduce((sum, item) => sum + (parseFloat(item.totalTargetAmount) || 0), 0)
-  const dynamic = rows
-    .filter((item) => item.status === 'ACTIVE')
-    .reduce((sum, item) => sum + (parseFloat(item.totalTargetAmount) || 0), 0)
-  return {
-    totalTarget,
-    locked,
-    dynamic,
-    deviation: totalTarget - locked,
-  }
-})
-
-const approvalRows = computed(() => {
-  const counts = tableData.value.reduce<Record<string, number>>((acc, item) => {
-    acc[item.approvalStatus] = (acc[item.approvalStatus] || 0) + 1
-    return acc
-  }, {})
-  const rows = Object.entries(counts).map(([status, count]) => ({
-    label: APPROVAL_STATUS_LABEL[status] ?? status,
-    count,
-  }))
-  return rows.length ? rows : [{ label: '暂无版本', count: 0 }]
-})
-
-const warningRows = computed(() => {
-  const rows = tableData.value
-    .filter((item) => item.approvalStatus === 'REJECTED' || item.status === 'CANCELLED')
-    .slice(0, 3)
-    .map((item) => ({
-      name: item.versionName,
-      status:
-        APPROVAL_STATUS_LABEL[item.approvalStatus] ??
-        TARGET_STATUS_LABEL[item.status] ??
-        item.status,
-    }))
-  return rows.length ? rows : [{ name: '暂无偏差预警', status: '平稳' }]
-})
-
 // ---- Fetch data ----
 async function fetchData() {
   loading.value = true
@@ -201,10 +158,6 @@ function fmtAmount(val: string): string {
   return (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function isActiveTag(isActive: number) {
-  return isActive === 1 ? { label: '当前版本', color: 'green' } : null
-}
-
 // ---- VxeGrid columns ----
 const columns = [
   { field: 'versionNo', title: '版本号', width: 130 },
@@ -231,30 +184,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="ct-page app-page project-target-redesign">
-    <div class="pt-page-head">
-      <div>
-        <a-breadcrumb class="pt-breadcrumb">
-          <a-breadcrumb-item>目标管理</a-breadcrumb-item>
-          <a-breadcrumb-item>目标管理</a-breadcrumb-item>
-        </a-breadcrumb>
-      </div>
-      <div class="pt-head-actions">
-        <a-button type="primary" @click="handleCreate">
-          <template #icon><PlusOutlined /></template>
-          新建目标成本
-        </a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
-      </div>
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb-item>目标管理</a-breadcrumb-item>
+        <a-breadcrumb-item>目标成本</a-breadcrumb-item>
+      </a-breadcrumb>
     </div>
 
-    <!-- Filter card -->
-    <div class="pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>所属项目：</label>
+    <div class="lg-search-bar">
+      <div class="lg-filter-row">
+        <div class="lg-filter-item">
+          <label class="lg-label">所属项目：</label>
           <a-select
             v-model:value="filter.projectId"
             placeholder="请选择项目"
@@ -271,16 +212,16 @@ onMounted(() => {
             }}</a-select-option>
           </a-select>
         </div>
-        <div class="pt-field">
-          <label>版本号：</label>
+        <div class="lg-filter-item">
+          <label class="lg-label">版本号：</label>
           <a-input
             v-model:value="filter.versionNo"
             placeholder="请输入版本号"
             style="width: 160px"
           />
         </div>
-        <div class="pt-field">
-          <label>审批状态：</label>
+        <div class="lg-filter-item">
+          <label class="lg-label">审批状态：</label>
           <a-select
             v-model:value="filter.approvalStatus"
             placeholder="全部"
@@ -293,8 +234,8 @@ onMounted(() => {
             <a-select-option value="REJECTED">已驳回</a-select-option>
           </a-select>
         </div>
-        <div class="pt-field">
-          <label>版本标识：</label>
+        <div class="lg-filter-item">
+          <label class="lg-label">版本标识：</label>
           <a-select
             v-model:value="filter.isActive"
             placeholder="全部"
@@ -305,144 +246,85 @@ onMounted(() => {
             <a-select-option :value="0">历史版本</a-select-option>
           </a-select>
         </div>
-        <div class="pt-filter-actions">
+        <div class="lg-filter-actions">
           <a-button type="primary" @click="handleSearch">查询</a-button>
           <a-button @click="handleReset">重置</a-button>
         </div>
       </div>
     </div>
 
-    <div class="pt-kpi-strip">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">目标总额</div>
-        <div class="pt-kpi-value">
-          {{ fmtAmount(String(targetStats.totalTarget)) }} <small>万元</small>
-        </div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">已锁定成本</div>
-        <div class="pt-kpi-value">
-          {{ fmtAmount(String(targetStats.locked)) }} <small>万元</small>
-        </div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">动态成本</div>
-        <div class="pt-kpi-value">
-          {{ fmtAmount(String(targetStats.dynamic)) }} <small>万元</small>
-        </div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">偏差金额</div>
-        <div class="pt-kpi-value">
-          {{ fmtAmount(String(targetStats.deviation)) }} <small>万元</small>
-        </div>
-      </div>
+    <div class="lg-toolbar">
+      <a-button type="primary" @click="handleCreate">
+        <template #icon><PlusOutlined /></template>
+        新建目标成本
+      </a-button>
+      <a-button @click="fetchData">
+        <template #icon><ReloadOutlined /></template>
+      </a-button>
     </div>
 
-    <div class="pt-ledger-layout target-layout">
-      <main class="pt-panel pt-table-panel">
-        <div class="pt-panel-header">目标版本列表</div>
-        <vxe-grid
-          :data="tableData"
-          :columns="columns"
-          :loading="loading"
-          :column-config="{ resizable: true }"
-          stripe
-          border="inner"
-          size="small"
-          max-height="480"
-        >
-          <template #amount="{ row }">
-            <span class="ct-money">{{ fmtAmount(row.totalTargetAmount) }}</span>
-          </template>
-          <template #approvalStatus="{ row }">
-            <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'">
-              {{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus }}
-            </a-tag>
-          </template>
-          <template #status="{ row }">
-            <a-tag :color="TARGET_STATUS_COLOR[row.status] || 'default'">
-              {{ TARGET_STATUS_LABEL[row.status] || row.status }}
-            </a-tag>
-          </template>
-          <template #isActive="{ row }">
-            <a-tag v-if="row.isActive === 1" color="green">当前版本</a-tag>
-            <span v-else class="ct-muted">历史版本</span>
-          </template>
-          <template #ops="{ row }">
-            <div class="ct-ops">
-              <a class="pt-link" @click="handleEdit(row)">编辑</a>
-              <a
-                v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
-                class="pt-link"
-                :class="{ 'ct-link--disabled': activating }"
-                @click="handleActivate(row)"
-              >
-                <CheckCircleOutlined style="margin-right: 4px" />切换版本
-              </a>
-              <a
-                v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
-                class="pt-link pt-danger"
-                @click="handleDelete(row)"
-                >删除</a
-              >
-            </div>
-          </template>
-        </vxe-grid>
-        <div class="pt-pagination">
-          <span class="pt-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
-      </main>
+    <div class="lg-table-wrap">
+      <vxe-grid
+        :data="tableData"
+        :columns="columns"
+        :loading="loading"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
+        size="small"
+        max-height="480"
+      >
+        <template #amount="{ row }">
+          <span class="ct-money">{{ fmtAmount(row.totalTargetAmount) }}</span>
+        </template>
+        <template #approvalStatus="{ row }">
+          <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'">
+            {{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus }}
+          </a-tag>
+        </template>
+        <template #status="{ row }">
+          <a-tag :color="TARGET_STATUS_COLOR[row.status] || 'default'">
+            {{ TARGET_STATUS_LABEL[row.status] || row.status }}
+          </a-tag>
+        </template>
+        <template #isActive="{ row }">
+          <a-tag v-if="row.isActive === 1" color="green">当前版本</a-tag>
+          <span v-else class="ct-muted">历史版本</span>
+        </template>
+        <template #ops="{ row }">
+          <div class="ct-ops">
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a
+              v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
+              class="lg-link"
+              :class="{ 'lg-link--disabled': activating }"
+              @click="handleActivate(row)"
+            >
+              <CheckCircleOutlined style="margin-right: 4px" />切换版本
+            </a>
+            <a
+              v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+              class="lg-link lg-link--danger"
+              @click="handleDelete(row)"
+              >删除</a
+            >
+          </div>
+        </template>
+      </vxe-grid>
+    </div>
 
-      <aside class="pt-analysis-rail">
-        <section class="pt-panel">
-          <div class="pt-panel-header">目标占比</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li class="pt-compact-row">
-                <span>当前版本</span
-                ><b>{{ tableData.filter((i) => i.isActive === 1).length }} 个</b>
-              </li>
-              <li class="pt-compact-row">
-                <span>历史版本</span
-                ><b>{{ tableData.filter((i) => i.isActive !== 1).length }} 个</b>
-              </li>
-            </ul>
-          </div>
-        </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">偏差预警</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="item in warningRows" :key="item.name" class="pt-compact-row">
-                <span>{{ item.name }}</span>
-                <b>{{ item.status }}</b>
-              </li>
-            </ul>
-          </div>
-        </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">审批状态</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="item in approvalRows" :key="item.label" class="pt-compact-row">
-                <span>{{ item.label }}</span>
-                <b>{{ item.count }} 个</b>
-              </li>
-            </ul>
-          </div>
-        </section>
-      </aside>
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
+      <a-pagination
+        v-model:current="pageNo"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-size-options="['10', '20', '50', '100']"
+        show-size-changer
+        show-quick-jumper
+        @change="handlePageChange"
+        @show-size-change="handlePageSizeChange"
+      />
     </div>
 
     <a-modal
@@ -468,14 +350,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.ct-page {
-  padding: 4px 0;
-}
 .ct-target-modal :deep(.ant-modal-body) {
   max-height: 82vh;
   overflow: auto;
 }
-.ct-link--disabled {
+.lg-link--disabled {
   color: #9ca3af;
   pointer-events: none;
 }
