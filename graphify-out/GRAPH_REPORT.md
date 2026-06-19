@@ -1,7 +1,7 @@
 # Graph Report - cgc-pms  (2026-06-20)
 
 ## Corpus Check
-- 816 files · ~278,897 words
+- 816 files · ~281,709 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b1c69b6a`
+- Built from commit: `e23904b9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -965,7 +965,7 @@ Nodes (15): computeSettlementAmount(), createSettlement(), deleteSettlement(), g
 
 ### Community 105 - "Alert"
 Cohesion: 0.12
-Nodes (13): columns, fetchData(), filteredAlerts, handleBatchEvaluate(), handleReset(), handleSearch(), kpi, kpiMax (+5 more)
+Nodes (13): fetchData(), filteredAlerts, gridColumns, handleBatchEvaluate(), handleReset(), handleSearch(), kpi, kpiMax (+5 more)
 
 ### Community 106 - "Payment"
 Cohesion: 0.32
@@ -1520,7 +1520,7 @@ Cohesion: 0.33
 Nodes (4): Delete, Long, AfterEach, CostSummaryMapper
 
 ## Knowledge Gaps
-- **905 isolated node(s):** `String`, `Object`, `PostMapping`, `AccountingEntryLineMapper`, `AccountingEntryMapper` (+900 more)
+- **905 isolated node(s):** `projectsLoading`, `pageNo`, `pageSize`, `pagedAlerts`, `total` (+900 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **246 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -1528,12 +1528,12 @@ Nodes (4): Delete, Long, AfterEach, CostSummaryMapper
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `request()` connect `Frontend` to `Contract`, `Frontend`, `Community 279`, `Workflow`, `Project`, `Workflow`, `Invoice`, `Payment`, `Frontend`, `Frontend`, `Dashboard`, `Community 311`, `Alert`, `Auth`, `Contract`, `Frontend`, `Contract`, `Frontend`, `Frontend`, `Notification`, `Frontend`, `Community 218`, `Frontend`, `Payment`?**
-  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+  _High betweenness centrality (0.074) - this node is a cross-community bridge._
 - **Why does `File` connect `Invoice` to `Frontend`?**
-  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+  _High betweenness centrality (0.073) - this node is a cross-community bridge._
 - **Are the 234 inferred relationships involving `request()` (e.g. with `batchEvaluate()` and `getAlertList()`) actually correct?**
   _`request()` has 234 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `String`, `Object`, `PostMapping` to the rest of the system?**
+- **What connects `projectsLoading`, `pageNo`, `pageSize` to the rest of the system?**
   _905 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Controller` be split into smaller, more focused modules?**
   _Cohesion score 0.051839464882943144 - nodes in this community are weakly interconnected._
