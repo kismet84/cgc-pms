@@ -45,14 +45,14 @@ const TXN_TYPE_COLOR: Record<string, string> = {
   ADJUST: 'warning',
 }
 
-const txnColumns = [
-  { title: '流水编号', dataIndex: 'id', width: 100 },
-  { title: '类型', dataIndex: 'txnType', width: 70, key: 'txnType' },
-  { title: '变动量', dataIndex: 'quantity', width: 100, key: 'quantity' },
-  { title: '变动后余量', dataIndex: 'availableAfter', width: 120, key: 'availableAfter' },
-  { title: '来源类型', dataIndex: 'sourceType', width: 100 },
-  { title: '操作时间', dataIndex: 'createdTime', width: 160 },
-]
+const gridColumns = computed(() => [
+  { field: 'id', title: '流水编号', width: 100 },
+  { field: 'txnType', title: '类型', width: 70, slots: { default: 'txnType' } },
+  { field: 'quantity', title: '变动量', width: 100, slots: { default: 'quantity' } },
+  { field: 'availableAfter', title: '变动后余量', width: 120, slots: { default: 'availableAfter' } },
+  { field: 'sourceType', title: '来源类型', width: 100 },
+  { field: 'createdTime', title: '操作时间', width: 160 },
+])
 
 async function fetchLedger() {
   if (!filter.warehouseId) {
@@ -291,47 +291,44 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <div style="padding: 0 0 12px; font-weight: 600; font-size: 14px; color: #374151">
             出入库流水
           </div>
-          <a-table
-            :columns="txnColumns"
-            :data-source="txnList"
+          <vxe-grid
+            :data="txnList"
+            :columns="gridColumns"
             :loading="loading"
-            :pagination="false"
-            row-key="id"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
             size="small"
+            max-height="480"
           >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'txnType'">
-                <a-tag :color="TXN_TYPE_COLOR[record.txnType]">
-                  {{ TXN_TYPE_LABEL[record.txnType] ?? record.txnType }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'quantity'">
-                <span
-                  :style="{
-                    color: record.txnType === 'OUT' ? '#ef4444' : '#16a34a',
-                    fontWeight: 600,
-                  }"
-                >
-                  {{ record.txnType === 'OUT' ? '-' : '+'
-                  }}{{
-                    Number(record.quantity).toLocaleString('zh-CN', { minimumFractionDigits: 4 })
-                  }}
-                </span>
-              </template>
-              <template v-else-if="column.key === 'availableAfter'">
-                <span style="font-weight: 600">
-                  {{
-                    Number(record.availableAfter).toLocaleString('zh-CN', {
-                      minimumFractionDigits: 4,
-                    })
-                  }}
-                </span>
-              </template>
-              <template v-else-if="column.dataIndex === 'sourceType'">
-                <span>{{ record.sourceType || '-' }}</span>
-              </template>
+            <template #txnType="{ row }">
+              <a-tag :color="TXN_TYPE_COLOR[row.txnType]">
+                {{ TXN_TYPE_LABEL[row.txnType] ?? row.txnType }}
+              </a-tag>
             </template>
-          </a-table>
+            <template #quantity="{ row }">
+              <span
+                :style="{
+                  color: row.txnType === 'OUT' ? '#ef4444' : '#16a34a',
+                  fontWeight: 600,
+                }"
+              >
+                {{ row.txnType === 'OUT' ? '-' : '+'
+                }}{{
+                  Number(row.quantity).toLocaleString('zh-CN', { minimumFractionDigits: 4 })
+                }}
+              </span>
+            </template>
+            <template #availableAfter="{ row }">
+              <span style="font-weight: 600">
+                {{
+                  Number(row.availableAfter).toLocaleString('zh-CN', {
+                    minimumFractionDigits: 4,
+                  })
+                }}
+              </span>
+            </template>
+          </vxe-grid>
         </div>
 
         <!-- Pagination -->
