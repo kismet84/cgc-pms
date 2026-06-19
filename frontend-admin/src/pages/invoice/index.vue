@@ -2,7 +2,12 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal, Upload } from 'ant-design-vue'
 import axios from 'axios'
-import { UploadOutlined } from '@ant-design/icons-vue'
+import {
+  SearchOutlined,
+  UploadOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons-vue'
 import {
   getInvoiceList,
   createInvoice,
@@ -24,8 +29,8 @@ import { uploadFile } from '@/api/modules/file'
 const INVOICE_BUSINESS_TYPE = 'INVOICE_ATTACHMENT'
 
 const filter = reactive({
+  keyword: '',
   payRecordId: undefined as string | undefined,
-  invoiceNo: '' as string,
   verifyStatus: undefined as string | undefined,
 })
 
@@ -34,7 +39,6 @@ const tableData = ref<InvoiceVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
-const searchError = ref('')
 
 const payRecordList = ref<PayRecordBrief[]>([])
 
@@ -61,46 +65,53 @@ const recognizing = ref(false)
 const recognizeResult = ref<InvoiceRecognizeResultVO | null>(null)
 const abortController = ref<AbortController | null>(null)
 
-const columns = [
-  { title: '发票号码', dataIndex: 'invoiceNo', width: 140, ellipsis: true },
-  { title: '发票类型', dataIndex: 'invoiceType', width: 100, key: 'invoiceType' },
+// ---- vxe-grid columns ----
+const gridColumns = computed(() => [
+  { field: 'invoiceNo', title: '发票号码', width: 140, ellipsis: true },
+  { field: 'invoiceType', title: '发票类型', width: 100, slots: { default: 'invoiceType' } },
   {
+    field: 'invoiceAmount',
     title: '发票金额',
-    dataIndex: 'invoiceAmount',
     width: 110,
-    key: 'invoiceAmount',
     align: 'right' as const,
+    slots: { default: 'invoiceAmount' },
   },
-  { title: '税率(%)', dataIndex: 'taxRate', width: 80, key: 'taxRate' },
-  { title: '税额', dataIndex: 'taxAmount', width: 110, key: 'taxAmount', align: 'right' as const },
-  { title: '开票日期', dataIndex: 'invoiceDate', width: 110 },
-  { title: '核验状态', dataIndex: 'verifyStatus', width: 90, key: 'verifyStatus' },
-  { title: '备注', dataIndex: 'remark', width: 120, ellipsis: true },
-  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
-  { title: '操作', key: 'action', width: 150 },
-]
+  {
+    field: 'taxRate',
+    title: '税率(%)',
+    width: 80,
+    slots: { default: 'taxRate' },
+  },
+  {
+    field: 'taxAmount',
+    title: '税额',
+    width: 110,
+    align: 'right' as const,
+    slots: { default: 'taxAmount' },
+  },
+  { field: 'invoiceDate', title: '开票日期', width: 110 },
+  { field: 'verifyStatus', title: '核验状态', width: 90, slots: { default: 'verifyStatus' } },
+  { field: 'remark', title: '备注', width: 120, ellipsis: true },
+  { field: 'createdAt', title: '创建时间', width: 150 },
+  { title: '操作', width: 150, slots: { default: 'action' } },
+])
 
 async function fetchData() {
   loading.value = true
-  searchError.value = ''
   try {
     const res = await getInvoiceList({
       pageNo: pageNo.value,
       pageSize: pageSize.value,
       payRecordId: filter.payRecordId,
-      invoiceNo: filter.invoiceNo || undefined,
+      invoiceNo: filter.keyword || undefined,
       verifyStatus: filter.verifyStatus,
     })
     tableData.value = res.records
     total.value = res.total
-    if (res.total === 0) {
-      searchError.value = '未查询到匹配的发票记录'
-    }
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
     total.value = 0
-    searchError.value = '加载发票列表失败，请稍后重试'
     message.error('加载发票列表失败，请稍后重试')
   } finally {
     loading.value = false
@@ -123,8 +134,8 @@ function handleSearch() {
 }
 
 function handleReset() {
+  filter.keyword = ''
   filter.payRecordId = undefined
-  filter.invoiceNo = ''
   filter.verifyStatus = undefined
   pageNo.value = 1
   fetchData()
@@ -408,15 +419,6 @@ function fmtAmount(val: string | undefined): string {
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
 }
 
-function getPayRecordLabel(record: InvoiceVO): string {
-  if (!record.payRecordId) return '-'
-  const pr = payRecordList.value.find((r) => r.id === record.payRecordId)
-  if (pr) {
-    return pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}`
-  }
-  return record.payRecordId
-}
-
 const kpiInvoiceTotal = computed(() =>
   tableData.value.reduce((s, r) => s + (parseFloat(r.invoiceAmount) || 0), 0),
 )
@@ -433,13 +435,27 @@ const kpiUninvoiced = computed(() =>
 const kpiAbnormal = computed(
   () => tableData.value.filter((r) => r.verifyStatus === 'FAILED').length,
 )
-const invoiceVerifyBreakdown = computed(() => {
+
+const kpiMax = computed(() => ({
+  total: Math.max(kpiInvoiceTotal.value, 1),
+}))
+function kpiPct(value: number, max: number): number {
+  if (max === 0) return 0
+  return Math.min(Math.round((value / max) * 100), 100)
+}
+
+const verifyBreakdown = computed(() => {
   const m: Record<string, number> = {}
   tableData.value.forEach((r) => {
-    m[VERIFY_STATUS_LABEL[r.verifyStatus] ?? r.verifyStatus] =
-      (m[VERIFY_STATUS_LABEL[r.verifyStatus] ?? r.verifyStatus] || 0) + 1
+    const label = VERIFY_STATUS_LABEL[r.verifyStatus] ?? r.verifyStatus
+    m[label] = (m[label] || 0) + 1
   })
-  return Object.entries(m).map(([k, v]) => ({ label: k, count: v }))
+  const total = Object.values(m).reduce((s, v) => s + v, 0) || 1
+  return Object.entries(m).map(([label, count]) => ({
+    label,
+    count,
+    pct: Math.round((count / total) * 100),
+  }))
 })
 
 onMounted(() => {
@@ -458,156 +474,162 @@ defineExpose({
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>发票管理</a-breadcrumb-item></a-breadcrumb
+  <div class="lg-page app-page">
+    <!-- 页面头部 -->
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+          <a-breadcrumb-item>发票管理</a-breadcrumb-item>
+          <a-breadcrumb-item>发票列表</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+    </div>
+
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.keyword"
+        placeholder="搜索发票号码…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
       >
-      <div class="pt-head-actions"></div>
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
-    <div class="pt-kpi-strip">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">发票总额</div>
-        <div class="pt-kpi-value">{{ kpiInvoiceTotal.toLocaleString() }}<small>元</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">已核验</div>
-        <div class="pt-kpi-value">{{ kpiInvoiced.toLocaleString() }}<small>元</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">待核验</div>
-        <div class="pt-kpi-value">{{ kpiUninvoiced.toLocaleString() }}<small>元</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">异常发票</div>
-        <div class="pt-kpi-value" style="color: #ef4444">{{ kpiAbnormal }}<small>张</small></div>
-      </div>
-    </div>
-
-    <!-- Filter -->
-    <div class="pt-ledger-layout">
-      <main style="flex: 1; min-width: 0">
-        <div class="pt-panel pt-filter-surface">
-          <div class="pt-filter-row">
-            <div class="pt-field">
-              <label>关联付款记录：</label>
-              <a-select
-                v-model:value="filter.payRecordId"
-                placeholder="全部"
-                allow-clear
-                style="width: 200px"
-              >
-                <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
-                  {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
-                </a-select-option>
-              </a-select>
-            </div>
-            <div class="pt-field">
-              <label>发票号码：</label>
-              <a-input
-                v-model:value="filter.invoiceNo"
-                placeholder="输入发票号码"
-                allow-clear
-                style="width: 180px"
-              />
-            </div>
-            <div class="pt-field">
-              <label>核验状态：</label>
-              <a-select
-                v-model:value="filter.verifyStatus"
-                placeholder="全部"
-                allow-clear
-                style="width: 110px"
-              >
-                <a-select-option value="PENDING">待核验</a-select-option>
-                <a-select-option value="VERIFIED">已认证</a-select-option>
-                <a-select-option value="ABNORMAL">异常</a-select-option>
-              </a-select>
-            </div>
-            <div class="pt-filter-actions">
-              <a-button type="primary" @click="handleSearch">查询</a-button>
-              <a-button @click="handleReset">重置</a-button>
-              <a-button type="primary" @click="handleAdd">新增发票</a-button>
-            </div>
+    <div class="lg-grid">
+      <div class="lg-left">
+        <!-- KPI 横条 -->
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">发票总额</span>
+            <span class="lg-kpi-card-value">{{ kpiInvoiceTotal.toLocaleString() }} <small>元</small></span>
+            <span class="lg-kpi-card-bar"><span style="width: 100%; background: var(--kpi-amount)"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">已核验</span>
+            <span class="lg-kpi-card-value">{{ kpiInvoiced.toLocaleString() }} <small>元</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiInvoiced, kpiMax.total) + '%', background: 'var(--kpi-paid)' }"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">待核验</span>
+            <span class="lg-kpi-card-value">{{ kpiUninvoiced.toLocaleString() }} <small>元</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiUninvoiced, kpiMax.total) + '%', background: 'var(--kpi-unpaid)' }"></span></span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">异常发票</span>
+            <span class="lg-kpi-card-value" style="color: #ef4444">{{ kpiAbnormal }} <small>张</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiAbnormal, kpiMax.total) + '%', background: 'var(--kpi-overdue)' }"></span></span>
           </div>
         </div>
 
-        <!-- Table -->
-        <div class="pt-panel pt-table-panel">
-          <a-alert
-            v-if="searchError"
-            :message="searchError"
-            :type="searchError.includes('失败') ? 'error' : 'info'"
-            show-icon
-            closable
-            style="margin-bottom: 12px"
-            @close="searchError = ''"
-          />
-          <a-table
-            :columns="columns"
-            :data-source="tableData"
-            :loading="loading"
-            :pagination="false"
-            row-key="id"
-            size="small"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'invoiceType'">
-                <a-tag
-                  :color="
-                    INVOICE_TYPE_COLOR[record.invoiceType as keyof typeof INVOICE_TYPE_COLOR] ||
-                    'default'
-                  "
-                >
-                  {{
-                    INVOICE_TYPE_LABEL[record.invoiceType as keyof typeof INVOICE_TYPE_LABEL] ||
-                    record.invoiceType
-                  }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'invoiceAmount'">
-                <span>{{ fmtAmount(record.invoiceAmount) }}</span>
-              </template>
-              <template v-else-if="column.key === 'taxRate'">
-                <span>{{ record.taxRate ? record.taxRate + '%' : '-' }}</span>
-              </template>
-              <template v-else-if="column.key === 'taxAmount'">
-                <span>{{ fmtAmount(record.taxAmount) }}</span>
-              </template>
-              <template v-else-if="column.key === 'verifyStatus'">
-                <a-tag
-                  :color="
-                    VERIFY_STATUS_COLOR[record.verifyStatus as keyof typeof VERIFY_STATUS_COLOR] ||
-                    'default'
-                  "
-                >
-                  {{
-                    VERIFY_STATUS_LABEL[record.verifyStatus as keyof typeof VERIFY_STATUS_LABEL] ||
-                    record.verifyStatus
-                  }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-                <a-button type="link" size="small" danger @click="handleDelete(record)"
-                  >删除</a-button
-                >
-                <a-button
-                  v-if="record.verifyStatus === 'PENDING'"
-                  type="link"
-                  size="small"
-                  @click="handleVerify(record)"
-                  >核验</a-button
-                >
-              </template>
-            </template>
-          </a-table>
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新增发票
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
+          </div>
+          <div class="lg-toolbar-right">
+            <a-select
+              v-model:value="filter.payRecordId"
+              placeholder="全部付款记录"
+              allow-clear
+              style="width: 180px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
+                {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.verifyStatus"
+              placeholder="全部核验状态"
+              allow-clear
+              style="width: 130px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option value="PENDING">待核验</a-select-option>
+              <a-select-option value="VERIFIED">已认证</a-select-option>
+              <a-select-option value="ABNORMAL">异常</a-select-option>
+            </a-select>
+          </div>
         </div>
 
-        <!-- Pagination -->
-        <div class="pt-pagination">
-          <span class="pt-total">共 {{ total }} 条</span>
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #invoiceType="{ row }">
+              <a-tag
+                :color="
+                  INVOICE_TYPE_COLOR[row.invoiceType as keyof typeof INVOICE_TYPE_COLOR] || 'default'
+                "
+              >
+                {{
+                  INVOICE_TYPE_LABEL[row.invoiceType as keyof typeof INVOICE_TYPE_LABEL] ||
+                  row.invoiceType
+                }}
+              </a-tag>
+            </template>
+            <template #invoiceAmount="{ row }">
+              <span class="lg-money">{{ fmtAmount(row.invoiceAmount) }}</span>
+            </template>
+            <template #taxRate="{ row }">
+              <span>{{ row.taxRate ? row.taxRate + '%' : '-' }}</span>
+            </template>
+            <template #taxAmount="{ row }">
+              <span class="lg-money">{{ fmtAmount(row.taxAmount) }}</span>
+            </template>
+            <template #verifyStatus="{ row }">
+              <a-tag
+                :color="
+                  VERIFY_STATUS_COLOR[row.verifyStatus as keyof typeof VERIFY_STATUS_COLOR] || 'default'
+                "
+              >
+                {{
+                  VERIFY_STATUS_LABEL[row.verifyStatus as keyof typeof VERIFY_STATUS_LABEL] ||
+                  row.verifyStatus
+                }}
+              </a-tag>
+            </template>
+            <template #action="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+                <a
+                  v-if="row.verifyStatus === 'PENDING'"
+                  class="lg-link"
+                  @click="handleVerify(row)"
+                >核验</a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
           <a-pagination
             v-model:current="pageNo"
             v-model:page-size="pageSize"
@@ -619,138 +641,144 @@ defineExpose({
             @show-size-change="handlePageSizeChange"
           />
         </div>
+      </div>
 
-        <!-- Add/Edit Modal -->
-        <a-modal
-          v-model:open="modalVisible"
-          :title="modalTitle"
-          :width="680"
-          @ok="handleModalOk"
-          @cancel="handleModalCancel"
-        >
-          <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
-            <a-form-item label="发票附件">
-              <a-upload
-                v-model:file-list="uploadFileList"
-                accept=".pdf"
-                :max-count="1"
-                :before-upload="handleBeforeUpload"
-                :show-upload-list="true"
-              >
-                <a-button>
-                  <upload-outlined />
-                  点击或拖拽上传PDF发票
-                </a-button>
-              </a-upload>
-              <a-button
-                type="primary"
-                style="margin-top: 8px"
-                :disabled="!uploadFileList.length"
-                :loading="recognizing"
-                @click="handleRecognize"
-              >
-                识别发票
-              </a-button>
-            </a-form-item>
-            <a-form-item label="付款记录">
-              <a-select
-                v-model:value="formData.payRecordId"
-                placeholder="请选择关联的付款记录（可选）"
-                allow-clear
-              >
-                <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
-                  {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
-                </a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="发票号码" required>
-              <a-input v-model:value="formData.invoiceNo" placeholder="请输入发票号码" />
-            </a-form-item>
-            <a-form-item label="发票类型" required>
-              <a-select v-model:value="formData.invoiceType" placeholder="请选择发票类型">
-                <a-select-option value="VAT_SPECIAL">增值税专票</a-select-option>
-                <a-select-option value="VAT_NORMAL">增值税普票</a-select-option>
-                <a-select-option value="OTHER">其他</a-select-option>
-              </a-select>
-            </a-form-item>
-            <a-form-item label="发票金额" required>
-              <a-input-number
-                v-model:value="formData.invoiceAmount"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-                placeholder="请输入发票金额"
-              />
-            </a-form-item>
-            <a-form-item label="税率(%)">
-              <a-input-number
-                v-model:value="formData.taxRate"
-                :min="0"
-                :max="100"
-                :precision="2"
-                style="width: 100%"
-                placeholder="请输入税率"
-              />
-            </a-form-item>
-            <a-form-item label="税额">
-              <a-input-number
-                v-model:value="formData.taxAmount"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-                placeholder="请输入税额"
-              />
-            </a-form-item>
-            <a-form-item label="开票日期">
-              <a-date-picker
-                v-model:value="formData.invoiceDate"
-                value-format="YYYY-MM-DD"
-                style="width: 100%"
-              />
-            </a-form-item>
-            <a-form-item label="卖方名称">
-              <a-input v-model:value="formData.sellerName" placeholder="请输入卖方名称" />
-            </a-form-item>
-            <a-form-item label="卖方税号">
-              <a-input v-model:value="formData.sellerTaxNo" placeholder="请输入卖方纳税人识别号" />
-            </a-form-item>
-            <a-form-item label="买方名称">
-              <a-input v-model:value="formData.buyerName" placeholder="请输入买方名称" />
-            </a-form-item>
-            <a-form-item label="买方税号">
-              <a-input v-model:value="formData.buyerTaxNo" placeholder="请输入买方纳税人识别号" />
-            </a-form-item>
-            <a-form-item label="备注">
-              <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
-            </a-form-item>
-          </a-form>
-        </a-modal>
-      </main>
-      <aside class="pt-analysis-rail">
-        <section class="pt-panel">
-          <div class="pt-panel-header">核验状态分布</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="it in invoiceVerifyBreakdown" :key="it.label" class="pt-compact-row">
-                <span>{{ it.label }}</span
-                ><b>{{ it.count }} 张</b>
-              </li>
-            </ul>
+      <!-- 右侧分析面板 -->
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">核验状态分布</div>
+          <div class="lg-type-list">
+            <div v-for="it in verifyBreakdown" :key="it.label" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: it.label === '已认证' ? '#31c48d' : it.label === '异常' ? '#ef4444' : it.label === '待核验' ? '#f59e0b' : '#8b5cf6' }"></span>
+              <span class="lg-type-label">{{ it.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span class="lg-type-bar" :style="{ width: it.pct + '%', background: it.label === '已认证' ? '#31c48d' : it.label === '异常' ? '#ef4444' : it.label === '待核验' ? '#f59e0b' : '#8b5cf6' }"></span>
+              </span>
+              <span class="lg-type-num">{{ it.count }}</span>
+              <span class="lg-type-pct">{{ it.pct }}%</span>
+            </div>
           </div>
         </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">异常提醒</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-if="kpiAbnormal > 0" class="pt-compact-row">
-                <span>核验失败</span><b style="color: #ef4444">{{ kpiAbnormal }} 张</b>
-              </li>
-              <li v-else class="pt-compact-row"><span>无异常发票</span></li>
-            </ul>
+
+        <section class="lg-panel">
+          <div class="lg-panel-title">异常提醒</div>
+          <div class="lg-warning-list">
+            <div v-if="kpiAbnormal > 0" class="lg-warning-item">
+              <span class="lg-warning-project">核验失败</span>
+              <span class="lg-warning-title">{{ kpiAbnormal }} 张</span>
+              <span class="lg-warning-days" style="color: #ef4444">需处理</span>
+            </div>
+            <div v-else class="lg-warning-empty">无异常发票</div>
           </div>
         </section>
       </aside>
     </div>
+
+    <!-- Add/Edit Modal -->
+    <a-modal
+      v-model:open="modalVisible"
+      :title="modalTitle"
+      :width="680"
+      @ok="handleModalOk"
+      @cancel="handleModalCancel"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+        <a-form-item label="发票附件">
+          <a-upload
+            v-model:file-list="uploadFileList"
+            accept=".pdf"
+            :max-count="1"
+            :before-upload="handleBeforeUpload"
+            :show-upload-list="true"
+          >
+            <a-button>
+              <upload-outlined />
+              点击或拖拽上传PDF发票
+            </a-button>
+          </a-upload>
+          <a-button
+            type="primary"
+            style="margin-top: 8px"
+            :disabled="!uploadFileList.length"
+            :loading="recognizing"
+            @click="handleRecognize"
+          >
+            识别发票
+          </a-button>
+        </a-form-item>
+        <a-form-item label="付款记录">
+          <a-select
+            v-model:value="formData.payRecordId"
+            placeholder="请选择关联的付款记录（可选）"
+            allow-clear
+          >
+            <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
+              {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="发票号码" required>
+          <a-input v-model:value="formData.invoiceNo" placeholder="请输入发票号码" />
+        </a-form-item>
+        <a-form-item label="发票类型" required>
+          <a-select v-model:value="formData.invoiceType" placeholder="请选择发票类型">
+            <a-select-option value="VAT_SPECIAL">增值税专票</a-select-option>
+            <a-select-option value="VAT_NORMAL">增值税普票</a-select-option>
+            <a-select-option value="OTHER">其他</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="发票金额" required>
+          <a-input-number
+            v-model:value="formData.invoiceAmount"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+            placeholder="请输入发票金额"
+          />
+        </a-form-item>
+        <a-form-item label="税率(%)">
+          <a-input-number
+            v-model:value="formData.taxRate"
+            :min="0"
+            :max="100"
+            :precision="2"
+            style="width: 100%"
+            placeholder="请输入税率"
+          />
+        </a-form-item>
+        <a-form-item label="税额">
+          <a-input-number
+            v-model:value="formData.taxAmount"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+            placeholder="请输入税额"
+          />
+        </a-form-item>
+        <a-form-item label="开票日期">
+          <a-date-picker
+            v-model:value="formData.invoiceDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="卖方名称">
+          <a-input v-model:value="formData.sellerName" placeholder="请输入卖方名称" />
+        </a-form-item>
+        <a-form-item label="卖方税号">
+          <a-input v-model:value="formData.sellerTaxNo" placeholder="请输入卖方纳税人识别号" />
+        </a-form-item>
+        <a-form-item label="买方名称">
+          <a-input v-model:value="formData.buyerName" placeholder="请输入买方名称" />
+        </a-form-item>
+        <a-form-item label="买方税号">
+          <a-input v-model:value="formData.buyerTaxNo" placeholder="请输入买方纳税人识别号" />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
