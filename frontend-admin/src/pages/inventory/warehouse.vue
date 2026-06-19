@@ -51,14 +51,14 @@ const STATUS_COLOR: Record<string, string> = {
   DISABLE: 'error',
 }
 
-const columns = [
-  { title: '仓库编号', dataIndex: 'warehouseCode', width: 120, ellipsis: true },
-  { title: '仓库名称', dataIndex: 'warehouseName', width: 140, ellipsis: true },
-  { title: '所属项目', dataIndex: 'projectName', width: 140, ellipsis: true },
-  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '创建时间', dataIndex: 'createdAt', width: 140 },
-  { title: '操作', key: 'action', width: 130 },
-]
+const gridColumns = computed(() => [
+  { field: 'warehouseCode', title: '仓库编号', width: 120, ellipsis: true },
+  { field: 'warehouseName', title: '仓库名称', width: 140, ellipsis: true },
+  { field: 'projectName', title: '所属项目', width: 140, ellipsis: true },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'createdAt', title: '创建时间', width: 140 },
+  { title: '操作', width: 130, slots: { default: 'ops' } },
+])
 
 async function fetchData() {
   loading.value = true
@@ -282,26 +282,28 @@ onMounted(() => {
 
     <!-- 表格 -->
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="false"
-        row-key="id"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
         size="small"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status]">
-              {{ STATUS_LABEL[record.status] ?? record.status }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-            <a-button type="link" size="small" danger @click="handleDelete(record)">删除</a-button>
-          </template>
+        <template #status="{ row }">
+          <a-tag :color="STATUS_COLOR[row.status]">
+            {{ STATUS_LABEL[row.status] ?? row.status }}
+          </a-tag>
         </template>
-      </a-table>
+        <template #ops="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <!-- 分页 -->
