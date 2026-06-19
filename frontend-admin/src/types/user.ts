@@ -38,6 +38,7 @@ export interface SysUserVO {
   status: string
   isAdmin?: number
   roleNames?: string[]
+  roleIds?: (number | string)[]
   createdAt?: string
   updatedAt?: string
 }

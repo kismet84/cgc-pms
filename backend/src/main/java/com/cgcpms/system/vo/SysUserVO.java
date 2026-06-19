@@ -17,6 +17,7 @@ public class SysUserVO {
     private String status;
     private Integer isAdmin;
     private List<String> roleNames;
+    private List<Long> roleIds;
     private String createdAt;
     private String updatedAt;
 }

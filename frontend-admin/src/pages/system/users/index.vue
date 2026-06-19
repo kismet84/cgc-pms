@@ -8,8 +8,11 @@ import {
   updateUser,
   updateUserStatus,
   deleteUser,
+  assignUserRoles,
 } from '@/api/modules/user'
+import { getRoles } from '@/api/modules/system'
 import type { SysUserVO } from '@/types/user'
+import type { SysRoleVO } from '@/types/system'
 
 const loading = ref(false)
 const tableData = ref<SysUserVO[]>([])
@@ -26,17 +29,20 @@ const modalVisible = ref(false)
 const modalTitle = ref('新增用户')
 const editingId = ref<string | null>(null)
 const saving = ref(false)
+const allRoles = ref<SysRoleVO[]>([])
 const formData = reactive({
   username: '',
   password: '',
   realName: '',
   phone: '',
   email: '',
+  roleIds: [] as (number | string)[],
 })
 
 const columns = [
   { title: '用户名', dataIndex: 'username', width: 120 },
   { title: '姓名', dataIndex: 'realName', width: 100 },
+  { title: '角色', dataIndex: 'roleNames', width: 120, key: 'roleNames' },
   { title: '手机号', dataIndex: 'phone', width: 130 },
   { title: '邮箱', dataIndex: 'email', width: 180, ellipsis: true },
   { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
@@ -86,6 +92,7 @@ function handleAdd() {
     realName: '',
     phone: '',
     email: '',
+    roleIds: [],
   })
   modalVisible.value = true
 }
@@ -99,6 +106,7 @@ function handleEdit(record: SysUserVO) {
     realName: record.realName,
     phone: record.phone ?? '',
     email: record.email ?? '',
+    roleIds: record.roleIds ? [...record.roleIds] : [],
   })
   modalVisible.value = true
 }
@@ -121,8 +129,10 @@ async function handleModalOk() {
       email: formData.email || undefined,
     }
     if (formData.password) payload.password = formData.password
+    if (formData.roleIds.length > 0) payload.roleIds = formData.roleIds
     if (editingId.value) {
       await updateUser(editingId.value, payload)
+      await assignUserRoles(editingId.value, formData.roleIds as string[])
       message.success('更新成功')
     } else {
       await createUser(payload)
@@ -187,12 +197,23 @@ function handleDelete(record: SysUserVO) {
   })
 }
 
+async function fetchRoles() {
+  try {
+    allRoles.value = await getRoles()
+  } catch (e: unknown) {
+    console.error(e)
+  }
+}
+
 function handlePageChange(page: number) {
   pageNo.value = page
   fetchData()
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  fetchData()
+  fetchRoles()
+})
 </script>
 
 <template>
@@ -246,7 +267,15 @@ onMounted(fetchData)
         size="small"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
+          <template v-if="column.key === 'roleNames'">
+            <template v-if="record.roleNames && record.roleNames.length">
+              <a-tag v-for="(r, i) in record.roleNames" :key="i" style="margin-right: 4px">{{
+                r
+              }}</a-tag>
+            </template>
+            <span v-else class="pt-muted">-</span>
+          </template>
+          <template v-else-if="column.key === 'status'">
             <a-tag :color="record.status === 'ENABLE' ? 'success' : 'error'">
               {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
             </a-tag>
@@ -313,6 +342,24 @@ onMounted(fetchData)
         </a-form-item>
         <a-form-item label="邮箱">
           <a-input v-model:value="formData.email" placeholder="请输入邮箱" />
+        </a-form-item>
+        <a-form-item label="角色">
+          <a-select
+            v-model:value="formData.roleIds"
+            mode="multiple"
+            placeholder="请选择角色"
+            option-filter-prop="label"
+            :allow-clear="true"
+          >
+            <a-select-option
+              v-for="role in allRoles"
+              :key="role.id"
+              :value="role.id"
+              :label="role.roleName"
+            >
+              {{ role.roleName }}
+            </a-select-option>
+          </a-select>
         </a-form-item>
       </a-form>
     </a-modal>

@@ -1,6 +1,7 @@
 package com.cgcpms.system.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
@@ -9,6 +10,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+
+import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -43,4 +46,8 @@ public class SysUser extends BaseEntity {
     private String status;
 
     private Integer isAdmin;
+
+    /** 接收前端的角色ID列表，不映射到数据库字段 */
+    @TableField(exist = false)
+    private List<Long> roleIds;
 }

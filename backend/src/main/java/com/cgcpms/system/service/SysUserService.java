@@ -50,6 +50,7 @@ public class SysUserService {
 
         List<Long> userIds = page.getRecords().stream().map(SysUser::getId).toList();
         Map<Long, List<String>> roleNamesMap = bulkLoadRoleNames(userIds);
+        Map<Long, List<Long>> roleIdsMap = bulkLoadRoleIds(userIds);
 
         return page.convert(user -> {
             SysUserVO vo = new SysUserVO();
@@ -63,6 +64,7 @@ public class SysUserService {
             vo.setStatus(user.getStatus());
             vo.setIsAdmin(user.getIsAdmin());
             vo.setRoleNames(roleNamesMap.getOrDefault(user.getId(), Collections.emptyList()));
+            vo.setRoleIds(roleIdsMap.getOrDefault(user.getId(), Collections.emptyList()));
             if (user.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(user.getCreatedAt()));
             if (user.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(user.getUpdatedAt()));
             return vo;
@@ -84,6 +86,7 @@ public class SysUserService {
         vo.setStatus(user.getStatus());
         vo.setIsAdmin(user.getIsAdmin());
         vo.setRoleNames(getRoleNames(user.getId()));
+        vo.setRoleIds(getRoleIds(user.getId()));
         if (user.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(user.getCreatedAt()));
         if (user.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(user.getUpdatedAt()));
         return vo;
@@ -100,6 +103,9 @@ public class SysUserService {
         user.setTenantId(UserContext.getCurrentTenantId());
         sysUserMapper.insert(user);
         log.info("Creating user: {}", user.getUsername());
+        if (user.getRoleIds() != null && !user.getRoleIds().isEmpty()) {
+            assignRoles(user.getId(), user.getRoleIds());
+        }
         return user.getId();
     }
 
@@ -205,6 +211,16 @@ public class SysUserService {
                 Collectors.mapping(ur -> roleMap.get(ur.getRoleId()), Collectors.toList())));
     }
 
+    private Map<Long, List<Long>> bulkLoadRoleIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) return Collections.emptyMap();
+        var userRoles = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId, userIds));
+        if (userRoles.isEmpty()) return Collections.emptyMap();
+        return userRoles.stream().collect(Collectors.groupingBy(
+                SysUserRole::getUserId,
+                Collectors.mapping(SysUserRole::getRoleId, Collectors.toList())));
+    }
+
     private List<String> getRoleNames(Long userId) {
         List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
                 new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
@@ -213,5 +229,12 @@ public class SysUserService {
         return sysRoleMapper.selectBatchIds(roleIds).stream()
                 .map(SysRole::getRoleName)
                 .collect(Collectors.toList());
+    }
+
+    private List<Long> getRoleIds(Long userId) {
+        List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
+        if (userRoles.isEmpty()) return Collections.emptyList();
+        return userRoles.stream().map(SysUserRole::getRoleId).collect(Collectors.toList());
     }
 }
