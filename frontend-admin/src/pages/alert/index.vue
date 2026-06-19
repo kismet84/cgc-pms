@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { SearchOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { RULE_TYPE_LABELS, SEVERITY_COLOR, type AlertLogVO } from '@/types/alert'
@@ -9,6 +10,7 @@ const store = useAlertStore()
 
 // ── Filters ──
 const filter = reactive({
+  keyword: '',
   projectId: undefined as string | undefined,
   severity: undefined as string | undefined,
   isRead: undefined as number | undefined,
@@ -19,7 +21,7 @@ const referenceStore = useReferenceStore()
 const projectOptions = computed(() => referenceStore.projects ?? [])
 const projectsLoading = ref(false)
 
-// ── Fetch ──
+// ── Store-based pagination (frontend-side slice) ──
 const pageNo = ref(1)
 const pageSize = ref(20)
 
@@ -50,6 +52,7 @@ function handleSearch() {
 }
 
 function handleReset() {
+  filter.keyword = ''
   filter.projectId = undefined
   filter.severity = undefined
   filter.isRead = undefined
@@ -86,6 +89,28 @@ async function handleBatchEvaluate() {
     console.error(e)
     message.error('触发评估失败')
   }
+}
+
+// ── KPI ──
+const kpi = computed(() => {
+  const all = store.alerts
+  const highCount = all.filter((a) => a.severity === 'HIGH').length
+  const unreadCount = all.filter((a) => a.isRead === 0).length
+  return {
+    total: all.length,
+    high: highCount,
+    unread: unreadCount,
+  }
+})
+
+const kpiMax = computed(() => ({
+  total: Math.max(kpi.value.total, 1),
+  high: Math.max(kpi.value.high, 1),
+  unread: Math.max(kpi.value.unread, 1),
+}))
+function kpiPct(value: number, max: number): number {
+  if (max === 0) return 0
+  return Math.min(Math.round((value / max) * 100), 100)
 }
 
 // ── Columns ──
@@ -125,6 +150,18 @@ function getProjectName(projectId: string): string {
   return p ? `${p.projectCode} ${p.projectName}` : `项目#${projectId}`
 }
 
+// ── Keyword filter ──
+const filteredAlerts = computed(() => {
+  const kw = filter.keyword.trim().toLowerCase()
+  if (!kw) return pagedAlerts.value
+  return pagedAlerts.value.filter(
+    (a) =>
+      a.message.toLowerCase().includes(kw) ||
+      getProjectName(a.projectId).toLowerCase().includes(kw) ||
+      (RULE_TYPE_LABELS[a.ruleType] || a.ruleType).toLowerCase().includes(kw),
+  )
+})
+
 // ── Init ──
 onMounted(async () => {
   projectsLoading.value = true
@@ -138,134 +175,174 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>预警中心</a-breadcrumb-item></a-breadcrumb
-      >
-      <div class="pt-head-actions">
-        <a-button type="primary" danger :loading="store.evaluating" @click="handleBatchEvaluate">
-          触发评估
-        </a-button>
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="al-breadcrumb">
+          <a-breadcrumb-item>预警中心</a-breadcrumb-item>
+          <a-breadcrumb-item>预警列表</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
-    <!-- Filter -->
-    <div class="pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>项目：</label>
-          <a-select
-            v-model:value="filter.projectId"
-            placeholder="全部项目"
-            allow-clear
-            style="width: 220px"
-            :loading="projectsLoading"
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                (option.label ?? '').toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option
-              v-for="p in projectOptions"
-              :key="p.id"
-              :value="p.id"
-              :label="`${p.projectCode} ${p.projectName}`"
-            >
-              {{ p.projectCode }} {{ p.projectName }}
-            </a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>严重度：</label>
-          <a-select
-            v-model:value="filter.severity"
-            placeholder="全部"
-            allow-clear
-            style="width: 120px"
-          >
-            <a-select-option value="HIGH">高</a-select-option>
-            <a-select-option value="MEDIUM">中</a-select-option>
-            <a-select-option value="LOW">低</a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-field">
-          <label>读取状态：</label>
-          <a-select
-            v-model:value="filter.isRead"
-            placeholder="全部"
-            allow-clear
-            style="width: 120px"
-          >
-            <a-select-option :value="0">未读</a-select-option>
-            <a-select-option :value="1">已读</a-select-option>
-          </a-select>
-        </div>
-        <div class="pt-filter-surface-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-        </div>
-      </div>
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.keyword"
+        placeholder="搜索预警内容、项目、规则类型…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
-    <!-- Table -->
-    <div class="pt-table-panel">
-      <a-table
-        :data-source="pagedAlerts"
-        :columns="columns"
-        :loading="store.loading"
-        :pagination="false"
-        row-key="id"
-        size="middle"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'projectId'">
-            <span class="al-muted">{{ getProjectName(record.projectId) }}</span>
-          </template>
-          <template v-else-if="column.key === 'severity'">
-            <a-tag :color="SEVERITY_COLOR[record.severity] ?? 'default'">
-              {{ record.severity === 'HIGH' ? '高' : record.severity === 'MEDIUM' ? '中' : '低' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'ruleType'">
-            <a-tag>{{ RULE_TYPE_LABELS[record.ruleType] || record.ruleType }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'isRead'">
-            <a-badge v-if="record.isRead === 0" status="processing" text="未读" />
-            <span v-else class="al-muted">已读</span>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button
-              v-if="record.isRead === 0"
-              type="link"
-              size="small"
-              :loading="store.markingRead.has(record.id)"
-              @click="handleMarkRead(record)"
-            >
-              标为已读
+    <div class="lg-grid">
+      <div class="lg-left">
+        <!-- KPI 横条 -->
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">预警总数</span>
+            <span class="lg-kpi-card-value">{{ kpi.total }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">高危预警</span>
+            <span class="lg-kpi-card-value">{{ kpi.high }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpi.high, kpiMax.total) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+            <span class="lg-kpi-card-hint">占 {{ kpiPct(kpi.high, kpiMax.total) }}%</span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">未读预警</span>
+            <span class="lg-kpi-card-value">{{ kpi.unread }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpi.unread, kpiMax.total) + '%', background: '#2f7df6' }"></span></span>
+            <span class="lg-kpi-card-hint">占 {{ kpiPct(kpi.unread, kpiMax.total) }}%</span>
+          </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" danger :loading="store.evaluating" @click="handleBatchEvaluate">
+              触发评估
             </a-button>
-            <span v-else class="al-muted">—</span>
-          </template>
-        </template>
-      </a-table>
-    </div>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
+          </div>
+          <div class="lg-toolbar-right">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              style="width: 160px"
+              size="small"
+              :loading="projectsLoading"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in projectOptions" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.severity"
+              placeholder="全部严重度"
+              allow-clear
+              style="width: 120px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option value="HIGH">高</a-select-option>
+              <a-select-option value="MEDIUM">中</a-select-option>
+              <a-select-option value="LOW">低</a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.isRead"
+              placeholder="全部状态"
+              allow-clear
+              style="width: 120px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option :value="0">未读</a-select-option>
+              <a-select-option :value="1">已读</a-select-option>
+            </a-select>
+          </div>
+        </div>
 
-    <!-- Pagination -->
-    <div class="pt-pagination">
-      <span class="pt-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <a-table
+            :data-source="filteredAlerts"
+            :columns="columns"
+            :loading="store.loading"
+            :pagination="false"
+            row-key="id"
+            size="middle"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'projectId'">
+                <span class="al-muted">{{ getProjectName(record.projectId) }}</span>
+              </template>
+              <template v-else-if="column.key === 'severity'">
+                <a-tag :color="SEVERITY_COLOR[record.severity] ?? 'default'">
+                  {{ record.severity === 'HIGH' ? '高' : record.severity === 'MEDIUM' ? '中' : '低' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'ruleType'">
+                <a-tag>{{ RULE_TYPE_LABELS[record.ruleType] || record.ruleType }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'isRead'">
+                <a-badge v-if="record.isRead === 0" status="processing" text="未读" />
+                <span v-else class="al-muted">已读</span>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <a-button
+                  v-if="record.isRead === 0"
+                  type="link"
+                  size="small"
+                  :loading="store.markingRead.has(record.id)"
+                  @click="handleMarkRead(record)"
+                >
+                  标为已读
+                </a-button>
+                <span v-else class="al-muted">—</span>
+              </template>
+            </template>
+          </a-table>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.al-breadcrumb {
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+.al-muted {
+  color: var(--muted);
+}
+</style>
