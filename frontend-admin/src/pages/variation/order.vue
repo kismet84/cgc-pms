@@ -6,6 +6,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SettingOutlined,
+  SearchOutlined,
 } from '@ant-design/icons-vue'
 import {
   getVarOrderList,
@@ -374,52 +375,6 @@ function fmtWan(val: string | undefined): string {
   return isNaN(n) ? '0.00' : (n / 10000).toFixed(2)
 }
 
-// ---- KPI ----
-const kpiTotalVar = computed(() =>
-  tableData.value.reduce((s, r) => s + (parseFloat(r.reportedAmount) || 0), 0),
-)
-const kpiApproved = computed(() =>
-  tableData.value
-    .filter((r) => r.approvalStatus === 'APPROVED')
-    .reduce((s, r) => s + (parseFloat(r.approvedAmount) || 0), 0),
-)
-const kpiPending = computed(
-  () =>
-    tableData.value.filter((r) => r.approvalStatus === 'DRAFT' || r.approvalStatus === 'APPROVING')
-      .length,
-)
-
-const kpiMax = computed(() => ({
-  total: Math.max(kpiTotalVar.value, 1),
-  approved: Math.max(kpiApproved.value, 1),
-  pending: Math.max(kpiPending.value, 1),
-}))
-function kpiPct(value: number, max: number): number {
-  if (max === 0) return 0
-  return Math.min(Math.round((value / max) * 100), 100)
-}
-
-// ---- Analysis rail ----
-const varTypeBreakdown = computed(() => {
-  const m: Record<string, number> = {}
-  tableData.value.forEach((r) => {
-    m[r.varType] = (m[r.varType] || 0) + 1
-  })
-  return Object.entries(m).map(([k, v]) => ({ label: VAR_TYPE_LABEL[k] ?? k, count: v }))
-})
-const statusBreakdown = computed(() => {
-  const m: Record<string, number> = {}
-  tableData.value.forEach((r) => {
-    m[r.approvalStatus] = (m[r.approvalStatus] || 0) + 1
-  })
-  return Object.entries(m).map(([k, v]) => ({ label: k, count: v }))
-})
-const topAmount = computed(() =>
-  [...tableData.value]
-    .sort((a, b) => (parseFloat(b.reportedAmount) || 0) - (parseFloat(a.reportedAmount) || 0))
-    .slice(0, 5),
-)
-
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({})
@@ -438,220 +393,164 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="lg-grid">
-      <div class="lg-left">
-        <!-- KPI 横条 -->
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">变更总额</span>
-            <span class="lg-kpi-card-value">{{ kpiTotalVar.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
-          </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">已审批金额</span>
-            <span class="lg-kpi-card-value">{{ kpiApproved.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiApproved, kpiMax.total) + '%', background: '#22c55e' }"></span></span>
-            <span class="lg-kpi-card-hint">占 {{ kpiPct(kpiApproved, kpiMax.total) }}%</span>
-          </div>
-          <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">影响利润</span>
-            <span class="lg-kpi-card-value" style="color: #ef4444">{{ (kpiTotalVar - kpiApproved).toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:#ef4444"></span></span>
-          </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">待审批数量</span>
-            <span class="lg-kpi-card-value">{{ kpiPending }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiPending, kpiMax.total) + '%', background: '#f59e0b' }"></span></span>
-          </div>
-        </div>
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.varCode"
+        placeholder="搜索变更编号…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
+    </div>
 
-        <!-- 工具栏（含筛选器） -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleAdd">
-              <template #icon><PlusOutlined /></template>
-              新建
-            </a-button>
-            <a-dropdown>
-              <a-button>
-                <template #icon><SettingOutlined /></template>
-                列设置
-              </a-button>
-              <template #overlay>
-                <a-menu>
-                  <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
-                    <a-checkbox :checked="colVisible[key]">
-                      {{ COL_LABELS[key] }}
-                    </a-checkbox>
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
-          </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 140px"
-              size="small"
-              @change="
-                (v: string | undefined) => {
-                  filter.contractId = undefined
-                  if (v) referenceStore.fetchContracts({ projectId: v })
-                  handleSearch()
-                }
-              "
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.contractId"
-              placeholder="全部合同"
-              allow-clear
-              style="width: 140px"
-              size="small"
-              @change="handleSearch()"
-            >
-              <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-                {{ c.contractName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.varType"
-              placeholder="全部类型"
-              allow-clear
-              style="width: 110px"
-              size="small"
-              @change="handleSearch()"
-            >
-              <a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">
-                {{ o.label }}
-              </a-select-option>
-            </a-select>
-            <a-input
-              v-model:value="filter.varCode"
-              placeholder="变更编号"
-              allow-clear
-              style="width: 130px"
-              size="small"
-              @press-enter="handleSearch"
-            />
-          </div>
-        </div>
-
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #varType="{ row }">
-              <a-tag size="small">{{ VAR_TYPE_LABEL[row.varType] ?? row.varType }}</a-tag>
-            </template>
-            <template #direction="{ row }">
-              <a-tag :color="row.direction === 'COST' ? 'red' : 'green'" size="small">{{
-                row.direction === 'COST' ? '成本' : row.direction
-              }}</a-tag>
-            </template>
-            <template #reportedAmount="{ row }">
-              <span>{{ fmtWan(row.reportedAmount) }} 万</span>
-            </template>
-            <template #approvedAmount="{ row }">
-              <span>{{ fmtWan(row.approvedAmount) }} 万</span>
-            </template>
-            <template #confirmedAmount="{ row }">
-              <span>{{ fmtWan(row.confirmedAmount) }} 万</span>
-            </template>
-            <template #approvalStatus="{ row }">
-              <a-tag
-                :color="
-                  row.approvalStatus === 'APPROVED'
-                    ? 'success'
-                    : row.approvalStatus === 'REJECTED'
-                      ? 'error'
-                      : 'processing'
-                "
-                size="small"
-              >{{ row.approvalStatus }}</a-tag>
-            </template>
-            <template #ops="{ row }">
-              <div class="lg-ops">
-                <a
-                  v-if="row.approvalStatus === 'DRAFT'"
-                  class="lg-link"
-                  @click="handleSubmitApproval(row)"
-                >提交审批</a>
-                <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-              </div>
-            </template>
-          </vxe-grid>
-        </div>
-
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
+    <!-- 工具栏 -->
+    <div class="lg-toolbar">
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleAdd">
+          <template #icon><PlusOutlined /></template>
+          新建
+        </a-button>
+        <a-dropdown>
+          <a-button>
+            <template #icon><SettingOutlined /></template>
+            列设置
+          </a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
+                <a-checkbox :checked="colVisible[key]">
+                  {{ COL_LABELS[key] }}
+                </a-checkbox>
+              </a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
       </div>
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.projectId"
+          placeholder="全部项目"
+          allow-clear
+          style="width: 140px"
+          size="small"
+          @change="
+            (v: string | undefined) => {
+              filter.contractId = undefined
+              if (v) referenceStore.fetchContracts({ projectId: v })
+              handleSearch()
+            }
+          "
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.contractId"
+          placeholder="全部合同"
+          allow-clear
+          style="width: 140px"
+          size="small"
+          @change="handleSearch()"
+        >
+          <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+            {{ c.contractName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.varType"
+          placeholder="全部类型"
+          allow-clear
+          style="width: 110px"
+          size="small"
+          @change="handleSearch()"
+        >
+          <a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">
+            {{ o.label }}
+          </a-select-option>
+        </a-select>
+      </div>
+    </div>
 
-      <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail">
-        <section class="pt-panel">
-          <div class="pt-panel-header">变更类型分布</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="it in varTypeBreakdown" :key="it.label" class="pt-compact-row">
-                <span>{{ it.label }}</span
-                ><b>{{ it.count }} 条</b>
-              </li>
-            </ul>
+    <!-- 表格 -->
+    <div class="lg-table-wrap">
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
+        :loading="loading"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
+        size="small"
+        max-height="480"
+      >
+        <template #varType="{ row }">
+          <a-tag size="small">{{ VAR_TYPE_LABEL[row.varType] ?? row.varType }}</a-tag>
+        </template>
+        <template #direction="{ row }">
+          <a-tag :color="row.direction === 'COST' ? 'red' : 'green'" size="small">{{
+            row.direction === 'COST' ? '成本' : row.direction
+          }}</a-tag>
+        </template>
+        <template #reportedAmount="{ row }">
+          <span>{{ fmtWan(row.reportedAmount) }} 万</span>
+        </template>
+        <template #approvedAmount="{ row }">
+          <span>{{ fmtWan(row.approvedAmount) }} 万</span>
+        </template>
+        <template #confirmedAmount="{ row }">
+          <span>{{ fmtWan(row.confirmedAmount) }} 万</span>
+        </template>
+        <template #approvalStatus="{ row }">
+          <a-tag
+            :color="
+              row.approvalStatus === 'APPROVED'
+                ? 'success'
+                : row.approvalStatus === 'REJECTED'
+                  ? 'error'
+                  : 'processing'
+            "
+            size="small"
+          >{{ row.approvalStatus }}</a-tag>
+        </template>
+        <template #ops="{ row }">
+          <div class="lg-ops">
+            <a
+              v-if="row.approvalStatus === 'DRAFT'"
+              class="lg-link"
+              @click="handleSubmitApproval(row)"
+            >提交审批</a>
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
           </div>
-        </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">审批状态统计</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="it in statusBreakdown" :key="it.label" class="pt-compact-row">
-                <span>{{ it.label }}</span
-                ><b>{{ it.count }} 条</b>
-              </li>
-            </ul>
-          </div>
-        </section>
-        <section class="pt-panel">
-          <div class="pt-panel-header">金额 Top5</div>
-          <div class="pt-panel-body">
-            <ul class="pt-compact-list">
-              <li v-for="it in topAmount" :key="it.id" class="pt-compact-row">
-                <span>{{ it.varName }}</span
-                ><b>{{ fmtWan(it.reportedAmount) }} 万</b>
-              </li>
-            </ul>
-          </div>
-        </section>
-      </aside>
+        </template>
+      </vxe-grid>
+    </div>
+
+    <!-- 分页 -->
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
+      <a-pagination
+        v-model:current="pageNo"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-size-options="['10', '20', '50']"
+        show-size-changer
+        show-quick-jumper
+        @change="handlePageChange"
+        @show-size-change="handlePageSizeChange"
+      />
     </div>
 
     <!-- Modal unchanged -->
