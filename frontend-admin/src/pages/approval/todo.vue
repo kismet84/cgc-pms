@@ -79,13 +79,13 @@ function handleDetail(record: { instanceId: string }) {
   router.push(`/approval/${record.instanceId}`)
 }
 
-const columns = [
-  { title: '审批标题', dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: '业务类型', dataIndex: 'businessType', key: 'businessType', width: 120 },
-  { title: '时间', dataIndex: 'timeCol', key: 'timeCol', width: 160 },
-  { title: '状态', dataIndex: 'instanceStatus', key: 'instanceStatus', width: 100 },
-  { title: '操作', key: 'action', width: 120 },
-]
+const gridColumns = computed(() => [
+  { field: 'title', title: '审批标题', ellipsis: true, slots: { default: 'title' } },
+  { field: 'businessType', title: '业务类型', width: 120, slots: { default: 'businessType' } },
+  { field: 'timeCol', title: '时间', width: 160, slots: { default: 'timeCol' } },
+  { field: 'instanceStatus', title: '状态', width: 100, slots: { default: 'instanceStatus' } },
+  { title: '操作', width: 120, slots: { default: 'action' } },
+])
 
 const tabs = [
   { key: 'todo', label: '我的待办' },
@@ -151,53 +151,43 @@ watch(
     </a-tabs>
 
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="{
-          current: pageNo,
-          pageSize,
-          total,
-          showSizeChanger: true,
-          showTotal: (t: number) => `共 ${t} 条`,
-        }"
-        row-key="id"
-        @change="({ current, pageSize: ps }: any) => handlePageChange(current, ps)"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
+        size="small"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'title'">
-            <a class="lg-link" @click="handleDetail(record as { instanceId: string })">{{ record.title }}</a>
-          </template>
-          <template v-else-if="column.key === 'businessType'">
-            <a-tag>{{
-              businessTypeMap[record.businessType as string] ||
-              (record.businessType as string) ||
-              '—'
-            }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'timeCol'">
-            {{ getTimeCol(record) }}
-          </template>
-          <template v-else-if="column.key === 'instanceStatus'">
-            <a-tag v-if="record.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>
-            <a-tag v-else-if="record.instanceStatus === 'APPROVED'" color="success">已通过</a-tag>
-            <a-tag v-else-if="record.instanceStatus === 'REJECTED'" color="error">已驳回</a-tag>
-            <a-tag v-else>{{ record.instanceStatus }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <div class="lg-ops">
-              <a-button
-                type="link"
-                size="small"
-                @click="handleDetail(record as { instanceId: string })"
-              >
-                {{ getActionLabel() }}
-              </a-button>
-            </div>
-          </template>
+        <template #title="{ row }">
+          <a class="lg-link" @click="handleDetail(row as { instanceId: string })">{{ row.title }}</a>
         </template>
-      </a-table>
+        <template #businessType="{ row }">
+          <a-tag>{{
+            businessTypeMap[row.businessType as string] ||
+            (row.businessType as string) ||
+            '—'
+          }}</a-tag>
+        </template>
+        <template #timeCol="{ row }">
+          {{ getTimeCol(row) }}
+        </template>
+        <template #instanceStatus="{ row }">
+          <a-tag v-if="row.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>
+          <a-tag v-else-if="row.instanceStatus === 'APPROVED'" color="success">已通过</a-tag>
+          <a-tag v-else-if="row.instanceStatus === 'REJECTED'" color="error">已驳回</a-tag>
+          <a-tag v-else>{{ row.instanceStatus }}</a-tag>
+        </template>
+        <template #action="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleDetail(row as { instanceId: string })">
+              {{ getActionLabel() }}
+            </a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <div class="lg-pagination">
