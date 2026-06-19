@@ -146,6 +146,7 @@ public class CostSummaryService {
         // 5. Compute project-level values (same for all subjects)
         BigDecimal projectEstimatedRemainingCost = computeProjectEstimatedRemainingCost(tenantId, projectId);
         BigDecimal projectContractIncome = computeProjectContractIncome(tenantId, projectId);
+        BigDecimal projectConfirmedRevenue = computeProjectConfirmedRevenue(tenantId, projectId);
         BigDecimal projectPaidAmount = computeProjectPaidAmount(tenantId, projectId);
 
         // 6. For each cost subject, calculate and insert summary
@@ -162,9 +163,13 @@ public class CostSummaryService {
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+            // Aggregate actualCost: include all cost source types plus bid_cost and overhead
             BigDecimal actualCost = subjectItems.stream()
                     .filter(item -> "MAT_RECEIPT".equals(item.getSourceType())
-                            || "SUB_MEASURE".equals(item.getSourceType()))
+                            || "SUB_MEASURE".equals(item.getSourceType())
+                            || "BID_COST".equals(item.getSourceType())
+                            || "BID_COST_TRANSFERRED".equals(item.getSourceType())
+                            || "OVERHEAD_ALLOCATION".equals(item.getSourceType()))
                     .map(CostItem::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -173,8 +178,9 @@ public class CostSummaryService {
             BigDecimal estimatedRemainingCost = projectEstimatedRemainingCost;
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal costDeviation = dynamicCost.subtract(targetCost);
-            BigDecimal contractIncome = projectContractIncome;
-            BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
+            BigDecimal confirmedRevenue = projectConfirmedRevenue;
+            // expectedProfit = confirmedRevenue - dynamicCost (使用已确认收入)
+            BigDecimal expectedProfit = confirmedRevenue.subtract(dynamicCost);
 
             CostSummary summary = new CostSummary();
             summary.setTenantId(tenantId);
@@ -187,7 +193,8 @@ public class CostSummaryService {
             summary.setPaidAmount(paidAmount);
             summary.setEstimatedRemainingCost(estimatedRemainingCost);
             summary.setDynamicCost(dynamicCost);
-            summary.setContractIncome(contractIncome);
+            summary.setContractIncome(projectContractIncome);
+            summary.setConfirmedRevenue(projectConfirmedRevenue);
             summary.setExpectedProfit(expectedProfit);
             summary.setCostDeviation(costDeviation);
 
@@ -258,6 +265,7 @@ public class CostSummaryService {
         // Project-level fields: compute directly (not aggregated from subjects, to avoid N× duplication)
         BigDecimal estimatedRemainingCost = computeProjectEstimatedRemainingCost(tenantId, projectId);
         BigDecimal contractIncome = computeProjectContractIncome(tenantId, projectId);
+        BigDecimal projectConfirmedRevenue = computeProjectConfirmedRevenue(tenantId, projectId);
         BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
         BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
         BigDecimal costDeviation = dynamicCost.subtract(targetCost);
@@ -272,6 +280,7 @@ public class CostSummaryService {
         vo.setEstimatedRemainingCost(estimatedRemainingCost.toPlainString());
         vo.setDynamicCost(dynamicCost.toPlainString());
         vo.setContractIncome(contractIncome.toPlainString());
+        vo.setConfirmedRevenue(projectConfirmedRevenue.toPlainString());
         vo.setExpectedProfit(expectedProfit.toPlainString());
         vo.setCostDeviation(costDeviation.toPlainString());
         vo.setSubjects(subjects);
@@ -401,6 +410,7 @@ public class CostSummaryService {
             BigDecimal estimatedRemainingCost = totalCurrentAmount
                     .subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
             BigDecimal contractIncome = totalContractAmount.add(incomeVarAmount);
+            BigDecimal projectConfirmedRevenue = BigDecimal.ZERO; // 批量汇总无明细查询
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
             BigDecimal costDeviation = dynamicCost.subtract(targetCost);
@@ -415,6 +425,7 @@ public class CostSummaryService {
             vo.setEstimatedRemainingCost(estimatedRemainingCost.toPlainString());
             vo.setDynamicCost(dynamicCost.toPlainString());
             vo.setContractIncome(contractIncome.toPlainString());
+            vo.setConfirmedRevenue(projectConfirmedRevenue.toPlainString());
             vo.setExpectedProfit(expectedProfit.toPlainString());
             vo.setCostDeviation(costDeviation.toPlainString());
             vo.setSubjects(Collections.emptyList());
@@ -536,6 +547,7 @@ public class CostSummaryService {
             vo.setEstimatedRemainingCost(s.getEstimatedRemainingCost() != null ? s.getEstimatedRemainingCost().toPlainString() : "0");
             vo.setDynamicCost(s.getDynamicCost() != null ? s.getDynamicCost().toPlainString() : "0");
             vo.setContractIncome(s.getContractIncome() != null ? s.getContractIncome().toPlainString() : "0");
+            vo.setConfirmedRevenue(s.getConfirmedRevenue() != null ? s.getConfirmedRevenue().toPlainString() : "0");
             vo.setExpectedProfit(s.getExpectedProfit() != null ? s.getExpectedProfit().toPlainString() : "0");
             vo.setCostDeviation(s.getCostDeviation() != null ? s.getCostDeviation().toPlainString() : "0");
             vo.setCreatedBy(s.getCreatedBy() != null ? s.getCreatedBy().toString() : null);
@@ -625,6 +637,23 @@ public class CostSummaryService {
                         .eq(PayRecord::getPayStatus, "SUCCESS"));
         return records.stream()
                 .map(r -> r.getPayAmount() == null ? BigDecimal.ZERO : r.getPayAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /**
+     * Compute project-level confirmed revenue:
+     * SUM(cost_item.amount WHERE cost_type='REVENUE_CONFIRMED')
+     */
+    private BigDecimal computeProjectConfirmedRevenue(Long tenantId, Long projectId) {
+        return costItemMapper.selectList(
+                new LambdaQueryWrapper<CostItem>()
+                        .eq(CostItem::getTenantId, tenantId)
+                        .eq(CostItem::getProjectId, projectId)
+                        .eq(CostItem::getCostType, "REVENUE_CONFIRMED")
+                        .eq(CostItem::getCostStatus, "CONFIRMED"))
+                .stream()
+                .map(CostItem::getAmount)
+                .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 

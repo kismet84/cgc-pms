@@ -15,6 +15,7 @@ public class CostProjectSummaryVO {
     private String estimatedRemainingCost;
     private String dynamicCost;
     private String contractIncome;
+    private String confirmedRevenue;
     private String expectedProfit;
     private String costDeviation;
     private List<CostSummaryVO> subjects;

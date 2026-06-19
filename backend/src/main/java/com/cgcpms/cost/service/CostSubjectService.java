@@ -30,9 +30,12 @@ public class CostSubjectService {
     private final CostItemMapper costItemMapper;
     private final CostTargetItemMapper costTargetItemMapper;
 
-    public List<CostSubjectTreeNodeVO> getTree() {
+    public List<CostSubjectTreeNodeVO> getTree(String accountCategory) {
         LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CostSubject::getTenantId, UserContext.getCurrentTenantId());
+        if (accountCategory != null && !accountCategory.isEmpty()) {
+            wrapper.eq(CostSubject::getAccountCategory, accountCategory);
+        }
         wrapper.orderByAsc(CostSubject::getSortOrder, CostSubject::getId);
 
         List<CostSubject> allSubjects = costSubjectMapper.selectList(wrapper);
@@ -54,6 +57,7 @@ public class CostSubjectService {
         node.setSubjectCode(subject.getSubjectCode());
         node.setSubjectName(subject.getSubjectName());
         node.setSubjectType(subject.getSubjectType());
+        node.setAccountCategory(subject.getAccountCategory());
         node.setLevel(subject.getLevel());
         node.setStatus(subject.getStatus());
         node.setSortOrder(subject.getSortOrder());
@@ -68,9 +72,12 @@ public class CostSubjectService {
         return node;
     }
 
-    public List<CostSubjectVO> getList() {
+    public List<CostSubjectVO> getList(String accountCategory) {
         LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CostSubject::getTenantId, UserContext.getCurrentTenantId());
+        if (accountCategory != null && !accountCategory.isEmpty()) {
+            wrapper.eq(CostSubject::getAccountCategory, accountCategory);
+        }
         wrapper.orderByAsc(CostSubject::getSortOrder, CostSubject::getId);
 
         List<CostSubject> subjects = costSubjectMapper.selectList(wrapper);
@@ -99,8 +106,11 @@ public class CostSubjectService {
             if (!parent.getTenantId().equals(UserContext.getCurrentTenantId())) {
                 throw new BusinessException("PARENT_NOT_FOUND", "父科目不存在");
             }
-            // Auto-set level
+            // Auto-set level and account category from parent
             subject.setLevel(parent.getLevel() + 1);
+            if (subject.getAccountCategory() == null || subject.getAccountCategory().isEmpty()) {
+                subject.setAccountCategory(parent.getAccountCategory());
+            }
         } else {
             // Root node
             subject.setParentId(0L);
@@ -173,17 +183,21 @@ public class CostSubjectService {
             throw new BusinessException("HAS_CHILDREN", "该科目下存在子科目，无法删除");
         }
 
-        // Check no cost item references exist
+        // Check no cost item references exist (exclude soft-deleted items)
         long costItemCount = costItemMapper.selectCount(
-                new LambdaQueryWrapper<CostItem>().eq(CostItem::getCostSubjectId, id));
+                new LambdaQueryWrapper<CostItem>()
+                        .eq(CostItem::getCostSubjectId, id)
+                        .eq(CostItem::getDeletedFlag, 0));
         if (costItemCount > 0) {
             throw new BusinessException("COST_SUBJECT_REFERENCED",
                     "该成本科目被 " + costItemCount + " 条成本明细引用，无法删除");
         }
 
-        // Check no cost target item references exist
+        // Check no cost target item references exist (exclude soft-deleted items)
         long targetItemCount = costTargetItemMapper.selectCount(
-                new LambdaQueryWrapper<CostTargetItem>().eq(CostTargetItem::getCostSubjectId, id));
+                new LambdaQueryWrapper<CostTargetItem>()
+                        .eq(CostTargetItem::getCostSubjectId, id)
+                        .eq(CostTargetItem::getDeletedFlag, 0));
         if (targetItemCount > 0) {
             throw new BusinessException("COST_SUBJECT_REFERENCED",
                     "该成本科目被 " + targetItemCount + " 条目标成本明细引用，无法删除");
@@ -200,6 +214,7 @@ public class CostSubjectService {
         vo.setSubjectCode(subject.getSubjectCode());
         vo.setSubjectName(subject.getSubjectName());
         vo.setSubjectType(subject.getSubjectType());
+        vo.setAccountCategory(subject.getAccountCategory());
         vo.setLevel(subject.getLevel());
         vo.setSortOrder(subject.getSortOrder());
         vo.setStatus(subject.getStatus());

@@ -17,4 +17,6 @@ public final class WorkflowBusinessTypes {
     public static final String SETTLEMENT = "SETTLEMENT";
     /** Phase 3: 成本目标 */
     public static final String COST_TARGET = "COST_TARGET";
+    /** Phase 5: 业主收入确认 */
+    public static final String CONTRACT_REVENUE = "CONTRACT_REVENUE";
 }

@@ -10,6 +10,7 @@ public class CostSubjectVO {
     private String subjectCode;
     private String subjectName;
     private String subjectType;
+    private String accountCategory;
     private Integer level;
     private Integer sortOrder;
     private String status;

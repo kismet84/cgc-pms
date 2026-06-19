@@ -11,6 +11,15 @@ import {
   toggleCostSubjectStatus,
 } from '@/api/modules/costSubject'
 
+// ─── Tab state ──────────────────────────────────────
+
+const activeCategory = ref<string>('COST')
+const categoryTabs = [
+  { key: 'COST', tab: '成本科目' },
+  { key: 'REVENUE', tab: '收入科目' },
+  { key: 'SETTLEMENT', tab: '结算科目' },
+]
+
 // ─── Tree state ──────────────────────────────────────────
 
 const treeData = ref<CostSubjectTreeNode[]>([])
@@ -70,14 +79,20 @@ async function fetchSubjectTypes() {
 async function fetchTree() {
   treeLoading.value = true
   try {
-    treeData.value = await getCostSubjectTree()
+    treeData.value = await getCostSubjectTree(activeCategory.value)
   } catch (e: unknown) {
     console.error(e)
-    message.error('加载成本科目树失败')
+    message.error('加载科目树失败')
     treeData.value = []
   } finally {
     treeLoading.value = false
   }
+}
+
+function handleCategoryChange() {
+  selectedKeys.value = []
+  expandedKeys.value = []
+  fetchTree()
 }
 
 function handleTreeSelect(keys: string[]) {
@@ -235,6 +250,11 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Category Tabs -->
+    <a-tabs v-model:activeKey="activeCategory" @change="handleCategoryChange" class="cs-category-tabs">
+      <a-tab-pane v-for="tab in categoryTabs" :key="tab.key" :tab="tab.tab" />
+    </a-tabs>
+
     <div class="cs-layout">
       <!-- Left: Tree -->
       <div class="pt-panel cs-tree-panel">
@@ -383,6 +403,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.cs-category-tabs {
+  margin-bottom: 0;
+}
+
 .cs-layout {
   display: flex;
   gap: 16px;

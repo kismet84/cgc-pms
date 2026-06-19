@@ -27,6 +27,9 @@ public class CostSubject extends BaseEntity {
 
     private String subjectType;
 
+    /** 科目大类：COST成本 / REVENUE收入 / SETTLEMENT结算 / RECEIVABLE应收 */
+    private String accountCategory;
+
     private Integer level;
 
     private Integer sortOrder;

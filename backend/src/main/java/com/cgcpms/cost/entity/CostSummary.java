@@ -55,6 +55,9 @@ public class CostSummary extends BaseEntity {
     private BigDecimal contractIncome;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal confirmedRevenue;
+
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal expectedProfit;
 
     @JsonSerialize(using = ToStringSerializer.class)

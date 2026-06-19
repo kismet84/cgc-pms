@@ -11,6 +11,7 @@ public class CostSubjectTreeNodeVO {
     private String subjectCode;
     private String subjectName;
     private String subjectType;
+    private String accountCategory;
     private Integer level;
     private String status;
     private Integer sortOrder;

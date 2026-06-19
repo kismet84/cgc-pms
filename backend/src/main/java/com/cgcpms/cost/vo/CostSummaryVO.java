@@ -19,6 +19,7 @@ public class CostSummaryVO {
     private String estimatedRemainingCost;
     private String dynamicCost;
     private String contractIncome;
+    private String confirmedRevenue;
     private String expectedProfit;
     private String costDeviation;
     private String createdBy;

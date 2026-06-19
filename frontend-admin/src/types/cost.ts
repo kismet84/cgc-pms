@@ -6,6 +6,10 @@ export const SOURCE_TYPE_LABEL: Record<SourceType, string> = {
   MAT_RECEIPT: '材料验收成本',
   SUB_MEASURE: '分包计量成本',
   VAR_ORDER: '签证变更成本',
+  CT_REVENUE: '业主收入确认',
+  BID_COST: '投标前期费用',
+  BID_COST_TRANSFERRED: '投标前期费用(已结转)',
+  OVERHEAD_ALLOCATION: '间接费用分摊',
 }
 
 export const SOURCE_TYPE_COLOR: Record<SourceType, string> = {
@@ -13,6 +17,10 @@ export const SOURCE_TYPE_COLOR: Record<SourceType, string> = {
   MAT_RECEIPT: 'green',
   SUB_MEASURE: 'orange',
   VAR_ORDER: 'purple',
+  CT_REVENUE: 'cyan',
+  BID_COST: 'geekblue',
+  BID_COST_TRANSFERRED: 'lime',
+  OVERHEAD_ALLOCATION: 'magenta',
 }
 
 /** Cost ledger item view object */
@@ -90,5 +98,8 @@ export interface CostSummaryVO {
   paidAmount: string
   dynamicCost: string
   costDeviation: string
+  contractIncome: string
+  confirmedRevenue: string
+  expectedProfit: string
   subjects: CostSubjectSummaryVO[]
 }

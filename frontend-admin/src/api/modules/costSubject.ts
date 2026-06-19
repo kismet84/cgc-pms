@@ -1,19 +1,21 @@
 import { request } from '@/api/request'
 import type { CostSubjectVO, CostSubjectTreeNode } from '@/types/costSubject'
 
-/** 获取成本科目树 */
-export function getCostSubjectTree() {
+/** 获取成本科目树，category 可选 COST|REVENUE|SETTLEMENT */
+export function getCostSubjectTree(category?: string) {
   return request<CostSubjectTreeNode[]>({
     url: '/cost-subjects/tree',
     method: 'get',
+    params: category ? { category } : undefined,
   })
 }
 
-/** 获取成本科目列表 */
-export function getCostSubjectList() {
+/** 获取成本科目列表，category 可选 COST|REVENUE|SETTLEMENT */
+export function getCostSubjectList(category?: string) {
   return request<CostSubjectVO[]>({
     url: '/cost-subjects',
     method: 'get',
+    params: category ? { category } : undefined,
   })
 }
 

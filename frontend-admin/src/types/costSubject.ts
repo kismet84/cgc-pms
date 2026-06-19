@@ -4,6 +4,7 @@ export interface CostSubjectVO {
   subjectCode: string
   subjectName: string
   subjectType: string
+  accountCategory: string
   level: number
   sortOrder: number
   status: string

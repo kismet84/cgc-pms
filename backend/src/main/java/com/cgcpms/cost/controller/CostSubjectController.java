@@ -21,14 +21,16 @@ public class CostSubjectController {
 
     @GetMapping("/tree")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:query')")
-    public ApiResponse<List<CostSubjectTreeNodeVO>> getTree() {
-        return ApiResponse.success(costSubjectService.getTree());
+    public ApiResponse<List<CostSubjectTreeNodeVO>> getTree(
+            @RequestParam(required = false) String category) {
+        return ApiResponse.success(costSubjectService.getTree(category));
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:query')")
-    public ApiResponse<List<CostSubjectVO>> getList() {
-        return ApiResponse.success(costSubjectService.getList());
+    public ApiResponse<List<CostSubjectVO>> getList(
+            @RequestParam(required = false) String category) {
+        return ApiResponse.success(costSubjectService.getList(category));
     }
 
     @GetMapping("/{id}")
