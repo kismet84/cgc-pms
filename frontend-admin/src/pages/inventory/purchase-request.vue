@@ -388,15 +388,6 @@ const kpiReqPending = computed(
       .length,
 )
 
-const statusBreakdown = computed(() => {
-  const m: Record<string, number> = {}
-  tableData.value.forEach((r) => {
-    const label = STATUS_LABEL[r.status] ?? r.status
-    m[label] = (m[label] || 0) + 1
-  })
-  return Object.entries(m).map(([label, count]) => ({ label, count }))
-})
-
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchMaterials()
@@ -467,100 +458,79 @@ onMounted(() => {
       </a-button>
     </div>
 
-    <div class="lg-grid">
-      <div class="lg-left">
-        <!-- KPI 横条 -->
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">申请数</span>
-            <span class="lg-kpi-card-value">{{ kpiReqTotal }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
-          </div>
-          <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">待审批</span>
-            <span class="lg-kpi-card-value">{{ kpiReqPending }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:#f59e0b"></span></span>
-          </div>
-        </div>
-
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleAdd">新建申请</a-button>
-          </div>
-          <div class="lg-toolbar-right" />
-        </div>
-
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <a-table
-            :columns="columns"
-            :data-source="tableData"
-            :loading="loading"
-            :pagination="false"
-            row-key="id"
-            size="small"
-          >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'approvalStatus'">
-                <ApprovalStatusTag :status="record.approvalStatus" />
-              </template>
-              <template v-else-if="column.key === 'status'">
-                <a-tag :color="STATUS_COLOR[record.status]">
-                  {{ STATUS_LABEL[record.status] ?? record.status }}
-                </a-tag>
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-                <a-button
-                  v-if="record.approvalStatus === 'DRAFT'"
-                  type="link"
-                  size="small"
-                  style="color: #1677ff"
-                  @click="handleSubmit(record)"
-                >
-                  提交审批
-                </a-button>
-                <a-button type="link" size="small" danger @click="handleDelete(record)"
-                  >删除</a-button
-                >
-              </template>
-            </template>
-          </a-table>
-        </div>
-
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
+    <!-- KPI 横条 -->
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">申请数</span>
+        <span class="lg-kpi-card-value">{{ kpiReqTotal }} <small>条</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
       </div>
+      <div class="lg-kpi-card is-warn">
+        <span class="lg-kpi-card-label">待审批</span>
+        <span class="lg-kpi-card-value">{{ kpiReqPending }} <small>条</small></span>
+        <span class="lg-kpi-card-bar"><span style="width:100%;background:#f59e0b"></span></span>
+      </div>
+    </div>
 
-      <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">业务状态分布</div>
-          <div class="lg-type-list">
-            <div v-for="it in statusBreakdown" :key="it.label" class="lg-type-row">
-              <span class="lg-type-label">{{ it.label }}</span>
-              <span class="lg-type-num">{{ it.count }}</span>
-              <span class="lg-type-pct">条</span>
-            </div>
-            <div v-if="statusBreakdown.length === 0" class="lg-type-row">
-              <span class="lg-type-label" style="color: #9ca3af">暂无数据</span>
-            </div>
-          </div>
-        </section>
-      </aside>
+    <!-- 工具栏 -->
+    <div class="lg-toolbar">
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleAdd">新建申请</a-button>
+      </div>
+      <div class="lg-toolbar-right" />
+    </div>
+
+    <!-- 表格 -->
+    <div class="lg-table-wrap">
+      <a-table
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'approvalStatus'">
+            <ApprovalStatusTag :status="record.approvalStatus" />
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="STATUS_COLOR[record.status]">
+              {{ STATUS_LABEL[record.status] ?? record.status }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
+            <a-button
+              v-if="record.approvalStatus === 'DRAFT'"
+              type="link"
+              size="small"
+              style="color: #1677ff"
+              @click="handleSubmit(record)"
+            >
+              提交审批
+            </a-button>
+            <a-button type="link" size="small" danger @click="handleDelete(record)"
+              >删除</a-button
+            >
+          </template>
+        </template>
+      </a-table>
+    </div>
+
+    <!-- 分页 -->
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
+      <a-pagination
+        v-model:current="pageNo"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-size-options="['10', '20', '50', '100']"
+        show-size-changer
+        show-quick-jumper
+        @change="handlePageChange"
+        @show-size-change="handlePageSizeChange"
+      />
     </div>
 
     <!-- Add/Edit Modal -->
