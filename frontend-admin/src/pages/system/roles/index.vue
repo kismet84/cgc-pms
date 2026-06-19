@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message } from 'ant-design-vue'
-import { SearchOutlined, ReloadOutlined, KeyOutlined } from '@ant-design/icons-vue'
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
 import { getRoles } from '@/api/modules/system'
 import type { SysRoleVO } from '@/types/system'
@@ -20,14 +20,14 @@ const filter = reactive({
 const permissionModalVisible = ref(false)
 const selectedRole = ref<SysRoleVO | null>(null)
 
-const columns = [
-  { title: '角色名称', dataIndex: 'roleName', width: 150 },
-  { title: '角色编码', dataIndex: 'roleCode', width: 150 },
-  { title: '角色类型', dataIndex: 'roleType', width: 120 },
-  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '操作', key: 'action', width: 100 },
-]
+const gridColumns = computed(() => [
+  { field: 'roleName', title: '角色名称', width: 150 },
+  { field: 'roleCode', title: '角色编码', width: 150 },
+  { field: 'roleType', title: '角色类型', width: 120 },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'createdAt', title: '创建时间', width: 160 },
+  { title: '操作', width: 100, slots: { default: 'action' } },
+])
 
 const filteredRoles = computed(() => {
   return allRoles.value.filter((r) => {
@@ -90,10 +90,12 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="lg-page">
+  <div class="lg-page app-page">
     <div class="lg-page-head">
       <div>
-        <a-page-header title="角色管理" style="padding: 0; background: transparent" />
+        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+          <a-breadcrumb-item>角色管理</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
@@ -126,30 +128,27 @@ onMounted(fetchData)
 
     <!-- 表格 -->
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="false"
-        row-key="id"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
         size="small"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <a-tag :color="record.status === 'ENABLE' ? 'success' : 'error'">
-              {{ record.status === 'ENABLE' ? '启用' : '禁用' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <div class="lg-ops">
-              <a-button type="link" size="small" @click="handleEditPermission(record)">
-                <template #icon><KeyOutlined /></template>
-                编辑权限
-              </a-button>
-            </div>
-          </template>
+        <template #status="{ row }">
+          <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
+            {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+          </a-tag>
         </template>
-      </a-table>
+        <template #action="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleEditPermission(row)">编辑权限</a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <!-- 分页 -->
