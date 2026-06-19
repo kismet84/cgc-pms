@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { getDictDataByCode } from '@/api/modules/dict'
 import { getPartnerList, createPartner, updatePartner, deletePartner } from '@/api/modules/partner'
 import type { PartnerVO } from '@/types/partner'
@@ -47,7 +47,6 @@ const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([
 const partnerTypeLabel = (val: string) => {
   const fromDict = partnerTypeOptions.value.find((o) => o.dictValue === val)
   if (fromDict) return fromDict.dictLabel
-  // Static fallback in case dict not loaded yet
   const fallback: Record<string, string> = { PARTY_A: '甲方', PARTY_B: '乙方', OTHER: '其他' }
   return fallback[val] ?? val
 }
@@ -251,69 +250,75 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="pm-page">
-    <a-page-header title="合作方管理" class="pm-header" />
-
-    <!-- Filter -->
-    <div class="pm-card pm-filter">
-      <div class="pm-filter-row">
-        <div class="pm-field">
-          <label>合作方编号：</label>
-          <a-input
-            v-model:value="filter.partnerCode"
-            placeholder="请输入编号"
-            style="width: 160px"
-            allow-clear
-          />
-        </div>
-        <div class="pm-field">
-          <label>合作方名称：</label>
-          <a-input
-            v-model:value="filter.partnerName"
-            placeholder="请输入名称"
-            style="width: 160px"
-            allow-clear
-          />
-        </div>
-        <div class="pm-field">
-          <label>类型：</label>
-          <a-select
-            v-model:value="filter.partnerType"
-            placeholder="全部"
-            allow-clear
-            style="width: 130px"
-          >
-            <a-select-option
-              v-for="opt in partnerTypeOptions"
-              :key="opt.dictValue"
-              :value="opt.dictValue"
-            >
-              {{ opt.dictLabel }}
-            </a-select-option></a-select
-          >
-        </div>
-        <div class="pm-field">
-          <label>状态：</label>
-          <a-select
-            v-model:value="filter.status"
-            placeholder="全部"
-            allow-clear
-            style="width: 110px"
-          >
-            <a-select-option value="ENABLE">启用</a-select-option>
-            <a-select-option value="DISABLE">禁用</a-select-option>
-          </a-select>
-        </div>
-        <div class="pm-filter-actions">
-          <a-button type="primary" @click="handleAdd"><PlusOutlined />新建合作方</a-button>
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-        </div>
+  <div class="lg-page">
+    <div class="lg-page-head">
+      <div>
+        <a-page-header title="合作方管理" style="padding: 0; background: transparent" />
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="pm-card pm-table-wrap">
+    <!-- 搜索栏 -->
+    <div class="lg-search-bar">
+      <a-input
+        v-model:value="filter.partnerName"
+        placeholder="搜索合作方名称…"
+        allow-clear
+        size="large"
+        @press-enter="handleSearch"
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="lg-toolbar">
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleAdd">
+          <template #icon><PlusOutlined /></template>
+          新建合作方
+        </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+      </div>
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.partnerType"
+          placeholder="全部类型"
+          allow-clear
+          style="width: 130px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option
+            v-for="opt in partnerTypeOptions"
+            :key="opt.dictValue"
+            :value="opt.dictValue"
+          >
+            {{ opt.dictLabel }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.status"
+          placeholder="全部状态"
+          allow-clear
+          style="width: 110px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option value="ENABLE">启用</a-select-option>
+          <a-select-option value="DISABLE">禁用</a-select-option>
+        </a-select>
+      </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="lg-table-wrap">
       <a-table
         :columns="columns"
         :data-source="tableData"
@@ -333,7 +338,7 @@ onMounted(() => {
           </template>
           <template v-else-if="column.key === 'blacklistFlag'">
             <a-tag v-if="record.blacklistFlag" color="error">黑名单</a-tag>
-            <span v-else class="pm-none">-</span>
+            <span v-else class="lg-none">-</span>
           </template>
           <template v-else-if="column.key === 'riskLevel'">
             <a-tag :color="RISK_COLOR[record.riskLevel]">
@@ -346,18 +351,18 @@ onMounted(() => {
             </a-tag>
           </template>
           <template v-else-if="column.dataIndex === 'ops'">
-            <div class="pm-ops">
-              <a class="pm-link" @click="handleEdit(record)">编辑</a>
-              <a class="pm-link" style="color: #ff4d4f" @click="handleDelete(record)">删除</a>
+            <div class="lg-ops">
+              <a class="lg-link" @click="handleEdit(record)">编辑</a>
+              <a class="lg-link lg-del" @click="handleDelete(record)">删除</a>
             </div>
           </template>
         </template>
       </a-table>
     </div>
 
-    <!-- Pagination -->
-    <div class="pm-pagination">
-      <span class="pm-total">共 {{ total }} 条</span>
+    <!-- 分页 -->
+    <div class="lg-pagination">
+      <span class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -440,72 +445,8 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.pm-page {
-  background: #f6f8fc;
-  min-height: 100%;
-  padding: 4px 0;
-}
-.pm-header {
-  background: transparent;
-  padding-bottom: 12px;
-}
-.pm-card {
-  background: #fff;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.05);
-}
-.pm-filter {
-  padding: 20px 22px;
-  margin-bottom: 14px;
-}
-.pm-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-}
-.pm-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-.pm-field label {
-  color: #374151;
-}
-.pm-filter-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.pm-table-wrap {
-  overflow: hidden;
-  margin-bottom: 0;
-}
-.pm-link {
-  color: #1677ff;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-}
-.pm-none {
-  color: #9ca3af;
-}
-.pm-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 0 0;
-}
-.pm-total {
-  font-size: 13px;
-  color: #4b5563;
-}
-.pm-ops {
-  display: flex;
-  gap: 10px;
+/* 页面专属样式 — 其余已由 lg-* 全局类覆盖 */
+.lg-none {
+  color: var(--muted);
 }
 </style>
