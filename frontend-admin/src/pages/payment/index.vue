@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   getApplicationList,
   createApplication,
@@ -318,6 +318,48 @@ const statusBreakdown = computed(() => {
   return Object.entries(m).map(([k, v]) => ({ label: PAY_STATUS_LABEL[k] ?? k, count: v }))
 })
 
+const kpiMax = computed(() => ({
+  unpaid: Math.max(kpiUnpaid.value, 1),
+  approvedUnpaid: Math.max(kpiApprovedUnpaid.value, 1),
+}))
+function kpiPct(value: number, max: number): number {
+  if (max === 0) return 0
+  return Math.min(Math.round((value / max) * 100), 100)
+}
+
+// vxe-grid columns
+const gridColumns = computed(() => [
+  { field: 'applyCode', title: '申请编号', width: 150, ellipsis: true },
+  { field: 'projectName', title: '项目', width: 120, ellipsis: true },
+  { field: 'contractName', title: '合同', width: 120, ellipsis: true },
+  { field: 'partnerName', title: '合作方', width: 120, ellipsis: true },
+  {
+    field: 'applyAmount',
+    title: '申请金额',
+    width: 100,
+    align: 'right' as const,
+    slots: { default: 'applyAmount' },
+  },
+  {
+    field: 'approvedAmount',
+    title: '审批金额',
+    width: 100,
+    align: 'right' as const,
+    slots: { default: 'approvedAmount' },
+  },
+  {
+    field: 'actualPayAmount',
+    title: '实付金额',
+    width: 100,
+    align: 'right' as const,
+    slots: { default: 'actualPayAmount' },
+  },
+  { field: 'payType', title: '付款类型', width: 90, slots: { default: 'payType' } },
+  { field: 'payStatus', title: '支付状态', width: 90, slots: { default: 'payStatus' } },
+  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
+  { title: '操作', width: 170, slots: { default: 'action' } },
+])
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({})
@@ -329,192 +371,195 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>付款管理</a-breadcrumb-item
-        ><a-breadcrumb-item>付款申请</a-breadcrumb-item></a-breadcrumb
-      >
-      <div class="pt-head-actions">
-        <a-button type="primary" @click="handleAdd"><PlusOutlined />新建申请</a-button>
-        <a-button @click="handleSearch"><ReloadOutlined />刷新</a-button>
+  <div class="lg-page app-page">
+    <!-- 页面头部 -->
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+          <a-breadcrumb-item>付款管理</a-breadcrumb-item>
+          <a-breadcrumb-item>付款申请</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
-    <div class="pt-kpi-strip">
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">待付款金额</div>
-        <div class="pt-kpi-value" style="color: #ef4444">
-          {{ kpiUnpaid.toLocaleString() }}<small>元</small>
+    <div class="lg-grid">
+      <div class="lg-left">
+        <!-- KPI 横条 -->
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">待付款金额</span>
+            <span class="lg-kpi-card-value" style="color: #ef4444">{{ kpiUnpaid.toLocaleString() }} <small>元</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:100%;background:#ef4444"></span></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">已审批未支付</span>
+            <span class="lg-kpi-card-value">{{ kpiApprovedUnpaid.toLocaleString() }} <small>元</small></span>
+            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiApprovedUnpaid, kpiMax.unpaid) + '%', background: 'var(--kpi-unpaid)' }"></span></span>
+            <span class="lg-kpi-card-hint">{{ kpiPct(kpiApprovedUnpaid, kpiMax.unpaid) }}%</span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">今日应付</span>
+            <span class="lg-kpi-card-value">-<small>元</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:0%;background:var(--muted)"></span></span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">超比例付款</span>
+            <span class="lg-kpi-card-value">0<small>条</small></span>
+            <span class="lg-kpi-card-bar"><span style="width:0%;background:var(--kpi-overdue)"></span></span>
+          </div>
         </div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">已审批未支付</div>
-        <div class="pt-kpi-value">{{ kpiApprovedUnpaid.toLocaleString() }}<small>元</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">今日应付</div>
-        <div class="pt-kpi-value">-<small>元</small></div>
-      </div>
-      <div class="pt-kpi">
-        <div class="pt-kpi-label">超比例付款</div>
-        <div class="pt-kpi-value">0<small>条</small></div>
-      </div>
-    </div>
 
-    <div class="pt-panel pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>项目：</label
-          ><a-select
-            v-model:value="filter.projectId"
-            placeholder="全部"
-            allow-clear
-            style="width: 160px"
-            @change="
-              (v: string | undefined) => {
-                filter.contractId = undefined
-                if (v) referenceStore.fetchContracts({ projectId: v })
-              }
-            "
-            ><a-select-option v-for="p in projects" :key="p.id" :value="p.id">{{
-              p.projectName
-            }}</a-select-option></a-select
-          >
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新建申请
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
+          </div>
+          <div class="lg-toolbar-right">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              style="width: 140px"
+              size="small"
+              @change="
+                (v: string | undefined) => {
+                  filter.contractId = undefined
+                  if (v) referenceStore.fetchContracts({ projectId: v })
+                  handleSearch()
+                }
+              "
+            >
+              <a-select-option v-for="p in projects" :key="p.id" :value="p.id">{{
+                p.projectName
+              }}</a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.contractId"
+              placeholder="全部合同"
+              allow-clear
+              style="width: 140px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">{{
+                c.contractName
+              }}</a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.payType"
+              placeholder="全部类型"
+              allow-clear
+              style="width: 110px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="(label, key) in PAY_TYPE_LABEL" :key="key" :value="key">{{
+                label
+              }}</a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.payStatus"
+              placeholder="全部状态"
+              allow-clear
+              style="width: 110px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="(label, key) in PAY_STATUS_LABEL" :key="key" :value="key">{{
+                label
+              }}</a-select-option>
+            </a-select>
+          </div>
         </div>
-        <div class="pt-field">
-          <label>合同：</label
-          ><a-select
-            v-model:value="filter.contractId"
-            placeholder="全部"
-            allow-clear
-            style="width: 160px"
-            ><a-select-option v-for="c in contracts" :key="c.id" :value="c.id">{{
-              c.contractName
-            }}</a-select-option></a-select
-          >
-        </div>
-        <div class="pt-field">
-          <label>付款类型：</label
-          ><a-select
-            v-model:value="filter.payType"
-            placeholder="全部"
-            allow-clear
-            style="width: 120px"
-            ><a-select-option v-for="(label, key) in PAY_TYPE_LABEL" :key="key" :value="key">{{
-              label
-            }}</a-select-option></a-select
-          >
-        </div>
-        <div class="pt-field">
-          <label>状态：</label
-          ><a-select
-            v-model:value="filter.payStatus"
-            placeholder="全部"
-            allow-clear
-            style="width: 120px"
-            ><a-select-option v-for="(label, key) in PAY_STATUS_LABEL" :key="key" :value="key">{{
-              label
-            }}</a-select-option></a-select
-          >
-        </div>
-        <div class="pt-filter-actions">
-          <a-button type="primary" size="small" @click="handleSearch"><SearchOutlined /></a-button
-          ><a-button size="small" @click="handleReset"><ReloadOutlined /></a-button>
-        </div>
-      </div>
-    </div>
 
-    <div class="pt-ledger-layout">
-      <main class="pt-panel pt-table-panel">
-        <div class="pt-panel-header">付款申请清单</div>
-        <a-table
-          :columns="columns"
-          :data-source="tableData"
-          :loading="loading"
-          :pagination="false"
-          row-key="id"
-          size="small"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'applyAmount'"
-              ><span>{{ fmtWan(record.applyAmount) }} 万</span></template
-            >
-            <template v-else-if="column.key === 'approvedAmount'"
-              ><span>{{ fmtWan(record.approvedAmount) }} 万</span></template
-            >
-            <template v-else-if="column.key === 'actualPayAmount'"
-              ><span>{{ fmtWan(record.actualPayAmount) }} 万</span></template
-            >
-            <template v-else-if="column.key === 'payType'"
-              ><a-tag :color="PAY_TYPE_COLOR[record.payType] || 'default'" size="small">{{
-                PAY_TYPE_LABEL[record.payType] ?? record.payType
-              }}</a-tag></template
-            >
-            <template v-else-if="column.key === 'payStatus'"
-              ><a-tag :color="PAY_STATUS_COLOR[record.payStatus] || 'default'" size="small">{{
-                PAY_STATUS_LABEL[record.payStatus] ?? record.payStatus
-              }}</a-tag></template
-            >
-            <template v-else-if="column.key === 'approvalStatus'"
-              ><a-tag
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #applyAmount="{ row }">
+              <span class="lg-money">{{ fmtWan(row.applyAmount) }} 万</span>
+            </template>
+            <template #approvedAmount="{ row }">
+              <span class="lg-money">{{ fmtWan(row.approvedAmount) }} 万</span>
+            </template>
+            <template #actualPayAmount="{ row }">
+              <span class="lg-money">{{ fmtWan(row.actualPayAmount) }} 万</span>
+            </template>
+            <template #payType="{ row }">
+              <a-tag :color="PAY_TYPE_COLOR[row.payType] || 'default'" size="small">{{
+                PAY_TYPE_LABEL[row.payType] ?? row.payType
+              }}</a-tag>
+            </template>
+            <template #payStatus="{ row }">
+              <a-tag :color="PAY_STATUS_COLOR[row.payStatus] || 'default'" size="small">{{
+                PAY_STATUS_LABEL[row.payStatus] ?? row.payStatus
+              }}</a-tag>
+            </template>
+            <template #approvalStatus="{ row }">
+              <a-tag
                 :color="
-                  record.approvalStatus === 'APPROVED'
+                  row.approvalStatus === 'APPROVED'
                     ? 'success'
-                    : record.approvalStatus === 'REJECTED'
+                    : row.approvalStatus === 'REJECTED'
                       ? 'error'
-                      : record.approvalStatus === 'APPROVING'
+                      : row.approvalStatus === 'APPROVING'
                         ? 'processing'
                         : 'default'
                 "
                 size="small"
-                >{{ record.approvalStatus }}</a-tag
-              ></template
-            >
-            <template v-else-if="column.key === 'action'">
-              <a class="pt-link" @click="handleEdit(record)">编辑</a>
-              <a
-                v-if="record.approvalStatus === 'DRAFT'"
-                class="pt-link"
-                style="margin-left: 8px"
-                @click="handleApproval(record)"
-                >提交审批</a
-              >
-              <a
-                v-if="record.approvalStatus === 'APPROVED' && record.payStatus !== 'PAID'"
-                class="pt-link"
-                style="margin-left: 8px"
-                @click="openWriteback(record)"
-                >付款回写</a
-              >
-              <a class="pt-link pt-danger" style="margin-left: 8px" @click="handleDelete(record)"
-                >删除</a
-              >
+              >{{ row.approvalStatus }}</a-tag>
             </template>
-          </template>
-        </a-table>
-        <a-empty
-          v-if="!loading && tableData.length === 0"
-          description="暂无付款申请"
-          style="padding: 48px 0"
-        />
-        <div class="pt-pagination">
-          <span class="pt-total">共 {{ total }} 条</span
-          ><a-pagination
-            :current="pageNo"
+            <template #action="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a
+                  v-if="row.approvalStatus === 'DRAFT'"
+                  class="lg-link"
+                  @click="handleApproval(row)"
+                >提交审批</a>
+                <a
+                  v-if="row.approvalStatus === 'APPROVED' && row.payStatus !== 'PAID'"
+                  class="lg-link"
+                  @click="openWriteback(row)"
+                >付款回写</a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
             :total="total"
-            :page-size="pageSize"
-            :show-size-changer="true"
-            :page-size-options="['10', '20', '50']"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
             show-quick-jumper
-            size="small"
             @change="handlePageChange"
-            @showSizeChange="handlePageSizeChange"
+            @show-size-change="handlePageSizeChange"
           />
         </div>
-      </main>
+      </div>
 
-      <aside class="pt-analysis-rail">
+      <!-- 右侧分析面板 -->
+      <aside class="lg-analysis-rail">
         <section class="pt-panel">
           <div class="pt-panel-header">付款状态统计</div>
           <div class="pt-panel-body">
@@ -548,7 +593,7 @@ onMounted(() => {
       </aside>
     </div>
 
-    <!-- Create/Edit Modal (unchanged structure) -->
+    <!-- Create/Edit Modal -->
     <a-modal v-model:open="modalVisible" :title="modalTitle" :width="760" @ok="handleSubmit">
       <a-form layout="vertical" :model="formData">
         <a-row :gutter="16">
