@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -47,23 +47,17 @@ const STATUS_LABEL: Record<string, string> = {
   DISABLE: '禁用',
 }
 
-const columns = [
-  { title: '材料编码', dataIndex: 'materialCode', width: 130, ellipsis: true },
-  { title: '材料名称', dataIndex: 'materialName', minWidth: 150, ellipsis: true },
-  { title: '规格型号', dataIndex: 'specification', width: 120, ellipsis: true },
-  { title: '单位', dataIndex: 'unit', width: 70 },
-  { title: '品牌', dataIndex: 'brand', width: 100, ellipsis: true },
-  {
-    title: '默认税率(%)',
-    dataIndex: 'defaultTaxRate',
-    width: 100,
-    align: 'right' as const,
-    key: 'defaultTaxRate',
-  },
-  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '创建时间', dataIndex: 'createdAt', width: 150 },
-  { title: '操作', dataIndex: 'ops', width: 130, key: 'ops' },
-]
+const gridColumns = computed(() => [
+  { field: 'materialCode', title: '材料编码', width: 130, ellipsis: true },
+  { field: 'materialName', title: '材料名称', minWidth: 150, ellipsis: true },
+  { field: 'specification', title: '规格型号', width: 120, ellipsis: true },
+  { field: 'unit', title: '单位', width: 70 },
+  { field: 'brand', title: '品牌', width: 100, ellipsis: true },
+  { field: 'defaultTaxRate', title: '默认税率(%)', width: 100, align: 'right' as const, slots: { default: 'defaultTaxRate' } },
+  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'createdAt', title: '创建时间', width: 150 },
+  { title: '操作', width: 130, slots: { default: 'ops' } },
+])
 
 async function fetchData() {
   loading.value = true
@@ -255,33 +249,33 @@ onMounted(fetchData)
 
     <!-- 表格 -->
     <div class="lg-table-wrap">
-      <a-table
-        :columns="columns"
-        :data-source="tableData"
+      <vxe-grid
+        :data="tableData"
+        :columns="gridColumns"
         :loading="loading"
-        :pagination="false"
-        row-key="id"
+        :column-config="{ resizable: true }"
+        stripe
+        border="inner"
         size="small"
+        max-height="480"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'defaultTaxRate'">
-            <span>{{ record.defaultTaxRate || '-' }}</span>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="STATUS_COLOR[record.status]">
-              {{ STATUS_LABEL[record.status] ?? record.status }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'ops'">
-            <div class="lg-ops">
-              <a class="lg-link" @click="handleEdit(record)">编辑</a>
-              <a class="lg-link lg-del" @click="handleToggleStatus(record)">
-                {{ record.status === 'ENABLE' ? '禁用' : '启用' }}
-              </a>
-            </div>
-          </template>
+        <template #defaultTaxRate="{ row }">
+          <span>{{ row.defaultTaxRate || '-' }}</span>
         </template>
-      </a-table>
+        <template #status="{ row }">
+          <a-tag :color="STATUS_COLOR[row.status]">
+            {{ STATUS_LABEL[row.status] ?? row.status }}
+          </a-tag>
+        </template>
+        <template #ops="{ row }">
+          <div class="lg-ops">
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a class="lg-link lg-del" @click="handleToggleStatus(row)">
+              {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
+            </a>
+          </div>
+        </template>
+      </vxe-grid>
     </div>
 
     <!-- 分页 -->
