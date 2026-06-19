@@ -238,13 +238,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb">
-        <a-breadcrumb-item>成本管理</a-breadcrumb-item>
-        <a-breadcrumb-item>成本科目</a-breadcrumb-item>
-      </a-breadcrumb>
-      <div class="pt-head-actions">
+  <div class="lg-page app-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="cl-breadcrumb">
+          <a-breadcrumb-item>成本管理</a-breadcrumb-item>
+          <a-breadcrumb-item>成本科目</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
         <a-button type="primary" @click="handleAddRoot">新增根节点</a-button>
         <a-button @click="handleAddChild" :disabled="!selectedNode">新增子节点</a-button>
       </div>
@@ -257,7 +259,7 @@ onMounted(() => {
 
     <div class="cs-layout">
       <!-- Left: Tree -->
-      <div class="pt-panel cs-tree-panel">
+      <div class="lg-table-wrap cs-tree-panel">
         <div class="cs-tree-header">
           <span class="cs-tree-title">科目树</span>
           <a-button type="link" size="small" @click="fetchTree">刷新</a-button>
@@ -286,7 +288,7 @@ onMounted(() => {
       </div>
 
       <!-- Right: Detail -->
-      <div class="pt-panel cs-detail-panel">
+      <div class="lg-table-wrap cs-detail-panel">
         <template v-if="selectedNode">
           <div class="cs-detail-header">
             <span class="cs-detail-title">{{ selectedNode.subjectName }}</span>
