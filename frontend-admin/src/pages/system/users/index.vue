@@ -227,40 +227,34 @@ onMounted(() => {
     </div>
 
     <div class="lg-search-bar">
-      <div class="lg-filter-row">
-        <div class="lg-filter-item">
-          <label class="lg-label">用户名：</label>
-          <a-input
-            v-model:value="filter.username"
-            placeholder="用户名"
-            allow-clear
-            style="width: 150px"
-          />
-        </div>
-        <div class="lg-filter-item">
-          <label class="lg-label">姓名：</label>
-          <a-input
-            v-model:value="filter.realName"
-            placeholder="姓名"
-            allow-clear
-            style="width: 150px"
-          />
-        </div>
-        <div class="lg-filter-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-        </div>
-      </div>
+      <a-input
+        v-model:value="filter.username"
+        placeholder="用户名"
+        allow-clear
+        style="flex: 1; max-width: 200px"
+        @press-enter="handleSearch"
+      />
+      <a-input
+        v-model:value="filter.realName"
+        placeholder="姓名"
+        allow-clear
+        style="flex: 1; max-width: 200px"
+        @press-enter="handleSearch"
+      />
+      <a-button type="primary" @click="handleSearch">查询</a-button>
+      <a-button @click="handleReset">重置</a-button>
     </div>
 
     <div class="lg-toolbar">
-      <a-button type="primary" @click="handleAdd">
-        <template #icon><PlusOutlined /></template>
-        新增用户
-      </a-button>
-      <a-button @click="fetchData">
-        <template #icon><ReloadOutlined /></template>
-      </a-button>
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleAdd">
+          <template #icon><PlusOutlined /></template>
+          新增用户
+        </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+      </div>
     </div>
 
     <div class="lg-table-wrap">

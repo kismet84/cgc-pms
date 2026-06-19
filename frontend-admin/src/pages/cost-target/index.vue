@@ -193,74 +193,70 @@ onMounted(() => {
     </div>
 
     <div class="lg-search-bar">
-      <div class="lg-filter-row">
-        <div class="lg-filter-item">
-          <label class="lg-label">所属项目：</label>
-          <a-select
-            v-model:value="filter.projectId"
-            placeholder="请选择项目"
-            allow-clear
-            style="width: 180px"
-            show-search
-            :filter-option="
-              (input: string, option: any) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
-              p.projectName
-            }}</a-select-option>
-          </a-select>
-        </div>
-        <div class="lg-filter-item">
-          <label class="lg-label">版本号：</label>
-          <a-input
-            v-model:value="filter.versionNo"
-            placeholder="请输入版本号"
-            style="width: 160px"
-          />
-        </div>
-        <div class="lg-filter-item">
-          <label class="lg-label">审批状态：</label>
-          <a-select
-            v-model:value="filter.approvalStatus"
-            placeholder="全部"
-            allow-clear
-            style="width: 130px"
-          >
-            <a-select-option value="DRAFT">草稿</a-select-option>
-            <a-select-option value="APPROVING">审批中</a-select-option>
-            <a-select-option value="APPROVED">已通过</a-select-option>
-            <a-select-option value="REJECTED">已驳回</a-select-option>
-          </a-select>
-        </div>
-        <div class="lg-filter-item">
-          <label class="lg-label">版本标识：</label>
-          <a-select
-            v-model:value="filter.isActive"
-            placeholder="全部"
-            allow-clear
-            style="width: 130px"
-          >
-            <a-select-option :value="1">当前版本</a-select-option>
-            <a-select-option :value="0">历史版本</a-select-option>
-          </a-select>
-        </div>
-        <div class="lg-filter-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-        </div>
-      </div>
+      <a-input
+        v-model:value="filter.versionNo"
+        placeholder="请输入版本号"
+        allow-clear
+        style="flex: 1; max-width: 240px"
+        @press-enter="handleSearch"
+      />
+      <a-button type="primary" @click="handleSearch">查询</a-button>
+      <a-button @click="handleReset">重置</a-button>
     </div>
 
     <div class="lg-toolbar">
-      <a-button type="primary" @click="handleCreate">
-        <template #icon><PlusOutlined /></template>
-        新建目标成本
-      </a-button>
-      <a-button @click="fetchData">
-        <template #icon><ReloadOutlined /></template>
-      </a-button>
+      <div class="lg-toolbar-left">
+        <a-button type="primary" @click="handleCreate">
+          <template #icon><PlusOutlined /></template>
+          新建目标成本
+        </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+      </div>
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.projectId"
+          placeholder="全部项目"
+          allow-clear
+          style="width: 160px"
+          size="small"
+          show-search
+          :filter-option="
+            (input: string, option: any) =>
+              option.label?.toLowerCase().includes(input.toLowerCase())
+          "
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
+            p.projectName
+          }}</a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.approvalStatus"
+          placeholder="全部审批状态"
+          allow-clear
+          style="width: 140px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option value="DRAFT">草稿</a-select-option>
+          <a-select-option value="APPROVING">审批中</a-select-option>
+          <a-select-option value="APPROVED">已通过</a-select-option>
+          <a-select-option value="REJECTED">已驳回</a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.isActive"
+          placeholder="全部版本标识"
+          allow-clear
+          style="width: 140px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option :value="1">当前版本</a-select-option>
+          <a-select-option :value="0">历史版本</a-select-option>
+        </a-select>
+      </div>
     </div>
 
     <div class="lg-table-wrap">
