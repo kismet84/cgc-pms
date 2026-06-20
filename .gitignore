@@ -56,8 +56,14 @@ login-snapshot.yml
 # Superpowers visual brainstorming working files
 .superpowers/
 
-# Archive (excluded from repo)
-archive/
+# Graphify knowledge graph (excluded from repo)
+graphify-out/
+
+# Claude Code settings (excluded from repo)
+.claude/
+
+# GitHub workflows (excluded from repo)
+.github/
 .opencode/
 frontend-admin/playwright-report/
 frontend-admin/test-results/
