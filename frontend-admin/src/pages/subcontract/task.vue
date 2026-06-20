@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
-import { SearchOutlined } from '@ant-design/icons-vue'
+import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   getSubTaskList,
   createSubTask,
@@ -19,6 +19,7 @@ const filter = reactive({
   status: undefined as string | undefined,
   taskCode: '',
   taskName: '',
+  keyword: '',
 })
 
 const loading = ref(false)
@@ -103,8 +104,7 @@ async function fetchData() {
       contractId: filter.contractId,
       partnerId: filter.partnerId,
       status: filter.status,
-      taskCode: filter.taskCode || undefined,
-      taskName: filter.taskName || undefined,
+      taskCode: filter.keyword || filter.taskCode || undefined,
     })
     tableData.value = res.records
     total.value = res.total
@@ -130,6 +130,7 @@ function handleReset() {
   filter.status = undefined
   filter.taskCode = ''
   filter.taskName = ''
+  filter.keyword = ''
   pageNo.value = 1
   fetchData()
 }
@@ -261,88 +262,20 @@ onMounted(() => {
 
     <!-- 搜索栏 -->
     <div class="lg-search-bar">
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部"
-        allow-clear
-        style="width: 180px"
-        show-search
-        @change="
-          (v: string | undefined) => {
-            filter.contractId = undefined
-            if (v) referenceStore.fetchContracts({ projectId: v })
-          }
-        "
-        :filter-option="
-          (input: string, option: any) =>
-            option.label?.toLowerCase().includes(input.toLowerCase())
-        "
-      >
-        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.contractId"
-        placeholder="全部"
-        allow-clear
-        style="width: 180px"
-        show-search
-        :filter-option="
-          (input: string, option: any) =>
-            option.label?.toLowerCase().includes(input.toLowerCase())
-        "
-      >
-        <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-          {{ c.contractName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.partnerId"
-        placeholder="全部"
-        allow-clear
-        style="width: 160px"
-        show-search
-        :filter-option="
-          (input: string, option: any) =>
-            option.label?.toLowerCase().includes(input.toLowerCase())
-        "
-      >
-        <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-          {{ p.partnerName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.status"
-        placeholder="全部"
-        allow-clear
-        style="width: 110px"
-      >
-        <a-select-option value="NOT_STARTED">未开始</a-select-option>
-        <a-select-option value="IN_PROGRESS">进行中</a-select-option>
-        <a-select-option value="COMPLETED">已完成</a-select-option>
-        <a-select-option value="SUSPENDED">已暂停</a-select-option>
-      </a-select>
       <a-input
-        v-model:value="filter.taskCode"
+        v-model:value="filter.keyword"
         placeholder="搜索任务编号、名称…"
-        style="width: 140px"
         allow-clear
+        size="large"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #697380" /></template>
       </a-input>
-      <a-input
-        v-model:value="filter.taskName"
-        placeholder="搜索任务编号、名称…"
-        style="width: 140px"
-        allow-clear
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: #697380" /></template>
-      </a-input>
-      <a-button type="primary" @click="handleSearch">查询</a-button>
-      <a-button @click="handleReset">重置</a-button>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
     <!-- KPI 横条 -->
@@ -372,9 +305,28 @@ onMounted(() => {
     <!-- 工具栏 -->
     <div class="lg-toolbar">
       <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleAdd">新建任务</a-button>
+        <a-button type="primary" @click="handleAdd">
+          <template #icon><PlusOutlined /></template>
+          新建任务
+        </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
       </div>
-      <div class="lg-toolbar-right" />
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.projectId"
+          placeholder="全部项目"
+          allow-clear
+          style="width: 160px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+      </div>
     </div>
 
     <!-- 表格 -->
