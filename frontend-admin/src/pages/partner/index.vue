@@ -282,35 +282,7 @@ onMounted(() => {
           <template #icon><ReloadOutlined /></template>
         </a-button>
       </div>
-      <div class="lg-toolbar-right">
-        <a-select
-          v-model:value="filter.partnerType"
-          placeholder="全部类型"
-          allow-clear
-          style="width: 130px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option
-            v-for="opt in partnerTypeOptions"
-            :key="opt.dictValue"
-            :value="opt.dictValue"
-          >
-            {{ opt.dictLabel }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.status"
-          placeholder="全部状态"
-          allow-clear
-          style="width: 110px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option value="ENABLE">启用</a-select-option>
-          <a-select-option value="DISABLE">禁用</a-select-option>
-        </a-select>
-      </div>
+      <div class="lg-toolbar-right" />
     </div>
 
     <!-- 表格 -->

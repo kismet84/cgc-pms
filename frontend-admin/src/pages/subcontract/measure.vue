@@ -470,47 +470,6 @@ onMounted(() => {
             {{ p.projectName }}
           </a-select-option>
         </a-select>
-        <a-select
-          v-model:value="filter.contractId"
-          placeholder="全部分包合同"
-          allow-clear
-          style="width: 160px"
-          size="small"
-          show-search
-          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-            {{ c.contractName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.partnerId"
-          placeholder="全部分包商"
-          allow-clear
-          style="width: 140px"
-          size="small"
-          show-search
-          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
-            {{ p.partnerName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.status"
-          placeholder="全部状态"
-          allow-clear
-          style="width: 110px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option value="DRAFT">草稿</a-select-option>
-          <a-select-option value="APPROVING">审批中</a-select-option>
-          <a-select-option value="CONFIRMED">已确认</a-select-option>
-          <a-select-option value="COMPLETED">已完成</a-select-option>
-        </a-select>
       </div>
     </div>
 

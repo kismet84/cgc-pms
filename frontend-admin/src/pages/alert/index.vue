@@ -229,29 +229,6 @@ onMounted(async () => {
                 {{ p.projectName }}
               </a-select-option>
             </a-select>
-            <a-select
-              v-model:value="filter.severity"
-              placeholder="全部严重度"
-              allow-clear
-              style="width: 120px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option value="HIGH">高</a-select-option>
-              <a-select-option value="MEDIUM">中</a-select-option>
-              <a-select-option value="LOW">低</a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.isRead"
-              placeholder="全部状态"
-              allow-clear
-              style="width: 120px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option :value="0">未读</a-select-option>
-              <a-select-option :value="1">已读</a-select-option>
-            </a-select>
           </div>
         </div>
 

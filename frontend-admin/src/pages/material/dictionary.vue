@@ -232,19 +232,7 @@ onMounted(fetchData)
           <template #icon><ReloadOutlined /></template>
         </a-button>
       </div>
-      <div class="lg-toolbar-right">
-        <a-select
-          v-model:value="filter.status"
-          placeholder="全部状态"
-          allow-clear
-          style="width: 120px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option value="ENABLE">启用</a-select-option>
-          <a-select-option value="DISABLE">禁用</a-select-option>
-        </a-select>
-      </div>
+      <div class="lg-toolbar-right" />
     </div>
 
     <!-- 表格 -->

@@ -456,30 +456,6 @@ onMounted(() => {
             {{ p.projectName }}
           </a-select-option>
         </a-select>
-        <a-select
-          v-model:value="filter.contractId"
-          placeholder="全部合同"
-          allow-clear
-          style="width: 140px"
-          size="small"
-          @change="handleSearch()"
-        >
-          <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-            {{ c.contractName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.varType"
-          placeholder="全部类型"
-          allow-clear
-          style="width: 110px"
-          size="small"
-          @change="handleSearch()"
-        >
-          <a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">
-            {{ o.label }}
-          </a-select-option>
-        </a-select>
       </div>
     </div>
 

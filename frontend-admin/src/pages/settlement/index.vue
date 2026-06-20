@@ -348,32 +348,6 @@ const colorMap: Record<string, string> = {
                 {{ p.projectName }}
               </a-select-option>
             </a-select>
-            <a-select
-              v-model:value="filter.contractId"
-              placeholder="全部合同"
-              allow-clear
-              style="width: 160px"
-              size="small"
-            >
-              <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">
-                {{ c.contractName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.settlementStatus"
-              placeholder="全部状态"
-              allow-clear
-              style="width: 120px"
-              size="small"
-            >
-              <a-select-option
-                v-for="(label, key) in SETTLEMENT_STATUS_LABEL"
-                :key="key"
-                :value="key"
-              >
-                {{ label }}
-              </a-select-option>
-            </a-select>
           </div>
         </div>
 

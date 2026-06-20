@@ -546,30 +546,6 @@ const gridColumns = computed(() => [
                 {{ p.projectName }}
               </a-select-option>
             </a-select>
-            <a-select
-              v-model:value="filter.contractType"
-              placeholder="全部类型"
-              allow-clear
-              style="width: 120px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="(label, key) in TYPE_LABEL" :key="key" :value="key">
-                {{ label }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.contractStatus"
-              placeholder="全部状态"
-              allow-clear
-              style="width: 120px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="(label, key) in STATUS_LABEL" :key="key" :value="key">
-                {{ label }}
-              </a-select-option>
-            </a-select>
           </div>
         </div>
 
