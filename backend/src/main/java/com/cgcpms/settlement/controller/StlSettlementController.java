@@ -38,9 +38,10 @@ public class StlSettlementController {
             @RequestParam(required = false) Long contractId,
             @RequestParam(required = false) Long partnerId,
             @RequestParam(required = false) String settlementCode,
-            @RequestParam(required = false) String settlementType) {
+            @RequestParam(required = false) String settlementType,
+            @RequestParam(required = false) String keyword) {
         IPage<StlSettlementVO> page = stlSettlementService.getPage(pageNo, pageSize,
-                projectId, contractId, partnerId, settlementCode, settlementType);
+                projectId, contractId, partnerId, settlementCode, settlementType, keyword);
         return ApiResponse.success(PageResult.of(page));
     }
 

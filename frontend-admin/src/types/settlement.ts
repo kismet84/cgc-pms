@@ -107,6 +107,7 @@ export interface SettlementQueryParams {
   settlementStatus?: SettlementStatus
   settlementCode?: string
   settlementType?: string
+  keyword?: string
   pageNo: number
   pageSize: number
 }

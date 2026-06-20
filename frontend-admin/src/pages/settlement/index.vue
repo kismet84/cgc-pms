@@ -82,6 +82,7 @@ async function fetchData() {
     settlementStatus: filter.settlementStatus,
     settlementCode: filter.settlementCode || undefined,
     settlementType: filter.settlementType,
+    keyword: filter.keyword || undefined,
     pageNo: pageNo.value,
     pageSize: pageSize.value,
   }
@@ -320,9 +321,9 @@ onMounted(() => {
             { title: '合同', dataIndex: 'contractName', width: 140 },
             {
               title: '结算金额(万)',
-              dataIndex: 'settlementAmount',
+              dataIndex: 'finalAmount',
               width: 140,
-              key: 'settlementAmount',
+              key: 'finalAmount',
             },
             { title: '状态', dataIndex: 'settlementStatus', width: 100, key: 'settlementStatus' },
             { title: '创建时间', dataIndex: 'createdAt', width: 160 },
@@ -335,8 +336,8 @@ onMounted(() => {
           size="small"
         >
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'settlementAmount'"
-              ><span>{{ fmtWan(record.settlementAmount) }}</span></template
+            <template v-if="column.key === 'finalAmount'"
+              ><span>{{ fmtWan(record.finalAmount) }}</span></template
             >
             <template v-else-if="column.key === 'settlementStatus'"
               ><a-tag
