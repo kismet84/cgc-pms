@@ -56,12 +56,8 @@ login-snapshot.yml
 # Superpowers visual brainstorming working files
 .superpowers/
 
-# Agent runtime & docs (excluded from repo)
-doc/
-docs/
+# Archive (excluded from repo)
+archive/
 .opencode/
 frontend-admin/playwright-report/
 frontend-admin/test-results/
-scripts/
-.agent-runtime/
-AGENTS.md

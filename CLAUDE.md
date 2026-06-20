@@ -11,7 +11,8 @@ CGC-PMS is a construction general-contracting project management system with a S
 - `backend/`: Spring Boot 3.3, Java 21, MyBatis-Plus, Flyway, JWT, Redis, MinIO, MySQL/H2.
 - `frontend-admin/`: Vue 3 + TypeScript + Vite, Ant Design Vue, Pinia, VxeTable, ECharts.
 - `deploy/`: Docker Compose definitions and environment templates for infrastructure/dev/prod.
-- `doc/`: project documentation, audit reports, testing reports, user manuals, and technical specs.
+- `docs/`: project documentation — quickstart, architecture, coding standards, API contract, security, and ops. See `docs/README.md` for index.
+- `archive/`: historical documents (audit reports, dev plans, test reports, user manuals) — not used in active development. See `archive/README.md`.
 - `docs/agents/`: local multi-agent workflow documentation referenced by `AGENTS.md`.
 
 ## Common Commands
