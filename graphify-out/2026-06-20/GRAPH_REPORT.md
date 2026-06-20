@@ -1,7 +1,7 @@
 # Graph Report - cgc-pms  (2026-06-20)
 
 ## Corpus Check
-- 816 files · ~281,926 words
+- 816 files · ~281,685 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `95ab38f6`
+- Built from commit: `22cf5aff`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -1563,9 +1563,9 @@ Nodes (5): Delete, Long, AfterEach, AfterEach, CostSummaryMapper
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `request()` connect `Frontend` to `Contract`, `Frontend`, `Community 279`, `Workflow`, `Project`, `Workflow`, `Invoice`, `Payment`, `Frontend`, `Frontend`, `Dashboard`, `Community 311`, `Alert`, `Auth`, `Contract`, `Frontend`, `Contract`, `Frontend`, `Frontend`, `Notification`, `Frontend`, `Community 218`, `Frontend`, `Payment`?**
-  _High betweenness centrality (0.074) - this node is a cross-community bridge._
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
 - **Why does `File` connect `Invoice` to `Frontend`?**
-  _High betweenness centrality (0.073) - this node is a cross-community bridge._
+  _High betweenness centrality (0.070) - this node is a cross-community bridge._
 - **Are the 234 inferred relationships involving `request()` (e.g. with `batchEvaluate()` and `getAlertList()`) actually correct?**
   _`request()` has 234 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `projectsLoading`, `pageNo`, `pageSize` to the rest of the system?**

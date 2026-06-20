@@ -3175,7 +3175,7 @@
     "semantic_hash": "ebd2c97f7a8627c869ab7a1c2a73eda5"
   },
   "frontend-admin/src/components.d.ts": {
-    "mtime": 1781919596.8667688,
+    "mtime": 1781921178.910889,
     "ast_hash": "61e3601abaf26351872d5ea8a5ae9817",
     "semantic_hash": ""
   },
@@ -3400,8 +3400,8 @@
     "semantic_hash": "3523048c787aa1fc1a0c88bde9ba8e4a"
   },
   "frontend-admin/src/pages/inventory/purchase-request.vue": {
-    "mtime": 1781891977.717737,
-    "ast_hash": "4b51a51b9542018fb2656e739e00bb5f",
+    "mtime": 1781921072.427672,
+    "ast_hash": "6ba038a7f8301ae34c2e045d724bc232",
     "semantic_hash": ""
   },
   "frontend-admin/src/pages/inventory/stock.vue": {
@@ -3415,8 +3415,8 @@
     "semantic_hash": ""
   },
   "frontend-admin/src/pages/inventory/warehouse.vue": {
-    "mtime": 1781919534.3575006,
-    "ast_hash": "b1e5c619dec41d90021d09777d108543",
+    "mtime": 1781921076.1632602,
+    "ast_hash": "a136fc41848b88ea48596f2ad4f48841",
     "semantic_hash": ""
   },
   "frontend-admin/src/pages/invoice/__tests__/invoice-pdf.test.ts": {
@@ -3500,8 +3500,8 @@
     "semantic_hash": "50d2f8e741c7eb9556806e9aa1491fc4"
   },
   "frontend-admin/src/pages/purchase/order.vue": {
-    "mtime": 1781919519.6868436,
-    "ast_hash": "795e27f7b19108a2f123cf986d305c28",
+    "mtime": 1781921072.427672,
+    "ast_hash": "360e2461ebeb6a5781c9a8a1b4836069",
     "semantic_hash": ""
   },
   "frontend-admin/src/pages/receipt/__tests__/index.test.ts": {
@@ -3540,13 +3540,13 @@
     "semantic_hash": "2afd2430537cd0e26ca637033189fa2a"
   },
   "frontend-admin/src/pages/subcontract/measure.vue": {
-    "mtime": 1781919537.5155032,
-    "ast_hash": "31cb91299606b151136b4715fb2c0ee1",
+    "mtime": 1781921074.4816494,
+    "ast_hash": "493cb9c67c42a004b2e824b5ed4cca3e",
     "semantic_hash": ""
   },
   "frontend-admin/src/pages/subcontract/task.vue": {
-    "mtime": 1781919524.4664369,
-    "ast_hash": "07ea07bc85532e66d4678be774c82866",
+    "mtime": 1781921090.7755103,
+    "ast_hash": "b2660459399db6f47924e7984c466a67",
     "semantic_hash": ""
   },
   "frontend-admin/src/pages/system/data/index.vue": {
