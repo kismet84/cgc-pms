@@ -27,6 +27,7 @@ const filter = reactive({
   partnerId: undefined as string | undefined,
   status: undefined as string | undefined,
   measureCode: '',
+  keyword: '',
 })
 
 const loading = ref(false)
@@ -119,7 +120,7 @@ async function fetchData() {
       contractId: filter.contractId,
       partnerId: filter.partnerId,
       status: filter.status,
-      measureCode: filter.measureCode || undefined,
+      measureCode: filter.keyword || filter.measureCode || undefined,
     })
     tableData.value = res.records
     total.value = res.total
@@ -155,6 +156,7 @@ function handleReset() {
   filter.partnerId = undefined
   filter.status = undefined
   filter.measureCode = ''
+  filter.keyword = ''
   pageNo.value = 1
   fetchData()
 }
@@ -403,7 +405,7 @@ onMounted(() => {
     <!-- 搜索栏 -->
     <div class="lg-search-bar">
       <a-input
-        v-model:value="filter.measureCode"
+        v-model:value="filter.keyword"
         placeholder="搜索计量编号…"
         allow-clear
         size="large"
