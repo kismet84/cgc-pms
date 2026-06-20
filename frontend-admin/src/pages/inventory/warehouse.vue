@@ -17,6 +17,7 @@ import type { WarehouseVO } from '@/types/inventory'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
+  keyword: '',
   warehouseCode: '',
   warehouseName: '',
   status: undefined as string | undefined,
@@ -67,8 +68,8 @@ async function fetchData() {
       pageNo: pageNo.value,
       pageSize: pageSize.value,
       projectId: filter.projectId,
-      warehouseCode: filter.warehouseCode || undefined,
-      warehouseName: filter.warehouseName || undefined,
+      warehouseCode: filter.keyword || filter.warehouseCode || undefined,
+      warehouseName: filter.keyword || filter.warehouseName || undefined,
       status: filter.status,
     })
     tableData.value = res.records
@@ -90,6 +91,7 @@ function handleSearch() {
 
 function handleReset() {
   filter.projectId = undefined
+  filter.keyword = ''
   filter.warehouseCode = ''
   filter.warehouseName = ''
   filter.status = undefined
@@ -224,50 +226,17 @@ onMounted(() => {
 
     <!-- 搜索栏 -->
     <div class="lg-search-bar">
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部项目"
-        allow-clear
-        style="width: 180px"
-        show-search
-        :filter-option="filterOption"
-      >
-        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
       <a-input
-        v-model:value="filter.warehouseCode"
-        placeholder="搜索仓库编号…"
-        style="width: 140px"
+        v-model:value="filter.keyword"
+        placeholder="搜索仓库编号、名称…"
         allow-clear
+        size="large"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #697380" /></template>
       </a-input>
-      <a-input
-        v-model:value="filter.warehouseName"
-        placeholder="搜索仓库名称…"
-        style="width: 140px"
-        allow-clear
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: #697380" /></template>
-      </a-input>
-      <a-select
-        v-model:value="filter.status"
-        placeholder="全部状态"
-        allow-clear
-        style="width: 110px"
-      >
-        <a-select-option value="ENABLE">启用</a-select-option>
-        <a-select-option value="DISABLE">停用</a-select-option>
-      </a-select>
-      <a-button type="primary" @click="handleSearch">
-        <template #icon><SearchOutlined /></template>
-        查询
-      </a-button>
-      <a-button @click="handleReset">
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
         重置
       </a-button>
@@ -280,8 +249,24 @@ onMounted(() => {
           <template #icon><PlusOutlined /></template>
           新建仓库
         </a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
       </div>
-      <div class="lg-toolbar-right" />
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.projectId"
+          placeholder="全部项目"
+          allow-clear
+          style="width: 160px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+      </div>
     </div>
 
     <!-- 表格 -->
