@@ -110,8 +110,8 @@ public class CostSummaryService {
 
         PmProject project = requireProjectInTenant(tenantId, projectId);
 
-        // 1. Physically replace generated snapshot rows; logical deletes keep the same unique key occupied.
-        costSummaryMapper.physicalDeleteByTenantAndProject(tenantId, projectId);
+        // 1. Remove today's snapshot rows for this project so re-inserts are idempotent
+        costSummaryMapper.physicalDeleteByTenantProjectAndDate(tenantId, projectId, LocalDate.now());
 
         // 2. Get project targetCost
         BigDecimal targetCost = (project != null && project.getTargetCost() != null)
@@ -410,7 +410,7 @@ public class CostSummaryService {
             BigDecimal estimatedRemainingCost = totalCurrentAmount
                     .subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
             BigDecimal contractIncome = totalContractAmount.add(incomeVarAmount);
-            BigDecimal projectConfirmedRevenue = BigDecimal.ZERO; // 批量汇总无明细查询
+            BigDecimal projectConfirmedRevenue = computeBatchProjectConfirmedRevenue(tenantId, projectId);
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
             BigDecimal costDeviation = dynamicCost.subtract(targetCost);
@@ -644,6 +644,19 @@ public class CostSummaryService {
      * Compute project-level confirmed revenue:
      * SUM(cost_item.amount WHERE cost_type='REVENUE_CONFIRMED')
      */
+    private BigDecimal computeBatchProjectConfirmedRevenue(Long tenantId, Long projectId) {
+        return costItemMapper.selectList(
+                new LambdaQueryWrapper<CostItem>()
+                        .eq(CostItem::getTenantId, tenantId)
+                        .eq(CostItem::getProjectId, projectId)
+                        .eq(CostItem::getCostStatus, "CONFIRMED")
+                        .eq(CostItem::getSourceType, "REVENUE"))
+                .stream()
+                .map(CostItem::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     private BigDecimal computeProjectConfirmedRevenue(Long tenantId, Long projectId) {
         return costItemMapper.selectList(
                 new LambdaQueryWrapper<CostItem>()
