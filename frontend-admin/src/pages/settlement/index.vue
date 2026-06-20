@@ -82,6 +82,7 @@ async function fetchData() {
     settlementStatus: filter.settlementStatus,
     settlementCode: filter.settlementCode || undefined,
     settlementType: filter.settlementType,
+    keyword: filter.keyword || undefined,
     pageNo: pageNo.value,
     pageSize: pageSize.value,
   }

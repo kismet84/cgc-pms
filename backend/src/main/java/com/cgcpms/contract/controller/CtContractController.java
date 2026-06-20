@@ -65,8 +65,8 @@ public class CtContractController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody CtContract contract) {
-        return ApiResponse.success(ctContractService.create(contract));
+    public ApiResponse<String> create(@Valid @RequestBody CtContract contract) {
+        return ApiResponse.success(String.valueOf(ctContractService.create(contract)));
     }
 
     @PutMapping("/{id}")
@@ -93,8 +93,8 @@ public class CtContractController {
 
     @PostMapping("/composite")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
-    public ApiResponse<Long> compositeCreate(@Valid @RequestBody ContractSaveRequest request) {
-        return ApiResponse.success(ctContractService.compositeSave(request));
+    public ApiResponse<String> compositeCreate(@Valid @RequestBody ContractSaveRequest request) {
+        return ApiResponse.success(String.valueOf(ctContractService.compositeSave(request)));
     }
 
     /**

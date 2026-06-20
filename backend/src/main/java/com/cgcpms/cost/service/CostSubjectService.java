@@ -119,7 +119,8 @@ public class CostSubjectService {
 
         // Validate unique subject_code within tenant among active rows only.
         Long count = costSubjectMapper.countByTenantAndCode(
-                UserContext.getCurrentTenantId(), subject.getSubjectCode(), null);
+                UserContext.getCurrentTenantId(), subject.getSubjectCode(),
+                subject.getAccountCategory(), null);
         if (count > 0) {
             throw new BusinessException("SUBJECT_CODE_DUPLICATE", "科目编码已存在");
         }
@@ -140,7 +141,8 @@ public class CostSubjectService {
 
         // Validate unique subject_code within tenant among active rows only.
         Long count = costSubjectMapper.countByTenantAndCode(
-                UserContext.getCurrentTenantId(), subject.getSubjectCode(), subject.getId());
+                UserContext.getCurrentTenantId(), subject.getSubjectCode(),
+                subject.getAccountCategory(), subject.getId());
         if (count > 0) {
             throw new BusinessException("SUBJECT_CODE_DUPLICATE", "科目编码已存在");
         }

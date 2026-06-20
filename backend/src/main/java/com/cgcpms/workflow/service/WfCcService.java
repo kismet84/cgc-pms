@@ -3,6 +3,7 @@ package com.cgcpms.workflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysUserMapper;
@@ -20,6 +21,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -57,12 +59,19 @@ public class WfCcService {
         // tenantId from instance, NOT from UserContext
         Long effectiveTenantId = instance.getTenantId();
 
-        // Batch-fetch user names for all cc recipients
+        // Batch-fetch user names for all cc recipients and validate tenant membership
         Map<Long, SysUser> userMap = Collections.emptyMap();
         if (!ccUserIds.isEmpty()) {
             List<SysUser> users = sysUserMapper.selectBatchIds(new HashSet<>(ccUserIds));
             userMap = users.stream()
                     .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
+            // Validate every cc user belongs to the same tenant as the instance
+            for (Long ccUserId : ccUserIds) {
+                SysUser ccUser = userMap.get(ccUserId);
+                if (ccUser == null || !Objects.equals(ccUser.getTenantId(), effectiveTenantId)) {
+                    throw new BusinessException("WORKFLOW_CC_USER_INVALID", "抄送用户不属于当前租户");
+                }
+            }
         }
 
         for (Long ccUserId : ccUserIds) {

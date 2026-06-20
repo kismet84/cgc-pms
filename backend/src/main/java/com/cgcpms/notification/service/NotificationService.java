@@ -33,10 +33,15 @@ public class NotificationService {
     private final SysNotificationMapper notificationMapper;
 
     /**
-     * Per-user SseEmitter map. Keyed by userId, used to push real-time
+     * Per-user SSE emitter map. Keyed by "tenantId:userId" composite key
+     * for tenant isolation, used to push real-time
      * notifications to connected SSE clients.
      */
-    private final Map<Long, SseEmitter> emitters = new ConcurrentHashMap<>();
+    private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
+
+    private String emitterKey(Long tenantId, Long userId) {
+        return tenantId + ":" + userId;
+    }
 
     // ──────────────────────────────────────────────
     // CRUD
@@ -155,8 +160,9 @@ public class NotificationService {
      * ConcurrentHashMap and removed on completion/error/timeout.
      */
     public SseEmitter subscribe(Long userId, Long tenantId) {
-        // Remove any existing emitter for this user
-        SseEmitter oldEmitter = emitters.remove(userId);
+        String key = emitterKey(tenantId, userId);
+        // Remove any existing emitter for this user in this tenant
+        SseEmitter oldEmitter = emitters.remove(key);
         if (oldEmitter != null) {
             try {
                 oldEmitter.complete();
@@ -166,20 +172,20 @@ public class NotificationService {
         }
 
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L); // 30-minute timeout
-        emitters.put(userId, emitter);
+        emitters.put(key, emitter);
 
         // Cleanup on completion/error/timeout
         emitter.onCompletion(() -> {
-            emitters.remove(userId);
-            log.debug("SSE completed for userId={}", userId);
+            emitters.remove(key);
+            log.debug("SSE completed for userId={}, tenantId={}", userId, tenantId);
         });
         emitter.onError(ex -> {
-            emitters.remove(userId);
-            log.debug("SSE error for userId={}", userId, ex);
+            emitters.remove(key);
+            log.debug("SSE error for userId={}, tenantId={}", userId, tenantId, ex);
         });
         emitter.onTimeout(() -> {
-            emitters.remove(userId);
-            log.debug("SSE timeout for userId={}", userId);
+            emitters.remove(key);
+            log.debug("SSE timeout for userId={}, tenantId={}", userId, tenantId);
         });
 
         // Send initial connection event
@@ -189,7 +195,7 @@ public class NotificationService {
                     .data("{\"userId\":" + userId + ",\"tenantId\":" + tenantId + "}",
                             MediaType.APPLICATION_JSON));
         } catch (IOException e) {
-            emitters.remove(userId);
+            emitters.remove(key);
             throw new RuntimeException("Failed to send SSE connect event", e);
         }
 
@@ -202,7 +208,8 @@ public class NotificationService {
      * Called internally by {@link #create} after persistence.
      */
     private void pushToUser(Long userId, SysNotification notification) {
-        SseEmitter emitter = emitters.get(userId);
+        String key = emitterKey(notification.getTenantId(), userId);
+        SseEmitter emitter = emitters.get(key);
         if (emitter == null) {
             return;
         }
@@ -212,8 +219,9 @@ public class NotificationService {
                     .data(NotificationVO.fromEntity(notification), MediaType.APPLICATION_JSON));
         } catch (IOException | IllegalStateException e) {
             // Remove dead or already-completed emitter
-            emitters.remove(userId);
-            log.debug("Failed to push SSE to userId={}, removed dead emitter: {}", userId, e.getMessage());
+            emitters.remove(key);
+            log.debug("Failed to push SSE to userId={}, tenantId={}, removed dead emitter: {}",
+                    userId, notification.getTenantId(), e.getMessage());
         }
     }
 }

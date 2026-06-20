@@ -140,6 +140,9 @@ public class WorkflowQueryService {
                 .eq(WfTask::getInstanceId, instanceId)
                 .eq(WfTask::getApproverId, currentUserId));
         if (count > 0) return true;
+        // ADMIN/SUPER_ADMIN may view instances in the current tenant. The instance was already loaded
+        // with the caller's tenantId; this fallback only exempts the participant check for admins within
+        // their own tenant, not across tenants.
         return UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN");
     }
 

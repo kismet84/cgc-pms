@@ -38,9 +38,10 @@ public class StlSettlementController {
             @RequestParam(required = false) Long contractId,
             @RequestParam(required = false) Long partnerId,
             @RequestParam(required = false) String settlementCode,
-            @RequestParam(required = false) String settlementType) {
+            @RequestParam(required = false) String settlementType,
+            @RequestParam(required = false) String keyword) {
         IPage<StlSettlementVO> page = stlSettlementService.getPage(pageNo, pageSize,
-                projectId, contractId, partnerId, settlementCode, settlementType);
+                projectId, contractId, partnerId, settlementCode, settlementType, keyword);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -64,8 +65,8 @@ public class StlSettlementController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody StlSettlement settlement) {
-        return ApiResponse.success(stlSettlementService.create(settlement));
+    public ApiResponse<String> create(@Valid @RequestBody StlSettlement settlement) {
+        return ApiResponse.success(String.valueOf(stlSettlementService.create(settlement)));
     }
 
     @PutMapping("/{id}")

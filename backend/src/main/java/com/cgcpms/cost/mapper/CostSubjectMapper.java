@@ -14,10 +14,12 @@ public interface CostSubjectMapper extends BaseMapper<CostSubject> {
             FROM cost_subject
             WHERE tenant_id = #{tenantId}
               AND subject_code = #{subjectCode}
+              AND account_category = #{accountCategory}
               AND deleted_flag = 0
               AND (#{excludeId} IS NULL OR id <> #{excludeId})
             """)
     Long countByTenantAndCode(@Param("tenantId") Long tenantId,
                               @Param("subjectCode") String subjectCode,
+                              @Param("accountCategory") String accountCategory,
                               @Param("excludeId") Long excludeId);
 }

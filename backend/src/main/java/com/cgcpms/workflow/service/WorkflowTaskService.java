@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +47,17 @@ public class WorkflowTaskService {
             throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
         }
 
+        WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
+        if (instance == null) {
+            throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
+        }
+
+        // Validate target user belongs to the same tenant as the instance
+        SysUser targetUser = core.sysUserMapper.selectById(targetUserId);
+        if (targetUser == null || !Objects.equals(targetUser.getTenantId(), instance.getTenantId())) {
+            throw new BusinessException("WORKFLOW_TARGET_USER_INVALID", "目标用户不属于当前租户");
+        }
+
         // CAS update: atomically mark original task as TRANSFERRED
         int updated = wfTaskMapper.updateTaskStatusWithCas(
                 taskId,
@@ -67,7 +79,7 @@ public class WorkflowTaskService {
         }
 
         // Only create new task after CAS confirms original update succeeded
-        WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
+        instance = wfInstanceMapper.selectById(task.getInstanceId());
         WfTask newTask = new WfTask();
         newTask.setTenantId(instance.getTenantId());
         newTask.setInstanceId(task.getInstanceId());
@@ -75,7 +87,7 @@ public class WorkflowTaskService {
         newTask.setBusinessType(task.getBusinessType());
         newTask.setBusinessId(task.getBusinessId());
         newTask.setApproverId(targetUserId);
-        SysUser targetUser = core.sysUserMapper.selectById(targetUserId);
+        targetUser = core.sysUserMapper.selectById(targetUserId);
         newTask.setApproverName(targetUser != null
                 ? (targetUser.getRealName() != null ? targetUser.getRealName() : targetUser.getUsername())
                 : "");
@@ -131,13 +143,20 @@ public class WorkflowTaskService {
         if (node == null || !WorkflowConstants.NODE_ACTIVE.equals(node.getNodeStatus())) {
             throw new BusinessException("NODE_NOT_ACTIVE", "只能对当前活动节点加签");
         }
-        // Batch-fetch user names for all signees
+        // Batch-fetch user names for all signees and validate tenant membership
         Map<Long, SysUser> signUserMap = Collections.emptyMap();
         if (!additionalUserIds.isEmpty()) {
             List<SysUser> signUsers = core.sysUserMapper.selectBatchIds(
                     new HashSet<>(additionalUserIds));
             signUserMap = signUsers.stream()
                     .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
+            // Validate every additional user belongs to the same tenant as the instance
+            for (Long additionalUserId : additionalUserIds) {
+                SysUser signUser = signUserMap.get(additionalUserId);
+                if (signUser == null || !Objects.equals(signUser.getTenantId(), instance.getTenantId())) {
+                    throw new BusinessException("WORKFLOW_TARGET_USER_INVALID", "加签用户不属于当前租户");
+                }
+            }
         }
         for (Long auid : additionalUserIds) {
             // Check not already exists

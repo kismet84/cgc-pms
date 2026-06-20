@@ -95,7 +95,7 @@ export const useReferenceStore = defineStore('reference', () => {
 
   async function fetchPartners(params?: FetchPartnersParams): Promise<PartnerVO[]> {
     if (params && params.partnerType) {
-      const res = await getPartnerList({ pageNum: 1, pageSize: 50, ...params })
+      const res = await getPartnerList({ pageNo: 1, pageSize: 50, ...params })
       const data = (res.records ?? res.data ?? res) as PartnerVO[]
       partners.value = data
       return data
@@ -118,7 +118,7 @@ export const useReferenceStore = defineStore('reference', () => {
 
   async function fetchMaterials(params?: FetchMaterialsParams): Promise<MaterialVO[]> {
     if (params && params.status) {
-      const res = await getMaterialList({ pageNum: 1, pageSize: 50, ...params })
+      const res = await getMaterialList({ pageNo: 1, pageSize: 50, ...params })
       const data = (res.records ?? res.data ?? res) as MaterialVO[]
       materials.value = data
       return data

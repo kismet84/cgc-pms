@@ -6,9 +6,10 @@ export interface ApiResponse<T = unknown> {
   data: T
 }
 
-/** 分页请求参数 */
+/** 分页请求参数 — 优先使用 pageNo 与后端 PageResult 对齐；pageNum 为仅限部分老接口的别名 */
 export interface PageParams {
-  pageNum: number
+  pageNo?: number
+  pageNum?: number
   pageSize: number
   [key: string]: unknown
 }

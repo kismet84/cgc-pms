@@ -87,7 +87,8 @@ public class StlSettlementService {
     // ================================================================
 
     public IPage<StlSettlementVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
-                                          Long partnerId, String settlementCode, String settlementType) {
+                                          Long partnerId, String settlementCode, String settlementType,
+                                          String keyword) {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<StlSettlement> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(StlSettlement::getTenantId, tenantId);
@@ -96,6 +97,9 @@ public class StlSettlementService {
         if (partnerId != null) wrapper.eq(StlSettlement::getPartnerId, partnerId);
         if (StringUtils.hasText(settlementCode)) wrapper.like(StlSettlement::getSettlementCode, settlementCode);
         if (StringUtils.hasText(settlementType)) wrapper.eq(StlSettlement::getSettlementType, settlementType);
+        if (StringUtils.hasText(keyword)) {
+            wrapper.and(w -> w.like(StlSettlement::getRemark, "%" + keyword.trim() + "%"));
+        }
         wrapper.orderByDesc(StlSettlement::getCreatedAt);
 
         Page<StlSettlement> page = stlSettlementMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
