@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
@@ -22,6 +22,7 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 
 const filter = reactive({
+  keyword: '',
   username: '',
   realName: '',
 })
@@ -89,6 +90,7 @@ function handleSearch() {
 }
 
 function handleReset() {
+  filter.keyword = ''
   filter.username = ''
   filter.realName = ''
   pageNo.value = 1
@@ -239,25 +241,19 @@ onMounted(() => {
 
     <div class="lg-search-bar">
       <a-input
-        v-model:value="filter.username"
+        v-model:value="filter.keyword"
         placeholder="搜索用户名、姓名…"
         allow-clear
-        style="flex: 1; max-width: 200px"
+        size="large"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #697380" /></template>
       </a-input>
-      <a-input
-        v-model:value="filter.realName"
-        placeholder="搜索用户名、姓名…"
-        allow-clear
-        style="flex: 1; max-width: 200px"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: #697380" /></template>
-      </a-input>
-      <a-button type="primary" @click="handleSearch">查询</a-button>
-      <a-button @click="handleReset">重置</a-button>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
     </div>
 
     <div class="lg-toolbar">
