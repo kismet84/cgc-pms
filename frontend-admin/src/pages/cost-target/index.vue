@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { PlusOutlined, ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, CheckCircleOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { getCostTargetList, activateCostTarget, deleteCostTarget } from '@/api/modules/costTarget'
 import { useReferenceStore } from '@/stores/reference'
@@ -195,11 +195,13 @@ onMounted(() => {
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.versionNo"
-        placeholder="请输入版本号"
+        placeholder="搜索版本号…"
         allow-clear
         style="flex: 1; max-width: 240px"
         @press-enter="handleSearch"
-      />
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
       <a-button type="primary" @click="handleSearch">查询</a-button>
       <a-button @click="handleReset">重置</a-button>
     </div>
@@ -231,30 +233,6 @@ onMounted(() => {
           <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
             p.projectName
           }}</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.approvalStatus"
-          placeholder="全部审批状态"
-          allow-clear
-          style="width: 140px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option value="DRAFT">草稿</a-select-option>
-          <a-select-option value="APPROVING">审批中</a-select-option>
-          <a-select-option value="APPROVED">已通过</a-select-option>
-          <a-select-option value="REJECTED">已驳回</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.isActive"
-          placeholder="全部版本标识"
-          allow-clear
-          style="width: 140px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option :value="1">当前版本</a-select-option>
-          <a-select-option :value="0">历史版本</a-select-option>
         </a-select>
       </div>
     </div>

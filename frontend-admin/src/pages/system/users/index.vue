@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
 import {
   getUserList,
@@ -240,18 +240,22 @@ onMounted(() => {
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.username"
-        placeholder="用户名"
+        placeholder="搜索用户名、姓名…"
         allow-clear
         style="flex: 1; max-width: 200px"
         @press-enter="handleSearch"
-      />
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
       <a-input
         v-model:value="filter.realName"
-        placeholder="姓名"
+        placeholder="搜索用户名、姓名…"
         allow-clear
         style="flex: 1; max-width: 200px"
         @press-enter="handleSearch"
-      />
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
       <a-button type="primary" @click="handleSearch">查询</a-button>
       <a-button @click="handleReset">重置</a-button>
     </div>

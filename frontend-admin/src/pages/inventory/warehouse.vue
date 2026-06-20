@@ -238,18 +238,22 @@ onMounted(() => {
       </a-select>
       <a-input
         v-model:value="filter.warehouseCode"
-        placeholder="仓库编号"
+        placeholder="搜索仓库编号…"
         style="width: 140px"
         allow-clear
         @press-enter="handleSearch"
-      />
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
       <a-input
         v-model:value="filter.warehouseName"
-        placeholder="仓库名称"
+        placeholder="搜索仓库名称…"
         style="width: 140px"
         allow-clear
         @press-enter="handleSearch"
-      />
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
       <a-select
         v-model:value="filter.status"
         placeholder="全部状态"

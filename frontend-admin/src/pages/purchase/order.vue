@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
+import { SearchOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import {
   getOrderList,
@@ -467,11 +468,13 @@ onMounted(() => {
       </a-select>
       <a-input
         v-model:value="filter.orderCode"
-        placeholder="订单编号"
+        placeholder="搜索订单编号、名称…"
         style="width: 150px"
         allow-clear
         @press-enter="handleSearch"
-      />
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
       <a-button type="primary" @click="handleSearch">查询</a-button>
       <a-button @click="handleReset">重置</a-button>
     </div>
