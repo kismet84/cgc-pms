@@ -19,6 +19,12 @@ class MigrationIntegrityTest {
             "(?im)^\\s*ALTER\\s+TABLE\\s+cost_summary\\s*\\R\\s*ADD\\s+COLUMN\\s+cost_target_id");
 
     @Test
+    void localTestProfileIncludesJavaMigrations() throws Exception {
+        String testLocal = Files.readString(Path.of("src/test/resources/application-local.yml"));
+        assertTrue(testLocal.contains("classpath:com.cgcpms.common.migration"));
+    }
+
+    @Test
     void costTargetIdColumnIsIntroducedOnlyOnceInMigrationChain() throws IOException {
         long additions = migrationFiles().stream()
                 .map(MigrationIntegrityTest::readString)

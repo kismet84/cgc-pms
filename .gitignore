@@ -53,6 +53,9 @@ login-snapshot.yml
 # Sisyphus working files
 .sisyphus/
 
+# Archived project artifacts
+/archive/
+
 # Superpowers visual brainstorming working files
 .superpowers/
 
