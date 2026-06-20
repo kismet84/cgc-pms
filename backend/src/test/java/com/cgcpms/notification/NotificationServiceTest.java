@@ -305,12 +305,29 @@ class NotificationServiceTest {
         System.out.println("✅ TC10 通过: SSE emitter created successfully");
     }
 
+    @Test
+    @Order(11)
+    @Transactional
+    @DisplayName("SSE订阅按租户隔离 → 同用户不同租户不会互相替换")
+    void test11_sseSubscribeSameUserDifferentTenants() {
+        SseEmitter tenantZeroEmitter = notificationService.subscribe(USER_1, TENANT_0);
+        SseEmitter tenantOtherEmitter = notificationService.subscribe(USER_1, TENANT_999);
+
+        assertNotNull(tenantZeroEmitter, "租户 0 的 SSE emitter 不应为空");
+        assertNotNull(tenantOtherEmitter, "租户 999 的 SSE emitter 不应为空");
+        assertNotSame(tenantZeroEmitter, tenantOtherEmitter, "同一用户在不同租户的 SSE emitter 应独立存在");
+
+        tenantZeroEmitter.complete();
+        tenantOtherEmitter.complete();
+        System.out.println("✅ TC11 通过: same user different tenants keep separate emitters");
+    }
+
     // ═══════════════════════════════════════════════════════════
     // RED → GREEN: SSE push on create
     // ═══════════════════════════════════════════════════════════
 
     @Test
-    @Order(11)
+    @Order(12)
     @Transactional
     @DisplayName("RED→GREEN: 创建通知时SSE推送 → 已订阅用户收到事件")
     void test11_ssePushOnCreate() {
@@ -402,5 +419,25 @@ class NotificationServiceTest {
         long countForUser2 = notificationService.getUnreadCount(USER_2, TENANT_0);
         assertEquals(0, countForUser2, "USER_2 不应看到 USER_1 的通知");
         System.out.println("✅ TC16 通过: cross-user count isolation");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Step 4: SSE 复合 key — 同 userId 不同 tenantId 应有独立 emitter
+    // ═══════════════════════════════════════════════════════════
+
+    @Test
+    @Order(17)
+    @DisplayName("SSE复合key: 相同userId不同tenantId应有独立emitter")
+    void subscribeAllowsSameUserIdInDifferentTenantsWithoutReplacingEmitter() throws Exception {
+        SseEmitter tenantOneEmitter = notificationService.subscribe(100L, 1L);
+        SseEmitter tenantTwoEmitter = notificationService.subscribe(100L, 2L);
+
+        assertNotSame(tenantOneEmitter, tenantTwoEmitter,
+                "不同租户下相同 userId 应返回不同的 SseEmitter 实例");
+
+        // Clean up
+        tenantOneEmitter.complete();
+        tenantTwoEmitter.complete();
+        System.out.println("✅ TC17 通过: cross-tenant SSE emitter isolation");
     }
 }

@@ -64,8 +64,8 @@ public class StlSettlementController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody StlSettlement settlement) {
-        return ApiResponse.success(stlSettlementService.create(settlement));
+    public ApiResponse<String> create(@Valid @RequestBody StlSettlement settlement) {
+        return ApiResponse.success(String.valueOf(stlSettlementService.create(settlement)));
     }
 
     @PutMapping("/{id}")

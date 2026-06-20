@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Resolves approver IDs from template node approverConfig JSON.
@@ -69,7 +70,7 @@ public class ApproverResolver {
         String type = config.get("type").asText();
 
         List<Long> userIds = switch (type.toUpperCase()) {
-            case "USER" -> resolveUser(config);
+            case "USER" -> resolveUser(config, tenantId);
             case "ROLE" -> resolveRole(config, tenantId);
             case "POSITION" -> resolvePosition(config, tenantId);
             case "PROJECT_ROLE" -> resolveProjectRole(config, projectId);
@@ -86,11 +87,16 @@ public class ApproverResolver {
 
     // ── type resolvers ──
 
-    private List<Long> resolveUser(JsonNode config) {
+    private List<Long> resolveUser(JsonNode config, Long tenantId) {
         if (!config.has("userId")) {
             throw new BusinessException("INVALID_APPROVER_CONFIG", "USER类型配置缺少userId");
         }
-        return Collections.singletonList(config.get("userId").asLong());
+        Long userId = config.get("userId").asLong();
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null || !Objects.equals(user.getTenantId(), tenantId)) {
+            throw new BusinessException("WORKFLOW_APPROVER_INVALID", "审批人不属于当前租户");
+        }
+        return Collections.singletonList(userId);
     }
 
     private List<Long> resolveRole(JsonNode config, Long tenantId) {
