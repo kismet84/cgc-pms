@@ -22,6 +22,7 @@ const filter = reactive({
   approvalStatus: undefined as string | undefined,
   status: undefined as string | undefined,
   requestCode: '',
+  keyword: '',
 })
 
 const loading = ref(false)
@@ -102,7 +103,7 @@ async function fetchData() {
       projectId: filter.projectId,
       approvalStatus: filter.approvalStatus,
       status: filter.status,
-      requestCode: filter.requestCode || undefined,
+      requestCode: filter.keyword || filter.requestCode || undefined,
     })
     tableData.value = res.records
     total.value = res.total
@@ -126,6 +127,7 @@ function handleReset() {
   filter.approvalStatus = undefined
   filter.status = undefined
   filter.requestCode = ''
+  filter.keyword = ''
   pageNo.value = 1
   fetchData()
 }
@@ -408,51 +410,17 @@ onMounted(() => {
 
     <!-- 搜索栏 -->
     <div class="lg-search-bar">
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部项目"
-        allow-clear
-        style="width: 180px"
-        show-search
-        :filter-option="filterOption"
-      >
-        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.approvalStatus"
-        placeholder="全部审批状态"
-        allow-clear
-        style="width: 130px"
-      >
-        <a-select-option value="DRAFT">草稿</a-select-option>
-        <a-select-option value="APPROVING">审批中</a-select-option>
-        <a-select-option value="APPROVED">已通过</a-select-option>
-        <a-select-option value="REJECTED">已驳回</a-select-option>
-        <a-select-option value="WITHDRAWN">已撤回</a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.status"
-        placeholder="全部业务状态"
-        allow-clear
-        style="width: 130px"
-      >
-        <a-select-option value="DRAFT">草稿</a-select-option>
-        <a-select-option value="CONVERTED">已转PO</a-select-option>
-      </a-select>
       <a-input
-        v-model:value="filter.requestCode"
-        placeholder="搜索申请编号"
-        style="width: 170px"
+        v-model:value="filter.keyword"
+        placeholder="搜索申请编号…"
         allow-clear
+        size="large"
         @press-enter="handleSearch"
-      />
-      <a-button type="primary" @click="handleSearch">
-        <template #icon><SearchOutlined /></template>
-        查询
-      </a-button>
-      <a-button @click="handleReset">
+      >
+        <template #prefix><SearchOutlined style="color: #697380" /></template>
+      </a-input>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
         重置
       </a-button>
@@ -476,8 +444,24 @@ onMounted(() => {
     <div class="lg-toolbar">
       <div class="lg-toolbar-left">
         <a-button type="primary" @click="handleAdd">新建申请</a-button>
+        <a-button @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
       </div>
-      <div class="lg-toolbar-right" />
+      <div class="lg-toolbar-right">
+        <a-select
+          v-model:value="filter.projectId"
+          placeholder="全部项目"
+          allow-clear
+          style="width: 160px"
+          size="small"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+      </div>
     </div>
 
     <!-- 表格 -->
