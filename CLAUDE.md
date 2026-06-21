@@ -4,6 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **语言要求：所有回答必须使用中文。**
 
+## 自动经验记录
+
+**重要：每次解决一个错误或问题后，必须自动将经验保存到 `memory/` 目录。**
+
+规则：
+- 所有被解决的错误（编译失败、测试失败、运行时异常、配置错误、Flyway 迁移失败等）— 记录根因、修复步骤、教训
+- 所有工具调用陷阱（Edit 匹配失败、编码问题、git lock 等）— 记录现象、原因、解决方法
+- 每个经验单独一个 `.md` 文件，使用 frontmatter（name/short-kebab-slug + description + metadata type/feedback + tags）
+- 保存后更新 `memory/MEMORY.md` 索引（一行链接 + 一句话描述）
+- **不需要等用户提醒，遇到就记**
+
 ## Project Overview
 
 CGC-PMS is a construction general-contracting project management system with a Spring Boot backend and a Vue 3 admin frontend.
