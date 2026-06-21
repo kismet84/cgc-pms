@@ -258,9 +258,9 @@ public class CostSummaryService {
         BigDecimal actualCost = subjects.stream()
                 .map(s -> new BigDecimal(s.getActualCost()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal paidAmount = subjects.stream()
-                .map(s -> new BigDecimal(s.getPaidAmount()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // paidAmount is project-level (same value on every subject row) — take from first subject, not sum
+        BigDecimal paidAmount = subjects.isEmpty() ? BigDecimal.ZERO
+                : new BigDecimal(subjects.get(0).getPaidAmount());
 
         // Project-level fields: compute directly (not aggregated from subjects, to avoid N× duplication)
         BigDecimal estimatedRemainingCost = computeProjectEstimatedRemainingCost(tenantId, projectId);
@@ -379,9 +379,9 @@ public class CostSummaryService {
             BigDecimal actualCost = latestSummaries.stream()
                     .map(s -> s.getActualCost() != null ? s.getActualCost() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal paidAmount = latestSummaries.stream()
-                    .map(s -> s.getPaidAmount() != null ? s.getPaidAmount() : BigDecimal.ZERO)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // paidAmount is project-level (same value on every subject row) — take from first subject, not sum
+            BigDecimal paidAmount = latestSummaries.isEmpty() ? BigDecimal.ZERO
+                    : (latestSummaries.get(0).getPaidAmount() != null ? latestSummaries.get(0).getPaidAmount() : BigDecimal.ZERO);
 
             // Compute project-level values from batched data
             List<CtContract> projectContracts = contractsByProject.getOrDefault(projectId, Collections.emptyList());
@@ -478,6 +478,12 @@ public class CostSummaryService {
     /**
      * Update paidAmount in cost_summary for a given project.
      * Called by PayRecordService after pay record changes.
+     * <p>
+     * <b>Concurrency protection:</b> acquires the same per-project
+     * {@link ReentrantLock} as {@link #refreshSummary(Long, Long)} so
+     * the UPDATE neither races with a concurrent DELETE+INSERT (lost
+     * update) nor misses a pay_record inserted after the snapshot of a
+     * running refresh.  See M-006.
      */
     @Transactional
     public void updatePaidAmount(Long projectId) {
@@ -486,6 +492,19 @@ public class CostSummaryService {
 
     @Transactional
     public void updatePaidAmount(Long tenantId, Long projectId) {
+        ReentrantLock lock = refreshLocks.computeIfAbsent(projectId, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            doUpdatePaidAmount(tenantId, projectId);
+        } finally {
+            lock.unlock();
+            if (!lock.isLocked() && !lock.hasQueuedThreads()) {
+                refreshLocks.remove(projectId, lock);
+            }
+        }
+    }
+
+    private void doUpdatePaidAmount(Long tenantId, Long projectId) {
         List<PayRecord> records = payRecordMapper.selectList(
                 new LambdaQueryWrapper<PayRecord>()
                         .eq(PayRecord::getTenantId, tenantId)

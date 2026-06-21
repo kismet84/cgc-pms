@@ -133,6 +133,11 @@ public class PayRecordService {
     void updateContractPaidAmount(Long contractId) {
         if (contractId == null) return;
 
+        // Use SELECT FOR UPDATE to lock the contract row, preventing concurrent
+        // writebacks from reading stale paidAmount and losing updates (see A-P1-1).
+        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId);
+        if (contract == null) return;
+
         // Sum all pay_record.pay_amount for this contract with status SUCCESS
         LambdaQueryWrapper<PayRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayRecord::getContractId, contractId)
@@ -143,12 +148,9 @@ public class PayRecordService {
                 .map(r -> r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        CtContract contract = ctContractMapper.selectById(contractId);
-        if (contract != null) {
-            contract.setPaidAmount(totalPaid);
-            ctContractMapper.updateById(contract);
-            log.info("Contract paid_amount updated: contractId={}, paidAmount={}", contractId, totalPaid);
-        }
+        contract.setPaidAmount(totalPaid);
+        ctContractMapper.updateById(contract);
+        log.info("Contract paid_amount updated: contractId={}, paidAmount={}", contractId, totalPaid);
     }
 
     // ---- CRUD removed — all writes MUST go through authoritative writeback() ----

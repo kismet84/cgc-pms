@@ -3,11 +3,19 @@ package com.cgcpms.cost;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostSummary;
+import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.cost.vo.CostProjectSummaryVO;
 import com.cgcpms.cost.vo.CostSummaryVO;
+import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import org.junit.jupiter.api.*;
@@ -20,6 +28,11 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -39,6 +52,18 @@ class CostSummaryServiceTest {
 
     @Autowired
     private PmProjectMapper projectMapper;
+
+    @Autowired
+    private CostItemMapper costItemMapper;
+
+    @Autowired
+    private CostSubjectMapper costSubjectMapper;
+
+    @Autowired
+    private PayRecordMapper payRecordMapper;
+
+    @Autowired
+    private PayApplicationMapper payApplicationMapper;
 
     private Long testProjectId;
 
@@ -65,6 +90,14 @@ class CostSummaryServiceTest {
     void cleanup() {
         // 清理成本汇总数据
         costSummaryMapper.physicalDeleteByTenantAndProject(TENANT_ID, testProjectId);
+        // 清理 TC18 种子数据
+        costItemMapper.deleteById(80001L);
+        costItemMapper.deleteById(80002L);
+        costSubjectMapper.deleteById(80001L);
+        costSubjectMapper.deleteById(80002L);
+        payRecordMapper.deleteById(80001L);
+        payRecordMapper.deleteById(80002L);
+        payApplicationMapper.deleteById(80001L);
         TestUserContext.clear();
     }
 
@@ -286,5 +319,129 @@ class CostSummaryServiceTest {
         assertNotNull(rows);
         // 应有 >=0 行（无 cost_item 时0行，有 cost_item 时 N 行）
         // 但不应有重复行
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 并发一致性 — M-006: refreshSummary 与 updatePaidAmount 共用锁
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("TC17: refreshSummary 与 updatePaidAmount 并发串行化 — 无丢失更新")
+    void testRefreshAndUpdatePaidAmountSerialized() throws Exception {
+        // 1. 先建一个初始汇总
+        costSummaryService.refreshSummary(TENANT_ID, testProjectId);
+
+        int threadCount = 4;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        AtomicInteger refreshCount = new AtomicInteger(0);
+        AtomicInteger updateCount = new AtomicInteger(0);
+        List<Exception> errors = Collections.synchronizedList(new java.util.ArrayList<>());
+
+        for (int i = 0; i < threadCount; i++) {
+            final int idx = i;
+            executor.submit(() -> {
+                try {
+                    TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
+                    startLatch.await(); // 同时起跑
+                    if (idx % 2 == 0) {
+                        costSummaryService.refreshSummary(TENANT_ID, testProjectId);
+                        refreshCount.incrementAndGet();
+                    } else {
+                        costSummaryService.updatePaidAmount(TENANT_ID, testProjectId);
+                        updateCount.incrementAndGet();
+                    }
+                } catch (Exception e) {
+                    synchronized (errors) { errors.add(e); }
+                } finally {
+                    TestUserContext.clear();
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown(); // 发令枪
+        doneLatch.await(30, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // 2. 断言：无异常
+        assertTrue(errors.isEmpty(), "并发不应抛异常: " + errors);
+
+        // 3. 断言：所有操作完成
+        assertEquals(2, refreshCount.get(), "应完成 2 次 refreshSummary");
+        assertEquals(2, updateCount.get(), "应完成 2 次 updatePaidAmount");
+
+        // 4. 最终验证：refresh 后数据一致
+        CostProjectSummaryVO finalResult = costSummaryService.refreshSummary(TENANT_ID, testProjectId);
+        assertNotNull(finalResult);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // paidAmount 一致性 — 项目级已付金额不随科目数倍增
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Transactional
+    @DisplayName("TC18: getProjectSummary paidAmount 不随科目数倍增")
+    void testPaidAmountNotMultipliedBySubjectCount() {
+        // 1. 种子：2 个科目 + 2 个 cost_item（各属不同科目）
+        CostSubject s1 = new CostSubject(); s1.setId(80001L); s1.setSubjectName("材料费");
+        s1.setSubjectCode("CL"); s1.setTenantId(TENANT_ID);
+        if (costSubjectMapper.selectById(80001L) == null) costSubjectMapper.insert(s1);
+
+        CostSubject s2 = new CostSubject(); s2.setId(80002L); s2.setSubjectName("人工费");
+        s2.setSubjectCode("RG"); s2.setTenantId(TENANT_ID);
+        if (costSubjectMapper.selectById(80002L) == null) costSubjectMapper.insert(s2);
+
+        CostItem item1 = new CostItem(); item1.setId(80001L); item1.setProjectId(testProjectId);
+        item1.setCostSubjectId(80001L); item1.setSourceType("CT_CONTRACT"); item1.setSourceId(80001L);
+        item1.setCostType("CONTRACT_COST"); item1.setCostStatus("CONFIRMED"); item1.setCostDate(java.time.LocalDate.now());
+        item1.setAmount(new BigDecimal("50000.00")); item1.setTenantId(TENANT_ID);
+        if (costItemMapper.selectById(80001L) == null) costItemMapper.insert(item1);
+
+        CostItem item2 = new CostItem(); item2.setId(80002L); item2.setProjectId(testProjectId);
+        item2.setCostSubjectId(80002L); item2.setSourceType("MAT_RECEIPT"); item2.setSourceId(80002L);
+        item2.setCostType("MATERIAL_COST"); item2.setCostStatus("CONFIRMED"); item2.setCostDate(java.time.LocalDate.now());
+        item2.setAmount(new BigDecimal("30000.00")); item2.setTenantId(TENANT_ID);
+        if (costItemMapper.selectById(80002L) == null) costItemMapper.insert(item2);
+
+        // 2. 插入 PayApplication 和 2笔付款记录
+        PayApplication app = new PayApplication(); app.setId(80001L); app.setProjectId(testProjectId);
+        app.setApplyCode("PAY-APP-TC18"); app.setPayType("进度款"); app.setApplyAmount(new BigDecimal("100000.00"));
+        app.setPayStatus("APPROVED"); app.setApprovalStatus("APPROVED"); app.setTenantId(TENANT_ID);
+        if (payApplicationMapper.selectById(80001L) == null) payApplicationMapper.insert(app);
+
+        PayRecord pr1 = new PayRecord(); pr1.setId(80001L); pr1.setProjectId(testProjectId);
+        pr1.setPayApplicationId(80001L);
+        pr1.setPayAmount(new BigDecimal("10000.00")); pr1.setPayDate(java.time.LocalDate.now());
+        pr1.setPayStatus("SUCCESS"); pr1.setTenantId(TENANT_ID);
+        if (payRecordMapper.selectById(80001L) == null) payRecordMapper.insert(pr1);
+
+        PayRecord pr2 = new PayRecord(); pr2.setId(80002L); pr2.setProjectId(testProjectId);
+        pr2.setPayApplicationId(80001L);
+        pr2.setPayAmount(new BigDecimal("15000.00")); pr2.setPayDate(java.time.LocalDate.now());
+        pr2.setPayStatus("SUCCESS"); pr2.setTenantId(TENANT_ID);
+        if (payRecordMapper.selectById(80002L) == null) payRecordMapper.insert(pr2);
+
+        // 3. refresh summary
+        CostProjectSummaryVO vo = costSummaryService.refreshSummary(TENANT_ID, testProjectId);
+        assertNotNull(vo);
+
+        // 4. 关键断言：getProjectSummary 的 paidAmount 应为 25000 (项目级汇总),
+        //    不是 25000 * 2科目 = 50000
+        CostProjectSummaryVO result = costSummaryService.getProjectSummary(TENANT_ID, testProjectId);
+        BigDecimal paidAmount = new BigDecimal(result.getPaidAmount());
+        assertEquals(0, new BigDecimal("25000.00").compareTo(paidAmount),
+                "项目级 paidAmount 应为 25000 (不随科目数倍增), 实际: " + paidAmount.toPlainString());
+
+        // 5. 同时验证 subjects 中每个 subject 的 paidAmount 也正确
+        List<CostSummaryVO> subjects = result.getSubjects();
+        assertNotNull(subjects);
+        for (CostSummaryVO s : subjects) {
+            BigDecimal subjectPaid = new BigDecimal(s.getPaidAmount());
+            assertEquals(0, new BigDecimal("25000.00").compareTo(subjectPaid),
+                    "每个科目行的 paidAmount 都应为项目级 25000, 实际: " + subjectPaid.toPlainString());
+        }
     }
 }
