@@ -53,6 +53,14 @@ pnpm dev      # http://localhost:5173
 scripts\start-dev.bat    # Docker → 后端 → 前端
 ```
 
+### 快速重建
+
+```bash
+python scripts/rebuild.py              # 重建后端 + 前端
+python scripts/rebuild.py backend       # 仅后端
+python scripts/rebuild.py --test        # 重建 + 测试
+```
+
 ## 项目结构
 
 ```
@@ -112,7 +120,7 @@ cgc-pms/
 | 层级 | 框架 | 用例 | 通过率 |
 |------|------|------|--------|
 | 后端 | JUnit 5 + MockMvc | 206 | 100% |
-| 前端 | Vitest | 136 | ~99% (1 预存) |
+| 前端 | Vitest | 154 | 100% |
 | E2E | Playwright | 36 | 12 模块覆盖 |
 
 ```bash
@@ -120,6 +128,13 @@ cd backend && ./mvnw test          # 后端
 cd frontend-admin && pnpm build    # 前端构建 + 类型检查
 cd frontend-admin && pnpm vitest   # 前端测试
 ```
+
+## 最近更新 (2026-06-21)
+
+- **库存台账表格优化**: 搜索栏增强（关键词 + 项目联动）、列设置下拉、详情 Drawer、来源类型中文映射、排序
+- **ESLint 全量清零**: 67 errors → 0，30 文件修复，255 warnings → 0
+- **构建脚本**: `scripts/rebuild.py` 一键重建后端/前端，支持 `--test` 模式
+- **三灯环**: type-check ✅ / ESLint 0 / 35/35 test ✅ / build ✅
 
 ## 部署
 
