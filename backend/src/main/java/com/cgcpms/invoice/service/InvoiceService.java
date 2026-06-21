@@ -81,17 +81,9 @@ public class InvoiceService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
 
-        // If invoice_no is being changed, check for duplicate
+        // If invoice_no is being changed, check for duplicate active invoices
         if (invoice.getInvoiceNo() != null && !invoice.getInvoiceNo().equals(existing.getInvoiceNo())) {
-            Long count = payInvoiceMapper.selectCount(
-                    new LambdaQueryWrapper<PayInvoice>()
-                            .eq(PayInvoice::getTenantId, UserContext.getCurrentTenantId())
-                            .eq(PayInvoice::getInvoiceNo, invoice.getInvoiceNo())
-                            .ne(PayInvoice::getId, invoice.getId()));
-            if (count > 0) {
-                throw new BusinessException("INVOICE_NO_DUPLICATE",
-                        "发票号码(" + invoice.getInvoiceNo() + ")已存在，同一租户下发票号码不可重复");
-            }
+            ensureActiveInvoiceNoUnique(invoice.getInvoiceNo(), invoice.getId());
         }
 
         checkAndThrowDuplicate(invoice.getInvoiceNo(), () -> payInvoiceMapper.updateById(invoice));
@@ -252,6 +244,22 @@ public class InvoiceService {
         try {
             dbWrite.run();
         } catch (DuplicateKeyException e) {
+            throw new BusinessException("INVOICE_NO_DUPLICATE",
+                    "发票号码(" + invoiceNo + ")已存在，同一租户下发票号码不可重复");
+        }
+    }
+
+    /**
+     * Check that an active (non-deleted) invoice with the given invoiceNo does not
+     * already exist, excluding the given invoice id (for update scenarios).
+     */
+    private void ensureActiveInvoiceNoUnique(String invoiceNo, Long excludeId) {
+        LambdaQueryWrapper<PayInvoice> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PayInvoice::getTenantId, UserContext.getCurrentTenantId());
+        wrapper.eq(PayInvoice::getInvoiceNo, invoiceNo);
+        wrapper.ne(PayInvoice::getId, excludeId);
+        Long count = payInvoiceMapper.selectCount(wrapper);
+        if (count != null && count > 0) {
             throw new BusinessException("INVOICE_NO_DUPLICATE",
                     "发票号码(" + invoiceNo + ")已存在，同一租户下发票号码不可重复");
         }

@@ -15,13 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MigrationIntegrityTest {
 
     private static final Path MIGRATION_DIR = Path.of("src/main/resources/db/migration");
+    private static final Path H2_MIGRATION_DIR = Path.of("src/main/resources/db/migration-h2");
     private static final Pattern DIRECT_ADD_COST_TARGET_ID = Pattern.compile(
             "(?im)^\\s*ALTER\\s+TABLE\\s+cost_summary\\s*\\R\\s*ADD\\s+COLUMN\\s+cost_target_id");
 
     @Test
     void localTestProfileIncludesJavaMigrations() throws Exception {
         String testLocal = Files.readString(Path.of("src/test/resources/application-local.yml"));
-        assertTrue(testLocal.contains("classpath:com.cgcpms.common.migration"));
+        assertTrue(testLocal.contains("classpath:com/cgcpms/common/migration"));
     }
 
     @Test
@@ -47,6 +48,40 @@ class MigrationIntegrityTest {
         assertFalse(permissionMigrations.stream()
                         .anyMatch(path -> path.getFileName().toString().startsWith("V21__")),
                 "V21 is already in use in deployed databases and must not contain submit permission backfill");
+    }
+
+    @Test
+    void matStockSoftDeleteUniqueConstraintRepairUsesNewMigrationVersion() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V82__fix_mat_stock_unique_with_deleted_flag.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V82__fix_mat_stock_unique_with_deleted_flag.sql");
+
+        assertTrue(Files.exists(mysqlMigration),
+                "MySQL mat_stock soft-delete unique repair must live in a new V82 migration");
+        assertTrue(Files.exists(h2Migration),
+                "H2 mat_stock soft-delete unique repair must live in a new V82 migration");
+
+        String mysqlSql = readString(mysqlMigration);
+        assertTrue(mysqlSql.contains("ALTER TABLE mat_stock DROP INDEX uk_ms_warehouse_material"));
+        assertTrue(mysqlSql.contains("UNIQUE KEY uk_ms_warehouse_material (warehouse_id, material_id, deleted_flag)"));
+
+        String h2Sql = readString(h2Migration);
+        String h2JavaMigration = Files.readString(Path.of("src/main/java/com/cgcpms/common/migration/V83__repair_h2_anonymous_soft_delete_unique_constraints.java"));
+        assertTrue(h2JavaMigration.contains("ALTER TABLE mat_stock ADD UNIQUE KEY uk_ms_warehouse_material (warehouse_id, material_id, deleted_flag)"));
+        assertTrue(h2Sql.contains("H2 auto-generates the original UNIQUE constraint name"));
+    }
+
+    @Test
+    void accountingEntryLineAuditColumnsAreBackfilledByNewMigrationVersion() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V82__fix_mat_stock_unique_with_deleted_flag.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V82__fix_mat_stock_unique_with_deleted_flag.sql");
+
+        String mysqlSql = readString(mysqlMigration);
+        assertTrue(mysqlSql.contains("ALTER TABLE accounting_entry_line ADD COLUMN created_by"));
+        assertTrue(mysqlSql.contains("ALTER TABLE accounting_entry_line ADD COLUMN deleted_flag"));
+
+        String h2Sql = readString(h2Migration);
+        assertTrue(h2Sql.contains("ALTER TABLE accounting_entry_line ADD COLUMN IF NOT EXISTS created_by"));
+        assertTrue(h2Sql.contains("ALTER TABLE accounting_entry_line ADD COLUMN IF NOT EXISTS deleted_flag"));
     }
 
     /**
