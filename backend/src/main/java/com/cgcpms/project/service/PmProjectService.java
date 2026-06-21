@@ -18,6 +18,10 @@ import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysRoleMapper;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.project.entity.PmProject;
@@ -32,6 +36,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.cgcpms.common.util.DateTimeUtils;
 
@@ -49,10 +54,47 @@ public class PmProjectService {
     private final PayRecordMapper payRecordMapper;
     private final StlSettlementMapper stlSettlementMapper;
     private final WfInstanceMapper wfInstanceMapper;
+    private final SysRoleMapper sysRoleMapper;
+    private final SysUserMapper sysUserMapper;
+
+    /**
+     * Resolve the tightest data scope for the current user.
+     * Returns the most restrictive scope among all roles.
+     */
+    private String resolveEffectiveDataScope() {
+        List<String> roleCodes = UserContext.getCurrentRoles();
+        if (roleCodes.isEmpty()) return "SELF";
+        boolean isAdmin = roleCodes.stream().anyMatch(rc -> "ADMIN".equalsIgnoreCase(rc) || "SUPER_ADMIN".equalsIgnoreCase(rc));
+        if (isAdmin) return "ALL";
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) return "SELF";
+        List<SysRole> roles = sysRoleMapper.selectList(
+                new LambdaQueryWrapper<SysRole>()
+                        .eq(SysRole::getTenantId, tenantId)
+                        .in(SysRole::getRoleCode, roleCodes));
+        if (roles.isEmpty()) return "SELF";
+        // Priority: SELF > DEPT > CUSTOM > ALL
+        if (roles.stream().anyMatch(r -> "SELF".equals(r.getDataScope()))) return "SELF";
+        if (roles.stream().anyMatch(r -> "DEPT".equals(r.getDataScope()))) return "DEPT";
+        if (roles.stream().anyMatch(r -> "CUSTOM".equals(r.getDataScope()))) return "CUSTOM";
+        return "ALL";
+    }
 
     public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String keyword, String projectCode, String projectName, String projectType, String status) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PmProject::getTenantId, UserContext.getCurrentTenantId());
+
+        // SEC-04: Apply data_scope filtering
+        String dataScope = resolveEffectiveDataScope();
+        if ("SELF".equals(dataScope)) {
+            Long currentUserId = UserContext.getCurrentUserId();
+            if (currentUserId != null) {
+                wrapper.eq(PmProject::getCreatedBy, currentUserId);
+            }
+        }
+        // DEPT/CUSTOM scopes require additional infrastructure (dept tree, custom rules)
+        // For now, fall through to tenant-level filtering which is the existing safe default
+
         // keyword 全局搜索：匹配项目编号、项目名称、项目类型、合同金额、项目地址等字段
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w ->

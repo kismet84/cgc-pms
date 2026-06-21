@@ -50,9 +50,14 @@ public class OverheadAllocationController {
     @PostMapping("/execute")
     @PreAuthorize("hasAuthority('overhead:execute') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> executeAllocation(
-            @RequestParam Long tenantId,
+            @RequestParam(required = false) Long tenantId,
             @RequestParam String period) {
-        service.executeAllocation(tenantId, java.time.LocalDate.parse(period));
+        // SEC-01: Ignore client-supplied tenantId; use authenticated tenant from context
+        Long effectiveTenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
+        if (effectiveTenantId == null) {
+            throw new com.cgcpms.common.exception.BusinessException("UNAUTHORIZED", "无法确定租户身份");
+        }
+        service.executeAllocation(effectiveTenantId, java.time.LocalDate.parse(period));
         return ApiResponse.success();
     }
 }

@@ -25,24 +25,32 @@ public class SysMenuService {
     private final SysRoleMenuMapper sysRoleMenuMapper;
 
     public List<MenuTreeVO> getTree() {
-        List<SysMenu> allMenus = sysMenuMapper.selectList(null);
+        Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
+        List<SysMenu> allMenus = sysMenuMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysMenu>()
+                        .eq(SysMenu::getTenantId, tenantId));
         return buildTree(allMenus, 0L);
     }
 
     public List<SysMenu> getFlatList() {
+        Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
         return sysMenuMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysMenu>()
+                        .eq(SysMenu::getTenantId, tenantId)
                         .orderByAsc(SysMenu::getOrderNum));
     }
 
     public SysMenu getById(Long id) {
+        Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
         SysMenu menu = sysMenuMapper.selectById(id);
-        if (menu == null) throw new BusinessException("MENU_NOT_FOUND", "菜单不存在");
+        if (menu == null || !menu.getTenantId().equals(tenantId)) throw new BusinessException("MENU_NOT_FOUND", "菜单不存在");
         return menu;
     }
 
     @Transactional
     public Long create(SysMenu menu) {
+        // Force tenantId from authenticated context, ignore client-supplied value
+        menu.setTenantId(com.cgcpms.auth.context.UserContext.getCurrentTenantId());
         if (menu.getStatus() == null) menu.setStatus("ENABLE");
         if (menu.getVisible() == null) menu.setVisible(1);
         sysMenuMapper.insert(menu);
@@ -52,15 +60,24 @@ public class SysMenuService {
 
     @Transactional
     public void update(SysMenu menu) {
+        Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
+        SysMenu existing = sysMenuMapper.selectById(menu.getId());
+        if (existing == null || !existing.getTenantId().equals(tenantId))
+            throw new BusinessException("MENU_NOT_FOUND", "菜单不存在");
         sysMenuMapper.updateById(menu);
     }
 
     @Transactional
     public void delete(Long id) {
+        Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
+        SysMenu existing = sysMenuMapper.selectById(id);
+        if (existing == null || !existing.getTenantId().equals(tenantId))
+            throw new BusinessException("MENU_NOT_FOUND", "菜单不存在");
         // Check for child menus
         long childCount = sysMenuMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysMenu>()
-                        .eq(SysMenu::getParentId, id));
+                        .eq(SysMenu::getParentId, id)
+                        .eq(SysMenu::getTenantId, tenantId));
         if (childCount > 0) {
             throw new BusinessException("MENU_HAS_CHILDREN", "菜单存在子菜单，请先删除子菜单");
         }

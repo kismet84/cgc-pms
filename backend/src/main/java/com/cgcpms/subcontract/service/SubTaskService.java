@@ -88,6 +88,8 @@ public class SubTaskService {
 
     @Transactional
     public Long create(SubTask task) {
+        // Force tenantId from authenticated context, ignore client-supplied value
+        task.setTenantId(UserContext.getCurrentTenantId());
         // Auto-generate task code: SUB-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "SUB-" + today + "-";

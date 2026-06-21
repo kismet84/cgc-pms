@@ -42,12 +42,14 @@ public class SysRoleService {
 
     @Transactional
     public Long create(SysRole role) {
+        Long tenantId = UserContext.getCurrentTenantId();
         if (sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRole>()
-                .eq(SysRole::getRoleCode, role.getRoleCode())) > 0) {
+                .eq(SysRole::getRoleCode, role.getRoleCode())
+                .eq(SysRole::getTenantId, tenantId)) > 0) {
             throw new BusinessException("ROLE_CODE_EXISTS", "角色编码已存在");
         }
         if (role.getStatus() == null) role.setStatus("ENABLE");
-        role.setTenantId(UserContext.getCurrentTenantId());
+        role.setTenantId(tenantId);
         sysRoleMapper.insert(role);
         log.info("Creating role: {}", role.getRoleCode());
         return role.getId();

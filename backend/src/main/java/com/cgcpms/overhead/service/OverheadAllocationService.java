@@ -59,9 +59,12 @@ public class OverheadAllocationService {
 
     @Transactional
     public void update(OverheadAllocationRule rule) {
+        Long tenantId = UserContext.getCurrentTenantId();
         OverheadAllocationRule existing = ruleMapper.selectById(rule.getId());
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+        if (existing == null || !existing.getTenantId().equals(tenantId))
             throw new BusinessException("RULE_NOT_FOUND", "分摊规则不存在");
+        // Preserve tenant from existing record, ignore client-supplied value
+        rule.setTenantId(existing.getTenantId());
         ruleMapper.updateById(rule);
     }
 

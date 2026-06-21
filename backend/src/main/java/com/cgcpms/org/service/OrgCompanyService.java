@@ -44,6 +44,8 @@ public class OrgCompanyService {
 
     @Transactional
     public Long create(OrgCompany company) {
+        // Force tenantId from authenticated context, ignore client-supplied value
+        company.setTenantId(UserContext.getCurrentTenantId());
         if (StringUtils.hasText(company.getCompanyCode())) {
             Long count = orgCompanyMapper.selectCount(new LambdaQueryWrapper<OrgCompany>()
                     .eq(OrgCompany::getCompanyCode, company.getCompanyCode())
