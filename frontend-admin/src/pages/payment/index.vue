@@ -202,7 +202,8 @@ async function handleEdit(record: PayApplicationVO) {
     basisList.value = data.map((it, idx) => ({ ...it, key: idx }))
     basisKeyCounter = basisList.value.length
   } catch {
-    basisList.value = []
+    message.error('加载付款依据失败，请稍后重试')
+    return
   }
   modalVisible.value = true
 }
@@ -227,8 +228,8 @@ async function handleSubmit() {
       await saveBasis(id, basisList.value)
       message.success('更新成功')
     } else {
-      const res = await createApplication(formData)
-      await saveBasis(res.id, basisList.value)
+      const id = await createApplication(formData)
+      await saveBasis(id, basisList.value)
       message.success('创建成功')
     }
     modalVisible.value = false

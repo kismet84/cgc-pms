@@ -296,8 +296,8 @@ async function handleEdit(record: VarOrderVO) {
     itemList.value = (detail.items ?? []).map((it, idx) => ({ ...it, key: idx }))
     itemKeyCounter = itemList.value.length
   } catch {
-    itemList.value = []
-    itemKeyCounter = 0
+    message.error('加载变更明细失败，请稍后重试')
+    return
   }
   modalVisible.value = true
 }
@@ -334,8 +334,8 @@ async function handleSubmit() {
       await saveVarOrderItems(id, itemList.value)
       message.success('更新成功')
     } else {
-      const res = await createVarOrder(formData)
-      await saveVarOrderItems(res.id, itemList.value)
+      const id = await createVarOrder(formData)
+      await saveVarOrderItems(id, itemList.value)
       message.success('创建成功')
     }
     modalVisible.value = false

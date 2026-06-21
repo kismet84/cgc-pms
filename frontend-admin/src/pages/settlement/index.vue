@@ -64,7 +64,7 @@ const createFormPartnerName = computed(
 watch(
   () => createForm.contractId,
   (val) => {
-    if (!val) createFormPartnerName
+    if (!val) createForm.settlementType = undefined
   },
 )
 

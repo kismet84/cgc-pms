@@ -69,12 +69,10 @@ export const useReferenceStore = defineStore('reference', () => {
   }
 
   async function fetchContracts(params?: FetchContractsParams): Promise<ContractVO[]> {
-    // When filters are provided, skip cache — this is a filtered query
+    // When filters are provided, skip cache — do not pollute base cache
     if (params && (params.projectId || params.contractType)) {
       const res = await getContractLedger({ pageNo: 1, pageSize: 50, ...params })
-      const data = (res.records ?? res.data ?? res) as ContractVO[]
-      contracts.value = data
-      return data
+      return (res.records ?? res.data ?? res) as ContractVO[]
     }
     // Base (unfiltered) query — cached + deduped + TTL
     if (contracts.value && !isExpired(contractsFetchedAt)) return contracts.value
@@ -94,11 +92,10 @@ export const useReferenceStore = defineStore('reference', () => {
   }
 
   async function fetchPartners(params?: FetchPartnersParams): Promise<PartnerVO[]> {
+    // When filters are provided, skip cache — do not pollute base cache
     if (params && params.partnerType) {
       const res = await getPartnerList({ pageNo: 1, pageSize: 50, ...params })
-      const data = (res.records ?? res.data ?? res) as PartnerVO[]
-      partners.value = data
-      return data
+      return (res.records ?? res.data ?? res) as PartnerVO[]
     }
     if (partners.value && !isExpired(partnersFetchedAt)) return partners.value
     if (partnersPromise) return partnersPromise
@@ -117,11 +114,10 @@ export const useReferenceStore = defineStore('reference', () => {
   }
 
   async function fetchMaterials(params?: FetchMaterialsParams): Promise<MaterialVO[]> {
+    // When filters are provided, skip cache — do not pollute base cache
     if (params && params.status) {
       const res = await getMaterialList({ pageNo: 1, pageSize: 50, ...params })
-      const data = (res.records ?? res.data ?? res) as MaterialVO[]
-      materials.value = data
-      return data
+      return (res.records ?? res.data ?? res) as MaterialVO[]
     }
     if (materials.value && !isExpired(materialsFetchedAt)) return materials.value
     if (materialsPromise) return materialsPromise
