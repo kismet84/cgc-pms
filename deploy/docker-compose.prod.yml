@@ -16,6 +16,82 @@ version: "3.8"
 
 services:
   # ===========================================================================
+  # Preflight — fail fast if required variables are missing or still CHANGE-ME
+  # This container exits 0 (success) only when ALL checks pass.
+  # Other services depend on it so they won't start until preflight succeeds.
+  # ===========================================================================
+  preflight:
+    image: busybox:1.36
+    container_name: cgc-pms-preflight
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - |
+        echo "=== CGC-PMS Production Preflight ==="
+        fail() { echo "  [FAIL] $$1"; exit 1; }
+        pass() { echo "  [PASS] $$1"; }
+        check_not_empty() {
+          eval "val=\"\$$$1\""
+          if [ -z "$$val" ]; then fail "$1 is empty or not set"; else pass "$1 is set"; fi
+        }
+        check_not_change_me() {
+          eval "val=\"\$$$1\""
+          case "$$val" in *CHANGE-ME*|*change-me*) fail "$1 still contains CHANGE-ME placeholder";; *) pass "$1 value looks valid";; esac
+        }
+        check_length() {
+          eval "val=\"\$$$1\""
+          if [ "$${#val}" -lt "$2" ]; then fail "$1 is too short (<$$2 chars, got $${#val})"; else pass "$1 length OK ($${#val} chars)"; fi
+        }
+        check_file() {
+          if [ -f "$$1" ] && [ -s "$$1" ]; then pass "File $$1 exists and non-empty";
+          else fail "File $$1 missing or empty (SSL certificate required)"; fi
+        }
+        echo ""
+        echo "--- Critical Secrets ---"
+        check_not_empty   "JWT_SECRET"
+        check_not_change_me "JWT_SECRET"
+        check_length      "JWT_SECRET" 32
+        check_not_empty   "MYSQL_ROOT_PASSWORD"
+        check_not_change_me "MYSQL_ROOT_PASSWORD"
+        check_not_empty   "MYSQL_PASSWORD"
+        check_not_change_me "MYSQL_PASSWORD"
+        check_not_empty   "REDIS_PASSWORD"
+        check_not_change_me "REDIS_PASSWORD"
+        check_not_empty   "MINIO_ROOT_USER"
+        check_not_change_me "MINIO_ROOT_USER"
+        check_not_empty   "MINIO_ROOT_PASSWORD"
+        check_not_change_me "MINIO_ROOT_PASSWORD"
+        check_not_empty   "JASYPT_ENCRYPTOR_PASSWORD"
+        check_not_change_me "JASYPT_ENCRYPTOR_PASSWORD"
+        echo ""
+        echo "--- SSL Certificates ---"
+        check_file "/etc/nginx/ssl/server.crt"
+        check_file "/etc/nginx/ssl/server.key"
+        echo ""
+        echo "--- Image Tags (must be pinned, not 'latest') ---"
+        check_not_empty "BACKEND_TAG"
+        check_not_empty "FRONTEND_TAG"
+        case "$$BACKEND_TAG" in latest) fail "BACKEND_TAG must not be 'latest'";; *) pass "BACKEND_TAG pinned to $$BACKEND_TAG";; esac
+        case "$$FRONTEND_TAG" in latest) fail "FRONTEND_TAG must not be 'latest'";; *) pass "FRONTEND_TAG pinned to $$FRONTEND_TAG";; esac
+        echo ""
+        echo "=== Preflight PASSED ==="
+        exit 0
+    environment:
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set in .env}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in .env}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set in .env}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set in .env}
+      - JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD:?JASYPT_ENCRYPTOR_PASSWORD must be set in .env}
+      - BACKEND_TAG=${BACKEND_TAG:?BACKEND_TAG must be set (e.g. git SHA)}
+      - FRONTEND_TAG=${FRONTEND_TAG:?FRONTEND_TAG must be set (e.g. git SHA)}
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - cgc-pms-net
+  # ===========================================================================
   # MySQL 8.0 — database server
   # ===========================================================================
   mysql:
@@ -113,10 +189,12 @@ services:
   # Backend — Spring Boot 3.3 Java 21 REST API (:8080)
   # ===========================================================================
   backend:
-    image: ${REGISTRY_URL:-}cgc-pms-backend:${BACKEND_TAG:-latest}
+    image: ${REGISTRY_URL:-}cgc-pms-backend:${BACKEND_TAG:?BACKEND_TAG must be set}
     container_name: cgc-pms-backend
     restart: unless-stopped
     depends_on:
+      preflight:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
@@ -165,10 +243,12 @@ services:
   # Frontend — Nginx serving Vue 3 SPA + reverse proxy to backend (:80/:443)
   # ===========================================================================
   frontend:
-    image: ${REGISTRY_URL:-}cgc-pms-frontend:${FRONTEND_TAG:-latest}
+    image: ${REGISTRY_URL:-}cgc-pms-frontend:${FRONTEND_TAG:?FRONTEND_TAG must be set}
     container_name: cgc-pms-frontend
     restart: unless-stopped
     depends_on:
+      preflight:
+        condition: service_completed_successfully
       backend:
         condition: service_healthy
     ports:

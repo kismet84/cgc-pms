@@ -47,32 +47,32 @@ ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=
 ENV SPRING_PROFILES_ACTIVE=prod
 
 # =============================================================================
-# Database — MySQL 8.0
-# Override application-dev.yml hard-coded URL with Docker service name
-# DB_USERNAME / DB_PASSWORD are resolved by Spring placeholder ${DB_USERNAME:…}
+# Database — MySQL 8.0 (Docker service name 'mysql' on internal network)
+# All secrets (DB_PASSWORD, etc.) MUST be provided via docker-compose environment.
+# Defaults below are intentionally absent — missing vars will cause startup failure.
 # =============================================================================
-ENV SPRING_DATASOURCE_URL="jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
-ENV DB_USERNAME=cgc
-ENV DB_PASSWORD=CHANGE-ME-DB-PASSWORD
+ENV SPRING_DATASOURCE_URL="jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true"
+# DB_USERNAME — injected by docker-compose from MYSQL_USER
+# DB_PASSWORD — injected by docker-compose from MYSQL_PASSWORD
 
 # =============================================================================
 # Redis — override localhost with Docker service name
 # =============================================================================
 ENV SPRING_DATA_REDIS_HOST=redis
 ENV SPRING_DATA_REDIS_PORT=6379
-ENV SPRING_DATA_REDIS_PASSWORD=CHANGE-ME-REDIS-PASSWORD
+# SPRING_DATA_REDIS_PASSWORD — injected by docker-compose from REDIS_PASSWORD
 
 # =============================================================================
 # MinIO object storage
 # =============================================================================
 ENV MINIO_ENDPOINT=http://minio:9000
-ENV MINIO_ACCESS_KEY=minioadmin
-ENV MINIO_SECRET_KEY=CHANGE-ME-MINIO-SECRET
+# MINIO_ACCESS_KEY — injected by docker-compose from MINIO_ROOT_USER
+# MINIO_SECRET_KEY — injected by docker-compose from MINIO_ROOT_PASSWORD
 
 # =============================================================================
-# JWT signing secret (MUST be overridden in production)
+# JWT signing secret (MUST be injected by docker-compose)
 # =============================================================================
-ENV JWT_SECRET=CHANGE-ME-JWT-SECRET
+# JWT_SECRET — injected by docker-compose from JWT_SECRET
 
 # ---------------------------------------------------------------------------
 # Copy the Spring Boot fat jar from the builder stage

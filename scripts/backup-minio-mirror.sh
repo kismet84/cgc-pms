@@ -8,8 +8,8 @@ set -euo pipefail
 BACKUP_DIR="${BACKUP_DIR:-/opt/cgc-pms/backups/minio}"
 MINIO_ALIAS="${MINIO_ALIAS:-cgc-minio}"
 MINIO_BUCKET="${MINIO_BUCKET:-cgc-pms}"
-MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY}"
-MINIO_SECRET_KEY="${MINIO_SECRET_KEY}"
+MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set}"
+MINIO_SECRET_KEY="${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set}"
 MINIO_ENDPOINT="${MINIO_ENDPOINT:-http://minio:9000}"
 
 mkdir -p "${BACKUP_DIR}"
@@ -22,3 +22,6 @@ mc alias set "${MINIO_ALIAS}" "${MINIO_ENDPOINT}" "${MINIO_ACCESS_KEY}" "${MINIO
 mc mirror --overwrite --remove "${MINIO_ALIAS}/${MINIO_BUCKET}" "${BACKUP_DIR}/"
 
 echo "[$(date)] MinIO mirror backup completed"
+FILE_COUNT=$(find "${BACKUP_DIR}" -type f 2>/dev/null | wc -l)
+TOTAL_SIZE=$(du -sh "${BACKUP_DIR}" 2>/dev/null | cut -f1)
+echo "[$(date)] MinIO mirror backed up ${FILE_COUNT} files, total: ${TOTAL_SIZE}"
