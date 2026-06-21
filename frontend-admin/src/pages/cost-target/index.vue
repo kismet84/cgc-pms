@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { PlusOutlined, ReloadOutlined, CheckCircleOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import {
+  PlusOutlined,
+  ReloadOutlined,
+  CheckCircleOutlined,
+  SearchOutlined,
+} from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { getCostTargetList, activateCostTarget, deleteCostTarget } from '@/api/modules/costTarget'
 import { useReferenceStore } from '@/stores/reference'
@@ -186,7 +191,7 @@ onMounted(() => {
 <template>
   <div class="lg-page app-page">
     <div class="lg-page-head">
-      <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+      <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
         <a-breadcrumb-item>目标管理</a-breadcrumb-item>
         <a-breadcrumb-item>目标成本</a-breadcrumb-item>
       </a-breadcrumb>

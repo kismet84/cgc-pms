@@ -29,11 +29,7 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 
 const referenceStore = useReferenceStore()
-const {
-  projects: projectList,
-  contracts: contractList,
-  partners: partnerList,
-} = storeToRefs(referenceStore)
+const { projects: projectList, contracts: contractList } = storeToRefs(referenceStore)
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建分包任务')
@@ -82,7 +78,13 @@ const STATUS_COLOR: Record<string, string> = {
 // ---- vxe-grid columns ----
 const gridColumns = computed(() => [
   { field: 'taskCode', title: '任务编号', width: 130, ellipsis: true },
-  { field: 'taskName', title: '任务名称', minWidth: 140, slots: { default: 'taskName' }, ellipsis: true },
+  {
+    field: 'taskName',
+    title: '任务名称',
+    minWidth: 140,
+    slots: { default: 'taskName' },
+    ellipsis: true,
+  },
   { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
   { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
   { field: 'partnerName', title: '分包商', width: 120, ellipsis: true },
@@ -254,7 +256,7 @@ onMounted(() => {
 <template>
   <div class="lg-page app-page">
     <div class="lg-page-head">
-      <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+      <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
         <a-breadcrumb-item>分包管理</a-breadcrumb-item>
         <a-breadcrumb-item>分包任务</a-breadcrumb-item>
       </a-breadcrumb>
@@ -283,22 +285,32 @@ onMounted(() => {
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">进行中</span>
         <span class="lg-kpi-card-value">{{ kpiInProgress }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+        <span class="lg-kpi-card-bar"
+          ><span style="width: 100%; background: var(--kpi-total)"></span
+        ></span>
       </div>
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">已完成</span>
         <span class="lg-kpi-card-value">{{ kpiCompleted }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-paid)"></span></span>
+        <span class="lg-kpi-card-bar"
+          ><span style="width: 100%; background: var(--kpi-paid)"></span
+        ></span>
       </div>
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">待开始</span>
         <span class="lg-kpi-card-value">{{ kpiPending }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+        <span class="lg-kpi-card-bar"
+          ><span style="width: 100%; background: var(--kpi-amount)"></span
+        ></span>
       </div>
       <div class="lg-kpi-card" :class="{ 'is-warn': kpiSuspended > 0 }">
         <span class="lg-kpi-card-label">已暂停</span>
         <span class="lg-kpi-card-value">{{ kpiSuspended }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"><span :style="{ width: (kpiSuspended > 0 ? 100 : 0) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+        <span class="lg-kpi-card-bar"
+          ><span
+            :style="{ width: (kpiSuspended > 0 ? 100 : 0) + '%', background: 'var(--kpi-overdue)' }"
+          ></span
+        ></span>
       </div>
     </div>
 

@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import {
-  SearchOutlined,
-  ReloadOutlined,
-  PlusOutlined,
-} from '@ant-design/icons-vue'
+import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import {
   getWarehouseList,
   createWarehouse,
@@ -188,10 +184,6 @@ function handleModalCancel() {
 const kpiWhTotal = computed(() => total.value)
 const kpiWhEnabled = computed(() => tableData.value.filter((r) => r.status === 'ENABLE').length)
 
-function filterOption(input: string, option: any) {
-  return option.label?.toLowerCase().includes(input.toLowerCase())
-}
-
 onMounted(() => {
   referenceStore.fetchProjects()
   fetchData()
@@ -203,7 +195,7 @@ onMounted(() => {
     <!-- Page head -->
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>仓库</a-breadcrumb-item>
         </a-breadcrumb>
@@ -215,12 +207,18 @@ onMounted(() => {
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">仓库总数</span>
         <span class="lg-kpi-card-value">{{ kpiWhTotal }} <small>个</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+        <span class="lg-kpi-card-bar"
+          ><span style="width: 100%; background: var(--kpi-total)"></span
+        ></span>
       </div>
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">启用仓库</span>
-        <span class="lg-kpi-card-value" style="color: #22c55e">{{ kpiWhEnabled }} <small>个</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-paid)"></span></span>
+        <span class="lg-kpi-card-value" style="color: #22c55e"
+          >{{ kpiWhEnabled }} <small>个</small></span
+        >
+        <span class="lg-kpi-card-bar"
+          ><span style="width: 100%; background: var(--kpi-paid)"></span
+        ></span>
       </div>
     </div>
 

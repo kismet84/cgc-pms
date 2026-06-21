@@ -108,7 +108,7 @@ function handleEditModalClose() {
 async function handleEditSubmit() {
   try {
     await editFormRef.value?.validate()
-  } catch (e: unknown) {
+  } catch {
     return
   }
   editLoading.value = true
@@ -384,7 +384,7 @@ const gridColumns = computed(() => [
     <!-- 页面头部 -->
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目列表</a-breadcrumb-item>
         </a-breadcrumb>
@@ -571,30 +571,66 @@ const gridColumns = computed(() => [
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">项目总数</span>
             <span class="lg-kpi-card-value">{{ projectStats.total }} <small>个</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">合同总金额</span>
-            <span class="lg-kpi-card-value">{{ (parseFloat(String(kpiMax.amount)) / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{
+                (parseFloat(String(kpiMax.amount)) / 10000).toLocaleString('zh-CN', {
+                  minimumFractionDigits: 2,
+                })
+              }}
+              <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-amount)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">在建项目</span>
             <span class="lg-kpi-card-value">{{ projectStats.ongoing }} <small>个</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(projectStats.ongoing, kpiMax.total) + '%', background: 'var(--kpi-paid)' }"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(projectStats.ongoing, kpiMax.total) + '%',
+                  background: 'var(--kpi-paid)',
+                }"
+              ></span
+            ></span>
             <span class="lg-kpi-card-hint">{{ kpiPct(projectStats.ongoing, kpiMax.total) }}%</span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">已完工项目</span>
             <span class="lg-kpi-card-value">{{ projectStats.completed }} <small>个</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(projectStats.completed, kpiMax.total) + '%', background: 'var(--kpi-paid)' }"></span></span>
-            <span class="lg-kpi-card-hint">{{ kpiPct(projectStats.completed, kpiMax.total) }}%</span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(projectStats.completed, kpiMax.total) + '%',
+                  background: 'var(--kpi-paid)',
+                }"
+              ></span
+            ></span>
+            <span class="lg-kpi-card-hint"
+              >{{ kpiPct(projectStats.completed, kpiMax.total) }}%</span
+            >
           </div>
           <div class="lg-kpi-card is-warn">
             <span class="lg-kpi-card-label">风险项目</span>
             <span class="lg-kpi-card-value">{{ projectStats.risk }} <small>个</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(projectStats.risk, kpiMax.total) + '%', background: 'var(--kpi-overdue)' }"></span></span>
-            <span class="lg-kpi-card-hint" v-if="projectStats.risk">{{ kpiPct(projectStats.risk, kpiMax.total) }}%</span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(projectStats.risk, kpiMax.total) + '%',
+                  background: 'var(--kpi-overdue)',
+                }"
+              ></span
+            ></span>
+            <span class="lg-kpi-card-hint" v-if="projectStats.risk"
+              >{{ kpiPct(projectStats.risk, kpiMax.total) }}%</span
+            >
           </div>
         </div>
 
@@ -629,9 +665,7 @@ const gridColumns = computed(() => [
               }}</a>
             </template>
             <template #projectType="{ row }">
-              <a-tag :color="TYPE_COLOR[row.projectType] ?? 'default'">{{
-                row.projectType
-              }}</a-tag>
+              <a-tag :color="TYPE_COLOR[row.projectType] ?? 'default'">{{ row.projectType }}</a-tag>
             </template>
             <template #contractAmount="{ row }">
               <span class="lg-money">{{ fmtAmount(row.contractAmount) }}</span>
@@ -685,7 +719,12 @@ const gridColumns = computed(() => [
           <div class="lg-panel-title">项目风险提示</div>
           <div class="lg-type-list">
             <div v-for="item in riskProjects" :key="item.name" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.status === '平稳' ? 'var(--kpi-paid)' : 'var(--kpi-overdue)' }"></span>
+              <span
+                class="lg-type-dot"
+                :style="{
+                  background: item.status === '平稳' ? 'var(--kpi-paid)' : 'var(--kpi-overdue)',
+                }"
+              ></span>
               <span class="lg-type-label" style="grid-column: 2 / span 4">{{ item.name }}</span>
             </div>
           </div>

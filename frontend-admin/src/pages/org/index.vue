@@ -283,10 +283,7 @@ async function fetchDeptTree() {
   }
 }
 
-function handleDeptSelect(
-  _selectedKeys: string[],
-  info: { node: { dataRef: OrgDepartmentTreeNodeVO } },
-) {
+function handleDeptSelect() {
   // Selection handled by v-model:selectedKeys
 }
 
@@ -613,7 +610,7 @@ onMounted(async () => {
     <div class="lg-page app-page">
       <div class="lg-page-head">
         <div>
-          <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+          <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
             <a-breadcrumb-item>系统管理</a-breadcrumb-item>
             <a-breadcrumb-item>组织架构</a-breadcrumb-item>
           </a-breadcrumb>
@@ -710,11 +707,7 @@ onMounted(async () => {
               </a-tag>
             </template>
             <template #companyOps="{ row }">
-              <a-button
-                v-if="canEdit"
-                size="small"
-                type="link"
-                @click="openCompanyEdit(row)"
+              <a-button v-if="canEdit" size="small" type="link" @click="openCompanyEdit(row)"
                 >编辑</a-button
               >
               <a-button
@@ -1041,7 +1034,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-
 .org-panel-header p {
   margin: 4px 0 0;
   color: var(--muted);

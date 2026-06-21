@@ -7,17 +7,12 @@ import {
   AuditOutlined,
   ClockCircleOutlined,
   DollarOutlined,
-  ExclamationCircleOutlined,
   FileTextOutlined,
   FundOutlined,
   LineChartOutlined,
-  LockOutlined,
-  PayCircleOutlined,
   ProjectOutlined,
   RiseOutlined,
   SwapOutlined,
-  TrophyOutlined,
-  WalletOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'

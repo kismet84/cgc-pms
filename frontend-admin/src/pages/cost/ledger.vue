@@ -6,16 +6,13 @@ import {
   DollarOutlined,
   LockOutlined,
   ToolOutlined,
-  CarOutlined,
   ReloadOutlined,
   SearchOutlined,
-  PieChartOutlined,
-  BarChartOutlined,
   AlertOutlined,
 } from '@ant-design/icons-vue'
 import type { TreeSelectProps } from 'ant-design-vue'
 import { getCostLedger, getCostLedgerSummary, getCostLedgerDetail } from '@/api/modules/cost'
-import { getCostSubjectTree, type CostSubjectTreeNode } from '@/api/modules/costSubject'
+import { getCostSubjectTree } from '@/api/modules/costSubject'
 import type {
   CostLedgerVO,
   CostLedgerQueryParams,
@@ -28,15 +25,13 @@ import { useReferenceStore } from '@/stores/reference'
 
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
-function onResize() { isMobile.value = window.innerWidth < MOBILE_BP }
+function onResize() {
+  isMobile.value = window.innerWidth < MOBILE_BP
+}
 
 // ---- Reference store ----
 const referenceStore = useReferenceStore()
-const {
-  projects: projectList,
-  contracts: contractList,
-  partners: partnerList,
-} = storeToRefs(referenceStore)
+const { projects: projectList } = storeToRefs(referenceStore)
 
 // ---- Dropdown data ----
 const subjectTree = ref<TreeSelectProps['treeData']>([])
@@ -73,9 +68,6 @@ const summary = ref<CostLedgerSummaryVO>({
 // ---- Detail drawer ----
 const detailVisible = ref(false)
 const detailItem = ref<CostLedgerVO | null>(null)
-
-// ---- Summary view mode ----
-const summaryMode = ref<'sourceType' | 'project' | 'costType'>('sourceType')
 
 async function fetchSubjectTree() {
   try {
@@ -296,7 +288,13 @@ const gridColumns = computed(() => [
   { field: 'id', title: '编号', width: 180, ellipsis: true },
   { field: 'costSubjectName', title: '成本科目', width: 130, ellipsis: true },
   { field: 'sourceType', title: '来源类型', width: 110, slots: { default: 'sourceType' } },
-  { field: 'amount', title: '金额(万元)', width: 110, align: 'right' as const, slots: { default: 'amount' } },
+  {
+    field: 'amount',
+    title: '金额(万元)',
+    width: 110,
+    align: 'right' as const,
+    slots: { default: 'amount' },
+  },
   { field: 'costDate', title: '成本日期', width: 110 },
   { field: 'costStatus', title: '状态', width: 90, slots: { default: 'costStatus' } },
   { title: '操作', width: 80, slots: { default: 'ops' } },
@@ -351,23 +349,48 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         <div v-if="!isMobile" class="lg-kpi-strip">
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">成本总额</span>
-            <span class="lg-kpi-card-value">{{ fmtWan(String(kpiStats.total)) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtWan(String(kpiStats.total)) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">锁定成本</span>
-            <span class="lg-kpi-card-value">{{ fmtWan(String(kpiStats.locked)) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtWan(String(kpiStats.locked)) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-amount)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">动态成本</span>
-            <span class="lg-kpi-card-value">{{ fmtWan(String(kpiStats.dynamic)) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-paid)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtWan(String(kpiStats.dynamic)) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-paid)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card is-warn" v-if="kpiStats.deviation !== 0">
             <span class="lg-kpi-card-label">偏差金额</span>
-            <span class="lg-kpi-card-value">{{ fmtWan(String(kpiStats.deviation)) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: Math.min(100, Math.abs(kpiStats.deviation) / Math.max(kpiStats.total, 1) * 100) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtWan(String(kpiStats.deviation)) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width:
+                    Math.min(
+                      100,
+                      (Math.abs(kpiStats.deviation) / Math.max(kpiStats.total, 1)) * 100,
+                    ) + '%',
+                  background: 'var(--kpi-overdue)',
+                }"
+              ></span
+            ></span>
           </div>
         </div>
 
@@ -376,10 +399,34 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <div
             class="lg-kpi-single-row"
             v-for="item in [
-              { icon: DollarOutlined, bg: 'var(--kpi-total)', label: '成本总额', value: fmtWan(String(kpiStats.total)), unit: '万元' },
-              { icon: LockOutlined, bg: 'var(--kpi-amount)', label: '锁定成本', value: fmtWan(String(kpiStats.locked)), unit: '万元' },
-              { icon: ToolOutlined, bg: 'var(--kpi-paid)', label: '动态成本', value: fmtWan(String(kpiStats.dynamic)), unit: '万元' },
-              { icon: AlertOutlined, bg: 'var(--kpi-overdue)', label: '偏差金额', value: fmtWan(String(kpiStats.deviation)), unit: '万元' },
+              {
+                icon: DollarOutlined,
+                bg: 'var(--kpi-total)',
+                label: '成本总额',
+                value: fmtWan(String(kpiStats.total)),
+                unit: '万元',
+              },
+              {
+                icon: LockOutlined,
+                bg: 'var(--kpi-amount)',
+                label: '锁定成本',
+                value: fmtWan(String(kpiStats.locked)),
+                unit: '万元',
+              },
+              {
+                icon: ToolOutlined,
+                bg: 'var(--kpi-paid)',
+                label: '动态成本',
+                value: fmtWan(String(kpiStats.dynamic)),
+                unit: '万元',
+              },
+              {
+                icon: AlertOutlined,
+                bg: 'var(--kpi-overdue)',
+                label: '偏差金额',
+                value: fmtWan(String(kpiStats.deviation)),
+                unit: '万元',
+              },
             ]"
             :key="item.label"
           >
@@ -387,7 +434,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <component :is="item.icon" />
             </div>
             <span class="lg-kpi-single-label">{{ item.label }}</span>
-            <span class="lg-kpi-single-value">{{ item.value }} <small>{{ item.unit }}</small></span>
+            <span class="lg-kpi-single-value"
+              >{{ item.value }} <small>{{ item.unit }}</small></span
+            >
           </div>
         </div>
 
@@ -427,7 +476,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             max-height="480"
           >
             <template #sourceType="{ row }">
-              <a-tag :color="SOURCE_TYPE_COLOR[row.sourceType as SourceType] || 'default'" size="small">
+              <a-tag
+                :color="SOURCE_TYPE_COLOR[row.sourceType as SourceType] || 'default'"
+                size="small"
+              >
                 {{ SOURCE_TYPE_LABEL[row.sourceType as SourceType] || row.sourceType }}
               </a-tag>
             </template>
@@ -445,7 +497,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 "
                 size="small"
               >
-                {{ row.costStatus === 'CONFIRMED' ? '已确认' : row.costStatus === 'PENDING' ? '待确认' : row.costStatus }}
+                {{
+                  row.costStatus === 'CONFIRMED'
+                    ? '已确认'
+                    : row.costStatus === 'PENDING'
+                      ? '待确认'
+                      : row.costStatus
+                }}
               </a-tag>
             </template>
             <template #ops="{ row }">
@@ -479,7 +537,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: barPercent(item.amount), background: 'var(--kpi-paid)' }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: barPercent(item.amount), background: 'var(--kpi-paid)' }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ fmtWan(item.amount) }}</span>
               <span class="lg-type-pct">{{ barPercent(item.amount) }}</span>
@@ -494,7 +555,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <span class="lg-type-dot" :style="{ background: 'var(--kpi-amount)' }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: barPercent(item.amount), background: 'var(--kpi-amount)' }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: barPercent(item.amount), background: 'var(--kpi-amount)' }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ fmtWan(item.amount) }}</span>
               <span class="lg-type-pct">{{ barPercent(item.amount) }}</span>
@@ -504,7 +568,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
         <section class="lg-panel">
           <div class="lg-warning-head">
-            <div class="lg-panel-title" style="margin-bottom:0">超预算预警</div>
+            <div class="lg-panel-title" style="margin-bottom: 0">超预算预警</div>
           </div>
           <div class="lg-warning-list">
             <div

@@ -93,7 +93,7 @@ onMounted(fetchData)
   <div class="lg-page app-page">
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
           <a-breadcrumb-item>角色管理</a-breadcrumb-item>
         </a-breadcrumb>
       </div>

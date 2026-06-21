@@ -14,7 +14,6 @@ import {
   CHANGE_APPROVAL_LABEL,
   type ContractChangeVO,
   type ChangeType,
-  type ChangeApprovalStatus,
 } from '@/types/contract-change'
 
 const props = defineProps<{
@@ -289,24 +288,6 @@ const CHANGE_TYPE_OPTIONS = [
 ]
 
 // ---- Approval timeline steps ----
-function getApprovalSteps(status: ChangeApprovalStatus) {
-  const steps = [
-    { title: '草稿', status: 'DRAFT' as const },
-    { title: '审批中', status: 'APPROVING' as const },
-    { title: '已通过', status: 'APPROVED' as const },
-    { title: '已驳回', status: 'REJECTED' as const },
-    { title: '已撤回', status: 'WITHDRAWN' as const },
-  ]
-
-  const currentIndex = steps.findIndex((s) => s.status === status)
-  if (currentIndex === -1) return steps
-
-  return steps.map((step, idx) => ({
-    ...step,
-    active: idx <= currentIndex,
-    isCurrent: idx === currentIndex,
-  }))
-}
 
 onMounted(() => {
   fetchData()

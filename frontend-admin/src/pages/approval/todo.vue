@@ -139,11 +139,13 @@ watch(
 <template>
   <div class="lg-page app-page">
     <div class="lg-page-head">
-      <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+      <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
         <a-breadcrumb-item>审批中心</a-breadcrumb-item>
         <a-breadcrumb-item>{{ pageHeaderTitle() }}</a-breadcrumb-item>
       </a-breadcrumb>
-      <p class="app-page-subtitle" style="margin:0;color:var(--subtext);font-size:13px">{{ pageHeaderSubtitle() }}</p>
+      <p class="app-page-subtitle" style="margin: 0; color: var(--subtext); font-size: 13px">
+        {{ pageHeaderSubtitle() }}
+      </p>
     </div>
 
     <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
@@ -162,13 +164,13 @@ watch(
         max-height="480"
       >
         <template #title="{ row }">
-          <a class="lg-link" @click="handleDetail(row as { instanceId: string })">{{ row.title }}</a>
+          <a class="lg-link" @click="handleDetail(row as { instanceId: string })">{{
+            row.title
+          }}</a>
         </template>
         <template #businessType="{ row }">
           <a-tag>{{
-            businessTypeMap[row.businessType as string] ||
-            (row.businessType as string) ||
-            '—'
+            businessTypeMap[row.businessType as string] || (row.businessType as string) || '—'
           }}</a-tag>
         </template>
         <template #timeCol="{ row }">

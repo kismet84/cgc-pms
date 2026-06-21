@@ -111,6 +111,10 @@ export interface StockTransactionParams {
 export interface StockLedgerQuery {
   warehouseId: string
   materialId: string
+  projectId?: string
+  keyword?: string
+  sortField?: string
+  sortOrder?: 'asc' | 'desc'
   pageNo?: number
   pageSize?: number
 }

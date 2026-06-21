@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, type VueWrapper } from '@vue/test-utils'
-import { defineComponent, h, nextTick } from 'vue'
+import { mount } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
 
 function flushPromises() {
   return new Promise((resolve) => setTimeout(resolve, 0))
@@ -315,7 +315,7 @@ describe('PermissionModal', () => {
   it('fetches menu tree when opened', async () => {
     mockGetMenuTree.mockResolvedValue(mockMenuTree)
 
-    const wrapper = mount(PermissionModal, {
+    mount(PermissionModal, {
       props: { open: true, role: mockRoles[0] },
       global: { stubs },
     })

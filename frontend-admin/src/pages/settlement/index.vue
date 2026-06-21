@@ -22,7 +22,7 @@ import type { PageResult } from '@/types/api'
 
 const router = useRouter()
 const referenceStore = useReferenceStore()
-const { projects, contracts, partners } = storeToRefs(referenceStore)
+const { projects, contracts } = storeToRefs(referenceStore)
 
 const filter = reactive({
   keyword: '',
@@ -305,23 +305,44 @@ const colorMap: Record<string, string> = {
         <div v-if="!isMobile" class="lg-kpi-strip">
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">累计结算金额</span>
-            <span class="lg-kpi-card-value">{{ fmtWan(kpi.totalFinalAmount) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width: 100%; background: var(--kpi-amount)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtWan(kpi.totalFinalAmount) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-amount)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">待审核金额</span>
-            <span class="lg-kpi-card-value">{{ fmtWan(kpi.totalContractAmount) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width: 100%; background: var(--kpi-total)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtWan(kpi.totalContractAmount) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">已确认金额</span>
-            <span class="lg-kpi-card-value">{{ fmtWan(kpi.totalPaidAmount) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(parseFloat(kpi.totalPaidAmount), kpiMax.totalAmount) + '%', background: 'var(--kpi-paid)' }"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtWan(kpi.totalPaidAmount) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(parseFloat(kpi.totalPaidAmount), kpiMax.totalAmount) + '%',
+                  background: 'var(--kpi-paid)',
+                }"
+              ></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">结算进度</span>
             <span class="lg-kpi-card-value">{{ progressPct }} <small>已定案</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: parseFloat(progressPct) + '%', background: 'var(--kpi-unpaid)' }"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{ width: parseFloat(progressPct) + '%', background: 'var(--kpi-unpaid)' }"
+              ></span
+            ></span>
           </div>
         </div>
 
@@ -369,10 +390,15 @@ const colorMap: Record<string, string> = {
             </template>
             <template #settlementStatus="{ row }">
               <a-tag
-                :color="SETTLEMENT_STATUS_COLOR[row.settlementStatus as SettlementStatus] || 'default'"
+                :color="
+                  SETTLEMENT_STATUS_COLOR[row.settlementStatus as SettlementStatus] || 'default'
+                "
                 size="small"
               >
-                {{ SETTLEMENT_STATUS_LABEL[row.settlementStatus as SettlementStatus] ?? row.settlementStatus }}
+                {{
+                  SETTLEMENT_STATUS_LABEL[row.settlementStatus as SettlementStatus] ??
+                  row.settlementStatus
+                }}
               </a-tag>
             </template>
             <template #ops="{ row }">
@@ -382,7 +408,8 @@ const colorMap: Record<string, string> = {
                   v-if="row.settlementStatus !== 'FINALIZED'"
                   class="lg-link lg-del"
                   @click="handleDelete(row)"
-                >删除</a>
+                  >删除</a
+                >
               </div>
             </template>
           </vxe-grid>
@@ -410,10 +437,16 @@ const colorMap: Record<string, string> = {
           <div class="lg-panel-title">结算状态分布</div>
           <div class="lg-type-list">
             <div v-for="it in statusBreakdown" :key="it.key" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: colorMap[it.key] || '#94a3b8' }"></span>
+              <span
+                class="lg-type-dot"
+                :style="{ background: colorMap[it.key] || '#94a3b8' }"
+              ></span>
               <span class="lg-type-label">{{ it.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: it.pct + '%', background: colorMap[it.key] || '#94a3b8' }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: it.pct + '%', background: colorMap[it.key] || '#94a3b8' }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ it.count }}</span>
               <span class="lg-type-pct">{{ it.pct }}%</span>
@@ -427,19 +460,47 @@ const colorMap: Record<string, string> = {
               <span class="lg-type-dot" style="background: #f59e0b"></span>
               <span class="lg-type-label">草稿</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: (kpi.totalCount > 0 ? (kpi.draftCount / kpi.totalCount * 100).toFixed(0) : '0') + '%', background: '#f59e0b' }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{
+                    width:
+                      (kpi.totalCount > 0
+                        ? ((kpi.draftCount / kpi.totalCount) * 100).toFixed(0)
+                        : '0') + '%',
+                    background: '#f59e0b',
+                  }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ kpi.draftCount }}</span>
-              <span class="lg-type-pct">{{ kpi.totalCount > 0 ? (kpi.draftCount / kpi.totalCount * 100).toFixed(0) : '0' }}%</span>
+              <span class="lg-type-pct"
+                >{{
+                  kpi.totalCount > 0 ? ((kpi.draftCount / kpi.totalCount) * 100).toFixed(0) : '0'
+                }}%</span
+              >
             </div>
             <div class="lg-type-row">
               <span class="lg-type-dot" style="background: #31c48d"></span>
               <span class="lg-type-label">已定案</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: (kpi.totalCount > 0 ? (kpi.finalizedCount / kpi.totalCount * 100).toFixed(0) : '0') + '%', background: '#31c48d' }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{
+                    width:
+                      (kpi.totalCount > 0
+                        ? ((kpi.finalizedCount / kpi.totalCount) * 100).toFixed(0)
+                        : '0') + '%',
+                    background: '#31c48d',
+                  }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ kpi.finalizedCount }}</span>
-              <span class="lg-type-pct">{{ kpi.totalCount > 0 ? (kpi.finalizedCount / kpi.totalCount * 100).toFixed(0) : '0' }}%</span>
+              <span class="lg-type-pct"
+                >{{
+                  kpi.totalCount > 0
+                    ? ((kpi.finalizedCount / kpi.totalCount) * 100).toFixed(0)
+                    : '0'
+                }}%</span
+              >
             </div>
           </div>
         </section>
@@ -449,7 +510,9 @@ const colorMap: Record<string, string> = {
             <div class="lg-type-row">
               <span class="lg-type-dot" style="background: #ef4444"></span>
               <span class="lg-type-label">未付金额</span>
-              <span class="lg-type-num" style="color: #ef4444; font-weight: 600">{{ fmtWan(kpi.totalUnpaidAmount) }} 万</span>
+              <span class="lg-type-num" style="color: #ef4444; font-weight: 600"
+                >{{ fmtWan(kpi.totalUnpaidAmount) }} 万</span
+              >
             </div>
           </div>
         </section>
@@ -473,12 +536,7 @@ const colorMap: Record<string, string> = {
           show-search
           option-filter-prop="label"
         >
-          <a-select-option
-            v-for="c in contracts"
-            :key="c.id"
-            :value="c.id"
-            :label="c.contractName"
-          >
+          <a-select-option v-for="c in contracts" :key="c.id" :value="c.id" :label="c.contractName">
             {{ c.contractName }}
           </a-select-option>
         </a-select>

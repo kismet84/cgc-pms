@@ -36,11 +36,7 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 
 const referenceStore = useReferenceStore()
-const {
-  projects: projectList,
-  contracts: contractList,
-  partners: partnerList,
-} = storeToRefs(referenceStore)
+const { projects: projectList, contracts: contractList } = storeToRefs(referenceStore)
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建变更签证')
@@ -498,7 +494,8 @@ onMounted(() => {
                   : 'processing'
             "
             size="small"
-          >{{ row.approvalStatus }}</a-tag>
+            >{{ row.approvalStatus }}</a-tag
+          >
         </template>
         <template #ops="{ row }">
           <div class="lg-ops">
@@ -506,7 +503,8 @@ onMounted(() => {
               v-if="row.approvalStatus === 'DRAFT'"
               class="lg-link"
               @click="handleSubmitApproval(row)"
-            >提交审批</a>
+              >提交审批</a
+            >
             <a class="lg-link" @click="handleEdit(row)">编辑</a>
             <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
           </div>

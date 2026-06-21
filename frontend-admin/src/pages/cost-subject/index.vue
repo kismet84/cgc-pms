@@ -246,14 +246,18 @@ onMounted(() => {
           <a-breadcrumb-item>成本科目</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display: flex; gap: 8px; align-items: center">
         <a-button type="primary" @click="handleAddRoot">新增根节点</a-button>
         <a-button @click="handleAddChild" :disabled="!selectedNode">新增子节点</a-button>
       </div>
     </div>
 
     <!-- Category Tabs -->
-    <a-tabs v-model:activeKey="activeCategory" @change="handleCategoryChange" class="cs-category-tabs">
+    <a-tabs
+      v-model:activeKey="activeCategory"
+      @change="handleCategoryChange"
+      class="cs-category-tabs"
+    >
       <a-tab-pane v-for="tab in categoryTabs" :key="tab.key" :tab="tab.tab" />
     </a-tabs>
 

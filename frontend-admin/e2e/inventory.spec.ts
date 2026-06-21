@@ -1,7 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 
 const SYSTEM_ERROR = '系统异常，请稍后重试'
-const SAVE_FAILED = '保存失败，请稍后重试'
 const IN_FAILED = '入库失败，请稍后重试'
 const OUT_FAILED = '出库失败，请稍后重试'
 const LEDGER_FAILED = '加载库存台账失败，请稍后重试'

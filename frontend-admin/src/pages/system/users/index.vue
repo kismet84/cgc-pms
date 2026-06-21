@@ -41,17 +41,6 @@ const formData = reactive({
   roleIds: [] as (number | string)[],
 })
 
-const columns = [
-  { title: '用户名', dataIndex: 'username', width: 120 },
-  { title: '姓名', dataIndex: 'realName', width: 100 },
-  { title: '角色', dataIndex: 'roleNames', width: 120, key: 'roleNames' },
-  { title: '手机号', dataIndex: 'phone', width: 130 },
-  { title: '邮箱', dataIndex: 'email', width: 180, ellipsis: true },
-  { title: '状态', dataIndex: 'status', width: 80, key: 'status' },
-  { title: '创建时间', dataIndex: 'createdAt', width: 160 },
-  { title: '操作', key: 'action', width: 180 },
-]
-
 const gridColumns = computed(() => [
   { field: 'username', title: '用户名', width: 120 },
   { field: 'realName', title: '姓名', width: 100 },
@@ -233,7 +222,7 @@ onMounted(() => {
 <template>
   <div class="lg-page app-page">
     <div class="lg-page-head">
-      <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+      <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
         <a-breadcrumb-item>系统设置</a-breadcrumb-item>
         <a-breadcrumb-item>用户管理</a-breadcrumb-item>
       </a-breadcrumb>

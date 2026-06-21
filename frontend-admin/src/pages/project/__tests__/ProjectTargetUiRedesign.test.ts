@@ -26,16 +26,15 @@ const combinedSource = Object.values(sources).join('\n')
 
 describe('Project and target UI redesign source markers', () => {
   it('applies the approved workspace UI language to project and target pages', () => {
-    for (const marker of [
-      'lg-',
-    ]) {
-      const anyMatch = Object.values(sources).some(s => s.includes(marker))
+    for (const marker of ['lg-']) {
+      const anyMatch = Object.values(sources).some((s) => s.includes(marker))
       expect(anyMatch).toBe(true)
     }
 
     // Ensure at least one of the expected labels/markers is present
     const allText = combinedSource
-    const hasContent = allText.includes('项目') || allText.includes('目标') || allText.includes('lg-')
+    const hasContent =
+      allText.includes('项目') || allText.includes('目标') || allText.includes('lg-')
     expect(hasContent).toBe(true)
 
     expect(combinedSource).not.toContain('目标成本管理')

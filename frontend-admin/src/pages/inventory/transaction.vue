@@ -115,7 +115,7 @@ onMounted(() => {
     <!-- 页面头部 -->
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>库存交易</a-breadcrumb-item>
         </a-breadcrumb>
@@ -126,24 +126,24 @@ onMounted(() => {
     <div class="lg-kpi-strip">
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">入库操作</span>
-        <span class="lg-kpi-card-value" style="color:#22c55e">快捷</span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:#22c55e"></span></span>
+        <span class="lg-kpi-card-value" style="color: #22c55e">快捷</span>
+        <span class="lg-kpi-card-bar"><span style="width: 100%; background: #22c55e"></span></span>
       </div>
       <div class="lg-kpi-card is-warn">
         <span class="lg-kpi-card-label">出库操作</span>
-        <span class="lg-kpi-card-value" style="color:#ef4444">快捷</span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:#ef4444"></span></span>
+        <span class="lg-kpi-card-value" style="color: #ef4444">快捷</span>
+        <span class="lg-kpi-card-bar"><span style="width: 100%; background: #ef4444"></span></span>
       </div>
     </div>
 
-    <div class="lg-toolbar" style="margin-bottom:0">
+    <div class="lg-toolbar" style="margin-bottom: 0">
       <a-tabs v-model:activeKey="activeTab">
         <a-tab-pane key="in" tab="入库" />
         <a-tab-pane key="out" tab="出库" />
       </a-tabs>
     </div>
 
-    <div class="lg-panel" style="padding:24px 28px">
+    <div class="lg-panel" style="padding: 24px 28px">
       <!-- Stock In Form -->
       <div v-if="activeTab === 'in'">
         <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">

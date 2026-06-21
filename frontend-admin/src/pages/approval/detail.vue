@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import {
   getInstanceDetail,
   approveTask,
@@ -14,7 +14,6 @@ import {
 import { message, Modal } from 'ant-design-vue'
 
 const route = useRoute()
-const router = useRouter()
 const instanceId = route.params.instanceId as string
 
 const loading = ref(false)
@@ -261,10 +260,6 @@ async function handleResubmit() {
       }
     },
   })
-}
-
-function goBack() {
-  router.push('/approval/todo')
 }
 
 onMounted(() => {

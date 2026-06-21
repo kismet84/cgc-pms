@@ -36,7 +36,7 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 const referenceStore = useReferenceStore()
-const { projects, contracts, partners } = storeToRefs(referenceStore)
+const { projects, contracts } = storeToRefs(referenceStore)
 const receiptList = ref<MatReceiptVO[]>([])
 const measureList = ref<SubMeasureVO[]>([])
 const modalVisible = ref(false)
@@ -73,38 +73,6 @@ const writebackForm = reactive({
   payMethod: 'BANK_TRANSFER',
   voucherNo: '',
 })
-
-const columns = [
-  { title: '申请编号', dataIndex: 'applyCode', width: 150, ellipsis: true },
-  { title: '项目', dataIndex: 'projectName', width: 120, ellipsis: true },
-  { title: '合同', dataIndex: 'contractName', width: 120, ellipsis: true },
-  { title: '合作方', dataIndex: 'partnerName', width: 120, ellipsis: true },
-  {
-    title: '申请金额',
-    dataIndex: 'applyAmount',
-    width: 100,
-    key: 'applyAmount',
-    align: 'right' as const,
-  },
-  {
-    title: '审批金额',
-    dataIndex: 'approvedAmount',
-    width: 100,
-    key: 'approvedAmount',
-    align: 'right' as const,
-  },
-  {
-    title: '实付金额',
-    dataIndex: 'actualPayAmount',
-    width: 100,
-    key: 'actualPayAmount',
-    align: 'right' as const,
-  },
-  { title: '付款类型', dataIndex: 'payType', width: 90, key: 'payType' },
-  { title: '支付状态', dataIndex: 'payStatus', width: 90, key: 'payStatus' },
-  { title: '审批状态', dataIndex: 'approvalStatus', width: 90, key: 'approvalStatus' },
-  { title: '操作', key: 'action', width: 170 },
-]
 
 async function fetchData() {
   loading.value = true
@@ -148,16 +116,6 @@ async function fetchMeasures() {
 }
 
 function handleSearch() {
-  pageNo.value = 1
-  fetchData()
-}
-function handleReset() {
-  filter.projectId = undefined
-  filter.contractId = undefined
-  filter.partnerId = undefined
-  filter.payType = undefined
-  filter.payStatus = undefined
-  filter.approvalStatus = undefined
   pageNo.value = 1
   fetchData()
 }
@@ -376,7 +334,7 @@ onMounted(() => {
     <!-- 页面头部 -->
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
           <a-breadcrumb-item>付款管理</a-breadcrumb-item>
           <a-breadcrumb-item>付款申请</a-breadcrumb-item>
         </a-breadcrumb>
@@ -389,24 +347,41 @@ onMounted(() => {
         <div class="lg-kpi-strip">
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">待付款金额</span>
-            <span class="lg-kpi-card-value" style="color: #ef4444">{{ kpiUnpaid.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:#ef4444"></span></span>
+            <span class="lg-kpi-card-value" style="color: #ef4444"
+              >{{ kpiUnpaid.toLocaleString() }} <small>元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: #ef4444"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">已审批未支付</span>
-            <span class="lg-kpi-card-value">{{ kpiApprovedUnpaid.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiApprovedUnpaid, kpiMax.unpaid) + '%', background: 'var(--kpi-unpaid)' }"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ kpiApprovedUnpaid.toLocaleString() }} <small>元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(kpiApprovedUnpaid, kpiMax.unpaid) + '%',
+                  background: 'var(--kpi-unpaid)',
+                }"
+              ></span
+            ></span>
             <span class="lg-kpi-card-hint">{{ kpiPct(kpiApprovedUnpaid, kpiMax.unpaid) }}%</span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">今日应付</span>
             <span class="lg-kpi-card-value">-<small>元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:0%;background:var(--muted)"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 0%; background: var(--muted)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card is-warn">
             <span class="lg-kpi-card-label">超比例付款</span>
             <span class="lg-kpi-card-value">0<small>条</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:0%;background:var(--kpi-overdue)"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 0%; background: var(--kpi-overdue)"></span
+            ></span>
           </div>
         </div>
 
@@ -522,7 +497,8 @@ onMounted(() => {
                         : 'default'
                 "
                 size="small"
-              >{{ row.approvalStatus }}</a-tag>
+                >{{ row.approvalStatus }}</a-tag
+              >
             </template>
             <template #action="{ row }">
               <div class="lg-ops">
@@ -531,12 +507,14 @@ onMounted(() => {
                   v-if="row.approvalStatus === 'DRAFT'"
                   class="lg-link"
                   @click="handleApproval(row)"
-                >提交审批</a>
+                  >提交审批</a
+                >
                 <a
                   v-if="row.approvalStatus === 'APPROVED' && row.payStatus !== 'PAID'"
                   class="lg-link"
                   @click="openWriteback(row)"
-                >付款回写</a>
+                  >付款回写</a
+                >
                 <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
               </div>
             </template>
@@ -568,7 +546,13 @@ onMounted(() => {
               <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
               <span class="lg-type-label">{{ it.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: kpiPct(it.count, total || 1) + '%', background: 'var(--kpi-paid)' }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{
+                    width: kpiPct(it.count, total || 1) + '%',
+                    background: 'var(--kpi-paid)',
+                  }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ it.count }}</span>
               <span class="lg-type-pct">{{ kpiPct(it.count, total || 1) }}%</span>
@@ -584,7 +568,9 @@ onMounted(() => {
               <span class="lg-type-bar-wrap">
                 <span class="lg-type-bar" style="width: 100%; background: #ef4444"></span>
               </span>
-              <span class="lg-type-num" style="color: #ef4444">{{ kpiUnpaid.toLocaleString() }}</span>
+              <span class="lg-type-num" style="color: #ef4444">{{
+                kpiUnpaid.toLocaleString()
+              }}</span>
               <span class="lg-type-pct">元</span>
             </div>
           </div>

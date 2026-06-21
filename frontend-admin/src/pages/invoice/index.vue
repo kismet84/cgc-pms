@@ -2,12 +2,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal, Upload } from 'ant-design-vue'
 import axios from 'axios'
-import {
-  SearchOutlined,
-  UploadOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons-vue'
+import { SearchOutlined, UploadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   getInvoiceList,
   createInvoice,
@@ -60,6 +55,7 @@ const formData = reactive<Partial<InvoiceVO>>({
   remark: '',
 })
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const uploadFileList = ref<any[]>([])
 const recognizing = ref(false)
 const recognizeResult = ref<InvoiceRecognizeResultVO | null>(null)
@@ -380,10 +376,13 @@ function clearInvoiceFields() {
   ]
   for (const field of fields) {
     if (field === 'invoiceType') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(formData as any)[field] = 'VAT_SPECIAL'
     } else if (field === 'invoiceNo' || field === 'remark') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(formData as any)[field] = ''
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(formData as any)[field] = undefined
     }
   }
@@ -407,6 +406,7 @@ function applyRecognitionResult(result: InvoiceRecognizeResultVO) {
   for (const field of fields) {
     const value = result[field]
     if (value != null && value !== '') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(formData as any)[field] = value
     }
   }
@@ -509,23 +509,54 @@ defineExpose({
         <div class="lg-kpi-strip">
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">发票总额</span>
-            <span class="lg-kpi-card-value">{{ kpiInvoiceTotal.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width: 100%; background: var(--kpi-amount)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ kpiInvoiceTotal.toLocaleString() }} <small>元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-amount)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">已核验</span>
-            <span class="lg-kpi-card-value">{{ kpiInvoiced.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiInvoiced, kpiMax.total) + '%', background: 'var(--kpi-paid)' }"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ kpiInvoiced.toLocaleString() }} <small>元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(kpiInvoiced, kpiMax.total) + '%',
+                  background: 'var(--kpi-paid)',
+                }"
+              ></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">待核验</span>
-            <span class="lg-kpi-card-value">{{ kpiUninvoiced.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiUninvoiced, kpiMax.total) + '%', background: 'var(--kpi-unpaid)' }"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ kpiUninvoiced.toLocaleString() }} <small>元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(kpiUninvoiced, kpiMax.total) + '%',
+                  background: 'var(--kpi-unpaid)',
+                }"
+              ></span
+            ></span>
           </div>
           <div class="lg-kpi-card is-warn">
             <span class="lg-kpi-card-label">异常发票</span>
-            <span class="lg-kpi-card-value" style="color: #ef4444">{{ kpiAbnormal }} <small>张</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpiAbnormal, kpiMax.total) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+            <span class="lg-kpi-card-value" style="color: #ef4444"
+              >{{ kpiAbnormal }} <small>张</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(kpiAbnormal, kpiMax.total) + '%',
+                  background: 'var(--kpi-overdue)',
+                }"
+              ></span
+            ></span>
           </div>
         </div>
 
@@ -583,7 +614,8 @@ defineExpose({
             <template #invoiceType="{ row }">
               <a-tag
                 :color="
-                  INVOICE_TYPE_COLOR[row.invoiceType as keyof typeof INVOICE_TYPE_COLOR] || 'default'
+                  INVOICE_TYPE_COLOR[row.invoiceType as keyof typeof INVOICE_TYPE_COLOR] ||
+                  'default'
                 "
               >
                 {{
@@ -604,7 +636,8 @@ defineExpose({
             <template #verifyStatus="{ row }">
               <a-tag
                 :color="
-                  VERIFY_STATUS_COLOR[row.verifyStatus as keyof typeof VERIFY_STATUS_COLOR] || 'default'
+                  VERIFY_STATUS_COLOR[row.verifyStatus as keyof typeof VERIFY_STATUS_COLOR] ||
+                  'default'
                 "
               >
                 {{
@@ -617,11 +650,9 @@ defineExpose({
               <div class="lg-ops">
                 <a class="lg-link" @click="handleEdit(row)">编辑</a>
                 <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                <a
-                  v-if="row.verifyStatus === 'PENDING'"
-                  class="lg-link"
-                  @click="handleVerify(row)"
-                >核验</a>
+                <a v-if="row.verifyStatus === 'PENDING'" class="lg-link" @click="handleVerify(row)"
+                  >核验</a
+                >
               </div>
             </template>
           </vxe-grid>
@@ -649,10 +680,35 @@ defineExpose({
           <div class="lg-panel-title">核验状态分布</div>
           <div class="lg-type-list">
             <div v-for="it in verifyBreakdown" :key="it.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: it.label === '已认证' ? '#31c48d' : it.label === '异常' ? '#ef4444' : it.label === '待核验' ? '#f59e0b' : '#8b5cf6' }"></span>
+              <span
+                class="lg-type-dot"
+                :style="{
+                  background:
+                    it.label === '已认证'
+                      ? '#31c48d'
+                      : it.label === '异常'
+                        ? '#ef4444'
+                        : it.label === '待核验'
+                          ? '#f59e0b'
+                          : '#8b5cf6',
+                }"
+              ></span>
               <span class="lg-type-label">{{ it.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: it.pct + '%', background: it.label === '已认证' ? '#31c48d' : it.label === '异常' ? '#ef4444' : it.label === '待核验' ? '#f59e0b' : '#8b5cf6' }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{
+                    width: it.pct + '%',
+                    background:
+                      it.label === '已认证'
+                        ? '#31c48d'
+                        : it.label === '异常'
+                          ? '#ef4444'
+                          : it.label === '待核验'
+                            ? '#f59e0b'
+                            : '#8b5cf6',
+                  }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ it.count }}</span>
               <span class="lg-type-pct">{{ it.pct }}%</span>

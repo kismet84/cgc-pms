@@ -51,7 +51,7 @@ const ACollapse = defineComponent({
 })
 
 const ACollapsePanel = defineComponent({
-  props: { header: String, key: String },
+  props: { header: String, panelKey: String },
   setup(props, { slots }) {
     return () =>
       h('div', { class: 'stub-collapse-panel' }, [

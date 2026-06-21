@@ -205,7 +205,7 @@ test.describe('Notification: Bell Popover → Read → SSE', () => {
             })
             // Call all registered 'notification' listeners
             const handlers = this.listeners.get('notification') || []
-            handlers.forEach((h) => h(mockEvent as any))
+            handlers.forEach((h) => h(mockEvent as Event))
           }, 1000)
         }
 
@@ -216,7 +216,7 @@ test.describe('Notification: Bell Popover → Read → SSE', () => {
         }
       }
 
-      ;(window as any).EventSource = MockEventSource
+      ;(window as EventSource).EventSource = MockEventSource
     })
 
     // Reload the page to pick up the mock EventSource

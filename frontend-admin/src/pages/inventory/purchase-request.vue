@@ -80,7 +80,7 @@ const itemColumns = [
   { title: '操作', key: 'action', width: 100 },
 ]
 
-const filterOption = (input: string, option: any) =>
+const filterOption = (input: string, option: { label?: string }) =>
   option.label?.toLowerCase().includes(input.toLowerCase())
 
 const gridColumns = computed(() => [
@@ -431,12 +431,14 @@ onMounted(() => {
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">申请数</span>
         <span class="lg-kpi-card-value">{{ kpiReqTotal }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+        <span class="lg-kpi-card-bar"
+          ><span style="width: 100%; background: var(--kpi-total)"></span
+        ></span>
       </div>
       <div class="lg-kpi-card is-warn">
         <span class="lg-kpi-card-label">待审批</span>
         <span class="lg-kpi-card-value">{{ kpiReqPending }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:#f59e0b"></span></span>
+        <span class="lg-kpi-card-bar"><span style="width: 100%; background: #f59e0b"></span></span>
       </div>
     </div>
 
@@ -492,7 +494,8 @@ onMounted(() => {
               class="lg-link"
               style="color: #1677ff"
               @click="handleSubmit(row)"
-            >提交审批</a>
+              >提交审批</a
+            >
             <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
           </div>
         </template>

@@ -24,20 +24,6 @@ const modalTitle = computed(() => {
   return props.role ? `编辑权限 - ${props.role.roleName}` : '编辑权限'
 })
 
-function flattenTree(nodes: MenuTreeVO[]): MenuTreeVO[] {
-  const result: MenuTreeVO[] = []
-  function walk(list: MenuTreeVO[]) {
-    for (const node of list) {
-      result.push(node)
-      if (node.children && node.children.length > 0) {
-        walk(node.children)
-      }
-    }
-  }
-  walk(nodes)
-  return result
-}
-
 async function fetchTree() {
   loading.value = true
   try {

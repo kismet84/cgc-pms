@@ -44,7 +44,9 @@ describe('reference store cache isolation', () => {
       { id: 'c1', contractName: '合同A', projectId: 'p1', contractType: 'GC' },
       { id: 'c2', contractName: '合同B', projectId: 'p2', contractType: 'SUB' },
     ]
-    const filteredContracts = [{ id: 'c1', contractName: '合同A', projectId: 'p1', contractType: 'GC' }]
+    const filteredContracts = [
+      { id: 'c1', contractName: '合同A', projectId: 'p1', contractType: 'GC' },
+    ]
 
     it('filtered fetchContracts should NOT pollute base cache — contracts ref stays untouched', async () => {
       // First, populate the base cache with unfiltered data

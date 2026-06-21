@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
-import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
@@ -14,10 +13,6 @@ import {
   submitOrderForApproval,
 } from '@/api/modules/purchase'
 import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchase'
-import type { ProjectVO } from '@/types/project'
-import type { ContractVO } from '@/types/contract'
-import type { PartnerVO } from '@/types/partner'
-import type { MaterialVO } from '@/types/material'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -38,7 +33,6 @@ const pageSize = ref(20)
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
-const partnerList = computed(() => referenceStore.partners ?? [])
 const materialList = computed(() => referenceStore.materials ?? [])
 
 const modalVisible = ref(false)
@@ -385,7 +379,7 @@ onMounted(() => {
   <div class="lg-page app-page">
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
           <a-breadcrumb-item>采购管理</a-breadcrumb-item>
           <a-breadcrumb-item>采购订单</a-breadcrumb-item>
         </a-breadcrumb>
@@ -417,22 +411,34 @@ onMounted(() => {
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">采购订单数</span>
             <span class="lg-kpi-card-value">{{ kpiOrderTotal }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">待审批</span>
             <span class="lg-kpi-card-value">{{ kpiOrderPending }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:#f59e0b"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: #f59e0b"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">已下单金额</span>
-            <span class="lg-kpi-card-value">{{ kpiOrderedAmount.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ kpiOrderedAmount.toLocaleString() }} <small>元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-amount)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card is-warn">
             <span class="lg-kpi-card-label">未入库金额</span>
-            <span class="lg-kpi-card-value" style="color: #f59e0b">{{ kpiUnreceived.toLocaleString() }} <small>元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:#f59e0b"></span></span>
+            <span class="lg-kpi-card-value" style="color: #f59e0b"
+              >{{ kpiUnreceived.toLocaleString() }} <small>元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: #f59e0b"></span
+            ></span>
           </div>
         </div>
 
@@ -481,9 +487,9 @@ onMounted(() => {
               </a-tag>
             </template>
             <template #totalAmount="{ row }">
-              <span v-if="row.totalAmount" class="lg-money"
-                >{{ Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span
-              >
+              <span v-if="row.totalAmount" class="lg-money">{{
+                Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+              }}</span>
               <span v-else :style="{ color: 'var(--muted)' }">-</span>
             </template>
             <template #orderStatus="{ row }">
@@ -699,7 +705,7 @@ onMounted(() => {
             </template>
           </a-table-column>
           <a-table-column title="操作" width="60">
-            <template #default="{ record: _item, index }">
+            <template #default="{ index }">
               <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
                 >删除</a-button
               >

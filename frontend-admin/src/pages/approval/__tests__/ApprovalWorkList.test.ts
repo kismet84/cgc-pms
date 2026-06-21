@@ -9,7 +9,9 @@ const source = readFileSync(resolve(currentDir, '../todo.vue'), 'utf-8')
 describe('approval work list route titles', () => {
   it('renders breadcrumb and subtitle from the active approval tab', () => {
     expect(source).toMatch(/<a-breadcrumb-item[^>]*>审批中心<\/a-breadcrumb-item>/)
-    expect(source).toMatch(/<a-breadcrumb-item[^>]*>\{\{ pageHeaderTitle\(\) \}\}<\/a-breadcrumb-item>/)
-    expect(source).toMatch(/<p[^>]*>\{\{ pageHeaderSubtitle\(\) \}\}<\/p>/)
+    expect(source).toMatch(
+      /<a-breadcrumb-item[^>]*>\{\{ pageHeaderTitle\(\) \}\}<\/a-breadcrumb-item>/,
+    )
+    expect(source).toMatch(/<p[^>]*>\s*\{\{ pageHeaderSubtitle\(\) \}\}[\s\S]*?<\/p>/)
   })
 })

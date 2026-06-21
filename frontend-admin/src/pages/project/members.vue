@@ -28,16 +28,6 @@ const ROLE_MAP: Record<string, string> = Object.fromEntries(
   ROLE_OPTIONS.map((r) => [r.value, r.label]),
 )
 
-const ROLE_COLOR: Record<string, string> = {
-  PM: 'blue',
-  CM: 'green',
-  CSTM: 'orange',
-  MAT: 'purple',
-  SUBC: 'cyan',
-  FIN: 'red',
-  OTH: 'default',
-}
-
 const memberStats = computed(() => ({
   total: store.membersTotal || store.members.length,
   manager: store.members.filter((item) => item.roleCode === 'PM').length,

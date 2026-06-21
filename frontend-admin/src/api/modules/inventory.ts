@@ -2,7 +2,6 @@ import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
 import type {
   WarehouseVO,
-  MatStockTxnVO,
   StockLedgerVO,
   PurchaseRequestVO,
   PurchaseRequestItemVO,

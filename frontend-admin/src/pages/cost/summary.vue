@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import {
-  ReloadOutlined,
-  LineChartOutlined,
-} from '@ant-design/icons-vue'
+import { ReloadOutlined, LineChartOutlined } from '@ant-design/icons-vue'
 import VChart from 'vue-echarts'
 import { getCostSummary, refreshCostSummary } from '@/api/modules/cost'
 import { getProjectList } from '@/api/modules/project'
-import type { CostSummaryVO, CostSubjectSummaryVO } from '@/types/cost'
+import type { CostSummaryVO } from '@/types/cost'
 import type { ProjectVO } from '@/types/project'
 
 const projectList = ref<ProjectVO[]>([])
@@ -171,6 +168,7 @@ const executionOption = computed(() => {
         ],
         itemStyle: {
           borderRadius: [4, 4, 0, 0],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           color: (params: any) => {
             const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e', '#ef4444']
             return colors[params.dataIndex] ?? '#3b82f6'
@@ -191,6 +189,7 @@ const compositionOption = computed(() => {
       value: parseFloat(s.dynamicCost) / 10000,
     }))
   return {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tooltip: { trigger: 'item' as const, formatter: '{b}: {c} 万元 ({d}%)' as any },
     series: [
       {
@@ -226,6 +225,7 @@ const deviationOption = computed(() => {
         data: subjects.map((s) => parseFloat(s.costDeviation) / 10000),
         itemStyle: {
           borderRadius: [3, 3, 0, 0],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           color: (params: any) => (params.value > 0 ? '#ef4444' : '#22c55e'),
         },
         barMaxWidth: 24,
@@ -257,6 +257,7 @@ const rankingOption = computed(() => {
         data: subjects.map((s) => parseFloat(s.dynamicCost) / 10000).reverse(),
         itemStyle: {
           borderRadius: [0, 3, 3, 0],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           color: (params: any) => {
             const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef']
             return colors[params.dataIndex % colors.length]
@@ -287,11 +288,18 @@ const anomalyItems = computed(() => {
 // ---- Right rail: subject composition distribution ----
 const subjectDistribution = computed(() => {
   if (!summary.value || !summary.value.subjects.length) return []
-  const subjects = summary.value.subjects.filter(
-    (s) => parseFloat(s.dynamicCost) > 0,
-  )
+  const subjects = summary.value.subjects.filter((s) => parseFloat(s.dynamicCost) > 0)
   const total = subjects.reduce((acc, s) => acc + parseFloat(s.dynamicCost), 0) || 1
-  const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e', '#ef4444', '#6366f1', '#a855f7', '#d946ef']
+  const colors = [
+    '#3b82f6',
+    '#8b5cf6',
+    '#f59e0b',
+    '#22c55e',
+    '#ef4444',
+    '#6366f1',
+    '#a855f7',
+    '#d946ef',
+  ]
   return subjects.slice(0, 8).map((s, i) => ({
     key: s.costSubjectId,
     label: s.costSubjectName,
@@ -301,9 +309,7 @@ const subjectDistribution = computed(() => {
   }))
 })
 
-const maxDistValue = computed(() =>
-  Math.max(...subjectDistribution.value.map((d) => d.value), 1),
-)
+const maxDistValue = computed(() => Math.max(...subjectDistribution.value.map((d) => d.value), 1))
 function distBarPct(value: number): number {
   return Math.min(Math.round((value / maxDistValue.value) * 100), 100)
 }
@@ -330,25 +336,37 @@ onMounted(() => {
         <div v-if="summary" class="lg-kpi-strip" style="grid-template-columns: repeat(5, 1fr)">
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">目标成本</span>
-            <span class="lg-kpi-card-value">{{ fmtAmount(summary.targetCost) }} <small>万元</small></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtAmount(summary.targetCost) }} <small>万元</small></span
+            >
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">锁定成本</span>
-            <span class="lg-kpi-card-value">{{ fmtAmount(summary.contractLockedCost) }} <small>万元</small></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtAmount(summary.contractLockedCost) }} <small>万元</small></span
+            >
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">动态成本</span>
-            <span class="lg-kpi-card-value">{{ fmtAmount(summary.dynamicCost) }} <small>万元</small></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtAmount(summary.dynamicCost) }} <small>万元</small></span
+            >
           </div>
           <div class="lg-kpi-card is-warn">
             <span class="lg-kpi-card-label">偏差金额</span>
-            <span class="lg-kpi-card-value" :style="{ color: getDeviationColor(summary.costDeviation) }">
+            <span
+              class="lg-kpi-card-value"
+              :style="{ color: getDeviationColor(summary.costDeviation) }"
+            >
               {{ fmtDeviation(summary.costDeviation) }} <small>万元</small>
             </span>
           </div>
           <div class="lg-kpi-card is-warn">
             <span class="lg-kpi-card-label">偏差率</span>
-            <span class="lg-kpi-card-value" :style="{ color: getDeviationColor(summary.costDeviation) }">
+            <span
+              class="lg-kpi-card-value"
+              :style="{ color: getDeviationColor(summary.costDeviation) }"
+            >
               {{ fmtPercent(summary.costDeviation, summary.targetCost) }}
             </span>
           </div>
@@ -385,7 +403,9 @@ onMounted(() => {
 
         <template v-if="summary">
           <!-- Row 1: 成本执行概览 + 成本构成分析 -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px">
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
+          >
             <section class="lg-panel">
               <div class="lg-panel-title">成本执行概览</div>
               <div style="padding: 0 4px 4px">
@@ -395,13 +415,19 @@ onMounted(() => {
             <section class="lg-panel">
               <div class="lg-panel-title">成本构成分析</div>
               <div style="padding: 0 4px 4px">
-                <v-chart :option="compositionOption" autoresize style="width: 100%; height: 260px" />
+                <v-chart
+                  :option="compositionOption"
+                  autoresize
+                  style="width: 100%; height: 260px"
+                />
               </div>
             </section>
           </div>
 
           <!-- Row 2: 偏差趋势分析 + 超预算预警 -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px">
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
+          >
             <section class="lg-panel">
               <div class="lg-panel-title">偏差趋势分析</div>
               <div style="padding: 0 4px 4px">
@@ -418,11 +444,19 @@ onMounted(() => {
                     class="lg-type-row"
                     style="grid-template-columns: 1fr 80px"
                   >
-                    <span style="font-size: 13px; color: var(--text-secondary)">{{ item.costSubjectName }}</span>
-                    <span style="text-align: right; font-weight: 700; color: #ef4444; font-size: 13px">+{{ fmtDeviation(item.costDeviation) }} 万</span>
+                    <span style="font-size: 13px; color: var(--text-secondary)">{{
+                      item.costSubjectName
+                    }}</span>
+                    <span
+                      style="text-align: right; font-weight: 700; color: #ef4444; font-size: 13px"
+                      >+{{ fmtDeviation(item.costDeviation) }} 万</span
+                    >
                   </div>
                 </div>
-                <div v-else style="font-size: 13px; color: var(--muted); padding: 12px 0; text-align: center">
+                <div
+                  v-else
+                  style="font-size: 13px; color: var(--muted); padding: 12px 0; text-align: center"
+                >
                   无超预算科目
                 </div>
               </div>
@@ -430,7 +464,9 @@ onMounted(() => {
           </div>
 
           <!-- Row 3: 成本科目排行 + 异常明细 -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px">
+          <div
+            style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
+          >
             <section class="lg-panel">
               <div class="lg-panel-title">成本科目排行</div>
               <div style="padding: 0 4px 4px">
@@ -447,11 +483,19 @@ onMounted(() => {
                     class="lg-type-row"
                     style="grid-template-columns: 1fr 80px"
                   >
-                    <span style="font-size: 13px; color: var(--text-secondary)">{{ item.costSubjectName }}</span>
-                    <span style="text-align: right; font-weight: 700; color: #ef4444; font-size: 13px">偏差 +{{ fmtDeviation(item.costDeviation) }} 万</span>
+                    <span style="font-size: 13px; color: var(--text-secondary)">{{
+                      item.costSubjectName
+                    }}</span>
+                    <span
+                      style="text-align: right; font-weight: 700; color: #ef4444; font-size: 13px"
+                      >偏差 +{{ fmtDeviation(item.costDeviation) }} 万</span
+                    >
                   </div>
                 </div>
-                <div v-else style="font-size: 13px; color: var(--muted); padding: 12px 0; text-align: center">
+                <div
+                  v-else
+                  style="font-size: 13px; color: var(--muted); padding: 12px 0; text-align: center"
+                >
                   无异常科目
                 </div>
               </div>
@@ -460,7 +504,15 @@ onMounted(() => {
 
           <!-- Subject detail table -->
           <div class="lg-table-wrap" style="margin-bottom: 0">
-            <div style="padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); color: var(--text); font-size: 15px; font-weight: 700">
+            <div
+              style="
+                padding: 12px 14px;
+                border-bottom: 1px solid var(--border-subtle);
+                color: var(--text);
+                font-size: 15px;
+                font-weight: 700;
+              "
+            >
               科目明细
             </div>
             <vxe-grid
@@ -499,7 +551,15 @@ onMounted(() => {
 
         <template v-else>
           <div
-            style="text-align: center; padding: 80px 0; color: #9ca3af; font-size: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md)"
+            style="
+              text-align: center;
+              padding: 80px 0;
+              color: #9ca3af;
+              font-size: 14px;
+              background: var(--surface);
+              border: 1px solid var(--border);
+              border-radius: var(--radius-md);
+            "
           >
             <LineChartOutlined
               style="font-size: 48px; margin-bottom: 16px; display: block; color: #d1d5db"
@@ -518,7 +578,10 @@ onMounted(() => {
               <span class="lg-type-dot" :style="{ background: item.color }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: distBarPct(item.value) + '%', background: item.color }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: distBarPct(item.value) + '%', background: item.color }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ fmtAmount(String(item.value)) }}</span>
               <span class="lg-type-pct">{{ item.percent }}%</span>

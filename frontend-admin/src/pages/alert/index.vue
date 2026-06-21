@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { SearchOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons-vue'
+import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { RULE_TYPE_LABELS, SEVERITY_COLOR, type AlertLogVO } from '@/types/alert'
@@ -116,7 +116,13 @@ function kpiPct(value: number, max: number): number {
 // ── Columns ──
 const gridColumns = computed(() => [
   { field: 'message', title: '预警内容', ellipsis: true, minWidth: 260 },
-  { field: 'projectId', title: '项目', width: 130, ellipsis: true, slots: { default: 'projectId' } },
+  {
+    field: 'projectId',
+    title: '项目',
+    width: 130,
+    ellipsis: true,
+    slots: { default: 'projectId' },
+  },
   { field: 'severity', title: '严重度', width: 80, slots: { default: 'severity' } },
   { field: 'ruleType', title: '规则类型', width: 110, slots: { default: 'ruleType' } },
   { field: 'triggeredAt', title: '触发时间', width: 160 },
@@ -189,18 +195,31 @@ onMounted(async () => {
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">预警总数</span>
             <span class="lg-kpi-card-value">{{ kpi.total }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card is-warn">
             <span class="lg-kpi-card-label">高危预警</span>
             <span class="lg-kpi-card-value">{{ kpi.high }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpi.high, kpiMax.total) + '%', background: 'var(--kpi-overdue)' }"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(kpi.high, kpiMax.total) + '%',
+                  background: 'var(--kpi-overdue)',
+                }"
+              ></span
+            ></span>
             <span class="lg-kpi-card-hint">占 {{ kpiPct(kpi.high, kpiMax.total) }}%</span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">未读预警</span>
             <span class="lg-kpi-card-value">{{ kpi.unread }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpi.unread, kpiMax.total) + '%', background: '#2f7df6' }"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{ width: kpiPct(kpi.unread, kpiMax.total) + '%', background: '#2f7df6' }"
+              ></span
+            ></span>
             <span class="lg-kpi-card-hint">占 {{ kpiPct(kpi.unread, kpiMax.total) }}%</span>
           </div>
         </div>
@@ -208,7 +227,12 @@ onMounted(async () => {
         <!-- 工具栏 -->
         <div class="lg-toolbar">
           <div class="lg-toolbar-left">
-            <a-button type="primary" danger :loading="store.evaluating" @click="handleBatchEvaluate">
+            <a-button
+              type="primary"
+              danger
+              :loading="store.evaluating"
+              @click="handleBatchEvaluate"
+            >
               触发评估
             </a-button>
             <a-button @click="fetchData">

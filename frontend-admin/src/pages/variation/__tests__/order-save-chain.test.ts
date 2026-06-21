@@ -11,12 +11,8 @@ describe('VariationOrderPage save chain integrity', () => {
     it('handleSubmit uses returned string directly, not .id property', () => {
       // createVarOrder returns Promise<string>, so res is a string.
       // The fix: const id = await createVarOrder(formData) then saveVarOrderItems(id, ...)
-      expect(orderSource).toMatch(
-        /const\s+id\s+=\s+await\s+createVarOrder\(formData\)/,
-      )
-      expect(orderSource).toMatch(
-        /await\s+saveVarOrderItems\(id,\s*itemList\.value\)/,
-      )
+      expect(orderSource).toMatch(/const\s+id\s+=\s+await\s+createVarOrder\(formData\)/)
+      expect(orderSource).toMatch(/await\s+saveVarOrderItems\(id,\s*itemList\.value\)/)
     })
 
     it('does NOT reference res.id for createVarOrder result', () => {
@@ -37,9 +33,7 @@ describe('VariationOrderPage save chain integrity', () => {
     it('does NOT set itemList to empty array on failure', () => {
       // The old buggy pattern: catch { itemList.value = [] } would allow saving empty list
       // After the fix, the function returns early with message.error instead
-      const handleEditFn = orderSource.match(
-        /async function handleEdit[\s\S]*?\n\}/,
-      )
+      const handleEditFn = orderSource.match(/async function handleEdit[\s\S]*?\n\}/)
       if (handleEditFn) {
         expect(handleEditFn[0]).not.toMatch(/catch[\s\S]*?itemList\.value\s*=\s*\[\]/)
       }

@@ -3,13 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import VChart from 'vue-echarts'
-import {
-  WarningOutlined,
-  TeamOutlined,
-  LineChartOutlined,
-  PayCircleOutlined,
-  FileTextOutlined,
-} from '@ant-design/icons-vue'
+import { TeamOutlined, FileTextOutlined } from '@ant-design/icons-vue'
 import { getProjectOverview } from '@/api/modules/project'
 import type { ProjectOverviewVO } from '@/types/project'
 

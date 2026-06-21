@@ -351,9 +351,7 @@ const gridColumns = computed(() => [
         },
       ]
     : []),
-  ...(colVisible.contractName
-    ? [{ field: 'contractName', title: '合同名称', minWidth: 120 }]
-    : []),
+  ...(colVisible.contractName ? [{ field: 'contractName', title: '合同名称', minWidth: 120 }] : []),
   ...(colVisible.contractType
     ? [{ field: 'contractType', title: '合同类型', width: 100, slots: { default: 'contractType' } }]
     : []),
@@ -419,30 +417,67 @@ const gridColumns = computed(() => [
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">合同总数</span>
             <span class="lg-kpi-card-value">{{ kpi.totalCount }} <small>份</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">合同总金额(含税)</span>
-            <span class="lg-kpi-card-value">{{ fmtAmount(kpi.totalAmount) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtAmount(kpi.totalAmount) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-amount)"></span
+            ></span>
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">已付款</span>
-            <span class="lg-kpi-card-value">{{ fmtAmount(kpi.paidAmount) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(parseFloat(kpi.paidAmount), kpiMax.totalAmount) + '%', background: 'var(--kpi-paid)' }"></span></span>
-            <span class="lg-kpi-card-hint">{{ kpiPct(parseFloat(kpi.paidAmount), kpiMax.totalAmount) }}%</span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtAmount(kpi.paidAmount) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(parseFloat(kpi.paidAmount), kpiMax.totalAmount) + '%',
+                  background: 'var(--kpi-paid)',
+                }"
+              ></span
+            ></span>
+            <span class="lg-kpi-card-hint"
+              >{{ kpiPct(parseFloat(kpi.paidAmount), kpiMax.totalAmount) }}%</span
+            >
           </div>
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">未付款</span>
-            <span class="lg-kpi-card-value">{{ fmtAmount(kpi.unpaidAmount) }} <small>万元</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(parseFloat(kpi.unpaidAmount), kpiMax.totalAmount) + '%', background: 'var(--kpi-unpaid)' }"></span></span>
-            <span class="lg-kpi-card-hint">{{ kpiPct(parseFloat(kpi.unpaidAmount), kpiMax.totalAmount) }}%</span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtAmount(kpi.unpaidAmount) }} <small>万元</small></span
+            >
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(parseFloat(kpi.unpaidAmount), kpiMax.totalAmount) + '%',
+                  background: 'var(--kpi-unpaid)',
+                }"
+              ></span
+            ></span>
+            <span class="lg-kpi-card-hint"
+              >{{ kpiPct(parseFloat(kpi.unpaidAmount), kpiMax.totalAmount) }}%</span
+            >
           </div>
           <div class="lg-kpi-card is-warn">
             <span class="lg-kpi-card-label">逾期合同</span>
             <span class="lg-kpi-card-value">{{ kpi.overdueCount }} <small>份</small></span>
-            <span class="lg-kpi-card-bar"><span :style="{ width: kpiPct(kpi.overdueCount, kpiMax.overdueCount) + '%', background: 'var(--kpi-overdue)' }"></span></span>
-            <span class="lg-kpi-card-hint" v-if="kpi.overdueCount">占 {{ kpiPct(kpi.overdueCount, kpiMax.totalCount) }}%</span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width: kpiPct(kpi.overdueCount, kpiMax.overdueCount) + '%',
+                  background: 'var(--kpi-overdue)',
+                }"
+              ></span
+            ></span>
+            <span class="lg-kpi-card-hint" v-if="kpi.overdueCount"
+              >占 {{ kpiPct(kpi.overdueCount, kpiMax.totalCount) }}%</span
+            >
           </div>
         </div>
 
@@ -681,7 +716,10 @@ const gridColumns = computed(() => [
               <span class="lg-type-dot" :style="{ background: item.color }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: typePercent(item.value) + '%', background: item.color }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: typePercent(item.value) + '%', background: item.color }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ item.value }}</span>
               <span class="lg-type-pct">{{ typePercent(item.value) }}%</span>
@@ -696,7 +734,10 @@ const gridColumns = computed(() => [
               <span class="lg-type-dot" :style="{ background: item.color }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" :style="{ width: item.percent + '%', background: item.color }"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: item.percent + '%', background: item.color }"
+                ></span>
               </span>
               <span class="lg-type-num">{{ item.value }}</span>
               <span class="lg-type-pct">{{ item.percent }}%</span>
@@ -706,7 +747,7 @@ const gridColumns = computed(() => [
 
         <section class="lg-panel">
           <div class="lg-warning-head">
-            <div class="lg-panel-title" style="margin-bottom:0">逾期预警</div>
+            <div class="lg-panel-title" style="margin-bottom: 0">逾期预警</div>
             <a-button type="link" size="small" @click="handleAllAlerts">查看全部</a-button>
           </div>
           <div class="lg-warning-list">
@@ -719,9 +760,7 @@ const gridColumns = computed(() => [
               <span class="lg-warning-title">{{ row.title }}</span>
               <span class="lg-warning-days">{{ row.days }}天</span>
             </div>
-            <div v-if="!warningRows.length" class="lg-warning-empty">
-              暂无逾期合同
-            </div>
+            <div v-if="!warningRows.length" class="lg-warning-empty">暂无逾期合同</div>
           </div>
         </section>
       </aside>

@@ -232,13 +232,6 @@ test.describe('Invoice: Create → Register → Verify', () => {
     }
 
     // Get invoice number for logging
-    const invoiceNoCell = await page
-      .locator('.ant-table-tbody tr.ant-table-row')
-      .first()
-      .locator('td')
-      .first()
-      .textContent()
-
     // Click "核验"
     await verifyBtn.click()
 

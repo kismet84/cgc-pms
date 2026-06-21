@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import {
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-} from '@ant-design/icons-vue'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   getReceiptList,
@@ -77,9 +73,7 @@ const QUALITY_STATUS_COLOR: Record<string, string> = {
 // ---- KPI computeds ----
 const kpiTotalCount = computed(() => total.value)
 const kpiTotalAmount = computed(() => {
-  return tableData.value
-    .reduce((sum, r) => sum + parseFloat(r.totalAmount || '0'), 0)
-    .toFixed(2)
+  return tableData.value.reduce((sum, r) => sum + parseFloat(r.totalAmount || '0'), 0).toFixed(2)
 })
 const kpiQualifiedCount = computed(() => {
   return tableData.value.filter((r) => r.qualityStatus === 'QUALIFIED').length
@@ -426,24 +420,48 @@ onMounted(() => {
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">验收总数</span>
         <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>单</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-total)"></span></span>
+        <span class="lg-kpi-card-bar"
+          ><span style="width: 100%; background: var(--kpi-total)"></span
+        ></span>
       </div>
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">验收总金额(含税)</span>
         <span class="lg-kpi-card-value">{{ fmtAmount(kpiTotalAmount) }} <small>万元</small></span>
-        <span class="lg-kpi-card-bar"><span style="width:100%;background:var(--kpi-amount)"></span></span>
+        <span class="lg-kpi-card-bar"
+          ><span style="width: 100%; background: var(--kpi-amount)"></span
+        ></span>
       </div>
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">合格批次</span>
         <span class="lg-kpi-card-value">{{ kpiQualifiedCount }} <small>单</small></span>
-        <span class="lg-kpi-card-bar"><span :style="{ width: (kpiTotalCount ? Math.round((kpiQualifiedCount / kpiTotalCount) * 100) : 0) + '%', background: 'var(--kpi-paid)' }"></span></span>
-        <span class="lg-kpi-card-hint" v-if="kpiTotalCount">{{ kpiTotalCount ? Math.round((kpiQualifiedCount / kpiTotalCount) * 100) : 0 }}%</span>
+        <span class="lg-kpi-card-bar"
+          ><span
+            :style="{
+              width:
+                (kpiTotalCount ? Math.round((kpiQualifiedCount / kpiTotalCount) * 100) : 0) + '%',
+              background: 'var(--kpi-paid)',
+            }"
+          ></span
+        ></span>
+        <span class="lg-kpi-card-hint" v-if="kpiTotalCount"
+          >{{ kpiTotalCount ? Math.round((kpiQualifiedCount / kpiTotalCount) * 100) : 0 }}%</span
+        >
       </div>
       <div class="lg-kpi-card is-warn" v-if="kpiUnqualifiedCount > 0">
         <span class="lg-kpi-card-label">不合格批次</span>
         <span class="lg-kpi-card-value">{{ kpiUnqualifiedCount }} <small>单</small></span>
-        <span class="lg-kpi-card-bar"><span :style="{ width: (kpiTotalCount ? Math.round((kpiUnqualifiedCount / kpiTotalCount) * 100) : 0) + '%', background: 'var(--kpi-overdue)' }"></span></span>
-        <span class="lg-kpi-card-hint" v-if="kpiTotalCount">{{ kpiTotalCount ? Math.round((kpiUnqualifiedCount / kpiTotalCount) * 100) : 0 }}%</span>
+        <span class="lg-kpi-card-bar"
+          ><span
+            :style="{
+              width:
+                (kpiTotalCount ? Math.round((kpiUnqualifiedCount / kpiTotalCount) * 100) : 0) + '%',
+              background: 'var(--kpi-overdue)',
+            }"
+          ></span
+        ></span>
+        <span class="lg-kpi-card-hint" v-if="kpiTotalCount"
+          >{{ kpiTotalCount ? Math.round((kpiUnqualifiedCount / kpiTotalCount) * 100) : 0 }}%</span
+        >
       </div>
     </div>
 
@@ -466,8 +484,17 @@ onMounted(() => {
           style="width: 160px"
           size="small"
           show-search
-          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
-          @change="(v: string | undefined) => { filter.contractId = undefined; if (v) referenceStore.fetchContracts({ projectId: v }); handleSearch() }"
+          :filter-option="
+            (input: string, option: any) =>
+              option.label?.toLowerCase().includes(input.toLowerCase())
+          "
+          @change="
+            (v: string | undefined) => {
+              filter.contractId = undefined
+              if (v) referenceStore.fetchContracts({ projectId: v })
+              handleSearch()
+            }
+          "
         >
           <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
             {{ p.projectName }}
@@ -480,7 +507,10 @@ onMounted(() => {
           style="width: 160px"
           size="small"
           show-search
-          :filter-option="(input: string, option: any) => option.label?.toLowerCase().includes(input.toLowerCase())"
+          :filter-option="
+            (input: string, option: any) =>
+              option.label?.toLowerCase().includes(input.toLowerCase())
+          "
           @change="handleSearch"
         >
           <a-select-option v-for="o in orderList" :key="o.id" :value="o.id">
@@ -537,7 +567,8 @@ onMounted(() => {
               v-if="row.approvalStatus === 'DRAFT'"
               class="lg-link"
               @click="handleSubmitApproval(row)"
-            >提交审批</a>
+              >提交审批</a
+            >
           </div>
         </template>
       </vxe-grid>
@@ -742,9 +773,9 @@ onMounted(() => {
         </a-table>
 
         <div style="text-align: right; margin-top: 8px; font-size: 14px">
-          合计：<span style="font-weight: 600; color: #1677ff"
-            >{{ Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span
-          >
+          合计：<span style="font-weight: 600; color: #1677ff">{{
+            Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+          }}</span>
         </div>
       </div>
     </a-modal>

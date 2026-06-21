@@ -29,10 +29,12 @@ export const useUserStore = defineStore('user', () => {
 
   // Backward-compat stubs — tokens are now HttpOnly cookies, JS never sees them.
   // These are kept so existing code calling setToken/setRefreshToken doesn't break.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function setToken(_value: string) {
     // no-op: tokens are set via Set-Cookie by the backend
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function setRefreshToken(_value: string) {
     // no-op: tokens are set via Set-Cookie by the backend
   }
@@ -55,7 +57,7 @@ function loadUserInfo(): UserInfo | null {
     const raw = localStorage.getItem(USER_INFO_KEY)
     if (!raw) return null
     return JSON.parse(raw) as UserInfo
-  } catch (e: unknown) {
+  } catch {
     if (import.meta.env.DEV) {
       console.warn('localStorage operation failed:', 'loadUserInfo')
     }
@@ -66,7 +68,7 @@ function loadUserInfo(): UserInfo | null {
 function persistUserInfo(info: UserInfo) {
   try {
     localStorage.setItem(USER_INFO_KEY, JSON.stringify(info))
-  } catch (e: unknown) {
+  } catch {
     if (import.meta.env.DEV) {
       console.warn('localStorage operation failed:', 'persistUserInfo')
     }
@@ -77,7 +79,7 @@ function persistUserInfo(info: UserInfo) {
 function clearUserInfo() {
   try {
     localStorage.removeItem(USER_INFO_KEY)
-  } catch (e: unknown) {
+  } catch {
     if (import.meta.env.DEV) {
       console.warn('localStorage operation failed:', 'clearUserInfo')
     }

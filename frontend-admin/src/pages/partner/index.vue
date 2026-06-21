@@ -247,7 +247,7 @@ onMounted(() => {
   <div class="lg-page app-page">
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb style="margin-bottom:5px;font-size:13px">
+        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
           <a-breadcrumb-item>合作方管理</a-breadcrumb-item>
         </a-breadcrumb>
       </div>

@@ -43,7 +43,8 @@ export interface ContractVO {
   id: string
   tenantId: string
   orgId: string
-  projectId: string  contractCode: string
+  projectId: string
+  contractCode: string
   contractName: string
   contractType: ContractType
   partyAId: string
@@ -62,7 +63,8 @@ export interface ContractVO {
   settlementMethod: string
   contractStatus: ContractStatus
   approvalStatus: ApprovalStatus
-  projectName: string  createdBy: string
+  projectName: string
+  createdBy: string
   createdAt: string
   updatedBy: string
   updatedAt: string
@@ -73,7 +75,8 @@ export interface ContractQueryParams {
   projectId?: string
   contractType?: ContractType
   contractStatus?: ContractStatus
-  approvalStatus?: ApprovalStatus  contractCode?: string
+  approvalStatus?: ApprovalStatus
+  contractCode?: string
   keyword?: string
   startDate?: string
   endDate?: string
