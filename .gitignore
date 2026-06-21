@@ -62,6 +62,14 @@ login-snapshot.yml
 # Graphify knowledge graph (excluded from repo)
 graphify-out/
 
+# Claude-mem agent runtime (excluded from repo)
+.agent-runtime/
+
+# Project config files (excluded from repo)
+CLAUDE.md
+AGENTS.md
+.serena
+
 # Claude Code settings (excluded from repo)
 .claude/
 
