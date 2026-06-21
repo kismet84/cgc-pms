@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
+import { onErrorCaptured } from 'vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { message } from 'ant-design-vue'
+
+onErrorCaptured((err, instance, info) => {
+  console.error('[App Error]', err, info)
+  return false // 阻止向上传播
+})
 
 message.config({
   top: '80px',

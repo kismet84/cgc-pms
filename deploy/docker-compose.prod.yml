@@ -118,7 +118,7 @@ services:
       - --default-time-zone=+08:00
       - --require-secure-transport=ON
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -144,7 +144,7 @@ services:
       - redis-data:/data
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5

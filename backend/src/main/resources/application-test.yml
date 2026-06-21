@@ -31,7 +31,8 @@ minio:
 
 jwt:
   secret: ${JWT_SECRET:ENC(EgW35Fy6JTLUkNtV9HYfsjMRg0O8D4kcOs/TmXwQCAJG7DwIf138Vp5+0V0MyRJlUZ5NAIUj/osChqroG4D4Sg8+5mcXurkd0yOy/uaO3xUbQxMl3mJlHWGdThupua+JgaUQNliDGm0pRdIohnMO1w==)}
-  expiration: 86400000
+  # 15 min — unified with production for consistent test behavior
+  expiration: 900000
   refresh-expiration: 604800000
   header: Authorization
   token-prefix: "Bearer "

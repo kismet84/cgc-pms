@@ -45,6 +45,7 @@ cookie:
 
 jwt:
   secret: ${JWT_SECRET}
+  # 15 min — production-grade access token lifetime (override via JWT_EXPIRATION env)
   expiration: ${JWT_EXPIRATION:900000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
   header: Authorization

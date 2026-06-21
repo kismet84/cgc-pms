@@ -59,7 +59,23 @@ public class PayInvoice extends BaseEntity {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String verifyStatus;
 
-    // ── V36 使用 created_time / updated_time 列名 ──
+    /**
+     * ── 审计字段 workaround 说明 ──
+     *
+     * 历史：
+     *   V36 最初使用 created_time / updated_time 列名。
+     *   V45 将列重命名为 created_at / updated_at（与 BaseEntity 默认映射一致）。
+     *
+     * 当前状态：
+     *   createdTime / updatedTime 显式映射 @TableField(value = "created_at")，
+     *   同时 createdAt / updatedAt (@TableField(exist = false)) 屏蔽 BaseEntity
+     *   继承的同名字段，避免 MyBatis-Plus 列冲突。
+     *
+     * 移除时机：
+     *   当 InvoiceService.toVO() 及 PayInvoice::getCreatedTime / getUpdatedTime
+     *   引用全部迁移为 createdAt / updatedAt 后，即可删除 createdTime / updatedTime
+     *   字段及 exist=false 屏蔽字段，直接使用 BaseEntity 的 createdAt / updatedAt。
+     */
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(value = "created_at", fill = FieldFill.INSERT)
@@ -71,12 +87,12 @@ public class PayInvoice extends BaseEntity {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedTime;
 
-    /** 屏蔽 BaseEntity.createdAt（V36 表无 created_at 列） */
+    /** 屏蔽 BaseEntity.createdAt，避免与 createdTime 映射到同一 DB 列 created_at */
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime createdAt;
 
-    /** 屏蔽 BaseEntity.updatedAt（V36 表无 updated_at 列） */
+    /** 屏蔽 BaseEntity.updatedAt，避免与 updatedTime 映射到同一 DB 列 updated_at */
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(exist = false)
     private LocalDateTime updatedAt;

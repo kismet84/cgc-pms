@@ -19,7 +19,9 @@ echo "[$(date)] Starting MinIO mirror backup..."
 # Configure mc alias if not exists
 mc alias set "${MINIO_ALIAS}" "${MINIO_ENDPOINT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}" --api S3v4 2>/dev/null || true
 
-mc mirror --overwrite --remove "${MINIO_ALIAS}/${MINIO_BUCKET}" "${BACKUP_DIR}/"
+# NOTE: Do NOT use --remove — it deletes destination files not present in source,
+# which can cause data loss if the source bucket is misconfigured or accidentally emptied.
+mc mirror --overwrite "${MINIO_ALIAS}/${MINIO_BUCKET}" "${BACKUP_DIR}/"
 
 echo "[$(date)] MinIO mirror backup completed"
 FILE_COUNT=$(find "${BACKUP_DIR}" -type f 2>/dev/null | wc -l)

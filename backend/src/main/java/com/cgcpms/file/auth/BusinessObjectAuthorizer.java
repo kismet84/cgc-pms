@@ -2,12 +2,31 @@ package com.cgcpms.file.auth;
 
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.cost.entity.CostTarget;
+import com.cgcpms.cost.mapper.CostTargetMapper;
+import com.cgcpms.invoice.entity.PayInvoice;
+import com.cgcpms.invoice.mapper.PayInvoiceMapper;
+import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.partner.entity.MdPartner;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.settlement.entity.StlSettlement;
+import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.mapper.VarOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -24,6 +43,16 @@ import java.util.Set;
 public class BusinessObjectAuthorizer {
 
     private final ProjectAccessChecker projectAccessChecker;
+    private final CtContractMapper contractMapper;
+    private final PayInvoiceMapper invoiceMapper;
+    private final MatReceiptMapper receiptMapper;
+    private final PayApplicationMapper paymentMapper;
+    private final SubMeasureMapper subcontractMapper;
+    private final StlSettlementMapper settlementMapper;
+    private final VarOrderMapper variationMapper;
+    private final CostTargetMapper bidCostMapper;
+    private final MdPartnerMapper partnerMapper;
+    private final MdMaterialMapper materialMapper;
 
     private static final Set<String> KNOWN_BUSINESS_TYPES = Set.of(
             "PROJECT", "CONTRACT", "INVOICE", "RECEIPT",
@@ -55,26 +84,128 @@ public class BusinessObjectAuthorizer {
 
         switch (upperType) {
             case "PROJECT":
-                // 项目文件需要项目读权限
                 projectAccessChecker.checkAccess(businessId, action + "项目文件");
                 break;
-            // 其他业务类型的授权检查在对应实现就绪后添加
-            // 当前至少校验业务对象不为 null
-            case "CONTRACT":
-            case "INVOICE":
-            case "RECEIPT":
-            case "PAYMENT":
-            case "SUBCONTRACT":
-            case "SETTLEMENT":
-            case "VARIATION":
-            case "BID_COST":
-            case "PARTNER":
-            case "MATERIAL":
-                // 当前仅做租户级校验（通过各业务 service 的查询间接保证）
-                // 未来扩展：为每种类型注册对应的 access checker
-                log.debug("业务对象授权: type={}, id={}, action={}, tenant={}",
-                        businessType, businessId, action, UserContext.getCurrentTenantId());
+            case "CONTRACT": {
+                CtContract contract = contractMapper.selectById(businessId);
+                if (contract == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "合同不存在: " + businessId);
+                }
+                if (!contract.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该合同文件");
+                }
                 break;
+            }
+            case "INVOICE": {
+                PayInvoice invoice = invoiceMapper.selectById(businessId);
+                if (invoice == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "发票不存在: " + businessId);
+                }
+                if (!invoice.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该发票文件");
+                }
+                break;
+            }
+            case "RECEIPT": {
+                MatReceipt receipt = receiptMapper.selectById(businessId);
+                if (receipt == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "收货单不存在: " + businessId);
+                }
+                if (!receipt.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该收货单文件");
+                }
+                break;
+            }
+            case "PAYMENT": {
+                PayApplication payment = paymentMapper.selectById(businessId);
+                if (payment == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "付款申请不存在: " + businessId);
+                }
+                if (!payment.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该付款申请文件");
+                }
+                break;
+            }
+            case "SUBCONTRACT": {
+                SubMeasure subcontract = subcontractMapper.selectById(businessId);
+                if (subcontract == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "分包计量不存在: " + businessId);
+                }
+                if (!subcontract.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该分包计量文件");
+                }
+                break;
+            }
+            case "SETTLEMENT": {
+                StlSettlement settlement = settlementMapper.selectById(businessId);
+                if (settlement == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "结算单不存在: " + businessId);
+                }
+                if (!settlement.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该结算单文件");
+                }
+                break;
+            }
+            case "VARIATION": {
+                VarOrder variation = variationMapper.selectById(businessId);
+                if (variation == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "变更单不存在: " + businessId);
+                }
+                if (!variation.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该变更单文件");
+                }
+                break;
+            }
+            case "BID_COST": {
+                CostTarget bidCost = bidCostMapper.selectById(businessId);
+                if (bidCost == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "目标成本不存在: " + businessId);
+                }
+                if (!bidCost.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该目标成本文件");
+                }
+                break;
+            }
+            case "PARTNER": {
+                MdPartner partner = partnerMapper.selectById(businessId);
+                if (partner == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "合作方不存在: " + businessId);
+                }
+                if (!partner.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该合作方文件");
+                }
+                break;
+            }
+            case "MATERIAL": {
+                MdMaterial material = materialMapper.selectById(businessId);
+                if (material == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "物料不存在: " + businessId);
+                }
+                if (!material.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED",
+                            "无权访问该物料文件");
+                }
+                break;
+            }
             default:
                 throw new BusinessException("FILE_BIZ_TYPE_UNKNOWN",
                         "不支持的业务类型: " + businessType);

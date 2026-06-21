@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+      - name: Run backend tests
+        run: cd backend && ./mvnw test -Djasypt.encryptor.password=dev-jasypt-key
+        env:
+          JASYPT_ENCRYPTOR_PASSWORD: dev-jasypt-key
+
+  backend-test-mysql:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cgc_pms_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+      - name: Run MySQL tests
+        run: cd backend && ./mvnw test -Dspring.profiles.active=test -Djasypt.encryptor.password=dev-jasypt-key
+        env:
+          JASYPT_ENCRYPTOR_PASSWORD: dev-jasypt-key
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/cgc_pms_test
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: root
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+      - name: Install & Build
+        run: cd frontend-admin && pnpm install && pnpm build
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+      - name: Install & Test
+        run: cd frontend-admin && pnpm install && pnpm test:unit

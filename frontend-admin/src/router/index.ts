@@ -409,6 +409,9 @@ router.beforeEach((to) => {
   if (to.meta?.adminOnly && !isAdminRole(userStore.roles)) {
     return { path: '/dashboard' }
   }
+  if (to.meta?.permission && !userStore.hasPermission(to.meta.permission)) {
+    return { path: '/dashboard' }
+  }
   return true
 })
 

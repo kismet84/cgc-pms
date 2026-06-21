@@ -45,6 +45,7 @@ minio:
 # JWT
 jwt:
   secret: ${JWT_SECRET:ENC(f8QazJP/qwoDWYnXe/Zl5yprkh2AwHISG0dPVPgD1cZZ+5IUNVcwwCnG/lH8mMotDMCakCmtvvMd63v8RjUvEq0iX2ZaZGCO9GDK69wzRi8bGldeu3RCD6wLCwjj5bRw)}
+  # 15 min — production-grade access token lifetime
   expiration: 900000
   refresh-expiration: 604800000
   header: Authorization

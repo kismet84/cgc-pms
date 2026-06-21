@@ -34,6 +34,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -66,12 +67,21 @@ public class AlertEvaluationService {
     private final PmProjectMemberMapper projectMemberMapper;
     private final NotificationService notificationService;
 
+    /**
+     * Prevents overlapping executions of the scheduled alert evaluation task.
+     */
+    private final AtomicBoolean scheduledEvaluateRunning = new AtomicBoolean(false);
+
     // ──────────────────────────────────────────────
     // Scheduled entry point
     // ──────────────────────────────────────────────
 
     @Scheduled(cron = "0 */30 * * * ?")
     public void scheduledEvaluate() {
+        if (!scheduledEvaluateRunning.compareAndSet(false, true)) {
+            log.warn("Previous scheduled alert evaluation still running, skipping this trigger");
+            return;
+        }
         log.info("Starting scheduled alert evaluation...");
         try {
             LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
@@ -89,6 +99,8 @@ public class AlertEvaluationService {
             }
         } catch (Exception e) {
             log.error("Scheduled alert evaluation failed", e);
+        } finally {
+            scheduledEvaluateRunning.set(false);
         }
         log.info("Scheduled alert evaluation completed");
     }

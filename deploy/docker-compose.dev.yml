@@ -38,7 +38,7 @@ services:
       - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+08:00
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,7 +58,7 @@ services:
       - redis-dev-data:/data
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "$$REDIS_PASSWORD", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -123,8 +123,8 @@ services:
       MINIO_ENDPOINT: "http://minio:9000"
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-do-not-use-in-production}
-      JASYPT_ENCRYPTOR_PASSWORD: ${JASYPT_ENCRYPTOR_PASSWORD:-dev-jasypt-key}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JASYPT_ENCRYPTOR_PASSWORD: ${JASYPT_ENCRYPTOR_PASSWORD:?JASYPT_ENCRYPTOR_PASSWORD is required}
     command: java -jar target/cgc-pms-backend.jar
     networks:
       - cgc-pms-dev-net

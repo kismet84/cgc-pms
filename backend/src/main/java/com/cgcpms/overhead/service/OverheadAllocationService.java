@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 间接费用分摊执行引擎。
@@ -40,6 +41,11 @@ public class OverheadAllocationService {
     private final CostSubjectMapper costSubjectMapper;
     private final PmProjectMapper projectMapper;
     private final CostSummaryService costSummaryService;
+
+    /**
+     * Prevents overlapping executions of the scheduled monthly allocation task.
+     */
+    private final AtomicBoolean scheduledMonthlyAllocationRunning = new AtomicBoolean(false);
 
     public IPage<OverheadAllocationRule> getPage(long pageNo, long pageSize) {
         Long tenantId = UserContext.getCurrentTenantId();
@@ -78,11 +84,44 @@ public class OverheadAllocationService {
 
     /**
      * 按月定时执行分摊 (每月1日凌晨2点)。
+     * <p>
+     * 在非 HTTP 线程中执行，无法从 {@link UserContext} 获取 tenantId，
+     * 因此遍历所有活跃项目提取 tenantId，逐租户执行分摊。
      */
     @Scheduled(cron = "0 0 2 1 * ?")
     public void scheduledMonthlyAllocation() {
+        if (!scheduledMonthlyAllocationRunning.compareAndSet(false, true)) {
+            log.warn("Previous monthly allocation still running, skipping this trigger");
+            return;
+        }
         log.info("月度间接费用分摊 Job 开始");
-        executeAllocation(UserContext.getCurrentTenantId(), LocalDate.now().withDayOfMonth(1).minusDays(1));
+        try {
+            LocalDate period = LocalDate.now().withDayOfMonth(1).minusDays(1);
+
+            Set<Long> tenantIds = new HashSet<>();
+            for (PmProject project : projectMapper.selectList(
+                    new LambdaQueryWrapper<PmProject>()
+                            .eq(PmProject::getStatus, "ACTIVE")
+                            .select(PmProject::getTenantId))) {
+                tenantIds.add(project.getTenantId());
+            }
+
+            if (tenantIds.isEmpty()) {
+                log.info("无活跃项目，月度分摊跳过");
+                return;
+            }
+
+            for (Long tenantId : tenantIds) {
+                try {
+                    executeAllocation(tenantId, period);
+                } catch (Exception e) {
+                    log.error("月度分摊失败 tenantId={} period={}", tenantId, period, e);
+                }
+            }
+            log.info("月度间接费用分摊 Job 完成 tenantIds={}", tenantIds);
+        } finally {
+            scheduledMonthlyAllocationRunning.set(false);
+        }
     }
 
     /**

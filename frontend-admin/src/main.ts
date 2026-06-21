@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { message } from 'ant-design-vue'
 import Antd from 'ant-design-vue'
 import { createPinia } from 'pinia'
 import dayjs from 'dayjs'
@@ -27,6 +28,7 @@ import {
 import App from './App.vue'
 import router from './router'
 import vLoading from './directives/loading'
+import vPermission from './directives/permission'
 import './assets/styles/global.css'
 
 use([
@@ -46,7 +48,20 @@ app.use(createPinia())
 app.use(router)
 app.use(Antd)
 app.directive('loading', vLoading)
+app.directive('permission', vPermission)
 app.use(VxeUIAll)
 app.use(VxeUITable)
+
+app.config.errorHandler = (err, instance, info) => {
+  console.error('[Global Error]', err)
+  // TODO: 接入监控服务 (Sentry / 日志上报)
+  if (err instanceof Error) {
+    try {
+      message.error('系统异常，请稍后重试')
+    } catch {
+      console.error('Error boundary caught:', err.message)
+    }
+  }
+}
 
 app.mount('#app')

@@ -74,8 +74,7 @@ docs/agents/
 # Claude Code settings (excluded from repo)
 .claude/
 
-# GitHub workflows (excluded from repo)
-.github/
+
 .opencode/
 frontend-admin/playwright-report/
 frontend-admin/test-results/

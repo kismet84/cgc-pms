@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
-import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.dto.WorkflowActionRequest;
 import com.cgcpms.workflow.dto.WorkflowAddSignRequest;
 import com.cgcpms.workflow.dto.WorkflowSubmitRequest;
@@ -19,11 +18,7 @@ import com.cgcpms.workflow.vo.WfTaskVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -38,7 +33,7 @@ public class WorkflowController {
     @PostMapping("/submit")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<String> submit(@Valid @RequestBody WorkflowSubmitRequest request) {
-        checkSubmitPermission(request.getBusinessType());
+        workflowEngine.checkSubmitPermission(request.getBusinessType());
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
         Long tenantId = UserContext.getCurrentTenantId();
@@ -49,49 +44,6 @@ public class WorkflowController {
                 request.getBusinessSummary(), request.getVariables(),
                 request.getCcUserIds());
         return ApiResponse.success(String.valueOf(instance.getId()));
-    }
-
-    /**
-     * Validate that the current user has the required permission (or ADMIN/SUPER_ADMIN role)
-     * to submit a workflow of the given business type.
-     */
-    private void checkSubmitPermission(String businessType) {
-        String requiredPermission = getRequiredPermission(businessType);
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) {
-            throw new AccessDeniedException("未认证");
-        }
-        for (GrantedAuthority authority : auth.getAuthorities()) {
-            String authStr = authority.getAuthority();
-            if ("ROLE_ADMIN".equals(authStr) || "ROLE_SUPER_ADMIN".equals(authStr)) {
-                log.warn("ADMIN/SUPER_ADMIN bypass submitting businessType={}, userId={}, role={}",
-                    businessType, UserContext.getCurrentUserId(), authStr);
-                return;
-            }
-            if (requiredPermission.equals(authStr)) {
-                return;
-            }
-        }
-        throw new AccessDeniedException("缺少权限: " + requiredPermission);
-    }
-
-    /**
-     * Map business type to the required authority/permission code for submission.
-     */
-    private String getRequiredPermission(String businessType) {
-        return switch (businessType) {
-            case WorkflowBusinessTypes.CONTRACT_APPROVAL -> "contract:submit";
-            case WorkflowBusinessTypes.PURCHASE_ORDER -> "purchase:order:submit";
-            case WorkflowBusinessTypes.PURCHASE_REQUEST -> "purchase:request:submit";
-            case WorkflowBusinessTypes.MATERIAL_RECEIPT -> "receipt:submit";
-            case WorkflowBusinessTypes.SUB_MEASURE -> "subcontract:measure:submit";
-            case WorkflowBusinessTypes.PAY_REQUEST -> "payment:app:submit";
-            case WorkflowBusinessTypes.VAR_ORDER -> "variation:order:submit";
-            case WorkflowBusinessTypes.CT_CHANGE -> "contract:change:submit";
-            case WorkflowBusinessTypes.SETTLEMENT -> "settlement:submit";
-            case WorkflowBusinessTypes.COST_TARGET -> "cost:target:submit";
-            default -> throw new IllegalArgumentException("不支持的业务类型: " + businessType);
-        };
     }
 
     @PostMapping("/tasks/{taskId}/approve")

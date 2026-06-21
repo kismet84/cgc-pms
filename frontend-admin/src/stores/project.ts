@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { message } from 'ant-design-vue'
 import type { ProjectVO, MemberVO, MemberFormParams } from '@/types/project'
 import {
   getProjectDetail,
@@ -21,6 +22,9 @@ export const useProjectStore = defineStore('project', () => {
     loading.value = true
     try {
       currentProject.value = await getProjectDetail(id)
+    } catch (error) {
+      message.error('加载项目信息失败')
+      throw error
     } finally {
       loading.value = false
     }
@@ -32,6 +36,9 @@ export const useProjectStore = defineStore('project', () => {
       const res = await getMemberList(projectId, { pageNum: pageNo, pageSize })
       members.value = res.records
       membersTotal.value = res.total
+    } catch (error) {
+      message.error('加载项目成员失败')
+      throw error
     } finally {
       membersLoading.value = false
     }
@@ -41,6 +48,9 @@ export const useProjectStore = defineStore('project', () => {
     saving.value = true
     try {
       await addMemberApi(projectId, data)
+    } catch (error) {
+      message.error('添加项目成员失败')
+      throw error
     } finally {
       saving.value = false
     }
@@ -50,6 +60,9 @@ export const useProjectStore = defineStore('project', () => {
     saving.value = true
     try {
       await updateMemberApi(projectId, memberId, data)
+    } catch (error) {
+      message.error('更新项目成员失败')
+      throw error
     } finally {
       saving.value = false
     }
@@ -59,6 +72,9 @@ export const useProjectStore = defineStore('project', () => {
     saving.value = true
     try {
       await removeMemberApi(projectId, memberId)
+    } catch (error) {
+      message.error('移除项目成员失败')
+      throw error
     } finally {
       saving.value = false
     }

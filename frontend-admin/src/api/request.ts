@@ -98,7 +98,12 @@ service.interceptors.response.use(
 
       try {
         // Use the isolated refreshClient — no 401 recursion possible
-        await refreshClient.post('/auth/refresh')
+        const refreshRes = await refreshClient.post('/auth/refresh')
+        // Validate refresh response — fail-open on malformed response would leak
+        // an unrefreshed token into the retry chain
+        if (refreshRes.data?.code !== SUCCESS_CODE) {
+          throw new Error(refreshRes.data?.message || 'Token refresh failed')
+        }
         drainQueue()
         return service(originalRequest)
       } catch (e: unknown) {

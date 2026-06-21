@@ -39,6 +39,7 @@ import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
@@ -59,6 +60,12 @@ public class CostSummaryService {
     private final VarOrderMapper varOrderMapper;
 
     /**
+     * Prevents overlapping executions of the scheduled refresh task.
+     * If a previous run is still in progress, the next cron trigger is skipped.
+     */
+    private final AtomicBoolean scheduledRefreshRunning = new AtomicBoolean(false);
+
+    /**
      * Per-project locks to serialize concurrent {@link #refreshSummary(Long, Long)} calls
      * for the same project. The scheduled task and manual refresh endpoint can both fire
      * simultaneously; without this lock, two refreshes would interleave DELETE+INSERT
@@ -66,9 +73,9 @@ public class CostSummaryService {
      */
     private final ConcurrentHashMap<Long, ReentrantLock> refreshLocks = new ConcurrentHashMap<>();
 
-    @Transactional
     public CostProjectSummaryVO refreshSummary(Long projectId) {
-        return refreshSummary(UserContext.getCurrentTenantId(), projectId);
+        // Use AOP proxy to ensure @Transactional(isolation=REPEATABLE_READ) on the overload is applied
+        return ((CostSummaryService) AopContext.currentProxy()).refreshSummary(UserContext.getCurrentTenantId(), projectId);
     }
 
     /**
@@ -454,6 +461,10 @@ public class CostSummaryService {
      */
     @Scheduled(cron = "0 0 * * * ?")
     public void scheduledRefresh() {
+        if (!scheduledRefreshRunning.compareAndSet(false, true)) {
+            log.warn("Previous scheduled cost summary refresh still running, skipping this trigger");
+            return;
+        }
         log.info("Starting scheduled cost summary refresh...");
         try {
             LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
@@ -471,6 +482,8 @@ public class CostSummaryService {
             }
         } catch (Exception e) {
             log.error("Scheduled cost summary refresh failed", e);
+        } finally {
+            scheduledRefreshRunning.set(false);
         }
         log.info("Scheduled cost summary refresh completed");
     }

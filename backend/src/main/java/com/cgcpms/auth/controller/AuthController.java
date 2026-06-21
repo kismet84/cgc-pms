@@ -103,6 +103,11 @@ public class AuthController {
         Claims claims = jwtUtils.parseToken(refreshToken);
         Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
         if (svc != null) svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken));
+        // Blacklist old access token to prevent replay during its remaining TTL
+        String oldAccessToken = resolveAccessToken(request);
+        if (oldAccessToken != null && jwtUtils.validateToken(oldAccessToken)) {
+            if (svc != null) svc.blacklist(oldAccessToken, jwtUtils.getRemainingTtlMillis(oldAccessToken));
+        }
         LoginResponse result = authService.loginById(userId);
         setTokenCookies(response, result.getToken(), result.getRefreshToken());
         // Strip tokens from JSON body — they are now HttpOnly cookies only.

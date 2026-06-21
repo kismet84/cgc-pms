@@ -5,12 +5,19 @@ import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.BlockAttackInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
+import com.cgcpms.auth.context.UserContext;
+import net.sf.jsqlparser.expression.Expression;
+import net.sf.jsqlparser.expression.LongValue;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
  * MyBatis-Plus configuration.
- * Registers pagination, optimistic-lock and block-attack interceptors.
+ * Registers pagination, optimistic-lock, block-attack and tenant-line interceptors.
+ * Tenant-line interceptor auto-injects tenant_id into every query.
+ * Use {@code @InterceptorIgnore(tenantLine = "true")} on mapper methods to bypass.
  */
 @Configuration
 public class MybatisPlusConfig {
@@ -31,6 +38,29 @@ public class MybatisPlusConfig {
 
         // Block full-table update / delete operations
         interceptor.addInnerInterceptor(new BlockAttackInnerInterceptor());
+
+        // Tenant isolation: auto-inject tenant_id into every query
+        interceptor.addInnerInterceptor(new TenantLineInnerInterceptor(new TenantLineHandler() {
+            @Override
+            public Expression getTenantId() {
+                Long tenantId = UserContext.getCurrentTenantId();
+                if (tenantId == null) {
+                    return new LongValue(0);
+                }
+                return new LongValue(tenantId);
+            }
+
+            @Override
+            public String getTenantIdColumn() {
+                return "tenant_id";
+            }
+
+            @Override
+            public boolean ignoreTable(String tableName) {
+                // Tables without tenant_id can be listed here
+                return false;
+            }
+        }));
 
         return interceptor;
     }

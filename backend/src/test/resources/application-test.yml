@@ -3,7 +3,8 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:cgc}
-    password: ${DB_PASSWORD:cgc123}
+    # Override TEST_DB_PASSWORD in CI environment
+    password: ${TEST_DB_PASSWORD:cgc123}
     hikari:
       pool-name: CgcPmsHikariPool
       minimum-idle: 2
@@ -16,8 +17,10 @@ minio:
   enabled: false
 
 jwt:
-  secret: "test-only-change-me-cgc-pms-jwt-secret-key-256bit-minimum-length"
-  expiration: 86400000
+  # Override TEST_JWT_SECRET in CI environment
+  secret: ${TEST_JWT_SECRET:test-only-change-me-cgc-pms-jwt-secret-key-256bit-minimum-length}
+  # 15 min — unified with production for consistent test behavior
+  expiration: 900000
   refresh-expiration: 604800000
 
 cors:

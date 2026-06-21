@@ -13,5 +13,13 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     exclude: ['e2e/**', 'node_modules/**'],
+    coverage: {
+      thresholds: {
+        lines: 50,
+        functions: 50,
+        branches: 40,
+        statements: 50,
+      },
+    },
   },
 })

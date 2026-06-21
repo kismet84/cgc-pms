@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { message } from 'ant-design-vue'
 import type {
   SettlementVO,
   SettlementItemVO,
@@ -44,6 +45,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     loading.value = true
     try {
       currentSettlement.value = await getSettlementDetail(id)
+    } catch (error) {
+      message.error('加载结算信息失败')
+      throw error
     } finally {
       loading.value = false
     }
@@ -53,6 +57,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     saving.value = true
     try {
       await createSettlementApi(data)
+    } catch (error) {
+      message.error('创建结算失败')
+      throw error
     } finally {
       saving.value = false
     }
@@ -62,6 +69,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     saving.value = true
     try {
       await updateSettlementApi(id, data)
+    } catch (error) {
+      message.error('更新结算失败')
+      throw error
     } finally {
       saving.value = false
     }
@@ -71,6 +81,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     itemsLoading.value = true
     try {
       items.value = await getSettlementItems(settlementId)
+    } catch (error) {
+      message.error('加载结算明细失败')
+      throw error
     } finally {
       itemsLoading.value = false
     }
@@ -81,6 +94,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     try {
       await saveSettlementItems(settlementId, itemsList)
       items.value = itemsList
+    } catch (error) {
+      message.error('保存结算明细失败')
+      throw error
     } finally {
       saving.value = false
     }
@@ -90,6 +106,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     variationsLoading.value = true
     try {
       variations.value = await getSettlementVariations(settlementId)
+    } catch (error) {
+      message.error('加载变更明细失败')
+      throw error
     } finally {
       variationsLoading.value = false
     }
@@ -99,6 +118,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     paymentsLoading.value = true
     try {
       payments.value = await getSettlementPayments(settlementId)
+    } catch (error) {
+      message.error('加载付款明细失败')
+      throw error
     } finally {
       paymentsLoading.value = false
     }
@@ -108,6 +130,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     costsLoading.value = true
     try {
       costs.value = await getSettlementCosts(settlementId)
+    } catch (error) {
+      message.error('加载成本明细失败')
+      throw error
     } finally {
       costsLoading.value = false
     }
@@ -117,6 +142,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     attachmentsLoading.value = true
     try {
       attachments.value = await getSettlementAttachments(settlementId)
+    } catch (error) {
+      message.error('加载附件失败')
+      throw error
     } finally {
       attachmentsLoading.value = false
     }
@@ -126,6 +154,9 @@ export const useSettlementStore = defineStore('settlement', () => {
     recordsLoading.value = true
     try {
       approvalRecords.value = await getSettlementApprovalRecords(settlementId)
+    } catch (error) {
+      message.error('加载审批记录失败')
+      throw error
     } finally {
       recordsLoading.value = false
     }

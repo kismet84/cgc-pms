@@ -25,6 +25,8 @@ Construction General Contracting Project Management System
 ```bash
 cd deploy
 cp .env.example .env
+# ⚠️ 编辑 .env，将 CHANGE-ME-* 替换为真实密钥
+# JASYPT_ENCRYPTOR_PASSWORD 与 JWT_SECRET 必须设为不同的值
 docker compose up -d    # MySQL:3306 / Redis:6379 / MinIO:9001
 ```
 
@@ -141,6 +143,8 @@ cd frontend-admin && pnpm vitest   # 前端测试
 ```bash
 cd deploy
 cp .env.example .env
+# ⚠️ 编辑 .env，将 CHANGE-ME-* 替换为真实密钥
+# JASYPT_ENCRYPTOR_PASSWORD 与 JWT_SECRET 必须设为不同的值
 mkdir -p ssl
 docker compose -f docker-compose.prod.yml up -d
 ```
