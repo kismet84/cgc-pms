@@ -76,8 +76,8 @@ ALTER TABLE mat_purchase_order ADD UNIQUE KEY uk_mat_po_code (tenant_id, order_c
 ALTER TABLE mat_receipt DROP INDEX uk_mat_receipt_code;
 ALTER TABLE mat_receipt ADD UNIQUE KEY uk_mat_receipt_code (tenant_id, receipt_code, deleted_token);
 
-ALTER TABLE mat_stock DROP INDEX uk_mat_stock_code;
-ALTER TABLE mat_stock ADD UNIQUE KEY uk_mat_stock_code (tenant_id, stock_code, deleted_token);
+ALTER TABLE mat_stock DROP INDEX uk_ms_warehouse_material;
+ALTER TABLE mat_stock ADD UNIQUE KEY uk_ms_warehouse_material (warehouse_id, material_id, deleted_token);
 
 ALTER TABLE pm_project DROP INDEX uk_pm_project_code;
 ALTER TABLE pm_project ADD UNIQUE KEY uk_pm_project_code (tenant_id, project_code, deleted_token);
