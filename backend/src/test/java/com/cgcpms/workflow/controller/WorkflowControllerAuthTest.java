@@ -1,0 +1,295 @@
+package com.cgcpms.workflow.controller;
+
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
+import com.cgcpms.workflow.dto.WorkflowActionRequest;
+import com.cgcpms.workflow.dto.WorkflowAddSignRequest;
+import com.cgcpms.workflow.dto.WorkflowSubmitRequest;
+import com.cgcpms.workflow.dto.WorkflowTransferRequest;
+import com.cgcpms.workflow.service.WorkflowEngine;
+import com.cgcpms.workflow.service.WorkflowQueryService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+/**
+ * Tests for WorkflowController authorization alignment.
+ *
+ * Verifies:
+ * - ADMIN role bypasses write endpoint checks (including submit permission)
+ * - SUPER_ADMIN role bypasses write endpoint checks (including submit permission)
+ * - Non-admin users without correct permission are rejected
+ * - Users with the exact required permission pass
+ */
+@ExtendWith(MockitoExtension.class)
+@DisplayName("WorkflowController 授权对齐")
+class WorkflowControllerAuthTest {
+
+    @Mock
+    private WorkflowEngine workflowEngine;
+
+    @Mock
+    private WorkflowQueryService workflowQueryService;
+
+    private WorkflowController controller;
+
+    @BeforeEach
+    void setUp() {
+        controller = new WorkflowController(workflowEngine, workflowQueryService);
+        // clear any lingering context from other tests
+        SecurityContextHolder.clearContext();
+    }
+
+    @AfterEach
+    void tearDown() {
+        UserContext.clear();
+        SecurityContextHolder.clearContext();
+    }
+
+    // ---- checkSubmitPermission (via submit endpoint) ----
+
+    @Nested
+    @DisplayName("checkSubmitPermission — 角色旁路")
+    class SubmitPermissionBypass {
+
+        private WorkflowSubmitRequest validRequest() {
+            WorkflowSubmitRequest req = new WorkflowSubmitRequest();
+            req.setBusinessType(WorkflowBusinessTypes.CONTRACT_APPROVAL);
+            req.setBusinessId(1L);
+            req.setTitle("test");
+            return req;
+        }
+
+        @Test
+        @DisplayName("ADMIN 角色绕过权限检查通过")
+        void adminRoleBypassesSubmitPermission() {
+            setAuthentication("ROLE_ADMIN");
+
+            // ADMIN should pass checkSubmitPermission without needing contract:submit
+            // Submit will fail deeper (mocked engine) but the permission check should pass
+            // We verify by calling submit - if it gets past permission check, it's correct
+            // (the engine mock will return null, but we only care that AccessDeniedException
+            //  is NOT thrown for the permission check step)
+            // Since the engine is mocked and submit creates a real WfInstance, we test
+            // checkSubmitPermission indirectly via a helper that wraps it.
+
+            // Directly test the permission check logic:
+            // The controller calls checkSubmitPermission which reads SecurityContextHolder.
+            // With ROLE_ADMIN it should pass.
+            assertDoesNotThrow(() -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_APPROVAL),
+                    "ADMIN 应绕过 contract:submit 权限检查");
+        }
+
+        @Test
+        @DisplayName("SUPER_ADMIN 角色绕过权限检查通过")
+        void superAdminRoleBypassesSubmitPermission() {
+            setAuthentication("ROLE_SUPER_ADMIN");
+
+            assertDoesNotThrow(() -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_APPROVAL),
+                    "SUPER_ADMIN 应绕过 contract:submit 权限检查");
+        }
+
+        @Test
+        @DisplayName("无权限普通用户被拒绝")
+        void ordinaryUserWithoutPermissionIsRejected() {
+            setAuthentication("ROLE_USER"); // no matching permission
+
+            assertThrows(AccessDeniedException.class,
+                    () -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_APPROVAL),
+                    "缺少 contract:submit 权限的普通用户应被拒绝");
+        }
+
+        @Test
+        @DisplayName("具有精确权限的用户通过")
+        void userWithExactPermissionPasses() {
+            setAuthentication("contract:submit");
+
+            assertDoesNotThrow(() -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_APPROVAL),
+                    "具有 contract:submit 权限的用户应通过");
+        }
+
+        @Test
+        @DisplayName("ADMIN 绕过所有业务类型的提交权限")
+        void adminBypassesAllBusinessTypes() {
+            setAuthentication("ROLE_ADMIN");
+
+            String[] types = {
+                    WorkflowBusinessTypes.CONTRACT_APPROVAL,
+                    WorkflowBusinessTypes.PURCHASE_ORDER,
+                    WorkflowBusinessTypes.PURCHASE_REQUEST,
+                    WorkflowBusinessTypes.MATERIAL_RECEIPT,
+                    WorkflowBusinessTypes.SUB_MEASURE,
+                    WorkflowBusinessTypes.PAY_REQUEST,
+                    WorkflowBusinessTypes.VAR_ORDER,
+                    WorkflowBusinessTypes.CT_CHANGE,
+                    WorkflowBusinessTypes.SETTLEMENT,
+                    WorkflowBusinessTypes.COST_TARGET
+            };
+
+            for (String type : types) {
+                assertDoesNotThrow(() -> invokeCheckSubmitPermission(type),
+                        "ADMIN 应绕过 " + type + " 权限检查");
+            }
+        }
+
+        @Test
+        @DisplayName("SUPER_ADMIN 绕过所有业务类型的提交权限")
+        void superAdminBypassesAllBusinessTypes() {
+            setAuthentication("ROLE_SUPER_ADMIN");
+
+            String[] types = {
+                    WorkflowBusinessTypes.CONTRACT_APPROVAL,
+                    WorkflowBusinessTypes.PURCHASE_ORDER,
+                    WorkflowBusinessTypes.PURCHASE_REQUEST,
+                    WorkflowBusinessTypes.MATERIAL_RECEIPT,
+                    WorkflowBusinessTypes.SUB_MEASURE,
+                    WorkflowBusinessTypes.PAY_REQUEST,
+                    WorkflowBusinessTypes.VAR_ORDER,
+                    WorkflowBusinessTypes.CT_CHANGE,
+                    WorkflowBusinessTypes.SETTLEMENT,
+                    WorkflowBusinessTypes.COST_TARGET
+            };
+
+            for (String type : types) {
+                assertDoesNotThrow(() -> invokeCheckSubmitPermission(type),
+                        "SUPER_ADMIN 应绕过 " + type + " 权限检查");
+            }
+        }
+
+        @Test
+        @DisplayName("未认证用户被拒绝")
+        void unauthenticatedUserIsRejected() {
+            SecurityContextHolder.clearContext();
+
+            assertThrows(AccessDeniedException.class,
+                    () -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_APPROVAL),
+                    "未认证用户应被拒绝");
+        }
+
+        @Test
+        @DisplayName("不支持的业务类型抛出 IllegalArgumentException")
+        void unsupportedBusinessTypeThrowsIllegalArgument() {
+            setAuthentication("ROLE_ADMIN");
+
+            assertThrows(IllegalArgumentException.class,
+                    () -> invokeCheckSubmitPermission("UNKNOWN_TYPE"),
+                    "不支持的业务类型应抛出 IllegalArgumentException");
+        }
+    }
+
+    // ---- Spring Security @PreAuthorize pattern verification ----
+
+    @Nested
+    @DisplayName("@PreAuthorize 注解模式一致")
+    class PreAuthorizePatternConsistency {
+
+        /**
+         * 验证规则：所有 write 端点的 @PreAuthorize 注解必须包含
+         * or hasAnyRole('ADMIN','SUPER_ADMIN') 后备。
+         *
+         * 此测试通过反射检查注解内容，确保代码审查后不会回退。
+         */
+        @Test
+        @DisplayName("approve 端点允许 ADMIN/SUPER_ADMIN 后备")
+        void approveEndpointAllowsAdminFallback() throws Exception {
+            var method = WorkflowController.class.getMethod("approve", Long.class, WorkflowActionRequest.class);
+            var annotation = method.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+            String value = annotation.value();
+            assert value.contains("hasAnyRole('ADMIN','SUPER_ADMIN')")
+                    : "approve 缺少 ADMIN/SUPER_ADMIN 后备: " + value;
+        }
+
+        @Test
+        @DisplayName("reject 端点允许 ADMIN/SUPER_ADMIN 后备")
+        void rejectEndpointAllowsAdminFallback() throws Exception {
+            var method = WorkflowController.class.getMethod("reject", Long.class, WorkflowActionRequest.class);
+            var annotation = method.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+            String value = annotation.value();
+            assert value.contains("hasAnyRole('ADMIN','SUPER_ADMIN')")
+                    : "reject 缺少 ADMIN/SUPER_ADMIN 后备: " + value;
+        }
+
+        @Test
+        @DisplayName("withdraw 端点允许 ADMIN/SUPER_ADMIN 后备")
+        void withdrawEndpointAllowsAdminFallback() throws Exception {
+            var method = WorkflowController.class.getMethod("withdraw", Long.class);
+            var annotation = method.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+            String value = annotation.value();
+            assert value.contains("hasAnyRole('ADMIN','SUPER_ADMIN')")
+                    : "withdraw 缺少 ADMIN/SUPER_ADMIN 后备: " + value;
+        }
+
+        @Test
+        @DisplayName("resubmit 端点允许 ADMIN/SUPER_ADMIN 后备")
+        void resubmitEndpointAllowsAdminFallback() throws Exception {
+            var method = WorkflowController.class.getMethod("resubmit", Long.class);
+            var annotation = method.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+            String value = annotation.value();
+            assert value.contains("hasAnyRole('ADMIN','SUPER_ADMIN')")
+                    : "resubmit 缺少 ADMIN/SUPER_ADMIN 后备: " + value;
+        }
+
+        @Test
+        @DisplayName("transfer 端点允许 ADMIN/SUPER_ADMIN 后备")
+        void transferEndpointAllowsAdminFallback() throws Exception {
+            var method = WorkflowController.class.getMethod("transfer", Long.class, WorkflowTransferRequest.class);
+            var annotation = method.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+            String value = annotation.value();
+            assert value.contains("hasAnyRole('ADMIN','SUPER_ADMIN')")
+                    : "transfer 缺少 ADMIN/SUPER_ADMIN 后备: " + value;
+        }
+
+        @Test
+        @DisplayName("addSign 端点允许 ADMIN/SUPER_ADMIN 后备")
+        void addSignEndpointAllowsAdminFallback() throws Exception {
+            var method = WorkflowController.class.getMethod("addSign", Long.class, WorkflowAddSignRequest.class);
+            var annotation = method.getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class);
+            String value = annotation.value();
+            assert value.contains("hasAnyRole('ADMIN','SUPER_ADMIN')")
+                    : "addSign 缺少 ADMIN/SUPER_ADMIN 后备: " + value;
+        }
+    }
+
+    // ---- helpers ----
+
+    private void setAuthentication(String... authorities) {
+        List<SimpleGrantedAuthority> authList = java.util.Arrays.stream(authorities)
+                .map(SimpleGrantedAuthority::new)
+                .toList();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("testUser", null, authList));
+    }
+
+    /**
+     * Indirectly invoke checkSubmitPermission via reflection to test
+     * the private method in isolation, without depending on mock engine behavior.
+     */
+    private void invokeCheckSubmitPermission(String businessType) {
+        try {
+            var method = WorkflowController.class.getDeclaredMethod("checkSubmitPermission", String.class);
+            method.setAccessible(true);
+            method.invoke(controller, businessType);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            if (e.getCause() instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException(e.getCause());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+}

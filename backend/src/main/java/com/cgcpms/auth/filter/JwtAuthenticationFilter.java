@@ -13,6 +13,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -33,6 +34,7 @@ import java.util.List;
  * Validates the JWT on every request, populates {@link UserContext} and the
  * Spring Security context, and rejects invalid tokens with a 401 JSON body.
  */
+@Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -88,7 +90,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         // Check blacklist
         TokenBlacklistService blacklistService = tokenBlacklistServiceProvider.getIfAvailable();
-        if (blacklistService != null && blacklistService.isBlacklisted(token)) {
+        if (blacklistService == null) {
+            log.warn("BLACKLIST_UNAVAILABLE: TokenBlacklistService 不可用（Redis 未配置），黑名单保护缺失，令牌仅依赖过期时间校验");
+        } else if (blacklistService.isBlacklisted(token)) {
+            log.warn("BLACKLISTED_TOKEN: 已黑名单令牌尝试访问, token_prefix={}",
+                    token.length() > 20 ? token.substring(0, 20) + "..." : token);
             writeUnauthorized(response);
             return;
         }

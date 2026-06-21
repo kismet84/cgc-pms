@@ -52,7 +52,7 @@ public class WorkflowController {
     }
 
     /**
-     * Validate that the current user has the required permission (or ADMIN role)
+     * Validate that the current user has the required permission (or ADMIN/SUPER_ADMIN role)
      * to submit a workflow of the given business type.
      */
     private void checkSubmitPermission(String businessType) {
@@ -63,9 +63,9 @@ public class WorkflowController {
         }
         for (GrantedAuthority authority : auth.getAuthorities()) {
             String authStr = authority.getAuthority();
-            if ("ROLE_ADMIN".equals(authStr)) {
-                log.warn("ADMIN bypass submitting businessType={}, userId={}",
-                    businessType, UserContext.getCurrentUserId());
+            if ("ROLE_ADMIN".equals(authStr) || "ROLE_SUPER_ADMIN".equals(authStr)) {
+                log.warn("ADMIN/SUPER_ADMIN bypass submitting businessType={}, userId={}, role={}",
+                    businessType, UserContext.getCurrentUserId(), authStr);
                 return;
             }
             if (requiredPermission.equals(authStr)) {
@@ -95,7 +95,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/approve")
-    @PreAuthorize("hasAuthority('workflow:approve')")
+    @PreAuthorize("hasAuthority('workflow:approve') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> approve(@PathVariable Long taskId,
                                       @Valid @RequestBody WorkflowActionRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -106,7 +106,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/reject")
-    @PreAuthorize("hasAuthority('workflow:reject')")
+    @PreAuthorize("hasAuthority('workflow:reject') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> reject(@PathVariable Long taskId,
                                      @Valid @RequestBody WorkflowActionRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -117,7 +117,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/instances/{instanceId}/withdraw")
-    @PreAuthorize("hasAuthority('workflow:withdraw')")
+    @PreAuthorize("hasAuthority('workflow:withdraw') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> withdraw(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -126,7 +126,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/instances/{instanceId}/resubmit")
-    @PreAuthorize("hasAuthority('workflow:resubmit')")
+    @PreAuthorize("hasAuthority('workflow:resubmit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> resubmit(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -135,7 +135,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/transfer")
-    @PreAuthorize("hasAuthority('workflow:transfer')")
+    @PreAuthorize("hasAuthority('workflow:transfer') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> transfer(@PathVariable Long taskId,
                                        @Valid @RequestBody WorkflowTransferRequest request) {
         Long userId = UserContext.getCurrentUserId();
@@ -146,7 +146,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/add-sign")
-    @PreAuthorize("hasAuthority('workflow:add-sign')")
+    @PreAuthorize("hasAuthority('workflow:add-sign') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> addSign(@PathVariable Long taskId,
                                       @Valid @RequestBody WorkflowAddSignRequest request) {
         Long userId = UserContext.getCurrentUserId();
