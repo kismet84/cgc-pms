@@ -49,11 +49,14 @@ public class ProjectOverviewService {
     private final AlertLogMapper alertLogMapper;
     private final PmProjectMemberMapper memberMapper;
     private final SysUserMapper sysUserMapper;
+    private final com.cgcpms.project.auth.ProjectAccessChecker projectAccessChecker;
 
     /**
      * Get project overview for the current tenant.
      */
     public ProjectOverviewVO getOverview(Long projectId) {
+        // 数据范围校验（非管理员用户）
+        projectAccessChecker.checkAccess(projectId, "查看总览");
         return getOverview(UserContext.getCurrentTenantId(), projectId);
     }
 

@@ -129,6 +129,34 @@ This repository also has `AGENTS.md` with local multi-agent coordination rules. 
 
 ## 避坑指南 (Pitfall Avoidance)
 
+### 后端测试无法执行 — 根因与正确执行方式
+
+**症状**: `./mvnw test` 在 Git Bash 中启动后进程立即消失，无输出、无错误信息、无 surefire 报告生成。所有测试类显示为"0 tests run"。
+
+**根因**: Maven Surefire 插件在 fork 模式下通过 JVM 的 `java.io.tmpdir` 创建临时文件（surefirebooter jar + communication pipe）。Windows 11 + Git Bash (MSYS2) 环境下，Java 21 读取的 `TMPDIR`/`TEMP` 环境变量可能指向 MSYS 映射的路径（如 `/tmp`），导致 JVM 子进程无法正确写入临时文件、surefire 通信通道静默破裂，Maven 收到空结果后报告 BUILD SUCCESS（假绿）。
+
+**已验证的修复**:
+
+```bash
+# ✅ 正确 — 显式设置 JAVA_HOME + 使用 bash 执行 mvnw
+export JAVA_HOME="D:\projects-test\jdk-21\jdk-21.0.11+10"
+cd D:/projects-test/cgc-pms/backend
+bash ./mvnw test -Djasypt.encryptor.password=dev-jasypt-key -Dtest="com.cgcpms.xxx.XxxTest"
+```
+
+**关键点**:
+1. **必须用 `bash ./mvnw`** 而不是直接 `./mvnw`。直接 `./mvnw` 在 PowerShell 中启动 Maven Wrapper 时，JAVA_HOME 传递可能失败，Maven 使用错误的 JVM 版本
+2. **必须显式 `export JAVA_HOME`**，指向 JDK 21 路径。项目中有多个 JDK 版本共存，不指定就会用错
+3. **Jasypt 密钥必须传**: `-Djasypt.encryptor.password=dev-jasypt-key`
+4. **分批执行，不要一次跑全量**: 54 个测试类全量跑耗时 5+ 分钟且有部分类在 H2 local profile 下失败。分批跑可以精准定位失败根因
+
+**正确做法**（每次执行 Maven 命令前）:
+```bash
+export JAVA_HOME="D:\projects-test\jdk-21\jdk-21.0.11+10"
+cd D:/projects-test/cgc-pms/backend
+bash ./mvnw <goal> -Djasypt.encryptor.password=dev-jasypt-key [额外参数]
+```
+
 ### Node 无法识别 MSYS 路径
 
 在 Git Bash (MSYS) 环境下，Node 和 npm/pnpm 等工具**不认识** `/c/Users/...` 或 `/d/projects/...` 这类 Unix 风格的路径。传入路径时必须使用 Windows 格式：
@@ -149,6 +177,23 @@ node D:/projects-test/cgc-pms/some-script.js
 - 任何传给 Node.js 进程的路径参数
 
 **关键规则**：当命令由 Node 进程解析时（而非 bash 内置命令），MSYS 不会自动转换路径，必须手动使用 Windows 格式。
+
+### Flyway H2 迁移与匿名唯一约束 — 本次任务经验
+
+**症状**：本地 `@ActiveProfiles("local")` 启动时，H2 上的软删唯一约束修复看似已经加了 `db/migration-h2` / Java migration，但测试仍然报 `CONSTRAINT_INDEX_*` / `DuplicateKeyException`，软删后无法重建同编码记录。
+
+**根因 1**：H2 对 `CREATE TABLE ... UNIQUE(...)` 生成的是匿名唯一约束/索引，单纯按固定索引名 `DROP INDEX` 很容易失效；应先从 `INFORMATION_SCHEMA.TABLE_CONSTRAINTS` 和 `INFORMATION_SCHEMA.INDEXES` 两侧收集，再 `ALTER TABLE ... DROP CONSTRAINT` / `DROP INDEX` 兜底重建。
+
+**根因 2**：`application-local.yml` 的 Flyway Java migration 扫描路径必须写成 classpath 可发现的实际路径（例如 `classpath:com/cgcpms/common/migration`），否则 H2 里新增的 Java migration 不会执行，SQL 迁移虽然存在但约束不会真正被重建。
+
+**根因 3**：逻辑删除实体与软删唯一约束必须成对修复；只改实体、只改 SQL、或只改测试都不够。像 `pay_invoice` 这类实体如果覆盖了 `BaseEntity.deletedFlag`，就会在代码层与数据库层制造不一致，最终导致删除后重建仍失败。
+
+**How to apply**：
+- 新增软删唯一约束时，优先复用 `com.cgcpms.common.migration.H2SoftDeleteUniqueMigration` 这类 Java 迁移，确保 H2 匿名约束能被真实重建。
+- 写 H2 回归测试时，不要只看迁移文件是否存在；还要跑一个能在 H2 内存库里插入、软删、再重建的实测用例。
+- 每次改本地 profile 的 Flyway 配置后，先用最小测试类确认 Java migration 被扫描，再跑真正的软删行为回归。
+
+**Related**: [[H2 软删迁移]]、[[Flyway 规则]]
 
 ## graphify
 

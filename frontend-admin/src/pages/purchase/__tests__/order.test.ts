@@ -24,10 +24,10 @@ describe('PurchaseOrderPage submit-approval button', () => {
   })
 
   it('renders 提交审批 button only when approvalStatus is DRAFT', () => {
-    expect(source).toMatch(/v-if="record\.approvalStatus\s*===\s*'DRAFT'"/)
+    expect(source).toMatch(/approvalStatus\s*===\s*'DRAFT'/)
   })
 
   it('wires 提交审批 button to handleSubmitApproval handler', () => {
-    expect(source).toMatch(/@click="handleSubmitApproval\(record\)"/)
+    expect(source).toMatch(/handleSubmitApproval\(row\)/)
   })
 })

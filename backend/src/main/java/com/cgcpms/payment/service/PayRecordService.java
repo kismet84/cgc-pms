@@ -67,7 +67,7 @@ public class PayRecordService {
             throw new BusinessException("MISSING_APP_ID", "付款申请ID不能为空");
 
         // Lookup and lock the pay application to prevent concurrent writeback TOCTOU
-        PayApplication app = payApplicationMapper.selectByIdForUpdate(payApplicationId);
+        PayApplication app = payApplicationMapper.selectByIdForUpdate(payApplicationId, UserContext.getCurrentTenantId());
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
 
@@ -135,7 +135,7 @@ public class PayRecordService {
 
         // Use SELECT FOR UPDATE to lock the contract row, preventing concurrent
         // writebacks from reading stale paidAmount and losing updates (see A-P1-1).
-        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId);
+        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId, UserContext.getCurrentTenantId());
         if (contract == null) return;
 
         // Sum all pay_record.pay_amount for this contract with status SUCCESS

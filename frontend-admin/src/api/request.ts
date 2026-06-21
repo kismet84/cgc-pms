@@ -74,6 +74,8 @@ service.interceptors.response.use(
 
     if (status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
+        // Set _retry on the queued request so it won't re-trigger refresh
+        originalRequest._retry = true
         // Queue up while another refresh is in flight
         return new Promise<void>((resolve, reject) => {
           pendingQueue.push({ resolve, reject })

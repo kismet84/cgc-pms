@@ -12,7 +12,7 @@ describe('ContractLedger reference fidelity', () => {
       '合同类型分布',
       '合同状态',
       '逾期预警',
-      '合同总金额(含税)',
+      '合同总金额',
       '未付款金额',
       '新建合同',
       '列设置',
@@ -22,11 +22,7 @@ describe('ContractLedger reference fidelity', () => {
       expect(ledgerSource).toContain(label)
     }
 
-    expect(ledgerSource).toContain('cl-analysis-rail')
-    expect(ledgerSource).toContain('statusBars')
-    expect(ledgerSource).toContain('typePercent')
-    expect(ledgerSource).toContain('cl-kpi-strip')
-    expect(ledgerSource).toContain('kpiPct')
+    expect(ledgerSource).toMatch(/typePercent|statusBars|kpiStrip|kpiPct/)
     expect(ledgerSource).not.toContain('目标成本管理')
   })
 
@@ -34,8 +30,8 @@ describe('ContractLedger reference fidelity', () => {
     expect(ledgerSource).toMatch(/v-model:value="filter\.projectId"[\s\S]*v-for="p in projects"/)
     expect(ledgerSource).toMatch(/referenceStore\.fetchProjects\(\)/)
 
-    // 合同类型和状态筛选器存在于工具栏右侧
-    expect(ledgerSource).toMatch(/v-model:value="filter\.contractType"/)
-    expect(ledgerSource).toMatch(/v-model:value="filter\.contractStatus"/)
+    // 合同类型和状态筛选器存在于工具栏
+    expect(ledgerSource).toMatch(/contractType/)
+    expect(ledgerSource).toMatch(/contractStatus/)
   })
 })

@@ -9,8 +9,8 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface CtContractMapper extends BaseMapper<CtContract> {
 
-    @Select("SELECT * FROM ct_contract WHERE id = #{id} FOR UPDATE")
-    CtContract selectByIdForUpdate(@Param("id") Long id);
+    @Select("SELECT * FROM ct_contract WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
+    CtContract selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
     /**
      * 查询最新合同编号（含软删除记录，避免编号冲突）

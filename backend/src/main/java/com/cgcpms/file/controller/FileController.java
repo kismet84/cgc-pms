@@ -46,6 +46,8 @@ public class FileController {
     public ApiResponse<List<SysFileVO>> listByBusiness(
             @RequestParam String businessType,
             @RequestParam Long businessId) {
+        // 业务对象读权限校验
+        fileService.checkBizReadPermission(businessType, businessId);
         return ApiResponse.success(fileService.listByBusiness(businessType, businessId));
     }
 }

@@ -66,7 +66,8 @@ public class WorkflowTaskService {
                 WorkflowConstants.TASK_TRANSFERRED,
                 WorkflowConstants.ACTION_TRANSFER,
                 "转办给用户 " + targetUserId + ": " + (comment != null ? comment : ""),
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                task.getTenantId());
         if (updated != 1) {
             throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突），无法转办");
         }

@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(name = "minio.enabled", havingValue = "true", matchIfMissing = true)
 public class FileService {
 
-    private static final int PRESIGNED_URL_EXPIRE_DAYS = 7;
+    private static final int PRESIGNED_URL_EXPIRE_MINUTES = 5;
     private static final long MAX_FILE_SIZE = 50 * 1024 * 1024L; // 50 MB
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
@@ -48,6 +48,7 @@ public class FileService {
     private final SysFileMapper sysFileMapper;
     private final MinioClient minioClient;
     private final MinioConfig minioConfig;
+    private final com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer;
 
     /**
      * Ensure the configured bucket exists on startup.
@@ -87,6 +88,8 @@ public class FileService {
         if (businessId == null) {
             throw new BusinessException("FILE_PARAM_MISSING", "业务ID不能为空");
         }
+        // 业务对象写权限校验
+        authorizer.checkWriteAccess(businessType, businessId);
         // Sanitize businessType to prevent path traversal
         if (!businessType.matches("[A-Za-z0-9_-]+")) {
             throw new BusinessException("FILE_PARAM_INVALID", "业务类型格式非法");
@@ -142,6 +145,8 @@ public class FileService {
         if (!sysFile.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
         }
+        // 业务对象读权限校验
+        authorizer.checkReadAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
         try {
             return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath());
         } catch (Exception e) {
@@ -162,6 +167,8 @@ public class FileService {
         if (!sysFile.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
         }
+        // 业务对象写权限校验
+        authorizer.checkWriteAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
 
         try {
             // Remove from MinIO first
@@ -189,6 +196,8 @@ public class FileService {
         if (businessId == null) {
             throw new BusinessException("FILE_PARAM_MISSING", "业务ID不能为空");
         }
+        // 业务对象读权限校验
+        authorizer.checkReadAccess(businessType, businessId);
 
         LambdaQueryWrapper<SysFile> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysFile::getBusinessType, businessType)
@@ -203,6 +212,13 @@ public class FileService {
                 .toList();
     }
 
+    /**
+     * 业务对象读权限校验（供控制器调用）。
+     */
+    public void checkBizReadPermission(String businessType, Long businessId) {
+        authorizer.checkReadAccess(businessType, businessId);
+    }
+
     // ---- private helpers ----
 
     private String genPresignedUrl(String bucket, String object) {
@@ -211,7 +227,7 @@ public class FileService {
                     GetPresignedObjectUrlArgs.builder()
                             .bucket(bucket)
                             .object(object)
-                            .expiry(PRESIGNED_URL_EXPIRE_DAYS, TimeUnit.DAYS)
+                            .expiry(PRESIGNED_URL_EXPIRE_MINUTES, TimeUnit.MINUTES)
                             .method(Method.GET)
                             .build());
         } catch (Exception e) {

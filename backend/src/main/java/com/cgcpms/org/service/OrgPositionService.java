@@ -56,10 +56,28 @@ public class OrgPositionService {
         if (position.getDepartmentId() == null) {
             throw new BusinessException("ORG_POSITION_DEPT_REQUIRED", "所属部门不能为空");
         }
+        // 强制绑定当前租户
+        Long tenantId = UserContext.getCurrentTenantId();
+        position.setTenantId(tenantId);
+
+        // 校验公司属于当前租户
+        if (orgCompanyMapper.selectOne(new LambdaQueryWrapper<com.cgcpms.org.entity.OrgCompany>()
+                .eq(com.cgcpms.org.entity.OrgCompany::getId, position.getCompanyId())
+                .eq(com.cgcpms.org.entity.OrgCompany::getTenantId, tenantId)) == null) {
+            throw new BusinessException("ORG_COMPANY_NOT_FOUND", "所属公司不存在");
+        }
+        // 校验部门属于当前租户且属于所选公司
+        if (orgDepartmentMapper.selectOne(new LambdaQueryWrapper<com.cgcpms.org.entity.OrgDepartment>()
+                .eq(com.cgcpms.org.entity.OrgDepartment::getId, position.getDepartmentId())
+                .eq(com.cgcpms.org.entity.OrgDepartment::getTenantId, tenantId)
+                .eq(com.cgcpms.org.entity.OrgDepartment::getCompanyId, position.getCompanyId())) == null) {
+            throw new BusinessException("ORG_DEPT_NOT_FOUND", "所属部门不存在或不属于所选公司");
+        }
+
         if (StringUtils.hasText(position.getPositionCode())) {
             Long count = orgPositionMapper.selectCount(new LambdaQueryWrapper<OrgPosition>()
                     .eq(OrgPosition::getPositionCode, position.getPositionCode())
-                    .eq(OrgPosition::getTenantId, UserContext.getCurrentTenantId()));
+                    .eq(OrgPosition::getTenantId, tenantId));
             if (count > 0) {
                 throw new BusinessException("ORG_POSITION_CODE_EXISTS", "岗位编码已存在");
             }
@@ -80,17 +98,25 @@ public class OrgPositionService {
         if (position.getCompanyId() == null) {
             throw new BusinessException("ORG_POSITION_COMPANY_REQUIRED", "所属公司不能为空");
         }
-        // 校验公司外键实际存在
-        if (orgCompanyMapper.selectById(position.getCompanyId()) == null) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        // 校验公司属于当前租户
+        if (orgCompanyMapper.selectOne(new LambdaQueryWrapper<com.cgcpms.org.entity.OrgCompany>()
+                .eq(com.cgcpms.org.entity.OrgCompany::getId, position.getCompanyId())
+                .eq(com.cgcpms.org.entity.OrgCompany::getTenantId, tenantId)) == null) {
             throw new BusinessException("ORG_COMPANY_NOT_FOUND", "所属公司不存在");
         }
         if (position.getDepartmentId() == null) {
             throw new BusinessException("ORG_POSITION_DEPT_REQUIRED", "所属部门不能为空");
         }
-        // 校验部门外键实际存在
-        if (orgDepartmentMapper.selectById(position.getDepartmentId()) == null) {
-            throw new BusinessException("ORG_DEPT_NOT_FOUND", "所属部门不存在");
+        // 校验部门属于当前租户且属于所选公司
+        if (orgDepartmentMapper.selectOne(new LambdaQueryWrapper<com.cgcpms.org.entity.OrgDepartment>()
+                .eq(com.cgcpms.org.entity.OrgDepartment::getId, position.getDepartmentId())
+                .eq(com.cgcpms.org.entity.OrgDepartment::getTenantId, tenantId)
+                .eq(com.cgcpms.org.entity.OrgDepartment::getCompanyId, position.getCompanyId())) == null) {
+            throw new BusinessException("ORG_DEPT_NOT_FOUND", "所属部门不存在或不属于所选公司");
         }
+        // 强制保留原 tenantId
+        position.setTenantId(existing.getTenantId());
         orgPositionMapper.updateById(position);
     }
 

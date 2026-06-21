@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+import com.cgcpms.system.dto.AssignRolesRequest;
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/system/users")
 @RequiredArgsConstructor
@@ -69,8 +72,8 @@ public class SysUserController {
 
     @PutMapping("/{id}/roles")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:assign')")
-    public ApiResponse<Void> assignRoles(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
-        sysUserService.assignRoles(id, body.get("roleIds"));
+    public ApiResponse<Void> assignRoles(@PathVariable Long id, @Valid @RequestBody com.cgcpms.system.dto.AssignRolesRequest request) {
+        sysUserService.assignRoles(id, request.getRoleIds());
         return ApiResponse.success();
     }
 }

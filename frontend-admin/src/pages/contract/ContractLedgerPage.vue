@@ -136,7 +136,9 @@ function toggleCol(key: string) {
 }
 
 // ---- Fetch ----
+let fetchSeq = 0
 async function fetchData() {
+  const mySeq = ++fetchSeq
   loading.value = true
   const params: ContractQueryParams = {
     projectId: filter.projectId,
@@ -151,15 +153,17 @@ async function fetchData() {
   }
   try {
     const res: PageResult<ContractVO> = await getContractLedger(params)
+    if (mySeq !== fetchSeq) return // stale response
     tableData.value = res.records
     total.value = Number(res.total) || 0
   } catch (e: unknown) {
+    if (mySeq !== fetchSeq) return
     console.error(e)
     tableData.value = []
     total.value = 0
     message.error('加载合同台账失败，请稍后重试')
   } finally {
-    loading.value = false
+    if (mySeq === fetchSeq) loading.value = false
   }
 }
 

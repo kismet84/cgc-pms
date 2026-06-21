@@ -9,6 +9,6 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface PayApplicationMapper extends BaseMapper<PayApplication> {
 
-    @Select("SELECT * FROM pay_application WHERE id = #{id} FOR UPDATE")
-    PayApplication selectByIdForUpdate(@Param("id") Long id);
+    @Select("SELECT * FROM pay_application WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
+    PayApplication selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 }

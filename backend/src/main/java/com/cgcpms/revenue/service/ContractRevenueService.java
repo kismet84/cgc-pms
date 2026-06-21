@@ -19,6 +19,9 @@ import com.cgcpms.revenue.entity.ContractRevenue;
 import com.cgcpms.revenue.mapper.ContractRevenueMapper;
 import com.cgcpms.revenue.vo.ContractRevenueBalanceVO;
 import com.cgcpms.revenue.vo.ContractRevenueVO;
+import com.cgcpms.workflow.service.WorkflowEngine;
+import com.cgcpms.common.annotation.RateLimit;
+import org.springframework.context.annotation.Lazy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -55,6 +58,8 @@ public class ContractRevenueService {
     private final CtContractMapper contractMapper;
     private final CostSummaryService costSummaryService;
     private final CodeGenerationService codeGenerationService;
+    @Lazy
+    private final WorkflowEngine workflowEngine;
 
     // ================================================================
     // Query
@@ -142,10 +147,34 @@ public class ContractRevenueService {
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
             throw new BusinessException("REVENUE_STATUS_NOT_EDITABLE", "仅草稿状态可编辑");
         }
-        if (revenue.getRevenueAmount() != null && revenue.getRevenueTax() != null) {
-            revenue.setRevenueAmountWithTax(revenue.getRevenueAmount().add(revenue.getRevenueTax()));
+        // 白名单合并：仅允许编辑业务字段，保留不可变字段
+        if (revenue.getRevenueDate() != null) existing.setRevenueDate(revenue.getRevenueDate());
+        if (revenue.getProgressPercent() != null) existing.setProgressPercent(revenue.getProgressPercent());
+        if (revenue.getProgressDesc() != null) existing.setProgressDesc(revenue.getProgressDesc());
+        if (revenue.getRevenueAmount() != null) existing.setRevenueAmount(revenue.getRevenueAmount());
+        if (revenue.getRevenueTax() != null) existing.setRevenueTax(revenue.getRevenueTax());
+        if (revenue.getBilledAmount() != null) existing.setBilledAmount(revenue.getBilledAmount());
+        if (revenue.getBilledTax() != null) existing.setBilledTax(revenue.getBilledTax());
+        // 计算含税金额
+        if (existing.getRevenueAmount() != null && existing.getRevenueTax() != null) {
+            existing.setRevenueAmountWithTax(existing.getRevenueAmount().add(existing.getRevenueTax()));
         }
-        mapper.updateById(revenue);
+        // CAS 更新：仅 DRAFT 状态
+        int rows = mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractRevenue>()
+                .eq(ContractRevenue::getId, existing.getId())
+                .eq(ContractRevenue::getTenantId, existing.getTenantId())
+                .eq(ContractRevenue::getApprovalStatus, "DRAFT")
+                .set(ContractRevenue::getRevenueDate, existing.getRevenueDate())
+                .set(ContractRevenue::getProgressPercent, existing.getProgressPercent())
+                .set(ContractRevenue::getProgressDesc, existing.getProgressDesc())
+                .set(ContractRevenue::getRevenueAmount, existing.getRevenueAmount())
+                .set(ContractRevenue::getRevenueTax, existing.getRevenueTax())
+                .set(ContractRevenue::getBilledAmount, existing.getBilledAmount())
+                .set(ContractRevenue::getBilledTax, existing.getBilledTax())
+                .set(ContractRevenue::getRevenueAmountWithTax, existing.getRevenueAmountWithTax()));
+        if (rows != 1) {
+            throw new BusinessException("REVENUE_STATUS_NOT_EDITABLE", "仅草稿状态可编辑");
+        }
     }
 
     @Transactional
@@ -158,8 +187,7 @@ public class ContractRevenueService {
     }
 
     /**
-     * 提交审批：状态从 DRAFT -> PENDING。
-     * 审批通过后由 WorkflowHandler.onApproved() 驱动后续流程。
+     * 提交审批：状态从 DRAFT -> PENDING，同时创建工作流实例。
      */
     @Transactional
     public void submitForApproval(Long id) {
@@ -167,8 +195,28 @@ public class ContractRevenueService {
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
             throw new BusinessException("REVENUE_SUBMIT_INVALID", "仅草稿状态可提交审批");
         }
-        existing.setApprovalStatus("PENDING");
-        mapper.updateById(existing);
+        // 原子状态更新：DRAFT → PENDING
+        int rows = mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractRevenue>()
+                .eq(ContractRevenue::getId, id)
+                .eq(ContractRevenue::getTenantId, existing.getTenantId())
+                .eq(ContractRevenue::getApprovalStatus, "DRAFT")
+                .set(ContractRevenue::getApprovalStatus, "PENDING"));
+        if (rows != 1) {
+            throw new BusinessException("REVENUE_SUBMIT_CONFLICT",
+                    "收入确认单状态冲突：已被并发操作，请刷新后重试");
+        }
+
+        // 创建工作流实例
+        Long userId = UserContext.getCurrentUserId();
+        String username = UserContext.getCurrentUsername();
+        workflowEngine.submit(userId, username, existing.getTenantId(),
+                com.cgcpms.workflow.WorkflowBusinessTypes.CONTRACT_REVENUE,
+                id,
+                existing.getRevenueCode(),
+                existing.getRevenueAmountWithTax(),
+                existing.getProjectId(),
+                existing.getContractId(),
+                null, null, null);
     }
 
     // ================================================================
@@ -178,25 +226,41 @@ public class ContractRevenueService {
     /**
      * 审批通过后回调：生成 cost_item（REVENUE_CONFIRMED）并刷新汇总。
      * 由 ContractRevenueWorkflowHandler.onApproved() 调用。
+     * <p>
+     * 并发保护：使用 CAS 更新状态（PENDING → APPROVED），
+     * 只有第一个成功的线程会写入 cost_item。
      */
     @Transactional
     public void onApproved(Long id) {
         ContractRevenue revenue = requireExisting(id);
 
-        // 状态守卫：防止重复审批
-        if (!"PENDING".equals(revenue.getApprovalStatus())) {
-            throw new BusinessException("REVENUE_STATUS_CONFLICT",
-                    "收入确认单状态冲突：已被并发操作，请刷新后重试");
+        // CAS: 原子状态迁移 PENDING → APPROVED
+        int rows = mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractRevenue>()
+                .eq(ContractRevenue::getId, id)
+                .eq(ContractRevenue::getTenantId, revenue.getTenantId())
+                .eq(ContractRevenue::getApprovalStatus, "PENDING")
+                .set(ContractRevenue::getApprovalStatus, "APPROVED"));
+        if (rows != 1) {
+            // 已被并发线程处理（幂等）
+            log.info("收入确认审批回调幂等退出 revenueId={} (已被并发处理)", id);
+            return;
         }
 
-        // 1. 生成 cost_item（收入记录，用于 cost_summary 聚合）
+        // 1. 生成 cost_item
         CostItem item = buildRevenueCostItem(revenue);
-        costItemMapper.insert(item);
+        try {
+            costItemMapper.insert(item);
+        } catch (Exception e) {
+            // unique constraint on cost source → 幂等
+            log.info("收入确认 cost_item 已存在（幂等） revenueId={}", id);
+            return;
+        }
 
         // 2. 回写关联
-        revenue.setApprovalStatus("APPROVED");
-        revenue.setCostItemId(item.getId());
-        mapper.updateById(revenue);
+        mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractRevenue>()
+                .eq(ContractRevenue::getId, id)
+                .eq(ContractRevenue::getTenantId, revenue.getTenantId())
+                .set(ContractRevenue::getCostItemId, item.getId()));
 
         // 3. 刷新成本汇总
         costSummaryService.refreshSummary(revenue.getTenantId(), revenue.getProjectId());
@@ -206,13 +270,20 @@ public class ContractRevenueService {
     }
 
     /**
-     * 审批驳回后回调。
+     * 审批驳回后回调：仅 PENDING 状态可驳回。
      */
     @Transactional
     public void onRejected(Long id) {
         ContractRevenue revenue = requireExisting(id);
-        revenue.setApprovalStatus("REJECTED");
-        mapper.updateById(revenue);
+        int rows = mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractRevenue>()
+                .eq(ContractRevenue::getId, id)
+                .eq(ContractRevenue::getTenantId, revenue.getTenantId())
+                .eq(ContractRevenue::getApprovalStatus, "PENDING")
+                .set(ContractRevenue::getApprovalStatus, "REJECTED"));
+        if (rows != 1) {
+            log.info("收入确认驳回回调已幂等跳过 revenueId={} (已非PENDING)", id);
+            return;
+        }
         log.info("收入确认审批驳回 revenueId={}", id);
     }
 

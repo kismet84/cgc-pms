@@ -51,18 +51,18 @@ public class TokenBlacklistService {
     /**
      * Check if a token is blacklisted.
      *
-     * @return {@code true} if the token is known to be blacklisted;
-     *         {@code false} if it is not blacklisted OR if Redis is unreachable
-     *         (safe default — in the failure case the system remains operational
-     *         but an audit warning is logged).
+     * @return {@code true} if the token is known to be blacklisted OR if Redis is unreachable
+     *         (fail-close — in the failure case the system refuses the token to prevent
+     *         revoked tokens from being used);
+     *         {@code false} only if Redis confirms the key does not exist.
      */
     public boolean isBlacklisted(String token) {
         try {
             return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + tokenKey(token)));
         } catch (RuntimeException e) {
-            log.warn("TOKEN_BLACKLIST_CHECK_FAILED: Redis不可用，黑名单检查回退为放行（可审计降级）, token_prefix={}",
+            log.warn("TOKEN_BLACKLIST_CHECK_FAILED: Redis不可用，黑名单检查回退为拒绝（fail-close），token_prefix={}",
                     token.length() > 20 ? token.substring(0, 20) + "..." : token, e);
-            return false;
+            return true;
         }
     }
 

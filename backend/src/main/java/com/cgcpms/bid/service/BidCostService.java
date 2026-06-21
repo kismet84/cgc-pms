@@ -87,6 +87,9 @@ public class BidCostService {
         }
         PmProject project = projectMapper.selectById(projectId);
         if (project == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        // 项目必须属于当前租户
+        if (!Objects.equals(project.getTenantId(), UserContext.getCurrentTenantId()))
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
 
         bid.setProjectId(projectId);
         bid.setBidStatus("WON");

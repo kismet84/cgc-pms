@@ -363,7 +363,12 @@ const termsTotal = computed(() =>
 onMounted(async () => {
   await Promise.all([referenceStore.fetchProjects(), referenceStore.fetchPartners()])
   if (isEdit.value && contractId.value) {
-    await loadContractDetail()
+    try {
+      await loadContractDetail()
+    } catch (e: unknown) {
+      console.error(e)
+      message.error('合同明细加载失败，请刷新页面重试')
+    }
   }
 })
 
@@ -403,7 +408,8 @@ async function loadContractDetail() {
       }))
     } catch (e: unknown) {
       console.error(e)
-      items.value = []
+      // Do NOT clear items to empty — throw to let caller handle
+      throw new Error('合同清单加载失败，请刷新页面重试')
     }
 
     try {
@@ -421,7 +427,8 @@ async function loadContractDetail() {
       }))
     } catch (e: unknown) {
       console.error(e)
-      terms.value = []
+      // Do NOT clear terms to empty — throw to let caller handle
+      throw new Error('付款条款加载失败，请刷新页面重试')
     }
   } catch (e: unknown) {
     console.error(e)

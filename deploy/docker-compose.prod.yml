@@ -224,8 +224,9 @@ services:
       JASYPT_ENCRYPTOR_PASSWORD: ${JASYPT_ENCRYPTOR_PASSWORD}
       # ---- CORS ----
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://localhost}
-    ports:
-      - "8080:8080"
+    # Backend port NOT exposed to host — only accessible via internal Docker network (frontend → backend proxy)
+    # ports:
+    #   - "8080:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/api/actuator/health || exit 1"]
       interval: 30s

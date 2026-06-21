@@ -18,12 +18,13 @@ public interface WfTaskMapper extends BaseMapper<WfTask> {
      */
     @Update("UPDATE wf_task SET task_status = #{newStatus}, task_version = task_version + 1, " +
             "action_type = #{actionType}, comment = #{comment}, handled_at = #{handledAt} " +
-            "WHERE id = #{taskId} AND task_status = #{expectedStatus} AND task_version = #{expectedVersion}")
+            "WHERE id = #{taskId} AND task_status = #{expectedStatus} AND task_version = #{expectedVersion} AND tenant_id = #{tenantId} AND deleted_flag = 0")
     int updateTaskStatusWithCas(@Param("taskId") Long taskId,
                                 @Param("expectedStatus") String expectedStatus,
                                 @Param("expectedVersion") Integer expectedVersion,
                                 @Param("newStatus") String newStatus,
                                 @Param("actionType") String actionType,
                                 @Param("comment") String comment,
-                                @Param("handledAt") LocalDateTime handledAt);
+                                @Param("handledAt") LocalDateTime handledAt,
+                                @Param("tenantId") Long tenantId);
 }

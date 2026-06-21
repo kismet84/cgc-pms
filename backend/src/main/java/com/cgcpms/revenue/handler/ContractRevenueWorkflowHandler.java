@@ -8,8 +8,8 @@ import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowContext;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 /**
@@ -17,14 +17,22 @@ import org.springframework.stereotype.Component;
  * <p>
  * 审批通过 → 生成 cost_item（REVENUE_CONFIRMED） → 刷新成本汇总。
  * 审批驳回 → 恢复为可编辑状态。
+ * <p>
+ * 使用 ObjectProvider<ContractRevenueService> 打破循环依赖：
+ * ContractRevenueService → WorkflowEngine → ... → ContractRevenueWorkflowHandler → ContractRevenueService
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ContractRevenueWorkflowHandler implements WorkflowBusinessHandler {
 
     private final ContractRevenueMapper mapper;
-    private final ContractRevenueService service;
+    private final ObjectProvider<ContractRevenueService> serviceProvider;
+
+    public ContractRevenueWorkflowHandler(ContractRevenueMapper mapper,
+                                           ObjectProvider<ContractRevenueService> serviceProvider) {
+        this.mapper = mapper;
+        this.serviceProvider = serviceProvider;
+    }
 
     @Override
     public String supportBusinessType() {
@@ -54,14 +62,14 @@ public class ContractRevenueWorkflowHandler implements WorkflowBusinessHandler {
     public void onApproved(WorkflowContext context) {
         Long revenueId = resolveBusinessId(context.getInstance());
         log.info("收入确认审批通过 revenueId={}", revenueId);
-        service.onApproved(revenueId);
+        serviceProvider.getObject().onApproved(revenueId);
     }
 
     @Override
     public void onRejected(WorkflowContext context) {
         Long revenueId = resolveBusinessId(context.getInstance());
         log.info("收入确认审批驳回 revenueId={}", revenueId);
-        service.onRejected(revenueId);
+        serviceProvider.getObject().onRejected(revenueId);
     }
 
     private Long resolveBusinessId(WfInstance instance) {

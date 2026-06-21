@@ -52,6 +52,10 @@ class OrgServiceTest {
     private Long createdChildDeptId;
     private Long createdPositionId;
 
+    /** Position test seed IDs (created in @BeforeEach) */
+    private Long posTestCompanyId;
+    private Long posTestDepartmentId;
+
     @BeforeEach
     void setupContext() {
         UserContext.set(Jwts.claims()
@@ -59,6 +63,27 @@ class OrgServiceTest {
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
                 .build());
+        seedPositionTestRefs();
+    }
+
+    /** Seed company + department needed for OrgPosition CRUD test fixtures. */
+    private void seedPositionTestRefs() {
+        if (posTestCompanyId == null) {
+            OrgCompany company = new OrgCompany();
+            company.setCompanyCode("POS-TEST-COMP");
+            company.setCompanyName("岗位测试公司");
+            company.setStatus("ENABLE");
+            posTestCompanyId = orgCompanyService.create(company);
+        }
+        if (posTestDepartmentId == null) {
+            OrgDepartment dept = new OrgDepartment();
+            dept.setCompanyId(posTestCompanyId);
+            dept.setDeptCode("POS-TEST-DEPT");
+            dept.setDeptName("岗位测试部门");
+            dept.setStatus("ENABLE");
+            dept.setParentId(0L);
+            posTestDepartmentId = orgDepartmentService.create(dept);
+        }
     }
 
     @AfterEach
@@ -469,6 +494,8 @@ class OrgServiceTest {
         OrgPosition position = new OrgPosition();
         position.setPositionCode("POS-MGR");
         position.setPositionName("项目经理");
+        position.setCompanyId(posTestCompanyId);
+        position.setDepartmentId(posTestDepartmentId);
         position.setStatus("ENABLE");
 
         Long id = orgPositionService.create(position);
@@ -493,11 +520,15 @@ class OrgServiceTest {
         OrgPosition p1 = new OrgPosition();
         p1.setPositionCode("POS-DUP");
         p1.setPositionName("重复岗位1");
+        p1.setCompanyId(posTestCompanyId);
+        p1.setDepartmentId(posTestDepartmentId);
         orgPositionService.create(p1);
 
         OrgPosition p2 = new OrgPosition();
         p2.setPositionCode("POS-DUP");
         p2.setPositionName("重复岗位2");
+        p2.setCompanyId(posTestCompanyId);
+        p2.setDepartmentId(posTestDepartmentId);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> orgPositionService.create(p2));
@@ -514,6 +545,8 @@ class OrgServiceTest {
         OrgPosition position = new OrgPosition();
         position.setPositionCode("POS-CRUD");
         position.setPositionName("全流程岗位");
+        position.setCompanyId(posTestCompanyId);
+        position.setDepartmentId(posTestDepartmentId);
         position.setStatus("ENABLE");
         Long id = orgPositionService.create(position);
 
@@ -548,6 +581,8 @@ class OrgServiceTest {
         OrgPosition position = new OrgPosition();
         position.setPositionCode("POS-XTNT");
         position.setPositionName("跨租户岗位");
+        position.setCompanyId(posTestCompanyId);
+        position.setDepartmentId(posTestDepartmentId);
         Long id = orgPositionService.create(position);
 
         UserContext.set(Jwts.claims()

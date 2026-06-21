@@ -174,7 +174,16 @@ public class SysUserService {
         if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
 
-        // Verify all roles belong to current tenant
+        // 禁止自我提权
+        Long currentUserId = UserContext.getCurrentUserId();
+        if (currentUserId != null && currentUserId.equals(userId)) {
+            throw new BusinessException("SELF_ROLE_ASSIGN_FORBIDDEN", "不能给自己分配角色");
+        }
+
+        // 获取当前操作者的最高角色等级
+        int operatorMaxLevel = getCurrentUserMaxRoleLevel();
+
+        // Verify all roles belong to current tenant and validate role level
         if (roleIds != null && !roleIds.isEmpty()) {
             List<SysRole> roles = sysRoleMapper.selectBatchIds(roleIds);
             if (roles.size() != roleIds.size())
@@ -183,6 +192,12 @@ public class SysUserService {
             for (SysRole role : roles) {
                 if (!currentTenantId.equals(role.getTenantId()))
                     throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
+                // 检查角色等级：只能授予 <= 自己等级的角色（数字越小等级越高）
+                int targetLevel = role.getRoleLevel() != null ? role.getRoleLevel() : 2;
+                if (targetLevel < operatorMaxLevel) {
+                    throw new BusinessException("ROLE_LEVEL_DENIED",
+                            "无权授予角色: " + role.getRoleName() + "（等级不足）");
+                }
             }
         }
 
@@ -196,6 +211,32 @@ public class SysUserService {
                 sysUserRoleMapper.insert(ur);
             }
         }
+    }
+
+    /**
+     * 获取当前用户的最高角色等级（数字越小等级越高）。
+     * SUPER_ADMIN=0, ADMIN=1, 普通角色=2。
+     * 当无法确定角色（如 JWT 无 roleCodes）时返回 0（最高权限），
+     * 此时依赖控制器层的 @PreAuthorize 确保调用方已认证。
+     */
+    private int getCurrentUserMaxRoleLevel() {
+        List<String> currentRoles = UserContext.getCurrentRoles();
+        if (currentRoles.isEmpty()) {
+            // 无法确定角色等级时返回最高权限（依赖 @PreAuthorize 门禁）
+            return 0;
+        }
+
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) return Integer.MAX_VALUE;
+
+        List<SysRole> roles = sysRoleMapper.selectList(
+                new LambdaQueryWrapper<SysRole>()
+                        .eq(SysRole::getTenantId, tenantId)
+                        .in(SysRole::getRoleCode, currentRoles));
+        return roles.stream()
+                .mapToInt(r -> r.getRoleLevel() != null ? r.getRoleLevel() : 2)
+                .min()
+                .orElse(Integer.MAX_VALUE);
     }
 
     private Map<Long, List<String>> bulkLoadRoleNames(List<Long> userIds) {

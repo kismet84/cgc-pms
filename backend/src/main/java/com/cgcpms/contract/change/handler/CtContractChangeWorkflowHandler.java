@@ -74,7 +74,7 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
         BigDecimal changeAmount = BigDecimalUtils.nvl(change.getChangeAmount());
         if (changeAmount.compareTo(BigDecimal.ZERO) != 0) {
             // Pessimistic lock: ensure contract exists and prevent concurrent modifications
-            CtContract contract = contractMapper.selectByIdForUpdate(change.getContractId());
+            CtContract contract = contractMapper.selectByIdForUpdate(change.getContractId(), change.getTenantId());
             if (contract == null) {
                 throw new IllegalStateException("合同不存在，contractId=" + change.getContractId());
             }

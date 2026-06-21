@@ -113,7 +113,7 @@ public class SysDictDataService {
                 new LambdaQueryWrapper<SysDictData>()
                         .eq(SysDictData::getDictTypeId, dictType.getId())
                         .eq(SysDictData::getTenantId, tenantId)
-                        .eq(SysDictData::getStatus, "ENABLED")
+                        .eq(SysDictData::getStatus, "ENABLE")
                         .orderByAsc(SysDictData::getOrderNum)
         );
         return dataList.stream().map(this::toVO).toList();

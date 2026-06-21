@@ -35,11 +35,12 @@ public interface WfInstanceMapper extends BaseMapper<WfInstance> {
      * Returns 1 if exactly one row matched, 0 if already changed by a concurrent operation.
      */
     @Update("UPDATE wf_instance SET instance_status = #{newStatus}, ended_at = #{endedAt} " +
-            "WHERE id = #{instanceId} AND instance_status = #{expectedStatus}")
+            "WHERE id = #{instanceId} AND instance_status = #{expectedStatus} AND tenant_id = #{tenantId} AND deleted_flag = 0")
     int updateInstanceStatusWithCas(@Param("instanceId") Long instanceId,
                                     @Param("expectedStatus") String expectedStatus,
                                     @Param("newStatus") String newStatus,
-                                    @Param("endedAt") java.time.LocalDateTime endedAt);
+                                    @Param("endedAt") java.time.LocalDateTime endedAt,
+                                    @Param("tenantId") Long tenantId);
 
     /**
      * CAS ping: acquires row lock on the instance row without changing its status.
@@ -58,10 +59,12 @@ public interface WfInstanceMapper extends BaseMapper<WfInstance> {
      */
     @Update("UPDATE wf_instance SET instance_status = #{newStatus}, ended_at = #{endedAt} " +
             "WHERE id = #{instanceId} AND instance_status = #{expectedStatus} " +
+            "AND tenant_id = #{tenantId} AND deleted_flag = 0 " +
             "AND NOT EXISTS (SELECT 1 FROM wf_task WHERE instance_id = #{instanceId} " +
             "AND task_status IN ('APPROVED', 'REJECTED') AND deleted_flag = 0)")
     int updateInstanceStatusWithCasNoApprovedTasks(@Param("instanceId") Long instanceId,
                                                     @Param("expectedStatus") String expectedStatus,
                                                     @Param("newStatus") String newStatus,
-                                                    @Param("endedAt") java.time.LocalDateTime endedAt);
+                                                    @Param("endedAt") java.time.LocalDateTime endedAt,
+                                                    @Param("tenantId") Long tenantId);
 }

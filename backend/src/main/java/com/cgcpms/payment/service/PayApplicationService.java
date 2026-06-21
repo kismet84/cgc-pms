@@ -257,8 +257,7 @@ public class PayApplicationService {
         Long contractId = app.getContractId();
         if (contractId == null) return;
 
-        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId);
-        if (contract == null) return;
+        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId, UserContext.getCurrentTenantId());
 
         BigDecimal currentAmount = contract.getCurrentAmount() != null
                 ? contract.getCurrentAmount() : BigDecimal.ZERO;
@@ -383,7 +382,7 @@ public class PayApplicationService {
 
         // Pessimistic lock on contract row to prevent concurrent bypass
         if (payApp.getContractId() != null) {
-            ctContractMapper.selectByIdForUpdate(payApp.getContractId());
+            ctContractMapper.selectByIdForUpdate(payApp.getContractId(), payApp.getTenantId());
         }
 
         validatePaymentAmount(payApp);

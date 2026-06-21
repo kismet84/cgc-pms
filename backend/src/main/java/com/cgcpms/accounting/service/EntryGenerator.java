@@ -47,7 +47,7 @@ public class EntryGenerator {
 
     /**
      * 根据来源类型自动生成会计分录。
-     * 幂等：同一 (tenant_id, source_type, source_id, entry_type) 已存在 POSTED 凭证时跳过。
+     * 幂等：同一来源已存在 DRAFT 或 POSTED 凭证时跳过。
      */
     @Transactional
     public AccountingEntry generateEntry(String sourceType, Long sourceId, String entryType) {
@@ -59,13 +59,13 @@ public class EntryGenerator {
 
         Long tenantId = UserContext.getCurrentTenantId();
 
-        // 幂等检查
+        // 幂等检查 — DRAFT 和 POSTED 均视为已存在
         Long count = entryMapper.selectCount(new LambdaQueryWrapper<AccountingEntry>()
                 .eq(AccountingEntry::getTenantId, tenantId)
                 .eq(AccountingEntry::getSourceType, sourceType)
                 .eq(AccountingEntry::getSourceId, sourceId)
                 .eq(AccountingEntry::getEntryType, entryType)
-                .eq(AccountingEntry::getEntryStatus, "POSTED"));
+                .in(AccountingEntry::getEntryStatus, "DRAFT", "POSTED"));
         if (count > 0) {
             log.info("凭证已存在，跳过 tenantId={} sourceType={} sourceId={} entryType={}",
                     tenantId, sourceType, sourceId, entryType);

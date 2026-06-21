@@ -55,7 +55,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
         // Validate contract balance before approval
         // Uses SELECT ... FOR UPDATE to prevent TOCTOU race with concurrent approvals
         if (order.getContractId() != null) {
-            CtContract contract = contractMapper.selectByIdForUpdate(order.getContractId());
+            CtContract contract = contractMapper.selectByIdForUpdate(order.getContractId(), order.getTenantId());
             if (contract != null) {
                 BigDecimal contractBalance = contract.getCurrentAmount() != null
                         ? contract.getCurrentAmount() : BigDecimal.ZERO;

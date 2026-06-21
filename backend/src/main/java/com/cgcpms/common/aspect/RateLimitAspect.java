@@ -77,14 +77,16 @@ public class RateLimitAspect {
         if (request == null) {
             return "unknown";
         }
-        String ip = request.getHeader("X-Forwarded-For");
+        // 优先取 Nginx 设置的 X-Real-IP（覆盖后的真实客户端 IP）
+        String ip = request.getHeader("X-Real-IP");
+        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
+            return ip.trim();
+        }
+        // 回退：从 X-Forwarded-For 取首个 IP
+        ip = request.getHeader("X-Forwarded-For");
         if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
             int comma = ip.indexOf(',');
             return comma > 0 ? ip.substring(0, comma).trim() : ip.trim();
-        }
-        ip = request.getHeader("X-Real-IP");
-        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.trim();
         }
         return request.getRemoteAddr();
     }

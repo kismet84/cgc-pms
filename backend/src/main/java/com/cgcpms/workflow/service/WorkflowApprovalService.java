@@ -176,7 +176,8 @@ public class WorkflowApprovalService {
                 targetStatus,
                 actionType,
                 comment,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                task.getTenantId());
         if (updated != 1) {
             throw new BusinessException("TASK_VERSION_CONFLICT", "任务已被他人处理（乐观锁冲突），请刷新后重试");
         }

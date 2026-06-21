@@ -119,12 +119,13 @@ class TokenBlacklistServiceTest {
 
             TokenBlacklistService service = new TokenBlacklistService(failingTemplate);
 
-            // When Redis is broken, isBlacklisted should return false (safe default)
-            // and not throw — the system continues operating
+            // When Redis is broken, isBlacklisted should return true (fail-close).
+            // In the failure case the system refuses the token to prevent
+            // revoked tokens from being used.
             boolean result = service.isBlacklisted("some-token-12345678901234567890123456789012");
 
-            // Then: should return false as safe default when Redis is unreachable
-            assertFalse(result, "Redis 不可用时应返回 false（安全默认值），不应抛出异常");
+            // Then: should return true as fail-close when Redis is unreachable
+            assertTrue(result, "Redis 不可用时应返回 true（fail-close 拒绝），防止已吊销令牌被使用");
         }
     }
 }

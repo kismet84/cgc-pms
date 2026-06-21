@@ -195,22 +195,21 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          envs: REGISTRY_URL,REGISTRY_USERNAME,REGISTRY_PASSWORD,BACKEND_TAG,FRONTEND_TAG,GITHUB_SHA
           script: |
-            # Pre-deploy secrets validation
+            # Pre-deploy secrets validation (now passed via envs — checked here, not remote env)
             check_var() {
               val=$(eval echo "\$$1" 2>/dev/null || echo "")
               if [ -z "$val" ]; then
-                echo "ERROR: Required secret $1 is not set"
+                echo "ERROR: Required variable $1 is not set"
                 exit 1
               fi
               echo "  $1: OK (length=${#val})"
             }
-            echo "Validating deploy secrets..."
+            echo "Validating deploy variables..."
             check_var REGISTRY_URL
             check_var REGISTRY_USERNAME
             check_var REGISTRY_PASSWORD
-            check_var SSH_HOST
-            check_var SSH_USER
             echo "Secrets validation passed"
             # Pull SHA-pinned images for immutable deployment
             docker pull ${{ secrets.REGISTRY_URL }}/cgc-pms-backend:${{ github.sha }}
@@ -218,19 +217,27 @@ jobs:
             # Tag images for compose reference (compose uses BACKEND_TAG/FRONTEND_TAG env vars)
             docker tag ${{ secrets.REGISTRY_URL }}/cgc-pms-backend:${{ github.sha }} cgc-pms-backend:${{ github.sha }}
             docker tag ${{ secrets.REGISTRY_URL }}/cgc-pms-frontend:${{ github.sha }} cgc-pms-frontend:${{ github.sha }}
+            # Save current SHA for rollback
+            PREVIOUS_SHA=$(docker inspect cgc-pms-frontend --format='{{index .Config.Labels "sha"}}' 2>/dev/null || echo "")
+            echo "Previous SHA for rollback: ${PREVIOUS_SHA:-none}"
+
+            # Tag images for compose reference (compose uses BACKEND_TAG/FRONTEND_TAG env vars)
+            docker tag ${{ secrets.REGISTRY_URL }}/cgc-pms-backend:$GITHUB_SHA cgc-pms-backend:$GITHUB_SHA
+            docker tag ${{ secrets.REGISTRY_URL }}/cgc-pms-frontend:$GITHUB_SHA cgc-pms-frontend:$GITHUB_SHA
             # Export tags for compose variable substitution (required by preflight)
-            export BACKEND_TAG=${{ github.sha }}
-            export FRONTEND_TAG=${{ github.sha }}
+            export BACKEND_TAG=$GITHUB_SHA
+            export FRONTEND_TAG=$GITHUB_SHA
             cd /opt/cgc-pms && docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            # Post-deploy readiness check: verify Spring Boot actuator JSON status=UP via HTTPS
-            echo "Waiting for services to stabilize (checking actuator health JSON)..."
+            # Post-deploy readiness check: verify actuator health from within Docker network
+            echo "Waiting for services to stabilize (checking actuator health)..."
             HEALTH_OK=false
             for i in $(seq 1 12); do
               sleep 5
-              HEALTH=$(curl -sS http://localhost/api/actuator/health 2>/dev/null)
+              # Check backend directly via internal Docker network (bypasses Nginx HTTPS redirect)
+              HEALTH=$(docker compose -f docker-compose.prod.yml exec -T backend curl -sS http://localhost:8080/api/actuator/health 2>/dev/null)
               if echo "$HEALTH" | grep -q '"status":"UP"'; then
                 echo "✅ Readiness check passed ($((i*5))s): $HEALTH"
-                echo "Deployed SHA: ${{ github.sha }}"
+                echo "Deployed SHA: $GITHUB_SHA"
                 echo "Deployed at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
                 HEALTH_OK=true
                 break
@@ -238,9 +245,16 @@ jobs:
               echo "Attempt $i/12: not ready yet"
             done
             if [ "$HEALTH_OK" = false ]; then
-              echo "❌ Readiness check failed after 60s"
+              echo "❌ Readiness check failed after 60s — rolling back..."
+              if [ -n "$PREVIOUS_SHA" ]; then
+                export BACKEND_TAG=$PREVIOUS_SHA
+                export FRONTEND_TAG=$PREVIOUS_SHA
+                docker tag ${{ secrets.REGISTRY_URL }}/cgc-pms-backend:$PREVIOUS_SHA cgc-pms-backend:$PREVIOUS_SHA 2>/dev/null || true
+                docker tag ${{ secrets.REGISTRY_URL }}/cgc-pms-frontend:$PREVIOUS_SHA cgc-pms-frontend:$PREVIOUS_SHA 2>/dev/null || true
+                cd /opt/cgc-pms && docker compose -f docker-compose.prod.yml up -d --remove-orphans
+                echo "⚠️  Rollback to $PREVIOUS_SHA initiated — verify health manually"
+              fi
               exit 1
             fi
-            # Rollback path (documented):
-            #   export BACKEND_TAG=<previous-sha> FRONTEND_TAG=<previous-sha>
-            #   docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # Tag image labels with SHA for next rollback tracking
+            docker tag cgc-pms-frontend:$GITHUB_SHA cgc-pms-frontend:latest 2>/dev/null || true

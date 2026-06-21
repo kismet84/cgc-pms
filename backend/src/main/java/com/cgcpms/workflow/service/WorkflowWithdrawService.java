@@ -46,7 +46,8 @@ public class WorkflowWithdrawService {
                 instanceId,
                 WorkflowConstants.INSTANCE_RUNNING,
                 WorkflowConstants.INSTANCE_WITHDRAWN,
-                LocalDateTime.now());
+                LocalDateTime.now(),
+                instance.getTenantId());
         if (updated != 1) {
             throw new BusinessException("INSTANCE_STATUS_CONFLICT", "审批实例状态已变更或已有任务被处理，撤回失败");
         }

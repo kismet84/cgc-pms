@@ -143,7 +143,7 @@ watch(
         <a-breadcrumb-item>审批中心</a-breadcrumb-item>
         <a-breadcrumb-item>{{ pageHeaderTitle() }}</a-breadcrumb-item>
       </a-breadcrumb>
-      <p style="margin:0;color:var(--subtext);font-size:13px">{{ pageHeaderSubtitle() }}</p>
+      <p class="app-page-subtitle" style="margin:0;color:var(--subtext);font-size:13px">{{ pageHeaderSubtitle() }}</p>
     </div>
 
     <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">

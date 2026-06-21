@@ -56,6 +56,7 @@ public class PmProjectService {
     private final WfInstanceMapper wfInstanceMapper;
     private final SysRoleMapper sysRoleMapper;
     private final SysUserMapper sysUserMapper;
+    private final com.cgcpms.project.auth.ProjectAccessChecker projectAccessChecker;
 
     /**
      * Resolve the tightest data scope for the current user.
@@ -124,6 +125,8 @@ public class PmProjectService {
         if (!project.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
+        // 数据范围校验（非管理员用户）
+        projectAccessChecker.checkAccess(id, "查看");
         return toVO(project);
     }
 
@@ -176,6 +179,8 @@ public class PmProjectService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
+        // 数据范围校验（非管理员用户）
+        projectAccessChecker.checkAccess(project.getId(), "编辑");
         pmProjectMapper.updateById(project);
     }
 

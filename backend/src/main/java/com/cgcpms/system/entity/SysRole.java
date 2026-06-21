@@ -34,4 +34,7 @@ public class SysRole extends BaseEntity {
     private String status;
 
     private String dataScope;
+
+    /** 角色等级：0=SUPER_ADMIN, 1=ADMIN, 2=普通角色。用于防止越级提权。 */
+    private Integer roleLevel;
 }
