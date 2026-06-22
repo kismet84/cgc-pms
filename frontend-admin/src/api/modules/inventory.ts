@@ -9,6 +9,7 @@ import type {
   StockTransactionParams,
   StockLedgerQuery,
   PurchaseRequestQuery,
+  StockKpiVO,
 } from '@/types/inventory'
 
 // ── 仓库 CRUD ──
@@ -91,6 +92,15 @@ export function stockOut(params: StockTransactionParams) {
 export function getStockLedger(params: StockLedgerQuery) {
   return request<StockLedgerVO>({
     url: '/inventory/stock/ledger',
+    method: 'get',
+    params,
+  })
+}
+
+/** 库存 KPI 统计 */
+export function getStockKpi(params?: { warehouseId?: string; projectId?: string }) {
+  return request<StockKpiVO>({
+    url: '/inventory/stock/kpi',
     method: 'get',
     params,
   })

@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal, Upload } from 'ant-design-vue'
 import axios from 'axios'
 import { SearchOutlined, UploadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import type { UploadFile } from 'ant-design-vue'
 import {
   getInvoiceList,
   createInvoice,
@@ -55,8 +56,7 @@ const formData = reactive<Partial<InvoiceVO>>({
   remark: '',
 })
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const uploadFileList = ref<any[]>([])
+const uploadFileList = ref<UploadFile[]>([])
 const recognizing = ref(false)
 const recognizeResult = ref<InvoiceRecognizeResultVO | null>(null)
 const abortController = ref<AbortController | null>(null)
@@ -377,13 +377,13 @@ function clearInvoiceFields() {
   for (const field of fields) {
     if (field === 'invoiceType') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(formData as any)[field] = 'VAT_SPECIAL'
+      ;(formData as Record<string, unknown>)[field] = 'VAT_SPECIAL'
     } else if (field === 'invoiceNo' || field === 'remark') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(formData as any)[field] = ''
+      ;(formData as Record<string, unknown>)[field] = ''
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(formData as any)[field] = undefined
+      ;(formData as Record<string, unknown>)[field] = undefined
     }
   }
 }
@@ -407,7 +407,7 @@ function applyRecognitionResult(result: InvoiceRecognizeResultVO) {
     const value = result[field]
     if (value != null && value !== '') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(formData as any)[field] = value
+      ;(formData as Record<string, unknown>)[field] = value
     }
   }
 }

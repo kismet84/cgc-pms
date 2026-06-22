@@ -699,7 +699,7 @@ onMounted(async () => {
             border="inner"
             size="small"
             max-height="480"
-            @row-click="({ row }: any) => handleCompanyRowClick(row)"
+            @row-click="({ row }: { row: Record<string, unknown> }) => handleCompanyRowClick(row)"
           >
             <template #companyStatus="{ row }">
               <a-tag :color="row.status === 'ENABLED' ? 'success' : 'default'">

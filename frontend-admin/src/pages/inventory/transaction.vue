@@ -1,9 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { stockIn, stockOut, getWarehouseList } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import type { WarehouseVO } from '@/types/inventory'
+import type { SelectOption } from '@/types/ui'
 
 const activeTab = ref<'in' | 'out'>('in')
 
@@ -42,15 +43,15 @@ function getMaterialInfo(id: string) {
 
 async function handleStockIn() {
   if (!inForm.warehouseId) {
-    message.warning('请选择仓库')
+    message.warning('璇烽€夋嫨浠撳簱')
     return
   }
   if (!inForm.materialId) {
-    message.warning('请选择物料')
+    message.warning('璇烽€夋嫨鐗╂枡')
     return
   }
   if (!inForm.quantity || parseFloat(inForm.quantity) <= 0) {
-    message.warning('请输入有效的入库数量')
+    message.warning('璇疯緭鍏ユ湁鏁堢殑鍏ュ簱鏁伴噺')
     return
   }
 
@@ -61,12 +62,12 @@ async function handleStockIn() {
       materialId: inForm.materialId,
       quantity: inForm.quantity,
     })
-    message.success('入库成功')
+    message.success('鍏ュ簱鎴愬姛')
     inForm.materialId = undefined
     inForm.quantity = ''
   } catch (e: unknown) {
     console.error(e)
-    message.error('入库失败，请稍后重试')
+    message.error('鍏ュ簱澶辫触锛岃绋嶅悗閲嶈瘯')
   } finally {
     inSubmitting.value = false
   }
@@ -74,15 +75,15 @@ async function handleStockIn() {
 
 async function handleStockOut() {
   if (!outForm.warehouseId) {
-    message.warning('请选择仓库')
+    message.warning('璇烽€夋嫨浠撳簱')
     return
   }
   if (!outForm.materialId) {
-    message.warning('请选择物料')
+    message.warning('璇烽€夋嫨鐗╂枡')
     return
   }
   if (!outForm.quantity || parseFloat(outForm.quantity) <= 0) {
-    message.warning('请输入有效的出库数量')
+    message.warning('璇疯緭鍏ユ湁鏁堢殑鍑哄簱鏁伴噺')
     return
   }
 
@@ -93,12 +94,12 @@ async function handleStockOut() {
       materialId: outForm.materialId,
       quantity: outForm.quantity,
     })
-    message.success('出库成功')
+    message.success('鍑哄簱鎴愬姛')
     outForm.materialId = undefined
     outForm.quantity = ''
   } catch (e: unknown) {
     console.error(e)
-    message.error('出库失败，请稍后重试')
+    message.error('鍑哄簱澶辫触锛岃绋嶅悗閲嶈瘯')
   } finally {
     outSubmitting.value = false
   }
@@ -112,34 +113,34 @@ onMounted(() => {
 
 <template>
   <div class="lg-page app-page">
-    <!-- 页面头部 -->
+    <!-- 椤甸潰澶撮儴 -->
     <div class="lg-page-head">
       <div>
         <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
-          <a-breadcrumb-item>库存管理</a-breadcrumb-item>
-          <a-breadcrumb-item>库存交易</a-breadcrumb-item>
+          <a-breadcrumb-item>搴撳瓨绠＄悊</a-breadcrumb-item>
+          <a-breadcrumb-item>搴撳瓨浜ゆ槗</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
     </div>
 
-    <!-- KPI 横条 -->
+    <!-- KPI 妯潯 -->
     <div class="lg-kpi-strip">
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">入库操作</span>
-        <span class="lg-kpi-card-value" style="color: #22c55e">快捷</span>
+        <span class="lg-kpi-card-label">鍏ュ簱鎿嶄綔</span>
+        <span class="lg-kpi-card-value" style="color: #22c55e">蹇嵎</span>
         <span class="lg-kpi-card-bar"><span style="width: 100%; background: #22c55e"></span></span>
       </div>
       <div class="lg-kpi-card is-warn">
-        <span class="lg-kpi-card-label">出库操作</span>
-        <span class="lg-kpi-card-value" style="color: #ef4444">快捷</span>
+        <span class="lg-kpi-card-label">鍑哄簱鎿嶄綔</span>
+        <span class="lg-kpi-card-value" style="color: #ef4444">蹇嵎</span>
         <span class="lg-kpi-card-bar"><span style="width: 100%; background: #ef4444"></span></span>
       </div>
     </div>
 
     <div class="lg-toolbar" style="margin-bottom: 0">
       <a-tabs v-model:activeKey="activeTab">
-        <a-tab-pane key="in" tab="入库" />
-        <a-tab-pane key="out" tab="出库" />
+        <a-tab-pane key="in" tab="鍏ュ簱" />
+        <a-tab-pane key="out" tab="鍑哄簱" />
       </a-tabs>
     </div>
 
@@ -147,14 +148,14 @@ onMounted(() => {
       <!-- Stock In Form -->
       <div v-if="activeTab === 'in'">
         <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
-          <a-form-item label="仓库" required>
+          <a-form-item label="浠撳簱" required>
             <a-select
               v-model:value="inForm.warehouseId"
-              placeholder="请选择仓库"
+              placeholder="璇烽€夋嫨浠撳簱"
               style="width: 300px"
               show-search
               :filter-option="
-                (input: string, option: any) =>
+                (input: string, option: SelectOption) =>
                   option.label?.toLowerCase().includes(input.toLowerCase())
               "
             >
@@ -163,14 +164,14 @@ onMounted(() => {
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="物料" required>
+          <a-form-item label="鐗╂枡" required>
             <a-select
               v-model:value="inForm.materialId"
-              placeholder="请选择物料"
+              placeholder="璇烽€夋嫨鐗╂枡"
               style="width: 300px"
               show-search
               :filter-option="
-                (input: string, option: any) =>
+                (input: string, option: SelectOption) =>
                   option.label?.toLowerCase().includes(input.toLowerCase())
               "
             >
@@ -189,13 +190,13 @@ onMounted(() => {
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="入库数量" required>
+          <a-form-item label="鍏ュ簱鏁伴噺" required>
             <a-input-number
               v-model:value="inForm.quantity"
               :min="0.0001"
               :precision="4"
               style="width: 200px"
-              placeholder="请输入数量"
+              placeholder="璇疯緭鍏ユ暟閲?
               addon-after=""
             >
               <template #addonAfter>
@@ -212,7 +213,7 @@ onMounted(() => {
               @click="handleStockIn"
               style="width: 120px"
             >
-              确认入库
+              纭鍏ュ簱
             </a-button>
           </a-form-item>
         </a-form>
@@ -221,14 +222,14 @@ onMounted(() => {
       <!-- Stock Out Form -->
       <div v-else>
         <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
-          <a-form-item label="仓库" required>
+          <a-form-item label="浠撳簱" required>
             <a-select
               v-model:value="outForm.warehouseId"
-              placeholder="请选择仓库"
+              placeholder="璇烽€夋嫨浠撳簱"
               style="width: 300px"
               show-search
               :filter-option="
-                (input: string, option: any) =>
+                (input: string, option: SelectOption) =>
                   option.label?.toLowerCase().includes(input.toLowerCase())
               "
             >
@@ -237,14 +238,14 @@ onMounted(() => {
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="物料" required>
+          <a-form-item label="鐗╂枡" required>
             <a-select
               v-model:value="outForm.materialId"
-              placeholder="请选择物料"
+              placeholder="璇烽€夋嫨鐗╂枡"
               style="width: 300px"
               show-search
               :filter-option="
-                (input: string, option: any) =>
+                (input: string, option: SelectOption) =>
                   option.label?.toLowerCase().includes(input.toLowerCase())
               "
             >
@@ -263,13 +264,13 @@ onMounted(() => {
               </a-select-option>
             </a-select>
           </a-form-item>
-          <a-form-item label="出库数量" required>
+          <a-form-item label="鍑哄簱鏁伴噺" required>
             <a-input-number
               v-model:value="outForm.quantity"
               :min="0.0001"
               :precision="4"
               style="width: 200px"
-              placeholder="请输入数量"
+              placeholder="璇疯緭鍏ユ暟閲?
             >
               <template #addonAfter>
                 <span style="min-width: 30px; display: inline-block">
@@ -286,7 +287,7 @@ onMounted(() => {
               @click="handleStockOut"
               style="width: 120px"
             >
-              确认出库
+              纭鍑哄簱
             </a-button>
           </a-form-item>
         </a-form>

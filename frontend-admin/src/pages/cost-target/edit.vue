@@ -515,7 +515,7 @@ onMounted(() => {
                     tree-node-filter-prop="title"
                     style="width: 100%"
                     size="small"
-                    @change="(val: any) => onSubjectChange(val, record)"
+                    @change="(val: string | number | undefined) => onSubjectChange(val, record)"
                   />
                 </template>
                 <template v-else-if="column.dataIndex === 'targetAmount'">

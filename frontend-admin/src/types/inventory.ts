@@ -1,3 +1,5 @@
+import type { PageResult } from './api'
+
 /** 仓库 */
 export interface WarehouseVO {
   id: string
@@ -48,12 +50,7 @@ export interface MatStockTxnVO {
 /** 库存台账（仓库+物料维度的当前库存+流水） */
 export interface StockLedgerVO {
   stock: MatStockVO | null
-  txns: {
-    records: MatStockTxnVO[]
-    total: number
-    pageNo: number
-    pageSize: number
-  }
+  txns: PageResult<MatStockTxnVO>
 }
 
 /** 采购申请主表 */
@@ -105,6 +102,8 @@ export interface StockTransactionParams {
   warehouseId: string
   materialId: string
   quantity: string
+  sourceType?: string
+  sourceId?: string
 }
 
 /** 库存台账查询参数 */
@@ -127,4 +126,13 @@ export interface PurchaseRequestQuery {
   approvalStatus?: string
   status?: string
   requestCode?: string
+}
+
+/** 库存 KPI VO */
+export interface StockKpiVO {
+  warehouseCount: number
+  lowStockCount: number
+  txnInCount: number
+  txnOutCount: number
+  materialTypeCount: number
 }

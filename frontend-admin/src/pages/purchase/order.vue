@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
@@ -13,6 +13,7 @@ import {
   submitOrderForApproval,
 } from '@/api/modules/purchase'
 import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchase'
+import type { SelectOption } from '@/types/ui'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -36,7 +37,7 @@ const contractList = computed(() => referenceStore.contracts ?? [])
 const materialList = computed(() => referenceStore.materials ?? [])
 
 const modalVisible = ref(false)
-const modalTitle = ref('新建采购订单')
+const modalTitle = ref('鏂板缓閲囪喘璁㈠崟')
 const editingId = ref<string | null>(null)
 const formData = reactive<Partial<MatPurchaseOrderVO>>({
   projectId: undefined,
@@ -66,10 +67,10 @@ const itemList = ref<(Partial<MatPurchaseOrderItemVO> & { key: number })[]>([])
 let itemKeyCounter = 0
 
 const ORDER_TYPE_LABEL: Record<string, string> = {
-  MATERIAL: '材料采购',
-  EQUIPMENT: '设备采购',
-  SERVICE: '服务采购',
-  OTHER: '其他',
+  MATERIAL: '鏉愭枡閲囪喘',
+  EQUIPMENT: '璁惧閲囪喘',
+  SERVICE: '鏈嶅姟閲囪喘',
+  OTHER: '鍏朵粬',
 }
 const ORDER_TYPE_COLOR: Record<string, string> = {
   MATERIAL: 'blue',
@@ -78,11 +79,11 @@ const ORDER_TYPE_COLOR: Record<string, string> = {
   OTHER: 'default',
 }
 const ORDER_STATUS_LABEL: Record<string, string> = {
-  DRAFT: '草稿',
-  APPROVING: '审批中',
-  PERFORMING: '履行中',
-  COMPLETED: '已完成',
-  CANCELLED: '已取消',
+  DRAFT: '鑽夌',
+  APPROVING: '瀹℃壒涓?,
+  PERFORMING: '灞ヨ涓?,
+  COMPLETED: '宸插畬鎴?,
+  CANCELLED: '宸插彇娑?,
 }
 const ORDER_STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',
@@ -93,22 +94,22 @@ const ORDER_STATUS_COLOR: Record<string, string> = {
 }
 
 const gridColumns = computed(() => [
-  { field: 'orderCode', title: '订单编号', width: 140, ellipsis: true },
-  { field: 'orderType', title: '订单类型', width: 90, slots: { default: 'orderType' } },
-  { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
-  { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
-  { field: 'partnerName', title: '供应商', width: 120, ellipsis: true },
+  { field: 'orderCode', title: '璁㈠崟缂栧彿', width: 140, ellipsis: true },
+  { field: 'orderType', title: '璁㈠崟绫诲瀷', width: 90, slots: { default: 'orderType' } },
+  { field: 'projectName', title: '椤圭洰鍚嶇О', width: 120, ellipsis: true },
+  { field: 'contractName', title: '鍚堝悓鍚嶇О', width: 120, ellipsis: true },
+  { field: 'partnerName', title: '渚涘簲鍟?, width: 120, ellipsis: true },
   {
     field: 'totalAmount',
-    title: '总金额',
+    title: '鎬婚噾棰?,
     width: 110,
     align: 'right' as const,
     slots: { default: 'totalAmount' },
   },
-  { field: 'deliveryDate', title: '交货日期', width: 100 },
-  { field: 'orderStatus', title: '订单状态', width: 90, slots: { default: 'orderStatus' } },
-  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
-  { title: '操作', width: 160, slots: { default: 'action' } },
+  { field: 'deliveryDate', title: '浜よ揣鏃ユ湡', width: 100 },
+  { field: 'orderStatus', title: '璁㈠崟鐘舵€?, width: 90, slots: { default: 'orderStatus' } },
+  { field: 'approvalStatus', title: '瀹℃壒鐘舵€?, width: 90, slots: { default: 'approvalStatus' } },
+  { title: '鎿嶄綔', width: 160, slots: { default: 'action' } },
 ])
 
 async function fetchData() {
@@ -130,7 +131,7 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('加载采购订单列表失败，请稍后重试')
+    message.error('鍔犺浇閲囪喘璁㈠崟鍒楄〃澶辫触锛岃绋嶅悗閲嶈瘯')
   } finally {
     loading.value = false
   }
@@ -165,7 +166,7 @@ function handlePageSizeChange(_cur: number, size: number) {
 }
 
 function handleAdd() {
-  modalTitle.value = '新建采购订单'
+  modalTitle.value = '鏂板缓閲囪喘璁㈠崟'
   editingId.value = null
   Object.assign(formData, {
     projectId: undefined,
@@ -182,7 +183,7 @@ function handleAdd() {
 }
 
 async function handleEdit(record: MatPurchaseOrderVO) {
-  modalTitle.value = '编辑采购订单'
+  modalTitle.value = '缂栬緫閲囪喘璁㈠崟'
   editingId.value = record.id
   Object.assign(formData, {
     projectId: record.projectId,
@@ -204,7 +205,7 @@ async function handleEdit(record: MatPurchaseOrderVO) {
     }))
   } catch (e: unknown) {
     console.error(e)
-    message.error('加载明细失败')
+    message.error('鍔犺浇鏄庣粏澶辫触')
     itemList.value = []
   }
   modalVisible.value = true
@@ -212,18 +213,18 @@ async function handleEdit(record: MatPurchaseOrderVO) {
 
 function handleDelete(record: MatPurchaseOrderVO) {
   Modal.confirm({
-    title: '确认删除',
-    content: `确定要删除采购订单"${record.orderCode}"吗？`,
-    okText: '确定',
-    cancelText: '取消',
+    title: '纭鍒犻櫎',
+    content: `纭畾瑕佸垹闄ら噰璐鍗?${record.orderCode}"鍚楋紵`,
+    okText: '纭畾',
+    cancelText: '鍙栨秷',
     onOk: async () => {
       try {
         await deleteOrder(record.id)
-        message.success('删除成功')
+        message.success('鍒犻櫎鎴愬姛')
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('删除失败，请稍后重试')
+        message.error('鍒犻櫎澶辫触锛岃绋嶅悗閲嶈瘯')
       }
     },
   })
@@ -231,18 +232,18 @@ function handleDelete(record: MatPurchaseOrderVO) {
 
 function handleSubmitApproval(record: MatPurchaseOrderVO) {
   Modal.confirm({
-    title: '确认提交',
-    content: `确定要提交采购订单"${record.orderCode}"吗？提交后将进入审批流程`,
-    okText: '确定',
-    cancelText: '取消',
+    title: '纭鎻愪氦',
+    content: `纭畾瑕佹彁浜ら噰璐鍗?${record.orderCode}"鍚楋紵鎻愪氦鍚庡皢杩涘叆瀹℃壒娴佺▼`,
+    okText: '纭畾',
+    cancelText: '鍙栨秷',
     onOk: async () => {
       try {
         await submitOrderForApproval(record.id)
-        message.success('提交审批成功')
+        message.success('鎻愪氦瀹℃壒鎴愬姛')
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('提交审批失败')
+        message.error('鎻愪氦瀹℃壒澶辫触')
       }
     },
   })
@@ -308,7 +309,7 @@ const itemsTotalAmount = computed(() => {
 
 async function handleModalOk() {
   if (!formData.projectId) {
-    message.warning('请选择项目')
+    message.warning('璇烽€夋嫨椤圭洰')
     return
   }
 
@@ -317,11 +318,11 @@ async function handleModalOk() {
     if (editingId.value) {
       await updateOrder(editingId.value, formData)
       orderId = editingId.value
-      message.success('更新成功')
+      message.success('鏇存柊鎴愬姛')
     } else {
       const result = await createOrder(formData)
       orderId = result
-      message.success('创建成功')
+      message.success('鍒涘缓鎴愬姛')
     }
 
     // Save line items
@@ -337,7 +338,7 @@ async function handleModalOk() {
     fetchData()
   } catch (e: unknown) {
     console.error(e)
-    message.error('操作失败，请稍后重试')
+    message.error('鎿嶄綔澶辫触锛岃绋嶅悗閲嶈瘯')
   }
 }
 
@@ -380,61 +381,61 @@ onMounted(() => {
     <div class="lg-page-head">
       <div>
         <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
-          <a-breadcrumb-item>采购管理</a-breadcrumb-item>
-          <a-breadcrumb-item>采购订单</a-breadcrumb-item>
+          <a-breadcrumb-item>閲囪喘绠＄悊</a-breadcrumb-item>
+          <a-breadcrumb-item>閲囪喘璁㈠崟</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
     </div>
 
-    <!-- 搜索栏 -->
+    <!-- 鎼滅储鏍?-->
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.keyword"
-        placeholder="搜索订单编号、名称…"
+        placeholder="鎼滅储璁㈠崟缂栧彿銆佸悕绉扳€?
         allow-clear
         size="large"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #697380" /></template>
       </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button type="primary" size="large" @click="handleSearch">鏌ヨ</a-button>
       <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
-        重置
+        閲嶇疆
       </a-button>
     </div>
 
     <div class="lg-grid">
       <div class="lg-left">
-        <!-- KPI 横条 -->
+        <!-- KPI 妯潯 -->
         <div class="lg-kpi-strip">
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">采购订单数</span>
-            <span class="lg-kpi-card-value">{{ kpiOrderTotal }} <small>条</small></span>
+            <span class="lg-kpi-card-label">閲囪喘璁㈠崟鏁?/span>
+            <span class="lg-kpi-card-value">{{ kpiOrderTotal }} <small>鏉?/small></span>
             <span class="lg-kpi-card-bar"
               ><span style="width: 100%; background: var(--kpi-total)"></span
             ></span>
           </div>
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">待审批</span>
-            <span class="lg-kpi-card-value">{{ kpiOrderPending }} <small>条</small></span>
+            <span class="lg-kpi-card-label">寰呭鎵?/span>
+            <span class="lg-kpi-card-value">{{ kpiOrderPending }} <small>鏉?/small></span>
             <span class="lg-kpi-card-bar"
               ><span style="width: 100%; background: #f59e0b"></span
             ></span>
           </div>
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">已下单金额</span>
+            <span class="lg-kpi-card-label">宸蹭笅鍗曢噾棰?/span>
             <span class="lg-kpi-card-value"
-              >{{ kpiOrderedAmount.toLocaleString() }} <small>元</small></span
+              >{{ kpiOrderedAmount.toLocaleString() }} <small>鍏?/small></span
             >
             <span class="lg-kpi-card-bar"
               ><span style="width: 100%; background: var(--kpi-amount)"></span
             ></span>
           </div>
           <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">未入库金额</span>
+            <span class="lg-kpi-card-label">鏈叆搴撻噾棰?/span>
             <span class="lg-kpi-card-value" style="color: #f59e0b"
-              >{{ kpiUnreceived.toLocaleString() }} <small>元</small></span
+              >{{ kpiUnreceived.toLocaleString() }} <small>鍏?/small></span
             >
             <span class="lg-kpi-card-bar"
               ><span style="width: 100%; background: #f59e0b"></span
@@ -442,12 +443,12 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 工具栏 -->
+        <!-- 宸ュ叿鏍?-->
         <div class="lg-toolbar">
           <div class="lg-toolbar-left">
             <a-button type="primary" @click="handleAdd">
               <template #icon><PlusOutlined /></template>
-              新建订单
+              鏂板缓璁㈠崟
             </a-button>
             <a-button @click="fetchData">
               <template #icon><ReloadOutlined /></template>
@@ -456,7 +457,7 @@ onMounted(() => {
           <div class="lg-toolbar-right">
             <a-select
               v-model:value="filter.projectId"
-              placeholder="全部项目"
+              placeholder="鍏ㄩ儴椤圭洰"
               allow-clear
               style="width: 160px"
               size="small"
@@ -469,7 +470,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 表格 -->
+        <!-- 琛ㄦ牸 -->
         <div class="lg-table-wrap">
           <vxe-grid
             :data="tableData"
@@ -501,22 +502,22 @@ onMounted(() => {
               <ApprovalStatusTag :status="row.approvalStatus" />
             </template>
             <template #action="{ row }">
-              <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="handleDelete(row)">删除</a-button>
+              <a-button type="link" size="small" @click="handleEdit(row)">缂栬緫</a-button>
+              <a-button type="link" size="small" danger @click="handleDelete(row)">鍒犻櫎</a-button>
               <a-button
                 v-if="row.approvalStatus === 'DRAFT'"
                 type="link"
                 size="small"
                 @click="handleSubmitApproval(row)"
-                >提交审批</a-button
+                >鎻愪氦瀹℃壒</a-button
               >
             </template>
           </vxe-grid>
         </div>
 
-        <!-- 分页 -->
+        <!-- 鍒嗛〉 -->
         <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
+          <span class="lg-total">鍏?{{ total }} 鏉?/span>
           <a-pagination
             v-model:current="pageNo"
             v-model:page-size="pageSize"
@@ -530,15 +531,15 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 右侧分析面板 -->
+      <!-- 鍙充晶鍒嗘瀽闈㈡澘 -->
       <aside class="lg-analysis-rail">
         <section class="lg-panel">
-          <div class="lg-panel-title">订单状态分布</div>
+          <div class="lg-panel-title">璁㈠崟鐘舵€佸垎甯?/div>
           <div class="lg-type-list">
             <div v-for="it in orderStatusBreakdown" :key="it.label" class="lg-type-row">
               <span class="lg-type-label">{{ it.label }}</span>
               <span class="lg-type-num">{{ it.count }}</span>
-              <span class="lg-type-pct">条</span>
+              <span class="lg-type-pct">鏉?/span>
             </div>
           </div>
         </section>
@@ -555,10 +556,10 @@ onMounted(() => {
     >
       <!-- Header Form -->
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
-        <a-form-item label="项目" required>
+        <a-form-item label="椤圭洰" required>
           <a-select
             v-model:value="formData.projectId"
-            placeholder="请选择项目"
+            placeholder="璇烽€夋嫨椤圭洰"
             show-search
             @change="
               (v: string) => {
@@ -568,7 +569,7 @@ onMounted(() => {
               }
             "
             :filter-option="
-              (input: string, option: any) =>
+              (input: string, option: SelectOption) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
             "
           >
@@ -577,14 +578,14 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="采购合同">
+        <a-form-item label="閲囪喘鍚堝悓">
           <a-select
             v-model:value="formData.contractId"
-            placeholder="请选择合同"
+            placeholder="璇烽€夋嫨鍚堝悓"
             allow-clear
             show-search
             :filter-option="
-              (input: string, option: any) =>
+              (input: string, option: SelectOption) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
             "
             @change="onContractChange"
@@ -594,33 +595,33 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="供应商">
-          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
+        <a-form-item label="渚涘簲鍟?>
+          <a-input :value="formPartnerName" disabled placeholder="閫夋嫨鍚堝悓鍚庤嚜鍔ㄥ～鍏呬箼鏂? />
         </a-form-item>
-        <a-form-item label="订单类型">
-          <a-select v-model:value="formData.orderType" placeholder="请选择类型" allow-clear>
-            <a-select-option value="MATERIAL">材料采购</a-select-option>
-            <a-select-option value="EQUIPMENT">设备采购</a-select-option>
-            <a-select-option value="SERVICE">服务采购</a-select-option>
-            <a-select-option value="OTHER">其他</a-select-option>
+        <a-form-item label="璁㈠崟绫诲瀷">
+          <a-select v-model:value="formData.orderType" placeholder="璇烽€夋嫨绫诲瀷" allow-clear>
+            <a-select-option value="MATERIAL">鏉愭枡閲囪喘</a-select-option>
+            <a-select-option value="EQUIPMENT">璁惧閲囪喘</a-select-option>
+            <a-select-option value="SERVICE">鏈嶅姟閲囪喘</a-select-option>
+            <a-select-option value="OTHER">鍏朵粬</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="订单日期">
+        <a-form-item label="璁㈠崟鏃ユ湡">
           <a-date-picker
             v-model:value="formData.orderDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="交货日期">
+        <a-form-item label="浜よ揣鏃ユ湡">
           <a-date-picker
             v-model:value="formData.deliveryDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
+        <a-form-item label="澶囨敞">
+          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="璇疯緭鍏ュ娉? />
         </a-form-item>
       </a-form>
 
@@ -634,8 +635,8 @@ onMounted(() => {
             margin-bottom: 10px;
           "
         >
-          <span style="font-weight: 600; font-size: 14px">订单明细</span>
-          <a-button type="dashed" size="small" @click="handleAddItem">+ 添加明细</a-button>
+          <span style="font-weight: 600; font-size: 14px">璁㈠崟鏄庣粏</span>
+          <a-button type="dashed" size="small" @click="handleAddItem">+ 娣诲姞鏄庣粏</a-button>
         </div>
 
         <a-table
@@ -645,16 +646,16 @@ onMounted(() => {
           size="small"
           :scroll="{ y: 250 }"
         >
-          <a-table-column title="材料" width="200">
+          <a-table-column title="鏉愭枡" width="200">
             <template #default="{ record: item, index }">
               <a-select
                 :value="item.materialId"
-                placeholder="请选择材料"
+                placeholder="璇烽€夋嫨鏉愭枡"
                 allow-clear
                 style="width: 100%"
                 show-search
                 :filter-option="
-                  (input: string, option: any) =>
+                  (input: string, option: SelectOption) =>
                     option.label?.toLowerCase().includes(input.toLowerCase())
                 "
                 @change="(val: string) => handleMaterialChange(index, val)"
@@ -665,17 +666,17 @@ onMounted(() => {
               </a-select>
             </template>
           </a-table-column>
-          <a-table-column title="规格" width="100">
+          <a-table-column title="瑙勬牸" width="100">
             <template #default="{ record: item }">
               <span>{{ item.specification || '-' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="单位" width="70">
+          <a-table-column title="鍗曚綅" width="70">
             <template #default="{ record: item }">
               <span>{{ item.unit || '-' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="数量" width="120">
+          <a-table-column title="鏁伴噺" width="120">
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.quantity"
@@ -686,7 +687,7 @@ onMounted(() => {
               />
             </template>
           </a-table-column>
-          <a-table-column title="单价(元)" width="130">
+          <a-table-column title="鍗曚环(鍏?" width="130">
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.unitPrice"
@@ -697,25 +698,25 @@ onMounted(() => {
               />
             </template>
           </a-table-column>
-          <a-table-column title="金额(元)" width="130">
+          <a-table-column title="閲戦(鍏?" width="130">
             <template #default="{ record: item }">
               <span>{{
                 Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
               }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="操作" width="60">
+          <a-table-column title="鎿嶄綔" width="60">
             <template #default="{ index }">
               <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
-                >删除</a-button
+                >鍒犻櫎</a-button
               >
             </template>
           </a-table-column>
         </a-table>
 
         <div style="text-align: right; margin-top: 8px; font-size: 14px">
-          合计：<span style="font-weight: 600; color: #1677ff"
-            >¥{{
+          鍚堣锛?span style="font-weight: 600; color: #1677ff"
+            >楼{{
               Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
             }}</span
           >

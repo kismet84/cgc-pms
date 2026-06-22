@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
@@ -11,6 +11,7 @@ import {
 } from '@/api/modules/subcontract'
 import { useReferenceStore } from '@/stores/reference'
 import type { SubTaskVO } from '@/types/subcontract'
+import type { SelectOption } from '@/types/ui'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -32,7 +33,7 @@ const referenceStore = useReferenceStore()
 const { projects: projectList, contracts: contractList } = storeToRefs(referenceStore)
 
 const modalVisible = ref(false)
-const modalTitle = ref('新建分包任务')
+const modalTitle = ref('鏂板缓鍒嗗寘浠诲姟')
 const editingId = ref<string | null>(null)
 const formData = reactive<Partial<SubTaskVO>>({
   projectId: undefined,
@@ -63,10 +64,10 @@ watch(
 )
 
 const STATUS_LABEL: Record<string, string> = {
-  NOT_STARTED: '未开始',
-  IN_PROGRESS: '进行中',
-  COMPLETED: '已完成',
-  SUSPENDED: '已暂停',
+  NOT_STARTED: '鏈紑濮?,
+  IN_PROGRESS: '杩涜涓?,
+  COMPLETED: '宸插畬鎴?,
+  SUSPENDED: '宸叉殏鍋?,
 }
 const STATUS_COLOR: Record<string, string> = {
   NOT_STARTED: 'default',
@@ -77,23 +78,23 @@ const STATUS_COLOR: Record<string, string> = {
 
 // ---- vxe-grid columns ----
 const gridColumns = computed(() => [
-  { field: 'taskCode', title: '任务编号', width: 130, ellipsis: true },
+  { field: 'taskCode', title: '浠诲姟缂栧彿', width: 130, ellipsis: true },
   {
     field: 'taskName',
-    title: '任务名称',
+    title: '浠诲姟鍚嶇О',
     minWidth: 140,
     slots: { default: 'taskName' },
     ellipsis: true,
   },
-  { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
-  { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
-  { field: 'partnerName', title: '分包商', width: 120, ellipsis: true },
-  { field: 'workArea', title: '施工区域', width: 100, ellipsis: true },
-  { field: 'progressPercent', title: '进度', width: 90, slots: { default: 'progressPercent' } },
-  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
-  { field: 'plannedStartDate', title: '计划开始', width: 100 },
-  { field: 'plannedEndDate', title: '计划结束', width: 100 },
-  { title: '操作', width: 110, slots: { default: 'action' } },
+  { field: 'projectName', title: '椤圭洰鍚嶇О', width: 120, ellipsis: true },
+  { field: 'contractName', title: '鍚堝悓鍚嶇О', width: 120, ellipsis: true },
+  { field: 'partnerName', title: '鍒嗗寘鍟?, width: 120, ellipsis: true },
+  { field: 'workArea', title: '鏂藉伐鍖哄煙', width: 100, ellipsis: true },
+  { field: 'progressPercent', title: '杩涘害', width: 90, slots: { default: 'progressPercent' } },
+  { field: 'status', title: '鐘舵€?, width: 80, slots: { default: 'status' } },
+  { field: 'plannedStartDate', title: '璁″垝寮€濮?, width: 100 },
+  { field: 'plannedEndDate', title: '璁″垝缁撴潫', width: 100 },
+  { title: '鎿嶄綔', width: 110, slots: { default: 'action' } },
 ])
 
 async function fetchData() {
@@ -114,7 +115,7 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('加载分包任务列表失败，请稍后重试')
+    message.error('鍔犺浇鍒嗗寘浠诲姟鍒楄〃澶辫触锛岃绋嶅悗閲嶈瘯')
   } finally {
     loading.value = false
   }
@@ -149,7 +150,7 @@ function handlePageSizeChange(_cur: number, size: number) {
 }
 
 function handleAdd() {
-  modalTitle.value = '新建分包任务'
+  modalTitle.value = '鏂板缓鍒嗗寘浠诲姟'
   editingId.value = null
   Object.assign(formData, {
     projectId: undefined,
@@ -169,7 +170,7 @@ function handleAdd() {
 }
 
 function handleEdit(record: SubTaskVO) {
-  modalTitle.value = '编辑分包任务'
+  modalTitle.value = '缂栬緫鍒嗗寘浠诲姟'
   editingId.value = record.id
   Object.assign(formData, {
     projectId: record.projectId,
@@ -190,18 +191,18 @@ function handleEdit(record: SubTaskVO) {
 
 function handleDelete(record: SubTaskVO) {
   Modal.confirm({
-    title: '确认删除',
-    content: `确定要删除分包任务"${record.taskName}"吗？`,
-    okText: '确定',
-    cancelText: '取消',
+    title: '纭鍒犻櫎',
+    content: `纭畾瑕佸垹闄ゅ垎鍖呬换鍔?${record.taskName}"鍚楋紵`,
+    okText: '纭畾',
+    cancelText: '鍙栨秷',
     onOk: async () => {
       try {
         await deleteSubTask(record.id)
-        message.success('删除成功')
+        message.success('鍒犻櫎鎴愬姛')
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('删除失败，请稍后重试')
+        message.error('鍒犻櫎澶辫触锛岃绋嶅悗閲嶈瘯')
       }
     },
   })
@@ -209,27 +210,27 @@ function handleDelete(record: SubTaskVO) {
 
 async function handleModalOk() {
   if (!formData.projectId) {
-    message.warning('请选择项目')
+    message.warning('璇烽€夋嫨椤圭洰')
     return
   }
   if (!formData.taskName) {
-    message.warning('请输入任务名称')
+    message.warning('璇疯緭鍏ヤ换鍔″悕绉?)
     return
   }
 
   try {
     if (editingId.value) {
       await updateSubTask(editingId.value, formData)
-      message.success('更新成功')
+      message.success('鏇存柊鎴愬姛')
     } else {
       await createSubTask(formData)
-      message.success('创建成功')
+      message.success('鍒涘缓鎴愬姛')
     }
     modalVisible.value = false
     fetchData()
   } catch (e: unknown) {
     console.error(e)
-    message.error('操作失败，请稍后重试')
+    message.error('鎿嶄綔澶辫触锛岃绋嶅悗閲嶈瘯')
   }
 }
 
@@ -257,55 +258,55 @@ onMounted(() => {
   <div class="lg-page app-page">
     <div class="lg-page-head">
       <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
-        <a-breadcrumb-item>分包管理</a-breadcrumb-item>
-        <a-breadcrumb-item>分包任务</a-breadcrumb-item>
+        <a-breadcrumb-item>鍒嗗寘绠＄悊</a-breadcrumb-item>
+        <a-breadcrumb-item>鍒嗗寘浠诲姟</a-breadcrumb-item>
       </a-breadcrumb>
     </div>
 
-    <!-- 搜索栏 -->
+    <!-- 鎼滅储鏍?-->
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.keyword"
-        placeholder="搜索任务编号、名称…"
+        placeholder="鎼滅储浠诲姟缂栧彿銆佸悕绉扳€?
         allow-clear
         size="large"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #697380" /></template>
       </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button type="primary" size="large" @click="handleSearch">鏌ヨ</a-button>
       <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
-        重置
+        閲嶇疆
       </a-button>
     </div>
 
-    <!-- KPI 横条 -->
+    <!-- KPI 妯潯 -->
     <div class="lg-kpi-strip">
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">进行中</span>
-        <span class="lg-kpi-card-value">{{ kpiInProgress }} <small>条</small></span>
+        <span class="lg-kpi-card-label">杩涜涓?/span>
+        <span class="lg-kpi-card-value">{{ kpiInProgress }} <small>鏉?/small></span>
         <span class="lg-kpi-card-bar"
           ><span style="width: 100%; background: var(--kpi-total)"></span
         ></span>
       </div>
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">已完成</span>
-        <span class="lg-kpi-card-value">{{ kpiCompleted }} <small>条</small></span>
+        <span class="lg-kpi-card-label">宸插畬鎴?/span>
+        <span class="lg-kpi-card-value">{{ kpiCompleted }} <small>鏉?/small></span>
         <span class="lg-kpi-card-bar"
           ><span style="width: 100%; background: var(--kpi-paid)"></span
         ></span>
       </div>
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">待开始</span>
-        <span class="lg-kpi-card-value">{{ kpiPending }} <small>条</small></span>
+        <span class="lg-kpi-card-label">寰呭紑濮?/span>
+        <span class="lg-kpi-card-value">{{ kpiPending }} <small>鏉?/small></span>
         <span class="lg-kpi-card-bar"
           ><span style="width: 100%; background: var(--kpi-amount)"></span
         ></span>
       </div>
       <div class="lg-kpi-card" :class="{ 'is-warn': kpiSuspended > 0 }">
-        <span class="lg-kpi-card-label">已暂停</span>
-        <span class="lg-kpi-card-value">{{ kpiSuspended }} <small>条</small></span>
+        <span class="lg-kpi-card-label">宸叉殏鍋?/span>
+        <span class="lg-kpi-card-value">{{ kpiSuspended }} <small>鏉?/small></span>
         <span class="lg-kpi-card-bar"
           ><span
             :style="{ width: (kpiSuspended > 0 ? 100 : 0) + '%', background: 'var(--kpi-overdue)' }"
@@ -314,12 +315,12 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 工具栏 -->
+    <!-- 宸ュ叿鏍?-->
     <div class="lg-toolbar">
       <div class="lg-toolbar-left">
         <a-button type="primary" @click="handleAdd">
           <template #icon><PlusOutlined /></template>
-          新建任务
+          鏂板缓浠诲姟
         </a-button>
         <a-button @click="fetchData">
           <template #icon><ReloadOutlined /></template>
@@ -328,7 +329,7 @@ onMounted(() => {
       <div class="lg-toolbar-right">
         <a-select
           v-model:value="filter.projectId"
-          placeholder="全部项目"
+          placeholder="鍏ㄩ儴椤圭洰"
           allow-clear
           style="width: 160px"
           size="small"
@@ -341,7 +342,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 表格 -->
+    <!-- 琛ㄦ牸 -->
     <div class="lg-table-wrap">
       <vxe-grid
         :data="tableData"
@@ -373,16 +374,16 @@ onMounted(() => {
         </template>
         <template #action="{ row }">
           <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+            <a class="lg-link" @click="handleEdit(row)">缂栬緫</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">鍒犻櫎</a>
           </div>
         </template>
       </vxe-grid>
     </div>
 
-    <!-- 分页 -->
+    <!-- 鍒嗛〉 -->
     <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
+      <span class="lg-total">鍏?{{ total }} 鏉?/span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -404,10 +405,10 @@ onMounted(() => {
       @cancel="handleModalCancel"
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
-        <a-form-item label="项目" required>
+        <a-form-item label="椤圭洰" required>
           <a-select
             v-model:value="formData.projectId"
-            placeholder="请选择项目"
+            placeholder="璇烽€夋嫨椤圭洰"
             show-search
             @change="
               (v: string) => {
@@ -417,7 +418,7 @@ onMounted(() => {
               }
             "
             :filter-option="
-              (input: string, option: any) =>
+              (input: string, option: SelectOption) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
             "
           >
@@ -426,14 +427,14 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="分包合同">
+        <a-form-item label="鍒嗗寘鍚堝悓">
           <a-select
             v-model:value="formData.contractId"
-            placeholder="请选择合同"
+            placeholder="璇烽€夋嫨鍚堝悓"
             allow-clear
             show-search
             :filter-option="
-              (input: string, option: any) =>
+              (input: string, option: SelectOption) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
             "
             @change="onContractChange"
@@ -443,44 +444,44 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="分包商">
-          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
+        <a-form-item label="鍒嗗寘鍟?>
+          <a-input :value="formPartnerName" disabled placeholder="閫夋嫨鍚堝悓鍚庤嚜鍔ㄥ～鍏呬箼鏂? />
         </a-form-item>
-        <a-form-item label="任务名称" required>
-          <a-input v-model:value="formData.taskName" placeholder="请输入任务名称" />
+        <a-form-item label="浠诲姟鍚嶇О" required>
+          <a-input v-model:value="formData.taskName" placeholder="璇疯緭鍏ヤ换鍔″悕绉? />
         </a-form-item>
-        <a-form-item label="施工区域">
-          <a-input v-model:value="formData.workArea" placeholder="请输入施工区域" />
+        <a-form-item label="鏂藉伐鍖哄煙">
+          <a-input v-model:value="formData.workArea" placeholder="璇疯緭鍏ユ柦宸ュ尯鍩? />
         </a-form-item>
-        <a-form-item label="计划开始日期">
+        <a-form-item label="璁″垝寮€濮嬫棩鏈?>
           <a-date-picker
             v-model:value="formData.plannedStartDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="计划结束日期">
+        <a-form-item label="璁″垝缁撴潫鏃ユ湡">
           <a-date-picker
             v-model:value="formData.plannedEndDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="实际开始日期">
+        <a-form-item label="瀹為檯寮€濮嬫棩鏈?>
           <a-date-picker
             v-model:value="formData.actualStartDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="实际结束日期">
+        <a-form-item label="瀹為檯缁撴潫鏃ユ湡">
           <a-date-picker
             v-model:value="formData.actualEndDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="进度百分比">
+        <a-form-item label="杩涘害鐧惧垎姣?>
           <a-input-number
             v-model:value="formData.progressPercent"
             :min="0"
@@ -489,16 +490,16 @@ onMounted(() => {
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="formData.status" placeholder="请选择状态">
-            <a-select-option value="NOT_STARTED">未开始</a-select-option>
-            <a-select-option value="IN_PROGRESS">进行中</a-select-option>
-            <a-select-option value="COMPLETED">已完成</a-select-option>
-            <a-select-option value="SUSPENDED">已暂停</a-select-option>
+        <a-form-item label="鐘舵€?>
+          <a-select v-model:value="formData.status" placeholder="璇烽€夋嫨鐘舵€?>
+            <a-select-option value="NOT_STARTED">鏈紑濮?/a-select-option>
+            <a-select-option value="IN_PROGRESS">杩涜涓?/a-select-option>
+            <a-select-option value="COMPLETED">宸插畬鎴?/a-select-option>
+            <a-select-option value="SUSPENDED">宸叉殏鍋?/a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea v-model:value="formData.remark" :rows="3" placeholder="请输入备注" />
+        <a-form-item label="澶囨敞">
+          <a-textarea v-model:value="formData.remark" :rows="3" placeholder="璇疯緭鍏ュ娉? />
         </a-form-item>
       </a-form>
     </a-modal>

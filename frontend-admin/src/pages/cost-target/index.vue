@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import {
   PlusOutlined,
@@ -11,6 +11,7 @@ import { getCostTargetList, activateCostTarget, deleteCostTarget } from '@/api/m
 import { useReferenceStore } from '@/stores/reference'
 import CostTargetEditPage from './edit.vue'
 import type { CostTargetVO, CostTargetQueryParams } from '@/types/costTarget'
+import type { SelectOption } from '@/types/ui'
 import {
   APPROVAL_STATUS_LABEL,
   APPROVAL_STATUS_COLOR,
@@ -60,7 +61,7 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('加载目标成本版本列表失败')
+    message.error('鍔犺浇鐩爣鎴愭湰鐗堟湰鍒楄〃澶辫触')
   } finally {
     loading.value = false
   }
@@ -106,19 +107,19 @@ function handleEdit(row: CostTargetVO) {
 
 function handleActivate(row: CostTargetVO) {
   Modal.confirm({
-    title: '确认切换版本？',
-    content: `将激活版本「${row.versionNo} ${row.versionName}」，该项目下其他版本将自动失效。`,
-    okText: '确认切换',
-    cancelText: '取消',
+    title: '纭鍒囨崲鐗堟湰锛?,
+    content: `灏嗘縺娲荤増鏈€?{row.versionNo} ${row.versionName}銆嶏紝璇ラ」鐩笅鍏朵粬鐗堟湰灏嗚嚜鍔ㄥけ鏁堛€俙,
+    okText: '纭鍒囨崲',
+    cancelText: '鍙栨秷',
     onOk: async () => {
       activating.value = true
       try {
         await activateCostTarget(row.id)
-        message.success('版本已激活')
+        message.success('鐗堟湰宸叉縺娲?)
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('版本激活失败')
+        message.error('鐗堟湰婵€娲诲け璐?)
       } finally {
         activating.value = false
       }
@@ -128,20 +129,19 @@ function handleActivate(row: CostTargetVO) {
 
 function handleDelete(row: CostTargetVO) {
   Modal.confirm({
-    title: '确认删除？',
-    content: `将删除版本「${row.versionNo} ${row.versionName}」，删除后不可恢复。`,
-    okText: '确认删除',
+    title: '纭鍒犻櫎锛?,
+    content: `灏嗗垹闄ょ増鏈€?{row.versionNo} ${row.versionName}銆嶏紝鍒犻櫎鍚庝笉鍙仮澶嶃€俙,
+    okText: '纭鍒犻櫎',
     okType: 'danger',
-    cancelText: '取消',
+    cancelText: '鍙栨秷',
     onOk: async () => {
       try {
         await deleteCostTarget(row.id)
-        message.success('已删除')
+        message.success('宸插垹闄?)
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        // 响应拦截器已弹出后端返回的错误消息，此处刷新列表以移除已删除的记录
-        fetchData()
+        // 鍝嶅簲鎷︽埅鍣ㄥ凡寮瑰嚭鍚庣杩斿洖鐨勯敊璇秷鎭紝姝ゅ鍒锋柊鍒楄〃浠ョЩ闄ゅ凡鍒犻櫎鐨勮褰?        fetchData()
       }
     },
   })
@@ -165,21 +165,21 @@ function fmtAmount(val: string): string {
 
 // ---- VxeGrid columns ----
 const columns = [
-  { field: 'versionNo', title: '版本号', width: 130 },
-  { field: 'versionName', title: '版本名称', minWidth: 160 },
-  { field: 'projectName', title: '所属项目', width: 150 },
+  { field: 'versionNo', title: '鐗堟湰鍙?, width: 130 },
+  { field: 'versionName', title: '鐗堟湰鍚嶇О', minWidth: 160 },
+  { field: 'projectName', title: '鎵€灞為」鐩?, width: 150 },
   {
     field: 'totalTargetAmount',
-    title: '目标成本合计(万元)',
+    title: '鐩爣鎴愭湰鍚堣(涓囧厓)',
     width: 150,
     align: 'right' as const,
     slots: { default: 'amount' },
   },
-  { field: 'effectiveDate', title: '生效日期', width: 110 },
-  { field: 'approvalStatus', title: '审批状态', width: 100, slots: { default: 'approvalStatus' } },
-  { field: 'status', title: '业务状态', width: 100, slots: { default: 'status' } },
-  { field: 'isActive', title: '版本标识', width: 100, slots: { default: 'isActive' } },
-  { title: '操作', width: 160, slots: { default: 'ops' } },
+  { field: 'effectiveDate', title: '鐢熸晥鏃ユ湡', width: 110 },
+  { field: 'approvalStatus', title: '瀹℃壒鐘舵€?, width: 100, slots: { default: 'approvalStatus' } },
+  { field: 'status', title: '涓氬姟鐘舵€?, width: 100, slots: { default: 'status' } },
+  { field: 'isActive', title: '鐗堟湰鏍囪瘑', width: 100, slots: { default: 'isActive' } },
+  { title: '鎿嶄綔', width: 160, slots: { default: 'ops' } },
 ]
 
 onMounted(() => {
@@ -192,30 +192,30 @@ onMounted(() => {
   <div class="lg-page app-page">
     <div class="lg-page-head">
       <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
-        <a-breadcrumb-item>目标管理</a-breadcrumb-item>
-        <a-breadcrumb-item>目标成本</a-breadcrumb-item>
+        <a-breadcrumb-item>鐩爣绠＄悊</a-breadcrumb-item>
+        <a-breadcrumb-item>鐩爣鎴愭湰</a-breadcrumb-item>
       </a-breadcrumb>
     </div>
 
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.versionNo"
-        placeholder="搜索版本号…"
+        placeholder="鎼滅储鐗堟湰鍙封€?
         allow-clear
         style="flex: 1; max-width: 240px"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #697380" /></template>
       </a-input>
-      <a-button type="primary" @click="handleSearch">查询</a-button>
-      <a-button @click="handleReset">重置</a-button>
+      <a-button type="primary" @click="handleSearch">鏌ヨ</a-button>
+      <a-button @click="handleReset">閲嶇疆</a-button>
     </div>
 
     <div class="lg-toolbar">
       <div class="lg-toolbar-left">
         <a-button type="primary" @click="handleCreate">
           <template #icon><PlusOutlined /></template>
-          新建目标成本
+          鏂板缓鐩爣鎴愭湰
         </a-button>
         <a-button @click="fetchData">
           <template #icon><ReloadOutlined /></template>
@@ -224,13 +224,13 @@ onMounted(() => {
       <div class="lg-toolbar-right">
         <a-select
           v-model:value="filter.projectId"
-          placeholder="全部项目"
+          placeholder="鍏ㄩ儴椤圭洰"
           allow-clear
           style="width: 160px"
           size="small"
           show-search
           :filter-option="
-            (input: string, option: any) =>
+            (input: string, option: SelectOption) =>
               option.label?.toLowerCase().includes(input.toLowerCase())
           "
           @change="handleSearch"
@@ -267,25 +267,25 @@ onMounted(() => {
           </a-tag>
         </template>
         <template #isActive="{ row }">
-          <a-tag v-if="row.isActive === 1" color="green">当前版本</a-tag>
-          <span v-else class="ct-muted">历史版本</span>
+          <a-tag v-if="row.isActive === 1" color="green">褰撳墠鐗堟湰</a-tag>
+          <span v-else class="ct-muted">鍘嗗彶鐗堟湰</span>
         </template>
         <template #ops="{ row }">
           <div class="ct-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a class="lg-link" @click="handleEdit(row)">缂栬緫</a>
             <a
               v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
               class="lg-link"
               :class="{ 'lg-link--disabled': activating }"
               @click="handleActivate(row)"
             >
-              <CheckCircleOutlined style="margin-right: 4px" />切换版本
+              <CheckCircleOutlined style="margin-right: 4px" />鍒囨崲鐗堟湰
             </a>
             <a
               v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
               class="lg-link lg-link--danger"
               @click="handleDelete(row)"
-              >删除</a
+              >鍒犻櫎</a
             >
           </div>
         </template>
@@ -293,7 +293,7 @@ onMounted(() => {
     </div>
 
     <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
+      <span class="lg-total">鍏?{{ total }} 鏉?/span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -308,7 +308,7 @@ onMounted(() => {
 
     <a-modal
       v-model:open="targetModalVisible"
-      :title="targetModalMode === 'edit' ? '编辑目标成本' : '新建目标成本'"
+      :title="targetModalMode === 'edit' ? '缂栬緫鐩爣鎴愭湰' : '鏂板缓鐩爣鎴愭湰'"
       :width="1160"
       :destroy-on-close="true"
       :footer="null"

@@ -11,14 +11,18 @@ import {
   toggleCostSubjectStatus,
 } from '@/api/modules/costSubject'
 
-// ─── Tab state ──────────────────────────────────────
+// ─── 科目类别标签 ──────────────────────────────
 
-const activeCategory = ref<string>('COST')
-const categoryTabs = [
-  { key: 'COST', tab: '成本科目' },
-  { key: 'REVENUE', tab: '收入科目' },
-  { key: 'SETTLEMENT', tab: '结算科目' },
-]
+const ACCOUNT_CATEGORY_LABEL: Record<string, string> = {
+  COST: '成本',
+  REVENUE: '收入',
+  SETTLEMENT: '结算',
+}
+const ACCOUNT_CATEGORY_COLOR: Record<string, string> = {
+  COST: 'blue',
+  REVENUE: 'success',
+  SETTLEMENT: 'orange',
+}
 
 // ─── Tree state ──────────────────────────────────────────
 
@@ -53,6 +57,7 @@ const formData = reactive<Partial<CostSubjectVO>>({
   subjectCode: '',
   subjectName: '',
   subjectType: 'MATERIAL',
+  accountCategory: 'COST',
   level: 1,
   sortOrder: 0,
   status: 'ENABLE',
@@ -79,7 +84,8 @@ async function fetchSubjectTypes() {
 async function fetchTree() {
   treeLoading.value = true
   try {
-    treeData.value = await getCostSubjectTree(activeCategory.value)
+    // 不传 category，一次性加载全部科目
+    treeData.value = await getCostSubjectTree()
   } catch (e: unknown) {
     console.error(e)
     message.error('加载科目树失败')
@@ -87,12 +93,6 @@ async function fetchTree() {
   } finally {
     treeLoading.value = false
   }
-}
-
-function handleCategoryChange() {
-  selectedKeys.value = []
-  expandedKeys.value = []
-  fetchTree()
 }
 
 function handleTreeSelect(keys: string[]) {
@@ -108,6 +108,7 @@ function handleAddRoot() {
   formData.subjectCode = ''
   formData.subjectName = ''
   formData.subjectType = 'MATERIAL'
+  formData.accountCategory = 'COST'
   formData.level = 1
   formData.sortOrder = 0
   formData.status = 'ENABLE'
@@ -124,6 +125,7 @@ function handleAddChild() {
   formData.subjectCode = ''
   formData.subjectName = ''
   formData.subjectType = 'MATERIAL'
+  formData.accountCategory = selectedNode.value.accountCategory
   formData.level = (selectedNode.value.level || 0) + 1
   formData.sortOrder = 0
   formData.status = 'ENABLE'
@@ -141,6 +143,7 @@ function handleEdit() {
   formData.subjectCode = node.subjectCode
   formData.subjectName = node.subjectName
   formData.subjectType = node.subjectType
+  formData.accountCategory = node.accountCategory
   formData.level = node.level
   formData.sortOrder = node.sortOrder
   formData.status = node.status
@@ -163,7 +166,6 @@ async function handleFormSubmit() {
     }
     formVisible.value = false
     await fetchTree()
-    // Restore selection
     const newId = formMode.value === 'create' ? undefined : selectedKeys.value[0]
     if (newId) selectedKeys.value = [newId]
   } catch (e: unknown) {
@@ -252,17 +254,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Category Tabs -->
-    <a-tabs
-      v-model:activeKey="activeCategory"
-      @change="handleCategoryChange"
-      class="cs-category-tabs"
-    >
-      <a-tab-pane v-for="tab in categoryTabs" :key="tab.key" :tab="tab.tab" />
-    </a-tabs>
-
     <div class="cs-layout">
-      <!-- Left: Tree -->
+      <!-- 左侧：科目树 -->
       <div class="lg-table-wrap cs-tree-panel">
         <div class="cs-tree-header">
           <span class="cs-tree-title">科目树</span>
@@ -280,8 +273,15 @@ onMounted(() => {
             @select="handleTreeSelect"
             @expand="(keys: string[]) => (expandedKeys = keys)"
           >
-            <template #title="{ subjectCode, subjectName }">
+            <template #title="{ subjectCode, subjectName, accountCategory }">
               <span class="cs-tree-node">
+                <a-tag
+                  :color="ACCOUNT_CATEGORY_COLOR[accountCategory] ?? 'default'"
+                  size="small"
+                  style="font-size: 10px; line-height: 16px"
+                >
+                  {{ ACCOUNT_CATEGORY_LABEL[accountCategory] ?? accountCategory }}
+                </a-tag>
                 <span class="cs-tree-code">{{ subjectCode }}</span>
                 <span class="cs-tree-name">{{ subjectName }}</span>
               </span>
@@ -291,7 +291,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Right: Detail -->
+      <!-- 右侧：详情 -->
       <div class="lg-table-wrap cs-detail-panel">
         <template v-if="selectedNode">
           <div class="cs-detail-header">
@@ -322,6 +322,14 @@ onMounted(() => {
             <a-descriptions-item label="科目名称">{{
               selectedNode.subjectName
             }}</a-descriptions-item>
+            <a-descriptions-item label="科目类别">
+              <a-tag :color="ACCOUNT_CATEGORY_COLOR[selectedNode.accountCategory] ?? 'default'">
+                {{
+                  ACCOUNT_CATEGORY_LABEL[selectedNode.accountCategory] ??
+                  selectedNode.accountCategory
+                }}
+              </a-tag>
+            </a-descriptions-item>
             <a-descriptions-item label="科目类型">
               <a-tag>{{
                 subjectTypeOptions.find((o) => o.dictValue === selectedNode.subjectType)
@@ -372,6 +380,27 @@ onMounted(() => {
             </a-form-item>
           </a-col>
           <a-col :span="12">
+            <a-form-item label="科目类别" v-if="formData.parentId == null">
+              <a-select
+                v-model:value="formData.accountCategory"
+                :options="[
+                  { value: 'COST', label: '成本科目' },
+                  { value: 'REVENUE', label: '收入科目' },
+                  { value: 'SETTLEMENT', label: '结算科目' },
+                ]"
+                placeholder="请选择科目类别"
+              />
+            </a-form-item>
+            <a-form-item v-else label="科目类别">
+              <a-tag :color="ACCOUNT_CATEGORY_COLOR[formData.accountCategory!] ?? 'default'">
+                {{ ACCOUNT_CATEGORY_LABEL[formData.accountCategory!] ?? formData.accountCategory }}
+              </a-tag>
+              <span style="color: #9ca3af; font-size: 12px; margin-left: 4px"
+                >（继承自父节点）</span
+              >
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
             <a-form-item label="科目类型">
               <a-select
                 v-model:value="formData.subjectType"
@@ -409,10 +438,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.cs-category-tabs {
-  margin-bottom: 0;
-}
-
 .cs-layout {
   display: flex;
   gap: 16px;
@@ -420,7 +445,7 @@ onMounted(() => {
 }
 
 .cs-tree-panel {
-  width: 320px;
+  width: 340px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -449,7 +474,7 @@ onMounted(() => {
 
 .cs-tree-node {
   display: inline-flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 

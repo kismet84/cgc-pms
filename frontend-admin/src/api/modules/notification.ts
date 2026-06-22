@@ -1,4 +1,5 @@
 import { request } from '@/api/request'
+import service from '@/api/request'
 import type { PageResult } from '@/types/api'
 import type {
   NotificationVO,
@@ -50,7 +51,7 @@ export function markAllAsRead() {
  * - 组件卸载时调用 `es.close()`
  */
 export function createNotificationStream(): EventSource {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api'
+  const baseUrl = (service.defaults.baseURL ?? '/api') as string
   const es = new EventSource(`${baseUrl}/notifications/stream`, {
     withCredentials: true,
   })

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
@@ -15,6 +15,7 @@ import {
 import { getContractItems } from '@/api/modules/contract'
 import { useReferenceStore } from '@/stores/reference'
 import type { SubMeasureVO, SubMeasureItemVO } from '@/types/subcontract'
+import type { SelectOption } from '@/types/ui'
 import type { ContractItem } from '@/types/contract'
 
 const filter = reactive({
@@ -37,7 +38,7 @@ const { projects: projectList, contracts: contractList } = storeToRefs(reference
 const contractItemList = ref<ContractItem[]>([])
 
 const modalVisible = ref(false)
-const modalTitle = ref('新建分包计量')
+const modalTitle = ref('鏂板缓鍒嗗寘璁￠噺')
 const editingId = ref<string | null>(null)
 const formData = reactive<Partial<SubMeasureVO>>({
   projectId: undefined,
@@ -56,10 +57,10 @@ const itemList = ref<(Partial<SubMeasureItemVO> & { key: number })[]>([])
 let itemKeyCounter = 0
 
 const STATUS_LABEL: Record<string, string> = {
-  DRAFT: '草稿',
-  APPROVING: '审批中',
-  CONFIRMED: '已确认',
-  COMPLETED: '已完成',
+  DRAFT: '鑽夌',
+  APPROVING: '瀹℃壒涓?,
+  CONFIRMED: '宸茬‘璁?,
+  COMPLETED: '宸插畬鎴?,
 }
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',
@@ -70,36 +71,36 @@ const STATUS_COLOR: Record<string, string> = {
 
 // ---- vxe-grid columns ----
 const gridColumns = computed(() => [
-  { field: 'measureCode', title: '计量编号', width: 140, ellipsis: true },
-  { field: 'measurePeriod', title: '计量期次', width: 100 },
-  { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
-  { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
-  { field: 'partnerName', title: '分包商', width: 120, ellipsis: true },
+  { field: 'measureCode', title: '璁￠噺缂栧彿', width: 140, ellipsis: true },
+  { field: 'measurePeriod', title: '璁￠噺鏈熸', width: 100 },
+  { field: 'projectName', title: '椤圭洰鍚嶇О', width: 120, ellipsis: true },
+  { field: 'contractName', title: '鍚堝悓鍚嶇О', width: 120, ellipsis: true },
+  { field: 'partnerName', title: '鍒嗗寘鍟?, width: 120, ellipsis: true },
   {
     field: 'reportedAmount',
-    title: '申报金额',
+    title: '鐢虫姤閲戦',
     width: 100,
     align: 'right' as const,
     slots: { default: 'reportedAmount' },
   },
   {
     field: 'approvedAmount',
-    title: '审核金额',
+    title: '瀹℃牳閲戦',
     width: 100,
     align: 'right' as const,
     slots: { default: 'approvedAmount' },
   },
   {
     field: 'netAmount',
-    title: '净额',
+    title: '鍑€棰?,
     width: 100,
     align: 'right' as const,
     slots: { default: 'netAmount' },
   },
-  { field: 'measureDate', title: '计量日期', width: 100 },
-  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
-  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
-  { title: '操作', width: 110, slots: { default: 'action' } },
+  { field: 'measureDate', title: '璁￠噺鏃ユ湡', width: 100 },
+  { field: 'status', title: '鐘舵€?, width: 80, slots: { default: 'status' } },
+  { field: 'approvalStatus', title: '瀹℃壒鐘舵€?, width: 90, slots: { default: 'approvalStatus' } },
+  { title: '鎿嶄綔', width: 110, slots: { default: 'action' } },
 ])
 
 async function fetchData() {
@@ -120,7 +121,7 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('加载分包计量列表失败，请稍后重试')
+    message.error('鍔犺浇鍒嗗寘璁￠噺鍒楄〃澶辫触锛岃绋嶅悗閲嶈瘯')
   } finally {
     loading.value = false
   }
@@ -133,7 +134,7 @@ async function loadContractItems(contractId: string) {
   } catch (e: unknown) {
     console.error(e)
     contractItemList.value = []
-    message.error('加载合同清单失败')
+    message.error('鍔犺浇鍚堝悓娓呭崟澶辫触')
   }
 }
 
@@ -165,7 +166,7 @@ function handlePageSizeChange(_cur: number, size: number) {
 }
 
 function handleAdd() {
-  modalTitle.value = '新建分包计量'
+  modalTitle.value = '鏂板缓鍒嗗寘璁￠噺'
   editingId.value = null
   Object.assign(formData, {
     projectId: undefined,
@@ -182,7 +183,7 @@ function handleAdd() {
 }
 
 async function handleEdit(record: SubMeasureVO) {
-  modalTitle.value = '编辑分包计量'
+  modalTitle.value = '缂栬緫鍒嗗寘璁￠噺'
   editingId.value = record.id
   Object.assign(formData, {
     projectId: record.projectId,
@@ -207,7 +208,7 @@ async function handleEdit(record: SubMeasureVO) {
     }))
   } catch (e: unknown) {
     console.error(e)
-    message.error('加载明细失败')
+    message.error('鍔犺浇鏄庣粏澶辫触')
     itemList.value = []
   }
   modalVisible.value = true
@@ -215,18 +216,18 @@ async function handleEdit(record: SubMeasureVO) {
 
 function handleDelete(record: SubMeasureVO) {
   Modal.confirm({
-    title: '确认删除',
-    content: `确定要删除分包计量"${record.measureCode}"吗？`,
-    okText: '确定',
-    cancelText: '取消',
+    title: '纭鍒犻櫎',
+    content: `纭畾瑕佸垹闄ゅ垎鍖呰閲?${record.measureCode}"鍚楋紵`,
+    okText: '纭畾',
+    cancelText: '鍙栨秷',
     onOk: async () => {
       try {
         await deleteMeasure(record.id)
-        message.success('删除成功')
+        message.success('鍒犻櫎鎴愬姛')
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('删除失败，请稍后重试')
+        message.error('鍒犻櫎澶辫触锛岃绋嶅悗閲嶈瘯')
       }
     },
   })
@@ -234,18 +235,18 @@ function handleDelete(record: SubMeasureVO) {
 
 function handleSubmitApproval(record: SubMeasureVO) {
   Modal.confirm({
-    title: '确认提交',
-    content: `确定要提交分包计量"${record.measureCode}"吗？提交后将进入审批流程`,
-    okText: '确定',
-    cancelText: '取消',
+    title: '纭鎻愪氦',
+    content: `纭畾瑕佹彁浜ゅ垎鍖呰閲?${record.measureCode}"鍚楋紵鎻愪氦鍚庡皢杩涘叆瀹℃壒娴佺▼`,
+    okText: '纭畾',
+    cancelText: '鍙栨秷',
     onOk: async () => {
       try {
         await submitMeasureForApproval(record.id)
-        message.success('提交审批成功')
+        message.success('鎻愪氦瀹℃壒鎴愬姛')
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('提交审批失败')
+        message.error('鎻愪氦瀹℃壒澶辫触')
       }
     },
   })
@@ -322,7 +323,7 @@ async function onContractSelect(contractId: string | undefined) {
 
 async function handleModalOk() {
   if (!formData.projectId) {
-    message.warning('请选择项目')
+    message.warning('璇烽€夋嫨椤圭洰')
     return
   }
 
@@ -331,11 +332,11 @@ async function handleModalOk() {
     if (editingId.value) {
       await updateMeasure(editingId.value, formData)
       measureId = editingId.value
-      message.success('更新成功')
+      message.success('鏇存柊鎴愬姛')
     } else {
       const result = await createMeasure(formData)
       measureId = result
-      message.success('创建成功')
+      message.success('鍒涘缓鎴愬姛')
     }
 
     // Save line items
@@ -351,7 +352,7 @@ async function handleModalOk() {
     fetchData()
   } catch (e: unknown) {
     console.error(e)
-    message.error('操作失败，请稍后重试')
+    message.error('鎿嶄綔澶辫触锛岃绋嶅悗閲嶈瘯')
   }
 }
 
@@ -388,49 +389,49 @@ onMounted(() => {
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="lg-breadcrumb">
-          <a-breadcrumb-item>分包管理</a-breadcrumb-item>
-          <a-breadcrumb-item>分包计量</a-breadcrumb-item>
+          <a-breadcrumb-item>鍒嗗寘绠＄悊</a-breadcrumb-item>
+          <a-breadcrumb-item>鍒嗗寘璁￠噺</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
     </div>
 
-    <!-- 搜索栏 -->
+    <!-- 鎼滅储鏍?-->
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.keyword"
-        placeholder="搜索计量编号…"
+        placeholder="鎼滅储璁￠噺缂栧彿鈥?
         allow-clear
         size="large"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #697380" /></template>
       </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button type="primary" size="large" @click="handleSearch">鏌ヨ</a-button>
       <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
-        重置
+        閲嶇疆
       </a-button>
     </div>
 
-    <!-- KPI 横条 -->
+    <!-- KPI 妯潯 -->
     <div class="lg-kpi-strip">
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">计量总数</span>
-        <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>条</small></span>
+        <span class="lg-kpi-card-label">璁￠噺鎬绘暟</span>
+        <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>鏉?/small></span>
         <span class="lg-kpi-card-bar"
           ><span style="width: 100%; background: var(--kpi-total)"></span
         ></span>
       </div>
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">申报总额</span>
-        <span class="lg-kpi-card-value">{{ fmtAmount(kpiMeasureTotal) }} <small>元</small></span>
+        <span class="lg-kpi-card-label">鐢虫姤鎬婚</span>
+        <span class="lg-kpi-card-value">{{ fmtAmount(kpiMeasureTotal) }} <small>鍏?/small></span>
         <span class="lg-kpi-card-bar"
           ><span style="width: 100%; background: var(--kpi-amount)"></span
         ></span>
       </div>
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">已审核金额</span>
-        <span class="lg-kpi-card-value">{{ fmtAmount(kpiApproved) }} <small>元</small></span>
+        <span class="lg-kpi-card-label">宸插鏍搁噾棰?/span>
+        <span class="lg-kpi-card-value">{{ fmtAmount(kpiApproved) }} <small>鍏?/small></span>
         <span class="lg-kpi-card-bar"
           ><span
             :style="{
@@ -445,8 +446,8 @@ onMounted(() => {
         >
       </div>
       <div class="lg-kpi-card is-warn" v-if="kpiMeasurePending > 0">
-        <span class="lg-kpi-card-label">待审核</span>
-        <span class="lg-kpi-card-value">{{ kpiMeasurePending }} <small>条</small></span>
+        <span class="lg-kpi-card-label">寰呭鏍?/span>
+        <span class="lg-kpi-card-value">{{ kpiMeasurePending }} <small>鏉?/small></span>
         <span class="lg-kpi-card-bar"
           ><span
             :style="{
@@ -462,12 +463,12 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 工具栏 -->
+    <!-- 宸ュ叿鏍?-->
     <div class="lg-toolbar">
       <div class="lg-toolbar-left">
         <a-button type="primary" @click="handleAdd">
           <template #icon><PlusOutlined /></template>
-          新建计量
+          鏂板缓璁￠噺
         </a-button>
         <a-button @click="fetchData">
           <template #icon><ReloadOutlined /></template>
@@ -476,13 +477,13 @@ onMounted(() => {
       <div class="lg-toolbar-right">
         <a-select
           v-model:value="filter.projectId"
-          placeholder="全部项目"
+          placeholder="鍏ㄩ儴椤圭洰"
           allow-clear
           style="width: 160px"
           size="small"
           show-search
           :filter-option="
-            (input: string, option: any) =>
+            (input: string, option: SelectOption) =>
               option.label?.toLowerCase().includes(input.toLowerCase())
           "
           @change="
@@ -500,7 +501,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 表格 -->
+    <!-- 琛ㄦ牸 -->
     <div class="lg-table-wrap">
       <vxe-grid
         :data="tableData"
@@ -540,22 +541,22 @@ onMounted(() => {
         </template>
         <template #action="{ row }">
           <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+            <a class="lg-link" @click="handleEdit(row)">缂栬緫</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">鍒犻櫎</a>
             <a
               v-if="row.approvalStatus === 'DRAFT'"
               class="lg-link"
               @click="handleSubmitApproval(row)"
-              >提交审批</a
+              >鎻愪氦瀹℃壒</a
             >
           </div>
         </template>
       </vxe-grid>
     </div>
 
-    <!-- 分页 -->
+    <!-- 鍒嗛〉 -->
     <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
+      <span class="lg-total">鍏?{{ total }} 鏉?/span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -578,10 +579,10 @@ onMounted(() => {
     >
       <!-- Header Form -->
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
-        <a-form-item label="项目" required>
+        <a-form-item label="椤圭洰" required>
           <a-select
             v-model:value="formData.projectId"
-            placeholder="请选择项目"
+            placeholder="璇烽€夋嫨椤圭洰"
             show-search
             @change="
               (v: string) => {
@@ -591,7 +592,7 @@ onMounted(() => {
               }
             "
             :filter-option="
-              (input: string, option: any) =>
+              (input: string, option: SelectOption) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
             "
           >
@@ -600,14 +601,14 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="分包合同">
+        <a-form-item label="鍒嗗寘鍚堝悓">
           <a-select
             v-model:value="formData.contractId"
-            placeholder="请选择合同"
+            placeholder="璇烽€夋嫨鍚堝悓"
             allow-clear
             show-search
             :filter-option="
-              (input: string, option: any) =>
+              (input: string, option: SelectOption) =>
                 option.label?.toLowerCase().includes(input.toLowerCase())
             "
             @change="(val: string) => onContractSelect(val)"
@@ -617,24 +618,24 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="分包商">
-          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
+        <a-form-item label="鍒嗗寘鍟?>
+          <a-input :value="formPartnerName" disabled placeholder="閫夋嫨鍚堝悓鍚庤嚜鍔ㄥ～鍏呬箼鏂? />
         </a-form-item>
-        <a-form-item label="计量期次">
+        <a-form-item label="璁￠噺鏈熸">
           <a-input
             v-model:value="formData.measurePeriod"
-            placeholder="请输入计量期次（如：第1期）"
+            placeholder="璇疯緭鍏ヨ閲忔湡娆★紙濡傦細绗?鏈燂級"
           />
         </a-form-item>
-        <a-form-item label="计量日期">
+        <a-form-item label="璁￠噺鏃ユ湡">
           <a-date-picker
             v-model:value="formData.measureDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
+        <a-form-item label="澶囨敞">
+          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="璇疯緭鍏ュ娉? />
         </a-form-item>
       </a-form>
 
@@ -648,8 +649,8 @@ onMounted(() => {
             margin-bottom: 10px;
           "
         >
-          <span style="font-weight: 600; font-size: 14px">计量明细</span>
-          <a-button type="dashed" size="small" @click="handleAddItem">+ 添加明细</a-button>
+          <span style="font-weight: 600; font-size: 14px">璁￠噺鏄庣粏</span>
+          <a-button type="dashed" size="small" @click="handleAddItem">+ 娣诲姞鏄庣粏</a-button>
         </div>
 
         <a-table
@@ -659,11 +660,11 @@ onMounted(() => {
           size="small"
           :scroll="{ y: 250 }"
         >
-          <a-table-column title="合同清单项" width="200">
+          <a-table-column title="鍚堝悓娓呭崟椤? width="200">
             <template #default="{ record: item, index }">
               <a-select
                 :value="item.contractItemId"
-                placeholder="请选择清单项"
+                placeholder="璇烽€夋嫨娓呭崟椤?
                 allow-clear
                 style="width: 100%"
                 @change="(val: string) => handleContractItemChange(index, val)"
@@ -674,17 +675,17 @@ onMounted(() => {
               </a-select>
             </template>
           </a-table-column>
-          <a-table-column title="单位" width="70">
+          <a-table-column title="鍗曚綅" width="70">
             <template #default="{ record: item }">
               <span>{{ item.unit || '-' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="合同量" width="100">
+          <a-table-column title="鍚堝悓閲? width="100">
             <template #default="{ record: item }">
               <span>{{ item.contractQuantity || '-' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="本期量" width="120">
+          <a-table-column title="鏈湡閲? width="120">
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.currentQuantity"
@@ -695,7 +696,7 @@ onMounted(() => {
               />
             </template>
           </a-table-column>
-          <a-table-column title="单价(元)" width="130">
+          <a-table-column title="鍗曚环(鍏?" width="130">
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.unitPrice"
@@ -706,24 +707,24 @@ onMounted(() => {
               />
             </template>
           </a-table-column>
-          <a-table-column title="金额(元)" width="130">
+          <a-table-column title="閲戦(鍏?" width="130">
             <template #default="{ record: item }">
               <span>{{
                 Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
               }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="操作" width="60">
+          <a-table-column title="鎿嶄綔" width="60">
             <template #default="{ index }">
               <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
-                >删除</a-button
+                >鍒犻櫎</a-button
               >
             </template>
           </a-table-column>
         </a-table>
 
         <div style="text-align: right; margin-top: 8px; font-size: 14px">
-          合计：<span style="font-weight: 600; color: #1677ff">{{
+          鍚堣锛?span style="font-weight: 600; color: #1677ff">{{
             Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
           }}</span>
         </div>
@@ -733,7 +734,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 页面专属样式 — 其余已由 lg-* 全局类覆盖 */
+/* 椤甸潰涓撳睘鏍峰紡 鈥?鍏朵綑宸茬敱 lg-* 鍏ㄥ眬绫昏鐩?*/
 .lg-breadcrumb {
   margin-bottom: 5px;
   font-size: 13px;
