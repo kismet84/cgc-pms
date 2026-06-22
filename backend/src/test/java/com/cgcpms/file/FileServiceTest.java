@@ -77,6 +77,8 @@ class FileServiceTest {
     @DisplayName("upload rejects oversized file (>50MB) with FILE_TOO_LARGE")
     void testUploadRejectsOversizedFile() {
         byte[] bigContent = new byte[51 * 1024 * 1024]; // 51 MB
+        // Set valid PDF signature at the start so size check is reached
+        System.arraycopy("%PDF-".getBytes(), 0, bigContent, 0, 5);
         MockMultipartFile bigFile = new MockMultipartFile(
                 "file", "big.pdf", "application/pdf", bigContent);
 
@@ -119,8 +121,9 @@ class FileServiceTest {
     @Test
     @DisplayName("upload rejects null businessType with FILE_PARAM_MISSING")
     void testUploadRejectsNullBusinessType() {
+        byte[] pdfContent = "%PDF-1.4 valid".getBytes();
         MockMultipartFile file = new MockMultipartFile(
-                "file", "test.pdf", "application/pdf", "content".getBytes());
+                "file", "test.pdf", "application/pdf", pdfContent);
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 fileService.upload(file, null, 1L));
@@ -130,8 +133,9 @@ class FileServiceTest {
     @Test
     @DisplayName("upload rejects blank businessType with FILE_PARAM_MISSING")
     void testUploadRejectsBlankBusinessType() {
+        byte[] pdfContent = "%PDF-1.4 valid".getBytes();
         MockMultipartFile file = new MockMultipartFile(
-                "file", "test.pdf", "application/pdf", "content".getBytes());
+                "file", "test.pdf", "application/pdf", pdfContent);
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 fileService.upload(file, "   ", 1L));
@@ -141,8 +145,9 @@ class FileServiceTest {
     @Test
     @DisplayName("upload rejects null businessId with FILE_PARAM_MISSING")
     void testUploadRejectsNullBusinessId() {
+        byte[] pdfContent = "%PDF-1.4 valid".getBytes();
         MockMultipartFile file = new MockMultipartFile(
-                "file", "test.pdf", "application/pdf", "content".getBytes());
+                "file", "test.pdf", "application/pdf", pdfContent);
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 fileService.upload(file, "CONTRACT", null));
@@ -157,8 +162,9 @@ class FileServiceTest {
     @Test
     @DisplayName("upload rejects businessType with path traversal chars (when authorizer bypassed)")
     void testUploadRejectsPathTraversalInBusinessType() {
+        byte[] pdfContent = "%PDF-1.4 valid".getBytes();
         MockMultipartFile file = new MockMultipartFile(
-                "file", "test.pdf", "application/pdf", "content".getBytes());
+                "file", "test.pdf", "application/pdf", pdfContent);
 
         // businessType 含 "/" 会被正则 [A-Za-z0-9_-]+ 拒绝
         BusinessException ex = assertThrows(BusinessException.class, () ->
@@ -169,8 +175,9 @@ class FileServiceTest {
     @Test
     @DisplayName("upload allows valid businessType with alphanumeric, dash, underscore")
     void testUploadAllowsValidBusinessTypeFormat() {
+        byte[] pdfContent = "%PDF-1.4 valid".getBytes();
         MockMultipartFile file = new MockMultipartFile(
-                "file", "test.pdf", "application/pdf", "content".getBytes());
+                "file", "test.pdf", "application/pdf", pdfContent);
 
         // 合法 businessType 格式 + mocked authorizer + mocked MinIO
         // 后续操作（DB insert）在 H2 中正常执行
@@ -183,5 +190,24 @@ class FileServiceTest {
             assertNotEquals("FILE_PARAM_INVALID", e.getCode(),
                     "合法格式 businessType 不应被格式校验拒绝: " + e.getCode());
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 6. 伪装文件 — MIME/扩展名与实际魔术字节不匹配
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("upload rejects file with PDF extension but PE/EXE magic bytes")
+    void testUploadRejectsPdfWithExeMagic() {
+        // MZ header (PE executable) masquerading as .pdf
+        byte[] exeContent = new byte[] {0x4D, 0x5A, 0x00, 0x00, 0x00, 0x00};
+        MockMultipartFile fakePdf = new MockMultipartFile(
+                "file", "report.pdf", "application/pdf", exeContent);
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                fileService.upload(fakePdf, "CONTRACT", 1L));
+        assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
+        assertTrue(ex.getMessage().contains("无法识别") || ex.getMessage().contains("不匹配"),
+                "应提示文件格式无法识别或类型不匹配: " + ex.getMessage());
     }
 }

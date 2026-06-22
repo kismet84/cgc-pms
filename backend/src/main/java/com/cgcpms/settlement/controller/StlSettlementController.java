@@ -1,5 +1,6 @@
 package com.cgcpms.settlement.controller;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
@@ -66,12 +67,14 @@ public class StlSettlementController {
     }
 
     @PostMapping
+    @AuditedOperation(type = "CREATE", businessType = "SETTLEMENT", businessIdExpression = "#settlement.id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:add')")
     public ApiResponse<String> create(@Valid @RequestBody StlSettlement settlement) {
         return ApiResponse.success(String.valueOf(writeService.create(settlement)));
     }
 
     @PutMapping("/{id}")
+    @AuditedOperation(type = "UPDATE", businessType = "SETTLEMENT", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody StlSettlement settlement) {
         settlement.setId(id);
@@ -80,6 +83,7 @@ public class StlSettlementController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditedOperation(type = "DELETE", businessType = "SETTLEMENT", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         writeService.delete(id);
@@ -154,6 +158,7 @@ public class StlSettlementController {
     // ---- Workflow ----
 
     @PostMapping("/{id}/submit")
+    @AuditedOperation(type = "SUBMIT", businessType = "SETTLEMENT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('settlement:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         writeService.submitForApproval(id);

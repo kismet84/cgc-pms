@@ -1,5 +1,6 @@
 package com.cgcpms.receipt.controller;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
@@ -47,12 +48,14 @@ public class MatReceiptController {
     }
 
     @PostMapping
+    @AuditedOperation(type = "CREATE", businessType = "RECEIPT", businessIdExpression = "#receipt.id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:add')")
     public ApiResponse<Long> create(@Valid @RequestBody MatReceipt receipt) {
         return ApiResponse.success(matReceiptService.create(receipt));
     }
 
     @PutMapping("/{id}")
+    @AuditedOperation(type = "UPDATE", businessType = "RECEIPT", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MatReceipt receipt) {
         receipt.setId(id);
@@ -61,6 +64,7 @@ public class MatReceiptController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditedOperation(type = "DELETE", businessType = "RECEIPT", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         matReceiptService.delete(id);
@@ -68,6 +72,7 @@ public class MatReceiptController {
     }
 
     @PostMapping("/{id}/submit")
+    @AuditedOperation(type = "SUBMIT", businessType = "RECEIPT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('receipt:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         matReceiptService.submitForApproval(id);

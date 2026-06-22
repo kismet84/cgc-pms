@@ -1,5 +1,6 @@
 package com.cgcpms.file.controller;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.annotation.RateLimit;
 import com.cgcpms.common.annotation.RateLimitKey;
 import com.cgcpms.common.result.ApiResponse;
@@ -22,6 +23,7 @@ public class FileController {
     private final FileService fileService;
 
     @PostMapping("/upload")
+    @AuditedOperation(type = "UPLOAD", businessType = "FILE")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:upload')")
     @RateLimit(maxRequests = 20, windowSeconds = 60, key = RateLimitKey.USER)
     public ApiResponse<SysFileVO> upload(
@@ -32,12 +34,14 @@ public class FileController {
     }
 
     @GetMapping("/{id}/url")
+    @AuditedOperation(type = "DOWNLOAD", businessType = "FILE", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')")
     public ApiResponse<String> getUrl(@PathVariable Long id) {
         return ApiResponse.success(fileService.getPresignedUrl(id));
     }
 
     @DeleteMapping("/{id}")
+    @AuditedOperation(type = "DELETE", businessType = "FILE", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         fileService.delete(id);

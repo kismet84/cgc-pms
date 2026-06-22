@@ -27,7 +27,6 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -38,17 +37,12 @@ import java.util.concurrent.TimeUnit;
 public class FileService {
 
     private static final int PRESIGNED_URL_EXPIRE_MINUTES = 5;
-    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024L; // 50 MB
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-            ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
-            ".zip", ".rar", ".7z", ".txt", ".csv"
-    );
 
     private final SysFileMapper sysFileMapper;
     private final MinioClient minioClient;
     private final MinioConfig minioConfig;
     private final com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer;
+    private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     /**
      * Ensure the configured bucket exists on startup.
@@ -75,13 +69,17 @@ public class FileService {
         if (file.isEmpty()) {
             throw new BusinessException("FILE_EMPTY", "上传文件不能为空");
         }
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new BusinessException("FILE_TOO_LARGE", "文件大小不能超过 50MB");
+
+        // 联合类型校验（扩展名 + MIME + 魔术字节）— 在权限校验之前执行
+        byte[] content;
+        try {
+            content = file.getBytes();
+        } catch (Exception e) {
+            throw new BusinessException("FILE_EMPTY", "无法读取文件内容");
         }
-        String ext = getExtension(file.getOriginalFilename()).toLowerCase();
-        if (!ALLOWED_EXTENSIONS.contains(ext)) {
-            throw new BusinessException("FILE_TYPE_NOT_ALLOWED", "不支持的文件类型: " + ext);
-        }
+        FileTypeValidator.ValidationResult vr = fileTypeValidator.validate(
+                file.getOriginalFilename(), file.getContentType(), content);
+
         if (businessType == null || businessType.isBlank()) {
             throw new BusinessException("FILE_PARAM_MISSING", "业务类型不能为空");
         }
@@ -96,17 +94,21 @@ public class FileService {
         }
 
         try {
-            String originalName = file.getOriginalFilename();
-            String fileName = UUID.randomUUID().toString().replace("-", "") + ext;
+            String originalName = vr.sanitizedName();
+            String fileName = UUID.randomUUID().toString().replace("-", "") + vr.extension();
             String storagePath = businessType + "/" + businessId + "/" + fileName;
             String bucketName = minioConfig.getBucket();
+            String contentType = vr.detectedMime();
 
-            // Upload to MinIO
+            // Re-build InputStream since getBytes() consumed it
+            java.io.InputStream inputStream = new java.io.ByteArrayInputStream(content);
+
+            // Upload to MinIO — use detectedMime, not client-provided contentType
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(bucketName)
                     .object(storagePath)
-                    .stream(file.getInputStream(), file.getSize(), -1)
-                    .contentType(file.getContentType())
+                    .stream(inputStream, content.length, -1)
+                    .contentType(contentType)
                     .build());
 
             // Persist file record
@@ -116,8 +118,8 @@ public class FileService {
             sysFile.setBusinessId(businessId);
             sysFile.setFileName(fileName);
             sysFile.setOriginalName(originalName);
-            sysFile.setFileSize(file.getSize());
-            sysFile.setContentType(file.getContentType());
+            sysFile.setFileSize((long) content.length);
+            sysFile.setContentType(contentType);
             sysFile.setStoragePath(storagePath);
             sysFile.setBucketName(bucketName);
             sysFileMapper.insert(sysFile);
@@ -250,10 +252,5 @@ public class FileService {
         vo.setPresignedUrl(presignedUrl);
         if (f.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(f.getCreatedAt()));
         return vo;
-    }
-
-    private String getExtension(String fileName) {
-        if (fileName == null || !fileName.contains(".")) return "";
-        return fileName.substring(fileName.lastIndexOf('.'));
     }
 }

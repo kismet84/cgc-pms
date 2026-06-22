@@ -1,5 +1,6 @@
 package com.cgcpms.contract.controller;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
@@ -64,12 +65,14 @@ public class CtContractController {
     }
 
     @PostMapping
+    @AuditedOperation(type = "CREATE", businessType = "CONTRACT", businessIdExpression = "#contract.id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
     public ApiResponse<String> create(@Valid @RequestBody CtContract contract) {
         return ApiResponse.success(String.valueOf(ctContractService.create(contract)));
     }
 
     @PutMapping("/{id}")
+    @AuditedOperation(type = "UPDATE", businessType = "CONTRACT", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CtContract contract) {
         contract.setId(id);
@@ -78,6 +81,7 @@ public class CtContractController {
     }
 
     @PostMapping("/{id}/submit")
+    @AuditedOperation(type = "SUBMIT", businessType = "CONTRACT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('contract:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         ctContractService.submitForApproval(id);
@@ -85,6 +89,7 @@ public class CtContractController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditedOperation(type = "DELETE", businessType = "CONTRACT", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         ctContractService.delete(id);

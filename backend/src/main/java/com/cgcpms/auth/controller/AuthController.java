@@ -1,5 +1,6 @@
 package com.cgcpms.auth.controller;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.auth.config.JwtProperties;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.dto.LoginRequest;
@@ -40,6 +41,7 @@ public class AuthController {
     }
 
     @RateLimit(maxRequests = 5, windowSeconds = 60)
+    @AuditedOperation(type = "LOGIN")
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                              HttpServletResponse response) {
@@ -60,6 +62,7 @@ public class AuthController {
         return ApiResponse.success(authService.getUserInfo(UserContext.getCurrentUserId()));
     }
 
+    @AuditedOperation(type = "LOGOUT")
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> logout(HttpServletRequest request,
