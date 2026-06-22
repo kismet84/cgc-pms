@@ -5,15 +5,23 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const ledgerSource = readFileSync(resolve(currentDir, '../ContractLedgerPage.vue'), 'utf-8')
+const composableSource = readFileSync(
+  resolve(currentDir, '../composables/useContractLedger.ts'),
+  'utf-8',
+)
+const analysisSource = readFileSync(
+  resolve(currentDir, '../components/ContractAnalysisPanel.vue'),
+  'utf-8',
+)
+const kpiSource = readFileSync(
+  resolve(currentDir, '../components/ContractKpiStrip.vue'),
+  'utf-8',
+)
 
 describe('ContractLedger reference fidelity', () => {
   it('keeps the approved ledger copy and adds the reference analysis rail structure', () => {
+    // Page-level strings
     for (const label of [
-      '合同类型分布',
-      '合同状态',
-      '逾期预警',
-      '合同总金额',
-      '未付款金额',
       '新建合同',
       '列设置',
       '合同管理',
@@ -21,17 +29,36 @@ describe('ContractLedger reference fidelity', () => {
     ]) {
       expect(ledgerSource).toContain(label)
     }
+    // Analysis panel strings (moved to component)
+    for (const label of [
+      '合同类型分布',
+      '合同状态',
+      '逾期预警',
+      '合同总金额',
+      '未付款金额',
+    ]) {
+      expect(
+        analysisSource.includes(label) ||
+          kpiSource.includes(label) ||
+          composableSource.includes(label),
+      ).toBe(true)
+    }
 
-    expect(ledgerSource).toMatch(/typePercent|statusBars|kpiStrip|kpiPct/)
+    // Key computed/function references still reachable
+    expect(composableSource).toMatch(/typePercent|statusBars|kpiPct/)
+    // KPI strip component references
+    expect(kpiSource).toMatch(/kpiStrip|kpiPct|kpi-strip/)
     expect(ledgerSource).not.toContain('目标成本管理')
   })
 
   it('loads project options only for the project filter', () => {
-    expect(ledgerSource).toMatch(/v-model:value="filter\.projectId"[\s\S]*v-for="p in projects"/)
-    expect(ledgerSource).toMatch(/referenceStore\.fetchProjects\(\)/)
+    expect(ledgerSource).toMatch(
+      /v-model:value="filter\.projectId"[\s\S]*v-for="p in projects"/,
+    )
+    expect(composableSource).toMatch(/referenceStore\.fetchProjects\(\)/)
 
     // 合同类型和状态筛选器存在于工具栏
-    expect(ledgerSource).toMatch(/contractType/)
-    expect(ledgerSource).toMatch(/contractStatus/)
+    expect(composableSource).toMatch(/contractType/)
+    expect(composableSource).toMatch(/contractStatus/)
   })
 })
