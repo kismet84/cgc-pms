@@ -12,7 +12,10 @@ vi.mock('@/stores/user', () => ({
 }))
 
 // ── Mock org API ──
-const mockPageResult = { records: [], total: 0, pages: 0, current: 1, size: 20 }
+const { mockPageResult } = vi.hoisted(() => ({
+  mockPageResult: { records: [], total: 0, pages: 0, current: 1, size: 20 },
+}))
+
 vi.mock('@/api/modules/org', () => ({
   getCompanyList: vi.fn().mockResolvedValue(mockPageResult),
   createCompany: vi.fn().mockResolvedValue({}),
@@ -67,6 +70,11 @@ describe('org/index.vue', () => {
           'a-tooltip': { template: '<div><slot /></div>' },
           'a-pagination': { template: '<div />' },
           'a-empty': { template: '<div />' },
+          'a-input-number': { template: '<input type="number" />' },
+          'a-textarea': { template: '<textarea />' },
+          'a-spin': { template: '<div><slot /></div>' },
+          'a-breadcrumb': { template: '<div><slot /></div>' },
+          'a-breadcrumb-item': { template: '<span><slot /></span>' },
           BankOutlined: true,
           ClusterOutlined: true,
           TeamOutlined: true,

@@ -4,12 +4,22 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
-const dashboardSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
+const read = (p: string) => readFileSync(resolve(currentDir, '..', p), 'utf-8')
+
+const indexSource = read('index.vue')
+const composableSource = read('composables/useDashboardData.ts')
+const bmViewSource = read('components/DashboardBmView.vue')
+const costViewSource = read('components/DashboardCostView.vue')
+const financeViewSource = read('components/DashboardFinanceView.vue')
+const mgmtViewSource = read('components/DashboardMgmtView.vue')
+
+const allViews = [bmViewSource, costViewSource, financeViewSource, mgmtViewSource].join('\n')
+const fullSource = [indexSource, composableSource, allViews].join('\n')
 
 describe('Dashboard role UI unification', () => {
   it('keeps role labels and moves non-PM dashboards onto the shared role layout language', () => {
     for (const label of ['项目总', '商务经理', '成本经理', '财务', '管理层']) {
-      expect(dashboardSource).toContain(label)
+      expect(fullSource).toContain(label)
     }
 
     for (const className of [
@@ -18,7 +28,7 @@ describe('Dashboard role UI unification', () => {
       'role-analysis-grid',
       'role-table-grid',
     ]) {
-      expect(dashboardSource).toContain(className)
+      expect(fullSource).toContain(className)
     }
 
     for (const label of [
@@ -35,36 +45,29 @@ describe('Dashboard role UI unification', () => {
       '项目风险分布',
       '经营趋势概览',
     ]) {
-      expect(dashboardSource).toContain(label)
+      expect(fullSource).toContain(label)
     }
 
-    const bmTemplate = dashboardSource.match(
-      /activeRole === 'bm' && bmData([\s\S]*?)activeRole === 'cost' && costData/,
-    )?.[1]
-    const costTemplate = dashboardSource.match(
-      /activeRole === 'cost' && costData([\s\S]*?)activeRole === 'finance' && financeData/,
-    )?.[1]
-    const financeTemplate = dashboardSource.match(
-      /activeRole === 'finance' && financeData([\s\S]*?)activeRole === 'mgmt' && mgmtData/,
-    )?.[1]
-    const mgmtTemplate = dashboardSource.match(
-      /activeRole === 'mgmt' && mgmtData([\s\S]*?)class="empty-page"/,
-    )?.[1]
+    // Index.vue delegates to sub-components per role
+    for (const role of ['bm', 'cost', 'finance', 'mgmt']) {
+      expect(indexSource).toContain(`activeRole === '${role}' && `)
+    }
 
-    for (const [role, template] of [
-      ['business manager', bmTemplate],
-      ['cost manager', costTemplate],
-      ['finance', financeTemplate],
-      ['management', mgmtTemplate],
+    // Each non-PM view uses the shared role layout patterns
+    for (const [role, source] of [
+      ['business manager', bmViewSource],
+      ['cost manager', costViewSource],
+      ['finance', financeViewSource],
+      ['management', mgmtViewSource],
     ] as const) {
-      expect(template, `${role} template should be present`).toBeDefined()
-      expect(template).toContain('role-dashboard-grid')
-      expect(template).toContain('role-metric-strip')
-      expect(template).toContain('role-analysis-grid')
-      expect(template).toContain('role-table-grid')
-      expect(template).not.toContain('class="chart-row"')
+      expect(source, `${role} template should be present`).toBeDefined()
+      expect(source).toContain('role-dashboard-grid')
+      expect(source).toContain('role-metric-strip')
+      expect(source).toContain('role-analysis-grid')
+      expect(source).toContain('role-table-grid')
+      expect(source).not.toContain('class="chart-row"')
     }
 
-    expect(dashboardSource).not.toContain('目标成本管理')
+    expect(fullSource).not.toContain('目标成本管理')
   })
 })
