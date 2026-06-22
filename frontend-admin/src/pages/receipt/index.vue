@@ -5,7 +5,12 @@ import { useReferenceStore } from '@/stores/reference'
 import type { MatReceiptVO } from '@/types/receipt'
 import type { SelectOption } from '@/types/ui'
 
-import { useReceiptList, fmtAmount, QUALITY_STATUS_LABEL, QUALITY_STATUS_COLOR } from './composables/useReceiptList'
+import {
+  useReceiptList,
+  fmtAmount,
+  QUALITY_STATUS_LABEL,
+  QUALITY_STATUS_COLOR,
+} from './composables/useReceiptList'
 import { useReceiptForm } from './composables/useReceiptForm'
 import ReceiptKpiStrip from './components/ReceiptKpiStrip.vue'
 import ReceiptFormModal from './components/ReceiptFormModal.vue'

@@ -21,9 +21,7 @@ const verifyBreakdown = computed(() => {
   }))
 })
 
-const kpiAbnormal = computed(
-  () => props.data.filter((r) => r.verifyStatus === 'FAILED').length,
-)
+const kpiAbnormal = computed(() => props.data.filter((r) => r.verifyStatus === 'FAILED').length)
 
 function dotColor(label: string): string {
   if (label === '已认证') return '#31c48d'
@@ -39,10 +37,7 @@ function dotColor(label: string): string {
       <div class="lg-panel-title">核验状态分布</div>
       <div class="lg-type-list">
         <div v-for="it in verifyBreakdown" :key="it.label" class="lg-type-row">
-          <span
-            class="lg-type-dot"
-            :style="{ background: dotColor(it.label) }"
-          ></span>
+          <span class="lg-type-dot" :style="{ background: dotColor(it.label) }"></span>
           <span class="lg-type-label">{{ it.label }}</span>
           <span class="lg-type-bar-wrap">
             <span

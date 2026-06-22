@@ -2,7 +2,14 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
-import { useStockLedger, defaultCols, TXN_TYPE_COLOR, TXN_TYPE_LABEL, getSourceTypeColor, getSourceTypeLabel } from './composables/useStockLedger'
+import {
+  useStockLedger,
+  defaultCols,
+  TXN_TYPE_COLOR,
+  TXN_TYPE_LABEL,
+  getSourceTypeColor,
+  getSourceTypeLabel,
+} from './composables/useStockLedger'
 import StockSearchBar from './components/StockSearchBar.vue'
 import StockKpiStrip from './components/StockKpiStrip.vue'
 import StockTxnTable from './components/StockTxnTable.vue'
@@ -95,16 +102,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       <!-- 左列 -->
       <div class="lg-left">
         <!-- KPI -->
-        <StockKpiStrip
-          :kpi="kpi"
-          :kpi-max="kpiMax"
-          :kpi-pct="kpiPct"
-          :is-mobile="isMobile"
-        />
+        <StockKpiStrip :kpi="kpi" :kpi-max="kpiMax" :kpi-pct="kpiPct" :is-mobile="isMobile" />
 
         <!-- Stock Balance Card -->
         <div v-if="stock" class="lg-panel" style="margin-bottom: 12px">
-          <div style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap; padding: 4px 0">
+          <div
+            style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap; padding: 4px 0"
+          >
             <div>
               <span style="font-size: 13px; color: #6b7280">仓库：</span>
               <span style="font-weight: 600">
@@ -278,11 +282,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
 
       <!-- 右侧分析面板 -->
-      <StockAnalysisPanel
-        :low-stock-warn="lowStockWarn"
-        :kpi="kpi"
-        :in-out-stats="inOutStats"
-      />
+      <StockAnalysisPanel :low-stock-warn="lowStockWarn" :kpi="kpi" :in-out-stats="inOutStats" />
     </div>
   </div>
 </template>

@@ -247,7 +247,10 @@ export function useContractLedger() {
   function fmtAmount(val: string): string {
     const n = parseFloat(val)
     if (isNaN(n)) return '0.00'
-    return (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return (n / 10000).toLocaleString('zh-CN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
   }
 
   // ---- Computed analysis ----
@@ -337,9 +340,18 @@ export function useContractLedger() {
           },
         ]
       : []),
-    ...(colVisible.contractName ? [{ field: 'contractName', title: '合同名称', minWidth: 120 }] : []),
+    ...(colVisible.contractName
+      ? [{ field: 'contractName', title: '合同名称', minWidth: 120 }]
+      : []),
     ...(colVisible.contractType
-      ? [{ field: 'contractType', title: '合同类型', width: 100, slots: { default: 'contractType' } }]
+      ? [
+          {
+            field: 'contractType',
+            title: '合同类型',
+            width: 100,
+            slots: { default: 'contractType' },
+          },
+        ]
       : []),
     ...(colVisible.partyAName
       ? [{ field: 'partyAName', title: '甲方', minWidth: 100, ellipsis: true }]

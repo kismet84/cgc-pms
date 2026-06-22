@@ -1,10 +1,6 @@
 import { ref, reactive, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import {
-  getReceiptList,
-  deleteReceipt,
-  submitReceiptForApproval,
-} from '@/api/modules/receipt'
+import { getReceiptList, deleteReceipt, submitReceiptForApproval } from '@/api/modules/receipt'
 import { getOrderList } from '@/api/modules/purchase'
 import { getWarehouseList } from '@/api/modules/inventory'
 import type { MatReceiptVO } from '@/types/receipt'
@@ -75,7 +71,12 @@ export function useReceiptList() {
       slots: { default: 'totalAmount' },
     },
     { field: 'qualityStatus', title: '质量状态', width: 100, slots: { default: 'qualityStatus' } },
-    { field: 'approvalStatus', title: '审批状态', width: 100, slots: { default: 'approvalStatus' } },
+    {
+      field: 'approvalStatus',
+      title: '审批状态',
+      width: 100,
+      slots: { default: 'approvalStatus' },
+    },
     { title: '操作', width: 180, slots: { default: 'action' } },
   ])
 

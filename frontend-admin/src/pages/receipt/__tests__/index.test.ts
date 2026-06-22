@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const indexSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-const useReceiptListSource = readFileSync(resolve(currentDir, '../composables/useReceiptList.ts'), 'utf-8')
+const useReceiptListSource = readFileSync(
+  resolve(currentDir, '../composables/useReceiptList.ts'),
+  'utf-8',
+)
 
 describe('ReceiptIndexPage submit-approval button', () => {
   it('imports submitReceiptForApproval in useReceiptList composable', () => {
@@ -17,7 +20,9 @@ describe('ReceiptIndexPage submit-approval button', () => {
   })
 
   it('calls submitReceiptForApproval inside handleSubmitApproval onOk in useReceiptList', () => {
-    expect(useReceiptListSource).toMatch(/function handleSubmitApproval[\s\S]*?submitReceiptForApproval\(/)
+    expect(useReceiptListSource).toMatch(
+      /function handleSubmitApproval[\s\S]*?submitReceiptForApproval\(/,
+    )
   })
 
   it('calls fetchData after successful submit in useReceiptList', () => {

@@ -34,7 +34,9 @@ const emit = defineEmits<{
       border="inner"
       size="small"
       max-height="480"
-      @sort-change="(params: { field: string; order: 'asc' | 'desc' | null }) => emit('sortChange', params)"
+      @sort-change="
+        (params: { field: string; order: 'asc' | 'desc' | null }) => emit('sortChange', params)
+      "
     >
       <template #txnType="{ row }: { row: MatStockTxnVO }">
         <a-tag :color="TXN_TYPE_COLOR[row.txnType]">

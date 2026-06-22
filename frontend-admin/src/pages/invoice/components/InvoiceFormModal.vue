@@ -4,11 +4,7 @@ import { message, Modal, Upload } from 'ant-design-vue'
 import axios from 'axios'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import type { UploadFile } from 'ant-design-vue'
-import {
-  createInvoice,
-  updateInvoice,
-  recognizeInvoice,
-} from '@/api/modules/invoice'
+import { createInvoice, updateInvoice, recognizeInvoice } from '@/api/modules/invoice'
 import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO } from '@/types/invoice'
 import { uploadFile } from '@/api/modules/file'
 
@@ -201,13 +197,10 @@ function clearInvoiceFields() {
   ]
   for (const field of fields) {
     if (field === 'invoiceType') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(formData as Record<string, unknown>)[field] = 'VAT_SPECIAL'
     } else if (field === 'invoiceNo' || field === 'remark') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(formData as Record<string, unknown>)[field] = ''
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(formData as Record<string, unknown>)[field] = undefined
     }
   }
@@ -230,7 +223,6 @@ function applyRecognitionResult(result: InvoiceRecognizeResultVO) {
   for (const field of fields) {
     const value = result[field]
     if (value != null && value !== '') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(formData as Record<string, unknown>)[field] = value
     }
   }

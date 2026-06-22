@@ -10,7 +10,10 @@ import {
 import type { MatReceiptVO, MatReceiptItemVO } from '@/types/receipt'
 import type { MatPurchaseOrderVO } from '@/types/purchase'
 
-export function useReceiptForm(fetchData: () => Promise<void>, orderList: ReturnType<typeof ref<MatPurchaseOrderVO[]>>) {
+export function useReceiptForm(
+  fetchData: () => Promise<void>,
+  orderList: ReturnType<typeof ref<MatPurchaseOrderVO[]>>,
+) {
   const modalVisible = ref(false)
   const modalTitle = ref('新建材料验收')
   const editingId = ref<string | null>(null)

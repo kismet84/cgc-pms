@@ -13,30 +13,16 @@ const analysisSource = readFileSync(
   resolve(currentDir, '../components/ContractAnalysisPanel.vue'),
   'utf-8',
 )
-const kpiSource = readFileSync(
-  resolve(currentDir, '../components/ContractKpiStrip.vue'),
-  'utf-8',
-)
+const kpiSource = readFileSync(resolve(currentDir, '../components/ContractKpiStrip.vue'), 'utf-8')
 
 describe('ContractLedger reference fidelity', () => {
   it('keeps the approved ledger copy and adds the reference analysis rail structure', () => {
     // Page-level strings
-    for (const label of [
-      '新建合同',
-      '列设置',
-      '合同管理',
-      '合同台账',
-    ]) {
+    for (const label of ['新建合同', '列设置', '合同管理', '合同台账']) {
       expect(ledgerSource).toContain(label)
     }
     // Analysis panel strings (moved to component)
-    for (const label of [
-      '合同类型分布',
-      '合同状态',
-      '逾期预警',
-      '合同总金额',
-      '未付款金额',
-    ]) {
+    for (const label of ['合同类型分布', '合同状态', '逾期预警', '合同总金额', '未付款金额']) {
       expect(
         analysisSource.includes(label) ||
           kpiSource.includes(label) ||
@@ -52,9 +38,7 @@ describe('ContractLedger reference fidelity', () => {
   })
 
   it('loads project options only for the project filter', () => {
-    expect(ledgerSource).toMatch(
-      /v-model:value="filter\.projectId"[\s\S]*v-for="p in projects"/,
-    )
+    expect(ledgerSource).toMatch(/v-model:value="filter\.projectId"[\s\S]*v-for="p in projects"/)
     expect(composableSource).toMatch(/referenceStore\.fetchProjects\(\)/)
 
     // 合同类型和状态筛选器存在于工具栏

@@ -40,7 +40,8 @@ const emit = defineEmits<{
       style="min-width: 180px"
       show-search
       :filter-option="
-        (input: string, option: SelectOption) => option.label?.toLowerCase().includes(input.toLowerCase())
+        (input: string, option: SelectOption) =>
+          option.label?.toLowerCase().includes(input.toLowerCase())
       "
       @update:value="(v: string | undefined) => emit('update:warehouseId', v)"
     >
@@ -56,7 +57,8 @@ const emit = defineEmits<{
       style="min-width: 220px"
       show-search
       :filter-option="
-        (input: string, option: SelectOption) => option.label?.toLowerCase().includes(input.toLowerCase())
+        (input: string, option: SelectOption) =>
+          option.label?.toLowerCase().includes(input.toLowerCase())
       "
       @update:value="(v: string | undefined) => emit('update:materialId', v)"
     >

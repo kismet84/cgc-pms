@@ -68,18 +68,14 @@ const mobileItems = computed(() => [
     </div>
     <div class="lg-kpi-card">
       <span class="lg-kpi-card-label">合同总金额(含税)</span>
-      <span class="lg-kpi-card-value"
-        >{{ fmtAmount(kpi.totalAmount) }} <small>万元</small></span
-      >
+      <span class="lg-kpi-card-value">{{ fmtAmount(kpi.totalAmount) }} <small>万元</small></span>
       <span class="lg-kpi-card-bar"
         ><span style="width: 100%; background: var(--kpi-amount)"></span
       ></span>
     </div>
     <div class="lg-kpi-card">
       <span class="lg-kpi-card-label">已付款</span>
-      <span class="lg-kpi-card-value"
-        >{{ fmtAmount(kpi.paidAmount) }} <small>万元</small></span
-      >
+      <span class="lg-kpi-card-value">{{ fmtAmount(kpi.paidAmount) }} <small>万元</small></span>
       <span class="lg-kpi-card-bar"
         ><span
           :style="{
@@ -94,9 +90,7 @@ const mobileItems = computed(() => [
     </div>
     <div class="lg-kpi-card">
       <span class="lg-kpi-card-label">未付款</span>
-      <span class="lg-kpi-card-value"
-        >{{ fmtAmount(kpi.unpaidAmount) }} <small>万元</small></span
-      >
+      <span class="lg-kpi-card-value">{{ fmtAmount(kpi.unpaidAmount) }} <small>万元</small></span>
       <span class="lg-kpi-card-bar"
         ><span
           :style="{
@@ -128,11 +122,7 @@ const mobileItems = computed(() => [
 
   <!-- KPI 移动端：单条卡片 -->
   <div v-else class="lg-kpi-single">
-    <div
-      class="lg-kpi-single-row"
-      v-for="item in mobileItems"
-      :key="item.label"
-    >
+    <div class="lg-kpi-single-row" v-for="item in mobileItems" :key="item.label">
       <div class="lg-kpi-single-icon" :style="{ background: item.bg }">
         <component :is="item.icon" />
       </div>

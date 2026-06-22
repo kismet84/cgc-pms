@@ -30,13 +30,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <a-modal
-    :open="visible"
-    :title="title"
-    :width="1000"
-    @ok="emit('ok')"
-    @cancel="emit('cancel')"
-  >
+  <a-modal :open="visible" :title="title" :width="1000" @ok="emit('ok')" @cancel="emit('cancel')">
     <!-- Header Form -->
     <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
       <a-form-item label="项目" required>
@@ -95,7 +89,12 @@ const emit = defineEmits<{
     <!-- Line Items Section -->
     <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
       <div
-        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px"
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+        "
       >
         <span style="font-weight: 600; font-size: 14px">验收明细</span>
         <span style="font-size: 12px; color: #9ca3af">（选择采购订单后自动加载订单明细）</span>

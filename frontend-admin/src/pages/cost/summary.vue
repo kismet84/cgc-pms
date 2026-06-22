@@ -170,7 +170,7 @@ const executionOption = computed(() => {
         ],
         itemStyle: {
           borderRadius: [4, 4, 0, 0],
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           color: (params: CallbackDataParams) => {
             const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e', '#ef4444']
             return colors[params.dataIndex ?? 0] ?? '#3b82f6'
@@ -226,7 +226,8 @@ const deviationOption = computed(() => {
         data: subjects.map((s) => parseFloat(s.costDeviation) / 10000),
         itemStyle: {
           borderRadius: [3, 3, 0, 0],
-          color: (params: CallbackDataParams) => ((params.value as number ?? 0) > 0 ? '#ef4444' : '#22c55e'),
+          color: (params: CallbackDataParams) =>
+            ((params.value as number) ?? 0) > 0 ? '#ef4444' : '#22c55e',
         },
         barMaxWidth: 24,
       },

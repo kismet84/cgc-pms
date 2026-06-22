@@ -19,9 +19,7 @@ const kpiUninvoiced = computed(() =>
     .filter((r) => r.verifyStatus !== 'VERIFIED')
     .reduce((s, r) => s + (parseFloat(r.invoiceAmount) || 0), 0),
 )
-const kpiAbnormal = computed(
-  () => props.data.filter((r) => r.verifyStatus === 'FAILED').length,
-)
+const kpiAbnormal = computed(() => props.data.filter((r) => r.verifyStatus === 'FAILED').length)
 
 const kpiMax = computed(() => ({
   total: Math.max(kpiInvoiceTotal.value, 1),
@@ -45,9 +43,7 @@ function kpiPct(value: number, max: number): number {
     </div>
     <div class="lg-kpi-card">
       <span class="lg-kpi-card-label">已核验</span>
-      <span class="lg-kpi-card-value"
-        >{{ kpiInvoiced.toLocaleString() }} <small>元</small></span
-      >
+      <span class="lg-kpi-card-value">{{ kpiInvoiced.toLocaleString() }} <small>元</small></span>
       <span class="lg-kpi-card-bar"
         ><span
           :style="{
@@ -59,9 +55,7 @@ function kpiPct(value: number, max: number): number {
     </div>
     <div class="lg-kpi-card">
       <span class="lg-kpi-card-label">待核验</span>
-      <span class="lg-kpi-card-value"
-        >{{ kpiUninvoiced.toLocaleString() }} <small>元</small></span
-      >
+      <span class="lg-kpi-card-value">{{ kpiUninvoiced.toLocaleString() }} <small>元</small></span>
       <span class="lg-kpi-card-bar"
         ><span
           :style="{

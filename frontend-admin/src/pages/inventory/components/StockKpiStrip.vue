@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import {
-  InboxOutlined,
-  FallOutlined,
-  RiseOutlined,
-  AlertOutlined,
-} from '@ant-design/icons-vue'
+import { InboxOutlined, FallOutlined, RiseOutlined, AlertOutlined } from '@ant-design/icons-vue'
 import type { StockKpiVO } from '@/types/inventory'
 
 defineProps<{

@@ -16,9 +16,7 @@ describe('ContractLedgerPage modal flows', () => {
       /import\s+ContractFormPage\s+from\s+['"]\.\/ContractFormPage\.vue['"]/,
     )
     // Modal state now lives in composable
-    expect(composableSource).toMatch(
-      /const\s+contractModalVisible\s*=\s*ref\(false\)/,
-    )
+    expect(composableSource).toMatch(/const\s+contractModalVisible\s*=\s*ref\(false\)/)
     expect(composableSource).toMatch(
       /const\s+contractModalMode\s*=\s*ref<'create'\s*\|\s*'edit'>\('create'\)/,
     )
@@ -37,12 +35,8 @@ describe('ContractLedgerPage modal flows', () => {
   })
 
   it('refreshes ledger data after modal save', () => {
-    expect(composableSource).toMatch(
-      /function\s+handleContractSaved\(\)[\s\S]*?fetchData\(\)/,
-    )
-    expect(composableSource).toMatch(
-      /function\s+handleContractSaved\(\)[\s\S]*?fetchKpi\(\)/,
-    )
+    expect(composableSource).toMatch(/function\s+handleContractSaved\(\)[\s\S]*?fetchData\(\)/)
+    expect(composableSource).toMatch(/function\s+handleContractSaved\(\)[\s\S]*?fetchKpi\(\)/)
   })
 
   it('keeps existing detail and delete actions routed through the list page', () => {
