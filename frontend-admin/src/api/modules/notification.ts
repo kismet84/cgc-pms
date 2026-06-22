@@ -1,5 +1,4 @@
-import { request } from '@/api/request'
-import service from '@/api/request'
+import { request, default as service } from '@/api/request'
 import type { PageResult } from '@/types/api'
 import type {
   NotificationVO,

@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, LineChartOutlined } from '@ant-design/icons-vue'
@@ -15,7 +15,7 @@ const selectedProjectId = ref<string | undefined>(undefined)
 const loading = ref(false)
 const summary = ref<CostSummaryVO | null>(null)
 
-anyync function fetchProjects() {
+async function fetchProjects() {
   try {
     const res = await getProjectList({ pageNum: 1, pageSize: 50 })
     projectList.value = res.records
@@ -36,7 +36,7 @@ async function fetchSummary() {
   } catch (e: unknown) {
     console.error(e)
     summary.value = null
-    message.error('鍔犺浇鍔ㄦ€佹垚鏈眹鎬诲け璐?)
+    message.error('加载动态成本汇总失败')
   } finally {
     loading.value = false
   }
@@ -44,16 +44,16 @@ async function fetchSummary() {
 
 async function handleRefresh() {
   if (!selectedProjectId.value) {
-    message.warning('璇峰厛閫夋嫨椤圭洰')
+    message.warning('请先选择项目')
     return
   }
   loading.value = true
   try {
     summary.value = await refreshCostSummary(selectedProjectId.value)
-    message.success('鍒锋柊鎴愬姛')
+    message.success('刷新成功')
   } catch (e: unknown) {
     console.error(e)
-    message.error('鍒锋柊澶辫触')
+    message.error('刷新失败')
   } finally {
     loading.value = false
   }
@@ -97,45 +97,45 @@ function fmtPercent(val: string | undefined, base: string | undefined): string {
 
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
-  { field: 'costSubjectName', title: '鎴愭湰绉戠洰', minWidth: 140, ellipsis: true },
+  { field: 'costSubjectName', title: '成本科目', minWidth: 140, ellipsis: true },
   {
     field: 'targetCost',
-    title: '鐩爣鎴愭湰(涓囧厓)',
+    title: '目标成本(万元)',
     width: 130,
     align: 'right' as const,
     slots: { default: 'targetCost' },
   },
   {
     field: 'contractLockedCost',
-    title: '鍚堝悓閿佸畾鎴愭湰(涓囧厓)',
+    title: '合同锁定成本(万元)',
     width: 150,
     align: 'right' as const,
     slots: { default: 'contractLockedCost' },
   },
   {
     field: 'actualCost',
-    title: '瀹為檯鎴愭湰(涓囧厓)',
+    title: '实际成本(万元)',
     width: 130,
     align: 'right' as const,
     slots: { default: 'actualCost' },
   },
   {
     field: 'paidAmount',
-    title: '宸蹭粯娆?涓囧厓)',
+    title: '已付款(万元)',
     width: 120,
     align: 'right' as const,
     slots: { default: 'paidAmount' },
   },
   {
     field: 'dynamicCost',
-    title: '鍔ㄦ€佹垚鏈?涓囧厓)',
+    title: '动态成本(万元)',
     width: 130,
     align: 'right' as const,
     slots: { default: 'dynamicCost' },
   },
   {
     field: 'costDeviation',
-    title: '鎴愭湰鍋忓樊(涓囧厓)',
+    title: '成本偏差(万元)',
     width: 130,
     align: 'right' as const,
     slots: { default: 'costDeviation' },
@@ -151,12 +151,12 @@ const executionOption = computed(() => {
     grid: { left: 10, right: 20, top: 20, bottom: 10, containLabel: true },
     xAxis: {
       type: 'category' as const,
-      data: ['鐩爣鎴愭湰', '閿佸畾鎴愭湰', '瀹為檯鎴愭湰', '宸蹭粯娆?, '鍔ㄦ€佹垚鏈?],
+      data: ['目标成本', '锁定成本', '实际成本', '已付款', '动态成本'],
       axisLabel: { fontSize: 12 },
     },
     yAxis: {
       type: 'value' as const,
-      axisLabel: { fontSize: 11, formatter: '{value} 涓? },
+      axisLabel: { fontSize: 11, formatter: '{value} 万' },
     },
     series: [
       {
@@ -170,6 +170,7 @@ const executionOption = computed(() => {
         ],
         itemStyle: {
           borderRadius: [4, 4, 0, 0],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           color: (params: CallbackDataParams) => {
             const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e', '#ef4444']
             return colors[params.dataIndex ?? 0] ?? '#3b82f6'
@@ -217,7 +218,7 @@ const deviationOption = computed(() => {
     },
     yAxis: {
       type: 'value' as const,
-      axisLabel: { fontSize: 11, formatter: '{value} 涓? },
+      axisLabel: { fontSize: 11, formatter: '{value} 万' },
     },
     series: [
       {
@@ -225,7 +226,7 @@ const deviationOption = computed(() => {
         data: subjects.map((s) => parseFloat(s.costDeviation) / 10000),
         itemStyle: {
           borderRadius: [3, 3, 0, 0],
-          color: (params: CallbackDataParams) => (params.value > 0 ? '#ef4444' : '#22c55e'),
+          color: (params: CallbackDataParams) => ((params.value as number ?? 0) > 0 ? '#ef4444' : '#22c55e'),
         },
         barMaxWidth: 24,
       },
@@ -243,7 +244,7 @@ const rankingOption = computed(() => {
     grid: { left: 10, right: 30, top: 10, bottom: 10, containLabel: true },
     xAxis: {
       type: 'value' as const,
-      axisLabel: { fontSize: 11, formatter: '{value} 涓? },
+      axisLabel: { fontSize: 11, formatter: '{value} 万' },
     },
     yAxis: {
       type: 'category' as const,
@@ -322,45 +323,45 @@ onMounted(() => {
     <!-- Page head -->
     <div class="lg-page-head">
       <a-breadcrumb style="font-size: 13px; color: var(--muted); margin-bottom: 5px">
-        <a-breadcrumb-item>鎴愭湰绠＄悊</a-breadcrumb-item>
-        <a-breadcrumb-item>鍔ㄦ€佹垚鏈眹鎬?/a-breadcrumb-item>
+        <a-breadcrumb-item>成本管理</a-breadcrumb-item>
+        <a-breadcrumb-item>动态成本汇总</a-breadcrumb-item>
       </a-breadcrumb>
     </div>
 
     <div class="lg-grid">
-      <!-- 宸﹀垪 -->
+      <!-- 左列 -->
       <div class="lg-left">
-        <!-- KPI 妯潯 -->
+        <!-- KPI 横条 -->
         <div v-if="summary" class="lg-kpi-strip" style="grid-template-columns: repeat(5, 1fr)">
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">鐩爣鎴愭湰</span>
+            <span class="lg-kpi-card-label">目标成本</span>
             <span class="lg-kpi-card-value"
-              >{{ fmtAmount(summary.targetCost) }} <small>涓囧厓</small></span
+              >{{ fmtAmount(summary.targetCost) }} <small>万元</small></span
             >
           </div>
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">閿佸畾鎴愭湰</span>
+            <span class="lg-kpi-card-label">锁定成本</span>
             <span class="lg-kpi-card-value"
-              >{{ fmtAmount(summary.contractLockedCost) }} <small>涓囧厓</small></span
+              >{{ fmtAmount(summary.contractLockedCost) }} <small>万元</small></span
             >
           </div>
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">鍔ㄦ€佹垚鏈?/span>
+            <span class="lg-kpi-card-label">动态成本</span>
             <span class="lg-kpi-card-value"
-              >{{ fmtAmount(summary.dynamicCost) }} <small>涓囧厓</small></span
+              >{{ fmtAmount(summary.dynamicCost) }} <small>万元</small></span
             >
           </div>
           <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">鍋忓樊閲戦</span>
+            <span class="lg-kpi-card-label">偏差金额</span>
             <span
               class="lg-kpi-card-value"
               :style="{ color: getDeviationColor(summary.costDeviation) }"
             >
-              {{ fmtDeviation(summary.costDeviation) }} <small>涓囧厓</small>
+              {{ fmtDeviation(summary.costDeviation) }} <small>万元</small>
             </span>
           </div>
           <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">鍋忓樊鐜?/span>
+            <span class="lg-kpi-card-label">偏差率</span>
             <span
               class="lg-kpi-card-value"
               :style="{ color: getDeviationColor(summary.costDeviation) }"
@@ -370,18 +371,18 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 宸ュ叿鏍?-->
+        <!-- 工具栏 -->
         <div class="lg-toolbar">
           <div class="lg-toolbar-left">
             <a-button type="primary" @click="handleRefresh" :disabled="!selectedProjectId">
               <template #icon><ReloadOutlined /></template>
-              鍒锋柊
+              刷新
             </a-button>
           </div>
           <div class="lg-toolbar-right">
             <a-select
               v-model:value="selectedProjectId"
-              placeholder="璇烽€夋嫨椤圭洰"
+              placeholder="请选择项目"
               allow-clear
               style="width: 200px"
               size="small"
@@ -400,18 +401,18 @@ onMounted(() => {
         </div>
 
         <template v-if="summary">
-          <!-- Row 1: 鎴愭湰鎵ц姒傝 + 鎴愭湰鏋勬垚鍒嗘瀽 -->
+          <!-- Row 1: 成本执行概览 + 成本构成分析 -->
           <div
             style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
           >
             <section class="lg-panel">
-              <div class="lg-panel-title">鎴愭湰鎵ц姒傝</div>
+              <div class="lg-panel-title">成本执行概览</div>
               <div style="padding: 0 4px 4px">
                 <v-chart :option="executionOption" autoresize style="width: 100%; height: 260px" />
               </div>
             </section>
             <section class="lg-panel">
-              <div class="lg-panel-title">鎴愭湰鏋勬垚鍒嗘瀽</div>
+              <div class="lg-panel-title">成本构成分析</div>
               <div style="padding: 0 4px 4px">
                 <v-chart
                   :option="compositionOption"
@@ -422,18 +423,18 @@ onMounted(() => {
             </section>
           </div>
 
-          <!-- Row 2: 鍋忓樊瓒嬪娍鍒嗘瀽 + 瓒呴绠楅璀?-->
+          <!-- Row 2: 偏差趋势分析 + 超预算预警 -->
           <div
             style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
           >
             <section class="lg-panel">
-              <div class="lg-panel-title">鍋忓樊瓒嬪娍鍒嗘瀽</div>
+              <div class="lg-panel-title">偏差趋势分析</div>
               <div style="padding: 0 4px 4px">
                 <v-chart :option="deviationOption" autoresize style="width: 100%; height: 260px" />
               </div>
             </section>
             <section class="lg-panel">
-              <div class="lg-panel-title">瓒呴绠楅璀?/div>
+              <div class="lg-panel-title">超预算预警</div>
               <div style="padding: 12px 14px">
                 <div v-if="overBudgetItems.length" class="lg-type-list">
                   <div
@@ -447,7 +448,7 @@ onMounted(() => {
                     }}</span>
                     <span
                       style="text-align: right; font-weight: 700; color: #ef4444; font-size: 13px"
-                      >+{{ fmtDeviation(item.costDeviation) }} 涓?/span
+                      >+{{ fmtDeviation(item.costDeviation) }} 万</span
                     >
                   </div>
                 </div>
@@ -455,24 +456,24 @@ onMounted(() => {
                   v-else
                   style="font-size: 13px; color: var(--muted); padding: 12px 0; text-align: center"
                 >
-                  鏃犺秴棰勭畻绉戠洰
+                  无超预算科目
                 </div>
               </div>
             </section>
           </div>
 
-          <!-- Row 3: 鎴愭湰绉戠洰鎺掕 + 寮傚父鏄庣粏 -->
+          <!-- Row 3: 成本科目排行 + 异常明细 -->
           <div
             style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
           >
             <section class="lg-panel">
-              <div class="lg-panel-title">鎴愭湰绉戠洰鎺掕</div>
+              <div class="lg-panel-title">成本科目排行</div>
               <div style="padding: 0 4px 4px">
                 <v-chart :option="rankingOption" autoresize style="width: 100%; height: 260px" />
               </div>
             </section>
             <section class="lg-panel">
-              <div class="lg-panel-title">寮傚父鏄庣粏</div>
+              <div class="lg-panel-title">异常明细</div>
               <div style="padding: 12px 14px">
                 <div v-if="anomalyItems.length" class="lg-type-list">
                   <div
@@ -486,7 +487,7 @@ onMounted(() => {
                     }}</span>
                     <span
                       style="text-align: right; font-weight: 700; color: #ef4444; font-size: 13px"
-                      >鍋忓樊 +{{ fmtDeviation(item.costDeviation) }} 涓?/span
+                      >偏差 +{{ fmtDeviation(item.costDeviation) }} 万</span
                     >
                   </div>
                 </div>
@@ -494,7 +495,8 @@ onMounted(() => {
                   v-else
                   style="font-size: 13px; color: var(--muted); padding: 12px 0; text-align: center"
                 >
-                  鏃犲紓甯哥鐩?                </div>
+                  无异常科目
+                </div>
               </div>
             </section>
           </div>
@@ -510,7 +512,7 @@ onMounted(() => {
                 font-weight: 700;
               "
             >
-              绉戠洰鏄庣粏
+              科目明细
             </div>
             <vxe-grid
               :data="summary.subjects"
@@ -561,14 +563,15 @@ onMounted(() => {
             <LineChartOutlined
               style="font-size: 48px; margin-bottom: 16px; display: block; color: #d1d5db"
             />
-            璇烽€夋嫨涓€涓」鐩紝鏌ョ湅鍔ㄦ€佹垚鏈眹鎬诲垎鏋?          </div>
+            请选择一个项目，查看动态成本汇总分析
+          </div>
         </template>
       </div>
 
-      <!-- 鍙充晶鍒嗘瀽闈㈡澘 -->
+      <!-- 右侧分析面板 -->
       <aside v-if="summary" class="lg-analysis-rail">
         <section class="lg-panel">
-          <div class="lg-panel-title">绉戠洰鍔ㄦ€佹垚鏈垎甯?/div>
+          <div class="lg-panel-title">科目动态成本分布</div>
           <div class="lg-type-list">
             <div v-for="item in subjectDistribution" :key="item.key" class="lg-type-row">
               <span class="lg-type-dot" :style="{ background: item.color }"></span>

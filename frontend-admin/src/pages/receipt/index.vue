@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -40,10 +40,9 @@ const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 const partnerList = computed(() => referenceStore.partners ?? [])
 const orderList = ref<MatPurchaseOrderVO[]>([])
-const warehouseList = ref<WarehouseVO[]>([])
 
 const modalVisible = ref(false)
-const modalTitle = ref('鏂板缓鏉愭枡楠屾敹')
+const modalTitle = ref('新建材料验收')
 const editingId = ref<string | null>(null)
 const formData = reactive<Partial<MatReceiptVO>>({
   projectId: undefined,
@@ -62,10 +61,10 @@ const itemList = ref<(Partial<MatReceiptItemVO> & { key: number; warning?: boole
 let itemKeyCounter = 0
 
 const QUALITY_STATUS_LABEL: Record<string, string> = {
-  QUALIFIED: '鍚堟牸',
-  PARTIAL: '閮ㄥ垎鍚堟牸',
-  UNQUALIFIED: '涓嶅悎鏍?,
-  PENDING: '寰呮楠?,
+  QUALIFIED: '合格',
+  PARTIAL: '部分合格',
+  UNQUALIFIED: '不合格',
+  PENDING: '待检验',
 }
 const QUALITY_STATUS_COLOR: Record<string, string> = {
   QUALIFIED: 'success',
@@ -94,21 +93,21 @@ function fmtAmount(val: string): string {
 // ---- End KPI ----
 
 const gridColumns = computed(() => [
-  { field: 'receiptCode', title: '楠屾敹鍗曞彿', width: 140, ellipsis: true },
-  { field: 'orderCode', title: '閲囪喘璁㈠崟', width: 130, ellipsis: true },
-  { field: 'projectName', title: '椤圭洰', width: 120, ellipsis: true },
-  { field: 'partnerName', title: '渚涘簲鍟?, width: 120, ellipsis: true },
-  { field: 'receiptDate', title: '楠屾敹鏃ユ湡', width: 100 },
+  { field: 'receiptCode', title: '验收单号', width: 140, ellipsis: true },
+  { field: 'orderCode', title: '采购订单', width: 130, ellipsis: true },
+  { field: 'projectName', title: '项目', width: 120, ellipsis: true },
+  { field: 'partnerName', title: '供应商', width: 120, ellipsis: true },
+  { field: 'receiptDate', title: '验收日期', width: 100 },
   {
     field: 'totalAmount',
-    title: '鎬婚噾棰?,
+    title: '总金额',
     width: 110,
     align: 'right' as const,
     slots: { default: 'totalAmount' },
   },
-  { field: 'qualityStatus', title: '璐ㄩ噺鐘舵€?, width: 100, slots: { default: 'qualityStatus' } },
-  { field: 'approvalStatus', title: '瀹℃壒鐘舵€?, width: 100, slots: { default: 'approvalStatus' } },
-  { title: '鎿嶄綔', width: 180, slots: { default: 'action' } },
+  { field: 'qualityStatus', title: '质量状态', width: 100, slots: { default: 'qualityStatus' } },
+  { field: 'approvalStatus', title: '审批状态', width: 100, slots: { default: 'approvalStatus' } },
+  { title: '操作', width: 180, slots: { default: 'action' } },
 ])
 
 async function fetchData() {
@@ -130,7 +129,7 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('鍔犺浇楠屾敹鍒楄〃澶辫触锛岃绋嶅悗閲嶈瘯')
+    message.error('加载验收列表失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -145,6 +144,8 @@ async function fetchOrders() {
     orderList.value = []
   }
 }
+
+const warehouseList = ref<WarehouseVO[]>([])
 
 async function fetchWarehouses() {
   try {
@@ -184,7 +185,7 @@ function handlePageSizeChange(_cur: number, size: number) {
 }
 
 function handleAdd() {
-  modalTitle.value = '鏂板缓鏉愭枡楠屾敹'
+  modalTitle.value = '新建材料验收'
   editingId.value = null
   Object.assign(formData, {
     projectId: undefined,
@@ -203,7 +204,7 @@ function handleAdd() {
 }
 
 async function handleEdit(record: MatReceiptVO) {
-  modalTitle.value = '缂栬緫鏉愭枡楠屾敹'
+  modalTitle.value = '编辑材料验收'
   editingId.value = record.id
   Object.assign(formData, {
     projectId: record.projectId,
@@ -227,7 +228,7 @@ async function handleEdit(record: MatReceiptVO) {
     }))
   } catch (e: unknown) {
     console.error(e)
-    message.error('鍔犺浇楠屾敹鏄庣粏澶辫触')
+    message.error('加载验收明细失败')
     itemList.value = []
   }
   modalVisible.value = true
@@ -235,18 +236,18 @@ async function handleEdit(record: MatReceiptVO) {
 
 function handleDelete(record: MatReceiptVO) {
   Modal.confirm({
-    title: '纭鍒犻櫎',
-    content: `纭畾瑕佸垹闄ら獙鏀跺崟"${record.receiptCode}"鍚楋紵`,
-    okText: '纭畾',
-    cancelText: '鍙栨秷',
+    title: '确认删除',
+    content: `确定要删除验收单"${record.receiptCode}"吗？`,
+    okText: '确定',
+    cancelText: '取消',
     onOk: async () => {
       try {
         await deleteReceipt(record.id)
-        message.success('鍒犻櫎鎴愬姛')
+        message.success('删除成功')
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('鍒犻櫎澶辫触锛岃绋嶅悗閲嶈瘯')
+        message.error('删除失败，请稍后重试')
       }
     },
   })
@@ -254,24 +255,24 @@ function handleDelete(record: MatReceiptVO) {
 
 function handleSubmitApproval(record: MatReceiptVO) {
   Modal.confirm({
-    title: '纭鎻愪氦',
-    content: `纭畾瑕佹彁浜ら獙鏀跺崟"${record.receiptCode}"鍚楋紵鎻愪氦鍚庡皢杩涘叆瀹℃壒娴佺▼`,
-    okText: '纭畾',
-    cancelText: '鍙栨秷',
+    title: '确认提交',
+    content: `确定要提交验收单"${record.receiptCode}"吗？提交后将进入审批流程`,
+    okText: '确定',
+    cancelText: '取消',
     onOk: async () => {
       try {
         await submitReceiptForApproval(record.id)
-        message.success('鎻愪氦瀹℃壒鎴愬姛')
+        message.success('提交审批成功')
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('鎻愪氦瀹℃壒澶辫触')
+        message.error('提交审批失败')
       }
     },
   })
 }
 
-// --- Order selection 鈫?load order items for receipt ---
+// --- Order selection → load order items for receipt ---
 async function handleOrderChange(orderId: string | undefined) {
   itemList.value = []
   itemKeyCounter = 0
@@ -295,7 +296,7 @@ async function handleOrderChange(orderId: string | undefined) {
     }))
   } catch (e: unknown) {
     console.error(e)
-    message.error('鍔犺浇閲囪喘璁㈠崟鏄庣粏澶辫触')
+    message.error('加载采购订单明细失败')
     itemList.value = []
   }
 }
@@ -328,7 +329,7 @@ function handleItemQualifiedQtyChange(index: number) {
   const qualified = parseFloat(item.qualifiedQuantity || '0')
   const actual = parseFloat(item.actualQuantity || '0')
   if (qualified > actual) {
-    message.warning('鍚堟牸鏁伴噺涓嶈兘瓒呰繃瀹為檯鍒拌揣鏁伴噺')
+    message.warning('合格数量不能超过实际到货数量')
     item.qualifiedQuantity = item.actualQuantity
   }
 }
@@ -348,13 +349,13 @@ const hasWarning = computed(() => {
 
 async function handleModalOk() {
   if (!formData.projectId) {
-    message.warning('璇烽€夋嫨椤圭洰')
+    message.warning('请选择项目')
     return
   }
 
   // Show warning but don't block (W0 Decision 3)
   if (hasWarning.value) {
-    message.warning('閮ㄥ垎楠屾敹鏁伴噺瓒呰繃閲囪喘璁㈠崟鍓╀綑鏁伴噺锛岃娉ㄦ剰鏍稿')
+    message.warning('部分验收数量超过采购订单剩余数量，请注意核对')
   }
 
   try {
@@ -362,11 +363,11 @@ async function handleModalOk() {
     if (editingId.value) {
       await updateReceipt(editingId.value, formData)
       receiptId = editingId.value
-      message.success('鏇存柊鎴愬姛')
+      message.success('更新成功')
     } else {
       const result = await createReceipt(formData)
       receiptId = result
-      message.success('鍒涘缓鎴愬姛')
+      message.success('创建成功')
     }
 
     // Save line items
@@ -383,7 +384,7 @@ async function handleModalOk() {
     fetchData()
   } catch (e: unknown) {
     console.error(e)
-    message.error('鎿嶄綔澶辫触锛岃绋嶅悗閲嶈瘯')
+    message.error('操作失败，请稍后重试')
   }
 }
 
@@ -406,49 +407,49 @@ onMounted(() => {
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="lg-breadcrumb">
-          <a-breadcrumb-item>閲囪喘绠＄悊</a-breadcrumb-item>
-          <a-breadcrumb-item>鏉愭枡楠屾敹</a-breadcrumb-item>
+          <a-breadcrumb-item>采购管理</a-breadcrumb-item>
+          <a-breadcrumb-item>材料验收</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
     </div>
 
-    <!-- 鎼滅储鏍?-->
+    <!-- 搜索栏 -->
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.receiptCode"
-        placeholder="鎼滅储楠屾敹鍗曞彿鈥?
+        placeholder="搜索验收单号…"
         allow-clear
         size="large"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #697380" /></template>
       </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">鏌ヨ</a-button>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
       <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
-        閲嶇疆
+        重置
       </a-button>
     </div>
 
-    <!-- KPI 妯潯 -->
+    <!-- KPI 横条 -->
     <div class="lg-kpi-strip">
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">楠屾敹鎬绘暟</span>
-        <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>鍗?/small></span>
+        <span class="lg-kpi-card-label">验收总数</span>
+        <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>单</small></span>
         <span class="lg-kpi-card-bar"
           ><span style="width: 100%; background: var(--kpi-total)"></span
         ></span>
       </div>
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">楠屾敹鎬婚噾棰?鍚◣)</span>
-        <span class="lg-kpi-card-value">{{ fmtAmount(kpiTotalAmount) }} <small>涓囧厓</small></span>
+        <span class="lg-kpi-card-label">验收总金额(含税)</span>
+        <span class="lg-kpi-card-value">{{ fmtAmount(kpiTotalAmount) }} <small>万元</small></span>
         <span class="lg-kpi-card-bar"
           ><span style="width: 100%; background: var(--kpi-amount)"></span
         ></span>
       </div>
       <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">鍚堟牸鎵规</span>
-        <span class="lg-kpi-card-value">{{ kpiQualifiedCount }} <small>鍗?/small></span>
+        <span class="lg-kpi-card-label">合格批次</span>
+        <span class="lg-kpi-card-value">{{ kpiQualifiedCount }} <small>单</small></span>
         <span class="lg-kpi-card-bar"
           ><span
             :style="{
@@ -463,8 +464,8 @@ onMounted(() => {
         >
       </div>
       <div class="lg-kpi-card is-warn" v-if="kpiUnqualifiedCount > 0">
-        <span class="lg-kpi-card-label">涓嶅悎鏍兼壒娆?/span>
-        <span class="lg-kpi-card-value">{{ kpiUnqualifiedCount }} <small>鍗?/small></span>
+        <span class="lg-kpi-card-label">不合格批次</span>
+        <span class="lg-kpi-card-value">{{ kpiUnqualifiedCount }} <small>单</small></span>
         <span class="lg-kpi-card-bar"
           ><span
             :style="{
@@ -480,12 +481,12 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 宸ュ叿鏍?-->
+    <!-- 工具栏 -->
     <div class="lg-toolbar">
       <div class="lg-toolbar-left">
         <a-button type="primary" @click="handleAdd">
           <template #icon><PlusOutlined /></template>
-          鏂板缓楠屾敹
+          新建验收
         </a-button>
         <a-button @click="fetchData">
           <template #icon><ReloadOutlined /></template>
@@ -494,7 +495,7 @@ onMounted(() => {
       <div class="lg-toolbar-right">
         <a-select
           v-model:value="filter.projectId"
-          placeholder="鍏ㄩ儴椤圭洰"
+          placeholder="全部项目"
           allow-clear
           style="width: 160px"
           size="small"
@@ -517,7 +518,7 @@ onMounted(() => {
         </a-select>
         <a-select
           v-model:value="filter.orderId"
-          placeholder="鍏ㄩ儴璁㈠崟"
+          placeholder="全部订单"
           allow-clear
           style="width: 160px"
           size="small"
@@ -534,21 +535,21 @@ onMounted(() => {
         </a-select>
         <a-select
           v-model:value="filter.qualityStatus"
-          placeholder="鍏ㄩ儴璐ㄩ噺鐘舵€?
+          placeholder="全部质量状态"
           allow-clear
           style="width: 140px"
           size="small"
           @change="handleSearch"
         >
-          <a-select-option value="QUALIFIED">鍚堟牸</a-select-option>
-          <a-select-option value="PARTIAL">閮ㄥ垎鍚堟牸</a-select-option>
-          <a-select-option value="UNQUALIFIED">涓嶅悎鏍?/a-select-option>
-          <a-select-option value="PENDING">寰呮楠?/a-select-option>
+          <a-select-option value="QUALIFIED">合格</a-select-option>
+          <a-select-option value="PARTIAL">部分合格</a-select-option>
+          <a-select-option value="UNQUALIFIED">不合格</a-select-option>
+          <a-select-option value="PENDING">待检验</a-select-option>
         </a-select>
       </div>
     </div>
 
-    <!-- 琛ㄦ牸 -->
+    <!-- 表格 -->
     <div class="lg-table-wrap">
       <vxe-grid
         :data="tableData"
@@ -576,22 +577,22 @@ onMounted(() => {
         </template>
         <template #action="{ row }">
           <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">缂栬緫</a>
-            <a class="lg-link lg-del" @click="handleDelete(row)">鍒犻櫎</a>
+            <a class="lg-link" @click="handleEdit(row)">编辑</a>
+            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
             <a
               v-if="row.approvalStatus === 'DRAFT'"
               class="lg-link"
               @click="handleSubmitApproval(row)"
-              >鎻愪氦瀹℃壒</a
+              >提交审批</a
             >
           </div>
         </template>
       </vxe-grid>
     </div>
 
-    <!-- 鍒嗛〉 -->
+    <!-- 分页 -->
     <div class="lg-pagination">
-      <span class="lg-total">鍏?{{ total }} 鏉?/span>
+      <span class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         v-model:current="pageNo"
         v-model:page-size="pageSize"
@@ -614,17 +615,17 @@ onMounted(() => {
     >
       <!-- Header Form -->
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
-        <a-form-item label="椤圭洰" required>
-          <a-select v-model:value="formData.projectId" placeholder="璇烽€夋嫨椤圭洰">
+        <a-form-item label="项目" required>
+          <a-select v-model:value="formData.projectId" placeholder="请选择项目">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="閲囪喘璁㈠崟">
+        <a-form-item label="采购订单">
           <a-select
             v-model:value="formData.orderId"
-            placeholder="璇烽€夋嫨閲囪喘璁㈠崟"
+            placeholder="请选择采购订单"
             allow-clear
             @change="(val: string) => handleOrderChange(val)"
           >
@@ -633,48 +634,37 @@ onMounted(() => {
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="閲囪喘鍚堝悓">
-          <a-select v-model:value="formData.contractId" placeholder="鑷姩濉厖" disabled>
+        <a-form-item label="采购合同">
+          <a-select v-model:value="formData.contractId" placeholder="自动填充" disabled>
             <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="渚涘簲鍟?>
-          <a-select v-model:value="formData.partnerId" placeholder="鑷姩濉厖" disabled>
+        <a-form-item label="供应商">
+          <a-select v-model:value="formData.partnerId" placeholder="自动填充" disabled>
             <a-select-option v-for="p in partnerList" :key="p.id" :value="p.id">
               {{ p.partnerName }}
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="鍏ュ簱浠撳簱">
-          <a-select
-            v-model:value="formData.warehouseId"
-            placeholder="璇烽€夋嫨鍏ュ簱浠撳簱"
-            allow-clear
-          >
-            <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-              {{ w.warehouseName }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="楠屾敹鏃ユ湡">
+        <a-form-item label="验收日期">
           <a-date-picker
             v-model:value="formData.receiptDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="璐ㄩ噺鐘舵€?>
-          <a-select v-model:value="formData.qualityStatus" placeholder="璇烽€夋嫨璐ㄩ噺鐘舵€? allow-clear>
-            <a-select-option value="QUALIFIED">鍚堟牸</a-select-option>
-            <a-select-option value="PARTIAL">閮ㄥ垎鍚堟牸</a-select-option>
-            <a-select-option value="UNQUALIFIED">涓嶅悎鏍?/a-select-option>
-            <a-select-option value="PENDING">寰呮楠?/a-select-option>
+        <a-form-item label="质量状态">
+          <a-select v-model:value="formData.qualityStatus" placeholder="请选择质量状态" allow-clear>
+            <a-select-option value="QUALIFIED">合格</a-select-option>
+            <a-select-option value="PARTIAL">部分合格</a-select-option>
+            <a-select-option value="UNQUALIFIED">不合格</a-select-option>
+            <a-select-option value="PENDING">待检验</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="澶囨敞">
-          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="璇疯緭鍏ュ娉? />
+        <a-form-item label="备注">
+          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
         </a-form-item>
       </a-form>
 
@@ -688,14 +678,14 @@ onMounted(() => {
             margin-bottom: 10px;
           "
         >
-          <span style="font-weight: 600; font-size: 14px">楠屾敹鏄庣粏</span>
-          <span style="font-size: 12px; color: #9ca3af">锛堥€夋嫨閲囪喘璁㈠崟鍚庤嚜鍔ㄥ姞杞借鍗曟槑缁嗭級</span>
+          <span style="font-weight: 600; font-size: 14px">验收明细</span>
+          <span style="font-size: 12px; color: #9ca3af">（选择采购订单后自动加载订单明细）</span>
         </div>
 
         <!-- Quantity warning -->
         <a-alert
           v-if="hasWarning"
-          message="閮ㄥ垎楠屾敹鏁伴噺瓒呰繃閲囪喘璁㈠崟鍓╀綑鏁伴噺锛屾牳瀹炲悗鍙户缁繚瀛?
+          message="部分验收数量超过采购订单剩余数量，核实后可继续保存"
           type="warning"
           show-icon
           :closable="false"
@@ -709,32 +699,32 @@ onMounted(() => {
           size="small"
           :scroll="{ y: 280 }"
         >
-          <a-table-column title="鏉愭枡" width="150">
+          <a-table-column title="材料" width="150">
             <template #default="{ record: item }">
               <span>{{ item.materialName || '-' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="瑙勬牸" width="90">
+          <a-table-column title="规格" width="90">
             <template #default="{ record: item }">
               <span>{{ item.specification || '-' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="鍗曚綅" width="60">
+          <a-table-column title="单位" width="60">
             <template #default="{ record: item }">
               <span>{{ item.unit || '-' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="璁㈠崟鏁伴噺" width="90">
+          <a-table-column title="订单数量" width="90">
             <template #default="{ record: item }">
               <span>{{ item.orderedQuantity || '0' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="宸查獙鏀? width="80">
+          <a-table-column title="已验收" width="80">
             <template #default="{ record: item }">
               <span>{{ item.receivedQuantity || '0' }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="鍓╀綑" width="80">
+          <a-table-column title="剩余" width="80">
             <template #default="{ record: item }">
               <span
                 :style="{
@@ -745,7 +735,7 @@ onMounted(() => {
               </span>
             </template>
           </a-table-column>
-          <a-table-column title="鏈鍒拌揣" width="110">
+          <a-table-column title="本次到货" width="110">
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.actualQuantity"
@@ -757,7 +747,7 @@ onMounted(() => {
               />
             </template>
           </a-table-column>
-          <a-table-column title="鍚堟牸鏁伴噺" width="110">
+          <a-table-column title="合格数量" width="110">
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.qualifiedQuantity"
@@ -768,7 +758,7 @@ onMounted(() => {
               />
             </template>
           </a-table-column>
-          <a-table-column title="鍗曚环(鍏?" width="110">
+          <a-table-column title="单价(元)" width="110">
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.unitPrice"
@@ -779,27 +769,27 @@ onMounted(() => {
               />
             </template>
           </a-table-column>
-          <a-table-column title="閲戦(鍏?" width="120">
+          <a-table-column title="金额(元)" width="120">
             <template #default="{ record: item }">
               <span>{{
                 Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
               }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="浣跨敤閮ㄤ綅" width="120">
+          <a-table-column title="使用部位" width="120">
             <template #default="{ record: item }">
-              <a-input v-model:value="item.useLocation" size="small" placeholder="閮ㄤ綅" />
+              <a-input v-model:value="item.useLocation" size="small" placeholder="部位" />
             </template>
           </a-table-column>
-          <a-table-column title="鎵瑰彿" width="100">
+          <a-table-column title="批号" width="100">
             <template #default="{ record: item }">
-              <a-input v-model:value="item.batchNo" size="small" placeholder="鎵瑰彿" />
+              <a-input v-model:value="item.batchNo" size="small" placeholder="批号" />
             </template>
           </a-table-column>
         </a-table>
 
         <div style="text-align: right; margin-top: 8px; font-size: 14px">
-          鍚堣锛?span style="font-weight: 600; color: #1677ff">{{
+          合计：<span style="font-weight: 600; color: #1677ff">{{
             Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
           }}</span>
         </div>
@@ -809,7 +799,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 椤甸潰涓撳睘鏍峰紡 鈥?鍏朵綑宸茬敱 lg-* 鍏ㄥ眬绫昏鐩?*/
+/* 页面专属样式 — 其余已由 lg-* 全局类覆盖 */
 .lg-breadcrumb {
   margin-bottom: 5px;
   font-size: 13px;

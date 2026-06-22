@@ -1,5 +1,5 @@
-﻿<script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+<script setup lang="ts">
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   SearchOutlined,
@@ -19,7 +19,7 @@ const referenceStore = useReferenceStore()
 const projects = computed(() => referenceStore.projects ?? [])
 const materialList = computed(() => referenceStore.materials ?? [])
 
-// ---- 绛涢€?----
+// ---- 筛选 ----
 const filter = reactive({
   keyword: '',
   warehouseId: undefined as string | undefined,
@@ -27,7 +27,7 @@ const filter = reactive({
   projectId: undefined as string | undefined,
 })
 
-// ---- 琛ㄦ牸鐘舵€?----
+// ---- 表格状态 ----
 const loading = ref(false)
 const stock = ref<{
   warehouseId: string
@@ -43,7 +43,7 @@ const txnTotal = ref(0)
 const txnPageNo = ref(1)
 const txnPageSize = ref(20)
 
-// ---- KPI 鐘舵€?----
+// ---- KPI 状态 ----
 const kpi = ref<StockKpiVO>({
   warehouseCount: 0,
   lowStockCount: 0,
@@ -52,10 +52,10 @@ const kpi = ref<StockKpiVO>({
   materialTypeCount: 0,
 })
 
-// ---- 浠撳簱涓嬫媺 ----
+// ---- 仓库下拉 ----
 const warehouseList = ref<WarehouseVO[]>([])
 
-// ---- 鍒楀彲瑙佹€?----
+// ---- 列可见性 ----
 const COLS_KEY = 'stock_ledger_cols'
 const defaultCols: Record<string, boolean> = {
   txnType: true,
@@ -80,7 +80,7 @@ function toggleCol(key: string) {
   localStorage.setItem(COLS_KEY, JSON.stringify(colVisible))
 }
 
-// ---- 鎺掑簭 ----
+// ---- 排序 ----
 const sortField = ref<string>('createdTime')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 function handleSortChange({ field, order }: { field: string; order: 'asc' | 'desc' | null }) {
@@ -90,7 +90,7 @@ function handleSortChange({ field, order }: { field: string; order: 'asc' | 'des
   fetchData()
 }
 
-// ---- 璇︽儏鎶藉眽 ----
+// ---- 详情抽屉 ----
 const detailVisible = ref(false)
 const detailItem = ref<MatStockTxnVO | null>(null)
 function showDetail(row: MatStockTxnVO) {
@@ -102,7 +102,7 @@ function closeDetail() {
   detailItem.value = null
 }
 
-// ---- 闃查檲鏃у搷搴?----
+// ---- 防陈旧响应 ----
 let fetchSeq = 0
 
 async function fetchData() {
@@ -113,7 +113,7 @@ async function fetchData() {
     return
   }
   if (!filter.materialId) {
-    message.warning('璇峰厛閫夋嫨鐗╂枡')
+    message.warning('请先选择物料')
     return
   }
   const mySeq = ++fetchSeq
@@ -144,7 +144,7 @@ async function fetchData() {
     stock.value = null
     txnList.value = []
     txnTotal.value = 0
-    message.error('鍔犺浇搴撳瓨鍙拌处澶辫触锛岃绋嶅悗閲嶈瘯')
+    message.error('加载库存台账失败，请稍后重试')
   } finally {
     if (mySeq === fetchSeq) loading.value = false
   }
@@ -214,7 +214,7 @@ function handleTxnPageSizeChange(_cur: number, size: number) {
   fetchData()
 }
 
-// ---- 杈呭姪鍑芥暟 ----
+// ---- 辅助函数 ----
 function getWarehouseName(id: string): string {
   return warehouseList.value.find((w) => w.id === id)?.warehouseName ?? id
 }
@@ -229,7 +229,7 @@ function fmtQty(val: string | number): string {
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
 }
 
-// ---- KPI 璁＄畻 ----
+// ---- KPI 计算 ----
 const kpiMax = computed(() => ({
   txnInCount: Math.max(kpi.value.txnInCount, 1),
   txnOutCount: Math.max(kpi.value.txnOutCount, 1),
@@ -238,7 +238,7 @@ function kpiPct(value: number, max: number): number {
   return Math.min(Math.round((value / max) * 100), 100)
 }
 
-// ---- 鍙充晶鍒嗘瀽闈㈡澘 ----
+// ---- 右侧分析面板 ----
 const lowStockWarn = computed(() => {
   const items: { name: string; qty: number }[] = []
   if (
@@ -262,11 +262,11 @@ const inOutStats = computed(() => {
   }
 })
 
-// ---- 浜ゆ槗绫诲瀷 ----
+// ---- 交易类型 ----
 const TXN_TYPE_LABEL: Record<string, string> = {
-  IN: '鍏ュ簱',
-  OUT: '鍑哄簱',
-  ADJUST: '璋冩暣',
+  IN: '入库',
+  OUT: '出库',
+  ADJUST: '调整',
 }
 const TXN_TYPE_COLOR: Record<string, string> = {
   IN: 'success',
@@ -275,16 +275,16 @@ const TXN_TYPE_COLOR: Record<string, string> = {
 }
 
 const SOURCE_TYPE_LABEL: Record<string, string> = {
-  PURCHASE_IN: '閲囪喘鍏ュ簱',
-  PURCHASE_RETURN: '閲囪喘閫€璐?,
-  MATERIAL_OUT: '棰嗘枡鍑哄簱',
-  MATERIAL_RETURN: '閫€鏂欏叆搴?,
-  INVENTORY_IN: '鐩樼偣鍏ュ簱',
-  INVENTORY_OUT: '鐩樼偣鍑哄簱',
-  ADJUST: '搴撳瓨璋冩暣',
-  TRANSFER_IN: '璋冩嫧鍏ュ簱',
-  TRANSFER_OUT: '璋冩嫧鍑哄簱',
-  INIT: '鏈熷垵瀵煎叆',
+  PURCHASE_IN: '采购入库',
+  PURCHASE_RETURN: '采购退货',
+  MATERIAL_OUT: '领料出库',
+  MATERIAL_RETURN: '退料入库',
+  INVENTORY_IN: '盘点入库',
+  INVENTORY_OUT: '盘点出库',
+  ADJUST: '库存调整',
+  TRANSFER_IN: '调拨入库',
+  TRANSFER_OUT: '调拨出库',
+  INIT: '期初导入',
 }
 const SOURCE_TYPE_COLOR: Record<string, string> = {
   PURCHASE_IN: 'success',
@@ -307,17 +307,17 @@ function getSourceTypeColor(type: string | null | undefined): string {
   return SOURCE_TYPE_COLOR[type] ?? 'default'
 }
 
-// ---- vxe-grid 鍒楀畾涔?----
+// ---- vxe-grid 列定义 ----
 const gridColumns = computed(() => [
-  { type: 'seq' as const, title: '娴佹按鍙?, width: 80, align: 'center' as const },
+  { type: 'seq' as const, title: '流水号', width: 80, align: 'center' as const },
   ...(colVisible.txnType
-    ? [{ field: 'txnType', title: '绫诲瀷', width: 80, slots: { default: 'txnType' } }]
+    ? [{ field: 'txnType', title: '类型', width: 80, slots: { default: 'txnType' } }]
     : []),
   ...(colVisible.quantity
     ? [
         {
           field: 'quantity',
-          title: '鍙樺姩閲?,
+          title: '变动量',
           width: 120,
           align: 'right' as const,
           sortable: true,
@@ -329,7 +329,7 @@ const gridColumns = computed(() => [
     ? [
         {
           field: 'availableAfter',
-          title: '鍙樺姩鍚庝綑閲?,
+          title: '变动后余量',
           width: 130,
           align: 'right' as const,
           slots: { default: 'availableAfter' },
@@ -337,13 +337,13 @@ const gridColumns = computed(() => [
       ]
     : []),
   ...(colVisible.sourceType
-    ? [{ field: 'sourceType', title: '鏉ユ簮绫诲瀷', width: 110, slots: { default: 'sourceType' } }]
+    ? [{ field: 'sourceType', title: '来源类型', width: 110, slots: { default: 'sourceType' } }]
     : []),
   ...(colVisible.sourceId
     ? [
         {
           field: 'sourceId',
-          title: '鍏宠仈鍗曟嵁',
+          title: '关联单据',
           width: 130,
           ellipsis: true,
           slots: { default: 'sourceId' },
@@ -354,18 +354,18 @@ const gridColumns = computed(() => [
     ? [
         {
           field: 'createdTime',
-          title: '鎿嶄綔鏃堕棿',
+          title: '操作时间',
           width: 150,
           sortable: true,
         },
       ]
     : []),
   ...(colVisible.ops
-    ? [{ title: '鎿嶄綔', width: 70, align: 'center' as const, slots: { default: 'ops' } }]
+    ? [{ title: '操作', width: 70, align: 'center' as const, slots: { default: 'ops' } }]
     : []),
 ])
 
-// ---- 绉诲姩绔娴?----
+// ---- 移动端检测 ----
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
 function onResize() {
@@ -387,17 +387,17 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="cl-breadcrumb">
-          <a-breadcrumb-item>搴撳瓨绠＄悊</a-breadcrumb-item>
-          <a-breadcrumb-item>搴撳瓨鍙拌处</a-breadcrumb-item>
+          <a-breadcrumb-item>库存管理</a-breadcrumb-item>
+          <a-breadcrumb-item>库存台账</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
     </div>
 
-    <!-- 鎼滅储鏍?-->
+    <!-- 搜索栏 -->
     <div class="lg-search-bar">
       <a-input
         v-model:value="filter.keyword"
-        placeholder="鎼滅储娴佹按缂栧彿銆佹潵婧愬崟鍙封€?
+        placeholder="搜索流水编号、来源单号…"
         allow-clear
         size="large"
         @press-enter="handleSearch"
@@ -406,7 +406,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </a-input>
       <a-select
         v-model:value="filter.warehouseId"
-        placeholder="璇烽€夋嫨浠撳簱"
+        placeholder="请选择仓库"
         allow-clear
         size="large"
         style="min-width: 180px"
@@ -421,7 +421,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </a-select>
       <a-select
         v-model:value="filter.materialId"
-        placeholder="閫夋嫨鐗╂枡"
+        placeholder="选择物料"
         allow-clear
         size="large"
         style="min-width: 220px"
@@ -434,35 +434,35 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           {{ m.materialName }} <span style="color: #9ca3af">({{ m.materialCode }})</span>
         </a-select-option>
       </a-select>
-      <a-button type="primary" size="large" @click="handleSearch">鏌ヨ</a-button>
+      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
       <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
-        閲嶇疆
+        重置
       </a-button>
     </div>
 
     <div class="lg-grid">
-      <!-- 宸﹀垪 -->
+      <!-- 左列 -->
       <div class="lg-left">
-        <!-- KPI 妯潯锛氭闈?-->
+        <!-- KPI 横条：桌面 -->
         <div v-if="!isMobile" class="lg-kpi-strip">
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">浠撳簱鏁伴噺</span>
-            <span class="lg-kpi-card-value">{{ kpi.warehouseCount }} <small>涓?/small></span>
+            <span class="lg-kpi-card-label">仓库数量</span>
+            <span class="lg-kpi-card-value">{{ kpi.warehouseCount }} <small>个</small></span>
             <span class="lg-kpi-card-bar"
               ><span style="width: 100%; background: var(--kpi-total)"></span
             ></span>
           </div>
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">鐗╂枡绉嶇被</span>
-            <span class="lg-kpi-card-value">{{ kpi.materialTypeCount }} <small>绉?/small></span>
+            <span class="lg-kpi-card-label">物料种类</span>
+            <span class="lg-kpi-card-value">{{ kpi.materialTypeCount }} <small>种</small></span>
             <span class="lg-kpi-card-bar"
               ><span style="width: 100%; background: var(--kpi-amount)"></span
             ></span>
           </div>
           <div class="lg-kpi-card is-warn" v-if="kpi.lowStockCount > 0" :key="'warn'">
-            <span class="lg-kpi-card-label">浣庡簱瀛樼墿鏂?/span>
-            <span class="lg-kpi-card-value">{{ kpi.lowStockCount }} <small>绉?/small></span>
+            <span class="lg-kpi-card-label">低库存物料</span>
+            <span class="lg-kpi-card-value">{{ kpi.lowStockCount }} <small>种</small></span>
             <span class="lg-kpi-card-bar"
               ><span
                 :style="{
@@ -473,15 +473,15 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             ></span>
           </div>
           <div class="lg-kpi-card" v-else :key="'normal'">
-            <span class="lg-kpi-card-label">浣庡簱瀛樼墿鏂?/span>
-            <span class="lg-kpi-card-value">0 <small>绉?/small></span>
+            <span class="lg-kpi-card-label">低库存物料</span>
+            <span class="lg-kpi-card-value">0 <small>种</small></span>
             <span class="lg-kpi-card-bar"
               ><span style="width: 0%; background: var(--kpi-overdue)"></span
             ></span>
           </div>
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">鍏ュ簱璁板綍</span>
-            <span class="lg-kpi-card-value">{{ kpi.txnInCount }} <small>鏉?/small></span>
+            <span class="lg-kpi-card-label">入库记录</span>
+            <span class="lg-kpi-card-value">{{ kpi.txnInCount }} <small>条</small></span>
             <span class="lg-kpi-card-bar"
               ><span
                 :style="{
@@ -492,8 +492,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             ></span>
           </div>
           <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">鍑哄簱璁板綍</span>
-            <span class="lg-kpi-card-value">{{ kpi.txnOutCount }} <small>鏉?/small></span>
+            <span class="lg-kpi-card-label">出库记录</span>
+            <span class="lg-kpi-card-value">{{ kpi.txnOutCount }} <small>条</small></span>
             <span class="lg-kpi-card-bar"
               ><span
                 :style="{
@@ -505,7 +505,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
         </div>
 
-        <!-- KPI 绉诲姩绔細鍗曞崱鐗?-->
+        <!-- KPI 移动端：单卡片 -->
         <div v-else class="lg-kpi-single">
           <div
             class="lg-kpi-single-row"
@@ -513,37 +513,37 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               {
                 icon: InboxOutlined,
                 bg: 'var(--kpi-total)',
-                label: '浠撳簱鏁伴噺',
+                label: '仓库数量',
                 value: kpi.warehouseCount,
-                unit: '涓?,
+                unit: '个',
               },
               {
                 icon: InboxOutlined,
                 bg: 'var(--kpi-amount)',
-                label: '鐗╂枡绉嶇被',
+                label: '物料种类',
                 value: kpi.materialTypeCount,
-                unit: '绉?,
+                unit: '种',
               },
               {
                 icon: AlertOutlined,
                 bg: 'var(--kpi-overdue)',
-                label: '浣庡簱瀛樼墿鏂?,
+                label: '低库存物料',
                 value: kpi.lowStockCount,
-                unit: '绉?,
+                unit: '种',
               },
               {
                 icon: RiseOutlined,
                 bg: 'var(--kpi-paid)',
-                label: '鍏ュ簱璁板綍',
+                label: '入库记录',
                 value: kpi.txnInCount,
-                unit: '鏉?,
+                unit: '条',
               },
               {
                 icon: FallOutlined,
                 bg: 'var(--kpi-unpaid)',
-                label: '鍑哄簱璁板綍',
+                label: '出库记录',
                 value: kpi.txnOutCount,
-                unit: '鏉?,
+                unit: '条',
               },
             ]"
             :key="item.label"
@@ -558,25 +558,25 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
         </div>
 
-        <!-- Stock Balance Card锛堝簱瀛樺彴璐︾壒鏈夛級 -->
+        <!-- Stock Balance Card（库存台账特有） -->
         <div v-if="stock" class="lg-panel" style="margin-bottom: 12px">
           <div
             style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap; padding: 4px 0"
           >
             <div>
-              <span style="font-size: 13px; color: #6b7280">浠撳簱锛?/span>
+              <span style="font-size: 13px; color: #6b7280">仓库：</span>
               <span style="font-weight: 600">
                 {{ stock.warehouseName || getWarehouseName(stock.warehouseId) }}
               </span>
             </div>
             <div>
-              <span style="font-size: 13px; color: #6b7280">鐗╂枡锛?/span>
+              <span style="font-size: 13px; color: #6b7280">物料：</span>
               <span style="font-weight: 600">
                 {{ stock.materialName || getMaterialName(stock.materialId) }}
               </span>
             </div>
             <div>
-              <span style="font-size: 13px; color: #6b7280">褰撳墠搴撳瓨锛?/span>
+              <span style="font-size: 13px; color: #6b7280">当前库存：</span>
               <span style="font-weight: 700; font-size: 18px; color: #1677ff">
                 {{ fmtQty(stock.availableQty) }}
               </span>
@@ -587,7 +587,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
         </div>
 
-        <!-- 宸ュ叿鏍?-->
+        <!-- 工具栏 -->
         <div class="lg-toolbar">
           <div class="lg-toolbar-left">
             <a-button @click="handleSearch">
@@ -596,20 +596,21 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <a-dropdown v-if="!isMobile">
               <a-button size="small">
                 <template #icon><SettingOutlined /></template>
-                鍒楄缃?              </a-button>
+                列设置
+              </a-button>
               <template #overlay>
                 <a-menu>
                   <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
                     <a-checkbox :checked="colVisible[key]">
                       {{
                         {
-                          txnType: '绫诲瀷',
-                          quantity: '鍙樺姩閲?,
-                          availableAfter: '鍙樺姩鍚庝綑閲?,
-                          sourceType: '鏉ユ簮绫诲瀷',
-                          sourceId: '鍏宠仈鍗曟嵁',
-                          createdTime: '鎿嶄綔鏃堕棿',
-                          ops: '鎿嶄綔',
+                          txnType: '类型',
+                          quantity: '变动量',
+                          availableAfter: '变动后余量',
+                          sourceType: '来源类型',
+                          sourceId: '关联单据',
+                          createdTime: '操作时间',
+                          ops: '操作',
                         }[key]
                       }}
                     </a-checkbox>
@@ -621,7 +622,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <div class="lg-toolbar-right">
             <a-select
               v-model:value="filter.projectId"
-              placeholder="鍏ㄩ儴椤圭洰"
+              placeholder="全部项目"
               allow-clear
               style="width: 160px"
               size="small"
@@ -634,10 +635,11 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
         </div>
 
-        <!-- 琛ㄦ牸锛氭闈?-->
+        <!-- 表格：桌面 -->
         <div v-if="!isMobile" class="lg-table-wrap">
           <div style="padding: 12px 14px 0 14px; font-weight: 600; font-size: 14px; color: #374151">
-            鍑哄叆搴撴祦姘?          </div>
+            出入库流水
+          </div>
           <vxe-grid
             :data="txnList"
             :columns="gridColumns"
@@ -661,7 +663,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                   color: row.txnType === 'OUT' ? '#ef4444' : '#16a34a',
                 }"
               >
-                {{ row.txnType === 'OUT' ? '鈭? : '+' }}{{ fmtQty(row.quantity) }}
+                {{ row.txnType === 'OUT' ? '−' : '+' }}{{ fmtQty(row.quantity) }}
               </span>
             </template>
             <template #availableAfter="{ row }">
@@ -687,12 +689,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <span v-else style="color: #9ca3af">-</span>
             </template>
             <template #ops="{ row }">
-              <a class="lg-link" @click="showDetail(row)">璇︽儏</a>
+              <a class="lg-link" @click="showDetail(row)">详情</a>
             </template>
           </vxe-grid>
         </div>
 
-        <!-- 绉诲姩绔崱鐗囧垪琛?-->
+        <!-- 移动端卡片列表 -->
         <div v-else class="lg-card-list">
           <div v-if="loading" class="lg-card-list-loading">
             <a-spin size="large" />
@@ -719,16 +721,16 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             </div>
             <div class="lg-card-item-body">
               <div v-if="colVisible.quantity" class="lg-card-field">
-                <span class="lg-card-label">鍙樺姩閲?/span>
+                <span class="lg-card-label">变动量</span>
                 <span
                   class="lg-card-value lg-card-money"
                   :style="{ color: row.txnType === 'OUT' ? '#ef4444' : '#16a34a' }"
                 >
-                  {{ row.txnType === 'OUT' ? '鈭? : '+' }}{{ fmtQty(row.quantity) }}
+                  {{ row.txnType === 'OUT' ? '−' : '+' }}{{ fmtQty(row.quantity) }}
                 </span>
               </div>
               <div v-if="colVisible.availableAfter" class="lg-card-field">
-                <span class="lg-card-label">鍙樺姩鍚庝綑閲?/span>
+                <span class="lg-card-label">变动后余量</span>
                 <span
                   class="lg-card-value lg-card-money"
                   :style="{ color: Number(row.availableAfter) < 10 ? '#ef4444' : 'var(--text)' }"
@@ -738,26 +740,26 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </div>
               <div class="lg-card-field-row">
                 <div v-if="colVisible.sourceId" class="lg-card-field">
-                  <span class="lg-card-label">鍏宠仈鍗曟嵁</span>
+                  <span class="lg-card-label">关联单据</span>
                   <span class="lg-card-value">{{ row.sourceId || '-' }}</span>
                 </div>
                 <div v-if="colVisible.createdTime" class="lg-card-field">
-                  <span class="lg-card-label">鎿嶄綔鏃堕棿</span>
+                  <span class="lg-card-label">操作时间</span>
                   <span class="lg-card-value">{{ row.createdTime || '-' }}</span>
                 </div>
               </div>
             </div>
             <div class="lg-card-item-foot">
               <a-space :size="4">
-                <a-button size="small" type="link" @click="showDetail(row)">璇︽儏</a-button>
+                <a-button size="small" type="link" @click="showDetail(row)">详情</a-button>
               </a-space>
             </div>
           </div>
         </div>
 
-        <!-- 鍒嗛〉 -->
+        <!-- 分页 -->
         <div class="lg-pagination">
-          <span class="lg-total">鍏?{{ txnTotal }} 鏉℃祦姘?/span>
+          <span class="lg-total">共 {{ txnTotal }} 条流水</span>
           <a-pagination
             v-model:current="txnPageNo"
             v-model:page-size="txnPageSize"
@@ -770,50 +772,50 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           />
         </div>
 
-        <!-- 娴佹按璇︽儏 Drawer -->
+        <!-- 流水详情 Drawer -->
         <a-drawer
           :open="detailVisible"
-          title="娴佹按璇︽儏"
+          title="流水详情"
           placement="right"
           :width="480"
           @close="closeDetail"
         >
           <template v-if="detailItem">
             <a-descriptions :column="2" size="small" bordered>
-              <a-descriptions-item label="娴佹按缂栧彿">{{ detailItem.id }}</a-descriptions-item>
-              <a-descriptions-item label="浜ゆ槗绫诲瀷">
+              <a-descriptions-item label="流水编号">{{ detailItem.id }}</a-descriptions-item>
+              <a-descriptions-item label="交易类型">
                 <a-tag :color="TXN_TYPE_COLOR[detailItem.txnType]">
                   {{ TXN_TYPE_LABEL[detailItem.txnType] ?? detailItem.txnType }}
                 </a-tag>
               </a-descriptions-item>
-              <a-descriptions-item label="浠撳簱鍚嶇О">
+              <a-descriptions-item label="仓库名称">
                 {{ detailItem.warehouseName || getWarehouseName(detailItem.warehouseId) }}
               </a-descriptions-item>
-              <a-descriptions-item label="鐗╂枡鍚嶇О">
+              <a-descriptions-item label="物料名称">
                 {{ detailItem.materialName || getMaterialName(detailItem.materialId) }}
               </a-descriptions-item>
-              <a-descriptions-item label="鍙樺姩閲?>
+              <a-descriptions-item label="变动量">
                 <span
                   :style="{
                     color: detailItem.txnType === 'OUT' ? '#ef4444' : '#16a34a',
                     fontWeight: 600,
                   }"
                 >
-                  {{ detailItem.txnType === 'OUT' ? '鈭? : '+' }}{{ fmtQty(detailItem.quantity) }}
+                  {{ detailItem.txnType === 'OUT' ? '−' : '+' }}{{ fmtQty(detailItem.quantity) }}
                 </span>
               </a-descriptions-item>
-              <a-descriptions-item label="鍙樺姩鍚庝綑閲?>
+              <a-descriptions-item label="变动后余量">
                 <span style="font-weight: 600">{{ fmtQty(detailItem.availableAfter) }}</span>
               </a-descriptions-item>
-              <a-descriptions-item label="鏉ユ簮绫诲瀷">
+              <a-descriptions-item label="来源类型">
                 <a-tag :color="getSourceTypeColor(detailItem.sourceType)" size="small">
                   {{ getSourceTypeLabel(detailItem.sourceType) }}
                 </a-tag>
               </a-descriptions-item>
-              <a-descriptions-item label="鏉ユ簮鍗曞彿">
+              <a-descriptions-item label="来源单号">
                 {{ detailItem.sourceId || '-' }}
               </a-descriptions-item>
-              <a-descriptions-item label="鎿嶄綔鏃堕棿" :span="2">
+              <a-descriptions-item label="操作时间" :span="2">
                 {{ detailItem.createdTime || '-' }}
               </a-descriptions-item>
             </a-descriptions>
@@ -821,10 +823,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         </a-drawer>
       </div>
 
-      <!-- 鍙充晶鍒嗘瀽闈㈡澘 -->
+      <!-- 右侧分析面板 -->
       <aside class="lg-analysis-rail">
         <section class="lg-panel">
-          <div class="lg-panel-title">浣庡簱瀛橀璀?/div>
+          <div class="lg-panel-title">低库存预警</div>
           <div class="lg-type-list">
             <div v-for="w in lowStockWarn" :key="w.name" class="lg-type-row">
               <span
@@ -846,16 +848,16 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             </div>
             <div v-if="lowStockWarn.length === 0" class="lg-type-row">
               <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
-              <span class="lg-type-label" style="grid-column: 2 / span 4">搴撳瓨姝ｅ父</span>
+              <span class="lg-type-label" style="grid-column: 2 / span 4">库存正常</span>
             </div>
           </div>
         </section>
         <section class="lg-panel">
-          <div class="lg-panel-title">鍑哄叆搴撶粺璁?/div>
+          <div class="lg-panel-title">出入库统计</div>
           <div class="lg-type-list">
             <div class="lg-type-row">
               <span class="lg-type-dot" style="background: #22c55e"></span>
-              <span class="lg-type-label">鍏ュ簱娆℃暟</span>
+              <span class="lg-type-label">入库次数</span>
               <span class="lg-type-bar-wrap">
                 <span
                   class="lg-type-bar"
@@ -870,7 +872,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             </div>
             <div class="lg-type-row">
               <span class="lg-type-dot" style="background: #ef4444"></span>
-              <span class="lg-type-label">鍑哄簱娆℃暟</span>
+              <span class="lg-type-label">出库次数</span>
               <span class="lg-type-bar-wrap">
                 <span
                   class="lg-type-bar"

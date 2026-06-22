@@ -125,7 +125,6 @@ function handleAddChild() {
   formData.subjectCode = ''
   formData.subjectName = ''
   formData.subjectType = 'MATERIAL'
-  formData.accountCategory = selectedNode.value.accountCategory
   formData.level = (selectedNode.value.level || 0) + 1
   formData.sortOrder = 0
   formData.status = 'ENABLE'
@@ -143,7 +142,6 @@ function handleEdit() {
   formData.subjectCode = node.subjectCode
   formData.subjectName = node.subjectName
   formData.subjectType = node.subjectType
-  formData.accountCategory = node.accountCategory
   formData.level = node.level
   formData.sortOrder = node.sortOrder
   formData.status = node.status
@@ -166,6 +164,7 @@ async function handleFormSubmit() {
     }
     formVisible.value = false
     await fetchTree()
+    // Restore selection
     const newId = formMode.value === 'create' ? undefined : selectedKeys.value[0]
     if (newId) selectedKeys.value = [newId]
   } catch (e: unknown) {
@@ -254,8 +253,17 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Category Tabs -->
+    <a-tabs
+      v-model:activeKey="activeCategory"
+      @change="handleCategoryChange"
+      class="cs-category-tabs"
+    >
+      <a-tab-pane v-for="tab in categoryTabs" :key="tab.key" :tab="tab.tab" />
+    </a-tabs>
+
     <div class="cs-layout">
-      <!-- 左侧：科目树 -->
+      <!-- Left: Tree -->
       <div class="lg-table-wrap cs-tree-panel">
         <div class="cs-tree-header">
           <span class="cs-tree-title">科目树</span>
@@ -273,15 +281,8 @@ onMounted(() => {
             @select="handleTreeSelect"
             @expand="(keys: string[]) => (expandedKeys = keys)"
           >
-            <template #title="{ subjectCode, subjectName, accountCategory }">
+            <template #title="{ subjectCode, subjectName }">
               <span class="cs-tree-node">
-                <a-tag
-                  :color="ACCOUNT_CATEGORY_COLOR[accountCategory] ?? 'default'"
-                  size="small"
-                  style="font-size: 10px; line-height: 16px"
-                >
-                  {{ ACCOUNT_CATEGORY_LABEL[accountCategory] ?? accountCategory }}
-                </a-tag>
                 <span class="cs-tree-code">{{ subjectCode }}</span>
                 <span class="cs-tree-name">{{ subjectName }}</span>
               </span>
@@ -291,7 +292,7 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 右侧：详情 -->
+      <!-- Right: Detail -->
       <div class="lg-table-wrap cs-detail-panel">
         <template v-if="selectedNode">
           <div class="cs-detail-header">
@@ -322,14 +323,6 @@ onMounted(() => {
             <a-descriptions-item label="科目名称">{{
               selectedNode.subjectName
             }}</a-descriptions-item>
-            <a-descriptions-item label="科目类别">
-              <a-tag :color="ACCOUNT_CATEGORY_COLOR[selectedNode.accountCategory] ?? 'default'">
-                {{
-                  ACCOUNT_CATEGORY_LABEL[selectedNode.accountCategory] ??
-                  selectedNode.accountCategory
-                }}
-              </a-tag>
-            </a-descriptions-item>
             <a-descriptions-item label="科目类型">
               <a-tag>{{
                 subjectTypeOptions.find((o) => o.dictValue === selectedNode.subjectType)
@@ -380,27 +373,6 @@ onMounted(() => {
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="科目类别" v-if="formData.parentId == null">
-              <a-select
-                v-model:value="formData.accountCategory"
-                :options="[
-                  { value: 'COST', label: '成本科目' },
-                  { value: 'REVENUE', label: '收入科目' },
-                  { value: 'SETTLEMENT', label: '结算科目' },
-                ]"
-                placeholder="请选择科目类别"
-              />
-            </a-form-item>
-            <a-form-item v-else label="科目类别">
-              <a-tag :color="ACCOUNT_CATEGORY_COLOR[formData.accountCategory!] ?? 'default'">
-                {{ ACCOUNT_CATEGORY_LABEL[formData.accountCategory!] ?? formData.accountCategory }}
-              </a-tag>
-              <span style="color: #9ca3af; font-size: 12px; margin-left: 4px"
-                >（继承自父节点）</span
-              >
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
             <a-form-item label="科目类型">
               <a-select
                 v-model:value="formData.subjectType"
@@ -438,6 +410,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.cs-category-tabs {
+  margin-bottom: 0;
+}
+
 .cs-layout {
   display: flex;
   gap: 16px;
@@ -445,7 +421,7 @@ onMounted(() => {
 }
 
 .cs-tree-panel {
-  width: 340px;
+  width: 320px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -474,7 +450,7 @@ onMounted(() => {
 
 .cs-tree-node {
   display: inline-flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
 }
 

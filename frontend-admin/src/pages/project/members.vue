@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
@@ -14,15 +14,15 @@ const store = useProjectStore()
 
 const projectId = route.params.projectId as string
 
-// 鈹€鈹€ Role definitions 鈹€鈹€
+// ── Role definitions ──
 const ROLE_OPTIONS = [
-  { value: 'PM', label: '椤圭洰缁忕悊' },
-  { value: 'CM', label: '鍟嗗姟缁忕悊' },
-  { value: 'CSTM', label: '鎴愭湰缁忕悊' },
-  { value: 'MAT', label: '鏉愭枡鍛? },
-  { value: 'SUBC', label: '鍒嗗寘绠＄悊鍛? },
-  { value: 'FIN', label: '璐㈠姟' },
-  { value: 'OTH', label: '鍏朵粬' },
+  { value: 'PM', label: '项目经理' },
+  { value: 'CM', label: '商务经理' },
+  { value: 'CSTM', label: '成本经理' },
+  { value: 'MAT', label: '材料员' },
+  { value: 'SUBC', label: '分包管理员' },
+  { value: 'FIN', label: '财务' },
+  { value: 'OTH', label: '其他' },
 ]
 
 const ROLE_MAP: Record<string, string> = Object.fromEntries(
@@ -46,10 +46,10 @@ const roleDistribution = computed(() => {
     label: ROLE_MAP[role] ?? role,
     count,
   }))
-  return rows.length ? rows : [{ role: 'EMPTY', label: '寰呮坊鍔犳垚鍛?, count: 0 }]
+  return rows.length ? rows : [{ role: 'EMPTY', label: '待添加成员', count: 0 }]
 })
 
-// 鈹€鈹€ User lookup 鈹€鈹€
+// ── User lookup ──
 const userList = ref<SysUserBrief[]>([])
 const userMap = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {}
@@ -63,7 +63,7 @@ function getUserName(userId: string): string {
   return userMap.value[userId] ?? userId
 }
 
-// 鈹€鈹€ Add member modal 鈹€鈹€
+// ── Add member modal ──
 const addVisible = ref(false)
 const addForm = reactive<MemberFormParams>({
   userId: '',
@@ -74,7 +74,7 @@ const addForm = reactive<MemberFormParams>({
 })
 const addLoading = ref(false)
 
-// 鈹€鈹€ Load data 鈹€鈹€
+// ── Load data ──
 async function loadUsers() {
   try {
     const res = await getUserList({ pageNum: 1, pageSize: 200 })
@@ -89,7 +89,7 @@ onMounted(async () => {
   await Promise.all([store.fetchProject(projectId), store.fetchMembers(projectId), loadUsers()])
 })
 
-// 鈹€鈹€ Handlers 鈹€鈹€
+// ── Handlers ──
 function openAddModal() {
   addForm.userId = ''
   addForm.roleCode = ''
@@ -101,13 +101,13 @@ function openAddModal() {
 
 async function handleAdd() {
   if (!addForm.userId || !addForm.roleCode) {
-    message.warning('璇烽€夋嫨鐢ㄦ埛鍜岃鑹?)
+    message.warning('请选择用户和角色')
     return
   }
   addLoading.value = true
   try {
     await store.addMember(projectId, { ...addForm })
-    message.success('娣诲姞鎴愬姛')
+    message.success('添加成功')
     addVisible.value = false
     await store.fetchMembers(projectId)
   } catch (e: unknown) {
@@ -125,7 +125,7 @@ async function handleRoleChange(member: MemberVO, newRole: string) {
       userId: member.userId,
       roleCode: newRole,
     })
-    message.success('瑙掕壊鏇存柊鎴愬姛')
+    message.success('角色更新成功')
     member.roleCode = newRole
   } catch (e: unknown) {
     console.error(e)
@@ -135,14 +135,14 @@ async function handleRoleChange(member: MemberVO, newRole: string) {
 
 function handleDelete(member: MemberVO) {
   Modal.confirm({
-    title: '纭绉婚櫎',
-    content: `纭畾瑕佷粠椤圭洰涓Щ闄ゆ垚鍛樸€?{getUserName(member.userId)}銆嶅悧锛焋,
-    okText: '纭绉婚櫎',
-    cancelText: '鍙栨秷',
+    title: '确认移除',
+    content: `确定要从项目中移除成员「${getUserName(member.userId)}」吗？`,
+    okText: '确认移除',
+    cancelText: '取消',
     okType: 'danger',
     onOk: async () => {
       await store.removeMember(projectId, member.id)
-      message.success('宸茬Щ闄?)
+      message.success('已移除')
       await store.fetchMembers(projectId)
     },
   })
@@ -152,14 +152,14 @@ function goBack() {
   router.push('/project')
 }
 
-// 鈹€鈹€ Table columns 鈹€鈹€
+// ── Table columns ──
 const columns = [
-  { title: '濮撳悕', dataIndex: 'userId', width: 140 },
-  { title: '瑙掕壊', dataIndex: 'roleCode', width: 160 },
-  { title: '宀椾綅', dataIndex: 'positionName', width: 140 },
-  { title: '寮€濮嬫棩鏈?, dataIndex: 'startDate', width: 130 },
-  { title: '鐘舵€?, dataIndex: 'status', width: 90 },
-  { title: '鎿嶄綔', dataIndex: 'ops', width: 80 },
+  { title: '姓名', dataIndex: 'userId', width: 140 },
+  { title: '角色', dataIndex: 'roleCode', width: 160 },
+  { title: '岗位', dataIndex: 'positionName', width: 140 },
+  { title: '开始日期', dataIndex: 'startDate', width: 130 },
+  { title: '状态', dataIndex: 'status', width: 90 },
+  { title: '操作', dataIndex: 'ops', width: 80 },
 ]
 </script>
 
@@ -168,8 +168,8 @@ const columns = [
     <div class="pt-page-head">
       <div>
         <a-breadcrumb class="pt-breadcrumb">
-          <a-breadcrumb-item>椤圭洰绠＄悊</a-breadcrumb-item>
-          <a-breadcrumb-item>椤圭洰鎴愬憳</a-breadcrumb-item>
+          <a-breadcrumb-item>项目管理</a-breadcrumb-item>
+          <a-breadcrumb-item>项目成员</a-breadcrumb-item>
         </a-breadcrumb>
         <div v-if="store.currentProject" class="pm-title-project">
           {{ store.currentProject.projectName }}
@@ -178,37 +178,37 @@ const columns = [
       <div class="pt-head-actions">
         <a-button @click="goBack">
           <ArrowLeftOutlined />
-          杩斿洖椤圭洰
+          返回项目
         </a-button>
         <a-button type="primary" @click="openAddModal">
           <PlusOutlined />
-          娣诲姞鎴愬憳
+          添加成员
         </a-button>
       </div>
     </div>
 
     <div class="pt-kpi-strip">
       <div class="pt-kpi">
-        <div class="pt-kpi-label">鎴愬憳鎬绘暟</div>
-        <div class="pt-kpi-value">{{ memberStats.total }} <small>浜?/small></div>
+        <div class="pt-kpi-label">成员总数</div>
+        <div class="pt-kpi-value">{{ memberStats.total }} <small>人</small></div>
       </div>
       <div class="pt-kpi">
-        <div class="pt-kpi-label">椤圭洰缁忕悊</div>
-        <div class="pt-kpi-value">{{ memberStats.manager }} <small>浜?/small></div>
+        <div class="pt-kpi-label">项目经理</div>
+        <div class="pt-kpi-value">{{ memberStats.manager }} <small>人</small></div>
       </div>
       <div class="pt-kpi">
-        <div class="pt-kpi-label">涓氬姟浜哄憳</div>
-        <div class="pt-kpi-value">{{ memberStats.business }} <small>浜?/small></div>
+        <div class="pt-kpi-label">业务人员</div>
+        <div class="pt-kpi-value">{{ memberStats.business }} <small>人</small></div>
       </div>
       <div class="pt-kpi">
-        <div class="pt-kpi-label">寰呯‘璁?/div>
-        <div class="pt-kpi-value">{{ memberStats.pending }} <small>浜?/small></div>
+        <div class="pt-kpi-label">待确认</div>
+        <div class="pt-kpi-value">{{ memberStats.pending }} <small>人</small></div>
       </div>
     </div>
 
     <div class="pt-ledger-layout">
       <main class="pt-panel pt-table-panel">
-        <div class="pt-panel-header">鎴愬憳娓呭崟</div>
+        <div class="pt-panel-header">成员清单</div>
         <a-table
           :data-source="store.members"
           :columns="columns"
@@ -239,51 +239,51 @@ const columns = [
 
             <template v-else-if="column.dataIndex === 'status'">
               <a-tag :color="record.status === 'ACTIVE' ? 'success' : 'default'">
-                {{ record.status === 'ACTIVE' ? '鍦ㄥ矖' : (record.status ?? '-') }}
+                {{ record.status === 'ACTIVE' ? '在岗' : (record.status ?? '-') }}
               </a-tag>
             </template>
 
             <template v-else-if="column.dataIndex === 'ops'">
               <a-popconfirm
-                title="纭畾绉婚櫎璇ユ垚鍛橈紵"
-                ok-text="纭"
-                cancel-text="鍙栨秷"
+                title="确定移除该成员？"
+                ok-text="确认"
+                cancel-text="取消"
                 @confirm="handleDelete(record)"
               >
-                <a class="pt-link pt-danger">绉婚櫎</a>
+                <a class="pt-link pt-danger">移除</a>
               </a-popconfirm>
             </template>
           </template>
         </a-table>
         <a-empty
           v-if="!store.membersLoading && store.members.length === 0"
-          description="鏆傛棤椤圭洰鎴愬憳锛岀偣鍑讳笂鏂规寜閽坊鍔?
+          description="暂无项目成员，点击上方按钮添加"
           style="padding: 48px 0"
         />
         <div class="pt-pagination">
-          <span class="pt-total">鍏?{{ store.membersTotal }} 浜?/span>
+          <span class="pt-total">共 {{ store.membersTotal }} 人</span>
         </div>
       </main>
 
       <aside class="pt-analysis-rail">
         <section class="pt-panel">
-          <div class="pt-panel-header">瑙掕壊鍒嗗竷</div>
+          <div class="pt-panel-header">角色分布</div>
           <div class="pt-panel-body">
             <ul class="pt-compact-list">
               <li v-for="item in roleDistribution" :key="item.role" class="pt-compact-row">
                 <span>{{ item.label }}</span>
-                <b>{{ item.count }} 浜?/b>
+                <b>{{ item.count }} 人</b>
               </li>
             </ul>
           </div>
         </section>
         <section class="pt-panel">
-          <div class="pt-panel-header">鎴愬憳鑱岃矗鎻愮ず</div>
+          <div class="pt-panel-header">成员职责提示</div>
           <div class="pt-panel-body">
             <ul class="pt-compact-list">
-              <li class="pt-compact-row"><span>椤圭洰缁忕悊</span><b>鎬昏礋璐?/b></li>
-              <li class="pt-compact-row"><span>鍟嗗姟/鎴愭湰</span><b>缁忚惀鎺у埗</b></li>
-              <li class="pt-compact-row"><span>璐㈠姟/鐗╄祫</span><b>鎵ц鏀寔</b></li>
+              <li class="pt-compact-row"><span>项目经理</span><b>总负责</b></li>
+              <li class="pt-compact-row"><span>商务/成本</span><b>经营控制</b></li>
+              <li class="pt-compact-row"><span>财务/物资</span><b>执行支持</b></li>
             </ul>
           </div>
         </section>
@@ -293,16 +293,16 @@ const columns = [
     <!-- Add Member Modal -->
     <a-modal
       v-model:open="addVisible"
-      title="娣诲姞椤圭洰鎴愬憳"
+      title="添加项目成员"
       :confirm-loading="addLoading"
       @ok="handleAdd"
       @cancel="addVisible = false"
     >
       <a-form layout="vertical" class="pm-form">
-        <a-form-item label="閫夋嫨鐢ㄦ埛" required>
+        <a-form-item label="选择用户" required>
           <a-select
             v-model:value="addForm.userId"
-            placeholder="璇锋悳绱㈠苟閫夋嫨鐢ㄦ埛"
+            placeholder="请搜索并选择用户"
             show-search
             :filter-option="
               (input: string, option: SelectOption) =>
@@ -319,25 +319,25 @@ const columns = [
           />
         </a-form-item>
 
-        <a-form-item label="瑙掕壊" required>
+        <a-form-item label="角色" required>
           <a-select
             v-model:value="addForm.roleCode"
-            placeholder="璇烽€夋嫨瑙掕壊"
+            placeholder="请选择角色"
             :options="ROLE_OPTIONS"
             style="width: 100%"
           />
         </a-form-item>
 
-        <a-form-item label="宀椾綅鍚嶇О">
-          <a-input v-model:value="addForm.positionName" placeholder="濡傦細鏂藉伐鍛樸€佸畨鍏ㄥ憳" />
+        <a-form-item label="岗位名称">
+          <a-input v-model:value="addForm.positionName" placeholder="如：施工员、安全员" />
         </a-form-item>
 
-        <a-form-item label="寮€濮嬫棩鏈?>
+        <a-form-item label="开始日期">
           <a-date-picker
             v-model:value="addForm.startDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
-            placeholder="閫夋嫨寮€濮嬫棩鏈?
+            placeholder="选择开始日期"
           />
         </a-form-item>
       </a-form>
@@ -356,7 +356,7 @@ const columns = [
   color: #6b7280;
 }
 
-/* 鈹€鈹€ User cell 鈹€鈹€ */
+/* ── User cell ── */
 .pm-user-cell {
   display: flex;
   align-items: center;
@@ -375,7 +375,7 @@ const columns = [
   font-weight: 500;
 }
 
-/* 鈹€鈹€ Form 鈹€鈹€ */
+/* ── Form ── */
 .pm-form :deep(.ant-form-item) {
   margin-bottom: 16px;
 }
