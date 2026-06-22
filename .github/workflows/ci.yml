@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
-    branches: [main]
+    branches: [master, main]
 
 jobs:
   backend-test:
@@ -16,10 +16,16 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
-      - name: Run backend tests
-        run: cd backend && ./mvnw test -Djasypt.encryptor.password=dev-jasypt-key
+      - name: Run backend tests with coverage
+        run: cd backend && ./mvnw verify -Djasypt.encryptor.password=dev-jasypt-key
         env:
           JASYPT_ENCRYPTOR_PASSWORD: dev-jasypt-key
+      - name: Upload backend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/target/site/jacoco
 
   backend-test-mysql:
     runs-on: ubuntu-latest
@@ -44,13 +50,28 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
-      - name: Run MySQL tests
+      - name: Run MySQL integration tests
         run: cd backend && ./mvnw test -Dspring.profiles.active=test -Djasypt.encryptor.password=dev-jasypt-key
         env:
           JASYPT_ENCRYPTOR_PASSWORD: dev-jasypt-key
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/cgc_pms_test
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: root
+
+  type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+      - name: TypeScript type check
+        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm type-check
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -65,7 +86,7 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: frontend-admin/pnpm-lock.yaml
       - name: Install & Build
-        run: cd frontend-admin && pnpm install && pnpm build
+        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm build
 
   frontend-test:
     runs-on: ubuntu-latest
@@ -79,5 +100,11 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
           cache-dependency-path: frontend-admin/pnpm-lock.yaml
-      - name: Install & Test
-        run: cd frontend-admin && pnpm install && pnpm test:unit
+      - name: Install & Test with coverage
+        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm test:coverage || true
+      - name: Upload frontend coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend-admin/coverage

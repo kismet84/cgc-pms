@@ -14,6 +14,15 @@ export default defineConfig({
     globals: true,
     exclude: ['e2e/**', 'node_modules/**'],
     coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary', 'html'],
+      include: ['src/**/*.{ts,vue}'],
+      exclude: [
+        'src/**/*.d.ts',
+        'src/main.ts',
+        'src/components.d.ts',
+        'src/types/**',
+      ],
       thresholds: {
         lines: 80,
         functions: 80,
