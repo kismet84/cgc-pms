@@ -27,6 +27,18 @@ FROM (VALUES (30001, 0, 10001, 20001, 20002, 'CT-2026-001', '主体结构施工�
   AS v(id, tid, pid, pa, pb, code, name, type, camt, curamt, cst, apst, sd, ed, cg, cby, rmk)
 WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = 30001);
 
+INSERT INTO ct_contract (id, tenant_id, project_id, party_a_id, party_b_id, contract_code, contract_name, contract_type, contract_amount, current_amount, contract_status, approval_status, start_date, end_date, cost_generated_flag, created_by, remark)
+SELECT v.id, v.tid, v.pid, v.pa, v.pb, v.code, v.name, v.type, v.camt, v.curamt, v.cst, v.apst, v.sd, v.ed, v.cg, v.cby, v.rmk
+FROM (VALUES (30002, 0, 10001, 20001, 20002, 'CT-2026-002', '分包工程合同', 'SUB', CAST(30000000.00 AS DECIMAL(18,2)), CAST(30000000.00 AS DECIMAL(18,2)), 'PERFORMING', 'APPROVED', DATE '2026-03-01', DATE '2026-12-31', 0, 1, '集成测试合同-分包'))
+  AS v(id, tid, pid, pa, pb, code, name, type, camt, curamt, cst, apst, sd, ed, cg, cby, rmk)
+WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = 30002);
+
+INSERT INTO ct_contract (id, tenant_id, project_id, party_a_id, party_b_id, contract_code, contract_name, contract_type, contract_amount, current_amount, contract_status, approval_status, start_date, end_date, cost_generated_flag, created_by, remark)
+SELECT v.id, v.tid, v.pid, v.pa, v.pb, v.code, v.name, v.type, v.camt, v.curamt, v.cst, v.apst, v.sd, v.ed, v.cg, v.cby, v.rmk
+FROM (VALUES (30003, 0, 10001, 20001, 20002, 'CT-2026-003', '工程服务合同', 'SERVICE', CAST(10000000.00 AS DECIMAL(18,2)), CAST(10000000.00 AS DECIMAL(18,2)), 'PERFORMING', 'APPROVED', DATE '2026-04-01', DATE '2026-12-31', 0, 1, '集成测试合同-服务'))
+  AS v(id, tid, pid, pa, pb, code, name, type, camt, curamt, cst, apst, sd, ed, cg, cby, rmk)
+WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = 30003);
+
 INSERT INTO pm_project_member (id, tenant_id, project_id, user_id, role_code)
 SELECT v.id, v.tid, v.pid, v.uid, v.role
 FROM (VALUES (40001, 0, 10001, 1, 'PROJECT_MANAGER'))
