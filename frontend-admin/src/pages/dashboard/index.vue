@@ -927,9 +927,9 @@ onMounted(() => {
       </div>
     </template>
 
-    <div v-if="!loading && needsProject(activeRole) && projectList.length > 0 && !selectedProjectId && !pmData && !bmData && !costData && !financeData" class="empty-page">
+    <div v-if="!loading && needsProject(activeRole) && projectList.length === 0" class="empty-page">
       <ProjectOutlined style="font-size: 48px; color: #d1d5db; margin-bottom: 16px" />
-      <div>请选择一个项目查看仪表盘数据</div>
+      <div>暂无项目数据</div>
     </div>
 
     <a-modal

@@ -89,8 +89,8 @@ describe('Dashboard data loading behavior', () => {
   })
 
   // ── Default empty state ──
-  it('shows empty page when no project selected and no data loaded', () => {
+  it('shows empty page when no projects exist', () => {
     expect(dashboardSource).toContain('empty-page')
-    expect(dashboardSource).toContain('请选择一个项目查看仪表盘数据')
+    expect(dashboardSource).toContain('暂无项目数据')
   })
 })
