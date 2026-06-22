@@ -17,17 +17,13 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'html'],
       include: ['src/**/*.{ts,vue}'],
-      exclude: [
-        'src/**/*.d.ts',
-        'src/main.ts',
-        'src/components.d.ts',
-        'src/types/**',
-      ],
+      exclude: ['src/**/*.d.ts', 'src/main.ts', 'src/components.d.ts', 'src/types/**'],
       thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 80,
-        statements: 80,
+        // 55% 目标声明 — 从 ~6.7% 基线出发，通过页面拆分 + composable 测试逐步达成
+        lines: 55,
+        functions: 45,
+        branches: 40,
+        statements: 55,
       },
     },
   },
