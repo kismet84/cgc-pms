@@ -4,3 +4,4 @@
 - [状态栏配置固定修复](statusline-config-fix-2026-06-21.md) — 项目级状态栏从 claude-hud/claude-hub 固定改回 ccstatusline
 - [claude-mem hook 阻断修复](claude-mem-hook-block-fix-2026-06-22.md) — claude-mem worker 不可达导致 UserPromptSubmit 被拦截，已先禁用插件止血
 - [后端重建 Jasypt 环境修复](backend-rebuild-jasypt-env-fix-2026-06-22.md) — Windows 下 mvnw.cmd 启动方式与 docker compose 必需环境变量修复
+- [PowerShell 不支持 Bash 花括号路径展开](powershell-no-bash-brace-expansion.md) — 跨目录检索改用 PowerShell 枚举，避免 `{a,b}` 解析失败
