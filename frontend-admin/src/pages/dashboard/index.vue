@@ -76,9 +76,6 @@ async function fetchProjects() {
   try {
     const res = await getProjectList({ pageNum: 1, pageSize: 50 })
     projectList.value = res.records
-    if (projectList.value.length > 0 && !selectedProjectId.value) {
-      selectedProjectId.value = projectList.value[0].id
-    }
   } catch (e: unknown) {
     console.error(e)
     projectList.value = []
@@ -90,31 +87,26 @@ function needsProject(role: DashboardRole) {
 }
 
 async function fetchViewData() {
-  const pid = selectedProjectId.value
-  if (needsProject(activeRole.value) && !pid) {
-    pmData.value = null
-    bmData.value = null
-    costData.value = null
-    financeData.value = null
-    mgmtData.value = null
-    costBreakdown.value = null
-    return
-  }
+  const pid = selectedProjectId.value || undefined
   loading.value = true
   try {
     switch (activeRole.value) {
       case 'pm':
-        pmData.value = await getProjectManagerView(pid!)
+        pmData.value = await getProjectManagerView(pid)
         break
       case 'bm':
-        bmData.value = await getBusinessManagerView(pid!)
+        bmData.value = await getBusinessManagerView(pid)
         break
       case 'cost':
-        costData.value = await getCostManagerView(pid!)
-        costBreakdown.value = await getCostBreakdown(pid!)
+        costData.value = await getCostManagerView(pid)
+        if (pid) {
+          costBreakdown.value = await getCostBreakdown(pid)
+        } else {
+          costBreakdown.value = null
+        }
         break
       case 'finance':
-        financeData.value = await getFinanceView(pid!)
+        financeData.value = await getFinanceView(pid)
         break
       case 'mgmt':
         mgmtData.value = await getManagementView()
@@ -935,7 +927,7 @@ onMounted(() => {
       </div>
     </template>
 
-    <div v-if="!loading && needsProject(activeRole) && !selectedProjectId" class="empty-page">
+    <div v-if="!loading && needsProject(activeRole) && projectList.length > 0 && !selectedProjectId && !pmData && !bmData && !costData && !financeData" class="empty-page">
       <ProjectOutlined style="font-size: 48px; color: #d1d5db; margin-bottom: 16px" />
       <div>请选择一个项目查看仪表盘数据</div>
     </div>

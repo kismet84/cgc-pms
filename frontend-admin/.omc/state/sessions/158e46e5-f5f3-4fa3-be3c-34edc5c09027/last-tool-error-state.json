@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd D:/projects-test/cgc-pms/frontend-admin && pnpm test:unit -- src/pages/dashboard/__tests__/ 2>&1\",\"timeout\":120000,\"description\":\"运行驾驶舱单元测试\",\"run_in_background\":false,\"dangerouslyDisabl...",
+  "error": "Exit code 1\n[WARN] The \"pnpm\" field in package.json is no longer read by pnpm. The following keys were ignored: \"pnpm.onlyBuiltDependencies\", \"pnpm.patchedDependencies\". See https://pnpm.io/settings for the new home of each setting.\n$ vitest run \"--\" \"src/pages/dashboard/__tests__/\"\n\n RUN  v4.1.8 D:/projects-test/cgc-pms/frontend-admin\n\n ❯ src/pages/org/__tests__/index.test.ts (0 test)\nstderr | src/pages/alert/__tests__/index.test.ts > alert/index.vue > 页面正常渲染\n[Vue warn]: Failed to resolve compo...",
+  "timestamp": "2026-06-21T15:59:57.587Z",
+  "retry_count": 1
+}

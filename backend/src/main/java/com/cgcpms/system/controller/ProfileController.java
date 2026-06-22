@@ -31,7 +31,7 @@ public class ProfileController {
      */
     @PutMapping
     @PreAuthorize("isAuthenticated()")
-    public ApiResponse<UserInfo> updateProfile(@RequestBody UpdateProfileRequest request) {
+    public ApiResponse<UserInfo> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         Long userId = UserContext.getCurrentUserId();
         UserInfo updated = profileService.updateProfile(userId, request);
         return ApiResponse.success(updated);

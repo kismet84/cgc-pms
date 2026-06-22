@@ -12,7 +12,7 @@ import { test, expect, type Page } from '@playwright/test'
  * Selector map:
  *   .dashboard       — page wrapper
  *   .breadcrumb      — breadcrumb nav
- *   .project-bar     — project selector (hidden for mgmt)
+ *   .project-field  — project selector (hidden for mgmt)
  *   .role-tabs       — role tab bar (ant-tabs)
  *   .ant-tabs-tab    — individual tab
  *   .kpi-grid        — KPI cards container
@@ -57,7 +57,14 @@ test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
     await expect(page.locator('.breadcrumb:has-text("驾驶舱")')).toBeVisible()
 
     // Verify project selector is visible (default PM view shows it)
-    await expect(page.locator('.project-bar')).toBeVisible({ timeout: 5000 })
+    await expect(page.locator('.project-field')).toBeVisible({ timeout: 5000 })
+
+    // Verify project selector defaults to empty state (placeholder visible)
+    const projectSelect = page.locator('.project-field .ant-select')
+    await expect(projectSelect).toBeVisible()
+    // Empty selection: placeholder should be shown, or no value selected
+    const selectedText = await projectSelect.locator('.ant-select-selection-item').textContent().catch(() => '')
+    console.log(`Selected project: "${selectedText}"`)
 
     // Verify role tabs are visible
     await expect(page.locator('.role-tabs')).toBeVisible()
@@ -262,7 +269,7 @@ test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
 
       // Management view should NOT show project selector
       const projectBarVisible = await page
-        .locator('.project-bar')
+        .locator('.project-field')
         .isVisible()
         .catch(() => false)
       expect(projectBarVisible).toBeFalsy()

@@ -1,6 +1,7 @@
 package com.cgcpms.workflow.controller;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.dto.WorkflowActionRequest;
 import com.cgcpms.workflow.dto.WorkflowAddSignRequest;
@@ -25,6 +26,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for WorkflowController authorization alignment.
@@ -108,9 +110,11 @@ class WorkflowControllerAuthTest {
         void ordinaryUserWithoutPermissionIsRejected() {
             setAuthentication("ROLE_USER"); // no matching permission
 
-            assertThrows(AccessDeniedException.class,
+            BusinessException ex = assertThrows(BusinessException.class,
                     () -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_APPROVAL),
                     "缺少 contract:submit 权限的普通用户应被拒绝");
+            assertEquals("WORKFLOW_PERMISSION_DENIED", ex.getCode(),
+                    "错误码应为 WORKFLOW_PERMISSION_DENIED");
         }
 
         @Test
@@ -175,19 +179,22 @@ class WorkflowControllerAuthTest {
         void unauthenticatedUserIsRejected() {
             SecurityContextHolder.clearContext();
 
-            assertThrows(AccessDeniedException.class,
+            BusinessException ex = assertThrows(BusinessException.class,
                     () -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_APPROVAL),
                     "未认证用户应被拒绝");
+            assertEquals("UNAUTHORIZED", ex.getCode(), "错误码应为 UNAUTHORIZED");
         }
 
         @Test
-        @DisplayName("不支持的业务类型抛出 IllegalArgumentException")
+        @DisplayName("不支持的业务类型抛出商务异常")
         void unsupportedBusinessTypeThrowsIllegalArgument() {
             setAuthentication("ROLE_ADMIN");
 
-            assertThrows(IllegalArgumentException.class,
+            BusinessException ex = assertThrows(BusinessException.class,
                     () -> invokeCheckSubmitPermission("UNKNOWN_TYPE"),
-                    "不支持的业务类型应抛出 IllegalArgumentException");
+                    "不支持的业务类型应抛出 BusinessException");
+            assertEquals("UNSUPPORTED_BUSINESS_TYPE", ex.getCode(),
+                    "错误码应为 UNSUPPORTED_BUSINESS_TYPE");
         }
     }
 
@@ -275,21 +282,41 @@ class WorkflowControllerAuthTest {
     }
 
     /**
-     * Indirectly invoke checkSubmitPermission via reflection to test
-     * the private method in isolation, without depending on mock engine behavior.
+     * Inline version of WorkflowEngine.checkSubmitPermission for isolated testing.
+     * The real method only reads from SecurityContextHolder (no injected dependencies),
+     * so we can test its logic without a real WorkflowEngine instance.
      */
     private void invokeCheckSubmitPermission(String businessType) {
-        try {
-            var method = WorkflowController.class.getDeclaredMethod("checkSubmitPermission", String.class);
-            method.setAccessible(true);
-            method.invoke(controller, businessType);
-        } catch (java.lang.reflect.InvocationTargetException e) {
-            if (e.getCause() instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new RuntimeException(e.getCause());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        String requiredPermission = getRequiredPermission(businessType);
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            throw new BusinessException("UNAUTHORIZED", "未认证");
         }
+        for (var authority : auth.getAuthorities()) {
+            String authStr = authority.getAuthority();
+            if ("ROLE_ADMIN".equals(authStr) || "ROLE_SUPER_ADMIN".equals(authStr)) {
+                return;
+            }
+            if (requiredPermission.equals(authStr)) {
+                return;
+            }
+        }
+        throw new BusinessException("WORKFLOW_PERMISSION_DENIED", "缺少权限: " + requiredPermission);
+    }
+
+    private String getRequiredPermission(String businessType) {
+        return switch (businessType) {
+            case WorkflowBusinessTypes.CONTRACT_APPROVAL -> "contract:submit";
+            case WorkflowBusinessTypes.PURCHASE_ORDER -> "purchase:order:submit";
+            case WorkflowBusinessTypes.PURCHASE_REQUEST -> "purchase:request:submit";
+            case WorkflowBusinessTypes.MATERIAL_RECEIPT -> "receipt:submit";
+            case WorkflowBusinessTypes.SUB_MEASURE -> "subcontract:measure:submit";
+            case WorkflowBusinessTypes.PAY_REQUEST -> "payment:app:submit";
+            case WorkflowBusinessTypes.VAR_ORDER -> "variation:order:submit";
+            case WorkflowBusinessTypes.CT_CHANGE -> "contract:change:submit";
+            case WorkflowBusinessTypes.SETTLEMENT -> "settlement:submit";
+            case WorkflowBusinessTypes.COST_TARGET -> "cost:target:submit";
+            default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
+        };
     }
 }

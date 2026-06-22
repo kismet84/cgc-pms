@@ -57,8 +57,10 @@ public class MybatisPlusConfig {
 
             @Override
             public boolean ignoreTable(String tableName) {
-                // Tables without tenant_id can be listed here
-                return false;
+                // Tables without tenant_id — tenant isolation is enforced
+                // through their related parent entities (e.g. sys_user, sys_role).
+                return "sys_user_role".equals(tableName)
+                        || "sys_role_menu".equals(tableName);
             }
         }));
 

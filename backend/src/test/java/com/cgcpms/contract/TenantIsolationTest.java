@@ -294,11 +294,22 @@ class TenantIsolationTest {
     @Test
     @DisplayName("T-ISOLATION-8: assignRoles rejects cross-tenant user+role combination")
     void testCrossTenantRoleBinding() {
-        // Use tenant A context; try to assign tenant B role to an existing tenant A user
+        // Create a separate tenant A user so the operator (admin=1L) is not
+        // assigning to themself, which would trigger SELF_ROLE_ASSIGN_FORBIDDEN.
+        SysUser target = new SysUser();
+        target.setUsername("isolation_target");
+        target.setPassword("test");
+        target.setTenantId(TENANT_A);
+        target.setStatus("ENABLE");
+        sysUserMapper.insert(target);
+        Long targetUserId = target.getId();
+
         TestUserContext.setAdmin(TENANT_A, USER_A);
-        // tenant A admin user ID is 1 (USER_A), tenant B role is tenantBRoleId
+        // admin in tenant A (USER_A) tries to assign tenant B role to
+        // a DIFFERENT tenant A user → should get ROLE_NOT_FOUND for the
+        // cross-tenant role, not SELF_ROLE_ASSIGN_FORBIDDEN.
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> sysUserService.assignRoles(USER_A, List.of(tenantBRoleId)));
+                () -> sysUserService.assignRoles(targetUserId, List.of(tenantBRoleId)));
         assertEquals("ROLE_NOT_FOUND", ex.getCode());
     }
 }

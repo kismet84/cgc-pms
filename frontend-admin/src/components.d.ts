@@ -76,6 +76,7 @@ declare module 'vue' {
     PaymentTermEditor: typeof import('./components/PaymentTermEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    StatusTag: typeof import('./components/StatusTag.vue')['default']
     StepWizard: typeof import('./components/StepWizard.vue')['default']
   }
 }

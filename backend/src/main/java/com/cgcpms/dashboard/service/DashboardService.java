@@ -66,6 +66,11 @@ public class DashboardService {
     // ========================================================================
     public ProjectManagerDashboardVO getProjectManagerView(Long projectId) {
         Long tenantId = UserContext.getCurrentTenantId();
+
+        if (projectId == null) {
+            return getProjectManagerViewAllProjects(tenantId);
+        }
+
         PmProject project = requireProject(tenantId, projectId);
 
         ProjectManagerDashboardVO vo = new ProjectManagerDashboardVO();
@@ -170,6 +175,11 @@ public class DashboardService {
     // ========================================================================
     public BusinessManagerDashboardVO getBusinessManagerView(Long projectId) {
         Long tenantId = UserContext.getCurrentTenantId();
+
+        if (projectId == null) {
+            return getBusinessManagerViewAllProjects(tenantId);
+        }
+
         PmProject project = requireProject(tenantId, projectId);
 
         BusinessManagerDashboardVO vo = new BusinessManagerDashboardVO();
@@ -260,6 +270,11 @@ public class DashboardService {
     // ========================================================================
     public CostManagerDashboardVO getCostManagerView(Long projectId) {
         Long tenantId = UserContext.getCurrentTenantId();
+
+        if (projectId == null) {
+            return getCostManagerViewAllProjects(tenantId);
+        }
+
         PmProject project = requireProject(tenantId, projectId);
 
         // Use pre-aggregated cost_summary via existing service
@@ -294,6 +309,11 @@ public class DashboardService {
     // ========================================================================
     public FinanceDashboardVO getFinanceView(Long projectId) {
         Long tenantId = UserContext.getCurrentTenantId();
+
+        if (projectId == null) {
+            return getFinanceViewAllProjects(tenantId);
+        }
+
         PmProject project = requireProject(tenantId, projectId);
 
         FinanceDashboardVO vo = new FinanceDashboardVO();
@@ -554,6 +574,359 @@ public class DashboardService {
                 .collect(Collectors.toList());
 
         vo.setSubjectBreakdowns(breakdowns);
+        return vo;
+    }
+
+    // ========================================================================
+    // All-projects aggregated views (projectId == null)
+    // ========================================================================
+
+    private ProjectManagerDashboardVO getProjectManagerViewAllProjects(Long tenantId) {
+        ProjectManagerDashboardVO vo = new ProjectManagerDashboardVO();
+        vo.setProjectId(null);
+        vo.setProjectName("全部项目");
+
+        List<PmProject> activeProjects = projectMapper.selectList(
+                new LambdaQueryWrapper<PmProject>()
+                        .eq(PmProject::getTenantId, tenantId)
+                        .eq(PmProject::getStatus, "ACTIVE"));
+
+        // Pending tasks for current user (tenant-wide, already not scoped to project)
+        Long currentUserId = UserContext.getCurrentUserId();
+        List<WfTask> pendingTasks = wfTaskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getTenantId, tenantId)
+                        .eq(WfTask::getApproverId, currentUserId)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                        .orderByDesc(WfTask::getReceivedAt));
+
+        Map<Long, WfInstance> instanceMap = batchLoadInstances(pendingTasks);
+
+        List<DashboardTaskItemVO> taskItems = pendingTasks.stream().map(t -> {
+            DashboardTaskItemVO item = new DashboardTaskItemVO();
+            item.setTaskId(String.valueOf(t.getId()));
+            item.setInstanceId(String.valueOf(t.getInstanceId()));
+            item.setBusinessType(t.getBusinessType());
+            item.setBusinessId(String.valueOf(t.getBusinessId()));
+            item.setTaskStatus(t.getTaskStatus());
+            if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
+            WfInstance inst = instanceMap.get(t.getInstanceId());
+            if (inst != null) {
+                item.setTitle(inst.getTitle());
+                item.setProjectId(inst.getProjectId() != null ? String.valueOf(inst.getProjectId()) : null);
+            }
+            return item;
+        }).collect(Collectors.toList());
+        vo.setPendingTasks(taskItems);
+        vo.setPendingTaskCount((long) taskItems.size());
+
+        // Lagging projects: all active projects with planned end date in the past
+        List<DashboardProjectSummaryVO> lagging = activeProjects.stream()
+                .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(LocalDate.now()))
+                .map(this::toProjectSummary)
+                .collect(Collectors.toList());
+        vo.setLaggingProjects(lagging);
+        vo.setLaggingProjectCount((long) lagging.size());
+
+        // Pending approvals: tenant-wide pending tasks
+        List<WfTask> allPendingApprovals = wfTaskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getTenantId, tenantId)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                        .orderByDesc(WfTask::getReceivedAt));
+        long pendingApprovalCount = allPendingApprovals.size();
+        List<DashboardTaskItemVO> pendingApprovals = allPendingApprovals.stream().limit(10).map(t -> {
+            DashboardTaskItemVO item = new DashboardTaskItemVO();
+            item.setTaskId(String.valueOf(t.getId()));
+            item.setInstanceId(String.valueOf(t.getInstanceId()));
+            item.setBusinessType(t.getBusinessType());
+            item.setTaskStatus(t.getTaskStatus());
+            if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
+            WfInstance inst = instanceMap.get(t.getInstanceId());
+            if (inst != null) {
+                item.setTitle(inst.getTitle());
+                item.setProjectId(inst.getProjectId() != null ? String.valueOf(inst.getProjectId()) : null);
+            }
+            return item;
+        }).collect(Collectors.toList());
+        vo.setPendingApprovals(pendingApprovals);
+        vo.setPendingApprovalCount(pendingApprovalCount);
+
+        // Expiring contracts: tenant-wide within 30 days
+        LocalDate cutoff = LocalDate.now().plusDays(30);
+        List<CtContract> expiringContracts = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .le(CtContract::getEndDate, cutoff)
+                        .ge(CtContract::getEndDate, LocalDate.now())
+                        .eq(CtContract::getContractStatus, "PERFORMING"));
+        vo.setExpiringContracts(expiringContracts.stream().map(this::toContractItem).collect(Collectors.toList()));
+        vo.setExpiringContractCount((long) expiringContracts.size());
+
+        return vo;
+    }
+
+    private BusinessManagerDashboardVO getBusinessManagerViewAllProjects(Long tenantId) {
+        List<PmProject> activeProjects = projectMapper.selectList(
+                new LambdaQueryWrapper<PmProject>()
+                        .eq(PmProject::getTenantId, tenantId)
+                        .eq(PmProject::getStatus, "ACTIVE"));
+        List<Long> projectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toList());
+
+        BusinessManagerDashboardVO vo = new BusinessManagerDashboardVO();
+        vo.setProjectId(null);
+        vo.setProjectName("全部项目");
+
+        if (projectIds.isEmpty()) {
+            vo.setTotalContractAmount("0");
+            vo.setContractChangeAmount("0");
+            vo.setVarOrderAmount("0");
+            vo.setSubMeasureAmount("0");
+            vo.setPaidRatio("0%");
+            vo.setSettlementProgress("0/0");
+            vo.setRecentChanges(Collections.emptyList());
+            vo.setSettlementItems(Collections.emptyList());
+            return vo;
+        }
+
+        // Contract totals — tenant-wide across all active projects
+        List<CtContract> allContracts = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .in(CtContract::getProjectId, projectIds));
+        BigDecimal totalContractAmount = BigDecimal.ZERO;
+        BigDecimal totalCurrentAmount = BigDecimal.ZERO;
+        BigDecimal totalPaidAmount = BigDecimal.ZERO;
+        for (CtContract c : allContracts) {
+            totalContractAmount = totalContractAmount.add(c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO);
+            totalCurrentAmount = totalCurrentAmount.add(c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO);
+            totalPaidAmount = totalPaidAmount.add(c.getPaidAmount() != null ? c.getPaidAmount() : BigDecimal.ZERO);
+        }
+        vo.setTotalContractAmount(totalContractAmount.toPlainString());
+        BigDecimal changeAmount = totalCurrentAmount.subtract(totalContractAmount);
+        vo.setContractChangeAmount(changeAmount.toPlainString());
+        if (totalContractAmount.compareTo(BigDecimal.ZERO) > 0) {
+            vo.setPaidRatio(totalPaidAmount.divide(totalContractAmount, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP).toPlainString() + "%");
+        } else {
+            vo.setPaidRatio("0%");
+        }
+
+        // Settlement progress — tenant-wide
+        List<StlSettlement> allSettlements = stlSettlementMapper.selectList(
+                new LambdaQueryWrapper<StlSettlement>()
+                        .eq(StlSettlement::getTenantId, tenantId)
+                        .in(StlSettlement::getProjectId, projectIds));
+        long finalizedCount = allSettlements.stream().filter(s -> "FINALIZED".equals(s.getSettlementStatus())).count();
+        vo.setSettlementProgress(allSettlements.isEmpty() ? "0/0" : finalizedCount + "/" + allSettlements.size());
+
+        // Var order amount — tenant-wide
+        BigDecimal varOrderTotal = varOrderMapper.selectList(
+                new LambdaQueryWrapper<VarOrder>()
+                        .eq(VarOrder::getTenantId, tenantId)
+                        .in(VarOrder::getProjectId, projectIds)
+                        .eq(VarOrder::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setVarOrderAmount(varOrderTotal.toPlainString());
+
+        // Sub measure amount — tenant-wide
+        BigDecimal subMeasureTotal = subMeasureMapper.selectList(
+                new LambdaQueryWrapper<SubMeasure>()
+                        .eq(SubMeasure::getTenantId, tenantId)
+                        .in(SubMeasure::getProjectId, projectIds)
+                        .eq(SubMeasure::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(s -> s.getApprovedAmount() != null ? s.getApprovedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setSubMeasureAmount(subMeasureTotal.toPlainString());
+
+        // Recent changes: top 5 contracts by currentAmount
+        vo.setRecentChanges(allContracts.stream()
+                .sorted(Comparator.comparing(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO,
+                        Comparator.reverseOrder()))
+                .limit(5)
+                .map(this::toContractItem)
+                .collect(Collectors.toList()));
+
+        // Settlement items
+        vo.setSettlementItems(allSettlements.stream().map(s -> {
+            DashboardProjectSummaryVO item = new DashboardProjectSummaryVO();
+            item.setProjectId(String.valueOf(s.getProjectId()));
+            item.setStatus(s.getSettlementStatus());
+            return item;
+        }).collect(Collectors.toList()));
+
+        return vo;
+    }
+
+    private CostManagerDashboardVO getCostManagerViewAllProjects(Long tenantId) {
+        List<PmProject> activeProjects = projectMapper.selectList(
+                new LambdaQueryWrapper<PmProject>()
+                        .eq(PmProject::getTenantId, tenantId)
+                        .eq(PmProject::getStatus, "ACTIVE"));
+        List<Long> projectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toList());
+
+        CostManagerDashboardVO vo = new CostManagerDashboardVO();
+        vo.setProjectId(null);
+        vo.setProjectName("全部项目");
+
+        if (projectIds.isEmpty()) {
+            vo.setTargetCost("0");
+            vo.setDynamicCost("0");
+            vo.setCostDeviation("0");
+            vo.setContractLockedCost("0");
+            vo.setActualCost("0");
+            vo.setEstimatedRemainingCost("0");
+            vo.setExpectedProfit("0");
+            vo.setContractIncome("0");
+            vo.setOverBudgetAlerts(Collections.emptyList());
+            return vo;
+        }
+
+        Map<Long, CostProjectSummaryVO> summaryMap = costSummaryService.getBatchProjectSummaries(tenantId, projectIds);
+
+        BigDecimal totalTargetCost = BigDecimal.ZERO;
+        BigDecimal totalDynamicCost = BigDecimal.ZERO;
+        BigDecimal totalContractLockedCost = BigDecimal.ZERO;
+        BigDecimal totalActualCost = BigDecimal.ZERO;
+        BigDecimal totalEstimatedRemainingCost = BigDecimal.ZERO;
+        BigDecimal totalExpectedProfit = BigDecimal.ZERO;
+        BigDecimal totalContractIncome = BigDecimal.ZERO;
+
+        for (CostProjectSummaryVO s : summaryMap.values()) {
+            totalTargetCost = totalTargetCost.add(s.getTargetCost() != null ? new BigDecimal(s.getTargetCost()) : BigDecimal.ZERO);
+            totalDynamicCost = totalDynamicCost.add(s.getDynamicCost() != null ? new BigDecimal(s.getDynamicCost()) : BigDecimal.ZERO);
+            totalContractLockedCost = totalContractLockedCost.add(s.getContractLockedCost() != null ? new BigDecimal(s.getContractLockedCost()) : BigDecimal.ZERO);
+            totalActualCost = totalActualCost.add(s.getActualCost() != null ? new BigDecimal(s.getActualCost()) : BigDecimal.ZERO);
+            totalEstimatedRemainingCost = totalEstimatedRemainingCost.add(s.getEstimatedRemainingCost() != null ? new BigDecimal(s.getEstimatedRemainingCost()) : BigDecimal.ZERO);
+            totalExpectedProfit = totalExpectedProfit.add(s.getExpectedProfit() != null ? new BigDecimal(s.getExpectedProfit()) : BigDecimal.ZERO);
+            totalContractIncome = totalContractIncome.add(s.getContractIncome() != null ? new BigDecimal(s.getContractIncome()) : BigDecimal.ZERO);
+        }
+
+        BigDecimal costDeviation = totalDynamicCost.subtract(totalTargetCost);
+
+        vo.setTargetCost(totalTargetCost.toPlainString());
+        vo.setDynamicCost(totalDynamicCost.toPlainString());
+        vo.setCostDeviation(costDeviation.toPlainString());
+        vo.setContractLockedCost(totalContractLockedCost.toPlainString());
+        vo.setActualCost(totalActualCost.toPlainString());
+        vo.setEstimatedRemainingCost(totalEstimatedRemainingCost.toPlainString());
+        vo.setExpectedProfit(totalExpectedProfit.toPlainString());
+        vo.setContractIncome(totalContractIncome.toPlainString());
+
+        // Over-budget alerts — tenant-wide
+        List<AlertLog> overBudgetAlerts = alertLogMapper.selectList(
+                new LambdaQueryWrapper<AlertLog>()
+                        .eq(AlertLog::getTenantId, tenantId)
+                        .in(AlertLog::getRuleType, Set.of("DYNAMIC_COST_EXCEEDS_TARGET", "MATERIAL_EXCEEDS_BUDGET"))
+                        .orderByDesc(AlertLog::getTriggeredAt));
+        vo.setOverBudgetAlerts(overBudgetAlerts.stream().map(this::toAlertItem).collect(Collectors.toList()));
+
+        return vo;
+    }
+
+    private FinanceDashboardVO getFinanceViewAllProjects(Long tenantId) {
+        List<PmProject> activeProjects = projectMapper.selectList(
+                new LambdaQueryWrapper<PmProject>()
+                        .eq(PmProject::getTenantId, tenantId)
+                        .eq(PmProject::getStatus, "ACTIVE"));
+        List<Long> projectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toList());
+
+        FinanceDashboardVO vo = new FinanceDashboardVO();
+        vo.setProjectId(null);
+        vo.setProjectName("全部项目");
+
+        if (projectIds.isEmpty()) {
+            vo.setPendingPaymentAmount("0");
+            vo.setPendingPaymentCount(0L);
+            vo.setApprovedUnpaidAmount("0");
+            vo.setOverRatioAmount("0");
+            vo.setWarrantyExpiringAmount("0");
+            vo.setPendingPayments(Collections.emptyList());
+            vo.setOverRatioPayments(Collections.emptyList());
+            return vo;
+        }
+
+        // Pay records — tenant-wide
+        List<PayRecord> allPayRecords = payRecordMapper.selectList(
+                new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getTenantId, tenantId)
+                        .in(PayRecord::getProjectId, projectIds));
+
+        // Pending payments
+        List<PayRecord> pendingPayments = allPayRecords.stream()
+                .filter(p -> !"SUCCESS".equals(p.getPayStatus()))
+                .collect(Collectors.toList());
+        BigDecimal pendingAmount = pendingPayments.stream()
+                .map(p -> p.getPayAmount() != null ? p.getPayAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setPendingPaymentAmount(pendingAmount.toPlainString());
+        vo.setPendingPaymentCount((long) pendingPayments.size());
+        vo.setApprovedUnpaidAmount(pendingAmount.toPlainString());
+
+        // Over-ratio payments
+        BigDecimal overRatioTotal = BigDecimal.ZERO;
+        List<PayRecord> successRecords = allPayRecords.stream()
+                .filter(p -> "SUCCESS".equals(p.getPayStatus()) && p.getContractId() != null)
+                .collect(Collectors.toList());
+        if (!successRecords.isEmpty()) {
+            Map<Long, BigDecimal> paidByContract = new HashMap<>();
+            for (PayRecord r : successRecords) {
+                paidByContract.merge(r.getContractId(),
+                        r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO, BigDecimal::add);
+            }
+            List<CtContract> relatedContracts = ctContractMapper.selectList(
+                    new LambdaQueryWrapper<CtContract>()
+                            .eq(CtContract::getTenantId, tenantId)
+                            .in(CtContract::getProjectId, projectIds)
+                            .in(CtContract::getId, paidByContract.keySet()));
+            Map<Long, CtContract> contractMap = relatedContracts.stream()
+                    .collect(Collectors.toMap(CtContract::getId, c -> c));
+            for (Map.Entry<Long, BigDecimal> entry : paidByContract.entrySet()) {
+                CtContract contract = contractMap.get(entry.getKey());
+                if (contract == null) continue;
+                BigDecimal contractAmount = contract.getContractAmount() != null ? contract.getContractAmount() : BigDecimal.ZERO;
+                if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
+                if (entry.getValue().compareTo(contractAmount) > 0) {
+                    overRatioTotal = overRatioTotal.add(entry.getValue().subtract(contractAmount));
+                }
+            }
+        }
+        vo.setOverRatioAmount(overRatioTotal.toPlainString());
+
+        // Warranty expiring
+        LocalDate today = LocalDate.now();
+        LocalDate threshold = today.plusDays(30);
+        BigDecimal warrantyExpiringTotal = ctContractMapper.selectList(
+                new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .in(CtContract::getProjectId, projectIds)
+                        .eq(CtContract::getContractStatus, "PERFORMING")
+                        .ge(CtContract::getEndDate, today)
+                        .le(CtContract::getEndDate, threshold))
+                .stream()
+                .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setWarrantyExpiringAmount(warrantyExpiringTotal.toPlainString());
+
+        // Detail lists
+        Map<Long, String> projectNameMap = activeProjects.stream()
+                .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
+        vo.setPendingPayments(pendingPayments.stream().limit(20).map(p -> {
+            DashboardPaymentItemVO item = new DashboardPaymentItemVO();
+            item.setPayRecordId(String.valueOf(p.getId()));
+            item.setContractId(p.getContractId() != null ? String.valueOf(p.getContractId()) : null);
+            item.setPayAmount(p.getPayAmount() != null ? p.getPayAmount().toPlainString() : "0");
+            item.setPayDate(p.getPayDate() != null ? p.getPayDate().toString() : null);
+            item.setPayStatus(p.getPayStatus());
+            item.setProjectId(String.valueOf(p.getProjectId()));
+            item.setProjectName(projectNameMap.getOrDefault(p.getProjectId(), ""));
+            return item;
+        }).collect(Collectors.toList()));
+        vo.setOverRatioPayments(Collections.emptyList());
+
         return vo;
     }
 

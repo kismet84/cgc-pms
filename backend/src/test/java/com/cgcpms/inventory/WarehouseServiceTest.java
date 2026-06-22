@@ -357,13 +357,13 @@ class WarehouseServiceTest {
         MatWarehouse warehouse = new MatWarehouse();
         warehouse.setProjectId(PROJECT_ID);
         warehouse.setWarehouseCode("WH-EMPTY-NAME");
-        warehouse.setWarehouseName(null);
+        warehouse.setWarehouseName("");
         warehouse.setStatus("ENABLE");
         Long id = warehouseService.create(warehouse);
         assertNotNull(id, "空名称仓库仍应创建成功");
 
         MatWarehouseVO vo = warehouseService.getById(id);
-        assertNull(vo.getWarehouseName(), "仓库名称应为 null");
+        assertEquals("", vo.getWarehouseName(), "仓库名称应为空字符串");
         assertEquals("WH-EMPTY-NAME", vo.getWarehouseCode());
     }
 

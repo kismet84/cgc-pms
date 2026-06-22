@@ -557,6 +557,8 @@ class OrgServiceTest {
         // Update
         OrgPosition update = new OrgPosition();
         update.setId(id);
+        update.setCompanyId(posTestCompanyId);
+        update.setDepartmentId(posTestDepartmentId);
         update.setPositionName("更新后岗位");
         update.setStatus("DISABLE");
         orgPositionService.update(update);

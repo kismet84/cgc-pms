@@ -3,6 +3,8 @@ package com.cgcpms.common.util;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
+import com.baomidou.mybatisplus.core.toolkit.support.LambdaMeta;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
@@ -88,12 +90,15 @@ public class CodeGenerationService {
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String fullPrefix = prefix + today + "-";
 
-        LambdaQueryWrapper<T> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SFunctionUtil.getTenantIdSF(), tenantId)
-                .likeRight(codeGetter, fullPrefix)
-                .orderByDesc(codeGetter);
+        // Use QueryWrapper with string column name instead of LambdaQueryWrapper
+        // with SFunctionUtil.getTenantIdSF() — TenantIdMarker is not a @TableName
+        // entity so MyBatis-Plus cannot resolve its lambda cache.
+        QueryWrapper<T> wrapper = new QueryWrapper<>();
+        wrapper.eq("tenant_id", tenantId)
+                .likeRight(extractColumnName(codeGetter), fullPrefix)
+                .orderByDesc(extractColumnName(codeGetter));
 
-        return generateNextCode(mapper, wrapper, fullPrefix, includeDeleted, codeGetter);
+        return generateNextCodeStr(mapper, wrapper, fullPrefix, includeDeleted, codeGetter);
     }
 
     // ---------------------------------------------------------------------
@@ -274,5 +279,21 @@ public class CodeGenerationService {
 
         private static final SFunction<TenantIdMarker, Long> TENANT_ID_SF =
                 TenantIdMarker::getTenantId;
+    }
+
+    /**
+     * Extract the database column name from a SFunction (lambda getter reference).
+     * Uses MyBatis-Plus internal LambdaUtils to resolve the property name, then
+     * converts camelCase to snake_case.
+     */
+    private static <T> String extractColumnName(SFunction<T, ?> getter) {
+        LambdaMeta meta = LambdaUtils.extract(getter);
+        String property = meta.getImplMethodName();
+        // Convert getXxx -> xxx
+        if (property.startsWith("get") && property.length() > 3) {
+            property = Character.toLowerCase(property.charAt(3)) + property.substring(4);
+        }
+        // camelCase -> snake_case
+        return com.baomidou.mybatisplus.core.toolkit.StringUtils.camelToUnderline(property);
     }
 }

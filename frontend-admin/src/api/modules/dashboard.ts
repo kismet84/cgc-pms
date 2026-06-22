@@ -11,38 +11,38 @@ import type {
 import type { ContractVO } from '@/types/contract'
 
 /** Project Manager dashboard view */
-export function getProjectManagerView(projectId: string) {
+export function getProjectManagerView(projectId?: string) {
   return request<ProjectManagerDashboardVO>({
     url: '/dashboard/project-manager',
     method: 'get',
-    params: { projectId },
+    params: projectId ? { projectId } : undefined,
   })
 }
 
 /** Business Manager dashboard view */
-export function getBusinessManagerView(projectId: string) {
+export function getBusinessManagerView(projectId?: string) {
   return request<BusinessManagerDashboardVO>({
     url: '/dashboard/business-manager',
     method: 'get',
-    params: { projectId },
+    params: projectId ? { projectId } : undefined,
   })
 }
 
 /** Cost Manager dashboard view */
-export function getCostManagerView(projectId: string) {
+export function getCostManagerView(projectId?: string) {
   return request<CostManagerDashboardVO>({
     url: '/dashboard/cost-manager',
     method: 'get',
-    params: { projectId },
+    params: projectId ? { projectId } : undefined,
   })
 }
 
 /** Finance dashboard view */
-export function getFinanceView(projectId: string) {
+export function getFinanceView(projectId?: string) {
   return request<FinanceDashboardVO>({
     url: '/dashboard/finance',
     method: 'get',
-    params: { projectId },
+    params: projectId ? { projectId } : undefined,
   })
 }
 

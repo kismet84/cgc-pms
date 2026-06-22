@@ -1,0 +1,6 @@
+- [系统环境修复 2026-06-21](system-environment-fix-2026-06-21.md) — JAVA_HOME、Python版本、psmux、OMC版本漂移 4 个问题修复记录
+- [Hook 注入风暴 v2 深度分析](hook-injection-storm-v2-analysis.md) — 三层 hook 注入叠加机制、任务循环根因、7 个优化方案
+- [重复注入源全量审计](duplicate-injection-sources-audit.md) — 6 个重复注入配置源审计，含字节级量化
+- [状态栏配置固定修复](statusline-config-fix-2026-06-21.md) — 项目级状态栏从 claude-hud/claude-hub 固定改回 ccstatusline
+- [claude-mem hook 阻断修复](claude-mem-hook-block-fix-2026-06-22.md) — claude-mem worker 不可达导致 UserPromptSubmit 被拦截，已先禁用插件止血
+- [后端重建 Jasypt 环境修复](backend-rebuild-jasypt-env-fix-2026-06-22.md) — Windows 下 mvnw.cmd 启动方式与 docker compose 必需环境变量修复

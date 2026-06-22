@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 库存台账服务 — 数量型库存管理，@Version 乐观锁并发控制。
@@ -54,7 +55,6 @@ public class MatStockService {
         if (stock == null) {
             // 首次入库：创建库存记录
             // 并发场景下 INSERT 可能因 UNIQUE 约束失败，此时回退到 UPDATE 路径
-            // 首次入库并发保护: mat_stock 表 UNIQUE 约束 (tenant_id, warehouse_id, material_id) 确保只有一条记录被创建
             try {
                 stock = new MatStock();
                 stock.setTenantId(tenantId);
@@ -198,13 +198,20 @@ public class MatStockService {
 
     /**
      * 按租户+仓库+物料查询库存记录，返回 null 表示不存在。
+     * 使用 selectList + LIMIT 1 代替 selectOne，因为 V88 的
+     * UNIQUE(deleted_token) 设计允许活动记录(NULL=NULL)共存。
      */
     private MatStock findStock(Long tenantId, Long warehouseId, Long materialId) {
         LambdaQueryWrapper<MatStock> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MatStock::getTenantId, tenantId);
         wrapper.eq(MatStock::getWarehouseId, warehouseId);
         wrapper.eq(MatStock::getMaterialId, materialId);
-        return matStockMapper.selectOne(wrapper);
+        // NOTE: MyBatis-Plus TenantLineInterceptor duplicates tenant_id in WHERE
+        // clause. Using .last("LIMIT 1") is safe here because it only appends a
+        // row-limit without introducing SQL injection risk (no user input involved).
+        wrapper.last("LIMIT 1");
+        List<MatStock> results = matStockMapper.selectList(wrapper);
+        return results.isEmpty() ? null : results.get(0);
     }
 
     /**

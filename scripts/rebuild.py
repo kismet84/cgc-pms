@@ -38,8 +38,12 @@ def run(cmd: list[str], *, cwd: Path | None = None, check: bool = True,
     """Run a command, print output in real time, return result."""
     full_env = os.environ.copy()
     full_env["JAVA_HOME"] = JAVA_HOME
+    full_env.setdefault("JASYPT_ENCRYPTOR_PASSWORD", JASYPT_PASSWORD)
     if env:
         full_env.update(env)
+
+    if sys.platform == "win32" and cmd and cmd[0].lower().endswith(".cmd"):
+        cmd = ["cmd", "/c", *cmd]
 
     print(f"  \033[36m→ {' '.join(cmd)}\033[0m")
     cwd = cwd or PROJECT_ROOT
@@ -55,6 +59,45 @@ def step_header(msg: str) -> None:
     print(f"\033[1;33m{'=' * 60}\033[0m")
 
 
+def resolve_maven_wrapper(cwd: Path) -> list[str]:
+    """Resolve a usable Maven Wrapper command for the current platform."""
+    windows_wrapper = cwd / "mvnw.cmd"
+    unix_wrapper = cwd / "mvnw"
+
+    if sys.platform == "win32":
+        if windows_wrapper.exists():
+            return ["mvnw.cmd"]
+        if unix_wrapper.exists():
+            return ["mvnw"]
+    else:
+        if unix_wrapper.exists():
+            return ["./mvnw"]
+        if windows_wrapper.exists():
+            return ["mvnw.cmd"]
+
+    raise FileNotFoundError(f"无法在 {cwd} 找到可用的 Maven Wrapper")
+
+
+def run_maven(cmd: list[str], *, cwd: Path, timeout: int) -> None:
+    """Run Maven with a clean-first, package fallback strategy."""
+    try:
+        run(cmd, cwd=cwd, timeout=timeout)
+        return
+    except subprocess.CalledProcessError as error:
+        if "clean" not in cmd:
+            raise
+        fallback_cmd = [argument for argument in cmd if argument != "clean"]
+        print(f"  \033[33m[WARN] clean 失败，改用 {' '.join(fallback_cmd)}\033[0m")
+        run(fallback_cmd, cwd=cwd, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if "clean" not in cmd:
+            raise
+
+        fallback_cmd = [argument for argument in cmd if argument != "clean"]
+        print(f"  \033[33m[WARN] clean 超时，改用 {' '.join(fallback_cmd)}\033[0m")
+        run(fallback_cmd, cwd=cwd, timeout=timeout)
+
+
 def check_docker() -> bool:
     """Check if Docker is running."""
     try:
@@ -68,13 +111,13 @@ def build_backend(test: bool = False) -> bool:
     """Build backend JAR on host using Maven Wrapper."""
     step_header("后端构建")
 
-    mvnw = "mvnw.cmd" if sys.platform == "win32" else "./mvnw"
+    mvnw = resolve_maven_wrapper(BACKEND_DIR)
 
     # Step 1: Maven clean package
     print(f"\n[1/2] Maven 构建 (clean package)...")
-    mvn_args = [mvnw, "clean", "package", "-DskipTests", "-q"]
+    mvn_args = [*mvnw, "clean", "package", "-DskipTests", "-q"]
     try:
-        run(mvn_args, cwd=BACKEND_DIR, timeout=300)
+        run_maven(mvn_args, cwd=BACKEND_DIR, timeout=300)
         print("  \033[32m[OK] JAR 构建完成\033[0m")
     except subprocess.CalledProcessError as e:
         print(f"  \033[31m[ERROR] Maven 构建失败 (退出码 {e.returncode})\033[0m")
@@ -93,7 +136,7 @@ def build_backend(test: bool = False) -> bool:
     # Step 3: Run tests if requested
     if test:
         print(f"\n[测试] 运行后端测试...")
-        test_args = [mvnw, "test", f"-Djasypt.encryptor.password={JASYPT_PASSWORD}"]
+        test_args = [*mvnw, "test", f"-Djasypt.encryptor.password={JASYPT_PASSWORD}"]
         try:
             run(test_args, cwd=BACKEND_DIR, timeout=600)
             print("  \033[32m[OK] 后端测试通过\033[0m")
