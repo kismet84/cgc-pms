@@ -3,7 +3,8 @@ package com.cgcpms.route;
 import com.cgcpms.contract.controller.CtContractController;
 import com.cgcpms.contract.service.CtContractService;
 import com.cgcpms.settlement.controller.StlSettlementController;
-import com.cgcpms.settlement.service.StlSettlementService;
+import com.cgcpms.settlement.service.StlSettlementQueryService;
+import com.cgcpms.settlement.service.StlSettlementWriteService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -49,7 +50,7 @@ class ContractSettlementKpiRouteTest {
     @Test
     @DisplayName("GET /settlements/kpi routes to settlement KPI endpoint")
     void settlementKpiRouteIsStaticEndpoint() throws Exception {
-        StlSettlementService settlementService = mock(StlSettlementService.class);
+        StlSettlementQueryService settlementService = mock(StlSettlementQueryService.class);
         when(settlementService.getKpi(null, null, null, null, null))
                 .thenReturn(Map.of(
                         "totalCount", 0L,
@@ -61,8 +62,10 @@ class ContractSettlementKpiRouteTest {
                         "draftCount", 0L,
                         "finalizedCount", 0L));
 
+        StlSettlementWriteService writeService = mock(StlSettlementWriteService.class);
+
         MockMvc mockMvc = MockMvcBuilders
-                .standaloneSetup(new StlSettlementController(settlementService))
+                .standaloneSetup(new StlSettlementController(settlementService, writeService))
                 .build();
 
         mockMvc.perform(get("/settlements/kpi"))
