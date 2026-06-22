@@ -150,7 +150,7 @@ class Phase4IntegrationTest {
                 "出库30后可用量应为70");
 
         // 5. 验证台账余额（通过 getLedger）
-        MatStockLedgerVO ledger = matStockService.getLedger(warehouseId, materialId, 1, 20);
+        MatStockLedgerVO ledger = matStockService.getLedger(warehouseId, materialId, null, null, null, null, 1, 20);
         assertNotNull(ledger, "台账不应为空");
         assertNotNull(ledger.getStock(), "库存记录应存在");
         assertEquals(0, new BigDecimal("70.00").compareTo(ledger.getStock().getAvailableQty()),
@@ -531,7 +531,7 @@ class Phase4IntegrationTest {
                 .add("tenantId", 1L)
                 .add("roleCodes", List.of())
                 .build());
-        MatStockLedgerVO t1Ledger = matStockService.getLedger(whId, matId, 1, 20);
+        MatStockLedgerVO t1Ledger = matStockService.getLedger(whId, matId, null, null, null, null, 1, 20);
         assertNull(t1Ledger.getStock(), "tenant 1查库存应为null（不存在tenant 1的库存记录）");
         assertEquals(0L, t1Ledger.getTxns().getTotal(),
                 "tenant 1查流水总数应为0");
@@ -547,7 +547,7 @@ class Phase4IntegrationTest {
                 .add("tenantId", 0L)
                 .add("roleCodes", List.of("ADMIN"))
                 .build());
-        MatStockLedgerVO t0Ledger = matStockService.getLedger(whId, matId, 1, 20);
+        MatStockLedgerVO t0Ledger = matStockService.getLedger(whId, matId, null, null, null, null, 1, 20);
         assertNotNull(t0Ledger.getStock(), "切回tenant 0库存应存在");
         assertEquals(0, new BigDecimal("500.00").compareTo(
                         t0Ledger.getStock().getAvailableQty()),

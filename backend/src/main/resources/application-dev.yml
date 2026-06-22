@@ -11,6 +11,7 @@ spring:
       idle-timeout: 600000
       max-lifetime: 1800000
       connection-timeout: 30000
+      connection-init-sql: SET NAMES utf8mb4
 
   data:
     redis:
@@ -50,6 +51,16 @@ jwt:
   refresh-expiration: 604800000
   header: Authorization
   token-prefix: "Bearer "
+
+# Actuator — 仅暴露 health 和 info（非 prod 默认全开的安全加固）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
 
 cors:
   allowed-origins: "http://localhost:5173"

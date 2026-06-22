@@ -11,8 +11,6 @@
 # Frontend: Vite HMR (hot module replacement) on file save
 # =============================================================================
 
-version: "3.8"
-
 services:
   # ===========================================================================
   # MySQL 8.0
@@ -115,6 +113,7 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       # Override dev profile's localhost → Docker service names
       SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_HIKARI_CONNECTION-INIT-SQL: SET NAMES utf8mb4
       DB_USERNAME: ${MYSQL_USER:-cgc}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis

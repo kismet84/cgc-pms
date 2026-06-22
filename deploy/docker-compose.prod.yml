@@ -12,8 +12,6 @@
 #   4. Stop:   docker compose -f docker-compose.prod.yml down
 # =============================================================================
 
-version: "3.8"
-
 services:
   # ===========================================================================
   # Preflight — fail fast if required variables are missing or still CHANGE-ME

@@ -1,3 +1,5 @@
+# ⚠️ 此文件覆盖 main/resources/application.yml 的全局默认值（classpath 优先级更高）。
+#   仅包含测试环境需要的覆盖项，其余配置继承 main 版本。
 spring:
   main:
     allow-circular-references: true
@@ -9,6 +11,18 @@ spring:
   sql:
     init:
       mode: never
+
+# MyBatis-Plus — 继承 main application.yml 的逻辑删除等配置，此处仅声明 mapper 路径
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_id
+      logic-delete-field: deletedFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:/mapper/**/*.xml
 
 minio:
   enabled: false

@@ -627,4 +627,88 @@ class OrgServiceTest {
 
         System.out.println("✅ TC18 通过: 不存在的实体统一抛出BusinessException");
     }
+
+    @Test
+    @Order(19)
+    @Transactional
+    @DisplayName("TC19: OrgDepartment更新部门信息")
+    void test19_updateDepartment() {
+        OrgCompany company = new OrgCompany();
+        company.setCompanyCode("COMP-UPDDEPT");
+        company.setCompanyName("部门更新测试公司");
+        Long companyId = orgCompanyService.create(company);
+
+        OrgDepartment dept = new OrgDepartment();
+        dept.setCompanyId(companyId);
+        dept.setDeptCode("UPDATE-ME");
+        dept.setDeptName("原始名称");
+        dept.setStatus("ENABLE");
+        Long deptId = orgDepartmentService.create(dept);
+
+        OrgDepartment update = new OrgDepartment();
+        update.setId(deptId);
+        update.setDeptName("已更新名称");
+        update.setStatus("DISABLE");
+        update.setOrderNum(99);
+        orgDepartmentService.update(update);
+
+        OrgDepartmentVO vo = orgDepartmentService.getById(deptId);
+        assertEquals("已更新名称", vo.getDeptName());
+        assertEquals("DISABLE", vo.getStatus());
+        assertEquals(99, vo.getOrderNum());
+
+        System.out.println("✅ TC19 通过: 部门更新成功, name=" + vo.getDeptName() + " status=" + vo.getStatus());
+    }
+
+    @Test
+    @Order(20)
+    @Transactional
+    @DisplayName("TC20: OrgDepartment无子部门时可成功删除")
+    void test20_deleteLeafDepartment() {
+        OrgCompany company = new OrgCompany();
+        company.setCompanyCode("COMP-DELLEAF");
+        company.setCompanyName("叶子部门删除公司");
+        Long companyId = orgCompanyService.create(company);
+
+        OrgDepartment dept = new OrgDepartment();
+        dept.setCompanyId(companyId);
+        dept.setDeptCode("LEAF-DEPT");
+        dept.setDeptName("叶子部门");
+        dept.setStatus("ENABLE");
+        Long deptId = orgDepartmentService.create(dept);
+
+        // Should succeed - no children
+        assertDoesNotThrow(() -> orgDepartmentService.delete(deptId));
+
+        // Should now be not found
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> orgDepartmentService.getById(deptId));
+        assertEquals("ORG_DEPT_NOT_FOUND", ex.getCode());
+
+        System.out.println("✅ TC20 通过: 叶子部门删除成功");
+    }
+
+    @Test
+    @Order(21)
+    @Transactional
+    @DisplayName("TC21: OrgCompany更新公司信息")
+    void test21_updateCompany() {
+        OrgCompany company = new OrgCompany();
+        company.setCompanyCode("COMP-UPDATE");
+        company.setCompanyName("原始公司名");
+        company.setStatus("ENABLE");
+        Long companyId = orgCompanyService.create(company);
+
+        OrgCompany update = new OrgCompany();
+        update.setId(companyId);
+        update.setCompanyName("已更新公司名");
+        update.setStatus("DISABLE");
+        orgCompanyService.update(update);
+
+        OrgCompanyVO vo = orgCompanyService.getById(companyId);
+        assertEquals("已更新公司名", vo.getCompanyName());
+        assertEquals("DISABLE", vo.getStatus());
+
+        System.out.println("✅ TC21 通过: 公司更新成功, name=" + vo.getCompanyName());
+    }
 }

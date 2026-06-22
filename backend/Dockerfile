@@ -47,6 +47,12 @@ ENV JAVA_OPTS="-Xms512m -Xmx1g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=
 ENV SPRING_PROFILES_ACTIVE=prod
 
 # =============================================================================
+# NOTE: The following ENV defaults mirror docker-compose.prod.yml settings.
+# docker-compose values take precedence at runtime — these are fallback defaults
+# for non-Docker deployments. Keep both in sync when changing infrastructure.
+# =============================================================================
+
+# =============================================================================
 # Database — MySQL 8.0 (Docker service name 'mysql' on internal network)
 # All secrets (DB_PASSWORD, etc.) MUST be provided via docker-compose environment.
 # Defaults below are intentionally absent — missing vars will cause startup failure.

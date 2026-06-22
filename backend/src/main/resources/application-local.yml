@@ -27,6 +27,8 @@ spring:
     table: flyway_schema_history
     encoding: UTF-8
     validate-on-migrate: false
+    # clean-disabled=false is safe for H2 in-memory — DB is recreated each run.
+    clean-disabled: false
 
   # Disable spring.sql.init — Flyway handles all schema and data
   sql:
@@ -39,7 +41,9 @@ minio:
 
 # JWT
 jwt:
-  secret: ${JWT_SECRET:ENC(MwUorwNfbkbN+4rmNgOu28KmKASRIhIGnFmeTgti3XKPDD1eUhqQ55DTARfKx8SYvcz9ipDaadS8CMcoTSe26txWki9RlM+Fkht8uBr2a1QQ73Ik6Xd3/8CkzzyrX7nCQw4F4nGzDvBk0OP1ayfOWg==)}
+  # Plaintext secret for local H2 development — no Jasypt dependency needed.
+  # Override via TEST_JWT_SECRET env var in CI if needed.
+  secret: ${TEST_JWT_SECRET:local-dev-only-cgc-pms-jwt-secret-key-256bit-minimum-length}
   # 1 h — developer convenience for local debugging
   expiration: 3600000
   refresh-expiration: 604800000

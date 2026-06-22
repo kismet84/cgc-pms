@@ -1,3 +1,6 @@
+# ⚠️ 此 profile 连接宿主机 localhost:3306 的 MySQL。
+#   确保 MySQL 已运行，且 cgc_pms 库的 Flyway migration 与当前版本一致。
+#   本地开发建议使用 @ActiveProfiles("local") → H2 内存库，无需外部依赖。
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
