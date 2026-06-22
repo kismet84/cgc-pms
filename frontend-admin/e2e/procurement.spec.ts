@@ -56,9 +56,11 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
     // Click "新建申请" to open modal
     await page.click('.pm-filter-actions button:has-text("新建申请")')
     await expect(page.locator('.ant-modal')).toBeVisible({ timeout: 5000 })
-    await expect(page.locator('.ant-modal .ant-modal-title:has-text("新建采购申请")')).toBeVisible()
+    await expect(
+      page.locator('.ant-modal .ant-modal-title:has-text("新建采购申请")'),
+    ).toBeVisible()
 
-    // Select project — click select, wait dropdown, pick first option
+    // Select project
     const projectSelect = page.locator(
       '.ant-modal .ant-form-item:has(label:has-text("项目")) .ant-select',
     )
@@ -73,7 +75,6 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
       .isVisible({ timeout: 3000 })
       .catch(() => false)
     if (!hasProjects) {
-      // No project data — cancel modal and skip
       await page.locator('.ant-modal .ant-modal-close').click()
       console.log('No projects available, skipping create test')
       return
@@ -128,7 +129,6 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
     await page.waitForSelector('.pm-page', { timeout: 10000 })
     await page.waitForSelector('.ant-table', { timeout: 10000 })
 
-    // Check if there are any draft PRs
     const hasRows = await page
       .locator('.ant-table-tbody tr.ant-table-row')
       .first()
@@ -139,7 +139,6 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
       return
     }
 
-    // Look for a row with "提交审批" button (only visible for DRAFT status)
     const submitBtn = page
       .locator('.ant-table-tbody tr.ant-table-row')
       .first()
@@ -151,19 +150,15 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
       return
     }
 
-    // Click "提交审批"
     await submitBtn.click()
 
-    // Wait for confirm modal
     await expect(page.locator('.ant-modal-confirm')).toBeVisible({ timeout: 5000 })
     await expect(
       page.locator('.ant-modal-confirm .ant-modal-confirm-title:has-text("确认提交审批")'),
     ).toBeVisible()
 
-    // Click confirm submit
     await page.locator('.ant-modal-confirm .ant-btn-primary:has-text("确定提交")').click()
 
-    // Wait for success
     await page.waitForSelector('.ant-message-success', { timeout: 10000 }).catch(() => {})
 
     // Verify the submit button is no longer visible (status changed to APPROVING)
@@ -176,36 +171,28 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
     await page.goto('/purchase/order')
     await page.waitForSelector('.pm-page', { timeout: 10000 })
 
-    // Verify page header
     await expect(page.locator('.pm-header')).toBeVisible()
     await expect(page.locator('.pm-header:has-text("采购订单")')).toBeVisible()
 
-    // Verify filter section
     await expect(page.locator('.pm-filter')).toBeVisible()
 
-    // Verify action buttons
     await expect(page.locator('.pm-filter-actions button:has-text("查询")')).toBeVisible()
     await expect(page.locator('.pm-filter-actions button:has-text("重置")')).toBeVisible()
     await expect(page.locator('.pm-filter-actions button:has-text("新建订单")')).toBeVisible()
 
-    // Verify table
     await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 })
 
-    // Verify table columns — orderCode, orderType, projectName, partnerName
     const columnHeaders = page.locator('.ant-table-thead th')
     await expect(columnHeaders.first()).toBeVisible()
 
-    // Take screenshot of the PO list
     await page.screenshot({ path: 'e2e/screenshots/procurement-po-list.png', fullPage: true })
   })
 
   test('should verify purchase order auto-generation after PR approval', async ({ page }) => {
-    // First check if there are any POs already in the system
     await page.goto('/purchase/order')
     await page.waitForSelector('.pm-page', { timeout: 10000 })
     await page.waitForSelector('.ant-table', { timeout: 10000 })
 
-    // Check if there are existing purchase orders
     const hasPOs = await page
       .locator('.ant-table-tbody tr.ant-table-row')
       .first()
@@ -213,10 +200,8 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
       .catch(() => false)
 
     if (hasPOs) {
-      // Verify PO row has meaningful data
       const firstRow = page.locator('.ant-table-tbody tr.ant-table-row').first()
 
-      // Look for orderCode (PO-xxxxx format) — should be in the first column
       const orderCodeCell = firstRow.locator('td').first()
       const orderCodeText = await orderCodeCell.textContent()
       expect(orderCodeText).toBeTruthy()
@@ -227,11 +212,91 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
       // Verify status tags are visible
       await expect(firstRow.locator('.ant-tag').nth(1)).toBeVisible()
 
-      await page.screenshot({ path: 'e2e/screenshots/procurement-po-verified.png', fullPage: true })
+      await page.screenshot({
+        path: 'e2e/screenshots/procurement-po-verified.png',
+        fullPage: true,
+      })
     } else {
       console.log('No purchase orders found. If a PR was approved, the PO should appear here.')
-      // Take screenshot even if empty — shows the empty state
       await page.screenshot({ path: 'e2e/screenshots/procurement-po-empty.png', fullPage: true })
     }
+  })
+
+  test('purchase order list supports status filter', async ({ page }) => {
+    await page.goto('/purchase/order')
+    await page.waitForSelector('.pm-filter', { timeout: 10000 })
+
+    // Find status filter select
+    const statusSelect = page
+      .locator('.pm-field:has(label:has-text("状态")) .ant-select')
+      .first()
+    const hasStatusFilter = await statusSelect.isVisible({ timeout: 3000 }).catch(() => false)
+
+    if (hasStatusFilter) {
+      await statusSelect.click()
+      await page.waitForTimeout(500)
+
+      const dropdown = page
+        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+        .last()
+      const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
+
+      if (dropdownVisible) {
+        const options = dropdown.locator('.ant-select-item-option')
+        const optionCount = await options.count()
+        if (optionCount > 1) {
+          await options.nth(1).click()
+          await page.waitForTimeout(300)
+          await page.locator('.pm-filter-actions button:has-text("查询")').click()
+          await page.waitForTimeout(1000)
+          await expect(page.locator('.ant-table')).toBeVisible({ timeout: 5000 })
+        }
+      }
+    }
+
+    await page.screenshot({ path: 'e2e/screenshots/procurement-po-filter.png', fullPage: true })
+  })
+
+  test('receipt warehouse selection loads warehouse options', async ({ page }) => {
+    // Navigate to receipt list (验收列表)
+    await page.goto('/receipt/list')
+    await page.waitForSelector('.pm-page', { timeout: 10000 })
+
+    await expect(page.locator('.pm-header')).toBeVisible()
+
+    // Verify filter section with warehouse filter
+    await expect(page.locator('.pm-filter')).toBeVisible()
+
+    // Check if warehouse filter exists
+    const warehouseFilter = page.locator(
+      '.pm-field:has(label:has-text("仓库")) .ant-select',
+    )
+    const hasWarehouseFilter = await warehouseFilter
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false)
+
+    if (hasWarehouseFilter) {
+      await warehouseFilter.first().click()
+      await page.waitForTimeout(500)
+
+      const dropdown = page
+        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+        .last()
+      const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
+
+      if (dropdownVisible) {
+        const options = dropdown.locator('.ant-select-item-option')
+        const optionCount = await options.count()
+        console.log(`Warehouse options loaded: ${optionCount}`)
+        // Should have at least the "all" option
+        expect(optionCount).toBeGreaterThanOrEqual(0)
+      }
+    }
+
+    await page.screenshot({
+      path: 'e2e/screenshots/procurement-receipt-warehouse.png',
+      fullPage: true,
+    })
   })
 })

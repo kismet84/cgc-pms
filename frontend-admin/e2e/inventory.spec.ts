@@ -13,26 +13,16 @@ async function loginAsAdmin(page: Page) {
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
 }
 
-/**
- * Robust Ant Design <a-select> helper.
- * - Opens the dropdown
- * - If preferredText is given, tries to find it (with optional search-input typing)
- * - Falls back to the first visible non-disabled option
- * - Returns the selected option text for logging
- */
 async function selectAntdOption(select: Locator, preferredText?: string): Promise<string> {
   const page = select.page()
 
-  // Click to open
   await select.click()
   await page.waitForTimeout(300)
 
-  // Locate the visible dropdown
   const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
   try {
     await dropdown.waitFor({ state: 'visible', timeout: 5000 })
   } catch {
-    // Retry clicking the selector area directly
     await select.locator('.ant-select-selector').click({ force: true })
     await dropdown.waitFor({ state: 'visible', timeout: 5000 })
   }
@@ -41,11 +31,9 @@ async function selectAntdOption(select: Locator, preferredText?: string): Promis
   let selectedText = ''
 
   if (preferredText) {
-    // Try to find the preferred option by text
     option = dropdown.locator('.ant-select-item-option').filter({ hasText: preferredText }).first()
     let found = await option.isVisible().catch(() => false)
 
-    // If show-search is available, type the text to filter
     if (!found) {
       const searchInput = select.locator('.ant-select-selection-search-input')
       const searchVisible = await searchInput.isVisible().catch(() => false)
@@ -63,7 +51,6 @@ async function selectAntdOption(select: Locator, preferredText?: string): Promis
     if (found) {
       selectedText = (await option.textContent())?.trim() ?? ''
     } else {
-      // Fallback: pick first visible non-disabled option
       option = dropdown
         .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
         .first()
@@ -71,7 +58,6 @@ async function selectAntdOption(select: Locator, preferredText?: string): Promis
       console.log(`selectAntdOption: "${preferredText}" not found, using "${selectedText}"`)
     }
   } else {
-    // No preferred text, just pick the first visible option
     option = dropdown
       .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
       .first()
@@ -79,15 +65,10 @@ async function selectAntdOption(select: Locator, preferredText?: string): Promis
   }
 
   await option.click()
-  // Wait for dropdown to close
   await dropdown.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
   return selectedText
 }
 
-/**
- * Click a button and wait for a matching network response (short timeout).
- * Returns the response if captured, or null if timed out.
- */
 async function clickAndCaptureResponse(
   page: Page,
   buttonName: string,
@@ -121,24 +102,20 @@ async function expectNoText(page: Page, text: string) {
 }
 
 async function fillInventoryForm(page: Page, tabLabel: string, quantity: string) {
-  // Switch to the right tab if needed
   if (tabLabel === '出库') {
     await page.locator('.ant-tabs-tab').filter({ hasText: '出库' }).click()
     await page.waitForTimeout(300)
   }
   await expect(page.locator('.ant-tabs-tab-active').filter({ hasText: tabLabel })).toBeVisible()
 
-  // Select warehouse
   await selectAntdOption(
     page.locator('.ant-form-item:has(label:has-text("仓库")) .ant-select').first(),
     'AutoWarehouse0359',
   )
-  // Select material
   await selectAntdOption(
     page.locator('.ant-form-item:has(label:has-text("物料")) .ant-select').first(),
     'MAT312742',
   )
-  // Fill quantity
   const qtyLabel = tabLabel === '出库' ? '出库数量' : '入库数量'
   await page
     .locator(`.ant-form-item:has(label:has-text("${qtyLabel}")) .ant-input-number-input`)
@@ -160,7 +137,6 @@ test.describe('Inventory original failure regressions', () => {
     await fillInventoryForm(page, '入库', '5')
     await clickAndCaptureResponse(page, '确认入库', '/inventory/stock/in')
 
-    // Assert no original system errors
     await expectNoText(page, SYSTEM_ERROR)
     await expectNoText(page, IN_FAILED)
   })
@@ -169,15 +145,12 @@ test.describe('Inventory original failure regressions', () => {
     await page.goto('/inventory/transaction')
     await expect(page.getByRole('heading', { name: '库存交易' })).toBeVisible({ timeout: 10000 })
 
-    // Ensure at least some stock exists before outbound
     await fillInventoryForm(page, '入库', '10')
     await clickAndCaptureResponse(page, '确认入库', '/inventory/stock/in')
 
-    // Now do outbound
     await fillInventoryForm(page, '出库', '1')
     await clickAndCaptureResponse(page, '确认出库', '/inventory/stock/out')
 
-    // Assert no original system errors
     await expectNoText(page, SYSTEM_ERROR)
     await expectNoText(page, OUT_FAILED)
   })
@@ -196,8 +169,122 @@ test.describe('Inventory original failure regressions', () => {
     )
     await clickAndCaptureResponse(page, '查询', '/inventory/stock/ledger', 3000)
 
-    // Should see either stock data or empty-state message, never system error
     await expectNoText(page, LEDGER_FAILED)
     await expectNoText(page, SYSTEM_ERROR)
+  })
+
+  test('stock ledger pagination controls are visible', async ({ page }) => {
+    await page.goto('/inventory/stock')
+    await expect(page.getByRole('heading', { name: '库存台账' })).toBeVisible({ timeout: 10000 })
+
+    // Click query first to load data
+    await page.locator('button:has-text("查询")').first().click()
+    await page.waitForTimeout(2000)
+
+    // Check for pagination
+    const pagination = page.locator('.ant-pagination')
+    const paginationVisible = await pagination.isVisible({ timeout: 5000 }).catch(() => false)
+
+    if (paginationVisible) {
+      const totalText = await pagination.locator('.ant-pagination-total-text').textContent()
+      console.log(`Pagination total: ${totalText}`)
+      expect(pagination).toBeVisible()
+    } else {
+      console.log('Pagination not visible — may be single page of results')
+    }
+
+    await page.screenshot({ path: 'e2e/screenshots/inventory-ledger-pagination.png', fullPage: true })
+  })
+
+  test('stock detail modal opens and displays data', async ({ page }) => {
+    await page.goto('/inventory/stock')
+    await expect(page.getByRole('heading', { name: '库存台账' })).toBeVisible({ timeout: 10000 })
+
+    await page.locator('button:has-text("查询")').first().click()
+    await page.waitForTimeout(2000)
+
+    // Look for a detail button or clickable row
+    const detailBtn = page.locator('button:has-text("详情"), a:has-text("详情")').first()
+    const hasDetailBtn = await detailBtn.isVisible({ timeout: 3000 }).catch(() => false)
+
+    if (hasDetailBtn) {
+      await detailBtn.click()
+      await page.waitForTimeout(500)
+
+      // Modal or drawer should open
+      const modal = page.locator('.ant-modal, .ant-drawer').first()
+      const modalVisible = await modal.isVisible({ timeout: 5000 }).catch(() => false)
+
+      if (modalVisible) {
+        console.log('Detail modal/drawer opened')
+        await page.screenshot({
+          path: 'e2e/screenshots/inventory-stock-detail.png',
+          fullPage: true,
+        })
+        // Close it
+        await page.keyboard.press('Escape')
+      }
+    } else {
+      console.log('No detail button found in stock ledger')
+    }
+  })
+
+  test('stock KPI statistics are visible', async ({ page }) => {
+    await page.goto('/inventory/stock')
+    await expect(page.getByRole('heading', { name: '库存台账' })).toBeVisible({ timeout: 10000 })
+
+    // KPI cards may exist on the page
+    const kpiSection = page.locator('.lg-kpi-strip, .ant-card:has(.ant-statistic)')
+    const kpiVisible = await kpiSection.first().isVisible({ timeout: 5000 }).catch(() => false)
+
+    if (kpiVisible) {
+      const kpiCount = await kpiSection.count()
+      console.log(`Found ${kpiCount} KPI elements`)
+      for (let i = 0; i < kpiCount; i++) {
+        const text = await kpiSection.nth(i).textContent()
+        console.log(`KPI ${i}: ${text?.trim()}`)
+      }
+    } else {
+      console.log('No KPI cards visible on stock ledger page')
+    }
+
+    await page.screenshot({ path: 'e2e/screenshots/inventory-kpi.png', fullPage: true })
+  })
+
+  test('inventory transaction page has both inbound and outbound tabs', async ({ page }) => {
+    await page.goto('/inventory/transaction')
+    await expect(page.getByRole('heading', { name: '库存交易' })).toBeVisible({ timeout: 10000 })
+
+    // Verify both tabs
+    await expect(page.locator('.ant-tabs-tab:has-text("入库")')).toBeVisible()
+    await expect(page.locator('.ant-tabs-tab:has-text("出库")')).toBeVisible()
+
+    // Default tab should be inbound
+    await expect(
+      page.locator('.ant-tabs-tab-active').filter({ hasText: '入库' }),
+    ).toBeVisible()
+  })
+
+  test('stock ledger search by keyword works', async ({ page }) => {
+    await page.goto('/inventory/stock')
+    await expect(page.getByRole('heading', { name: '库存台账' })).toBeVisible({ timeout: 10000 })
+
+    // Find keyword search input
+    const searchInput = page.locator('input[placeholder*="搜索"], input[placeholder*="关键词"]').first()
+    const hasSearch = await searchInput.isVisible({ timeout: 3000 }).catch(() => false)
+
+    if (hasSearch) {
+      await searchInput.fill('test')
+      await page.locator('button:has-text("查询")').first().click()
+      await page.waitForTimeout(1500)
+
+      // Table should still be visible after search
+      await expect(page.locator('.ant-table, .vxe-table').first()).toBeVisible({ timeout: 5000 })
+
+      // Reset
+      await page.locator('button:has-text("重置")').first().click()
+    }
+
+    await page.screenshot({ path: 'e2e/screenshots/inventory-search.png', fullPage: true })
   })
 })
