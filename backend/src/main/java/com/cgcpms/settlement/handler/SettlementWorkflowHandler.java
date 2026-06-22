@@ -2,9 +2,7 @@ package com.cgcpms.settlement.handler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.contract.entity.CtContract;
-import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
@@ -20,6 +18,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_APPROVED;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_DRAFT;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_REJECTED;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_DRAFT;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_FINALIZED;
 
 /**
  * Business handler for settlement approval workflows.
@@ -106,9 +110,9 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
         // Status guard: only finalize if still in DRAFT (prevents double-finalization via concurrent approvals)
         int rows = stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
-                .eq(StlSettlement::getSettlementStatus, "DRAFT")
-                .set(StlSettlement::getApprovalStatus, "APPROVED")
-                .set(StlSettlement::getSettlementStatus, "FINALIZED")
+                .eq(StlSettlement::getSettlementStatus, SETTLEMENT_DRAFT)
+                .set(StlSettlement::getApprovalStatus, APPROVAL_APPROVED)
+                .set(StlSettlement::getSettlementStatus, SETTLEMENT_FINALIZED)
                 .set(StlSettlement::getFinalizedAt, LocalDateTime.now()));
         if (rows != 1) {
             throw new BusinessException("SETTLEMENT_STATUS_CONFLICT",
@@ -135,7 +139,7 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
 
         stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
-                .set(StlSettlement::getApprovalStatus, "REJECTED"));
+                .set(StlSettlement::getApprovalStatus, APPROVAL_REJECTED));
     }
 
     // ================================================================
@@ -149,8 +153,8 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
 
         stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
-                .set(StlSettlement::getApprovalStatus, "DRAFT")
-                .set(StlSettlement::getSettlementStatus, "DRAFT"));
+                .set(StlSettlement::getApprovalStatus, APPROVAL_DRAFT)
+                .set(StlSettlement::getSettlementStatus, SETTLEMENT_DRAFT));
     }
 
     // ================================================================

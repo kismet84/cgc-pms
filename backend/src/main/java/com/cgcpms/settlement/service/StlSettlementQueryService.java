@@ -18,6 +18,7 @@ import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
@@ -40,7 +41,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_DRAFT;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_FINALIZED;
 import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
@@ -125,9 +127,9 @@ public class StlSettlementQueryService {
             totalChangeAmount = totalChangeAmount.add(StlSettlementAssembler.nullToZero(settlement.getChangeAmount()));
             totalPaidAmount = totalPaidAmount.add(StlSettlementAssembler.nullToZero(settlement.getPaidAmount()));
             totalUnpaidAmount = totalUnpaidAmount.add(StlSettlementAssembler.nullToZero(settlement.getUnpaidAmount()));
-            if ("DRAFT".equals(settlement.getSettlementStatus())) {
+            if (SETTLEMENT_DRAFT.equals(settlement.getSettlementStatus())) {
                 draftCount++;
-            } else if ("FINALIZED".equals(settlement.getSettlementStatus())) {
+            } else if (SETTLEMENT_FINALIZED.equals(settlement.getSettlementStatus())) {
                 finalizedCount++;
             }
         }

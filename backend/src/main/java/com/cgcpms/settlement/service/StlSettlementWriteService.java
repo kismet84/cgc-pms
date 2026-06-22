@@ -8,6 +8,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
@@ -21,7 +22,10 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_APPROVING;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_DRAFT;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_DRAFT;
+import static com.cgcpms.settlement.constant.SettlementStatusConstants.STATUS_DRAFT;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
@@ -87,13 +91,13 @@ public class StlSettlementWriteService {
 
         // Default statuses
         if (settlement.getApprovalStatus() == null || settlement.getApprovalStatus().isBlank()) {
-            settlement.setApprovalStatus("DRAFT");
+            settlement.setApprovalStatus(APPROVAL_DRAFT);
         }
         if (settlement.getStatus() == null || settlement.getStatus().isBlank()) {
-            settlement.setStatus("DRAFT");
+            settlement.setStatus(STATUS_DRAFT);
         }
         if (settlement.getSettlementStatus() == null || settlement.getSettlementStatus().isBlank()) {
-            settlement.setSettlementStatus("DRAFT");
+            settlement.setSettlementStatus(SETTLEMENT_DRAFT);
         }
 
         // Auto-compute amounts
@@ -117,7 +121,7 @@ public class StlSettlementWriteService {
     public void update(StlSettlement settlement) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement existing = queryService.validateAndGetSettlement(settlement.getId());
-        if (!"DRAFT".equals(existing.getApprovalStatus())) {
+        if (!APPROVAL_DRAFT.equals(existing.getApprovalStatus())) {
             throw new BusinessException("STL_SETTLEMENT_IN_APPROVAL", "结算单审批中或已审批，不可编辑");
         }
 
@@ -135,7 +139,7 @@ public class StlSettlementWriteService {
     public void delete(Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement existing = queryService.validateAndGetSettlement(id);
-        if (!"DRAFT".equals(existing.getApprovalStatus())) {
+        if (!APPROVAL_DRAFT.equals(existing.getApprovalStatus())) {
             throw new BusinessException("STL_SETTLEMENT_IN_APPROVAL", "结算单审批中或已审批，不可删除");
         }
 
@@ -153,7 +157,7 @@ public class StlSettlementWriteService {
     public void saveItems(Long settlementId, List<StlSettlementItem> items) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement settlement = queryService.validateAndGetSettlement(settlementId);
-        if (!"DRAFT".equals(settlement.getApprovalStatus())) {
+        if (!APPROVAL_DRAFT.equals(settlement.getApprovalStatus())) {
             throw new BusinessException("STL_SETTLEMENT_IN_APPROVAL", "结算单审批中或已审批，不可编辑");
         }
 
@@ -182,7 +186,7 @@ public class StlSettlementWriteService {
         if (settlement == null || !Objects.equals(settlement.getTenantId(), tenantId)) {
             throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
         }
-        if (!"DRAFT".equals(settlement.getApprovalStatus())) {
+        if (!APPROVAL_DRAFT.equals(settlement.getApprovalStatus())) {
             throw new BusinessException("STL_ALREADY_SUBMITTED", "结算单已提交审批，不可重复提交");
         }
 
@@ -192,7 +196,7 @@ public class StlSettlementWriteService {
 
         stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
-                .set(StlSettlement::getApprovalStatus, "APPROVING"));
+                .set(StlSettlement::getApprovalStatus, APPROVAL_APPROVING));
 
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
