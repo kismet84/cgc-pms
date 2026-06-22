@@ -1,7 +1,10 @@
 package com.cgcpms.common.aspect;
 
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.annotation.RateLimit;
+import com.cgcpms.common.annotation.RateLimitKey;
 import com.cgcpms.common.exception.RateLimitExceededException;
+import com.cgcpms.common.ratelimit.RateLimitCounterStore;
 import com.cgcpms.common.result.ApiResponse;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -21,12 +24,13 @@ import java.util.concurrent.TimeUnit;
  * Enforces {@link RateLimit} constraints on annotated controller methods,
  * plus account-lockout protection for login endpoints.
  *
- * <h3>Rate limiting (existing)</h3>
- * Each client IP gets a sliding counter that resets after the configured window.
- * Stale entries are evicted by Guava after 5 minutes of inactivity (max 10 000 entries).
+ * <h3>Rate limiting</h3>
+ * Each dimension key (IP / USER / TENANT / IP_AND_ACCOUNT) gets a counter
+ * that resets after the configured window. The actual counter storage is
+ * delegated to {@link RateLimitCounterStore} (Redis or in-memory fallback).
  *
- * <h3>Account lockout (new – R-27)</h3>
- * After 5 failed login attempts from the same IP within a 15‑minute window,
+ * <h3>Account lockout (R-27)</h3>
+ * After 5 failed login attempts from the same IP within a 15-minute window,
  * the IP is locked out for 30 minutes. During the lockout period any login
  * request from that IP is rejected before reaching the auth logic.
  *
@@ -52,9 +56,6 @@ public class RateLimitAspect {
     private static final int MAX_IDLE_SECONDS = 300;
     private static final int MAX_CACHE_SIZE = 10_000;
 
-    private static final int IDX_WINDOW_START = 0;
-    private static final int IDX_COUNT = 1;
-
     // ---- Account-lockout constants (R-27) ----
     /** Number of failed attempts before lockout triggers. */
     private static final int LOCKOUT_THRESHOLD = 5;
@@ -69,20 +70,15 @@ public class RateLimitAspect {
     private static final int LX_FAILURE_COUNT = 2;
 
     /**
-     * IP → [windowStartMs, requestCount].
-     * Guava handles automatic eviction; the aspect checks the time window manually
-     * so different annotated methods can have different {@code windowSeconds}.
+     * Pluggable counter store — injected via Spring (Redis or fallback).
      */
-    private final Cache<String, long[]> counterCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(MAX_IDLE_SECONDS, TimeUnit.SECONDS)
-            .maximumSize(MAX_CACHE_SIZE)
-            .build();
+    private final RateLimitCounterStore counterStore;
 
     /**
-     * IP → [lockoutUntilMs, firstFailureMs, failureCount] – R‑27 account lockout.
+     * IP → [lockoutUntilMs, firstFailureMs, failureCount] — R-27 account lockout.
      * <ul>
-     *   <li>{@code lockoutUntilMs}: epoch‑millis until lockout ends, or 0 when not locked.</li>
-     *   <li>{@code firstFailureMs}: epoch‑millis of the first failure in the current window.</li>
+     *   <li>{@code lockoutUntilMs}: epoch-millis until lockout ends, or 0 when not locked.</li>
+     *   <li>{@code firstFailureMs}: epoch-millis of the first failure in the current window.</li>
      *   <li>{@code failureCount}: number of failures in the current window.</li>
      * </ul>
      * Entries expire 5 minutes after the last access to prevent memory leaks.
@@ -92,8 +88,12 @@ public class RateLimitAspect {
             .maximumSize(MAX_CACHE_SIZE)
             .build();
 
+    public RateLimitAspect(RateLimitCounterStore counterStore) {
+        this.counterStore = counterStore;
+    }
+
     /* =========================================================================
-     * Rate limit advice (existing behaviour, unchanged)
+     * Rate limit advice
      * ========================================================================= */
 
     @Around("@annotation(rateLimit)")
@@ -103,25 +103,17 @@ public class RateLimitAspect {
         // --- R-27: check account lockout BEFORE proceeding ---
         checkLockout(ip);
 
-        long windowMs = rateLimit.windowSeconds() * 1000L;
+        String endpoint = joinPoint.getSignature().toShortString();
+        RateLimitKey keyDimension = rateLimit.key();
+        String limitKey = buildLimitKey(endpoint, keyDimension, ip);
 
-        long[] entry = counterCache.asMap().compute(ip, (key, old) -> {
-            long now = System.currentTimeMillis();
-            if (old == null || (now - old[IDX_WINDOW_START]) > windowMs) {
-                return new long[]{now, 1L};
-            }
-            old[IDX_COUNT]++;
-            return old;
-        });
+        long count = counterStore.increment(limitKey, rateLimit.windowSeconds());
 
-        if (entry[IDX_COUNT] > rateLimit.maxRequests()) {
-            long remainingMs = (entry[IDX_WINDOW_START] + windowMs) - System.currentTimeMillis();
-            long remainingSec = Math.max(1, remainingMs / 1000);
-            log.warn("Rate limit exceeded: ip={}, endpoint={}, count={}, limit={}, retryAfter={}s",
-                    ip, joinPoint.getSignature().toShortString(),
-                    entry[IDX_COUNT], rateLimit.maxRequests(), remainingSec);
+        if (count > rateLimit.maxRequests()) {
+            log.warn("Rate limit exceeded: key={}, endpoint={}, count={}, limit={}",
+                    limitKey, endpoint, count, rateLimit.maxRequests());
             throw new RateLimitExceededException(
-                    String.format("请求过于频繁，请在 %d 秒后重试", remainingSec));
+                    String.format("请求过于频繁，请在 %d 秒后重试", rateLimit.windowSeconds()));
         }
 
         // Proceed with the actual method
@@ -147,13 +139,38 @@ public class RateLimitAspect {
     }
 
     /* =========================================================================
-     * R‑27 Account-lockout helpers
+     * Multi-dimensional key builder
+     * ========================================================================= */
+
+    /**
+     * Build a rate-limit key in the format {@code endpoint:dimension:value}.
+     */
+    private String buildLimitKey(String endpoint, RateLimitKey dimension, String ip) {
+        return switch (dimension) {
+            case IP -> endpoint + ":ip:" + ip;
+            case USER -> {
+                Long userId = UserContext.getCurrentUserId();
+                yield endpoint + ":user:" + (userId != null ? userId : ip);
+            }
+            case TENANT -> {
+                Long tenantId = UserContext.getCurrentTenantId();
+                yield endpoint + ":tenant:" + (tenantId != null ? tenantId : ip);
+            }
+            case IP_AND_ACCOUNT -> {
+                Long userId = UserContext.getCurrentUserId();
+                yield endpoint + ":ip_account:" + ip + ":" + (userId != null ? userId : "anon");
+            }
+        };
+    }
+
+    /* =========================================================================
+     * R-27 Account-lockout helpers
      * ========================================================================= */
 
     /**
      * Reject the request if the IP is currently in the lockout period.
      *
-     * @throws RateLimitExceededException with a lockout‑specific message
+     * @throws RateLimitExceededException with a lockout-specific message
      */
     private void checkLockout(String ip) {
         long[] lockEntry = lockoutCache.getIfPresent(ip);
@@ -217,12 +234,12 @@ public class RateLimitAspect {
         if (request == null) {
             return "unknown";
         }
-        // 优先取 Nginx 设置的 X-Real-IP（覆盖后的真实客户端 IP）
+        // Prefer Nginx X-Real-IP (overridden real client IP)
         String ip = request.getHeader("X-Real-IP");
         if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
             return ip.trim();
         }
-        // 回退：从 X-Forwarded-For 取首个 IP
+        // Fallback: first IP from X-Forwarded-For
         ip = request.getHeader("X-Forwarded-For");
         if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
             int comma = ip.indexOf(',');

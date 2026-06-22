@@ -1,5 +1,7 @@
 package com.cgcpms.file.controller;
 
+import com.cgcpms.common.annotation.RateLimit;
+import com.cgcpms.common.annotation.RateLimitKey;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.file.service.FileService;
 import com.cgcpms.file.vo.SysFileVO;
@@ -21,6 +23,7 @@ public class FileController {
 
     @PostMapping("/upload")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:upload')")
+    @RateLimit(maxRequests = 20, windowSeconds = 60, key = RateLimitKey.USER)
     public ApiResponse<SysFileVO> upload(
             @RequestParam MultipartFile file,
             @RequestParam String businessType,

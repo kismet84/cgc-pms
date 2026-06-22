@@ -1,5 +1,7 @@
 package com.cgcpms.dashboard.controller;
 
+import com.cgcpms.common.annotation.RateLimit;
+import com.cgcpms.common.annotation.RateLimitKey;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.dashboard.service.DashboardService;
 import com.cgcpms.dashboard.vo.*;
@@ -60,6 +62,7 @@ public class DashboardController {
      */
     @GetMapping("/management")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:management:view')")
+    @RateLimit(maxRequests = 60, windowSeconds = 60, key = RateLimitKey.TENANT)
     public ApiResponse<ManagementDashboardVO> getManagementView() {
         return ApiResponse.success(dashboardService.getManagementView());
     }

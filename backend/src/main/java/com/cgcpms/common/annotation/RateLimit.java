@@ -7,7 +7,7 @@ import java.lang.annotation.Target;
 
 /**
  * Rate-limit annotation for brute-force protection on sensitive endpoints.
- * Uses Guava in-memory cache keyed by client IP address.
+ * Supports multiple key dimensions: IP, USER, TENANT, IP_AND_ACCOUNT.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
@@ -18,4 +18,7 @@ public @interface RateLimit {
 
     /** Time window in seconds. */
     int windowSeconds() default 60;
+
+    /** Key dimension for rate limiting. Defaults to IP. */
+    RateLimitKey key() default RateLimitKey.IP;
 }
