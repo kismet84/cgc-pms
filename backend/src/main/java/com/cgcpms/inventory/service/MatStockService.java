@@ -1,23 +1,31 @@
 package com.cgcpms.inventory.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.entity.MatStockTxn;
+import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatStockMapper;
 import com.cgcpms.inventory.mapper.MatStockTxnMapper;
+import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.vo.MatStockLedgerVO;
+import com.cgcpms.inventory.vo.MatStockTxnVO;
+import com.cgcpms.inventory.vo.MatStockVO;
+import com.cgcpms.inventory.vo.StockKpiVO;
+import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.mapper.MdMaterialMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 库存台账服务 — 数量型库存管理，@Version 乐观锁并发控制。
@@ -38,17 +46,28 @@ public class MatStockService {
 
     private final MatStockMapper matStockMapper;
     private final MatStockTxnMapper matStockTxnMapper;
+    private final MatWarehouseMapper matWarehouseMapper;
+    private final MdMaterialMapper mdMaterialMapper;
 
     /**
      * 入库：增加指定仓库+物料的可用库存。
      * 如该组合尚无库存记录则自动创建；已存在则在现有记录上累加。
      * 每次入库生成一条 txn_type='IN' 的流水。
-     * <p>
-     * TODO: stockIn/stockOut 返回 MatStock 实体会暴露 version 内部字段给前端，
-     * 应在 Controller 层转换为 VO（如 MatStockVO）或过滤 version/txnCount 等内部字段。
      */
     @Transactional
     public MatStock stockIn(Long warehouseId, Long materialId, BigDecimal quantity) {
+        return stockIn(warehouseId, materialId, quantity, null, null);
+    }
+
+    /**
+     * 入库（带业务来源追溯）。
+     *
+     * @param sourceType 来源业务类型，如 "MAT_RECEIPT"；可为 null
+     * @param sourceId   来源业务ID，如验收单ID；可为 null
+     */
+    @Transactional
+    public MatStock stockIn(Long warehouseId, Long materialId, BigDecimal quantity,
+                            String sourceType, Long sourceId) {
         Long tenantId = UserContext.getCurrentTenantId();
 
         MatStock stock = findStock(tenantId, warehouseId, materialId);
@@ -67,7 +86,6 @@ public class MatStockService {
                 // 并发线程已创建了同 warehouse+material 的库存，重新查询后走累加路径
                 stock = findStock(tenantId, warehouseId, materialId);
                 if (stock == null) {
-                    // 理论上不应走到这里（UNIQUE 冲突说明已有记录）
                     throw new BusinessException("STOCK_CONCURRENT_CONFLICT",
                             "库存并发冲突，请稍后重试");
                 }
@@ -78,9 +96,9 @@ public class MatStockService {
             stock = doUpdateIncrement(tenantId, warehouseId, materialId, quantity, stock);
         }
 
-        // 写入流水
+        // 写入流水（带来源追溯）
         insertTxn(tenantId, warehouseId, materialId, "IN", quantity,
-                stock.getAvailableQty(), null, null);
+                stock.getAvailableQty(), sourceType, sourceId);
 
         return stock;
     }
@@ -127,6 +145,18 @@ public class MatStockService {
      */
     @Transactional
     public MatStock stockOut(Long warehouseId, Long materialId, BigDecimal quantity) {
+        return stockOut(warehouseId, materialId, quantity, null, null);
+    }
+
+    /**
+     * 出库（带业务来源追溯）。
+     *
+     * @param sourceType 来源业务类型；可为 null
+     * @param sourceId   来源业务ID；可为 null
+     */
+    @Transactional
+    public MatStock stockOut(Long warehouseId, Long materialId, BigDecimal quantity,
+                             String sourceType, Long sourceId) {
         Long tenantId = UserContext.getCurrentTenantId();
 
         MatStock stock = findStock(tenantId, warehouseId, materialId);
@@ -157,41 +187,130 @@ public class MatStockService {
             }
         }
 
-        // 写入流水
+        // 写入流水（带来源追溯）
         insertTxn(tenantId, warehouseId, materialId, "OUT", quantity,
-                stock.getAvailableQty(), null, null);
+                stock.getAvailableQty(), sourceType, sourceId);
 
         return stock;
     }
 
     /**
      * 查询库存台账：当前库存余额 + 分页流水记录。
+     * <p>
+     * 包含仓库名、物料名/编码/单位的 JOIN 查询，支持 keyword 模糊搜索和动态排序。
      *
-     * @param warehouseId 仓库ID
-     * @param materialId  物料ID
+     * @param warehouseId 仓库ID（必传）
+     * @param materialId  物料ID（必传）
+     * @param projectId   项目ID（可选）
+     * @param keyword     关键词（可选，模糊搜索流水号/来源单号）
+     * @param sortField   排序字段（可选，默认 createdTime）
+     * @param sortOrder   排序方向（可选，默认 desc）
      * @param pageNo      流水页码（从 1 开始）
      * @param pageSize    每页条数
      * @return 台账（含当前库存和分页流水）
      */
     public MatStockLedgerVO getLedger(Long warehouseId, Long materialId,
+                                       Long projectId,
+                                       String keyword,
+                                       String sortField, String sortOrder,
                                        long pageNo, long pageSize) {
         Long tenantId = UserContext.getCurrentTenantId();
 
+        // 1. 当前库存余额
         MatStock stock = findStock(tenantId, warehouseId, materialId);
 
+        // 2. 流水查询
         LambdaQueryWrapper<MatStockTxn> txnWrapper = new LambdaQueryWrapper<>();
         txnWrapper.eq(MatStockTxn::getTenantId, tenantId);
         txnWrapper.eq(MatStockTxn::getWarehouseId, warehouseId);
         txnWrapper.eq(MatStockTxn::getMaterialId, materialId);
-        txnWrapper.orderByDesc(MatStockTxn::getCreatedTime);
+
+        // keyword 模糊搜索（流水ID或来源单号）
+        if (StringUtils.hasText(keyword)) {
+            txnWrapper.and(w -> w
+                    .like(MatStockTxn::getId, keyword)
+                    .or()
+                    .like(MatStockTxn::getSourceId, keyword));
+        }
+
+        // 动态排序
+        applySort(txnWrapper, sortField, sortOrder);
 
         Page<MatStockTxn> page = matStockTxnMapper.selectPage(
                 new Page<>(pageNo, pageSize), txnWrapper);
 
+        // 3. 批量获取 display name
+        Map<Long, String> warehouseNameMap = getWarehouseNameMap(tenantId);
+        Map<Long, MdMaterial> materialMap = getMaterialMap(tenantId);
+
+        // 4. 组装 VO
         MatStockLedgerVO ledger = new MatStockLedgerVO();
-        ledger.setStock(stock);
-        ledger.setTxns(PageResult.of(page));
+        ledger.setStock(toStockVO(stock, warehouseNameMap, materialMap));
+
+        List<MatStockTxnVO> txnVOs = page.getRecords().stream()
+                .map(txn -> toTxnVO(txn, warehouseNameMap, materialMap))
+                .collect(Collectors.toList());
+        PageResult<MatStockTxnVO> txnPage = new PageResult<>(
+                page.getCurrent(), page.getSize(), page.getTotal(), txnVOs);
+        ledger.setTxns(txnPage);
+
         return ledger;
+    }
+
+    /**
+     * 库存台账 KPI 统计。
+     *
+     * @param warehouseId 仓库ID（可选，传 null 则全仓库统计）
+     * @param projectId   项目ID（可选）
+     * @return KPI VO
+     */
+    public StockKpiVO getKpi(Long warehouseId, Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+
+        StockKpiVO kpi = new StockKpiVO();
+
+        // 仓库总数（ENABLE 状态）
+        LambdaQueryWrapper<MatWarehouse> whWrapper = new LambdaQueryWrapper<>();
+        whWrapper.eq(MatWarehouse::getTenantId, tenantId);
+        whWrapper.eq(MatWarehouse::getStatus, "ENABLE");
+        if (projectId != null) {
+            whWrapper.eq(MatWarehouse::getProjectId, projectId);
+        }
+        kpi.setWarehouseCount(matWarehouseMapper.selectCount(whWrapper));
+
+        // 有库存的物料种类数
+        LambdaQueryWrapper<MatStock> stockWrapper = new LambdaQueryWrapper<>();
+        stockWrapper.eq(MatStock::getTenantId, tenantId);
+        if (warehouseId != null) {
+            stockWrapper.eq(MatStock::getWarehouseId, warehouseId);
+        }
+        stockWrapper.gt(MatStock::getAvailableQty, BigDecimal.ZERO);
+        kpi.setMaterialTypeCount(matStockMapper.selectCount(stockWrapper));
+
+        // 低库存物料数（可用量 > 0 且 < 10）
+        LambdaQueryWrapper<MatStock> lowStockWrapper = new LambdaQueryWrapper<>();
+        lowStockWrapper.eq(MatStock::getTenantId, tenantId);
+        if (warehouseId != null) {
+            lowStockWrapper.eq(MatStock::getWarehouseId, warehouseId);
+        }
+        lowStockWrapper.gt(MatStock::getAvailableQty, BigDecimal.ZERO);
+        lowStockWrapper.lt(MatStock::getAvailableQty, new BigDecimal("10"));
+        kpi.setLowStockCount(matStockMapper.selectCount(lowStockWrapper));
+
+        // 出入库次数
+        LambdaQueryWrapper<MatStockTxn> txnWrapper = new LambdaQueryWrapper<>();
+        txnWrapper.eq(MatStockTxn::getTenantId, tenantId);
+        if (warehouseId != null) {
+            txnWrapper.eq(MatStockTxn::getWarehouseId, warehouseId);
+        }
+        txnWrapper.select(MatStockTxn::getTxnType);
+        List<MatStockTxn> allTxns = matStockTxnMapper.selectList(txnWrapper);
+        long inCount = allTxns.stream().filter(t -> "IN".equals(t.getTxnType())).count();
+        long outCount = allTxns.stream().filter(t -> "OUT".equals(t.getTxnType())).count();
+        kpi.setTxnInCount(inCount);
+        kpi.setTxnOutCount(outCount);
+
+        return kpi;
     }
 
     // ── 内部工具方法 ──
@@ -206,9 +325,6 @@ public class MatStockService {
         wrapper.eq(MatStock::getTenantId, tenantId);
         wrapper.eq(MatStock::getWarehouseId, warehouseId);
         wrapper.eq(MatStock::getMaterialId, materialId);
-        // NOTE: MyBatis-Plus TenantLineInterceptor duplicates tenant_id in WHERE
-        // clause. Using .last("LIMIT 1") is safe here because it only appends a
-        // row-limit without introducing SQL injection risk (no user input involved).
         wrapper.last("LIMIT 1");
         List<MatStock> results = matStockMapper.selectList(wrapper);
         return results.isEmpty() ? null : results.get(0);
@@ -231,5 +347,102 @@ public class MatStockService {
         txn.setSourceType(sourceType);
         txn.setSourceId(sourceId);
         matStockTxnMapper.insert(txn);
+    }
+
+    /**
+     * 动态排序 — 仅允许白名单字段，防 SQL 注入。
+     */
+    private void applySort(LambdaQueryWrapper<MatStockTxn> wrapper,
+                           String sortField, String sortOrder) {
+        boolean asc = "asc".equalsIgnoreCase(sortOrder);
+        if ("quantity".equals(sortField)) {
+            if (asc) {
+                wrapper.orderByAsc(MatStockTxn::getQuantity);
+            } else {
+                wrapper.orderByDesc(MatStockTxn::getQuantity);
+            }
+        } else if ("createdTime".equals(sortField)) {
+            if (asc) {
+                wrapper.orderByAsc(MatStockTxn::getCreatedTime);
+            } else {
+                wrapper.orderByDesc(MatStockTxn::getCreatedTime);
+            }
+        } else {
+            // 默认按创建时间倒序
+            wrapper.orderByDesc(MatStockTxn::getCreatedTime);
+        }
+    }
+
+    /**
+     * 获取当前租户下所有仓库 ID→名称 映射。
+     */
+    private Map<Long, String> getWarehouseNameMap(Long tenantId) {
+        LambdaQueryWrapper<MatWarehouse> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MatWarehouse::getTenantId, tenantId);
+        wrapper.select(MatWarehouse::getId, MatWarehouse::getWarehouseName);
+        List<MatWarehouse> warehouses = matWarehouseMapper.selectList(wrapper);
+        return warehouses.stream()
+                .collect(Collectors.toMap(MatWarehouse::getId, MatWarehouse::getWarehouseName));
+    }
+
+    /**
+     * 获取当前租户下所有物料 ID→实体 映射。
+     */
+    private Map<Long, MdMaterial> getMaterialMap(Long tenantId) {
+        LambdaQueryWrapper<MdMaterial> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MdMaterial::getTenantId, tenantId);
+        List<MdMaterial> materials = mdMaterialMapper.selectList(wrapper);
+        return materials.stream()
+                .collect(Collectors.toMap(MdMaterial::getId, m -> m, (a, b) -> a));
+    }
+
+    /**
+     * 将 MatStock 实体转为 MatStockVO，填充 display name。
+     */
+    private MatStockVO toStockVO(MatStock entity,
+                                  Map<Long, String> warehouseNameMap,
+                                  Map<Long, MdMaterial> materialMap) {
+        if (entity == null) return null;
+        MatStockVO vo = new MatStockVO();
+        vo.setId(entity.getId());
+        vo.setWarehouseId(entity.getWarehouseId());
+        vo.setMaterialId(entity.getMaterialId());
+        vo.setAvailableQty(entity.getAvailableQty());
+        vo.setCreatedTime(entity.getCreatedTime() != null ? entity.getCreatedTime().toString() : null);
+        vo.setUpdatedTime(entity.getUpdatedTime() != null ? entity.getUpdatedTime().toString() : null);
+
+        vo.setWarehouseName(warehouseNameMap.get(entity.getWarehouseId()));
+        MdMaterial mat = materialMap.get(entity.getMaterialId());
+        if (mat != null) {
+            vo.setMaterialName(mat.getMaterialName());
+            vo.setMaterialCode(mat.getMaterialCode());
+            vo.setUnit(mat.getUnit());
+        }
+        return vo;
+    }
+
+    /**
+     * 将 MatStockTxn 实体转为 MatStockTxnVO，填充 display name。
+     */
+    private MatStockTxnVO toTxnVO(MatStockTxn entity,
+                                   Map<Long, String> warehouseNameMap,
+                                   Map<Long, MdMaterial> materialMap) {
+        MatStockTxnVO vo = new MatStockTxnVO();
+        vo.setId(entity.getId());
+        vo.setWarehouseId(entity.getWarehouseId());
+        vo.setMaterialId(entity.getMaterialId());
+        vo.setTxnType(entity.getTxnType());
+        vo.setQuantity(entity.getQuantity());
+        vo.setAvailableAfter(entity.getAvailableAfter());
+        vo.setSourceType(entity.getSourceType());
+        vo.setSourceId(entity.getSourceId());
+        vo.setCreatedTime(entity.getCreatedTime() != null ? entity.getCreatedTime().toString() : null);
+
+        vo.setWarehouseName(warehouseNameMap.get(entity.getWarehouseId()));
+        MdMaterial mat = materialMap.get(entity.getMaterialId());
+        if (mat != null) {
+            vo.setMaterialName(mat.getMaterialName());
+        }
+        return vo;
     }
 }

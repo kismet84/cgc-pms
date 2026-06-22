@@ -27,4 +27,10 @@ public class StockTransactionDTO {
     @NotNull(message = "数量不能为空")
     @Positive(message = "数量必须大于0")
     private BigDecimal quantity;
+
+    /** 来源业务类型，如 "MAT_RECEIPT"，可选 */
+    private String sourceType;
+
+    /** 来源业务ID，如验收单ID，可选 */
+    private Long sourceId;
 }

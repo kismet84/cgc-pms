@@ -74,8 +74,9 @@ public class StlSettlement extends BaseEntity {
     private BigDecimal warrantyAmount;
 
     /**
-     * 结算最终归档状态: DRAFT(草稿) / CALCULATED(已计算) / FINALIZED(已定稿)。
+     * 结算定案状态: DRAFT(草稿) / CALCULATED(已计算) / FINALIZED(已定案，金额锁定不可编辑)。
      * 审批通过后自动置为 FINALIZED，代表金额锁定、不可再编辑。
+     * 注意：此字段表示结算单自身的定案状态，与项目级别的归档（ARCHIVED）是不同概念。
      */
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String settlementStatus;
