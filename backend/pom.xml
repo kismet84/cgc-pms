@@ -199,6 +199,8 @@
                 <configuration>
                     <argLine>@{argLine} --add-opens java.base/java.time=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED -Xmx1024m</argLine>
                     <forkedProcessExitTimeoutInSeconds>300</forkedProcessExitTimeoutInSeconds>
+                    <reuseForks>false</reuseForks>
+                    <forkCount>1C</forkCount>
                     <systemPropertyVariables>
                         <spring.devtools.restart.enabled>false</spring.devtools.restart.enabled>
                     </systemPropertyVariables>
