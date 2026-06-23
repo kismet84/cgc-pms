@@ -585,6 +585,9 @@ a {
   text-decoration: none;
   cursor: pointer;
 }
+.lg-link:hover {
+  color: var(--primary-hover);
+}
 .lg-money {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -596,6 +599,36 @@ a {
 }
 .lg-del {
   color: var(--error);
+}
+.lg-del:hover {
+  color: #FF7875;
+}
+/* 通用标签 */
+.lg-tag {
+  display: inline-block;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: 20px;
+  padding: 0 8px;
+  white-space: nowrap;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 500;
+}
+.lg-tag--success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.lg-tag--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.lg-tag--danger {
+  background: var(--error-soft);
+  color: var(--error);
+}
+.lg-tag--pill {
+  border-radius: 12px;
 }
 /* vxe-table 内部统一样式 */
 .lg-table-wrap :deep(.vxe-header--column) {
@@ -611,6 +644,43 @@ a {
 }
 .lg-table-wrap :deep(.vxe-body--row:hover) {
   background: var(--bg);
+}
+.lg-table-wrap :deep(.vxe-body--row:hover .vxe-body--column) {
+  background: var(--bg);
+}
+.lg-table-wrap :deep(.vxe-table--border-line) {
+  border-color: var(--border);
+}
+/* Ant Design Table 全局统一覆盖 */
+.lg-table-wrap :deep(.ant-table) {
+  font-size: 14px;
+}
+.lg-table-wrap :deep(.ant-table-thead > tr > th) {
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  height: 42px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.lg-table-wrap :deep(.ant-table-tbody > tr > td) {
+  color: var(--text);
+  font-size: 14px;
+  padding: 10px 16px;
+}
+.lg-table-wrap :deep(.ant-table-tbody > tr:hover > td) {
+  background: var(--bg) !important;
+}
+.lg-table-wrap :deep(.ant-table-thead > tr > th::before) {
+  display: none;
+}
+.lg-table-wrap :deep(.ant-table-bordered .ant-table-thead > tr > th),
+.lg-table-wrap :deep(.ant-table-bordered .ant-table-tbody > tr > td) {
+  border-color: var(--border);
+}
+.lg-table-wrap :deep(.ant-table.ant-table-bordered > .ant-table-container) {
+  border-color: var(--border);
 }
 
 /* ---- 移动端卡片列表 ---- */
