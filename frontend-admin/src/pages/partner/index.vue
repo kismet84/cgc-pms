@@ -346,13 +346,14 @@ onMounted(() => {
       :title="modalTitle"
       :confirm-loading="formLoading"
       :mask-closable="false"
+      class="lg-modal-form"
       ok-text="保存"
       cancel-text="取消"
-      width="600px"
+      width="640px"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
     >
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+      <a-form>
         <a-form-item label="合作方名称" required>
           <a-input v-model:value="formData.partnerName" placeholder="请输入合作方名称" />
         </a-form-item>

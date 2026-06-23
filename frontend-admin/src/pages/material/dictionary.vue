@@ -293,10 +293,13 @@ onMounted(fetchData)
       :title="modalTitle"
       :confirm-loading="formLoading"
       width="600px"
+      class="lg-modal-form"
+      ok-text="保存"
+      cancel-text="取消"
       @ok="handleSubmit"
       @cancel="handleCancel"
     >
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+      <a-form>
         <a-form-item label="材料编码" required>
           <a-input
             v-model:value="formData.materialCode"

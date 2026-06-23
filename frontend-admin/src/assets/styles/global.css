@@ -414,6 +414,23 @@ a {
   justify-content: space-between;
   margin-bottom: 12px;
 }
+.lg-page-head-breadcrumb {
+  margin-bottom: 5px;
+}
+.lg-page-head-title {
+  margin: 0;
+  font-size: var(--font-size-xxl);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+.lg-page-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
 
 /* ---- 搜索栏 ---- */
 .lg-search-bar {
@@ -598,6 +615,19 @@ a {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+.lg-toolbar :deep(.ant-btn) {
+  height: 34px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+.lg-toolbar :deep(.ant-btn-primary) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.lg-toolbar :deep(.ant-btn-primary:hover) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 /* ---- 表格容器 ---- */
@@ -925,6 +955,130 @@ a {
   text-align: center;
 }
 
+/* ============================================================
+   lg-modal-form — 统一新增/编辑弹窗 & 表单样式
+   ============================================================ */
+
+/* 弹窗整体：标题、间距 */
+.lg-modal-form :deep(.ant-modal-header) {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lg-modal-form :deep(.ant-modal-title) {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.lg-modal-form :deep(.ant-modal-body) {
+  padding: 24px 24px 12px;
+}
+
+/* 弹窗按钮：确认在前、取消在后 */
+.lg-modal-form :deep(.ant-modal-footer) {
+  padding: 12px 24px 20px;
+  border-top: none;
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  gap: 8px;
+}
+.lg-modal-form :deep(.ant-modal-footer .ant-btn + .ant-btn) {
+  margin-inline-start: 0;
+}
+.lg-modal-form :deep(.ant-btn-primary) {
+  height: 36px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  padding: 0 16px;
+}
+.lg-modal-form :deep(.ant-btn:not(.ant-btn-primary)) {
+  height: 36px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  padding: 0 16px;
+}
+
+/* 表单栅格：标签 80px + 24px 间距 */
+.lg-modal-form .ant-form {
+  --form-label-width: 80px;
+}
+.lg-modal-form :deep(.ant-form-item) {
+  margin-bottom: 16px;
+}
+.lg-modal-form :deep(.ant-form-item-label) {
+  width: var(--form-label-width);
+  text-align: right;
+  padding-right: 12px;
+}
+.lg-modal-form :deep(.ant-form-item-label > label) {
+  color: var(--text-secondary);
+  font-size: 14px;
+  height: 32px;
+  line-height: 32px;
+}
+.lg-modal-form :deep(.ant-form-item-control) {
+  max-width: calc(100% - var(--form-label-width));
+}
+
+/* 统一输入组件高度 32px */
+.lg-modal-form :deep(.ant-input) {
+  height: 32px;
+  font-size: 14px;
+}
+.lg-modal-form :deep(.ant-input-affix-wrapper) {
+  height: 32px;
+  font-size: 14px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.lg-modal-form :deep(.ant-input-affix-wrapper .ant-input) {
+  height: auto;
+}
+.lg-modal-form :deep(.ant-select-selector) {
+  height: 32px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+.lg-modal-form :deep(.ant-select-selection-item),
+.lg-modal-form :deep(.ant-select-selection-placeholder) {
+  line-height: 30px !important;
+}
+.lg-modal-form :deep(.ant-select-selection-search) {
+  height: 30px;
+}
+.lg-modal-form :deep(.ant-select-selection-search-input) {
+  height: 30px;
+}
+.lg-modal-form :deep(.ant-input-number) {
+  height: 32px;
+}
+.lg-modal-form :deep(.ant-input-number-input) {
+  height: 30px;
+}
+.lg-modal-form :deep(.ant-input-number-handler-wrap) {
+  height: 30px;
+}
+
+/* vertical 布局兼容 */
+.lg-modal-form.is-vertical :deep(.ant-form-item-label) {
+  width: auto;
+  text-align: left;
+  padding-right: 0;
+}
+.lg-modal-form.is-vertical :deep(.ant-form-item-control) {
+  max-width: 100%;
+}
+
+/* 双列表单栅格（可选） */
+.lg-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+.lg-form-grid .span-full {
+  grid-column: 1 / -1;
+}
+
 /* ---- 响应式 ---- */
 @media (max-width: 1280px) {
   .lg-grid {
@@ -962,5 +1116,8 @@ a {
   .lg-pagination {
     width: 100%;
     flex-wrap: wrap;
+  }
+  .lg-form-grid {
+    grid-template-columns: 1fr;
   }
 }

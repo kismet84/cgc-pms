@@ -65,8 +65,8 @@ service.interceptors.response.use(
     if (res.code === SUCCESS_CODE) {
       return res.data as never
     }
-    message.error(res.message || 'Request failed')
-    return Promise.reject(new Error(res.message || 'Error'))
+    message.error(res.message || '操作失败，请稍后重试')
+    return Promise.reject(new Error(res.message || '操作失败'))
   },
   async (error) => {
     const status = error?.response?.status
@@ -118,7 +118,7 @@ service.interceptors.response.use(
     }
 
     if (status !== 401) {
-      const msg = error?.response?.data?.message || error.message || 'Network error'
+      const msg = error?.response?.data?.message || error.message || '网络异常，请检查连接'
       message.error(msg)
     }
     return Promise.reject(error)

@@ -314,11 +314,14 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="480"
+      :width="560"
+      class="lg-modal-form"
+      ok-text="保存"
+      cancel-text="取消"
       @ok="handleModalOk"
       :confirm-loading="saving"
     >
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+      <a-form>
         <a-form-item label="用户名" required>
           <a-input
             v-model:value="formData.username"

@@ -694,17 +694,19 @@ const gridColumns = computed(() => [
       <!-- 左列 -->
       <div class="project-table-panel">
         <!-- 工具栏 -->
-        <div class="project-table-toolbar">
-          <div>
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
             <a-button type="primary" @click="handleCreateModalOpen">
               <template #icon><PlusOutlined /></template>
               新建项目
             </a-button>
-            <a-button class="project-refresh-btn" @click="fetchData">
+            <a-button @click="fetchData">
               <template #icon><ReloadOutlined /></template>
             </a-button>
+          </div>
+          <div class="lg-toolbar-right">
             <a-dropdown :trigger="['click']">
-              <a-button class="project-column-btn">
+              <a-button>
                 <template #icon><SettingOutlined /></template>
                 列设置
               </a-button>
@@ -857,22 +859,6 @@ const gridColumns = computed(() => [
   font-size: 14px;
 }
 
-.project-table-toolbar :deep(.ant-btn) {
-  height: 34px;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.project-table-toolbar :deep(.ant-btn-primary) {
-  background: var(--project-primary);
-  border-color: var(--project-primary);
-}
-
-.project-table-toolbar :deep(.ant-btn-primary:hover) {
-  background: var(--project-primary-hover);
-  border-color: var(--project-primary-hover);
-}
-
 .project-content-layout {
   display: flex;
   gap: 16px;
@@ -887,24 +873,6 @@ const gridColumns = computed(() => [
   background: var(--project-surface);
   border-radius: var(--project-radius);
   box-shadow: var(--project-shadow);
-}
-
-.project-table-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 20px 16px;
-  border-bottom: 1px solid var(--project-border);
-}
-
-.project-refresh-btn {
-  margin-left: 8px;
-  width: 34px;
-  padding-inline: 0;
-}
-
-.project-column-btn {
-  margin-left: 8px;
 }
 
 /* lg-table-wrap 已提供全局 vxe-table/Ant Table 统一样式；仅保留页面级溢出控制 */

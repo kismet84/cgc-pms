@@ -487,11 +487,14 @@ onMounted(() => {
       v-model:open="typeModalVisible"
       :title="typeModalTitle"
       :confirm-loading="typeFormLoading"
-      width="480px"
+      width="520px"
+      class="lg-modal-form"
+      ok-text="保存"
+      cancel-text="取消"
       @ok="handleTypeSubmit"
       @cancel="handleTypeCancel"
     >
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+      <a-form>
         <a-form-item label="字典编码" required>
           <a-input
             v-model:value="typeForm.dictCode"
@@ -517,10 +520,13 @@ onMounted(() => {
       :title="dataModalTitle"
       :confirm-loading="dataFormLoading"
       width="560px"
+      class="lg-modal-form"
+      ok-text="保存"
+      cancel-text="取消"
       @ok="handleDataSubmit"
       @cancel="handleDataCancel"
     >
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+      <a-form>
         <a-form-item label="字典标签" required>
           <a-input v-model:value="dataForm.dictLabel" placeholder="请输入字典标签" />
         </a-form-item>

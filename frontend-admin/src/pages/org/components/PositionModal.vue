@@ -33,6 +33,10 @@ function onCompanyChange(_val: string) {
     :open="open"
     :title="title"
     :confirm-loading="loading"
+    :width="520"
+    class="lg-modal-form is-vertical"
+    ok-text="保存"
+    cancel-text="取消"
     @ok="emit('ok')"
     @update:open="emit('update:open', $event)"
   >

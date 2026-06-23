@@ -85,6 +85,8 @@ async function handleSave() {
     :title="modalTitle"
     :width="520"
     :confirm-loading="saving"
+    ok-text="保存"
+    cancel-text="取消"
     @ok="handleSave"
     @cancel="emit('update:open', false)"
   >
