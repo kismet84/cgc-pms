@@ -65,9 +65,7 @@ class WorkflowEngineIntegrationTest {
      */
     @BeforeAll
     void seedTestUsers() {
-        // 1. Restore any test-seed users that were moved to other tenants by prior tests
-        jdbcTemplate.update("UPDATE sys_user SET tenant_id = 0 WHERE id BETWEEN 1 AND 5 AND remark = 'test-seed'");
-        // 2. Ensure all 5 test users exist in tenant 0
+        // Ensure all 5 test users exist in tenant 0.
         jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
                 "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
@@ -83,6 +81,7 @@ class WorkflowEngineIntegrationTest {
         jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
                 "SELECT 5, 0, 'cost', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '成本人员', '13800000004', 'cost@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 5)");
+        restoreUsersToTenant0();
     }
 
     /**
@@ -90,11 +89,26 @@ class WorkflowEngineIntegrationTest {
      * Call restoreUsersToTenant0() to move them back.
      */
     private void moveUsersToTenant(long tenantId) {
-        jdbcTemplate.update("UPDATE sys_user SET tenant_id = ? WHERE id BETWEEN 1 AND 5 AND remark = 'test-seed'", tenantId);
+        jdbcTemplate.update("UPDATE sys_user SET tenant_id = ?, status = 'ENABLE', remark = 'test-seed' WHERE id BETWEEN 1 AND 5",
+                tenantId);
     }
 
     private void restoreUsersToTenant0() {
-        jdbcTemplate.update("UPDATE sys_user SET tenant_id = 0 WHERE id BETWEEN 1 AND 5 AND remark = 'test-seed'");
+        jdbcTemplate.update("""
+                UPDATE sys_user
+                SET tenant_id = 0,
+                    status = 'ENABLE',
+                    remark = 'test-seed',
+                    real_name = CASE id
+                        WHEN 1 THEN '系统管理员'
+                        WHEN 2 THEN '项目经理'
+                        WHEN 3 THEN '总经理'
+                        WHEN 4 THEN '商务人员'
+                        WHEN 5 THEN '成本人员'
+                        ELSE real_name
+                    END
+                WHERE id BETWEEN 1 AND 5
+                """);
     }
 
     @BeforeEach

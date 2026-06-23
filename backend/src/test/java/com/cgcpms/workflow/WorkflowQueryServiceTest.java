@@ -473,16 +473,22 @@ class WorkflowQueryServiceTest {
     }
 
     private void cleanup() {
-        // Clean ALL leftover wf_task records for this test's user/tenant from any other
-        // test class that may have left workflow data behind (cross-test pollution).
-        // Use broad delete-first to guarantee @BeforeEach produces a clean slate.
-        jdbcTemplate.update("DELETE FROM wf_cc WHERE tenant_id = ?", TENANT_0);
-        jdbcTemplate.update("DELETE FROM wf_record WHERE tenant_id = ?", TENANT_0);
-        jdbcTemplate.update("DELETE FROM wf_task WHERE tenant_id = ?", TENANT_0);
-        jdbcTemplate.update("DELETE FROM wf_node_instance WHERE tenant_id = ?", TENANT_0);
-        jdbcTemplate.update("DELETE FROM wf_instance WHERE tenant_id = ?", TENANT_0);
-        // 不删除 wf_template_node / wf_template — 它们是 Flyway 种子数据 (V9 CONTRACT_APPROVAL)
-        // 删除它们会导致其他测试类找不到审批模板
+        // Keep cleanup scoped to this class. Broad tenant-level deletes remove Flyway
+        // workflow seed data used by later tests in the same H2 application context.
+        jdbcTemplate.update("DELETE FROM wf_cc WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?)",
+                BUSINESS_TYPE, 33333001L, 33333011L);
+        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key IN (?, ?, ?)",
+                "done-test-key-001", "reject-test-key-001", "detail-approve-key-001");
+        jdbcTemplate.update("DELETE FROM wf_record WHERE business_type = ? OR business_id BETWEEN ? AND ?",
+                BUSINESS_TYPE, 33333001L, 33333011L);
+        jdbcTemplate.update("DELETE FROM wf_task WHERE business_type = ? OR business_id BETWEEN ? AND ?",
+                BUSINESS_TYPE, 33333001L, 33333011L);
+        jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?)",
+                BUSINESS_TYPE, 33333001L, 33333011L);
+        jdbcTemplate.update("DELETE FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?",
+                BUSINESS_TYPE, 33333001L, 33333011L);
+        jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
+        jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
     }
 
     private void cleanupInstance(Long instanceId, Long businessId) {
