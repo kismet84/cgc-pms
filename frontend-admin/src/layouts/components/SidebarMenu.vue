@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
 }
 
 :deep(.ant-menu-item-selected) {
-  background: #edf5ff !important;
+  background: var(--primary-soft) !important;
   color: var(--primary) !important;
   font-weight: 700;
 }

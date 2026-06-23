@@ -26,7 +26,7 @@ onMounted(() => {
 <style scoped>
 .layout-shell {
   min-height: 100vh;
-  background: #f5f7fb;
+  background: var(--bg);
 }
 
 .layout-shell__loading {
@@ -36,7 +36,7 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #f5f7fb;
+  background: var(--bg);
   z-index: 100;
   transition: opacity 0.3s ease;
 }
@@ -44,8 +44,8 @@ onMounted(() => {
 .layout-shell__spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #e4e9f2;
-  border-top-color: #1668dc;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin-bottom: 12px;
@@ -53,7 +53,7 @@ onMounted(() => {
 
 .layout-shell__text {
   font-size: 14px;
-  color: #999;
+  color: var(--muted);
 }
 
 @keyframes spin {
