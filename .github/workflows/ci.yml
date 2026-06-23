@@ -163,3 +163,11 @@ jobs:
         run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm exec playwright install chromium
       - name: Run E2E tests
         run: cd frontend-admin && pnpm exec playwright test
+
+  sql-safety-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run SQL injection safety scan
+        shell: pwsh
+        run: ./scripts/check-sql-safety.ps1

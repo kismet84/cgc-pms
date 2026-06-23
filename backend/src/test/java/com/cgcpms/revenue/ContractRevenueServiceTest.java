@@ -37,6 +37,9 @@ class ContractRevenueServiceTest {
     @Autowired private CostItemMapper costItemMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
 
+    private static final long EXACT_REVENUE_SUBJECT_ID = 900201L;
+    private static final long FALLBACK_REVENUE_SUBJECT_ID = 900200L;
+
     @BeforeEach void setUp() {
         UserContext.set(Jwts.claims().subject("admin").add("userId", USER_ID)
                 .add("username", "admin").add("tenantId", TENANT_ID)
@@ -180,7 +183,23 @@ class ContractRevenueServiceTest {
         assertEquals("CT_REVENUE", item.getSourceType());
         assertEquals(pending.getId(), item.getSourceId());
         assertEquals("REVENUE_CONFIRMED", item.getCostType());
+        assertEquals(EXACT_REVENUE_SUBJECT_ID, item.getCostSubjectId());
         assertEquals(new BigDecimal("16000.00"), item.getAmount());
+    }
+
+    @Test @DisplayName("onApproved → 缺少 6001.01 时回退到首个启用收入科目")
+    void testOnApproved_FallsBackWhen600101Missing() {
+        jdbcTemplate.update("UPDATE cost_subject SET deleted_flag = 1 WHERE id = ?", EXACT_REVENUE_SUBJECT_ID);
+
+        ContractRevenue pending = revenue("RV-FALLBACK-", "PENDING", "6000.00", "1000.00");
+        mapper.insert(pending);
+
+        service.onApproved(pending.getId());
+
+        ContractRevenue approved = mapper.selectById(pending.getId());
+        CostItem item = costItemMapper.selectById(approved.getCostItemId());
+        assertNotNull(item);
+        assertEquals(FALLBACK_REVENUE_SUBJECT_ID, item.getCostSubjectId());
     }
 
     @Test @DisplayName("onApproved → 非 PENDING 状态幂等退出且不重复生成 cost_item")
@@ -216,6 +235,7 @@ class ContractRevenueServiceTest {
 
     private void cleanupRevenueRows() {
         jdbcTemplate.update("DELETE FROM cost_item WHERE tenant_id = ? AND source_type = 'CT_REVENUE'", TENANT_ID);
-        jdbcTemplate.update("DELETE FROM contract_revenue WHERE tenant_id = ? AND (revenue_code LIKE 'RV-BAL-%' OR revenue_code LIKE 'RV-APP-%' OR revenue_code LIKE 'RV-IDEMP-%')", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM contract_revenue WHERE tenant_id = ? AND (revenue_code LIKE 'RV-BAL-%' OR revenue_code LIKE 'RV-APP-%' OR revenue_code LIKE 'RV-FALLBACK-%' OR revenue_code LIKE 'RV-IDEMP-%')", TENANT_ID);
+        jdbcTemplate.update("UPDATE cost_subject SET deleted_flag = 0 WHERE id = ?", EXACT_REVENUE_SUBJECT_ID);
     }
 }

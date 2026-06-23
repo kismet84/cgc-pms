@@ -130,8 +130,12 @@ export function useDashboardData() {
     drillChildren.value = []
   }
 
-  onMounted(() => {
-    fetchProjects()
+  onMounted(async () => {
+    await fetchProjects()
+    if (needsProject(activeRole.value) && !selectedProjectId.value && projectList.value.length > 0) {
+      selectedProjectId.value = projectList.value[0].id
+    }
+    await fetchViewData()
   })
 
   return {

@@ -9,3 +9,9 @@
 - [重建脚本 Maven Wrapper Windows 路径修复 2026-06-23](rebuild-script-maven-wrapper-windows-path-fix-2026-06-23.md) — scripts/rebuild.py 使用 Maven Wrapper 绝对路径，避免 mvnw.cmd not recognized
 - [首页驾驶舱首屏空白修复 2026-06-23](dashboard-initial-load-blank-fix-2026-06-23.md) — onMounted 初始化默认项目并加载驾驶舱数据，避免默认页签空白
 - [H2 测试污染与表锁修复 2026-06-23](h2-test-isolation-pagination-table-lock-fix-2026-06-23.md) — WorkflowQueryServiceTest 分页断言污染 + CtContractPaymentTermServiceTest Db.saveBatch 表锁超时
+- [lg-* 设计系统视觉基准收敛 2026-06-24](lg-design-token-alignment-2026-06-24.md) — 保留 lg-* 布局类名体系，将全局 Token、KPI、表格、搜索栏收敛到项目列表页企业级 UI 基准
+- [ContractRevenueService 收入科目兜底多结果修复 2026-06-24](contract-revenue-subject-selectone-too-many-results-2026-06-24.md) — 将收入科目兜底查询从 selectOne 改为排序后取首项，避免 H2 多个 REVENUE 科目触发 TooManyResultsException
+- [JDT LS + Lombok 安装修复 2026-06-24](jdtls-lombok-javaagent-install-2026-06-24.md) — Windows 安装 Eclipse JDT LS 后加 Lombok javaagent 并重启旧 LSP 进程，消除 getter/setter 误报
+- [H2 V78 缺失收入子科目种子修复 2026-06-24](h2-v78-missing-contract-revenue-subject-seed-2026-06-24.md) — H2 的 V78 少了 6001.01~6001.04，新增 V92 回填后才能稳定覆盖 ContractRevenueService 精确分支
+- [cost_item 测试前置数据必须补 project_id 2026-06-24](cost-item-h2-project-id-required-in-service-tests-2026-06-24.md) — 手工插入 cost_item 做服务测试前置时，H2 要求 project_id 非空，否则会触发 DataIntegrityViolationException
+- [结算提交审批测试需要 workflow 用户种子 2026-06-24](settlement-submit-workflow-user-seed-required-2026-06-24.md) — StlSettlementWriteService 的 submitForApproval 测试若不补 sys_user 1~3，会在 ApproverResolver 报审批人不属于当前租户

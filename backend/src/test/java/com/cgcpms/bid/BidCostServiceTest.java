@@ -2,7 +2,13 @@ package com.cgcpms.bid;
 
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.bid.entity.BidCost;
+import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidCostService;
+import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +19,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,9 +32,20 @@ class BidCostServiceTest {
 
     private static final long USER_ID = 1L;
     private static final long TENANT_ID = 0L;
+    private static final long PROJECT_ID = 10001L;
+    private static final long OTHER_TENANT_PROJECT_ID = 99001L;
 
     @Autowired
     private BidCostService bidCostService;
+
+    @Autowired
+    private BidCostMapper bidCostMapper;
+
+    @Autowired
+    private CostItemMapper costItemMapper;
+
+    @Autowired
+    private PmProjectMapper projectMapper;
 
     @BeforeEach
     void setUp() {
@@ -65,6 +84,189 @@ class BidCostServiceTest {
         var page = bidCostService.getPage(1, 10, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() > 0, "应能查到数据");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("update → BIDDING 状态可编辑")
+    void testUpdate_Success() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("待更新投标项目");
+        Long id = bidCostService.create(bid);
+
+        BidCost updated = new BidCost();
+        updated.setId(id);
+        updated.setBidProjectName("更新后投标项目");
+        bidCostService.update(updated);
+
+        BidCost saved = bidCostService.getById(id);
+        assertEquals("更新后投标项目", saved.getBidProjectName());
+        assertEquals("BIDDING", saved.getBidStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("update → 非 BIDDING 状态不可编辑")
+    void testUpdate_WhenNotBidding() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("不可编辑项目");
+        Long id = bidCostService.create(bid);
+
+        BidCost db = bidCostMapper.selectById(id);
+        db.setBidStatus("WON");
+        bidCostMapper.updateById(db);
+
+        BidCost updated = new BidCost();
+        updated.setId(id);
+        updated.setBidProjectName("非法更新");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.update(updated));
+        assertEquals("BID_STATUS_NOT_EDITABLE", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("delete → 非 BIDDING 状态不可删除")
+    void testDelete_WhenNotBidding() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("不可删除项目");
+        Long id = bidCostService.create(bid);
+
+        BidCost db = bidCostMapper.selectById(id);
+        db.setBidStatus("LOST");
+        bidCostMapper.updateById(db);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.delete(id));
+        assertEquals("BID_STATUS_NOT_DELETABLE", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("markAsWon → 关联项目、结转费用并刷新状态")
+    void testMarkAsWon_Success() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("中标项目");
+        Long id = bidCostService.create(bid);
+        insertBidCostItem(id);
+
+        bidCostService.markAsWon(id, PROJECT_ID);
+
+        BidCost saved = bidCostService.getById(id);
+        assertEquals("WON", saved.getBidStatus());
+        assertEquals(PROJECT_ID, saved.getProjectId());
+
+        CostItem item = costItemMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getTenantId, TENANT_ID)
+                .eq(CostItem::getSourceId, id));
+        assertNotNull(item);
+        assertEquals(PROJECT_ID, item.getProjectId());
+        assertEquals("BID_COST_TRANSFERRED", item.getSourceType());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("markAsWon → 项目不存在时抛 PROJECT_NOT_FOUND")
+    void testMarkAsWon_ProjectNotFound() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("项目不存在测试");
+        Long id = bidCostService.create(bid);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.markAsWon(id, 99999999L));
+        assertEquals("PROJECT_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("markAsWon → 跨租户项目不可关联")
+    void testMarkAsWon_ProjectTenantIsolation() {
+        PmProject project = new PmProject();
+        project.setId(OTHER_TENANT_PROJECT_ID);
+        project.setTenantId(999L);
+        project.setProjectCode("TENANT-BID-PROJ");
+        project.setProjectName("跨租户项目");
+        project.setProjectType("房建工程");
+        project.setStatus("ACTIVE");
+        project.setApprovalStatus("APPROVED");
+        projectMapper.insert(project);
+
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("跨租户中标测试");
+        Long id = bidCostService.create(bid);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.markAsWon(id, OTHER_TENANT_PROJECT_ID));
+        assertEquals("PROJECT_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("markAsWon → 非 BIDDING 状态不可中标")
+    void testMarkAsWon_WhenNotBidding() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("重复中标测试");
+        Long id = bidCostService.create(bid);
+
+        BidCost db = bidCostMapper.selectById(id);
+        db.setBidStatus("WON");
+        bidCostMapper.updateById(db);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.markAsWon(id, PROJECT_ID));
+        assertEquals("BID_STATUS_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("markAsLost → 冲销费用并改为 LOST")
+    void testMarkAsLost_Success() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("未中标项目");
+        Long id = bidCostService.create(bid);
+        insertBidCostItem(id);
+
+        bidCostService.markAsLost(id);
+
+        BidCost saved = bidCostService.getById(id);
+        assertEquals("LOST", saved.getBidStatus());
+
+        CostItem item = costItemMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getTenantId, TENANT_ID)
+                .eq(CostItem::getSourceType, "BID_COST")
+                .eq(CostItem::getSourceId, id));
+        assertNotNull(item);
+        assertEquals("WRITE_OFF", item.getCostStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("markAsLost → 非 BIDDING 状态不可标记未中标")
+    void testMarkAsLost_WhenNotBidding() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("重复未中标测试");
+        Long id = bidCostService.create(bid);
+
+        BidCost db = bidCostMapper.selectById(id);
+        db.setBidStatus("LOST");
+        bidCostMapper.updateById(db);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.markAsLost(id));
+        assertEquals("BID_STATUS_INVALID", ex.getCode());
+    }
+
+    private void insertBidCostItem(Long bidCostId) {
+        CostItem item = new CostItem();
+        item.setTenantId(TENANT_ID);
+        item.setProjectId(PROJECT_ID);
+        item.setCostSubjectId(900010L);
+        item.setCostType("BID");
+        item.setAmount(new BigDecimal("1000.00"));
+        item.setAmountWithoutTax(new BigDecimal("1000.00"));
+        item.setTaxAmount(BigDecimal.ZERO);
+        item.setSourceType("BID_COST");
+        item.setSourceId(bidCostId);
+        item.setSourceItemId(0L);
+        item.setCostDate(LocalDate.now());
+        item.setCostStatus("CONFIRMED");
+        item.setGeneratedFlag(1);
+        costItemMapper.insert(item);
     }
 
     private void setAdminContext() {

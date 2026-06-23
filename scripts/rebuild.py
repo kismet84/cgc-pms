@@ -66,9 +66,9 @@ def resolve_maven_wrapper(cwd: Path) -> list[str]:
 
     if sys.platform == "win32":
         if windows_wrapper.exists():
-            return ["mvnw.cmd"]
+            return [str(windows_wrapper)]
         if unix_wrapper.exists():
-            return ["mvnw"]
+            return [str(unix_wrapper)]
     else:
         if unix_wrapper.exists():
             return ["./mvnw"]

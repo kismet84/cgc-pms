@@ -70,11 +70,16 @@ describe('Dashboard data loading behavior', () => {
     expect(composableSource).toMatch(/fetchViewData\s*\(\s*\)/)
   })
 
-  // ── onMounted fetches project list ──
-  it('calls fetchProjects on mounted', () => {
+  // ── onMounted fetches project list and initializes first-screen data ──
+  it('loads projects and initializes dashboard data on mounted', () => {
     expect(composableSource).toMatch(
-      /onMounted\s*\(\s*\(\s*\)\s*=>\s*\{[\s\S]*fetchProjects\s*\(\s*\)/,
+      /onMounted\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*await\s+fetchProjects\s*\(\s*\)/,
     )
+    expect(composableSource).toMatch(/selectedProjectId\.value\s*=\s*projectList\.value\[0\]\.id/)
+    expect(composableSource).toMatch(/await\s+fetchViewData\s*\(\s*\)/)
+    const mountedBlock = composableSource.match(/onMounted\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*?\n  \}\)/)?.[0]
+    expect(mountedBlock).toBeDefined()
+    expect(mountedBlock).not.toContain('return')
   })
 
   // ── Error handling ──
