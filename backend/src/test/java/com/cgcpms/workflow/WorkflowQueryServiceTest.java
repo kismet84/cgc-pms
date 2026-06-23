@@ -423,6 +423,10 @@ class WorkflowQueryServiceTest {
     }
 
     private void seedTemplateAndSubmit() {
+        // 清理可能由之前测试轮次遗留的模板记录（@BeforeEach 可能残留）
+        jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
+        jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
+
         // Template
         WfTemplate template = new WfTemplate();
         template.setId(TEMPLATE_ID);
@@ -477,8 +481,8 @@ class WorkflowQueryServiceTest {
         jdbcTemplate.update("DELETE FROM wf_task WHERE tenant_id = ?", TENANT_0);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE tenant_id = ?", TENANT_0);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE tenant_id = ?", TENANT_0);
-        jdbcTemplate.update("DELETE FROM wf_template_node WHERE tenant_id = ?", TENANT_0);
-        jdbcTemplate.update("DELETE FROM wf_template WHERE tenant_id = ?", TENANT_0);
+        // 不删除 wf_template_node / wf_template — 它们是 Flyway 种子数据 (V9 CONTRACT_APPROVAL)
+        // 删除它们会导致其他测试类找不到审批模板
     }
 
     private void cleanupInstance(Long instanceId, Long businessId) {
