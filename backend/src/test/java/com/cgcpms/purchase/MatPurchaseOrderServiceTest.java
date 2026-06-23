@@ -1,0 +1,187 @@
+package com.cgcpms.purchase;
+
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
+import com.cgcpms.purchase.service.MatPurchaseOrderService;
+import com.cgcpms.purchase.vo.MatPurchaseOrderItemVO;
+import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
+import io.jsonwebtoken.Jwts;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@ActiveProfiles("local")
+@DisplayName("MatPurchaseOrderService — CRUD + guards + batch items")
+class MatPurchaseOrderServiceTest {
+
+    private static final long USER_ADMIN = 1L;
+    private static final long TENANT_ID = 0L;
+    private static final long PROJECT_ID = 10001L;
+
+    @Autowired private MatPurchaseOrderService service;
+    @Autowired private MatPurchaseOrderMapper orderMapper;
+    @Autowired private MatPurchaseOrderItemMapper itemMapper;
+
+    @BeforeEach void setupContext() {
+        UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")
+                .add("tenantId", TENANT_ID).add("roleCodes", List.of("ADMIN")).build());
+    }
+    @AfterEach void clearContext() { UserContext.clear(); }
+
+    @Test @Transactional @DisplayName("create → auto-generates PO code, returns ID")
+    void testCreate() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+        assertNotNull(id);
+        MatPurchaseOrderVO vo = service.getById(id);
+        assertNotNull(vo.getOrderCode(), "应自动生成订单编码");
+        assertTrue(vo.getOrderCode().startsWith("PO-"), "编码应以 PO- 开头");
+        assertEquals("DRAFT", vo.getApprovalStatus());
+        assertEquals("DRAFT", vo.getOrderStatus());
+    }
+
+    @Test @Transactional @DisplayName("create → contract validation with PERFORMING contract")
+    void testCreate_WithContract() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(30001L); // CT-2026-001 is SUB with PERFORMING status
+        Long id = service.create(order);
+        assertNotNull(id);
+    }
+
+    @Test @Transactional @DisplayName("getById → throws on non-existent")
+    void testGetById_NotFound() {
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.getById(99999999L));
+        assertEquals("PURCHASE_ORDER_NOT_FOUND", ex.getCode());
+    }
+
+    @Test @Transactional @DisplayName("getById → tenant isolation")
+    void testGetById_CrossTenant() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+
+        UserContext.clear();
+        UserContext.set(Jwts.claims().add("userId", 999L).add("tenantId", 999L).add("roleCodes", List.of("ADMIN")).build());
+        assertThrows(BusinessException.class, () -> service.getById(id));
+    }
+
+    @Test @Transactional @DisplayName("getPage → returns paginated results")
+    void testGetPage() {
+        var page = service.getPage(1, 10, null, null, null, null, null, null);
+        assertNotNull(page);
+        assertTrue(page.getTotal() >= 0);
+    }
+
+    @Test @Transactional @DisplayName("update → succeeds")
+    void testUpdate() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+
+        MatPurchaseOrder upd = new MatPurchaseOrder();
+        upd.setId(id);
+        upd.setProjectId(PROJECT_ID);
+        upd.setOrderType("PURCHASE");
+        service.update(upd);
+    }
+
+    @Test @Transactional @DisplayName("update → guard: cannot update when APPROVING")
+    void testUpdate_WhenApproving() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID); order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+        MatPurchaseOrder db = orderMapper.selectById(id);
+        db.setApprovalStatus("APPROVING"); orderMapper.updateById(db);
+
+        MatPurchaseOrder upd = new MatPurchaseOrder();
+        upd.setId(id); upd.setProjectId(PROJECT_ID);
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.update(upd));
+        assertEquals("ORDER_IN_APPROVAL", ex.getCode());
+    }
+
+    @Test @Transactional @DisplayName("update → guard: cannot update when APPROVED")
+    void testUpdate_WhenApproved() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID); order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+        MatPurchaseOrder db = orderMapper.selectById(id);
+        db.setApprovalStatus("APPROVED"); orderMapper.updateById(db);
+
+        MatPurchaseOrder upd = new MatPurchaseOrder();
+        upd.setId(id); upd.setProjectId(PROJECT_ID);
+        assertThrows(BusinessException.class, () -> service.update(upd));
+    }
+
+    @Test @Transactional @DisplayName("submitForApproval → DRAFT→APPROVING")
+    void testSubmitForApproval() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+
+        service.submitForApproval(id);
+        MatPurchaseOrderVO vo = service.getById(id);
+        assertEquals("APPROVING", vo.getApprovalStatus());
+    }
+
+    @Test @Transactional @DisplayName("submitForApproval → duplicate throws")
+    void testSubmitForApproval_Duplicate() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID); order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+        service.submitForApproval(id);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.submitForApproval(id));
+        assertEquals("PURCHASE_ORDER_ALREADY_SUBMITTED", ex.getCode());
+    }
+
+    @Test @Transactional @DisplayName("saveItemsBatch → bulks saves items")
+    void testSaveItemsBatch() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID); order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+
+        MatPurchaseOrderItem item = new MatPurchaseOrderItem();
+        item.setMaterialId(1L); item.setOrderId(id);
+        item.setQuantity(new BigDecimal("10.00"));
+        item.setUnitPrice(new BigDecimal("3500.00"));
+        item.setAmount(new BigDecimal("35000.00"));
+        service.saveItemsBatch(id, List.of(item));
+
+        List<MatPurchaseOrderItemVO> items = service.getItems(id);
+        assertEquals(1, items.size());
+    }
+
+    @Test @Transactional @DisplayName("getItems → throws on non-existent")
+    void testGetItems_NotFound() {
+        assertThrows(BusinessException.class, () -> service.getItems(99999999L));
+    }
+
+    @Test @Transactional @DisplayName("getItems → returns empty list")
+    void testGetItems_Empty() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID); order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+
+        List<MatPurchaseOrderItemVO> items = service.getItems(id);
+        assertNotNull(items);
+        assertTrue(items.isEmpty());
+    }
+}

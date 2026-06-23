@@ -35,6 +35,8 @@ class MatReceiptServiceTest {
     @Autowired
     private MatReceiptMapper receiptMapper;
 
+    private static final long PROJECT_ID = 10001L;
+
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
@@ -47,10 +49,14 @@ class MatReceiptServiceTest {
 
     private MatReceipt buildReceipt(String qualityStatus) {
         MatReceipt receipt = new MatReceipt();
-        receipt.setProjectId(1L);
+        receipt.setProjectId(PROJECT_ID);
         receipt.setReceiptDate(LocalDate.of(2026, 3, 10));
+        receipt.setReceiptCode("MR-TEST-" + System.nanoTime());
         receipt.setQualityStatus(qualityStatus);
         receipt.setTotalAmount(new BigDecimal("50000.00"));
+        receipt.setWarehouseId(1L);
+        receipt.setPartnerId(20002L);
+        receipt.setContractId(30001L);
         return receipt;
     }
 
