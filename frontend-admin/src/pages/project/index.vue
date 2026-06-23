@@ -404,16 +404,6 @@ const recentProjects = computed(() =>
     .concat(tableData.value.length ? [] : [{ name: '等待项目数据加载', status: '空状态' }]),
 )
 
-function kpiPct(val: number, max: number): number {
-  if (!max || max <= 0) return 0
-  return Math.round((val / max) * 100)
-}
-
-const kpiMax = computed(() => ({
-  total: total.value || 1,
-  amount: tableData.value.reduce((m, r) => Math.max(m, parseFloat(r.contractAmount) || 0), 0) || 1,
-}))
-
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
   ...(colVisible.projectCode
@@ -478,17 +468,17 @@ const gridColumns = computed(() => [
     </a-breadcrumb>
 
     <!-- 搜索栏 -->
-    <div class="project-search">
+    <div class="lg-search-bar">
       <a-input
         v-model:value="filter.keyword"
         placeholder="搜索项目编号、名称、类型、建设单位…"
         allow-clear
-        class="project-search-input"
+        class="lg-search-input"
         @press-enter="handleSearch"
       >
         <template #prefix><SearchOutlined style="color: #8c8c8c" /></template>
       </a-input>
-      <div class="project-search-actions">
+      <div class="lg-search-actions">
         <a-button type="primary" @click="handleSearch">查询</a-button>
         <a-button @click="handleReset">
           <template #icon><ReloadOutlined /></template>
@@ -652,49 +642,51 @@ const gridColumns = computed(() => [
     </a-modal>
 
     <!-- KPI 卡片 -->
-    <div class="project-stats-grid">
-      <div class="project-stat-card">
-        <div class="project-stat-title">
-          <FileTextOutlined style="color: #1890ff" />
-          <span>项目总数</span>
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <div class="lg-kpi-card-label">
+          <FileTextOutlined style="color: #1890ff; margin-right: 4px" />
+          项目总数
         </div>
-        <div class="project-stat-value">{{ projectStats.total }} <small>个</small></div>
+        <div class="lg-kpi-card-value">{{ projectStats.total || 0 }} <small>个</small></div>
       </div>
-      <div class="project-stat-card">
-        <div class="project-stat-title">
-          <DollarOutlined style="color: #faad14" />
-          <span>合同总金额</span>
+      <div class="lg-kpi-card">
+        <div class="lg-kpi-card-label">
+          <DollarOutlined style="color: #faad14; margin-right: 4px" />
+          合同总金额
         </div>
-        <div class="project-stat-value">
+        <div class="lg-kpi-card-value">
           {{
-            (totalContractAmount / 10000).toLocaleString('zh-CN', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })
+            totalContractAmount
+              ? (totalContractAmount / 10000).toLocaleString('zh-CN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })
+              : '0.00'
           }}
           <small>万元</small>
         </div>
       </div>
-      <div class="project-stat-card">
-        <div class="project-stat-title">
-          <SafetyCertificateOutlined style="color: #52c41a" />
-          <span>在建项目</span>
+      <div class="lg-kpi-card">
+        <div class="lg-kpi-card-label">
+          <SafetyCertificateOutlined style="color: #52c41a; margin-right: 4px" />
+          在建项目
         </div>
-        <div class="project-stat-value">{{ projectStats.ongoing }} <small>个</small></div>
+        <div class="lg-kpi-card-value">{{ projectStats.ongoing || 0 }} <small>个</small></div>
       </div>
-      <div class="project-stat-card">
-        <div class="project-stat-title">
-          <FlagOutlined style="color: #52c41a" />
-          <span>已竣工项目</span>
+      <div class="lg-kpi-card">
+        <div class="lg-kpi-card-label">
+          <FlagOutlined style="color: #52c41a; margin-right: 4px" />
+          已竣工项目
         </div>
-        <div class="project-stat-value">{{ projectStats.completed }} <small>个</small></div>
+        <div class="lg-kpi-card-value">{{ projectStats.completed || 0 }} <small>个</small></div>
       </div>
-      <div class="project-stat-card project-stat-card--risk">
-        <div class="project-stat-title">
-          <WarningOutlined />
-          <span>风险项目</span>
+      <div class="lg-kpi-card is-warn">
+        <div class="lg-kpi-card-label">
+          <WarningOutlined style="color: #ff4d4f; margin-right: 4px" />
+          风险项目
         </div>
-        <div class="project-stat-value">{{ projectStats.risk }} <small>个</small></div>
+        <div class="lg-kpi-card-value">{{ projectStats.risk || 0 }} <small>个</small></div>
       </div>
     </div>
 
@@ -792,32 +784,38 @@ const gridColumns = computed(() => [
       </div>
 
       <!-- 右侧分析面板 -->
-      <aside class="project-right-panel">
-        <section class="project-widget">
-          <div class="project-widget-title">项目状态分布</div>
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">项目状态分布</div>
           <VChart :option="statusOption" autoresize style="height: 176px" />
         </section>
-        <section class="project-widget">
-          <div class="project-widget-title">项目风险提示</div>
-          <div class="project-list">
-            <div v-for="item in riskProjects" :key="item.name" class="project-list-row">
+        <section class="lg-panel">
+          <div class="lg-panel-title">项目风险提示</div>
+          <div class="lg-type-list">
+            <div v-for="item in riskProjects" :key="item.name" class="lg-type-row">
               <span
-                class="project-list-dot"
+                class="lg-type-dot"
                 :style="{
                   background:
                     item.status === '平稳' ? 'var(--project-success)' : 'var(--project-danger)',
                 }"
               ></span>
-              <span class="project-list-label">{{ item.name }}</span>
+              <span class="lg-type-label">{{ item.name }}</span>
+              <span></span>
+              <span></span>
+              <span></span>
             </div>
           </div>
         </section>
-        <section class="project-widget">
-          <div class="project-widget-title">近期项目</div>
-          <div class="project-list">
-            <div v-for="item in recentProjects" :key="item.name" class="project-list-row">
-              <span class="project-list-dot" :style="{ background: '#1890ff' }"></span>
-              <span class="project-list-label">{{ item.name }}</span>
+        <section class="lg-panel">
+          <div class="lg-panel-title">近期项目</div>
+          <div class="lg-type-list">
+            <div v-for="item in recentProjects" :key="item.name" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: '#1890ff' }"></span>
+              <span class="lg-type-label">{{ item.name }}</span>
+              <span></span>
+              <span></span>
+              <span></span>
             </div>
           </div>
         </section>
@@ -859,114 +857,20 @@ const gridColumns = computed(() => [
   font-size: 14px;
 }
 
-.project-search {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 16px 24px;
-  background: var(--project-surface);
-  border-radius: var(--project-radius);
-  box-shadow: var(--project-shadow);
-}
-
-.project-search-input {
-  flex: 1;
-  min-width: 240px;
-}
-
-.project-search-input :deep(.ant-input),
-.project-search-input :deep(.ant-input-affix-wrapper) {
-  font-size: 14px;
-}
-
-.project-search :deep(.ant-input-affix-wrapper) {
-  border: 0;
-  box-shadow: none;
-  padding-inline: 0;
-}
-
-.project-search :deep(.ant-input),
-.project-search :deep(.ant-input::placeholder) {
-  color: var(--project-text-secondary);
-}
-
-.project-search-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.project-search :deep(.ant-btn),
 .project-table-toolbar :deep(.ant-btn) {
   height: 34px;
   border-radius: 4px;
   font-size: 14px;
 }
 
-.project-search :deep(.ant-btn-primary),
 .project-table-toolbar :deep(.ant-btn-primary) {
   background: var(--project-primary);
   border-color: var(--project-primary);
 }
 
-.project-search :deep(.ant-btn-primary:hover),
 .project-table-toolbar :deep(.ant-btn-primary:hover) {
   background: var(--project-primary-hover);
   border-color: var(--project-primary-hover);
-}
-
-.project-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.project-stat-card {
-  min-height: 112px;
-  padding: 20px;
-  background: var(--project-surface);
-  border: 0;
-  border-radius: var(--project-radius);
-  box-shadow: var(--project-shadow);
-}
-
-.project-stat-card--risk {
-  background: var(--project-danger-bg);
-  border-left: 4px solid var(--project-danger);
-}
-
-.project-stat-card--risk .project-stat-value {
-  color: var(--project-danger);
-}
-
-.project-stat-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  color: var(--project-text-secondary);
-  font-size: 14px;
-}
-
-.project-stat-title :deep(.anticon) {
-  font-size: 16px;
-}
-
-.project-stat-value {
-  color: var(--project-text);
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.25;
-  font-variant-numeric: tabular-nums;
-}
-
-.project-stat-value small {
-  margin-left: 4px;
-  color: var(--project-text-secondary);
-  font-size: 14px;
-  font-weight: 400;
 }
 
 .project-content-layout {
@@ -1005,66 +909,13 @@ const gridColumns = computed(() => [
 
 /* lg-table-wrap 已提供全局 vxe-table/Ant Table 统一样式；仅保留页面级溢出控制 */
 
-.project-right-panel {
-  width: 290px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.project-widget {
-  padding: 20px;
-  background: var(--project-surface);
-  border-radius: var(--project-radius);
-  box-shadow: var(--project-shadow);
-}
-
-.project-widget-title {
-  margin-bottom: 16px;
-  color: var(--project-text);
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.project-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.project-list-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: var(--project-text);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.project-list-dot {
-  width: 8px;
-  height: 8px;
-  margin-top: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.project-list-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .pj-create-form {
   padding-top: 16px;
 }
 
-@media (max-width: 1400px) {
-  .project-stats-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+.project-content-layout .lg-analysis-rail {
+  width: 290px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 1024px) {
@@ -1072,12 +923,8 @@ const gridColumns = computed(() => [
     display: block;
   }
 
-  .project-right-panel {
+  .project-content-layout .lg-analysis-rail {
     display: none;
-  }
-
-  .project-stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1086,18 +933,14 @@ const gridColumns = computed(() => [
     padding: 16px;
   }
 
-  .project-search {
+  .lg-search-bar {
     align-items: stretch;
     flex-direction: column;
     padding: 14px 16px;
   }
 
-  .project-search-actions {
+  .lg-search-actions {
     justify-content: flex-end;
-  }
-
-  .project-stats-grid {
-    grid-template-columns: 1fr;
   }
 
   .project-content-layout .lg-pagination {

@@ -418,6 +418,7 @@ a {
 /* ---- 搜索栏 ---- */
 .lg-search-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
   padding: 0 0 14px;
@@ -426,11 +427,40 @@ a {
 }
 .lg-search-bar :deep(.ant-input-affix-wrapper) {
   flex: 1;
+  min-width: 200px;
   height: 40px;
   border-radius: var(--radius-md);
 }
 .lg-search-bar :deep(.ant-input) {
   font-size: 14px;
+}
+.lg-search-bar :deep(.ant-btn) {
+  height: 40px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+}
+
+/* ---- 搜索栏扩展筛选 ---- */
+.lg-search-bar-expand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0 0;
+  width: 100%;
+}
+.lg-search-bar-expand :deep(.ant-select),
+.lg-search-bar-expand :deep(.ant-picker) {
+  min-width: 160px;
+}
+.lg-search-bar-expand :deep(.ant-select-selector),
+.lg-search-bar-expand :deep(.ant-picker) {
+  height: 40px;
+  border-radius: var(--radius-md);
+}
+.lg-search-bar-expand :deep(.ant-select-selection-item),
+.lg-search-bar-expand :deep(.ant-picker-input > input) {
+  line-height: 38px;
 }
 
 /* ---- 双栏布局 ---- */
