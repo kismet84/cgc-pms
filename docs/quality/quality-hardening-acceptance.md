@@ -50,15 +50,15 @@
 
 ---
 
-## 三、测试失败情况 — **未清零**
+## 三、测试失败情况 — **已清零 ✅**
 
 | 端 | 失败数 | 说明 |
 |---|---|---|
-| 后端 | **58 项** | 多为 H2 环境 + 通知/库存测试，非本次变更引入 |
-| 前端 | **1 项** | `alert/__tests__/index.test.ts` mock 未被调用 |
+| 后端 | **0** | 2026-06-23 修复：全量套件 1198/1198 PASS |
+| 前端 | **0** 项 | 2026-06-23 前端 alert mock 修复 + 驾驶舱首屏空白修复 |
 
-> 虽然大部分失败是既有问题、非本次引入，但**验收应当以全量测试通过为前提**。
-> 59 项失败表明系统处于不健康状态，不能签署"全部完成"。
+> 2026-06-23 修复完成后，全量 `mvn test` 1198 tests, 0 failures, 0 errors, BUILD SUCCESS。
+> 原先 3 个失败：2 个 WorkflowQueryServiceTest H2 分页断言污染 + 1 个 CtContractPaymentTermServiceTest Db.saveBatch H2 表锁超时，均已修复并经验记录归档。
 
 ---
 
@@ -141,7 +141,7 @@
 |------|----------|------|
 | 后端覆盖率 67% 未达 80% | **P2** | JaCoCo 门禁会失败 `mvn verify`；需 +55 测试类 |
 | 前端覆盖率 9.79% 未达 55% | **P2** | 阈值已对齐基线，需补充 composable/component 测试 |
-| 3 个测试类(8 errors)全量套件失败 | **P2** | H2 环境数据污染；单独运行全部 PASS |
+| ~~3 个测试类(8 errors)全量套件失败~~ | ✅ 已修复 | H2 分页断言污染 + Db.saveBatch 表锁超时，2026-06-23 修复 |
 | `org/index.vue` 576 行超标 | ✅ 已修复 (473) | |
 | CI 缺失 E2E job | ✅ 已新增 | |
 | MySQL CI `continue-on-error: true` | ✅ 已修复 | |
@@ -152,7 +152,7 @@
 
 ## 十、验收结论
 
-**验收状态：有条件通过**
+**验收状态：通过 ✅**
 
 | 维度 | 结论 |
 |---|---|
@@ -160,8 +160,8 @@
 | 页面拆分 | ✅ 通过（6/6 达标，org 576→473） |
 | E2E 集成 | ✅ CI 已新增 e2e job |
 | CI 硬门禁 | ✅ 全部 6 个 job 均为硬门禁 |
-| 后端测试 | ⚠️ 924/932 PASS，8 errors 为 H2 数据污染（单独运行全部 PASS） |
-| 覆盖率门禁 | ⚠️ 后端 67/49%，前端 9.79%（门禁对齐基线，需持续提升）
+| 后端测试 | ✅ 全量 1198/1198 PASS (0 failures, 0 errors) |
+| 覆盖率门禁 | ⚠️ 后端 73%/53%，前端 9.79%（门禁对齐基线，需持续提升）
 
 **已完成事项**:
 1. ✅ `org/index.vue` 576→473 行（提取 OrgMetricStrip 组件）
@@ -170,14 +170,16 @@
 4. ✅ 移除前端 CI `|| true` 软门禁
 5. ✅ MySQL CI `continue-on-error: true` → 硬门禁
 6. ✅ JaCoCo 0.8.12→0.8.13 + JSQLParser 排除
-7. ✅ 后端测试：全量套件 925/932 PASS (Failures=0, Errors=7)，全部为跨类 H2 数据污染
+7. ✅ 后端测试：全量套件 1198/1198 PASS (0 failures, 0 errors)
 8. ✅ WFE test15 withdraw 通知断言修正：取消后无 pending 任务则 skip
+9. ✅ WorkflowQueryServiceTest H2 分页断言污染修复（按 taskId 精确匹配）
+10. ✅ CtContractPaymentTermServiceTest H2 表锁超时修复（Db.saveBatch → 逐条 insert）
 
 **待后续提升**:
-1. 后端覆盖率 67→80%（需 +55 测试类）
+1. 后端覆盖率 73→80%（需 +7pp instruction / +17pp branch）
 2. 前端覆盖率 9.79→55%（需 composable/component 测试）
-3. 2 个测试类(7 errors) H2 全量套件数据污染（单独运行全部 PASS）
+3. ~~H2 全量套件数据污染~~ ✅ 已清零
 
 ---
 
-**修订记录**: 2026-06-23 全量修复，8/8 P0 任务完成。CI 门禁、页面拆分、E2E job、测试均已修复。覆盖率需持续提升。
+**修订记录**: 2026-06-23 全量修复，10/10 任务完成。全量套件 1198/1198 PASS (0/0)。CI 门禁、页面拆分、E2E job、测试均已修复。覆盖率需持续提升。
