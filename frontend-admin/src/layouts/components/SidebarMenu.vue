@@ -162,9 +162,6 @@ onBeforeUnmount(() => {
   background: var(--primary-soft) !important;
   color: var(--primary) !important;
   font-weight: 700;
-}
-
-:deep(.ant-menu-item-selected::after) {
-  display: none;
+  border-right: 3px solid var(--primary);
 }
 </style>
