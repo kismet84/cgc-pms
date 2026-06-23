@@ -361,6 +361,7 @@ CREATE TABLE IF NOT EXISTS stl_settlement (
     remark VARCHAR(500) NULL,
     PRIMARY KEY (id),
     UNIQUE (tenant_id, settlement_code),
+    UNIQUE (tenant_id, contract_id),
     KEY idx_stl_project (project_id),
     KEY idx_stl_contract (contract_id)
 );

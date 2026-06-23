@@ -27,7 +27,10 @@ vi.mock('@/api/modules/auth', () => ({
 // ── Mock ant-design-vue ──
 vi.mock('ant-design-vue', async () => {
   const actual = await vi.importActual('ant-design-vue')
-  return { ...actual, message: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }
+  return {
+    ...actual,
+    message: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+  }
 })
 
 describe('login/index.vue', () => {

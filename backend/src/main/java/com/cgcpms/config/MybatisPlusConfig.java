@@ -59,8 +59,11 @@ public class MybatisPlusConfig {
             public boolean ignoreTable(String tableName) {
                 // Tables without tenant_id — tenant isolation is enforced
                 // through their related parent entities (e.g. sys_user, sys_role).
+                // Workflow templates are shared across tenants (tenant_id=0 fallback).
                 return "sys_user_role".equals(tableName)
-                        || "sys_role_menu".equals(tableName);
+                        || "sys_role_menu".equals(tableName)
+                        || "wf_template".equals(tableName)
+                        || "wf_template_node".equals(tableName);
             }
         }));
 

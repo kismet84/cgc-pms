@@ -1,7 +1,7 @@
 package com.cgcpms.contract;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cgcpms.common.TestUserContext;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
@@ -9,9 +9,11 @@ import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
 import com.cgcpms.contract.service.CtContractPaymentTermService;
+import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -34,6 +36,8 @@ class CtContractPaymentTermServiceTest {
 
     /** Approved, performing contract from V90 seed — requiresParentContract only */
     private static final long CONTRACT_ID = 30001L;
+    private static final long TENANT_0 = 0L;
+    private static final long USER_ADMIN = 1L;
 
     /** DRAFT contract created in @BeforeEach for update/delete/batchSave operations */
     private Long draftContractId;
@@ -47,15 +51,22 @@ class CtContractPaymentTermServiceTest {
     @Autowired
     private CtContractMapper contractMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setupContext() {
-        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        // 清除全量套件中其他测试类（如 ContractApprovalIntegrationTest）遗留的同 ID 合约及条款
+        jdbcTemplate.update("DELETE FROM ct_contract_payment_term WHERE contract_id = " + CONTRACT_ID);
+        // 同时清除可能被全量套件中其他测试插入到同 ID 的条款（硬编码 ID 冲突）
+        jdbcTemplate.update("DELETE FROM ct_contract_payment_term WHERE contract_id IN (30001, 30002, 30003)");
+        setAdmin(TENANT_0, USER_ADMIN);
         draftContractId = seedDraftContract();
     }
 
     @AfterEach
     void clearContext() {
-        TestUserContext.clear();
+        UserContext.clear();
     }
 
     /** Create a DRAFT contract for testing write operations that require draft status. */
@@ -73,7 +84,7 @@ class CtContractPaymentTermServiceTest {
         c.setTaxRate(new BigDecimal("13.00"));
         c.setContractStatus(ContractStatusConstants.STATUS_DRAFT);
         c.setApprovalStatus(ContractStatusConstants.APPROVAL_DRAFT);
-        c.setTenantId(TestUserContext.TENANT_0);
+        c.setTenantId(TENANT_0);
         c.setCostGeneratedFlag(0);
         contractMapper.insert(c);
         return c.getId();
@@ -111,7 +122,7 @@ class CtContractPaymentTermServiceTest {
         CtContractPaymentTerm term = buildDraftTerm("租户隔离条款");
         termService.create(term);
 
-        TestUserContext.setAdmin(999L, TestUserContext.USER_ADMIN);
+        setAdmin(999L, USER_ADMIN);
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> termService.getByContractId(draftContractId));
         assertEquals("CONTRACT_NOT_FOUND", ex.getCode());
@@ -161,7 +172,7 @@ class CtContractPaymentTermServiceTest {
         assertNotNull(saved);
         assertEquals("创建测试条款", saved.getTermName());
         assertEquals(draftContractId, saved.getContractId());
-        assertEquals(TestUserContext.TENANT_0, saved.getTenantId());
+        assertEquals(TENANT_0, saved.getTenantId());
     }
 
     @Test
@@ -371,5 +382,15 @@ class CtContractPaymentTermServiceTest {
         term.setTermStatus("PENDING");
         term.setSortOrder(1);
         return term;
+    }
+
+    /** Inline UserContext setup (avoids NoClassDefFoundError on TestUserContext in full suite). */
+    private static void setAdmin(long tenantId, long userId) {
+        UserContext.set(Jwts.claims()
+                .add("userId", userId)
+                .add("username", "admin")
+                .add("tenantId", tenantId)
+                .add("roleCodes", List.of("ADMIN"))
+                .build());
     }
 }

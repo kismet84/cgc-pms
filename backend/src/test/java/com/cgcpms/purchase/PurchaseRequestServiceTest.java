@@ -381,6 +381,11 @@ class PurchaseRequestServiceTest {
         request.setProjectId(PROJECT_ID);
         Long requestId = requestService.create(request);
 
+        // Set status to APPROVED — convertToPurchaseOrder requires approved status
+        MatPurchaseRequest db = requestMapper.selectById(requestId);
+        db.setStatus("APPROVED");
+        requestMapper.updateById(db);
+
         // Add items required for conversion
         MatPurchaseRequestItem item = new MatPurchaseRequestItem();
         item.setMaterialId(1L);
@@ -388,10 +393,11 @@ class PurchaseRequestServiceTest {
         item.setUnit("m³");
         requestService.saveItemsBatch(requestId, java.util.List.of(item));
 
-        // Convert to purchase order (void, but should not throw)
-        assertDoesNotThrow(() -> {
+        // 手动转换尚未实现，应抛出 NOT_IMPLEMENTED
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
             requestService.convertToPurchaseOrder(requestId);
-        }, "转换采购订单不应抛异常");
+        }, "手动转换应抛 NOT_IMPLEMENTED");
+        assertEquals("NOT_IMPLEMENTED", ex.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════

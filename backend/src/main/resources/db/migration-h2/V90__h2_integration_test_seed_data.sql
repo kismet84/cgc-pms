@@ -56,3 +56,12 @@ SELECT v.id, v.tid, v.code, v.name, v.cid, v.st, v.cby, v.rmk
 FROM (VALUES (90002, 0, 'DEPT-TEST', '测试部门', 90001, 'ENABLE', 1, '集成测试部门'))
   AS v(id, tid, code, name, cid, st, cby, rmk)
 WHERE NOT EXISTS (SELECT 1 FROM org_department WHERE id = 90002);
+
+-- Phase4 集成测试用 CC 抄送用户（tenant_id=0，与测试实例租户一致）
+INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark)
+SELECT v.id, v.tid, v.uname, v.pwd, v.rname, v.ph, v.em, v.st, v.adm, v.cby, v.rmk
+FROM (VALUES
+  (999, 0, 'ccuser1', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '抄送用户1', '13800000999', 'cc1@test.com', 'ENABLE', 0, 1, 'CC测试用户1'),
+  (998, 0, 'ccuser2', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '抄送用户2', '13800000998', 'cc2@test.com', 'ENABLE', 0, 1, 'CC测试用户2'))
+  AS v(id, tid, uname, pwd, rname, ph, em, st, adm, cby, rmk)
+WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 999 OR id = 998);

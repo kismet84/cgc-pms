@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Parameter;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -102,16 +103,32 @@ public class SensitiveDataMaskingAspect {
         return String.valueOf(arg);
     }
 
+    private static final int MAX_MASK_DEPTH = 3;
+
     /**
      * Recursively describe a DTO, masking password/token fields via reflection.
      */
     private String maskDto(Object dto) {
+        return maskDtoDepth(dto, new HashSet<>(), 0);
+    }
+
+    private String maskDtoDepth(Object dto, Set<Integer> visited, int depth) {
         if (dto == null) {
             return "null";
         }
+        if (depth >= MAX_MASK_DEPTH) {
+            return dto.getClass().getSimpleName() + "{...}";
+        }
         Class<?> clazz = dto.getClass();
-        if (isSimpleType(clazz)) {
+        if (isSimpleType(clazz) || clazz.isArray()
+                || Map.class.isAssignableFrom(clazz)
+                || Collection.class.isAssignableFrom(clazz)) {
             return String.valueOf(dto);
+        }
+
+        int identity = System.identityHashCode(dto);
+        if (!visited.add(identity)) {
+            return clazz.getSimpleName() + "{<cycle>}";
         }
 
         StringBuilder sb = new StringBuilder(clazz.getSimpleName()).append('{');
@@ -131,8 +148,8 @@ public class SensitiveDataMaskingAspect {
                     displayValue = SensitiveDataUtils.maskFieldValue(field.getName(),
                             String.valueOf(value));
                 } else {
-                    // Nested object – recurse (shallow to avoid loops)
-                    displayValue = maskDto(value);
+                    // Nested object – recurse with depth limit and cycle detection
+                    displayValue = maskDtoDepth(value, visited, depth + 1);
                 }
                 if (!first) {
                     sb.append(", ");

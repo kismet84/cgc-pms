@@ -7,6 +7,10 @@ backend/.mvn/wrapper/maven-wrapper.jar
 .gradle/
 build/
 
+# Dot-directories (exclude all, with explicit exceptions below)
+.*/
+!.github/
+
 # Node
 node_modules/
 frontend-admin/dist/
@@ -68,7 +72,6 @@ graphify-out/
 # Project config files (excluded from repo)
 CLAUDE.md
 AGENTS.md
-.serena
 docs/agents/
 
 # Claude Code settings (excluded from repo)

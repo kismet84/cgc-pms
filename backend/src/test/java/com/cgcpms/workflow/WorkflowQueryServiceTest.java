@@ -469,21 +469,16 @@ class WorkflowQueryServiceTest {
     }
 
     private void cleanup() {
-        // Clean up test instances in order
-        cleanupInstance(submittedInstanceId, 33333001L);
-        // Clean extra instances if any
-        for (long bizId : new long[]{33333002L, 33333003L, 33333010L, 33333011L}) {
-            jdbcTemplate.update("DELETE FROM wf_cc WHERE business_id = ?", bizId);
-            jdbcTemplate.update("DELETE FROM wf_record WHERE business_id = ?", bizId);
-            jdbcTemplate.update("DELETE FROM wf_task WHERE business_id = ?", bizId);
-            jdbcTemplate.update(
-                    "DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id = ?)",
-                    bizId);
-            jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id = ?", bizId);
-        }
-        // Clean template nodes and template
-        jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
-        jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
+        // Clean ALL leftover wf_task records for this test's user/tenant from any other
+        // test class that may have left workflow data behind (cross-test pollution).
+        // Use broad delete-first to guarantee @BeforeEach produces a clean slate.
+        jdbcTemplate.update("DELETE FROM wf_cc WHERE tenant_id = ?", TENANT_0);
+        jdbcTemplate.update("DELETE FROM wf_record WHERE tenant_id = ?", TENANT_0);
+        jdbcTemplate.update("DELETE FROM wf_task WHERE tenant_id = ?", TENANT_0);
+        jdbcTemplate.update("DELETE FROM wf_node_instance WHERE tenant_id = ?", TENANT_0);
+        jdbcTemplate.update("DELETE FROM wf_instance WHERE tenant_id = ?", TENANT_0);
+        jdbcTemplate.update("DELETE FROM wf_template_node WHERE tenant_id = ?", TENANT_0);
+        jdbcTemplate.update("DELETE FROM wf_template WHERE tenant_id = ?", TENANT_0);
     }
 
     private void cleanupInstance(Long instanceId, Long businessId) {

@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -96,6 +97,9 @@ class Phase4IntegrationTest {
     // ── SYSTEM ──
     @Autowired private SysRoleMenuMapper sysRoleMenuMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setupContext() {
         UserContext.set(Jwts.claims()
@@ -104,6 +108,7 @@ class Phase4IntegrationTest {
                 .add("tenantId", 0L)
                 .add("roleCodes", List.of("ADMIN"))
                 .build());
+        seedCcTestUsers();
     }
 
     @AfterEach
@@ -811,5 +816,29 @@ class Phase4IntegrationTest {
                         .eq(com.cgcpms.system.entity.SysRoleMenu::getRoleId, 6L));
         assertTrue(financeCount >= 3,
                 "FINANCE (role_id=6) should have at least 3 menu entries, but got " + financeCount);
+    }
+
+    /**
+     * Seed CC test users (id=999, 998) and ensure admin user (id=1) exists with tenant_id=0.
+     * Uses INSERT IGNORE pattern to be idempotent across @Transactional test methods and context reuse.
+     */
+    private void seedCcTestUsers() {
+        // Ensure admin user exists (required by approver resolution in workflow templates)
+        String adminSql = "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) "
+                + "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', "
+                + "'系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, '系统内置超级管理员' "
+                + "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)";
+        jdbcTemplate.update(adminSql);
+
+        String sql = "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) "
+                + "SELECT 999, 0, 'ccuser1', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', "
+                + "'抄送用户1', '13800000999', 'cc1@test.com', 'ENABLE', 0, 1, 'CC测试用户1' "
+                + "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 999)";
+        jdbcTemplate.update(sql);
+        sql = "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) "
+                + "SELECT 998, 0, 'ccuser2', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', "
+                + "'抄送用户2', '13800000998', 'cc2@test.com', 'ENABLE', 0, 1, 'CC测试用户2' "
+                + "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 998)";
+        jdbcTemplate.update(sql);
     }
 }

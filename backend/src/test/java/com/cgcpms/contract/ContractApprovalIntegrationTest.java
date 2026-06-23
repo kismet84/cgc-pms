@@ -30,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ContractApprovalIntegrationTest {
 
     private static final long USER_ADMIN = 1L;
+    private static final long TENANT_0 = 0L;
 
     /** Demo data: DRAFT contract CT-2026-003 (id=30003) */
     private static final long DRAFT_CONTRACT_ID = 30003L;
@@ -84,19 +86,37 @@ class ContractApprovalIntegrationTest {
     @Autowired
     private WfRecordMapper wfRecordMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setupContext() {
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
-                .add("tenantId", 0L)
+                .add("tenantId", TENANT_0)
                 .build());
+        seedAdminUser();
         seedRequiredContractData();
     }
 
     @AfterEach
     void clearContext() {
         UserContext.clear();
+    }
+
+    private void seedAdminUser() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, USER_ADMIN);
+        if (count != null && count == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    USER_ADMIN, TENANT_0, "admin",
+                    "$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2",
+                    "系统管理员", "13800000000", "admin@cgc-pms.com",
+                    "ENABLE", 1, USER_ADMIN, "测试种子数据");
+        }
     }
 
     private void seedRequiredContractData() {
@@ -143,7 +163,18 @@ class ContractApprovalIntegrationTest {
 
     private void ensureContract(Long id, String contractCode, String contractName,
                                 String contractStatus, String approvalStatus) {
-        if (contractMapper.selectById(id) != null) return;
+        CtContract existing = contractMapper.selectById(id);
+        if (existing != null) {
+            // Reset to the expected state — V90 demo data may have inserted it with a
+            // different status, and a previous test may have modified it in a rolled-back
+            // transaction that left the status stale in H2.
+            existing.setContractStatus(contractStatus);
+            existing.setApprovalStatus(approvalStatus);
+            existing.setContractCode(contractCode);
+            existing.setContractName(contractName);
+            contractMapper.updateById(existing);
+            return;
+        }
         CtContract contract = new CtContract();
         contract.setId(id);
         contract.setProjectId(10001L);

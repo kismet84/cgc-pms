@@ -63,7 +63,10 @@ test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
     const projectSelect = page.locator('.project-field .ant-select')
     await expect(projectSelect).toBeVisible()
     // Empty selection: placeholder should be shown, or no value selected
-    const selectedText = await projectSelect.locator('.ant-select-selection-item').textContent().catch(() => '')
+    const selectedText = await projectSelect
+      .locator('.ant-select-selection-item')
+      .textContent()
+      .catch(() => '')
     console.log(`Selected project: "${selectedText}"`)
 
     // Verify role tabs are visible

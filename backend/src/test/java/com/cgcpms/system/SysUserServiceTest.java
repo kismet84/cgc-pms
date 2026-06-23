@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,9 @@ class SysUserServiceTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private Long createdUserId;
 
     @BeforeEach
@@ -62,6 +66,9 @@ class SysUserServiceTest {
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
                 .build());
+        // 确保 admin 用户存在（测试间可能存在软删除交叉污染）
+        jdbcTemplate.update(
+                "UPDATE sys_user SET deleted_flag = 0 WHERE id = 1 AND deleted_flag = 1");
     }
 
     @AfterEach
@@ -625,6 +632,20 @@ class SysUserServiceTest {
     @Transactional
     @DisplayName("分页查询 — 返回的VO包含roleNames（admin有SUPER_ADMIN角色）")
     void testGetPage_IncludesRoleNames() {
+        // V85 删除了默认 admin，需要种子数据
+        jdbcTemplate.update(
+            "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+            "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
+            "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
+        jdbcTemplate.update(
+            "INSERT INTO sys_role (id, tenant_id, role_code, role_name, role_type, status, data_scope, created_by, remark) " +
+            "SELECT 1, 0, 'SUPER_ADMIN', '超级管理员', 'SYSTEM', 'ENABLE', 'ALL', 1, 'test-seed' " +
+            "WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE id = 1)");
+        jdbcTemplate.update(
+            "INSERT INTO sys_user_role (id, user_id, role_id) " +
+            "SELECT 1, 1, 1 " +
+            "WHERE NOT EXISTS (SELECT 1 FROM sys_user_role WHERE user_id = 1 AND role_id = 1)");
+
         // admin (id=1) 已分配 SUPER_ADMIN 角色
         IPage<SysUserVO> page = userService.getPage(1, 10, "admin", null, null);
         assertTrue(page.getTotal() >= 1);

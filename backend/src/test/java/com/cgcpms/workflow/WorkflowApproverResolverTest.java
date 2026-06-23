@@ -15,6 +15,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("Workflow ApproverResolver and Resubmit State Machine")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WorkflowApproverResolverTest {
 
     private static final long TENANT_0 = 0L;
@@ -65,6 +67,35 @@ class WorkflowApproverResolverTest {
     @Autowired private SysUserMapper sysUserMapper;
     @Autowired private SysRoleMapper sysRoleMapper;
     @Autowired private SysUserRoleMapper sysUserRoleMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
+
+    /**
+     * V85 deleted the demo admin user; workflow templates reference userId=1 as approver,
+     * and role-based resolution requires users to exist in tenant 0.
+     * Re-seed users 1-5 in tenant 0 so that submit/approve/resolve flows work.
+     * Uses raw SQL to bypass MyBatis tenant isolation and ensure cross-class robustness.
+     */
+    @BeforeAll
+    void seedBaseUsers() {
+        // 1. Restore any test-seed users that were moved to other tenants by prior tests
+        jdbcTemplate.update("UPDATE sys_user SET tenant_id = 0 WHERE id BETWEEN 1 AND 5 AND remark = 'test-seed'");
+        // 2. Ensure all 5 test users exist in tenant 0
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 2, 0, 'manager', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '项目经理', '13800000001', 'manager@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 2)");
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 3, 0, 'gm', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '总经理', '13800000002', 'gm@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 3)");
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 4, 0, 'biz', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '商务人员', '13800000003', 'biz@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 4)");
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 5, 0, 'cost', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '成本人员', '13800000004', 'cost@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 5)");
+    }
 
     @BeforeEach
     void setupContext() {
@@ -78,14 +109,20 @@ class WorkflowApproverResolverTest {
     }
 
     @AfterAll
-    static void cleanupTestDataStatic() {
-        // Cleanup handled by @Transactional (auto-rollback)
+    void cleanupTestData() {
+        // Cleanup handled by @Transactional on each test (auto-rollback).
+        // Base users (1-5) are kept for other test classes.
     }
 
     // ── seed data for role-based tests ──
 
     private void seedTestData() {
-        // Ensure approver user exists
+        // Ensure approver user exists with the realName expected by the role-based resolver test.
+        // User 2 was seeded by @BeforeAll seedBaseUsers() with real_name='项目经理', but this test
+        // needs it to be '审批人' for the role-based resolution verification.
+        // Use raw SQL to bypass MyBatis tenant isolation.
+        jdbcTemplate.update("UPDATE sys_user SET real_name = '审批人', status = 'ENABLE' WHERE id = ? AND tenant_id = ?",
+                USER_APPROVER, TENANT_0);
         if (sysUserMapper.selectById(USER_APPROVER) == null) {
             SysUser approver = new SysUser();
             approver.setId(USER_APPROVER);
@@ -96,9 +133,6 @@ class WorkflowApproverResolverTest {
             approver.setStatus("ENABLE");
             approver.setIsAdmin(0);
             sysUserMapper.insert(approver);
-            // Clear UserContext temporarily to avoid tenant filtering issues in insert
-            // (BaseEntity auto-fills tenant from UserContext which is set)
-            // Re-set context after inserts
         }
 
         // Ensure role exists

@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,8 +36,15 @@ class MatStockServiceTest {
     @Autowired
     private MatStockService stockService;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setupContext() {
+        // Clean up any cross-test data pollution from other test classes
+        jdbcTemplate.update("DELETE FROM mat_stock_txn WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM mat_stock WHERE tenant_id = ?", TENANT_ID);
+
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")

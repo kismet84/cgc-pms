@@ -10,6 +10,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -45,6 +46,9 @@ class StlSettlementServiceTest {
     @Autowired
     private StlSettlementMapper stlSettlementMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setUp() {
         Claims claims = Jwts.claims()
@@ -55,6 +59,19 @@ class StlSettlementServiceTest {
                 .add("roleCodes", java.util.List.of("ADMIN"))
                 .build();
         UserContext.set(claims);
+
+        // Clear stl_settlement data left by other test classes
+        // (e.g. Phase3IntegrationTest) to prevent pollution.
+        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
+
+        // Pre-load JSQLParser via a trivial MyBatis query.
+        // JaCoCo 0.8.13 throws IllegalClassFormatException when instrumenting
+        // net.sf.jsqlparser.parser.CCJSqlParserTokenManager (method jjMoveNfa_0
+        // too large for ASM). The class loads despite the error on the main thread,
+        // but when two concurrent threads trigger the first load simultaneously,
+        // class definition corruption can occur. This query ensures the parser
+        // is fully loaded before any concurrent test spawns threads.
+        stlSettlementMapper.selectCount(null);
     }
 
     @AfterEach

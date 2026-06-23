@@ -44,15 +44,19 @@ import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import io.jsonwebtoken.Jwts;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,6 +71,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
 @ActiveProfiles("local")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Phase3IntegrationTest {
 
     private static final long USER_ADMIN = 1L;
@@ -123,6 +128,31 @@ class Phase3IntegrationTest {
 
     // ── CONTRACT ──
     @Autowired private CtContractMapper contractMapper;
+
+    @Autowired private JdbcTemplate jdbcTemplate;
+
+    /**
+     * V85 deleted the demo admin user; workflow templates reference userId=1 as approver.
+     * Re-seed users 1-5 in tenant 0 so the workflow approve/transfer/withdraw flows work.
+     */
+    @BeforeAll
+    void seedTestUsers() {
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 2, 0, 'manager', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '项目经理', '13800000001', 'manager@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 2)");
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 3, 0, 'gm', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '总经理', '13800000002', 'gm@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 3)");
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 4, 0, 'biz', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '商务人员', '13800000003', 'biz@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 4)");
+        jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 5, 0, 'cost', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '成本人员', '13800000004', 'cost@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 5)");
+    }
 
     @BeforeEach
     void setupContext() {
@@ -638,20 +668,12 @@ class Phase3IntegrationTest {
     @Transactional
     @DisplayName("场景7: 预警→通知 → 插入项目成员→触发预警→验证通知生成，tenantId来自project而非UserContext")
     void test07_alertToNotification() {
-        // 1. 插入项目成员（admin 作为项目经理 PM）
-        PmProjectMember member = new PmProjectMember();
-        member.setId(System.currentTimeMillis()); // 雪花ID模拟
-        member.setTenantId(0L);
-        member.setProjectId(PROJECT_ID);
-        member.setUserId(USER_ADMIN);
-        member.setRoleCode("PM");
-        member.setStatus("ACTIVE");
-        member.setCreatedBy(USER_ADMIN);
-        member.setCreatedTime(LocalDateTime.now());
-        member.setUpdatedBy(USER_ADMIN);
-        member.setUpdatedTime(LocalDateTime.now());
-        member.setDeletedFlag(0);
-        projectMemberMapper.insert(member);
+        // V90 seeds pm_project_member(40001, 0, 10001, 1, 'PROJECT_MANAGER').
+        // Use raw INSERT with WHERE NOT EXISTS to avoid DuplicateKeyException
+        // on the unique constraint (project_id, user_id).
+        jdbcTemplate.update("INSERT INTO pm_project_member (id, tenant_id, project_id, user_id, role_code, status, created_at, updated_at, created_by, updated_by, deleted_flag) "
+                + "SELECT 40001, 0, 10001, 1, 'PM', 'ACTIVE', NOW(), NOW(), 1, 1, 0 "
+                + "WHERE NOT EXISTS (SELECT 1 FROM pm_project_member WHERE project_id = 10001 AND user_id = 1 AND deleted_flag = 0)");
 
         // 2. 设置触发条件：将合同结束日期改为15天后（触发 CONTRACT_EXPIRING 预警）
         CtContract contract = contractMapper.selectById(CONTRACT_ID);

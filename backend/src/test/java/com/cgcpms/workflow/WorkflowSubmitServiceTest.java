@@ -15,6 +15,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,8 +63,20 @@ class WorkflowSubmitServiceTest {
     @Autowired
     private CtContractMapper contractMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setupContext() {
+        // 恢复 V85 删除的 admin 用户并清理前序测试遗留的工作流数据
+        jdbcTemplate.update(
+            "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+            "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
+            "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
+        jdbcTemplate.update("DELETE FROM wf_task");
+        jdbcTemplate.update("DELETE FROM wf_cc");
+        jdbcTemplate.update("DELETE FROM wf_record");
+        jdbcTemplate.update("DELETE FROM wf_instance");
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         seedReferenceData();
     }

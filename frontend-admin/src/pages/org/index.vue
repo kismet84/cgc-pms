@@ -1,16 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import {
-  BankOutlined,
-  ClusterOutlined,
-  SafetyCertificateOutlined,
-  TeamOutlined,
-} from '@ant-design/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { countDeptNodes } from './utils'
 import { useCompany } from './composables/useCompany'
 import { useDepartment } from './composables/useDepartment'
 import { usePosition } from './composables/usePosition'
+import OrgMetricStrip from './components/OrgMetricStrip.vue'
 import CompanyModal from './components/CompanyModal.vue'
 import DepartmentModal from './components/DepartmentModal.vue'
 import PositionModal from './components/PositionModal.vue'
@@ -144,36 +139,13 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="org-metric-strip">
-        <div class="org-metric">
-          <div class="org-metric-icon company"><BankOutlined /></div>
-          <div>
-            <span>公司</span>
-            <strong>{{ companyTotal }}</strong>
-          </div>
-        </div>
-        <div class="org-metric">
-          <div class="org-metric-icon dept"><ClusterOutlined /></div>
-          <div>
-            <span>{{ currentCompanyName }}部门</span>
-            <strong>{{ departmentCount }}</strong>
-          </div>
-        </div>
-        <div class="org-metric">
-          <div class="org-metric-icon position"><TeamOutlined /></div>
-          <div>
-            <span>岗位</span>
-            <strong>{{ positionTotal }}</strong>
-          </div>
-        </div>
-        <div class="org-metric">
-          <div class="org-metric-icon health"><SafetyCertificateOutlined /></div>
-          <div>
-            <span>启用率</span>
-            <strong>{{ enabledRate }}<small>%</small></strong>
-          </div>
-        </div>
-      </div>
+      <OrgMetricStrip
+        :company-total="companyTotal"
+        :current-company-name="currentCompanyName"
+        :department-count="departmentCount"
+        :position-total="positionTotal"
+        :enabled-rate="enabledRate"
+      />
 
       <div class="org-workspace">
         <CompanyPanel
@@ -293,79 +265,6 @@ onMounted(async () => {
 .org-panel-actions {
   gap: 8px;
   justify-content: flex-end;
-}
-
-.org-metric-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.org-metric {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 82px;
-  padding: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow-soft);
-}
-
-.org-metric-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 34px;
-  height: 34px;
-  color: #fff;
-  font-size: 15px;
-  border-radius: 8px;
-}
-
-.org-metric-icon.company {
-  background: #1668dc;
-}
-
-.org-metric-icon.dept {
-  background: #0ea5e9;
-}
-
-.org-metric-icon.position {
-  background: #14b8a6;
-}
-
-.org-metric-icon.health {
-  background: #16a34a;
-}
-
-.org-metric span {
-  display: block;
-  max-width: 180px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.org-metric strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
-.org-metric small {
-  margin-left: 2px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .org-workspace {
@@ -527,8 +426,7 @@ onMounted(async () => {
 }
 
 @media (max-width: 1180px) {
-  .org-workspace,
-  .org-metric-strip {
+  .org-workspace {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -559,7 +457,6 @@ onMounted(async () => {
     width: calc(50% - 4px);
   }
 
-  .org-metric-strip,
   .org-workspace {
     grid-template-columns: 1fr;
   }

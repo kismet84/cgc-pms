@@ -3,12 +3,14 @@ package com.cgcpms.auth;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -35,6 +37,21 @@ class AuthEndpointSecurityTest {
 
     @Autowired
     private JwtUtils jwtUtils;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    /**
+     * V85 migration removes the default admin user.
+     * Re-seed it so JWT-based auth tests can look up the user from the DB.
+     */
+    @BeforeEach
+    void seedAdminUser() {
+        jdbcTemplate.update(
+                "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
+    }
 
     @Test
     @DisplayName("GET /api/auth/userinfo without JWT → 401")

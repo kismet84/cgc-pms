@@ -3,7 +3,9 @@ package com.cgcpms.notification;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.notification.entity.SysNotification;
+import com.cgcpms.notification.mapper.SysNotificationMapper;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.notification.vo.NotificationVO;
 import io.jsonwebtoken.Jwts;
@@ -30,10 +32,15 @@ class NotificationServiceTest {
     @Autowired
     private NotificationService notificationService;
 
+    @Autowired
+    private SysNotificationMapper notificationMapper;
+
     private Long createdNotificationId;
 
     @BeforeEach
     void setupContext() {
+        // 清理 H2 残留数据，避免跨测试计数污染（MyBatis-Plus 禁止全表删除，用 gt(0) 条件）
+        notificationMapper.delete(new LambdaQueryWrapper<SysNotification>().gt(SysNotification::getId, 0));
         UserContext.set(Jwts.claims()
                 .add("userId", USER_1)
                 .add("username", "admin")

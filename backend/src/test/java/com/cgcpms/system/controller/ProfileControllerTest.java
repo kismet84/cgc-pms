@@ -3,12 +3,14 @@ package com.cgcpms.system.controller;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -34,6 +36,9 @@ class ProfileControllerTest {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
@@ -45,6 +50,41 @@ class ProfileControllerTest {
                 List.of("ADMIN"),
                 List.of());
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    /**
+     * Seed admin user because V85 migration removes the default admin.
+     * Required for MockMvc tests that authenticate via JWT and then look up the user in DB.
+     */
+    @BeforeEach
+    void seedAdminUser() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, ADMIN_ID);
+        if (count != null && count == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    ADMIN_ID, TENANT_ID, "admin",
+                    "$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2",
+                    "系统管理员", "13800000000", "admin@cgc-pms.com",
+                    "ENABLE", 1, ADMIN_ID, "测试种子数据");
+        }
+        // Also seed the SUPER_ADMIN role and user-role mapping (needed by ProfileService.buildUserInfo)
+        Integer roleCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_role WHERE id = 1", Integer.class);
+        if (roleCount != null && roleCount == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_role (id, tenant_id, role_code, role_name, role_type, status, data_scope, created_by, remark) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    1L, 0L, "SUPER_ADMIN", "超级管理员", "SYSTEM", "ENABLE", "ALL", 1L, "测试种子数据");
+        }
+        Integer userRoleCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user_role WHERE user_id = ? AND role_id = 1", Integer.class, ADMIN_ID);
+        if (userRoleCount != null && userRoleCount == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_user_role (id, user_id, role_id) VALUES (?, ?, ?)",
+                    1L, ADMIN_ID, 1L);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

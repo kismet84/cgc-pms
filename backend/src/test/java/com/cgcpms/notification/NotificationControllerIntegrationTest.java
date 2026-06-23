@@ -3,12 +3,14 @@ package com.cgcpms.notification;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -38,6 +40,28 @@ class NotificationControllerIntegrationTest {
 
     @Autowired
     private JwtUtils jwtUtils;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    /**
+     * V85 删除了默认 admin 用户，需要种子数据让 JWT 认证的用户在 DB 中存在。
+     */
+    @BeforeEach
+    void seedAdminUser() {
+        // Clean notifications left by other test classes (e.g. NotificationServiceTest)
+        // to guarantee unreadCount = 0 in a clean slate.
+        jdbcTemplate.update("DELETE FROM sys_notification WHERE tenant_id = 0");
+
+        jdbcTemplate.update(
+            "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+            "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
+            "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
+        jdbcTemplate.update(
+            "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+            "SELECT 2, 0, 'limited', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '受限用户', '13800000002', 'limited@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
+            "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 2)");
+    }
 
     /**
      * Test 1: valid JWT in {@code access_token} cookie → 200 + SSE content type

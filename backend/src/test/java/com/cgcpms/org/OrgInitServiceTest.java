@@ -186,6 +186,13 @@ class OrgInitServiceTest {
     @Order(2)
     @DisplayName("TC2: 第二次调用backfill应幂等，不创建重复公司/部门")
     void test02_idempotentBackfill() {
+        // Switch UserContext to tenant 998 so TenantLine interceptor can see the data
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", 998L)
+                .build());
+
         // Seed data for a fresh tenant
         PmProject p = createProject(998L, null, "PRJ-IDM-001", "幂等测试项目");
         createContract(998L, null, p.getId(), "CT-IDM-001", "幂等测试合同");
@@ -228,6 +235,13 @@ class OrgInitServiceTest {
     @Order(3)
     @DisplayName("TC3: 所有orgId已设置时，backfill不创建额外组织")
     void test03_noOpWhenAllSet() {
+        // Switch UserContext to tenant 997 so TenantLine interceptor can see the data
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", 997L)
+                .build());
+
         // Create a project and contract with orgId already set
         PmProject p = createProject(997L, 777777L, "PRJ-NOOP-001", "无操作测试项目");
         createContract(997L, 777777L, p.getId(), "CT-NOOP-001", "无操作测试合同");
