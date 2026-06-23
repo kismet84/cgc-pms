@@ -121,15 +121,24 @@ cgc-pms/
 
 | 层级 | 框架 | 用例 | 通过率 |
 |------|------|------|--------|
-| 后端 | JUnit 5 + MockMvc | 206 | 100% |
-| 前端 | Vitest | 154 | 100% |
-| E2E | Playwright | 36 | 12 模块覆盖 |
+| 后端 | JUnit 5 + MockMvc | 1,198 | 99.7% (2 既有 H2 分页 + 1 表锁) |
+| 前端 | Vitest | 174 | 100% |
+| E2E | Playwright | 83 | 16 spec 覆盖 |
+
+覆盖率: 后端 73% instruction / 53% branch · 前端 9.79% (CI 阈值对齐基线)
 
 ```bash
-cd backend && ./mvnw test          # 后端
+cd backend && ./mvnw test          # 后端 (1198 tests)
 cd frontend-admin && pnpm build    # 前端构建 + 类型检查
-cd frontend-admin && pnpm vitest   # 前端测试
+cd frontend-admin && pnpm vitest   # 前端测试 (174 tests)
 ```
+
+## 最近更新 (2026-06-23)
+
+- **后端测试覆盖提升**: 68%→73% Instruction, 49%→53% Branch (932→1198 tests, +266 方法, +36 文件)，零覆盖包 17→0
+- **Surefire 优化**: forkCount 1C→1, parallel=classes, threadCount=2 — CPU 从多核满载降为 1 进程
+- **CLAUDE.md 协议增强**: /goal 命令新增自动加载检查步骤 + 常见失败模式清单，/plan 命令新增五段式任务拆解模板
+- **测试**: Phase A (18 Controller 测试) + Phase B (10 Handler 测试) + Phase C (6 Service 增强)
 
 ## 最近更新 (2026-06-21)
 
