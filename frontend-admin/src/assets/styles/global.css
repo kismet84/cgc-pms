@@ -34,6 +34,8 @@
   --kpi-paid: #52C41A;
   --kpi-unpaid: #FAAD14;
   --kpi-overdue: #FF4D4F;
+  --brand-gradient-logo: linear-gradient(135deg, #1668dc, #0ea5e9);
+  --brand-gradient-avatar: linear-gradient(135deg, #8ac1ff, #006dff);
 
   /* 字体体系 */
   --font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;

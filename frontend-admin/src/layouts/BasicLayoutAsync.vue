@@ -87,7 +87,7 @@ onBeforeUnmount(() => {
             <div class="user-info">
               <a-avatar
                 :size="32"
-                :style="{ background: 'linear-gradient(135deg, #8ac1ff, #006dff)' }"
+                :style="{ background: 'var(--brand-gradient-avatar, linear-gradient(135deg, #8ac1ff, #006dff))' }"
               >
                 {{ userInfo?.realName?.[0] || '●' }}
               </a-avatar>
@@ -150,10 +150,10 @@ onBeforeUnmount(() => {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #1668dc, #0ea5e9);
+  background: var(--brand-gradient-logo, linear-gradient(135deg, #1668dc, #0ea5e9));
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--surface);
   flex-shrink: 0;
   box-shadow: 0 8px 18px rgba(22, 104, 220, 0.22);
 }
@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
 .hamburger {
   font-size: 20px;
   cursor: pointer;
-  color: #374151;
+  color: var(--text);
 }
 
 .flex-1 {
