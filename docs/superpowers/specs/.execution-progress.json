@@ -1,88 +1,52 @@
 {
-  "planFile": "D:\\projects-test\\cgc-pms\\docs\\superpowers\\plans\\2026-06-24-ui-refactor-plan.md",
-  "startedAt": "2026-06-24T00:00:00+08:00",
-  "lastUpdatedAt": "2026-06-24T02:17:00+08:00",
+  "planFile": "D:\\projects-test\\cgc-pms\\docs\\superpowers\\plans\\2026-06-24-ci-risk-and-ops-foundation-plan.md",
+  "startedAt": "2026-06-24T09:00:00+08:00",
+  "lastUpdatedAt": "2026-06-24T10:05:00+08:00",
   "phases": [
     {
       "id": "phase-0",
       "title": "Phase 0: 环境检查",
       "status": "completed",
-      "tasksCompleted": 3,
-      "tasksTotal": 3,
+      "tasksCompleted": 5,
+      "tasksTotal": 5,
       "tasksSkipped": [],
-      "notes": "Java 21 Temurin, pnpm 11.7.0, Git 工作树正常"
+      "notes": "Java 21 OK, pnpm 11.7.0, Docker Compose v5.1.4. JaCoCo实际79.75%/57.56%超CI阈值. Prometheus依赖已在pom.xml+endpoint已暴露. SQL CI已接入. 备份脚本+Prometheus编排均需新建."
     },
     {
       "id": "phase-A",
-      "title": "模块 A: 设计基准与 Token 体系统一",
+      "title": "模块 A: JaCoCo 风险解除",
       "status": "completed",
       "tasksCompleted": 2,
-      "tasksTotal": 2,
-      "tasksSkipped": [],
-      "notes": "A1 CSS Token固化(字体+间距+品牌渐变), A2 UI重构检查清单(66页面)"
+      "tasksTotal": 3,
+      "tasksSkipped": ["A3: AuthService补测"],
+      "notes": "A1: JaCoCo 79.8%/57.6% vs CI 73%/53% — 不阻塞. A2: pom.xml阈值与文档同步. A3: 可选P1跳过. mvn verify BUILD SUCCESS."
     },
     {
       "id": "phase-B",
-      "title": "模块 B: 全局布局与导航统一",
+      "title": "模块 B: SQL 安全门禁",
       "status": "completed",
       "tasksCompleted": 2,
       "tasksTotal": 2,
       "tasksSkipped": [],
-      "notes": "B1 布局壳层4处硬编码→CSS变量, B2 页面包装结构已在C/D中覆盖"
+      "notes": "B1: CI sql-safety-scan job已存在(ci.yml 167-173行). B2: 豁免机制+误报处理文档写入docs/11-安全规范.md. check-sql-safety.ps1 PASS."
     },
     {
       "id": "phase-C",
-      "title": "模块 C: 列表页/台账页统一",
+      "title": "模块 C: Prometheus 监控",
       "status": "completed",
-      "tasksCompleted": 3,
-      "tasksTotal": 3,
+      "tasksCompleted": 2,
+      "tasksTotal": 2,
       "tasksSkipped": [],
-      "notes": "C1 搜索栏→lg-search-bar, C2 工具栏→lg-toolbar, C3 表格→lg-table-wrap+lg-tag"
+      "notes": "C1: micrometer-registry-prometheus依赖已在pom.xml, endpoint已暴露. C2: deploy/monitoring/prometheus.yml + docker-compose.monitoring.yml + 运维手册更新."
     },
     {
       "id": "phase-D",
-      "title": "模块 D: KPI 与分析面板统一",
+      "title": "模块 D: 备份恢复",
       "status": "completed",
       "tasksCompleted": 2,
       "tasksTotal": 2,
       "tasksSkipped": [],
-      "notes": "D1 KPI→lg-kpi-strip/lg-kpi-card, D2 分析栏→lg-analysis-rail/lg-panel. 全模块已对齐"
-    },
-    {
-      "id": "phase-E",
-      "title": "模块 E: 表单、弹窗、详情页统一",
-      "status": "completed",
-      "tasksCompleted": 2,
-      "tasksTotal": 2,
-      "tasksSkipped": [],
-      "notes": "E1 7个弹窗+125行lg-modal-form全局CSS, E2 详情页部分覆盖"
-    },
-    {
-      "id": "phase-F",
-      "title": "模块 F: 文案、空状态、错误提示统一",
-      "status": "completed",
-      "tasksCompleted": 1,
-      "tasksTotal": 1,
-      "tasksSkipped": [],
-      "notes": "新建uiText.ts(30个中文常量), request.ts英化中"
-    },
-    {
-      "id": "phase-G",
-      "title": "模块 G: 组件抽象与复用",
-      "status": "completed",
-      "tasksCompleted": 1,
-      "tasksTotal": 1,
-      "tasksSkipped": [],
-      "notes": "新建5个lg-*通用组件(LgPageHeader/LgSearchBar/LgToolbar/LgKpiCard/LgEmptyState)"
-    },
-    {
-      "id": "phase-H",
-      "title": "模块 H: 视觉回归与质量门禁",
-      "status": "completed",
-      "tasksCompleted": 1,
-      "tasksTotal": 1,
-      "tasksSkipped": [],
-      "notes": "e2e/ui-refactor-smoke.spec.ts 7核心页面, pnpm build+test:unit+E2E全部通过"
+      "notes": "D1: scripts/mysql-backup.ps1 (全量+保留策略). D2: scripts/mysql-restore.ps1 (恢复+健康检查). .env.example备份变量. 运维手册更新."
     }
   ]
 }
