@@ -31,6 +31,9 @@ export interface SubMeasureVO {
   projectId: string
   contractId?: string
   partnerId?: string
+  subTaskId?: string
+  subTaskCode?: string
+  subTaskName?: string
   measureCode: string
   measurePeriod?: string
   measureDate?: string

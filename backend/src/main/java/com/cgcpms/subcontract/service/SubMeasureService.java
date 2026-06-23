@@ -14,8 +14,10 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.vo.SubMeasureItemVO;
 import com.cgcpms.subcontract.vo.SubMeasureVO;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -40,6 +42,7 @@ public class SubMeasureService {
 
     private final SubMeasureMapper subMeasureMapper;
     private final SubMeasureItemMapper subMeasureItemMapper;
+    private final SubTaskMapper subTaskMapper;
     private final PmProjectMapper pmProjectMapper;
     private final CtContractMapper ctContractMapper;
     private final MdPartnerMapper mdPartnerMapper;
@@ -82,8 +85,15 @@ public class SubMeasureService {
         Map<Long, String> partnerNames = partnerIds.isEmpty() ? Map.of()
                 : mdPartnerMapper.selectBatchIds(partnerIds).stream()
                         .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
+        Set<Long> subTaskIds = records.stream()
+                .map(SubMeasure::getSubTaskId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, SubTask> subTaskMap = subTaskIds.isEmpty() ? Map.of()
+                : subTaskMapper.selectBatchIds(subTaskIds).stream()
+                        .collect(Collectors.toMap(SubTask::getId, t -> t, (a, b) -> a));
 
-        return page.convert(t -> toVO(t, projectNames, contractNames, partnerNames));
+        return page.convert(t -> toVO(t, projectNames, contractNames, partnerNames, subTaskMap));
     }
 
     public SubMeasureVO getById(Long id) {
@@ -104,6 +114,9 @@ public class SubMeasureService {
 
     @Transactional
     public Long create(SubMeasure measure) {
+        // Validate subTaskId belongs to same project/contract/partner
+        validateSubTaskBelongsToSameContext(measure);
+
         // Auto-generate measure code: SM-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "SM-" + today + "-";
@@ -149,9 +162,37 @@ public class SubMeasureService {
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
+        // Validate subTaskId belongs to same project/contract/partner
+        validateSubTaskBelongsToSameContext(measure);
+
         calcNetAmount(measure);
 
         subMeasureMapper.updateById(measure);
+    }
+
+    /**
+     * 校验 subTaskId 的合法性：存在性 → 租户隔离 → 项目/合同/合作方一致性。
+     * 当 subTaskId 为 null 时直接通过（本阶段兼容空值策略）。
+     */
+    private void validateSubTaskBelongsToSameContext(SubMeasure measure) {
+        Long subTaskId = measure.getSubTaskId();
+        if (subTaskId == null) return;
+
+        SubTask task = subTaskMapper.selectById(subTaskId);
+        if (task == null || task.getDeletedFlag() != null && task.getDeletedFlag() == 1)
+            throw new BusinessException("SUB_TASK_NOT_FOUND", "关联的分包任务不存在");
+        Long currentTenantId = UserContext.getCurrentTenantId();
+        if (!currentTenantId.equals(task.getTenantId()))
+            throw new BusinessException("SUB_TASK_TENANT_MISMATCH", "关联的分包任务不属于当前租户");
+        Long projectId = measure.getProjectId();
+        if (projectId != null && !projectId.equals(task.getProjectId()))
+            throw new BusinessException("SUB_TASK_PROJECT_MISMATCH", "关联的分包任务不属于当前项目");
+        Long contractId = measure.getContractId();
+        if (contractId != null && !contractId.equals(task.getContractId()))
+            throw new BusinessException("SUB_TASK_CONTRACT_MISMATCH", "关联的分包任务不属于当前合同");
+        Long partnerId = measure.getPartnerId();
+        if (partnerId != null && !partnerId.equals(task.getPartnerId()))
+            throw new BusinessException("SUB_TASK_PARTNER_MISMATCH", "关联的分包任务不属于当前合作方");
     }
 
     @Transactional
@@ -253,16 +294,31 @@ public class SubMeasureService {
             MdPartner partner = mdPartnerMapper.selectById(m.getPartnerId());
             if (partner != null) vo.setPartnerName(partner.getPartnerName());
         }
+        if (m.getSubTaskId() != null) {
+            SubTask task = subTaskMapper.selectById(m.getSubTaskId());
+            if (task != null && task.getDeletedFlag() == 0) {
+                vo.setSubTaskCode(task.getTaskCode());
+                vo.setSubTaskName(task.getTaskName());
+            }
+        }
         return vo;
     }
 
     private SubMeasureVO toVO(SubMeasure m, Map<Long, String> projectNames,
-                               Map<Long, String> contractNames, Map<Long, String> partnerNames) {
+                               Map<Long, String> contractNames, Map<Long, String> partnerNames,
+                               Map<Long, SubTask> subTaskMap) {
         // Batch variant: use pre-fetched name maps
         SubMeasureVO vo = buildBaseVO(m);
         if (m.getProjectId() != null) vo.setProjectName(projectNames.get(m.getProjectId()));
         if (m.getContractId() != null) vo.setContractName(contractNames.get(m.getContractId()));
         if (m.getPartnerId() != null) vo.setPartnerName(partnerNames.get(m.getPartnerId()));
+        if (m.getSubTaskId() != null) {
+            SubTask task = subTaskMap.get(m.getSubTaskId());
+            if (task != null) {
+                vo.setSubTaskCode(task.getTaskCode());
+                vo.setSubTaskName(task.getTaskName());
+            }
+        }
         return vo;
     }
 
@@ -273,6 +329,7 @@ public class SubMeasureService {
         vo.setProjectId(m.getProjectId() != null ? m.getProjectId().toString() : null);
         vo.setContractId(m.getContractId() != null ? m.getContractId().toString() : null);
         vo.setPartnerId(m.getPartnerId() != null ? m.getPartnerId().toString() : null);
+        vo.setSubTaskId(m.getSubTaskId() != null ? m.getSubTaskId().toString() : null);
         vo.setMeasureCode(m.getMeasureCode());
         vo.setMeasurePeriod(m.getMeasurePeriod());
         vo.setMeasureDate(m.getMeasureDate() != null ? m.getMeasureDate().format(DateTimeUtils.DATE_FMT) : null);

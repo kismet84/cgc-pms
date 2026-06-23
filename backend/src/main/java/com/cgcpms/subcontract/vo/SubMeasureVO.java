@@ -11,6 +11,9 @@ public class SubMeasureVO {
     private String projectId;
     private String contractId;
     private String partnerId;
+    private String subTaskId;
+    private String subTaskCode;
+    private String subTaskName;
     private String measureCode;
     private String measurePeriod;
     private String measureDate;

@@ -4,8 +4,10 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.service.SubMeasureService;
 import com.cgcpms.subcontract.vo.SubMeasureItemVO;
 import com.cgcpms.subcontract.vo.SubMeasureVO;
@@ -36,6 +38,7 @@ class SubMeasureServiceTest {
     @Autowired private SubMeasureService service;
     @Autowired private SubMeasureMapper measureMapper;
     @Autowired private SubMeasureItemMapper itemMapper;
+    @Autowired private SubTaskMapper subTaskMapper;
 
     @BeforeEach void setupContext() {
         UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")
@@ -62,6 +65,78 @@ class SubMeasureServiceTest {
         SubMeasureVO vo = service.getById(id);
         assertNotNull(vo.getMeasureCode(), "应自动生成编码");
         assertEquals("DRAFT", vo.getApprovalStatus());
+    }
+
+    @Test @Transactional @DisplayName("create → with valid subTaskId succeeds")
+    void testCreate_WithValidSubTaskId() {
+        // Setup: create a subtask in the same project/contract/partner context
+        SubTask task = new SubTask();
+        task.setTenantId(TENANT_ID); task.setProjectId(PROJECT_ID);
+        task.setContractId(CONTRACT_ID); task.setPartnerId(PARTNER_ID);
+        task.setTaskCode("TEST-CODE-001"); task.setTaskName("测试任务-subTaskId绑定"); task.setStatus("IN_PROGRESS");
+        subTaskMapper.insert(task);
+
+        SubMeasure m = buildMeasure();
+        m.setSubTaskId(task.getId());
+        Long id = service.create(m);
+        assertNotNull(id);
+        SubMeasureVO vo = service.getById(id);
+        assertEquals(task.getId().toString(), vo.getSubTaskId());
+        assertEquals(task.getTaskCode(), vo.getSubTaskCode());
+        assertEquals(task.getTaskName(), vo.getSubTaskName());
+    }
+
+    @Test @Transactional @DisplayName("create → with non-existent subTaskId throws")
+    void testCreate_WithInvalidSubTaskId() {
+        SubMeasure m = buildMeasure();
+        m.setSubTaskId(99999999L);
+        assertThrows(BusinessException.class, () -> service.create(m));
+    }
+
+    @Test @Transactional @DisplayName("create → with cross-project subTaskId throws")
+    void testCreate_WithCrossProjectSubTaskId() {
+        SubTask task = new SubTask();
+        task.setTenantId(TENANT_ID); task.setProjectId(99999L);
+        task.setContractId(CONTRACT_ID); task.setPartnerId(PARTNER_ID);
+        task.setTaskCode("TEST-CODE-002"); task.setTaskName("跨项目任务"); task.setStatus("IN_PROGRESS");
+        subTaskMapper.insert(task);
+
+        SubMeasure m = buildMeasure();
+        m.setSubTaskId(task.getId());
+        assertThrows(BusinessException.class, () -> service.create(m));
+    }
+
+    @Test @Transactional @DisplayName("create → with cross-contract subTaskId throws")
+    void testCreate_WithCrossContractSubTaskId() {
+        SubTask task = new SubTask();
+        task.setTenantId(TENANT_ID); task.setProjectId(PROJECT_ID);
+        task.setContractId(99999L); task.setPartnerId(PARTNER_ID);
+        task.setTaskCode("TEST-CODE-003"); task.setTaskName("跨合同任务"); task.setStatus("IN_PROGRESS");
+        subTaskMapper.insert(task);
+
+        SubMeasure m = buildMeasure();
+        m.setSubTaskId(task.getId());
+        assertThrows(BusinessException.class, () -> service.create(m));
+    }
+
+    @Test @Transactional @DisplayName("getPage → null subTaskId returns null fields (compatible)")
+    void testGetPage_NoSubTaskId_Compatible() {
+        service.create(buildMeasure());
+        var page = service.getPage(1, 20, PROJECT_ID, null, null, null, null);
+        assertTrue(page.getTotal() > 0);
+        SubMeasureVO vo = page.getRecords().get(0);
+        assertNotNull(vo.getMeasureCode());
+        // subTaskId not set → subTaskCode/Name should be null, no error
+        assertNull(vo.getSubTaskId());
+        assertNull(vo.getSubTaskCode());
+        assertNull(vo.getSubTaskName());
+    }
+
+    @Test @Transactional @DisplayName("submitForApproval → with null subTaskId succeeds")
+    void testSubmitForApproval_NoSubTaskId() {
+        Long id = service.create(buildMeasure());
+        service.submitForApproval(id);
+        assertEquals("APPROVING", service.getById(id).getApprovalStatus());
     }
 
     @Test @Transactional @DisplayName("getById → throws on non-existent")

@@ -1,52 +1,16 @@
 {
-  "planFile": "D:\\projects-test\\cgc-pms\\docs\\superpowers\\plans\\2026-06-24-ci-risk-and-ops-foundation-plan.md",
-  "startedAt": "2026-06-24T09:00:00+08:00",
-  "lastUpdatedAt": "2026-06-24T10:05:00+08:00",
+  "planFile": "D:\projects-test\cgc-pms\docs\superpowers\plans\2026-06-24-subtask-submeasure-explicit-association-plan.md",
+  "startedAt": "2026-06-24T10:30:00+08:00",
+  "lastUpdatedAt": "2026-06-24T10:30:00+08:00",
   "phases": [
     {
       "id": "phase-0",
       "title": "Phase 0: 环境检查",
       "status": "completed",
-      "tasksCompleted": 5,
-      "tasksTotal": 5,
+      "tasksCompleted": 1,
+      "tasksTotal": 1,
       "tasksSkipped": [],
-      "notes": "Java 21 OK, pnpm 11.7.0, Docker Compose v5.1.4. JaCoCo实际79.75%/57.56%超CI阈值. Prometheus依赖已在pom.xml+endpoint已暴露. SQL CI已接入. 备份脚本+Prometheus编排均需新建."
-    },
-    {
-      "id": "phase-A",
-      "title": "模块 A: JaCoCo 风险解除",
-      "status": "completed",
-      "tasksCompleted": 2,
-      "tasksTotal": 3,
-      "tasksSkipped": ["A3: AuthService补测"],
-      "notes": "A1: JaCoCo 79.8%/57.6% vs CI 73%/53% — 不阻塞. A2: pom.xml阈值与文档同步. A3: 可选P1跳过. mvn verify BUILD SUCCESS."
-    },
-    {
-      "id": "phase-B",
-      "title": "模块 B: SQL 安全门禁",
-      "status": "completed",
-      "tasksCompleted": 2,
-      "tasksTotal": 2,
-      "tasksSkipped": [],
-      "notes": "B1: CI sql-safety-scan job已存在(ci.yml 167-173行). B2: 豁免机制+误报处理文档写入docs/11-安全规范.md. check-sql-safety.ps1 PASS."
-    },
-    {
-      "id": "phase-C",
-      "title": "模块 C: Prometheus 监控",
-      "status": "completed",
-      "tasksCompleted": 2,
-      "tasksTotal": 2,
-      "tasksSkipped": [],
-      "notes": "C1: micrometer-registry-prometheus依赖已在pom.xml, endpoint已暴露. C2: deploy/monitoring/prometheus.yml + docker-compose.monitoring.yml + 运维手册更新."
-    },
-    {
-      "id": "phase-D",
-      "title": "模块 D: 备份恢复",
-      "status": "completed",
-      "tasksCompleted": 2,
-      "tasksTotal": 2,
-      "tasksSkipped": [],
-      "notes": "D1: scripts/mysql-backup.ps1 (全量+保留策略). D2: scripts/mysql-restore.ps1 (恢复+健康检查). .env.example备份变量. 运维手册更新."
+      "notes": "Git clean, all Docker containers running, latest Flyway V92"
     }
   ]
 }

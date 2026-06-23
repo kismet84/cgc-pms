@@ -34,6 +34,8 @@ public class SubMeasure extends BaseEntity {
 
     private Long partnerId;
 
+    private Long subTaskId;
+
     private String measureCode;
 
     private String measurePeriod;

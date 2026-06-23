@@ -11,10 +11,11 @@ import {
   getMeasureItems,
   saveMeasureItems,
   submitMeasureForApproval,
+  getSubTaskList,
 } from '@/api/modules/subcontract'
 import { getContractItems } from '@/api/modules/contract'
 import { useReferenceStore } from '@/stores/reference'
-import type { SubMeasureVO, SubMeasureItemVO } from '@/types/subcontract'
+import type { SubMeasureVO, SubMeasureItemVO, SubTaskVO } from '@/types/subcontract'
 import type { SelectOption } from '@/types/ui'
 import type { ContractItem } from '@/types/contract'
 
@@ -44,10 +45,12 @@ const formData = reactive<Partial<SubMeasureVO>>({
   projectId: undefined,
   contractId: undefined,
   partnerId: undefined,
+  subTaskId: undefined,
   measurePeriod: '',
   measureDate: undefined,
   remark: '',
 })
+const subTaskOptions = ref<SubTaskVO[]>([])
 const formPartnerName = computed(
   () => contractList.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
 )
@@ -76,6 +79,7 @@ const gridColumns = computed(() => [
   { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
   { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
   { field: 'partnerName', title: '分包商', width: 120, ellipsis: true },
+  { field: 'subTaskName', title: '关联任务', width: 120, ellipsis: true, slots: { default: 'subTaskName' } },
   {
     field: 'reportedAmount',
     title: '申报金额',
@@ -127,6 +131,24 @@ async function fetchData() {
   }
 }
 
+async function loadSubTaskOptions() {
+  if (!formData.projectId && !formData.contractId && !formData.partnerId) {
+    subTaskOptions.value = []
+    return
+  }
+  try {
+    const params: Record<string, unknown> = { pageSize: 999 }
+    if (formData.projectId) params.projectId = formData.projectId
+    if (formData.contractId) params.contractId = formData.contractId
+    if (formData.partnerId) params.partnerId = formData.partnerId
+    const res = await getSubTaskList(params)
+    subTaskOptions.value = res.records || []
+  } catch (e: unknown) {
+    console.error(e)
+    subTaskOptions.value = []
+  }
+}
+
 async function loadContractItems(contractId: string) {
   try {
     const items = await getContractItems(contractId)
@@ -172,12 +194,14 @@ function handleAdd() {
     projectId: undefined,
     contractId: undefined,
     partnerId: undefined,
+    subTaskId: undefined,
     measurePeriod: '',
     measureDate: undefined,
     remark: '',
   })
   itemList.value = []
   contractItemList.value = []
+  subTaskOptions.value = []
   itemKeyCounter = 0
   modalVisible.value = true
 }
@@ -189,6 +213,7 @@ async function handleEdit(record: SubMeasureVO) {
     projectId: record.projectId,
     contractId: record.contractId,
     partnerId: record.partnerId,
+    subTaskId: record.subTaskId,
     measurePeriod: record.measurePeriod,
     measureDate: record.measureDate,
     remark: record.remark,
@@ -199,6 +224,8 @@ async function handleEdit(record: SubMeasureVO) {
   if (record.contractId) {
     await loadContractItems(record.contractId)
   }
+  // Load subtask options for the current context
+  await loadSubTaskOptions()
   // Load existing measure items
   try {
     const items = await getMeasureItems(record.id)
@@ -319,6 +346,9 @@ async function onContractSelect(contractId: string | undefined) {
     formData.partnerId = undefined
     contractItemList.value = []
   }
+  // When contract changes, subtask filter context also changes
+  formData.subTaskId = undefined
+  await loadSubTaskOptions()
 }
 
 async function handleModalOk() {
@@ -513,6 +543,10 @@ onMounted(() => {
         size="small"
         max-height="480"
       >
+        <template #subTaskName="{ row }">
+          <span v-if="row.subTaskName">{{ row.subTaskName }}</span>
+          <span v-else class="lg-none">-</span>
+        </template>
         <template #reportedAmount="{ row }">
           <span v-if="row.reportedAmount" class="lg-money">
             {{ Number(row.reportedAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
@@ -588,6 +622,8 @@ onMounted(() => {
               (v: string) => {
                 formData.contractId = undefined
                 formData.partnerId = undefined
+                formData.subTaskId = undefined
+                subTaskOptions.value = []
                 referenceStore.fetchContracts({ projectId: v })
               }
             "
@@ -620,6 +656,23 @@ onMounted(() => {
         </a-form-item>
         <a-form-item label="分包商">
           <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
+        </a-form-item>
+        <!-- 关联分包任务 -->
+        <a-form-item label="关联任务">
+          <a-select
+            v-model:value="formData.subTaskId"
+            placeholder="请选择关联分包任务"
+            allow-clear
+            show-search
+            :filter-option="
+              (input: string, option: SelectOption) =>
+                option.label?.toLowerCase().includes(input.toLowerCase())
+            "
+          >
+            <a-select-option v-for="t in subTaskOptions" :key="t.id" :value="t.id">
+              {{ t.taskCode }} {{ t.taskName }}
+            </a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item label="计量期次">
           <a-input
