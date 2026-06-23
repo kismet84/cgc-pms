@@ -4,7 +4,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
-import com.cgcpms.settlement.service.StlSettlementService;
+import com.cgcpms.settlement.service.StlSettlementWriteService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
@@ -41,7 +41,7 @@ class StlSettlementServiceTest {
     private static final long CONTRACT_ID_30002 = 30002L;
 
     @Autowired
-    private StlSettlementService stlSettlementService;
+    private StlSettlementWriteService stlSettlementWriteService;
 
     @Autowired
     private StlSettlementMapper stlSettlementMapper;
@@ -91,7 +91,7 @@ class StlSettlementServiceTest {
         settlement.setSettlementType("FINAL");
         settlement.setStatus("DRAFT");
 
-        Long id = stlSettlementService.create(settlement);
+        Long id = stlSettlementWriteService.create(settlement);
         assertNotNull(id);
         assertTrue(id > 0);
 
@@ -116,7 +116,7 @@ class StlSettlementServiceTest {
         first.setProjectId(PROJECT_ID);
         first.setContractId(CONTRACT_ID_30002);
         first.setSettlementType("FINAL");
-        Long id1 = stlSettlementService.create(first);
+        Long id1 = stlSettlementWriteService.create(first);
         assertNotNull(id1);
 
         // Second create with same contractId should fail
@@ -126,7 +126,7 @@ class StlSettlementServiceTest {
         second.setSettlementType("INTERIM");
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
-            stlSettlementService.create(second);
+            stlSettlementWriteService.create(second);
         });
         assertEquals("STL_DUPLICATE_SETTLEMENT", ex.getCode());
     }
@@ -166,7 +166,7 @@ class StlSettlementServiceTest {
                 settlement.setProjectId(PROJECT_ID);
                 settlement.setContractId(contractId);
                 settlement.setSettlementType("FINAL");
-                stlSettlementService.create(settlement);
+                stlSettlementWriteService.create(settlement);
                 successCount.incrementAndGet();
             } catch (BusinessException e) {
                 failureCount.incrementAndGet();
@@ -208,7 +208,7 @@ class StlSettlementServiceTest {
         // contractId not set
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
-            stlSettlementService.create(settlement);
+            stlSettlementWriteService.create(settlement);
         });
         assertEquals("CONTRACT_REQUIRED", ex.getCode());
     }
@@ -224,7 +224,7 @@ class StlSettlementServiceTest {
         settlement.setContractId(CONTRACT_ID_30001); // Belongs to project 10001
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
-            stlSettlementService.create(settlement);
+            stlSettlementWriteService.create(settlement);
         });
         assertEquals("CROSS_PROJECT_NOT_ALLOWED", ex.getCode());
     }

@@ -4,7 +4,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.settlement.entity.StlSettlement;
-import com.cgcpms.settlement.service.StlSettlementService;
+import com.cgcpms.settlement.service.StlSettlementWriteService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.Cookie;
@@ -40,7 +40,7 @@ class StlSettlementControllerMockMvcTest {
     private JwtUtils jwtUtils;
 
     @Autowired
-    private StlSettlementService stlSettlementService;
+    private StlSettlementWriteService stlSettlementWriteService;
 
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
@@ -81,7 +81,7 @@ class StlSettlementControllerMockMvcTest {
             settlement.setProjectId(PROJECT_ID);
             settlement.setContractId(CONTRACT_ID);
             settlement.setSettlementType("FINAL");
-            settlementId = stlSettlementService.create(settlement);
+            settlementId = stlSettlementWriteService.create(settlement);
         } finally {
             clearUserContext();
         }

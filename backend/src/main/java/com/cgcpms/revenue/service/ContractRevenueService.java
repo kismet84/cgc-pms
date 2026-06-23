@@ -345,7 +345,8 @@ public class ContractRevenueService {
         wrapper.eq(CostSubject::getStatus, "ENABLE");
         wrapper.eq(CostSubject::getDeletedFlag, 0);
         wrapper.orderByAsc(CostSubject::getLevel, CostSubject::getSortOrder);
-        subject = costSubjectMapper.selectOne(wrapper);
+        List<CostSubject> subjects = costSubjectMapper.selectList(wrapper);
+        subject = subjects.isEmpty() ? null : subjects.get(0);
         if (subject != null) {
             log.warn("未找到 6001.01 科目，兜底使用 subjectId={}", subject.getId());
             return subject.getId();

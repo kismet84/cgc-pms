@@ -1,7 +1,10 @@
 package com.cgcpms.revenue;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.revenue.entity.ContractRevenue;
 import com.cgcpms.revenue.mapper.ContractRevenueMapper;
 import com.cgcpms.revenue.service.ContractRevenueService;
@@ -9,6 +12,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,13 +34,19 @@ class ContractRevenueServiceTest {
 
     @Autowired private ContractRevenueService service;
     @Autowired private ContractRevenueMapper mapper;
+    @Autowired private CostItemMapper costItemMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @BeforeEach void setUp() {
         UserContext.set(Jwts.claims().subject("admin").add("userId", USER_ID)
                 .add("username", "admin").add("tenantId", TENANT_ID)
                 .add("roleCodes", List.of("ADMIN")).build());
+        cleanupRevenueRows();
     }
-    @AfterEach void tearDown() { UserContext.clear(); }
+    @AfterEach void tearDown() {
+        cleanupRevenueRows();
+        UserContext.clear();
+    }
 
     @Test @Transactional @DisplayName("创建收入确认单并验证默认审批状态为 DRAFT")
     void testCreateRevenue() {
@@ -137,5 +147,75 @@ class ContractRevenueServiceTest {
         } catch (BusinessException e) {
             assertNotNull(e.getCode()); // Already submitted or no template
         }
+    }
+
+    @Test @DisplayName("getBalance → 仅统计已审批收入并区分合同资产")
+    void testGetBalance_ApprovedRevenueCreatesAsset() {
+        mapper.insert(revenue("RV-BAL-A-", "APPROVED", "12000.00", "7000.00"));
+        mapper.insert(revenue("RV-BAL-B-", "APPROVED", "3000.00", "5000.00"));
+        mapper.insert(revenue("RV-BAL-C-", "DRAFT", "9000.00", "9000.00"));
+
+        var balance = service.getBalance(CONTRACT_ID);
+
+        assertEquals(String.valueOf(CONTRACT_ID), balance.getContractId());
+        assertEquals("15000.00", balance.getTotalConfirmedRevenue());
+        assertEquals("12000.00", balance.getTotalBilled());
+        assertEquals("3000.00", balance.getContractAsset());
+        assertEquals("0", balance.getContractLiability());
+    }
+
+    @Test @DisplayName("onApproved → PENDING 转 APPROVED 并生成收入 cost_item")
+    void testOnApproved_GeneratesRevenueCostItem() {
+        ContractRevenue pending = revenue("RV-APP-", "PENDING", "16000.00", "10000.00");
+        mapper.insert(pending);
+
+        service.onApproved(pending.getId());
+
+        ContractRevenue approved = mapper.selectById(pending.getId());
+        assertEquals("APPROVED", approved.getApprovalStatus());
+        assertNotNull(approved.getCostItemId());
+
+        CostItem item = costItemMapper.selectById(approved.getCostItemId());
+        assertNotNull(item);
+        assertEquals("CT_REVENUE", item.getSourceType());
+        assertEquals(pending.getId(), item.getSourceId());
+        assertEquals("REVENUE_CONFIRMED", item.getCostType());
+        assertEquals(new BigDecimal("16000.00"), item.getAmount());
+    }
+
+    @Test @DisplayName("onApproved → 非 PENDING 状态幂等退出且不重复生成 cost_item")
+    void testOnApproved_IdempotentWhenAlreadyApproved() {
+        ContractRevenue approved = revenue("RV-IDEMP-", "APPROVED", "9000.00", "9000.00");
+        mapper.insert(approved);
+
+        service.onApproved(approved.getId());
+
+        Long count = costItemMapper.selectCount(new LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getTenantId, TENANT_ID)
+                .eq(CostItem::getSourceType, "CT_REVENUE")
+                .eq(CostItem::getSourceId, approved.getId()));
+        assertEquals(0L, count);
+    }
+
+    private ContractRevenue revenue(String codePrefix, String status, String revenueAmount, String billedAmount) {
+        ContractRevenue revenue = new ContractRevenue();
+        revenue.setTenantId(TENANT_ID);
+        revenue.setProjectId(PROJECT_ID);
+        revenue.setContractId(CONTRACT_ID);
+        revenue.setRevenueCode(codePrefix + System.nanoTime());
+        revenue.setRevenueDate(LocalDate.now());
+        revenue.setProgressPercent(new BigDecimal("50.00"));
+        revenue.setRevenueAmount(new BigDecimal(revenueAmount));
+        revenue.setRevenueTax(BigDecimal.ZERO);
+        revenue.setRevenueAmountWithTax(new BigDecimal(revenueAmount));
+        revenue.setBilledAmount(new BigDecimal(billedAmount));
+        revenue.setBilledTax(BigDecimal.ZERO);
+        revenue.setApprovalStatus(status);
+        return revenue;
+    }
+
+    private void cleanupRevenueRows() {
+        jdbcTemplate.update("DELETE FROM cost_item WHERE tenant_id = ? AND source_type = 'CT_REVENUE'", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM contract_revenue WHERE tenant_id = ? AND (revenue_code LIKE 'RV-BAL-%' OR revenue_code LIKE 'RV-APP-%' OR revenue_code LIKE 'RV-IDEMP-%')", TENANT_ID);
     }
 }

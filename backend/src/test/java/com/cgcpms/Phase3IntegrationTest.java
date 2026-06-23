@@ -26,7 +26,7 @@ import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
-import com.cgcpms.settlement.service.StlSettlementService;
+import com.cgcpms.settlement.service.StlSettlementWriteService;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
@@ -93,7 +93,7 @@ class Phase3IntegrationTest {
     @Autowired private VarOrderItemMapper varOrderItemMapper;
 
     // ── SETTLEMENT ──
-    @Autowired private StlSettlementService settlementService;
+    @Autowired private StlSettlementWriteService settlementWriteService;
     @Autowired private StlSettlementMapper settlementMapper;
 
     // ── SUB_MEASURE ──
@@ -311,7 +311,7 @@ class Phase3IntegrationTest {
         settlement.setPaidAmount(BigDecimal.ZERO);
         settlement.setFinalAmount(new BigDecimal("45090000.00"));
 
-        Long settlementId = settlementService.create(settlement);
+        Long settlementId = settlementWriteService.create(settlement);
         assertNotNull(settlementId, "结算单ID不应为空");
 
         StlSettlement saved = settlementMapper.selectById(settlementId);
