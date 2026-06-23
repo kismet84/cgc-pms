@@ -1,7 +1,6 @@
 package com.cgcpms.contract.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.toolkit.Db;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
@@ -66,13 +65,14 @@ public class CtContractPaymentTermService {
      * 数据完整性说明：此方法遵循"先删后插"的全量替换策略。
      * <ol>
      *   <li>先物理删除合同下所有旧条款（含已被软删除的记录，确保主键不冲突）</li>
-     *   <li>再批量插入新条款列表（如果非空）</li>
+     *   <li>再逐条插入新条款列表（如果非空）</li>
      * </ol>
      * 调用方应保证 newTerms 包含完整的最新条款集合，避免数据丢失。
      * <p>
-     * 使用 {@link Db#saveBatch} 而非实例方法：此 Service 未继承 MyBatis-Plus 的
-     * {@code ServiceImpl}，因此没有 {@code this.saveBatch()} 实例方法可用。
-     * {@code Db.saveBatch()} 是 MyBatis-Plus 提供的静态工具方法，功能等价。
+     * 使用逐条 {@code ctContractPaymentTermMapper.insert()} 而非 {@code Db.saveBatch()}：
+     * MyBatis-Plus 的 {@code Db.saveBatch()} 内部使用 JDBC batch executor，
+     * 在 MySQL 下正常但在 H2 内存数据库并行测试中易触发表锁超时（H2 行锁粒度较粗）。
+     * 付款条款通常 ≤10 条/合同，逐条插入性能差异可忽略。
      */
     @Transactional
     public void batchSave(Long contractId, List<CtContractPaymentTerm> newTerms) {
@@ -82,12 +82,12 @@ public class CtContractPaymentTermService {
         ctContractPaymentTermMapper.delete(deleteWrapper);
         if (newTerms != null && !newTerms.isEmpty()) {
             Long tenantId = UserContext.getCurrentTenantId();
-            newTerms.forEach(t -> {
+            for (CtContractPaymentTerm t : newTerms) {
                 t.setId(null);            // 清空ID，让ASSIGN_ID自动生成新ID，避免与软删除记录主键冲突
                 t.setContractId(contractId);
                 t.setTenantId(tenantId);
-            });
-            Db.saveBatch(newTerms);
+                ctContractPaymentTermMapper.insert(t);
+            }
         } else {
             log.info("batchSave: deleted all payment terms for contract {}, no new terms to insert", contractId);
         }

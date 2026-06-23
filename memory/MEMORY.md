@@ -6,3 +6,6 @@
 - [后端重建 Jasypt 环境修复](backend-rebuild-jasypt-env-fix-2026-06-22.md) — Windows 下 mvnw.cmd 启动方式与 docker compose 必需环境变量修复
 - [PowerShell 不支持 Bash 花括号路径展开](powershell-no-bash-brace-expansion.md) — 跨目录检索改用 PowerShell 枚举，避免 `{a,b}` 解析失败
 - [H2 Workflow 测试数据污染修复 2026-06-23](h2-workflow-test-data-pollution-fix-2026-06-23.md) — 收紧 WorkflowQueryServiceTest 清理范围并加固 WorkflowEngineIntegrationTest 用户种子，避免 H2 全量套件跨类污染
+- [重建脚本 Maven Wrapper Windows 路径修复 2026-06-23](rebuild-script-maven-wrapper-windows-path-fix-2026-06-23.md) — scripts/rebuild.py 使用 Maven Wrapper 绝对路径，避免 mvnw.cmd not recognized
+- [首页驾驶舱首屏空白修复 2026-06-23](dashboard-initial-load-blank-fix-2026-06-23.md) — onMounted 初始化默认项目并加载驾驶舱数据，避免默认页签空白
+- [H2 测试污染与表锁修复 2026-06-23](h2-test-isolation-pagination-table-lock-fix-2026-06-23.md) — WorkflowQueryServiceTest 分页断言污染 + CtContractPaymentTermServiceTest Db.saveBatch 表锁超时

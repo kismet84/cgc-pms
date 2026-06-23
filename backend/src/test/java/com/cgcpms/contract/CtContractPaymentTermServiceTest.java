@@ -56,17 +56,14 @@ class CtContractPaymentTermServiceTest {
 
     @BeforeEach
     void setupContext() {
-        // 清除全量套件中其他测试类遗留的 payment term 数据
-        // 注意：MyBatis-Plus 的逻辑删除默认保留 deleted_flag=1 的记录，
-        // 但 ID 由 ASSIGN_ID 策略生成且雪花 ID 在同一毫秒内可能冲突。
-        // 为最大限度避免冲突，物理删除全量套件中可能已有的所有遗留记录。
-        jdbcTemplate.update("DELETE FROM ct_contract_payment_term WHERE id > 0");
         setAdmin(TENANT_0, USER_ADMIN);
         draftContractId = seedDraftContract();
     }
 
     @AfterEach
     void clearContext() {
+        // 物理删除本测试创建的 payment term 记录，避免后续测试受影响
+        jdbcTemplate.update("DELETE FROM ct_contract_payment_term WHERE contract_id = ?", draftContractId);
         UserContext.clear();
     }
 
