@@ -16,6 +16,7 @@ import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowContext;
+import com.cgcpms.project.service.ProjectArchiveNotifier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -45,6 +46,7 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
     private final CtContractMapper ctContractMapper;
     private final VarOrderMapper varOrderMapper;
     private final SubMeasureMapper subMeasureMapper;
+    private final ProjectArchiveNotifier archiveNotifier;
 
     @Override
     public String supportBusinessType() {
@@ -128,6 +130,15 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
             ctContractMapper.update(null, new LambdaUpdateWrapper<CtContract>()
                     .eq(CtContract::getId, settlement.getContractId())
                     .set(CtContract::getSettlementAmount, settlement.getFinalAmount()));
+        }
+
+        // Triggers async archive-condition check for the parent project.
+        // Non-blocking: project archive notifier runs on a separate thread pool,
+        // failure here never rolls back settlement approval.
+        if (settlement.getProjectId() != null) {
+            String trigger = String.format("结算 %s 审批通过",
+                    settlement.getSettlementCode() != null ? settlement.getSettlementCode() : "#" + settlementId);
+            archiveNotifier.checkAndNotify(settlement.getProjectId(), settlement.getTenantId(), trigger);
         }
     }
 
