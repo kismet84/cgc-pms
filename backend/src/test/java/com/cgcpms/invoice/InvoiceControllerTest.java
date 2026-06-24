@@ -179,9 +179,10 @@ class InvoiceControllerTest {
                     "invoiceNo": "INV-TEST-%d",
                     "invoiceType": "VAT_SPECIAL",
                     "invoiceAmount": 5000.00,
-                    "invoiceDate": "2026-06-22"
+                    "invoiceDate": "2026-06-22",
+                    "payRecordId": %d
                 }
-                """.formatted(System.nanoTime());
+                """.formatted(System.nanoTime(), payRecordId);
 
         String response = mockMvc.perform(postWithApi("/invoices")
                         .cookie(adminCookie())
