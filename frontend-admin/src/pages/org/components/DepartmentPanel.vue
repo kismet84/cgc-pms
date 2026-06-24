@@ -49,10 +49,9 @@ const emit = defineEmits<{
     </div>
 
     <div class="org-dept-focus">
-      <div>
-        <span>当前范围</span>
-        <strong>{{ currentCompanyName }}</strong>
-      </div>
+      <span
+        >{{ currentCompanyName }} / {{ currentCompanyName }} {{ departmentCount }} 个部门节点</span
+      >
       <a-button
         v-if="selectedCompanyId"
         size="small"

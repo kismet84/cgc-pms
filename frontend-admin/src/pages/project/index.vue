@@ -832,7 +832,7 @@ const gridColumns = computed(() => [
   --project-primary-hover: #40a9ff;
   --project-primary-light: #e6f7ff;
   --project-primary-text: #0050b3;
-  --project-bg: #f0f2f5;
+  --project-bg: var(--bg);
   --project-surface: #fff;
   --project-text: #333333;
   --project-text-secondary: #8c8c8c;
@@ -844,32 +844,32 @@ const gridColumns = computed(() => [
   --project-warning-bg: #fffbe6;
   --project-danger: #ff4d4f;
   --project-danger-bg: #fff1f0;
-  --project-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --project-shadow: var(--shadow-soft);
   --project-radius: 8px;
 
   min-height: 100%;
-  padding: 20px 24px;
+  padding: 32px 18px;
   background: var(--project-bg);
   color: var(--project-text);
 }
 
 .project-breadcrumb {
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   color: var(--project-text-secondary);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .project-content-layout {
   display: flex;
-  gap: 16px;
+  gap: 22px;
   align-items: flex-start;
 }
 
 .project-table-panel {
   flex: 1;
   min-width: 0;
-  min-height: 516px;
-  padding: 16px 0 0;
+  min-height: 718px;
+  padding: 0;
   background: var(--project-surface);
   border-radius: var(--project-radius);
   box-shadow: var(--project-shadow);
@@ -882,8 +882,57 @@ const gridColumns = computed(() => [
 }
 
 .project-content-layout .lg-analysis-rail {
-  width: 290px;
+  width: 402px;
   flex-shrink: 0;
+}
+
+.project-list-page :deep(.ant-btn-primary) {
+  background: var(--project-primary);
+  border-color: var(--project-primary);
+}
+
+.project-list-page :deep(.ant-btn-primary:hover) {
+  background: var(--project-primary-hover);
+  border-color: var(--project-primary-hover);
+}
+
+.project-list-page .lg-search-bar {
+  min-height: 90px;
+  padding: 22px 28px;
+}
+
+.project-list-page .lg-search-input {
+  max-width: none;
+  font-size: 17px;
+}
+
+.project-list-page .lg-search-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.project-list-page .lg-kpi-card.is-warn {
+  border-left-width: 6px;
+}
+
+.project-list-page .lg-analysis-rail .lg-panel {
+  min-height: 178px;
+}
+
+.project-list-page .lg-analysis-rail .lg-panel:first-child {
+  min-height: 300px;
+}
+
+.project-list-page .lg-analysis-rail .lg-panel:last-child {
+  min-height: 198px;
+}
+
+.project-list-page .lg-table-wrap :deep(.vxe-table) {
+  border-top: 1px solid var(--project-border);
+}
+
+.project-list-page .lg-panel :deep(.echarts) {
+  min-height: 190px;
 }
 
 @media (max-width: 1024px) {

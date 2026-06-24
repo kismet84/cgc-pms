@@ -1,39 +1,39 @@
 :root {
   /* UI 设计基准：项目列表页视觉 Token */
-  --primary: #1677FF;
-  --primary-hover: #4096FF;
-  --primary-active: #0958D9;
-  --bg: #F5F7FA;
-  --surface: #FFFFFF;
-  --surface-subtle: #FAFAFA;
-  --border: #E5E6EB;
-  --border-subtle: #F0F0F0;
-  --border-strong: #E5E6EB;
-  --text: #1D2129;
-  --text-secondary: #4E5969;
-  --muted: #86909C;
-  --disabled: #C9CDD4;
-  --success: #52C41A;
-  --warning: #FAAD14;
-  --error: #FF4D4F;
-  --info: #1677FF;
+  --primary: #1890ff;
+  --primary-hover: #40a9ff;
+  --primary-active: #096dd9;
+  --bg: #f3f6f9;
+  --surface: #ffffff;
+  --surface-subtle: #fafafa;
+  --border: #eef1f5;
+  --border-subtle: #f0f2f5;
+  --border-strong: #e5e6eb;
+  --text: #1d2129;
+  --text-secondary: #4e5969;
+  --muted: #86909c;
+  --disabled: #c9cdd4;
+  --success: #52c41a;
+  --warning: #faad14;
+  --error: #ff4d4f;
+  --info: #1677ff;
   --radius-sm: 4px;
-  --radius-md: 4px;
+  --radius-md: 8px;
   --shell-sidebar-width: 216px;
   --shell-sidebar-collapsed-width: 64px;
   --shell-header-height: 56px;
-  --shadow-soft: 0px 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0px 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0px 2px 8px rgba(0, 0, 0, 0.04);
-  --primary-soft: #E6F4FF;
-  --success-soft: #F6FFED;
-  --warning-soft: #FFFBE6;
-  --error-soft: #FFF1F0;
-  --kpi-total: #1677FF;
-  --kpi-amount: #1677FF;
-  --kpi-paid: #52C41A;
-  --kpi-unpaid: #FAAD14;
-  --kpi-overdue: #FF4D4F;
+  --shadow-soft: 0 4px 14px rgba(31, 45, 61, 0.06);
+  --shadow-sm: 0 4px 14px rgba(31, 45, 61, 0.06);
+  --shadow-md: 0 4px 16px rgba(31, 45, 61, 0.06);
+  --primary-soft: #e6f4ff;
+  --success-soft: #f6ffed;
+  --warning-soft: #fffbe6;
+  --error-soft: #fff1f0;
+  --kpi-total: #1677ff;
+  --kpi-amount: #1677ff;
+  --kpi-paid: #52c41a;
+  --kpi-unpaid: #faad14;
+  --kpi-overdue: #ff4d4f;
   --brand-gradient-logo: linear-gradient(135deg, #1668dc, #0ea5e9);
   --brand-gradient-avatar: linear-gradient(135deg, #8ac1ff, #006dff);
 
@@ -406,13 +406,13 @@ a {
 .lg-page {
   background: var(--bg);
   min-height: 100%;
-  padding: 2px 0;
+  padding: 16px 18px;
 }
 .lg-page-head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 18px;
 }
 .lg-page-head-breadcrumb {
   margin-bottom: 5px;
@@ -438,8 +438,8 @@ a {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  padding: 16px 24px;
-  margin-bottom: 16px;
+  padding: 22px 28px;
+  margin-bottom: 22px;
   background: var(--surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
@@ -447,14 +447,14 @@ a {
 .lg-search-bar :deep(.ant-input-affix-wrapper) {
   flex: 1;
   min-width: 200px;
-  height: 40px;
+  height: 44px;
   border-radius: var(--radius-md);
 }
 .lg-search-bar :deep(.ant-input) {
   font-size: 14px;
 }
 .lg-search-bar :deep(.ant-btn) {
-  height: 40px;
+  height: 44px;
   border-radius: var(--radius-md);
   font-size: 14px;
 }
@@ -497,39 +497,40 @@ a {
 .lg-kpi-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(136px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 22px;
+  margin-bottom: 22px;
 }
 .lg-kpi-card {
-  padding: 12px 16px;
+  min-height: 138px;
+  padding: 30px 28px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 18px;
   position: relative;
 }
 .lg-kpi-card.is-warn {
   background: var(--error-soft);
-  border-color: #FFCCC7;
+  border-color: #ffccc7;
   border-left: 4px solid var(--error);
 }
 .lg-kpi-card-label {
-  font-size: 12px;
+  font-size: 16px;
   color: var(--muted);
   font-weight: 500;
 }
 .lg-kpi-card-value {
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 600;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
 .lg-kpi-card-value small {
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--muted);
   margin-left: 2px;
@@ -605,8 +606,9 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
+  min-height: 92px;
+  margin-bottom: 0;
+  padding: 22px 28px;
   border-bottom: 1px solid var(--border-subtle);
 }
 .lg-toolbar-left {
@@ -636,9 +638,9 @@ a {
 /* ---- 表格容器 ---- */
 .lg-table-wrap {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: var(--shadow-md);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
   margin-bottom: 0;
 }
@@ -664,7 +666,7 @@ a {
   color: var(--error);
 }
 .lg-del:hover {
-  color: #FF7875;
+  color: #ff7875;
 }
 /* 通用标签 */
 .lg-tag {
@@ -695,15 +697,16 @@ a {
 }
 /* vxe-table 内部统一样式 */
 .lg-table-wrap :deep(.vxe-header--column) {
-  background: var(--surface-subtle);
+  background: #fbfbfc;
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
-  height: 42px;
+  height: 62px;
 }
 .lg-table-wrap :deep(.vxe-body--column) {
   color: var(--text);
   font-size: 14px;
+  height: 62px;
 }
 .lg-table-wrap :deep(.vxe-body--row:hover) {
   background: var(--bg);
@@ -837,7 +840,8 @@ a {
   align-items: center;
   justify-content: flex-end;
   gap: 14px;
-  padding: 14px 0 0;
+  min-height: 84px;
+  padding: 18px 28px;
 }
 .lg-total {
   font-size: 13px;
@@ -848,18 +852,19 @@ a {
 .lg-analysis-rail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 22px;
 }
 .lg-panel {
-  padding: 14px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-subtle);
+  padding: 30px 28px;
+  background: var(--surface);
+  border: 0;
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 .lg-panel-title {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
-  margin-bottom: 12px;
+  margin-bottom: 24px;
   color: var(--text);
 }
 
@@ -867,12 +872,11 @@ a {
 .lg-type-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
 }
 .lg-type-row {
-  display: grid;
-  grid-template-columns: 7px 56px 1fr 28px 32px;
-  gap: 8px;
+  display: flex;
+  gap: 12px;
   align-items: center;
   font-size: 13px;
 }
@@ -884,7 +888,7 @@ a {
 }
 .lg-type-label {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 16px;
 }
 .lg-type-bar-wrap {
   height: 5px;
@@ -932,7 +936,7 @@ a {
   transition: background 0.15s;
 }
 .lg-warning-item:hover {
-  background: #FFE2E0;
+  background: #ffe2e0;
 }
 .lg-warning-project {
   font-weight: 600;

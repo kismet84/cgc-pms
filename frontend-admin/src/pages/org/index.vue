@@ -250,7 +250,7 @@ onMounted(async () => {
 
 <style scoped>
 .org-panel-header p {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
@@ -267,11 +267,20 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
+.org-panel-actions :deep(.ant-btn),
+.org-panel-header > :deep(.ant-btn) {
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 4px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
 .org-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
-  gap: 14px;
-  margin-bottom: 14px;
+  grid-template-columns: minmax(0, 1.65fr) minmax(360px, 0.95fr);
+  gap: 22px;
+  margin-bottom: 22px;
   align-items: stretch;
 }
 
@@ -279,7 +288,7 @@ onMounted(async () => {
   min-width: 0;
   overflow: hidden;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 8px;
   box-shadow: var(--shadow-soft);
 }
@@ -289,29 +298,32 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 62px;
-  padding: 13px 16px;
+  min-height: 78px;
+  padding: 24px 28px 18px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .org-panel-title {
   color: var(--text);
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: 0;
 }
 
 /* ---- Search bars inside org panels (overrides for panel context) ---- */
 .lg-search-bar {
-  gap: 8px;
-  padding: 10px 12px;
-  background: #fbfdff;
+  gap: 14px;
+  padding: 18px 28px;
+  margin-bottom: 0;
+  background: var(--surface);
+  border-radius: 0;
   border-bottom: 1px solid var(--border-subtle);
+  box-shadow: none;
 }
 
 .lg-search-bar :deep(.ant-input-affix-wrapper),
 .lg-search-bar :deep(.ant-select) {
-  width: 130px;
+  width: 166px;
 }
 
 .lg-search-bar.one-line :deep(.ant-input-affix-wrapper) {
@@ -320,7 +332,20 @@ onMounted(async () => {
 
 .lg-search-bar.position :deep(.ant-input-affix-wrapper),
 .lg-search-bar.position :deep(.ant-select) {
-  width: 150px;
+  width: 178px;
+}
+
+.lg-search-bar :deep(.ant-input),
+.lg-search-bar :deep(.ant-select-selector),
+.lg-search-bar :deep(.ant-btn) {
+  height: 44px;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.lg-search-bar :deep(.ant-select-selection-item),
+.lg-search-bar :deep(.ant-select-selection-placeholder) {
+  line-height: 42px;
 }
 
 .org-table :deep(.ant-table) {
@@ -330,15 +355,15 @@ onMounted(async () => {
 
 .org-table :deep(.ant-table-thead > tr > th) {
   color: var(--text-secondary);
-  background: #f8fafc;
+  background: #fbfbfc;
   border-bottom-color: var(--border-subtle);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 800;
 }
 
 .org-table :deep(.ant-table-tbody > tr > td) {
-  padding-top: 9px;
-  padding-bottom: 9px;
+  padding-top: 16px;
+  padding-bottom: 16px;
   border-bottom-color: var(--border-subtle);
 }
 
@@ -357,11 +382,11 @@ onMounted(async () => {
 .org-panel-footer {
   justify-content: space-between;
   gap: 12px;
-  min-height: 48px;
-  padding: 10px 12px;
+  min-height: 82px;
+  padding: 18px 28px;
   color: var(--text-secondary);
   border-top: 1px solid var(--border-subtle);
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .org-dept-panel {
@@ -374,38 +399,31 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 12px 14px;
-  background: #f8fbff;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 24px 28px 8px;
+  background: var(--surface);
+  border-bottom: 0;
 }
 
 .org-dept-focus span {
   display: block;
   color: var(--muted);
-  font-size: 12px;
-}
-
-.org-dept-focus strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .org-tree-wrap {
-  min-height: 286px;
-  padding: 12px 10px 14px;
+  min-height: 270px;
+  padding: 22px 28px 28px;
   flex: 1;
 }
 
 .org-tree-wrap :deep(.ant-tree) {
   background: transparent;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .org-tree-wrap :deep(.ant-tree-node-content-wrapper) {
-  min-height: 30px;
-  padding: 3px 8px;
+  min-height: 44px;
+  padding: 7px 8px;
   border-radius: 6px;
 }
 
@@ -415,14 +433,44 @@ onMounted(async () => {
 }
 
 .org-empty-hint {
-  padding: 54px 12px;
+  padding: 72px 12px;
   color: #94a3b8;
-  font-size: 13px;
+  font-size: 16px;
   text-align: center;
 }
 
 .org-position-panel {
+  min-height: 358px;
   margin-bottom: 4px;
+}
+
+.org-position-panel .org-panel-header {
+  min-height: 84px;
+}
+
+.org-position-panel .org-table {
+  min-height: 168px;
+}
+
+.org-table :deep(.vxe-header--column) {
+  background: #fbfbfc;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+  height: 62px;
+}
+
+.org-table :deep(.vxe-body--column) {
+  color: var(--text-secondary);
+  font-size: 16px;
+  height: 62px;
+}
+
+.org-table :deep(.vxe-body--row:hover),
+.org-table :deep(.vxe-body--row:hover .vxe-body--column),
+.org-table :deep(.vxe-body--row.org-row-selected),
+.org-table :deep(.vxe-body--row.org-row-selected .vxe-body--column) {
+  background: #f5f9ff;
 }
 
 @media (max-width: 1180px) {
