@@ -129,7 +129,7 @@ onMounted(async () => {
 
 <template>
   <a-spin :spinning="loading">
-    <div class="lg-page app-page">
+    <div class="lg-page app-page org-page">
       <div class="lg-page-head">
         <div>
           <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
@@ -250,7 +250,7 @@ onMounted(async () => {
 
 <style scoped>
 .org-panel-header p {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
@@ -269,18 +269,18 @@ onMounted(async () => {
 
 .org-panel-actions :deep(.ant-btn),
 .org-panel-header > :deep(.ant-btn) {
-  height: 46px;
-  padding: 0 22px;
+  height: 34px;
+  padding: 0 16px;
   border-radius: 4px;
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 500;
 }
 
 .org-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(360px, 0.95fr);
-  gap: 22px;
-  margin-bottom: 22px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  margin-bottom: 16px;
   align-items: stretch;
 }
 
@@ -295,25 +295,25 @@ onMounted(async () => {
 
 .org-panel-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  min-height: 78px;
-  padding: 24px 28px 18px;
-  border-bottom: 1px solid var(--border-subtle);
+  min-height: 0;
+  padding: 16px 20px 0;
+  border-bottom: 0;
 }
 
 .org-panel-title {
   color: var(--text);
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
 /* ---- Search bars inside org panels (overrides for panel context) ---- */
 .lg-search-bar {
-  gap: 14px;
-  padding: 18px 28px;
+  gap: 12px;
+  padding: 12px 20px;
   margin-bottom: 0;
   background: var(--surface);
   border-radius: 0;
@@ -323,7 +323,7 @@ onMounted(async () => {
 
 .lg-search-bar :deep(.ant-input-affix-wrapper),
 .lg-search-bar :deep(.ant-select) {
-  width: 166px;
+  width: 160px;
 }
 
 .lg-search-bar.one-line :deep(.ant-input-affix-wrapper) {
@@ -332,20 +332,20 @@ onMounted(async () => {
 
 .lg-search-bar.position :deep(.ant-input-affix-wrapper),
 .lg-search-bar.position :deep(.ant-select) {
-  width: 178px;
+  width: 160px;
 }
 
 .lg-search-bar :deep(.ant-input),
 .lg-search-bar :deep(.ant-select-selector),
 .lg-search-bar :deep(.ant-btn) {
-  height: 44px;
+  height: 34px;
   border-radius: 4px;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .lg-search-bar :deep(.ant-select-selection-item),
 .lg-search-bar :deep(.ant-select-selection-placeholder) {
-  line-height: 42px;
+  line-height: 32px;
 }
 
 .org-table :deep(.ant-table) {
@@ -355,15 +355,15 @@ onMounted(async () => {
 
 .org-table :deep(.ant-table-thead > tr > th) {
   color: var(--text-secondary);
-  background: #fbfbfc;
+  background: #fff;
   border-bottom-color: var(--border-subtle);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .org-table :deep(.ant-table-tbody > tr > td) {
-  padding-top: 16px;
-  padding-bottom: 16px;
+  padding-top: 12px;
+  padding-bottom: 12px;
   border-bottom-color: var(--border-subtle);
 }
 
@@ -381,12 +381,13 @@ onMounted(async () => {
 
 .org-panel-footer {
   justify-content: space-between;
-  gap: 12px;
-  min-height: 82px;
-  padding: 18px 28px;
+  gap: 16px;
+  min-height: 60px;
+  padding: 16px 20px 0;
   color: var(--text-secondary);
   border-top: 1px solid var(--border-subtle);
-  font-size: 16px;
+  margin-top: 16px;
+  font-size: 14px;
 }
 
 .org-dept-panel {
@@ -399,7 +400,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 24px 28px 8px;
+  padding: 16px 20px 0;
   background: var(--surface);
   border-bottom: 0;
 }
@@ -407,24 +408,24 @@ onMounted(async () => {
 .org-dept-focus span {
   display: block;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .org-tree-wrap {
-  min-height: 270px;
-  padding: 22px 28px 28px;
+  min-height: 194px;
+  padding: 0 20px 0;
   flex: 1;
 }
 
 .org-tree-wrap :deep(.ant-tree) {
   background: transparent;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .org-tree-wrap :deep(.ant-tree-node-content-wrapper) {
-  min-height: 44px;
-  padding: 7px 8px;
-  border-radius: 6px;
+  min-height: 39px;
+  padding: 5px 0;
+  border-radius: 0;
 }
 
 .org-tree-wrap :deep(.ant-tree-node-content-wrapper:hover),
@@ -433,19 +434,19 @@ onMounted(async () => {
 }
 
 .org-empty-hint {
-  padding: 72px 12px;
+  padding: 40px 12px;
   color: #94a3b8;
-  font-size: 16px;
+  font-size: 14px;
   text-align: center;
 }
 
 .org-position-panel {
-  min-height: 358px;
+  min-height: 0;
   margin-bottom: 4px;
 }
 
 .org-position-panel .org-panel-header {
-  min-height: 84px;
+  min-height: 0;
 }
 
 .org-position-panel .org-table {
@@ -453,17 +454,17 @@ onMounted(async () => {
 }
 
 .org-table :deep(.vxe-header--column) {
-  background: #fbfbfc;
+  background: #fff;
   color: var(--muted);
-  font-size: 16px;
-  font-weight: 700;
-  height: 62px;
+  font-size: 14px;
+  font-weight: 500;
+  height: 42px;
 }
 
 .org-table :deep(.vxe-body--column) {
   color: var(--text-secondary);
-  font-size: 16px;
-  height: 62px;
+  font-size: 14px;
+  height: 48px;
 }
 
 .org-table :deep(.vxe-body--row:hover),
@@ -471,6 +472,187 @@ onMounted(async () => {
 .org-table :deep(.vxe-body--row.org-row-selected),
 .org-table :deep(.vxe-body--row.org-row-selected .vxe-body--column) {
   background: #f5f9ff;
+}
+
+.org-page :deep(.org-panel-header p) {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.org-page :deep(.org-panel-actions),
+.org-page :deep(.org-panel-footer) {
+  display: flex;
+  align-items: center;
+}
+
+.org-page :deep(.org-panel-actions) {
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.org-page :deep(.org-dept-panel .org-panel-actions .ant-btn) {
+  height: auto;
+  padding: 0 8px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.org-page :deep(.org-dept-panel .org-panel-actions .ant-btn-dangerous) {
+  color: var(--error);
+}
+
+.org-page :deep(.org-panel-header > .ant-btn),
+.org-page :deep(.org-position-panel .org-panel-header > .ant-btn) {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.org-page :deep(.org-panel-header) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 0;
+  padding: 16px 20px 0;
+  border-bottom: 0;
+}
+
+.org-page :deep(.org-panel-title) {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.org-page :deep(.lg-search-bar) {
+  gap: 12px;
+  padding: 12px 20px;
+  margin-bottom: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.org-page :deep(.lg-search-bar .ant-input-affix-wrapper),
+.org-page :deep(.lg-search-bar .ant-select) {
+  width: 160px;
+}
+
+.org-page :deep(.lg-search-bar.one-line .ant-input-affix-wrapper) {
+  width: 100%;
+}
+
+.org-page :deep(.lg-search-bar .ant-input),
+.org-page :deep(.lg-search-bar .ant-select-selector),
+.org-page :deep(.lg-search-bar .ant-btn) {
+  height: 34px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.org-page :deep(.lg-search-bar .ant-select-selection-item),
+.org-page :deep(.lg-search-bar .ant-select-selection-placeholder) {
+  line-height: 32px;
+}
+
+.org-page :deep(.org-table .vxe-header--column) {
+  height: 42px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.org-page :deep(.org-table .vxe-body--column) {
+  height: 48px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.org-page :deep(.org-table .vxe-body--row:hover),
+.org-page :deep(.org-table .vxe-body--row:hover .vxe-body--column),
+.org-page :deep(.org-table .vxe-body--row.org-row-selected),
+.org-page :deep(.org-table .vxe-body--row.org-row-selected .vxe-body--column) {
+  background: #fafafa;
+}
+
+.org-page :deep(.org-table .ant-btn-link) {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.org-page :deep(.org-panel-footer) {
+  justify-content: flex-end;
+  gap: 16px;
+  min-height: 60px;
+  padding: 16px 20px 0;
+  margin-top: 16px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 14px;
+}
+
+.org-page :deep(.org-dept-focus) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 20px 0;
+  background: var(--surface);
+  border-bottom: 0;
+}
+
+.org-page :deep(.org-dept-focus span) {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.org-page :deep(.org-tree-wrap) {
+  min-height: 194px;
+  padding: 0 20px;
+  flex: 1;
+}
+
+.org-page :deep(.org-list) {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.org-page :deep(.org-list li) {
+  padding: 10px 0;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    background 0.2s,
+    padding-left 0.2s;
+}
+
+.org-page :deep(.org-list li:last-child) {
+  border-bottom: 0;
+}
+
+.org-page :deep(.org-list li:hover),
+.org-page :deep(.org-list li.active) {
+  padding-left: 8px;
+  color: var(--primary);
+  background: #fafafa;
 }
 
 @media (max-width: 1180px) {

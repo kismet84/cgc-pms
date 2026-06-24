@@ -103,7 +103,7 @@ function getDeptName(departmentId: string | undefined, flatDeptList: FlatDeptIte
         <a-select-option value="ENABLED">启用</a-select-option>
         <a-select-option value="DISABLED">禁用</a-select-option>
       </a-select>
-      <a-button size="small" @click="emit('search')">查询</a-button>
+      <a-button type="primary" size="small" @click="emit('search')">查询</a-button>
       <a-button size="small" @click="emit('reset')">重置</a-button>
     </div>
 

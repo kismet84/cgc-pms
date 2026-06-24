@@ -848,28 +848,28 @@ const gridColumns = computed(() => [
   --project-radius: 8px;
 
   min-height: 100%;
-  padding: 32px 18px;
+  padding: 20px 24px;
   background: var(--project-bg);
   color: var(--project-text);
 }
 
 .project-breadcrumb {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   color: var(--project-text-secondary);
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .project-content-layout {
   display: flex;
-  gap: 22px;
+  gap: 16px;
   align-items: flex-start;
 }
 
 .project-table-panel {
   flex: 1;
   min-width: 0;
-  min-height: 718px;
-  padding: 0;
+  min-height: 516px;
+  padding: 0 0 16px;
   background: var(--project-surface);
   border-radius: var(--project-radius);
   box-shadow: var(--project-shadow);
@@ -882,7 +882,7 @@ const gridColumns = computed(() => [
 }
 
 .project-content-layout .lg-analysis-rail {
-  width: 402px;
+  width: 290px;
   flex-shrink: 0;
 }
 
@@ -897,13 +897,13 @@ const gridColumns = computed(() => [
 }
 
 .project-list-page .lg-search-bar {
-  min-height: 90px;
-  padding: 22px 28px;
+  min-height: 72px;
+  padding: 16px 24px;
 }
 
 .project-list-page .lg-search-input {
   max-width: none;
-  font-size: 17px;
+  font-size: 14px;
 }
 
 .project-list-page .lg-search-actions {
@@ -912,19 +912,19 @@ const gridColumns = computed(() => [
 }
 
 .project-list-page .lg-kpi-card.is-warn {
-  border-left-width: 6px;
+  border-left-width: 4px;
 }
 
 .project-list-page .lg-analysis-rail .lg-panel {
-  min-height: 178px;
+  min-height: 0;
 }
 
 .project-list-page .lg-analysis-rail .lg-panel:first-child {
-  min-height: 300px;
+  min-height: 0;
 }
 
 .project-list-page .lg-analysis-rail .lg-panel:last-child {
-  min-height: 198px;
+  min-height: 0;
 }
 
 .project-list-page .lg-table-wrap :deep(.vxe-table) {
@@ -932,7 +932,7 @@ const gridColumns = computed(() => [
 }
 
 .project-list-page .lg-panel :deep(.echarts) {
-  min-height: 190px;
+  min-height: 176px;
 }
 
 @media (max-width: 1024px) {

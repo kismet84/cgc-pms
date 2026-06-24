@@ -52,16 +52,16 @@ defineProps<{
 .org-metric-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(150px, 1fr));
-  gap: 22px;
-  margin-bottom: 22px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .org-metric {
   display: flex;
   align-items: center;
-  gap: 22px;
-  min-height: 132px;
-  padding: 32px 28px;
+  gap: 16px;
+  min-height: 80px;
+  padding: 16px 20px 20px;
   background: var(--surface);
   border: 0;
   border-radius: 8px;
@@ -72,10 +72,10 @@ defineProps<{
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 60px;
-  height: 60px;
+  width: 44px;
+  height: 44px;
   color: #fff;
-  font-size: 28px;
+  font-size: 20px;
   border-radius: 8px;
 }
 
@@ -97,7 +97,7 @@ defineProps<{
   max-width: 180px;
   overflow: hidden;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -106,7 +106,7 @@ defineProps<{
   display: block;
   margin-top: 4px;
   color: var(--text);
-  font-size: 34px;
+  font-size: 24px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
@@ -115,8 +115,8 @@ defineProps<{
 .org-metric small {
   margin-left: 2px;
   color: var(--text-secondary);
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .org-metric:last-child {
@@ -125,10 +125,10 @@ defineProps<{
 
 .org-metric:last-child::after {
   position: absolute;
-  right: 28px;
-  bottom: 22px;
-  left: 110px;
-  height: 5px;
+  right: 20px;
+  bottom: 16px;
+  left: 80px;
+  height: 4px;
   content: '';
   background: #43c51a;
   border-radius: 99px;

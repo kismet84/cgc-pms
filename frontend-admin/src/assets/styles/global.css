@@ -3,15 +3,15 @@
   --primary: #1890ff;
   --primary-hover: #40a9ff;
   --primary-active: #096dd9;
-  --bg: #f3f6f9;
+  --bg: #f0f2f5;
   --surface: #ffffff;
   --surface-subtle: #fafafa;
-  --border: #eef1f5;
-  --border-subtle: #f0f2f5;
+  --border: #f0f0f0;
+  --border-subtle: #f0f0f0;
   --border-strong: #e5e6eb;
-  --text: #1d2129;
-  --text-secondary: #4e5969;
-  --muted: #86909c;
+  --text: #333333;
+  --text-secondary: #8c8c8c;
+  --muted: #8c8c8c;
   --disabled: #c9cdd4;
   --success: #52c41a;
   --warning: #faad14;
@@ -19,12 +19,12 @@
   --info: #1677ff;
   --radius-sm: 4px;
   --radius-md: 8px;
-  --shell-sidebar-width: 216px;
+  --shell-sidebar-width: 220px;
   --shell-sidebar-collapsed-width: 64px;
-  --shell-header-height: 56px;
-  --shadow-soft: 0 4px 14px rgba(31, 45, 61, 0.06);
-  --shadow-sm: 0 4px 14px rgba(31, 45, 61, 0.06);
-  --shadow-md: 0 4px 16px rgba(31, 45, 61, 0.06);
+  --shell-header-height: 64px;
+  --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.04);
   --primary-soft: #e6f4ff;
   --success-soft: #f6ffed;
   --warning-soft: #fffbe6;
@@ -406,13 +406,13 @@ a {
 .lg-page {
   background: var(--bg);
   min-height: 100%;
-  padding: 16px 18px;
+  padding: 2px 0;
 }
 .lg-page-head {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 .lg-page-head-breadcrumb {
   margin-bottom: 5px;
@@ -438,8 +438,8 @@ a {
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  padding: 22px 28px;
-  margin-bottom: 22px;
+  padding: 16px 24px;
+  margin-bottom: 16px;
   background: var(--surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
@@ -447,14 +447,14 @@ a {
 .lg-search-bar :deep(.ant-input-affix-wrapper) {
   flex: 1;
   min-width: 200px;
-  height: 44px;
+  height: 40px;
   border-radius: var(--radius-md);
 }
 .lg-search-bar :deep(.ant-input) {
   font-size: 14px;
 }
 .lg-search-bar :deep(.ant-btn) {
-  height: 44px;
+  height: 40px;
   border-radius: var(--radius-md);
   font-size: 14px;
 }
@@ -497,19 +497,19 @@ a {
 .lg-kpi-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(136px, 1fr));
-  gap: 22px;
-  margin-bottom: 22px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 .lg-kpi-card {
-  min-height: 138px;
-  padding: 30px 28px;
+  min-height: 98px;
+  padding: 20px;
   background: var(--surface);
   border: 0;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 8px;
   position: relative;
 }
 .lg-kpi-card.is-warn {
@@ -518,19 +518,19 @@ a {
   border-left: 4px solid var(--error);
 }
 .lg-kpi-card-label {
-  font-size: 16px;
+  font-size: 14px;
   color: var(--muted);
   font-weight: 500;
 }
 .lg-kpi-card-value {
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
 .lg-kpi-card-value small {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--muted);
   margin-left: 2px;
@@ -606,9 +606,9 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 92px;
+  min-height: 66px;
   margin-bottom: 0;
-  padding: 22px 28px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border-subtle);
 }
 .lg-toolbar-left {
@@ -697,16 +697,16 @@ a {
 }
 /* vxe-table 内部统一样式 */
 .lg-table-wrap :deep(.vxe-header--column) {
-  background: #fbfbfc;
+  background: var(--surface-subtle);
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
-  height: 62px;
+  height: 42px;
 }
 .lg-table-wrap :deep(.vxe-body--column) {
   color: var(--text);
   font-size: 14px;
-  height: 62px;
+  height: 48px;
 }
 .lg-table-wrap :deep(.vxe-body--row:hover) {
   background: var(--bg);
@@ -840,8 +840,10 @@ a {
   align-items: center;
   justify-content: flex-end;
   gap: 14px;
-  min-height: 84px;
-  padding: 18px 28px;
+  min-height: 60px;
+  padding: 16px 20px 0;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 16px;
 }
 .lg-total {
   font-size: 13px;
@@ -852,19 +854,19 @@ a {
 .lg-analysis-rail {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
 }
 .lg-panel {
-  padding: 30px 28px;
+  padding: 20px;
   background: var(--surface);
   border: 0;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
 }
 .lg-panel-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
   color: var(--text);
 }
 
@@ -872,11 +874,11 @@ a {
 .lg-type-list {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
 }
 .lg-type-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
   font-size: 13px;
 }
@@ -888,7 +890,7 @@ a {
 }
 .lg-type-label {
   color: var(--text-secondary);
-  font-size: 16px;
+  font-size: 13px;
 }
 .lg-type-bar-wrap {
   height: 5px;

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { OrgDepartmentTreeNodeVO } from '@/types/org'
 
-defineProps<{
+const props = defineProps<{
   canAdd: boolean
   canEdit: boolean
   canDelete: boolean
@@ -23,6 +24,23 @@ const emit = defineEmits<{
   edit: []
   delete: []
 }>()
+
+const flatDepartments = computed(() => {
+  const result: OrgDepartmentTreeNodeVO[] = []
+  const walk = (nodes: OrgDepartmentTreeNodeVO[]) => {
+    nodes.forEach((node) => {
+      result.push(node)
+      if (node.children?.length) walk(node.children)
+    })
+  }
+  walk(props.filteredTree)
+  return result
+})
+
+function handleDeptClick(id: string) {
+  emit('update:selectedKeys', [id])
+  emit('select')
+}
 </script>
 
 <template>
@@ -74,16 +92,17 @@ const emit = defineEmits<{
 
     <div class="org-tree-wrap">
       <a-spin :spinning="treeLoading">
-        <a-tree
-          :selected-keys="selectedKeys"
-          :tree-data="filteredTree"
-          :field-names="{ title: 'deptName', key: 'id', children: 'children' }"
-          default-expand-all
-          block-node
-          @select="emit('select')"
-          @update:selectedKeys="emit('update:selectedKeys', $event)"
-        />
-        <div v-if="!treeLoading && !filteredTree.length" class="org-empty-hint">暂无部门节点</div>
+        <ul v-if="flatDepartments.length" class="org-list">
+          <li
+            v-for="dept in flatDepartments"
+            :key="dept.id"
+            :class="{ active: selectedKeys.includes(dept.id) }"
+            @click="handleDeptClick(dept.id)"
+          >
+            {{ dept.deptName }}
+          </li>
+        </ul>
+        <div v-else-if="!treeLoading" class="org-empty-hint">暂无部门节点</div>
       </a-spin>
     </div>
   </section>
