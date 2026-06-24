@@ -130,7 +130,7 @@ function handleMenuClick(entry: MenuEntry) {
         @click="handleMenuClick(item)"
       >
         <component :is="item.icon" class="menu-icon" />
-        <span>{{ item.label }}</span>
+        <span class="menu-label">{{ item.label }}</span>
       </button>
     </template>
   </nav>
@@ -190,5 +190,21 @@ function handleMenuClick(entry: MenuEntry) {
 
 .menu-item--active .menu-icon {
   color: var(--primary);
+}
+
+:global(.ant-layout-sider-collapsed) .menu-group,
+:global(.ant-layout-sider-collapsed) .menu-label {
+  display: none;
+}
+
+:global(.ant-layout-sider-collapsed) .menu-item {
+  justify-content: center;
+  padding: 0;
+  border-right-color: transparent;
+}
+
+:global(.ant-layout-sider-collapsed) .menu-icon {
+  margin-right: 0;
+  font-size: 17px;
 }
 </style>

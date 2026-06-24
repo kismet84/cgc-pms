@@ -407,7 +407,7 @@ const recentProjects = computed(() =>
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
   ...(colVisible.projectCode
-    ? [{ field: 'projectCode', title: '项目编号', width: 138, ellipsis: true }]
+    ? [{ field: 'projectCode', title: '项目编号', minWidth: 150, showOverflow: 'tooltip' }]
     : []),
   ...(colVisible.projectName
     ? [
@@ -415,20 +415,30 @@ const gridColumns = computed(() => [
           field: 'projectName',
           title: '项目名称',
           minWidth: 140,
+          showOverflow: 'tooltip',
           slots: { default: 'projectName' },
         },
       ]
     : []),
   ...(colVisible.projectType
-    ? [{ field: 'projectType', title: '项目类型', width: 100, slots: { default: 'projectType' } }]
+    ? [
+        {
+          field: 'projectType',
+          title: '项目类型',
+          minWidth: 116,
+          showOverflow: 'tooltip',
+          slots: { default: 'projectType' },
+        },
+      ]
     : []),
   ...(colVisible.contractAmount
     ? [
         {
           field: 'contractAmount',
           title: '合同金额',
-          width: 120,
+          minWidth: 128,
           align: 'right' as const,
+          showOverflow: 'tooltip',
           slots: { default: 'contractAmount' },
         },
       ]
@@ -438,25 +448,35 @@ const gridColumns = computed(() => [
         {
           field: 'plannedStartDate',
           title: '计划工期',
-          width: 96,
+          minWidth: 110,
+          showOverflow: 'tooltip',
           slots: { default: 'plannedDuration' },
         },
       ]
     : []),
   ...(colVisible.status
-    ? [{ field: 'status', title: '状态', width: 74, slots: { default: 'status' } }]
+    ? [
+        {
+          field: 'status',
+          title: '状态',
+          minWidth: 76,
+          showOverflow: 'tooltip',
+          slots: { default: 'status' },
+        },
+      ]
     : []),
   ...(colVisible.approvalStatus
     ? [
         {
           field: 'approvalStatus',
           title: '审批状态',
-          width: 86,
+          minWidth: 92,
+          showOverflow: 'tooltip',
           slots: { default: 'approvalStatus' },
         },
       ]
     : []),
-  ...(colVisible.ops ? [{ title: '操作', width: 112, slots: { default: 'ops' } }] : []),
+  ...(colVisible.ops ? [{ title: '操作', minWidth: 118, slots: { default: 'ops' } }] : []),
 ])
 </script>
 
@@ -700,11 +720,6 @@ const gridColumns = computed(() => [
               <template #icon><PlusOutlined /></template>
               新建项目
             </a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
-          </div>
-          <div class="lg-toolbar-right">
             <a-dropdown :trigger="['click']">
               <a-button>
                 <template #icon><SettingOutlined /></template>
@@ -720,6 +735,9 @@ const gridColumns = computed(() => [
                 </a-menu>
               </template>
             </a-dropdown>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
         </div>
 
@@ -729,7 +747,9 @@ const gridColumns = computed(() => [
             :data="tableData"
             :columns="gridColumns"
             :loading="loading"
-            :column-config="{ resizable: true }"
+            :column-config="{ resizable: true, useKey: true }"
+            show-overflow="tooltip"
+            show-header-overflow="tooltip"
             stripe
             border="inner"
             size="small"
@@ -988,6 +1008,27 @@ const gridColumns = computed(() => [
 .project-list-page .lg-table-wrap :deep(.vxe-cell) {
   padding-left: 20px;
   padding-right: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-list-page .lg-table-wrap :deep(.vxe-cell--title),
+.project-list-page .lg-table-wrap :deep(.vxe-cell > span),
+.project-list-page .lg-table-wrap :deep(.vxe-cell > a),
+.project-list-page .lg-table-wrap :deep(.lg-link),
+.project-list-page .lg-table-wrap :deep(.lg-money),
+.project-list-page .lg-table-wrap :deep(.lg-tag) {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.project-list-page .lg-table-wrap :deep(.vxe-table--render-default .vxe-body--column) {
+  white-space: nowrap;
 }
 
 .project-list-page .lg-table-wrap :deep(.vxe-body--row:hover),
