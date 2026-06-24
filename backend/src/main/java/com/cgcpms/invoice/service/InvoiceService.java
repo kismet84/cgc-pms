@@ -13,6 +13,8 @@ import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -35,6 +37,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 public class InvoiceService {
 
     private final PayInvoiceMapper payInvoiceMapper;
+    private final PayRecordMapper payRecordMapper;
 
     // ── Query ──
 
@@ -70,8 +73,19 @@ public class InvoiceService {
         if (invoice.getVerifyStatus() == null || invoice.getVerifyStatus().isBlank()) {
             invoice.setVerifyStatus("PENDING");
         }
+        // 强制关联付款记录 — 新创建的发票必须绑定有效付款记录
+        if (invoice.getPayRecordId() == null) {
+            throw new BusinessException("MISSING_PAY_RECORD_ID", "创建发票时必须关联付款记录");
+        }
+        // 校验付款记录存在且属于当前租户
+        PayRecord payRecord = payRecordMapper.selectById(invoice.getPayRecordId());
+        if (payRecord == null || !payRecord.getTenantId().equals(invoice.getTenantId())) {
+            throw new BusinessException("PAY_RECORD_NOT_FOUND",
+                    "关联的付款记录(" + invoice.getPayRecordId() + ")不存在或不属于当前租户");
+        }
         checkAndThrowDuplicate(invoice.getInvoiceNo(), () -> payInvoiceMapper.insert(invoice));
-        log.info("Invoice created: id={}, invoiceNo={}", invoice.getId(), invoice.getInvoiceNo());
+        log.info("Invoice created: id={}, invoiceNo={}, payRecordId={}",
+                invoice.getId(), invoice.getInvoiceNo(), invoice.getPayRecordId());
         return invoice.getId();
     }
 
@@ -124,7 +138,8 @@ public class InvoiceService {
 
     @Transactional
     public Long register(PayInvoice invoice) {
-        // Register is same as create but ensures pay_record_id linkage
+        // Register is same as create but additionally validates payRecord linkage
+        // create() already enforces payRecordId non-null + referential integrity
         if (invoice.getPayRecordId() == null) {
             throw new BusinessException("MISSING_PAY_RECORD_ID", "登记发票时必须关联付款记录");
         }

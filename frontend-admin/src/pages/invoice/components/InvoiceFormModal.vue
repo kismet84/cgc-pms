@@ -105,6 +105,10 @@ watch(
 )
 
 async function handleModalOk() {
+  if (!formData.payRecordId) {
+    message.warning('请选择关联的付款记录')
+    return
+  }
   if (!formData.invoiceNo || formData.invoiceNo.trim() === '') {
     message.warning('请输入发票号码')
     return
@@ -318,11 +322,10 @@ defineExpose({
           识别发票
         </a-button>
       </a-form-item>
-      <a-form-item label="付款记录">
+      <a-form-item label="付款记录" required>
         <a-select
           v-model:value="formData.payRecordId"
-          placeholder="请选择关联的付款记录（可选）"
-          allow-clear
+          placeholder="请选择关联的付款记录"
         >
           <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
             {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}

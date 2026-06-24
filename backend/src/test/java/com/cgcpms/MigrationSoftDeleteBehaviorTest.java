@@ -22,6 +22,10 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +38,7 @@ class MigrationSoftDeleteBehaviorTest {
 
     private static final long TENANT_ID = 1L;
     private static final long USER_ID = 1L;
+    private static final long SEED_PAY_RECORD_ID = 90001L;
 
     @Autowired
     private MatStockMapper matStockMapper;
@@ -50,6 +55,9 @@ class MigrationSoftDeleteBehaviorTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private PayRecordMapper payRecordMapper;
+
     @BeforeEach
     void setUp() {
         Claims claims = Jwts.claims()
@@ -60,6 +68,18 @@ class MigrationSoftDeleteBehaviorTest {
                 .add("roleCodes", java.util.List.of("ADMIN"))
                 .build();
         UserContext.set(claims);
+
+        // Insert seed pay record so invoice creation (now mandatory payRecordId) succeeds
+        // Use JDBC physical delete to avoid logical-delete PK conflicts
+        jdbcTemplate.update("DELETE FROM pay_record WHERE tenant_id = ?", TENANT_ID);
+        PayRecord seed = new PayRecord();
+        seed.setId(SEED_PAY_RECORD_ID);
+        seed.setTenantId(TENANT_ID);
+        seed.setPayApplicationId(SEED_PAY_RECORD_ID);
+        seed.setPayAmount(new BigDecimal("100000.00"));
+        seed.setPayDate(LocalDate.of(2026, 6, 1));
+        seed.setPayStatus("PAID");
+        payRecordMapper.insert(seed);
     }
 
     @AfterEach
@@ -143,6 +163,7 @@ class MigrationSoftDeleteBehaviorTest {
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("100.00"));
         invoice.setInvoiceDate(LocalDate.of(2026, 6, 21));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         return invoice;
     }
 }

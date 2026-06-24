@@ -1,19 +1,21 @@
 package com.cgcpms.invoice;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceVO;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,12 +29,19 @@ class InvoiceServiceTest {
 
     private static final long TENANT_ID = 1L;
     private static final long USER_ADMIN = 1L;
+    private static final long SEED_PAY_RECORD_ID = 90001L;
 
     @Autowired
     private InvoiceService invoiceService;
 
     @Autowired
     private PayInvoiceMapper payInvoiceMapper;
+
+    @Autowired
+    private PayRecordMapper payRecordMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -44,6 +53,20 @@ class InvoiceServiceTest {
                 .add("roleCodes", java.util.List.of("ADMIN"))
                 .build();
         UserContext.set(claims);
+
+        // 物理清理本测试关心的表，防止数据污染（MyBatis-Plus delete 走逻辑删，会触发 PK 冲突）
+        jdbcTemplate.update("DELETE FROM pay_invoice WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM pay_record WHERE tenant_id = ?", TENANT_ID);
+
+        // 插入种子付款记录，供发票创建时关联使用
+        PayRecord seed = new PayRecord();
+        seed.setId(SEED_PAY_RECORD_ID);
+        seed.setTenantId(TENANT_ID);
+        seed.setPayApplicationId(SEED_PAY_RECORD_ID);
+        seed.setPayAmount(new BigDecimal("100000.00"));
+        seed.setPayDate(LocalDate.of(2026, 6, 1));
+        seed.setPayStatus("PAID");
+        payRecordMapper.insert(seed);
     }
 
     @AfterEach
@@ -64,7 +87,7 @@ class InvoiceServiceTest {
         invoice.setTaxRate(new BigDecimal("13.00"));
         invoice.setTaxAmount(new BigDecimal("1300.00"));
         invoice.setInvoiceDate(LocalDate.of(2026, 6, 12));
-        invoice.setPayRecordId(1L);
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
 
         Long id = invoiceService.create(invoice);
         assertNotNull(id);
@@ -89,6 +112,7 @@ class InvoiceServiceTest {
         invoice1.setInvoiceNo("INV-DUP-002");
         invoice1.setInvoiceType("VAT_SPECIAL");
         invoice1.setInvoiceAmount(new BigDecimal("5000.00"));
+        invoice1.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id1 = invoiceService.create(invoice1);
         assertNotNull(id1);
 
@@ -96,6 +120,7 @@ class InvoiceServiceTest {
         invoice2.setInvoiceNo("INV-DUP-002");
         invoice2.setInvoiceType("VAT_NORMAL");
         invoice2.setInvoiceAmount(new BigDecimal("3000.00"));
+        invoice2.setPayRecordId(SEED_PAY_RECORD_ID);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             invoiceService.create(invoice2);
@@ -113,6 +138,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceNo("INV-VFY-003");
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("8000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
 
         invoiceService.verify(id, "VERIFIED");
@@ -131,6 +157,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceNo("INV-ABN-004");
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("6000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
 
         invoiceService.verify(id, "ABNORMAL");
@@ -149,6 +176,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceNo("INV-NPV-005");
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("7000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
         invoiceService.verify(id, "VERIFIED");
 
@@ -168,6 +196,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceNo("INV-INV-006");
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("9000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
@@ -186,6 +215,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceNo("INV-TNT-007");
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("4000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
 
         // Switch to different tenant
@@ -214,6 +244,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceNo("INV-UPD-008");
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("2000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
 
         PayInvoice update = new PayInvoice();
@@ -237,6 +268,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceNo("INV-DEL-009");
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("1000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
 
         invoiceService.delete(id);
@@ -257,13 +289,13 @@ class InvoiceServiceTest {
         invoice.setInvoiceNo("INV-REG-010");
         invoice.setInvoiceType("VAT_SPECIAL");
         invoice.setInvoiceAmount(new BigDecimal("15000.00"));
-        invoice.setPayRecordId(1L);
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
 
         Long id = invoiceService.register(invoice);
         assertNotNull(id);
 
         InvoiceVO vo = invoiceService.getById(id);
-        assertEquals("1", vo.getPayRecordId());
+        assertEquals(String.valueOf(SEED_PAY_RECORD_ID), vo.getPayRecordId());
     }
 
     // ── RED 11: register without pay_record_id → rejected ──
@@ -282,5 +314,41 @@ class InvoiceServiceTest {
             invoiceService.register(invoice);
         });
         assertEquals("MISSING_PAY_RECORD_ID", ex.getCode());
+    }
+
+    // ── RED 12: create without pay_record_id → rejected ──
+
+    @Test
+    @Order(12)
+    @DisplayName("CREATE: missing payRecordId rejected (mandatory linkage)")
+    void shouldRejectCreateWithoutPayRecord() {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setInvoiceNo("INV-NOPR-012");
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setInvoiceAmount(new BigDecimal("5000.00"));
+        // payRecordId not set
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            invoiceService.create(invoice);
+        });
+        assertEquals("MISSING_PAY_RECORD_ID", ex.getCode());
+    }
+
+    // ── RED 13: create with non-existent pay_record_id → rejected ──
+
+    @Test
+    @Order(13)
+    @DisplayName("CREATE: non-existent payRecordId rejected")
+    void shouldRejectCreateWithInvalidPayRecord() {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setInvoiceNo("INV-INVPR-013");
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setInvoiceAmount(new BigDecimal("5000.00"));
+        invoice.setPayRecordId(99999999999L);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> {
+            invoiceService.create(invoice);
+        });
+        assertEquals("PAY_RECORD_NOT_FOUND", ex.getCode());
     }
 }

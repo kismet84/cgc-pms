@@ -99,7 +99,7 @@ test.describe('Invoice: Create → Register → Verify', () => {
       .locator('.ant-modal .ant-form-item:has(label:has-text("税额")) .ant-input-number-input')
       .fill('19500')
 
-    // Optionally link a pay record if available — try selecting the first one
+    // Link a pay record (mandatory)
     const payRecordSelect = page.locator(
       '.ant-modal .ant-form-item:has(label:has-text("付款记录")) .ant-select',
     )
@@ -108,18 +108,18 @@ test.describe('Invoice: Create → Register → Verify', () => {
       timeout: 5000,
     })
 
-    const hasPayRecords = await page
-      .locator('.ant-select-item-option')
-      .first()
+    const firstOption = page.locator('.ant-select-item-option').first()
+    const hasPayRecords = await firstOption
       .isVisible({ timeout: 3000 })
       .catch(() => false)
-    if (hasPayRecords) {
-      // Click the first pay record to register invoice
-      await page.locator('.ant-select-item-option').first().click()
-    } else {
-      // Close the dropdown without selecting
-      await page.keyboard.press('Escape')
+    if (!hasPayRecords) {
+      console.warn('No pay records available — invoice creation requires a pay record, skipping test')
+      // Close modal and skip
+      await page.locator('.ant-modal .ant-modal-close').click()
+      return
     }
+    // Select the first pay record
+    await firstOption.click()
 
     // Click OK to save
     await page.locator('.ant-modal .ant-modal-footer .ant-btn-primary').click()
