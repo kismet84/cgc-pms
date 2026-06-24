@@ -79,7 +79,13 @@ const gridColumns = computed(() => [
   { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
   { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
   { field: 'partnerName', title: '分包商', width: 120, ellipsis: true },
-  { field: 'subTaskName', title: '关联任务', width: 120, ellipsis: true, slots: { default: 'subTaskName' } },
+  {
+    field: 'subTaskName',
+    title: '关联任务',
+    width: 120,
+    ellipsis: true,
+    slots: { default: 'subTaskName' },
+  },
   {
     field: 'reportedAmount',
     title: '申报金额',

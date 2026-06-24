@@ -77,7 +77,9 @@ describe('Dashboard data loading behavior', () => {
     )
     expect(composableSource).toMatch(/selectedProjectId\.value\s*=\s*projectList\.value\[0\]\.id/)
     expect(composableSource).toMatch(/await\s+fetchViewData\s*\(\s*\)/)
-    const mountedBlock = composableSource.match(/onMounted\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*?\n  \}\)/)?.[0]
+    const mountedBlock = composableSource.match(
+      /onMounted\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*?\n  \}\)/,
+    )?.[0]
     expect(mountedBlock).toBeDefined()
     expect(mountedBlock).not.toContain('return')
   })

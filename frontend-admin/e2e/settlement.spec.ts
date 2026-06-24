@@ -260,7 +260,15 @@ test.describe('Settlement: List → Detail → Summary', () => {
     await page.waitForSelector('.stl-detail-page', { timeout: 10000 })
 
     // Verify expected tabs exist
-    const expectedTabs = ['基本信息', '汇总', '签证变更', '付款记录', '成本明细', '附件', '审批记录']
+    const expectedTabs = [
+      '基本信息',
+      '汇总',
+      '签证变更',
+      '付款记录',
+      '成本明细',
+      '附件',
+      '审批记录',
+    ]
     for (const tabName of expectedTabs) {
       const tab = page.locator(`.ant-tabs-tab:has-text("${tabName}")`)
       const visible = await tab.isVisible({ timeout: 3000 }).catch(() => false)
@@ -279,18 +287,14 @@ test.describe('Settlement: List → Detail → Summary', () => {
     await page.waitForSelector('.stl-filter', { timeout: 10000 })
 
     // Find project select filter
-    const projectSelect = page.locator(
-      '.stl-field:has(label:has-text("所属项目")) .ant-select',
-    )
+    const projectSelect = page.locator('.stl-field:has(label:has-text("所属项目")) .ant-select')
     const hasProjectFilter = await projectSelect.isVisible({ timeout: 3000 }).catch(() => false)
 
     if (hasProjectFilter) {
       await projectSelect.click()
       await page.waitForTimeout(500)
 
-      const dropdown = page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-        .last()
+      const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
       const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
 
       if (dropdownVisible) {

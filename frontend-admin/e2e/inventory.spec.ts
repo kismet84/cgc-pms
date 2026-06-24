@@ -193,7 +193,10 @@ test.describe('Inventory original failure regressions', () => {
       console.log('Pagination not visible — may be single page of results')
     }
 
-    await page.screenshot({ path: 'e2e/screenshots/inventory-ledger-pagination.png', fullPage: true })
+    await page.screenshot({
+      path: 'e2e/screenshots/inventory-ledger-pagination.png',
+      fullPage: true,
+    })
   })
 
   test('stock detail modal opens and displays data', async ({ page }) => {
@@ -235,7 +238,10 @@ test.describe('Inventory original failure regressions', () => {
 
     // KPI cards may exist on the page
     const kpiSection = page.locator('.lg-kpi-strip, .ant-card:has(.ant-statistic)')
-    const kpiVisible = await kpiSection.first().isVisible({ timeout: 5000 }).catch(() => false)
+    const kpiVisible = await kpiSection
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false)
 
     if (kpiVisible) {
       const kpiCount = await kpiSection.count()
@@ -260,9 +266,7 @@ test.describe('Inventory original failure regressions', () => {
     await expect(page.locator('.ant-tabs-tab:has-text("出库")')).toBeVisible()
 
     // Default tab should be inbound
-    await expect(
-      page.locator('.ant-tabs-tab-active').filter({ hasText: '入库' }),
-    ).toBeVisible()
+    await expect(page.locator('.ant-tabs-tab-active').filter({ hasText: '入库' })).toBeVisible()
   })
 
   test('stock ledger search by keyword works', async ({ page }) => {
@@ -270,7 +274,9 @@ test.describe('Inventory original failure regressions', () => {
     await expect(page.getByRole('heading', { name: '库存台账' })).toBeVisible({ timeout: 10000 })
 
     // Find keyword search input
-    const searchInput = page.locator('input[placeholder*="搜索"], input[placeholder*="关键词"]').first()
+    const searchInput = page
+      .locator('input[placeholder*="搜索"], input[placeholder*="关键词"]')
+      .first()
     const hasSearch = await searchInput.isVisible({ timeout: 3000 }).catch(() => false)
 
     if (hasSearch) {

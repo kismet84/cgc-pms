@@ -323,10 +323,7 @@ defineExpose({
         </a-button>
       </a-form-item>
       <a-form-item label="付款记录" required>
-        <a-select
-          v-model:value="formData.payRecordId"
-          placeholder="请选择关联的付款记录"
-        >
+        <a-select v-model:value="formData.payRecordId" placeholder="请选择关联的付款记录">
           <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
             {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
           </a-select-option>

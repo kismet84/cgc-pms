@@ -87,7 +87,10 @@ onBeforeUnmount(() => {
             <div class="user-info">
               <a-avatar
                 :size="32"
-                :style="{ background: 'var(--brand-gradient-avatar, linear-gradient(135deg, #8ac1ff, #006dff))' }"
+                :style="{
+                  background:
+                    'var(--brand-gradient-avatar, linear-gradient(135deg, #8ac1ff, #006dff))',
+                }"
               >
                 {{ userInfo?.realName?.[0] || '●' }}
               </a-avatar>

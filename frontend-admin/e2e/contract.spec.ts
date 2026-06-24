@@ -176,18 +176,14 @@ test.describe('Contract draft-save and ledger regression', () => {
     await page.waitForSelector('.pm-filter', { timeout: 10000 })
 
     // Find contract type filter and try to select
-    const typeSelect = page
-      .locator('.pm-field:has(label:has-text("合同类型")) .ant-select')
-      .first()
+    const typeSelect = page.locator('.pm-field:has(label:has-text("合同类型")) .ant-select').first()
     const typeSelectVisible = await typeSelect.isVisible({ timeout: 3000 }).catch(() => false)
 
     if (typeSelectVisible) {
       await typeSelect.click()
       await page.waitForTimeout(500)
 
-      const dropdown = page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-        .last()
+      const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
       const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
 
       if (dropdownVisible) {
@@ -221,10 +217,11 @@ test.describe('Contract draft-save and ledger regression', () => {
     await page.waitForSelector('.pm-page', { timeout: 10000 })
 
     // KPI cards may be present with class lg-kpi-strip or similar
-    const kpiSection = page.locator(
-      '.lg-kpi-strip, .ant-card:has(.ant-statistic), .stl-kpis',
-    )
-    const kpiVisible = await kpiSection.first().isVisible({ timeout: 5000 }).catch(() => false)
+    const kpiSection = page.locator('.lg-kpi-strip, .ant-card:has(.ant-statistic), .stl-kpis')
+    const kpiVisible = await kpiSection
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false)
 
     if (kpiVisible) {
       console.log('KPI cards visible on contract ledger')

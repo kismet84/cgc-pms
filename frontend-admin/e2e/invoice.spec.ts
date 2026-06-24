@@ -109,11 +109,11 @@ test.describe('Invoice: Create → Register → Verify', () => {
     })
 
     const firstOption = page.locator('.ant-select-item-option').first()
-    const hasPayRecords = await firstOption
-      .isVisible({ timeout: 3000 })
-      .catch(() => false)
+    const hasPayRecords = await firstOption.isVisible({ timeout: 3000 }).catch(() => false)
     if (!hasPayRecords) {
-      console.warn('No pay records available — invoice creation requires a pay record, skipping test')
+      console.warn(
+        'No pay records available — invoice creation requires a pay record, skipping test',
+      )
       // Close modal and skip
       await page.locator('.ant-modal .ant-modal-close').click()
       return

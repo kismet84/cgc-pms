@@ -56,9 +56,7 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
     // Click "新建申请" to open modal
     await page.click('.pm-filter-actions button:has-text("新建申请")')
     await expect(page.locator('.ant-modal')).toBeVisible({ timeout: 5000 })
-    await expect(
-      page.locator('.ant-modal .ant-modal-title:has-text("新建采购申请")'),
-    ).toBeVisible()
+    await expect(page.locator('.ant-modal .ant-modal-title:has-text("新建采购申请")')).toBeVisible()
 
     // Select project
     const projectSelect = page.locator(
@@ -227,18 +225,14 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
     await page.waitForSelector('.pm-filter', { timeout: 10000 })
 
     // Find status filter select
-    const statusSelect = page
-      .locator('.pm-field:has(label:has-text("状态")) .ant-select')
-      .first()
+    const statusSelect = page.locator('.pm-field:has(label:has-text("状态")) .ant-select').first()
     const hasStatusFilter = await statusSelect.isVisible({ timeout: 3000 }).catch(() => false)
 
     if (hasStatusFilter) {
       await statusSelect.click()
       await page.waitForTimeout(500)
 
-      const dropdown = page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-        .last()
+      const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
       const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
 
       if (dropdownVisible) {
@@ -268,9 +262,7 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
     await expect(page.locator('.pm-filter')).toBeVisible()
 
     // Check if warehouse filter exists
-    const warehouseFilter = page.locator(
-      '.pm-field:has(label:has-text("仓库")) .ant-select',
-    )
+    const warehouseFilter = page.locator('.pm-field:has(label:has-text("仓库")) .ant-select')
     const hasWarehouseFilter = await warehouseFilter
       .first()
       .isVisible({ timeout: 3000 })
@@ -280,9 +272,7 @@ test.describe('Procurement: Purchase Request → Purchase Order', () => {
       await warehouseFilter.first().click()
       await page.waitForTimeout(500)
 
-      const dropdown = page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-        .last()
+      const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
       const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
 
       if (dropdownVisible) {

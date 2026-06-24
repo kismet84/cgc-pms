@@ -49,7 +49,10 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     const table = sharedPage.locator('.ant-table, .vxe-table').first()
     await expect(table).toBeVisible({ timeout: 5000 })
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/ui-smoke-project-list.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/ui-smoke-project-list.png',
+      fullPage: true,
+    })
   })
 
   test('2. 合同台账页 -- lg-grid 布局可见', async () => {
@@ -63,7 +66,10 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     const gridOrTable = sharedPage.locator('.lg-grid, .ant-table, .vxe-table').first()
     await expect(gridOrTable).toBeVisible({ timeout: 5000 })
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/ui-smoke-contract-ledger.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/ui-smoke-contract-ledger.png',
+      fullPage: true,
+    })
   })
 
   test('3. 成本台账页 -- 搜索栏和表格可见', async () => {
@@ -78,7 +84,10 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     const table = sharedPage.locator('.ant-table, .vxe-table').first()
     await expect(table).toBeVisible({ timeout: 5000 })
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/ui-smoke-cost-ledger.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/ui-smoke-cost-ledger.png',
+      fullPage: true,
+    })
   })
 
   test('4. 付款申请页 -- KPI 卡片可见', async () => {
@@ -94,7 +103,10 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
 
     // KPI 卡片可选验证
     const kpiCards = sharedPage.locator('.lg-kpi-strip, .ant-card:has(.ant-statistic)')
-    const kpiVisible = await kpiCards.first().isVisible({ timeout: 3000 }).catch(() => false)
+    const kpiVisible = await kpiCards
+      .first()
+      .isVisible({ timeout: 3000 })
+      .catch(() => false)
     if (kpiVisible) {
       const kpiCount = await kpiCards.count()
       console.log(`付款页 KPI 卡片数量: ${kpiCount}`)
@@ -116,7 +128,10 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     const table = sharedPage.locator('.ant-table, .vxe-table').first()
     await expect(table).toBeVisible({ timeout: 5000 })
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/ui-smoke-inventory-stock.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/ui-smoke-inventory-stock.png',
+      fullPage: true,
+    })
   })
 
   test('6. 审批中心 -- 待办列表可见', async () => {
@@ -131,7 +146,10 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     const table = sharedPage.locator('.ant-table, .vxe-table, .ant-list').first()
     await expect(table).toBeVisible({ timeout: 5000 })
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/ui-smoke-approval-todo.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/ui-smoke-approval-todo.png',
+      fullPage: true,
+    })
   })
 
   test('7. 系统用户页 -- 表格可见', async () => {
@@ -145,6 +163,9 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     const table = sharedPage.locator('.ant-table, .vxe-table').first()
     await expect(table).toBeVisible({ timeout: 5000 })
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/ui-smoke-system-users.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/ui-smoke-system-users.png',
+      fullPage: true,
+    })
   })
 })

@@ -63,12 +63,9 @@ test.describe('Subcontract: Measure → Cost generation', () => {
     console.log(`Measure table headers: ${allHeaders}`)
 
     // Verify key columns
-    const hasApprovalStatus =
-      allHeaders.includes('审批状态') || allHeaders.includes('审批')
+    const hasApprovalStatus = allHeaders.includes('审批状态') || allHeaders.includes('审批')
     const hasAmount = allHeaders.includes('金额') || allHeaders.includes('计量')
-    console.log(
-      `Headers: approvalStatus=${hasApprovalStatus}, amount=${hasAmount}`,
-    )
+    console.log(`Headers: approvalStatus=${hasApprovalStatus}, amount=${hasAmount}`)
 
     await page.screenshot({
       path: 'e2e/screenshots/subcontract-measure-columns.png',
@@ -112,9 +109,7 @@ test.describe('Subcontract: Measure → Cost generation', () => {
     await expect(page.locator('.ant-table, .vxe-table').first()).toBeVisible({ timeout: 10000 })
 
     // Try to filter by sourceType = SUB_MEASURE
-    const sourceTypeSelect = page.locator(
-      '.pm-field:has(label:has-text("来源类型")) .ant-select',
-    )
+    const sourceTypeSelect = page.locator('.pm-field:has(label:has-text("来源类型")) .ant-select')
     const hasSourceTypeFilter = await sourceTypeSelect
       .first()
       .isVisible({ timeout: 3000 })
@@ -124,19 +119,13 @@ test.describe('Subcontract: Measure → Cost generation', () => {
       await sourceTypeSelect.first().click()
       await page.waitForTimeout(500)
 
-      const dropdown = page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-        .last()
+      const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
       const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
 
       if (dropdownVisible) {
         // Look for "分包计量成本" option
-        const measureOption = dropdown.locator(
-          '.ant-select-item-option:has-text("分包计量")',
-        )
-        const hasMeasureOption = await measureOption
-          .isVisible({ timeout: 3000 })
-          .catch(() => false)
+        const measureOption = dropdown.locator('.ant-select-item-option:has-text("分包计量")')
+        const hasMeasureOption = await measureOption.isVisible({ timeout: 3000 }).catch(() => false)
         if (hasMeasureOption) {
           await measureOption.click()
           await page.waitForTimeout(300)
@@ -161,9 +150,7 @@ test.describe('Subcontract: Measure → Cost generation', () => {
     await page.waitForSelector('.pm-page', { timeout: 10000 })
 
     // Look for summary/cards section
-    const summarySection = page.locator(
-      '.lg-kpi-strip, .ant-card:has(.ant-statistic), .stl-kpis',
-    )
+    const summarySection = page.locator('.lg-kpi-strip, .ant-card:has(.ant-statistic), .stl-kpis')
     const summaryVisible = await summarySection
       .first()
       .isVisible({ timeout: 5000 })

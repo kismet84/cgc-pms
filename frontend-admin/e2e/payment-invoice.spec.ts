@@ -74,9 +74,7 @@ test.describe('Payment: Application list and detail', () => {
     await page.goto('/payment/application')
     await page.waitForSelector('.pm-filter', { timeout: 10000 })
 
-    const payTypeSelect = page.locator(
-      '.pm-field:has(label:has-text("付款类型")) .ant-select',
-    )
+    const payTypeSelect = page.locator('.pm-field:has(label:has-text("付款类型")) .ant-select')
     const hasPayTypeFilter = await payTypeSelect
       .first()
       .isVisible({ timeout: 3000 })
@@ -86,9 +84,7 @@ test.describe('Payment: Application list and detail', () => {
       await payTypeSelect.first().click()
       await page.waitForTimeout(500)
 
-      const dropdown = page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-        .last()
+      const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
       const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
 
       if (dropdownVisible) {
@@ -100,9 +96,9 @@ test.describe('Payment: Application list and detail', () => {
           await page.waitForTimeout(300)
           await page.locator('.pm-filter-actions button:has-text("查询")').click()
           await page.waitForTimeout(1000)
-          await expect(
-            page.locator('.ant-table, .vxe-table').first(),
-          ).toBeVisible({ timeout: 5000 })
+          await expect(page.locator('.ant-table, .vxe-table').first()).toBeVisible({
+            timeout: 5000,
+          })
         }
       }
     }
@@ -167,9 +163,7 @@ test.describe('Invoice: List → Registration → OCR', () => {
     await page.goto('/invoice/list')
     await page.waitForSelector('.pm-filter', { timeout: 10000 })
 
-    const verifySelect = page.locator(
-      '.pm-field:has(label:has-text("核验状态")) .ant-select',
-    )
+    const verifySelect = page.locator('.pm-field:has(label:has-text("核验状态")) .ant-select')
     const hasVerifyFilter = await verifySelect
       .first()
       .isVisible({ timeout: 3000 })
@@ -179,9 +173,7 @@ test.describe('Invoice: List → Registration → OCR', () => {
       await verifySelect.first().click()
       await page.waitForTimeout(500)
 
-      const dropdown = page
-        .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-        .last()
+      const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
       const dropdownVisible = await dropdown.isVisible({ timeout: 5000 }).catch(() => false)
 
       if (dropdownVisible) {
@@ -193,9 +185,9 @@ test.describe('Invoice: List → Registration → OCR', () => {
           await page.waitForTimeout(300)
           await page.locator('.pm-filter-actions button:has-text("查询")').click()
           await page.waitForTimeout(1000)
-          await expect(
-            page.locator('.ant-table, .vxe-table').first(),
-          ).toBeVisible({ timeout: 5000 })
+          await expect(page.locator('.ant-table, .vxe-table').first()).toBeVisible({
+            timeout: 5000,
+          })
         }
       }
     }
@@ -250,9 +242,7 @@ test.describe('Invoice: List → Registration → OCR', () => {
     }
 
     // Click first row to view detail
-    const firstRow = page
-      .locator('.ant-table-tbody tr.ant-table-row, .vxe-body--row')
-      .first()
+    const firstRow = page.locator('.ant-table-tbody tr.ant-table-row, .vxe-body--row').first()
     await firstRow.locator('a, button:has-text("详情")').first().click()
     await page.waitForTimeout(1000)
 
