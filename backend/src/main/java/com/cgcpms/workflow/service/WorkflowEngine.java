@@ -76,6 +76,7 @@ public class WorkflowEngine {
             case WorkflowBusinessTypes.CT_CHANGE -> "contract:change:submit";
             case WorkflowBusinessTypes.SETTLEMENT -> "settlement:submit";
             case WorkflowBusinessTypes.COST_TARGET -> "cost:target:submit";
+            case WorkflowBusinessTypes.MATERIAL_REQUISITION -> "requisition:submit";
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         };
     }
