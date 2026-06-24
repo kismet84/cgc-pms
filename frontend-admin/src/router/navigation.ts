@@ -59,6 +59,7 @@ export const navigationItems: NavigationItem[] = [
     matchPrefixes: ['/purchase', '/inventory'],
     children: [
       { key: '/inventory/purchase-request', label: '采购申请' },
+      { key: '/inventory/material-requisition', label: '领料申请' },
       { key: '/purchase/order', label: '采购订单' },
       { key: '/purchase/receipt', label: '材料验收' },
       { key: '/inventory/warehouse', label: '仓库管理' },

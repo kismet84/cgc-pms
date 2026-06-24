@@ -265,6 +265,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/inventory/purchase-request.vue'),
             meta: { title: '采购申请' },
           },
+          {
+            path: 'material-requisition',
+            name: 'InventoryMaterialRequisition',
+            component: () => import('@/pages/requisition/index.vue'),
+            meta: { title: '领料申请' },
+          },
         ],
       },
       {
