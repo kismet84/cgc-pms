@@ -3,7 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { QuestionCircleOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
+import { MenuFoldOutlined, ProjectOutlined } from '@ant-design/icons-vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 
@@ -48,16 +48,14 @@ onBeforeUnmount(() => {
   >
     <a-layout-sider
       v-model:collapsed="collapsed"
-      :width="216"
+      :width="220"
       :collapsed-width="64"
       class="sidebar"
       theme="light"
     >
       <div class="brand" :class="{ 'brand--collapsed': collapsed }">
-        <div class="logo" aria-hidden="true">
-          <span class="logo-mark">建</span>
-        </div>
-        <span v-if="!collapsed" class="brand-text">建筑工程总包项目管理系统</span>
+        <ProjectOutlined class="logo" aria-hidden="true" />
+        <span v-if="!collapsed" class="brand-text">建筑工程总包项目</span>
       </div>
       <SidebarMenu />
     </a-layout-sider>
@@ -78,11 +76,6 @@ onBeforeUnmount(() => {
         <div class="flex-1"></div>
         <div class="top-actions">
           <span v-if="bellReady" aria-label="通知"><NotificationBell /></span>
-          <QuestionCircleOutlined
-            aria-label="帮助"
-            style="font-size: 18px; cursor: pointer"
-            @click="router.push('/help')"
-          />
           <a-dropdown>
             <div class="user-info">
               <a-avatar
@@ -139,7 +132,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 18px;
+  padding: 0 24px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
@@ -150,29 +143,17 @@ onBeforeUnmount(() => {
 }
 
 .logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--brand-gradient-logo, linear-gradient(135deg, #1668dc, #0ea5e9));
-  display: grid;
-  place-items: center;
-  color: var(--surface);
+  color: var(--primary);
+  font-size: 20px;
   flex-shrink: 0;
-  box-shadow: 0 8px 18px rgba(22, 104, 220, 0.22);
-}
-
-.logo-mark {
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1;
 }
 
 .brand-text {
   min-width: 0;
   overflow: hidden;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 800;
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 600;
   text-overflow: ellipsis;
 }
 
@@ -180,7 +161,7 @@ onBeforeUnmount(() => {
   height: var(--shell-header-height);
   background: rgba(255, 255, 255, 0.96);
   border-bottom: 1px solid var(--border);
-  padding: 0 22px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -195,7 +176,7 @@ onBeforeUnmount(() => {
 .hamburger {
   font-size: 20px;
   cursor: pointer;
-  color: var(--text);
+  color: var(--text-secondary);
 }
 
 .flex-1 {
@@ -232,7 +213,7 @@ onBeforeUnmount(() => {
 }
 
 .main-content {
-  padding: 18px;
+  padding: 0;
   margin-left: var(--shell-sidebar-width);
   min-height: calc(100vh - var(--shell-header-height));
   background: var(--bg);

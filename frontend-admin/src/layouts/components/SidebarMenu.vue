@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, h, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { computed, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { navigationItems, type NavigationItem } from '@/router/navigation'
+import { navigationItems } from '@/router/navigation'
 import { useUserStore } from '@/stores/user'
 import {
   AccountBookOutlined,
@@ -15,153 +15,180 @@ import {
   ShoppingCartOutlined,
 } from '@ant-design/icons-vue'
 
+interface MenuEntry {
+  key: string
+  label: string
+  target: string
+  icon?: Component
+  matchPrefixes?: string[]
+}
+
+interface MenuSection {
+  title?: string
+  items: MenuEntry[]
+}
+
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-
-interface MenuItem {
-  key: string
-  label: string
-  icon?: () => ReturnType<typeof h>
-  children?: MenuItem[]
-}
-
-const iconMap: Record<string, MenuItem['icon']> = {
-  AccountBookOutlined,
-  AuditOutlined,
-  BranchesOutlined,
-  DollarOutlined,
-  FileTextOutlined,
-  HomeOutlined,
-  ProjectOutlined,
-  SettingOutlined,
-  ShoppingCartOutlined,
-}
-
-const menuItems = computed(() => {
-  return navigationItems.filter((item) => isMenuVisible(item)).map((item) => buildMenuItem(item))
-})
 
 const isAdmin = computed(() => {
   return userStore.roles.includes('ADMIN') || userStore.roles.includes('SUPER_ADMIN')
 })
 
-function buildMenuItem(navigation: NavigationItem): MenuItem {
-  const item: MenuItem = {
-    key: navigation.key,
-    label: navigation.label,
-  }
-  const iconName = navigation.icon
-  if (iconName && iconMap[iconName]) {
-    item.icon = () => h(iconMap[iconName])
-  }
-  if (navigation.children && navigation.children.length > 0) {
-    item.children = navigation.children
-      .filter((child) => isMenuVisible(child))
-      .map((child) => buildMenuItem(child))
-  }
-  return item
-}
-
-function isMenuVisible(item: NavigationItem) {
+function isMenuVisible(item: { adminOnly?: boolean }) {
   if (item.adminOnly && !isAdmin.value) return false
   return true
 }
 
-const selectedKeys = computed(() => {
-  return [route.path]
-})
-
-function computeOpenKeys(): string[] {
-  const parent = navigationItems.find((item) =>
-    item.matchPrefixes?.some(
-      (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
-    ),
-  )
-  return parent ? [parent.key] : []
+function findTop(key: string) {
+  return navigationItems.find((item) => item.key === key)
 }
 
-const openKeys = ref<string[]>(computeOpenKeys())
-
-watch(
-  () => route.path,
-  () => {
-    openKeys.value = computeOpenKeys()
-  },
-  { immediate: true },
-)
-
-function handleMenuClick({ key }: { key: string }) {
-  router.push(key)
-}
-
-let menuObserver: MutationObserver | null = null
-
-function ensureMenuRole() {
-  const menuUl = document.querySelector('.sidebar-menu')
-  if (menuUl && !menuUl.hasAttribute('role')) {
-    menuUl.setAttribute('role', 'menu')
+function childEntry(parentKey: string, childKey: string, icon: Component): MenuEntry | undefined {
+  const parent = findTop(parentKey)
+  const child = parent?.children?.find((item) => item.key === childKey)
+  if (!parent || !child || !isMenuVisible(parent) || !isMenuVisible(child)) return undefined
+  return {
+    key: child.key,
+    target: child.key,
+    label: child.label,
+    icon,
+    matchPrefixes: [child.key],
   }
 }
 
-onMounted(() => {
-  nextTick(() => {
-    ensureMenuRole()
-    menuObserver = new MutationObserver(() => ensureMenuRole())
-    menuObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class'],
-    })
-  })
-})
+function parentEntry(parentKey: string, icon: Component): MenuEntry | undefined {
+  const parent = findTop(parentKey)
+  if (!parent || !isMenuVisible(parent)) return undefined
+  const target = parent.children?.find((item) => isMenuVisible(item))?.key ?? parent.key
+  return {
+    key: parent.key,
+    target,
+    label: parent.label,
+    icon,
+    matchPrefixes: parent.matchPrefixes,
+  }
+}
 
-onBeforeUnmount(() => {
-  menuObserver?.disconnect()
-})
+function compact(items: Array<MenuEntry | undefined>) {
+  return items.filter(Boolean) as MenuEntry[]
+}
+
+const menuSections = computed<MenuSection[]>(() => [
+  {
+    items: compact([parentEntry('/workbench', HomeOutlined)]),
+  },
+  {
+    title: '项目与主数据',
+    items: compact([
+      childEntry('/master-data', '/project/list', ProjectOutlined),
+      childEntry('/master-data', '/partner', AccountBookOutlined),
+      childEntry('/master-data', '/org', BranchesOutlined),
+      childEntry('/master-data', '/material/dictionary', FileTextOutlined),
+    ]),
+  },
+  {
+    title: '经营与风控',
+    items: compact([
+      parentEntry('/contract-domain', FileTextOutlined),
+      parentEntry('/cost-domain', DollarOutlined),
+      parentEntry('/procurement-inventory', ShoppingCartOutlined),
+      parentEntry('/subcontract-domain', BranchesOutlined),
+      parentEntry('/payment-invoice', AccountBookOutlined),
+      parentEntry('/settlement-domain', AccountBookOutlined),
+      parentEntry('/approval-center', AuditOutlined),
+      parentEntry('/system-management', SettingOutlined),
+    ]),
+  },
+])
+
+function isActive(entry: MenuEntry) {
+  return (
+    route.path === entry.key ||
+    route.path === entry.target ||
+    entry.matchPrefixes?.some((prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`))
+  )
+}
+
+function handleMenuClick(entry: MenuEntry) {
+  router.push(entry.target)
+}
 </script>
 
 <template>
-  <a-menu
-    :selected-keys="selectedKeys"
-    v-model:open-keys="openKeys"
-    mode="inline"
-    class="sidebar-menu"
-    :items="menuItems"
-    tabindex="0"
-    role="menu"
-    aria-label="主导航菜单"
-    @click="handleMenuClick"
-  />
+  <nav class="sidebar-menu" tabindex="0" role="menu" aria-label="主导航菜单">
+    <template v-for="section in menuSections" :key="section.title || 'root'">
+      <div v-if="section.title" class="menu-group">{{ section.title }}</div>
+      <button
+        v-for="item in section.items"
+        :key="item.key"
+        type="button"
+        class="menu-item"
+        :class="{ 'menu-item--active': isActive(item) }"
+        role="menuitem"
+        @click="handleMenuClick(item)"
+      >
+        <component :is="item.icon" class="menu-icon" />
+        <span>{{ item.label }}</span>
+      </button>
+    </template>
+  </nav>
 </template>
 
 <style scoped>
 .sidebar-menu {
-  border-right: none;
-  padding: 10px 10px 14px;
   height: calc(100vh - var(--shell-header-height));
+  padding: 16px 0;
   overflow-y: auto;
   background: transparent;
 }
 
-:deep(.ant-menu) {
+.menu-group {
+  padding: 8px 24px;
+  margin-top: 8px;
   color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 44px;
+  padding: 0 24px;
+  border: 0;
+  border-right: 3px solid transparent;
   background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
-:deep(.ant-menu-item),
-:deep(.ant-menu-submenu-title) {
-  height: 38px;
-  line-height: 38px;
-  margin: 3px 0;
-  border-radius: var(--radius-md);
+.menu-item:hover {
+  background: #f5f5f5;
 }
 
-:deep(.ant-menu-item-selected) {
-  background: var(--primary-soft) !important;
-  color: var(--primary) !important;
-  font-weight: 700;
-  border-right: 3px solid var(--primary);
+.menu-item--active {
+  background: #e6f7ff;
+  color: var(--primary);
+  border-right-color: var(--primary);
+}
+
+.menu-icon {
+  width: 20px;
+  margin-right: 10px;
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+.menu-item--active .menu-icon {
+  color: var(--primary);
 }
 </style>

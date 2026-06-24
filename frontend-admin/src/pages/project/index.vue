@@ -747,7 +747,11 @@ const gridColumns = computed(() => [
               <span class="lg-money">{{ fmtAmount(row.contractAmount) }}</span>
             </template>
             <template #plannedDuration="{ row }">
-              <span>{{ row.plannedStartDate }} ~ {{ row.plannedEndDate }}</span>
+              <span>{{
+                row.plannedStartDate || row.plannedEndDate
+                  ? `${row.plannedStartDate || '-'} ~ ${row.plannedEndDate || '-'}`
+                  : '-'
+              }}</span>
             </template>
             <template #status="{ row }">
               <span class="lg-tag lg-tag--pill" :class="getStatusTagClass(row.status)">{{
@@ -778,7 +782,6 @@ const gridColumns = computed(() => [
             :total="total"
             :page-size-options="['10', '20', '50', '100']"
             show-size-changer
-            show-quick-jumper
             @change="handlePageChange"
             @show-size-change="handlePageSizeChange"
           />
@@ -862,14 +865,13 @@ const gridColumns = computed(() => [
 .project-content-layout {
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .project-table-panel {
   flex: 1;
   min-width: 0;
-  min-height: 516px;
-  padding: 0 0 16px;
+  padding: 16px 0;
   background: var(--project-surface);
   border-radius: var(--project-radius);
   box-shadow: var(--project-shadow);
@@ -899,16 +901,27 @@ const gridColumns = computed(() => [
 .project-list-page .lg-search-bar {
   min-height: 72px;
   padding: 16px 24px;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .project-list-page .lg-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: none;
   font-size: 14px;
 }
 
 .project-list-page .lg-search-actions {
   display: flex;
-  gap: 12px;
+  flex: 0 0 auto;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.project-list-page .lg-search-actions :deep(.ant-btn) {
+  min-width: 58px;
 }
 
 .project-list-page .lg-kpi-card.is-warn {
@@ -928,11 +941,120 @@ const gridColumns = computed(() => [
 }
 
 .project-list-page .lg-table-wrap :deep(.vxe-table) {
-  border-top: 1px solid var(--project-border);
+  border-top: 0;
+}
+
+.project-list-page :deep(.ant-btn) {
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.project-list-page :deep(.ant-btn:not(.ant-btn-primary)) {
+  border-color: var(--project-control-border);
+  color: var(--project-text);
+}
+
+.project-list-page .lg-toolbar {
+  min-height: auto;
+  padding: 0 20px 16px;
+}
+
+.project-list-page .lg-toolbar :deep(.ant-btn) {
+  height: 34px;
+  padding: 6px 12px;
+  line-height: 20px;
+}
+
+.project-list-page .lg-toolbar-left {
+  gap: 8px;
+}
+
+.project-list-page .lg-table-wrap :deep(.vxe-header--column) {
+  height: 43px;
+  padding: 0 20px;
+  background: #fafafa;
+  color: var(--project-text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.project-list-page .lg-table-wrap :deep(.vxe-body--column) {
+  height: 54px;
+  padding: 0 20px;
+  color: var(--project-text);
+  font-size: 14px;
+}
+
+.project-list-page .lg-table-wrap :deep(.vxe-cell) {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.project-list-page .lg-table-wrap :deep(.vxe-body--row:hover),
+.project-list-page .lg-table-wrap :deep(.vxe-body--row:hover .vxe-body--column) {
+  background: #fafafa;
+}
+
+.project-list-page .lg-money {
+  font-weight: 400;
+}
+
+.project-list-page .lg-ops {
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.project-list-page .lg-pagination {
+  gap: 16px;
+  min-height: auto;
+  padding: 16px 20px 0;
+  margin-top: 16px;
+}
+
+.project-list-page .lg-pagination :deep(.ant-pagination-options-quick-jumper) {
+  display: none;
+}
+
+.project-list-page .lg-pagination :deep(.ant-pagination-item),
+.project-list-page .lg-pagination :deep(.ant-pagination-prev),
+.project-list-page .lg-pagination :deep(.ant-pagination-next) {
+  min-width: 28px;
+  height: 28px;
+  line-height: 26px;
+  border-radius: 4px;
+}
+
+.project-list-page .lg-pagination :deep(.ant-select-selector) {
+  height: 28px !important;
+  border-radius: 4px !important;
 }
 
 .project-list-page .lg-panel :deep(.echarts) {
   min-height: 176px;
+}
+
+.project-list-page .lg-analysis-rail .lg-panel:first-child {
+  padding-bottom: 16px;
+}
+
+.project-list-page .lg-type-list {
+  gap: 12px;
+}
+
+.project-list-page .lg-type-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--project-text);
+  line-height: 1.5;
+}
+
+.project-list-page .lg-type-dot {
+  margin-top: 6px;
+}
+
+.project-list-page .lg-type-label {
+  color: var(--project-text);
 }
 
 @media (max-width: 1024px) {
