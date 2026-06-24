@@ -4,7 +4,10 @@ import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,12 +42,31 @@ class InvoiceValidationTest {
     @Autowired
     private PayInvoiceMapper payInvoiceMapper;
 
+    @Autowired
+    private PayRecordMapper payRecordMapper;
+
+    private static final long SEED_PAY_RECORD_ID = 90001L;
+
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
                 1L, "admin", 0L,
                 List.of("ADMIN"),
                 List.of("invoice:add"));
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    @BeforeEach
+    void setUp() {
+        // Seed pay_record for mandatory payRecordId linkage
+        payRecordMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PayRecord>().gt(PayRecord::getId, 0));
+        PayRecord seed = new PayRecord();
+        seed.setId(SEED_PAY_RECORD_ID);
+        seed.setTenantId(0L);
+        seed.setPayApplicationId(SEED_PAY_RECORD_ID);
+        seed.setPayAmount(new java.math.BigDecimal("100000.00"));
+        seed.setPayDate(java.time.LocalDate.of(2026, 6, 1));
+        seed.setPayStatus("PAID");
+        payRecordMapper.insert(seed);
     }
 
     @Test
@@ -112,11 +134,12 @@ class InvoiceValidationTest {
         String body = """
                 {
                     "tenantId": 999,
+                    "payRecordId": %d,
                     "invoiceNo": "INV-SEC-TENANT-001",
                     "invoiceType": "VAT_SPECIAL",
                     "invoiceAmount": "5000.00",
                     "invoiceDate": "2026-01-15"
-                }""";
+                }""".formatted(SEED_PAY_RECORD_ID);
 
         MvcResult result = mockMvc.perform(post("/api/invoices")
                         .contextPath("/api")
@@ -144,11 +167,12 @@ class InvoiceValidationTest {
         // Create an invoice with a known partial invoiceNo
         String body = """
                 {
+                    "payRecordId": %d,
                     "invoiceNo": "INV-FILTER-PARTIAL-001",
                     "invoiceType": "VAT_SPECIAL",
                     "invoiceAmount": "3000.00",
                     "invoiceDate": "2026-01-15"
-                }""";
+                }""".formatted(SEED_PAY_RECORD_ID);
         mockMvc.perform(post("/api/invoices")
                 .contextPath("/api")
                 .cookie(adminCookie())
@@ -175,11 +199,12 @@ class InvoiceValidationTest {
         // Create an invoice (defaults to PENDING)
         String body = """
                 {
+                    "payRecordId": %d,
                     "invoiceNo": "INV-FILTER-STATUS-001",
                     "invoiceType": "VAT_SPECIAL",
                     "invoiceAmount": "4000.00",
                     "invoiceDate": "2026-01-15"
-                }""";
+                }""".formatted(SEED_PAY_RECORD_ID);
         mockMvc.perform(post("/api/invoices")
                 .contextPath("/api")
                 .cookie(adminCookie())
