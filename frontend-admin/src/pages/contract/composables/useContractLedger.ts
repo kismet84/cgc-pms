@@ -330,7 +330,6 @@ export function useContractLedger() {
 
   // ---- VxeGrid columns ----
   const gridColumns = computed(() => [
-    { type: 'checkbox', width: 42 },
     ...(colVisible.contractCode
       ? [
           {

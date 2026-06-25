@@ -2613,6 +2613,14 @@ body {
   line-height: 22px;
 }
 
+.ant-table-selection-column,
+.ant-table-cell.ant-table-selection-column,
+.vxe-header--column.col--checkbox,
+.vxe-body--column.col--checkbox,
+.vxe-footer--column.col--checkbox {
+  display: none !important;
+}
+
 .lg-table-wrap .vxe-header--column,
 .lg-list-page .lg-table-wrap .vxe-header--column,
 .lg-table-wrap .ant-table-thead > tr > th,

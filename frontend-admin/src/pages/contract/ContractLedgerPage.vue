@@ -165,7 +165,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               :columns="gridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
-              :checkbox-config="{ highlight: true }"
               stripe
               border="inner"
               size="small"
