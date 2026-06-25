@@ -250,7 +250,7 @@ onUnmounted(() => {
 .nb-trigger {
   display: inline-flex;
   align-items: center;
-  color: #374151;
+  color: var(--text);
   transition: color 0.2s;
 }
 
@@ -277,7 +277,7 @@ onUnmounted(() => {
 .nb-title {
   font-size: 15px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 
 /* ── List ── */
@@ -298,7 +298,7 @@ onUnmounted(() => {
 .nb-empty-state {
   padding: 32px 16px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -342,7 +342,7 @@ onUnmounted(() => {
 .nb-item-title {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -350,7 +350,7 @@ onUnmounted(() => {
 
 .nb-item-content {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-top: 4px;
   line-height: 1.5;
   display: -webkit-box;
@@ -368,7 +368,7 @@ onUnmounted(() => {
 
 .nb-item-time {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--muted);
 }
 
 .nb-item-spin {

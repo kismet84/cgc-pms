@@ -100,7 +100,7 @@ async function handleSave() {
         default-expand-all
         block-node
       />
-      <div v-else-if="!loading" style="text-align: center; padding: 24px; color: #9ca3af">
+      <div v-else-if="!loading" style="text-align: center; padding: 24px; color: var(--muted)">
         暂无菜单数据
       </div>
     </a-spin>

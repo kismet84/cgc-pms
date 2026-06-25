@@ -501,17 +501,17 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                     </div>
                     <div
                       v-if="record.nodeName"
-                      style="color: #888; font-size: 13px; margin-top: 2px"
+                      style="color: var(--text-secondary); font-size: 13px; margin-top: 2px"
                     >
                       {{ record.nodeName }}
                     </div>
                     <div
                       v-if="record.comment"
-                      style="color: #666; font-size: 13px; margin-top: 4px"
+                      style="color: var(--text-secondary); font-size: 13px; margin-top: 4px"
                     >
                       {{ record.comment }}
                     </div>
-                    <div style="color: #999; font-size: 12px; margin-top: 2px">
+                    <div style="color: var(--muted); font-size: 12px; margin-top: 2px">
                       {{ record.createdAt }}
                     </div>
                   </a-timeline-item>
@@ -576,7 +576,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   border-bottom: none;
 }
 .cd-info-label {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   white-space: nowrap;
   min-width: 88px;
   flex-shrink: 0;
@@ -633,7 +633,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 .cd-mc-code {
   font-size: 11px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   font-family: monospace;
 }
 .cd-mc-name {
@@ -653,7 +653,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   font-size: 12px;
 }
 .cd-mc-label {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   white-space: nowrap;
   min-width: 64px;
   flex-shrink: 0;

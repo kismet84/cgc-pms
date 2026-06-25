@@ -117,7 +117,7 @@ const {
           row-key="costSubjectId"
           style="margin-top: 16px"
         />
-        <div v-else style="margin-top: 16px; color: #9ca3af; text-align: center">
+        <div v-else style="margin-top: 16px; color: var(--muted); text-align: center">
           该科目下暂无子科目数据（已达第2级）
         </div>
       </template>
@@ -389,7 +389,7 @@ const {
 .empty-page {
   padding: 80px 20px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--muted);
   background: var(--surface);
   border: 0;
   border-radius: var(--radius-md);

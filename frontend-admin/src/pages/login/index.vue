@@ -151,13 +151,13 @@ function handleForgotPassword() {
 .title {
   font-size: 20px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text);
   margin: 0 0 6px;
 }
 
 .subtitle {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--muted);
   margin: 0;
 }
 

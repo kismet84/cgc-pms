@@ -23,7 +23,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="lg-table-wrap">
-    <div style="padding: 12px 14px 0 14px; font-weight: 600; font-size: 14px; color: #374151">
+    <div style="padding: 12px 14px 0 14px; font-weight: 600; font-size: 14px; color: var(--text)">
       出入库流水
     </div>
     <vxe-grid
@@ -73,7 +73,7 @@ const emit = defineEmits<{
         <span v-if="row.sourceId" class="lg-link">
           {{ row.sourceId }}
         </span>
-        <span v-else style="color: #9ca3af">-</span>
+        <span v-else style="color: var(--muted)">-</span>
       </template>
       <template #ops="{ row }: { row: MatStockTxnVO }">
         <a-dropdown :trigger="['click']">

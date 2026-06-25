@@ -320,7 +320,9 @@ onMounted(() => {
             </a-tag>
           </template>
           <template v-else-if="column.key === 'beforeAmount'">
-            <span :style="{ color: '#6b7280' }">¥{{ formatAmount(record.beforeAmount) }}</span>
+            <span :style="{ color: 'var(--text-secondary)' }"
+              >¥{{ formatAmount(record.beforeAmount) }}</span
+            >
           </template>
           <template v-else-if="column.key === 'changeAmount'">
             <span
@@ -627,7 +629,7 @@ onMounted(() => {
 
 .cc-total {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .cc-amount-impact {
@@ -639,7 +641,7 @@ onMounted(() => {
 }
 
 .cc-amount-before {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-family: 'Consolas', 'Monaco', monospace;
 }
 
@@ -655,7 +657,7 @@ onMounted(() => {
 }
 
 .cc-amount-arrow {
-  color: #9ca3af;
+  color: var(--muted);
   font-size: 16px;
 }
 
@@ -670,7 +672,7 @@ onMounted(() => {
 .cc-impact-label {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text);
   margin-bottom: 12px;
 }
 
@@ -692,7 +694,7 @@ onMounted(() => {
 
 .cc-impact-card-label {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
@@ -704,7 +706,7 @@ onMounted(() => {
 
 .cc-impact-arrow {
   font-size: 20px;
-  color: #9ca3af;
+  color: var(--muted);
   font-weight: 700;
 }
 
@@ -718,7 +720,7 @@ onMounted(() => {
 .cc-timeline-title {
   font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text);
   margin-bottom: 16px;
 }
 </style>

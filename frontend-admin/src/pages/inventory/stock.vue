@@ -110,23 +110,23 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap; padding: 4px 0"
           >
             <div>
-              <span style="font-size: 13px; color: #6b7280">仓库：</span>
+              <span style="font-size: 13px; color: var(--text-secondary)">仓库：</span>
               <span style="font-weight: 600">
                 {{ stock.warehouseName || getWarehouseName(stock.warehouseId) }}
               </span>
             </div>
             <div>
-              <span style="font-size: 13px; color: #6b7280">物料：</span>
+              <span style="font-size: 13px; color: var(--text-secondary)">物料：</span>
               <span style="font-weight: 600">
                 {{ stock.materialName || getMaterialName(stock.materialId) }}
               </span>
             </div>
             <div>
-              <span style="font-size: 13px; color: #6b7280">当前库存：</span>
+              <span style="font-size: 13px; color: var(--text-secondary)">当前库存：</span>
               <span style="font-weight: 700; font-size: 18px; color: #1677ff">
                 {{ fmtQty(stock.availableQty) }}
               </span>
-              <span style="font-size: 13px; color: #6b7280; margin-left: 4px">{{
+              <span style="font-size: 13px; color: var(--text-secondary); margin-left: 4px">{{
                 stock.unit
               }}</span>
             </div>

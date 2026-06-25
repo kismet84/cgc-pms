@@ -50,7 +50,7 @@ const emit = defineEmits<{
       @update:value="(v: string) => emit('update:keyword', v)"
       @press-enter="emit('search')"
     >
-      <template #prefix><SearchOutlined style="color: #697380" /></template>
+      <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
     </a-input>
     <a-button type="primary" size="large" :loading="loading" @click="emit('search')">查询</a-button>
     <a-button v-if="showReset" size="large" @click="emit('reset')">

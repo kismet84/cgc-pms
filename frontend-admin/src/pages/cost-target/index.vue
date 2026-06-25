@@ -232,7 +232,7 @@ onMounted(() => {
           allow-clear
           @press-enter="handleSearch"
         >
-          <template #prefix><SearchOutlined style="color: #697380" /></template>
+          <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
         </a-input>
         <a-select
           v-model:value="filter.projectId"
@@ -415,7 +415,7 @@ onMounted(() => {
   overflow: auto;
 }
 .lg-link--disabled {
-  color: #9ca3af;
+  color: var(--muted);
   pointer-events: none;
 }
 .ct-money {
@@ -425,7 +425,7 @@ onMounted(() => {
   display: flex;
 }
 .ct-muted {
-  color: #9ca3af;
+  color: var(--muted);
   font-size: 13px;
 }
 .ct-content-grid {

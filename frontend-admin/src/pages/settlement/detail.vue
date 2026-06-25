@@ -293,17 +293,19 @@ onMounted(() => {
             "
           >
             <div>
-              <span style="color: #6b7280">结算编号：</span
+              <span style="color: var(--text-secondary)">结算编号：</span
               ><strong>{{ detail.settlementCode }}</strong>
             </div>
             <div>
-              <span style="color: #6b7280">项目：</span><strong>{{ detail.projectName }}</strong>
+              <span style="color: var(--text-secondary)">项目：</span
+              ><strong>{{ detail.projectName }}</strong>
             </div>
             <div>
-              <span style="color: #6b7280">合同：</span><strong>{{ detail.contractName }}</strong>
+              <span style="color: var(--text-secondary)">合同：</span
+              ><strong>{{ detail.contractName }}</strong>
             </div>
             <div>
-              <span style="color: #6b7280">结算状态：</span
+              <span style="color: var(--text-secondary)">结算状态：</span
               ><a-tag
                 :color="
                   SETTLEMENT_STATUS_COLOR[detail.settlementStatus as SettlementStatus] || 'default'
@@ -316,19 +318,19 @@ onMounted(() => {
               >
             </div>
             <div>
-              <span style="color: #6b7280">合同金额：</span
+              <span style="color: var(--text-secondary)">合同金额：</span
               ><strong>{{ formatAmount(detail.contractAmount) }}</strong>
             </div>
             <div>
-              <span style="color: #6b7280">结算金额：</span
+              <span style="color: var(--text-secondary)">结算金额：</span
               ><strong style="color: #1677ff">{{ formatAmount(detail.settlementAmount) }}</strong>
             </div>
             <div>
-              <span style="color: #6b7280">变更金额：</span
+              <span style="color: var(--text-secondary)">变更金额：</span
               ><strong style="color: #ef4444">{{ formatAmount(detail.changeAmount) }}</strong>
             </div>
             <div>
-              <span style="color: #6b7280">审批状态：</span
+              <span style="color: var(--text-secondary)">审批状态：</span
               ><a-tag
                 :color="APPROVAL_STATUS_COLOR[detail.approvalStatus] || 'default'"
                 size="small"
@@ -353,7 +355,7 @@ onMounted(() => {
                   "
                 >
                   <div>
-                    <span style="color: #6b7280">结算类型：</span
+                    <span style="color: var(--text-secondary)">结算类型：</span
                     ><span>{{
                       detail.settlementType === 'PROGRESS'
                         ? '进度结算'
@@ -365,19 +367,19 @@ onMounted(() => {
                     }}</span>
                   </div>
                   <div>
-                    <span style="color: #6b7280">创建人：</span
+                    <span style="color: var(--text-secondary)">创建人：</span
                     ><span>{{ detail.createdBy ?? '-' }}</span>
                   </div>
                   <div>
-                    <span style="color: #6b7280">创建时间：</span
+                    <span style="color: var(--text-secondary)">创建时间：</span
                     ><span>{{ detail.createdAt ?? '-' }}</span>
                   </div>
                   <div>
-                    <span style="color: #6b7280">更新时间：</span
+                    <span style="color: var(--text-secondary)">更新时间：</span
                     ><span>{{ detail.updatedAt ?? '-' }}</span>
                   </div>
                   <div style="grid-column: span 2">
-                    <span style="color: #6b7280">备注：</span
+                    <span style="color: var(--text-secondary)">备注：</span
                     ><span>{{ detail.remark || '-' }}</span>
                   </div>
                 </div>
@@ -529,14 +531,19 @@ onMounted(() => {
                     }}</a-tag
                     ><span
                       v-if="r.nodeName"
-                      style="margin-left: 8px; color: #999; font-size: 13px"
+                      style="margin-left: 8px; color: var(--muted); font-size: 13px"
                       >{{ r.nodeName }}</span
                     >
                   </div>
-                  <div v-if="r.comment" style="color: #666; font-size: 13px; margin-top: 4px">
+                  <div
+                    v-if="r.comment"
+                    style="color: var(--text-secondary); font-size: 13px; margin-top: 4px"
+                  >
                     {{ r.comment }}
                   </div>
-                  <div style="color: #999; font-size: 12px; margin-top: 2px">{{ r.createdAt }}</div>
+                  <div style="color: var(--muted); font-size: 12px; margin-top: 2px">
+                    {{ r.createdAt }}
+                  </div>
                 </a-timeline-item>
               </a-timeline>
               <a-empty v-else description="暂无审批记录" style="padding: 32px 0" />

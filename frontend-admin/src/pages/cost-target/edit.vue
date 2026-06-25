@@ -629,7 +629,7 @@ onMounted(() => {
   gap: 8px;
   justify-content: flex-end;
   font-size: 13px;
-  color: #374151;
+  color: var(--text);
 }
 .cte-total {
   font-weight: 600;

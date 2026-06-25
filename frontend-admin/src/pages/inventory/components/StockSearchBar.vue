@@ -30,7 +30,7 @@ const emit = defineEmits<{
       @update:value="(v: string) => emit('update:keyword', v)"
       @press-enter="emit('search')"
     >
-      <template #prefix><SearchOutlined style="color: #697380" /></template>
+      <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
     </a-input>
     <a-select
       :value="warehouseId"
@@ -63,7 +63,7 @@ const emit = defineEmits<{
       @update:value="(v: string | undefined) => emit('update:materialId', v)"
     >
       <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
-        {{ m.materialName }} <span style="color: #9ca3af">({{ m.materialCode }})</span>
+        {{ m.materialName }} <span style="color: var(--muted)">({{ m.materialCode }})</span>
       </a-select-option>
     </a-select>
     <a-button type="primary" size="large" @click="emit('search')">查询</a-button>

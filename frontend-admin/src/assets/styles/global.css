@@ -2020,6 +2020,196 @@ body {
   background: transparent;
 }
 
+.app-page,
+.lg-page,
+.lg-page-shell,
+.lg-list-page,
+.project-list-page,
+.project-target-redesign,
+.pt-page,
+.dashboard,
+.profile-page,
+.settings-page {
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: 14px;
+}
+
+.app-page *,
+.lg-page *,
+.lg-page-shell *,
+.lg-list-page *,
+.project-list-page *,
+.project-target-redesign *,
+.pt-page *,
+.dashboard *,
+.profile-page *,
+.settings-page *,
+.ant-modal *,
+.ant-drawer *,
+.ant-popover *,
+.ant-dropdown * {
+  font-family: var(--font-family);
+}
+
+.app-page .ant-breadcrumb,
+.app-page .ant-breadcrumb a,
+.app-page .ant-breadcrumb li,
+.lg-page .ant-breadcrumb,
+.lg-page .ant-breadcrumb a,
+.lg-page .ant-breadcrumb li,
+.lg-list-page .ant-breadcrumb,
+.lg-list-page .lg-breadcrumb,
+.lg-list-page .lg-page-head-breadcrumb,
+.project-target-redesign .ant-breadcrumb,
+.project-target-redesign .ant-breadcrumb a,
+.project-target-redesign .ant-breadcrumb li,
+.pt-breadcrumb {
+  color: var(--muted) !important;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.app-page-title,
+.lg-page-head-title,
+.lg-detail-title,
+.lg-section-title,
+.lg-card-title,
+.lg-panel-title,
+.pt-page-title,
+.pt-panel-header,
+.ant-card-head-title,
+.ant-modal-title,
+.ant-drawer-title {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.app-page .ant-input,
+.app-page .ant-input-affix-wrapper,
+.app-page .ant-select-selector,
+.app-page .ant-picker,
+.app-page .ant-input-number,
+.lg-page .ant-input,
+.lg-page .ant-input-affix-wrapper,
+.lg-page .ant-select-selector,
+.lg-page .ant-picker,
+.lg-page .ant-input-number,
+.lg-list-page .ant-input,
+.lg-list-page .ant-input-affix-wrapper,
+.lg-list-page .ant-select-selector,
+.lg-list-page .ant-picker,
+.lg-list-page .ant-input-number,
+.project-target-redesign .ant-input,
+.project-target-redesign .ant-input-affix-wrapper,
+.project-target-redesign .ant-select-selector,
+.project-target-redesign .ant-picker,
+.project-target-redesign .ant-input-number,
+.pt-page .ant-input,
+.pt-page .ant-input-affix-wrapper,
+.pt-page .ant-select-selector,
+.pt-page .ant-picker,
+.pt-page .ant-input-number,
+.ant-modal .ant-input,
+.ant-modal .ant-input-affix-wrapper,
+.ant-modal .ant-select-selector,
+.ant-modal .ant-picker,
+.ant-modal .ant-input-number,
+.ant-drawer .ant-input,
+.ant-drawer .ant-input-affix-wrapper,
+.ant-drawer .ant-select-selector,
+.ant-drawer .ant-picker,
+.ant-drawer .ant-input-number {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.app-page .ant-input::placeholder,
+.app-page .ant-select-selection-placeholder,
+.lg-page .ant-input::placeholder,
+.lg-page .ant-select-selection-placeholder,
+.lg-list-page .ant-input::placeholder,
+.lg-list-page .ant-select-selection-placeholder,
+.project-target-redesign .ant-input::placeholder,
+.project-target-redesign .ant-select-selection-placeholder,
+.pt-page .ant-input::placeholder,
+.pt-page .ant-select-selection-placeholder,
+.ant-modal .ant-input::placeholder,
+.ant-modal .ant-select-selection-placeholder,
+.ant-drawer .ant-input::placeholder,
+.ant-drawer .ant-select-selection-placeholder {
+  color: var(--muted);
+}
+
+.app-page .ant-input-prefix,
+.lg-page .ant-input-prefix,
+.lg-list-page .ant-input-prefix,
+.project-target-redesign .ant-input-prefix,
+.pt-page .ant-input-prefix,
+.ant-modal .ant-input-prefix,
+.ant-drawer .ant-input-prefix {
+  color: var(--text-secondary);
+}
+
+.app-page .ant-btn,
+.lg-page .ant-btn,
+.lg-list-page .ant-btn,
+.project-target-redesign .ant-btn,
+.pt-page .ant-btn,
+.ant-modal .ant-btn,
+.ant-drawer .ant-btn {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.app-page .ant-btn-primary,
+.lg-page .ant-btn-primary,
+.lg-list-page .ant-btn-primary,
+.project-target-redesign .ant-btn-primary,
+.pt-page .ant-btn-primary,
+.ant-modal .ant-btn-primary,
+.ant-drawer .ant-btn-primary {
+  color: #fff;
+}
+
+.app-page .ant-btn-link,
+.app-page .ant-btn-text,
+.lg-page .ant-btn-link,
+.lg-page .ant-btn-text,
+.lg-list-page .ant-btn-link,
+.lg-list-page .ant-btn-text,
+.project-target-redesign .ant-btn-link,
+.project-target-redesign .ant-btn-text,
+.pt-page .ant-btn-link,
+.pt-page .ant-btn-text,
+.ant-modal .ant-btn-link,
+.ant-modal .ant-btn-text,
+.ant-drawer .ant-btn-link,
+.ant-drawer .ant-btn-text {
+  color: var(--primary);
+}
+
+.app-page .ant-form-item-label > label,
+.lg-page .ant-form-item-label > label,
+.lg-list-page .ant-form-item-label > label,
+.project-target-redesign .ant-form-item-label > label,
+.pt-page .ant-form-item-label > label,
+.ant-modal .ant-form-item-label > label,
+.ant-drawer .ant-form-item-label > label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.ant-modal,
+.ant-drawer,
+.ant-popover,
+.ant-dropdown {
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: 14px;
+}
+
 .lg-list-page,
 .project-list-page {
   padding: 22px 28px 28px;
@@ -2226,6 +2416,71 @@ body {
 .lg-table-wrap .ant-table {
   color: var(--text);
   background: transparent;
+}
+
+.app-page .ant-table,
+.lg-page .ant-table,
+.lg-list-page .ant-table,
+.project-target-redesign .ant-table,
+.pt-page .ant-table,
+.ant-modal .ant-table,
+.ant-drawer .ant-table,
+.app-page .vxe-table,
+.lg-page .vxe-table,
+.lg-list-page .vxe-table,
+.project-target-redesign .vxe-table,
+.pt-page .vxe-table {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.app-page .ant-table-thead > tr > th,
+.lg-page .ant-table-thead > tr > th,
+.lg-list-page .ant-table-thead > tr > th,
+.project-target-redesign .ant-table-thead > tr > th,
+.pt-page .ant-table-thead > tr > th,
+.ant-modal .ant-table-thead > tr > th,
+.ant-drawer .ant-table-thead > tr > th,
+.app-page .vxe-header--column,
+.lg-page .vxe-header--column,
+.lg-list-page .vxe-header--column,
+.project-target-redesign .vxe-header--column,
+.pt-page .vxe-header--column {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-page .ant-table-tbody > tr > td,
+.lg-page .ant-table-tbody > tr > td,
+.lg-list-page .ant-table-tbody > tr > td,
+.project-target-redesign .ant-table-tbody > tr > td,
+.pt-page .ant-table-tbody > tr > td,
+.ant-modal .ant-table-tbody > tr > td,
+.ant-drawer .ant-table-tbody > tr > td,
+.app-page .vxe-body--column,
+.lg-page .vxe-body--column,
+.lg-list-page .vxe-body--column,
+.project-target-redesign .vxe-body--column,
+.pt-page .vxe-body--column {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.app-page .ant-table-cell,
+.lg-page .ant-table-cell,
+.lg-list-page .ant-table-cell,
+.project-target-redesign .ant-table-cell,
+.pt-page .ant-table-cell,
+.ant-modal .ant-table-cell,
+.ant-drawer .ant-table-cell,
+.app-page .vxe-cell,
+.lg-page .vxe-cell,
+.lg-list-page .vxe-cell,
+.project-target-redesign .vxe-cell,
+.pt-page .vxe-cell {
+  line-height: 22px;
 }
 
 .lg-table-wrap .vxe-header--column,

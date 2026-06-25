@@ -89,11 +89,11 @@ function fmtDeviation(val: string | undefined): string {
 }
 
 function getDeviationColor(val: string | undefined): string {
-  if (!val) return '#6b7280'
+  if (!val) return 'var(--text-secondary)'
   const n = parseFloat(val)
   if (n > 0) return '#ef4444'
   if (n < 0) return '#22c55e'
-  return '#6b7280'
+  return 'var(--text-secondary)'
 }
 
 function fmtPercent(val: string | undefined, base: string | undefined): string {

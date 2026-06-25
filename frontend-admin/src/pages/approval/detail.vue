@@ -337,10 +337,7 @@ onMounted(() => {
             >
               转办
             </a-button>
-            <a-button
-              v-if="availableActions.includes('addSign')"
-              @click="handleAction('addSign')"
-            >
+            <a-button v-if="availableActions.includes('addSign')" @click="handleAction('addSign')">
               加签
             </a-button>
             <a-button
@@ -358,11 +355,7 @@ onMounted(() => {
         <!-- Node Flow -->
         <div class="pt-panel">
           <h4 style="margin-top: 0">审批流程</h4>
-          <a-steps
-            :current="completedNodeCount"
-            size="small"
-            direction="vertical"
-          >
+          <a-steps :current="completedNodeCount" size="small" direction="vertical">
             <a-step v-for="node in nodes" :key="node.id">
               <template #title>
                 {{ node.nodeName }}
@@ -371,13 +364,16 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template #description>
-                <div v-if="Array.isArray(node.tasks) && node.tasks.length > 0" class="wf-node-tasks">
+                <div
+                  v-if="Array.isArray(node.tasks) && node.tasks.length > 0"
+                  class="wf-node-tasks"
+                >
                   <div v-for="task in node.tasks" :key="task.id" class="wf-node-task-item">
                     <span>{{ task.approverName }}</span>
                     <a-tag :color="taskStatusMap[task.taskStatus]?.color" size="small">
                       {{ taskStatusMap[task.taskStatus]?.text || task.taskStatus }}
                     </a-tag>
-                    <span v-if="task.comment" style="color: #999; font-size: 12px">{{
+                    <span v-if="task.comment" style="color: var(--muted); font-size: 12px">{{
                       task.comment
                     }}</span>
                   </div>
@@ -398,10 +394,13 @@ onMounted(() => {
                   actionNameMap[record.actionType] || record.actionName
                 }}</a-tag>
               </div>
-              <div v-if="record.comment" style="color: #666; font-size: 13px; margin-top: 4px">
+              <div
+                v-if="record.comment"
+                style="color: var(--text-secondary); font-size: 13px; margin-top: 4px"
+              >
                 {{ record.comment }}
               </div>
-              <div style="color: #999; font-size: 12px; margin-top: 2px">
+              <div style="color: var(--muted); font-size: 12px; margin-top: 2px">
                 {{ record.createdAt }}
               </div>
             </a-timeline-item>

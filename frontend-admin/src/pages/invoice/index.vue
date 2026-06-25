@@ -115,7 +115,7 @@ defineExpose({
         size="large"
         @press-enter="handleSearch"
       >
-        <template #prefix><SearchOutlined style="color: #697380" /></template>
+        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
       </a-input>
       <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
       <a-button size="large" @click="handleReset">

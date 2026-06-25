@@ -97,7 +97,7 @@ const emit = defineEmits<{
         "
       >
         <span style="font-weight: 600; font-size: 14px">验收明细</span>
-        <span style="font-size: 12px; color: #9ca3af">（选择采购订单后自动加载订单明细）</span>
+        <span style="font-size: 12px; color: var(--muted)">（选择采购订单后自动加载订单明细）</span>
       </div>
 
       <!-- Quantity warning -->

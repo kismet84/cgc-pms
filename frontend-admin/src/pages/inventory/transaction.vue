@@ -183,7 +183,7 @@ onMounted(() => {
               >
                 <div>
                   <span>{{ m.materialName }}</span>
-                  <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{
+                  <span style="color: var(--muted); font-size: 12px; margin-left: 8px">{{
                     m.materialCode
                   }}</span>
                 </div>
@@ -257,7 +257,7 @@ onMounted(() => {
               >
                 <div>
                   <span>{{ m.materialName }}</span>
-                  <span style="color: #9ca3af; font-size: 12px; margin-left: 8px">{{
+                  <span style="color: var(--muted); font-size: 12px; margin-left: 8px">{{
                     m.materialCode
                   }}</span>
                 </div>
