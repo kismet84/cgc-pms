@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
+    "check:bundle-size": "node scripts/check-bundle-size.mjs",
     "type-check": "vue-tsc --noEmit",
     "lint": "eslint . --ext .vue,.js,.ts,.jsx,.tsx --fix",
     "format": "prettier --write \"src/**/*.{vue,ts,js,json,css}\"",
@@ -47,16 +48,6 @@
     "vite": "^6.4.3",
     "vitest": "^4.1.8",
     "vue-tsc": "^2.1.10"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "core-js",
-      "esbuild",
-      "vue-demi"
-    ],
-    "patchedDependencies": {
-      "ant-design-vue@4.2.6": "patches/ant-design-vue@4.2.6.patch"
-    }
   },
   "packageManager": "pnpm@11.0.9+sha512.34ce82e6780233cf9cad8685029a8f81d2e06196c5a9bad98879f7424940c6817c4e4524fb7d38b8553ceed48b9758b8ebaf1abd3600c232c4c8cf7366086f38"
 }

@@ -325,7 +325,7 @@ public class MatStockService {
         wrapper.eq(MatStock::getTenantId, tenantId);
         wrapper.eq(MatStock::getWarehouseId, warehouseId);
         wrapper.eq(MatStock::getMaterialId, materialId);
-        wrapper.last("LIMIT 1");
+        wrapper.last("LIMIT 1"); // SQL-SAFETY: fixed-sql-fragment
         List<MatStock> results = matStockMapper.selectList(wrapper);
         return results.isEmpty() ? null : results.get(0);
     }

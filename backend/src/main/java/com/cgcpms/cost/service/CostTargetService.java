@@ -142,7 +142,7 @@ public class CostTargetService {
         LambdaQueryWrapper<CostTarget> lockQw = new LambdaQueryWrapper<>();
         lockQw.eq(CostTarget::getId, id)
                 .eq(CostTarget::getTenantId, tenantId)
-                .last("FOR UPDATE");
+                .last("FOR UPDATE"); // SQL-SAFETY: fixed-sql-fragment
         CostTarget target = costTargetMapper.selectOne(lockQw);
         if (target == null) {
             throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");

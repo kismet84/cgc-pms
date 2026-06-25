@@ -1,6 +1,5 @@
 import { createApp } from 'vue'
 import { message } from 'ant-design-vue'
-import Antd from 'ant-design-vue'
 import { createPinia } from 'pinia'
 import dayjs from 'dayjs'
 import localeData from 'dayjs/plugin/localeData'
@@ -10,9 +9,9 @@ dayjs.extend(localeData)
 
 // VxeTable
 import VxeUITable from 'vxe-table'
-import VxeUIAll from 'vxe-pc-ui'
+import VxeLoading from 'vxe-pc-ui/es/loading'
 import 'vxe-table/lib/style.css'
-import 'vxe-pc-ui/lib/style.css'
+import 'vxe-pc-ui/es/loading/style.css'
 
 // ECharts (按需注册)
 import { use } from 'echarts/core'
@@ -46,10 +45,9 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
-app.use(Antd)
 app.directive('loading', vLoading)
 app.directive('permission', vPermission)
-app.use(VxeUIAll)
+app.use(VxeLoading)
 app.use(VxeUITable)
 
 app.config.errorHandler = (err, instance, info) => {

@@ -145,16 +145,16 @@ public class CostLedgerService {
 
     // ---- Private helpers ----
 
-    private String escapeLike(String s) {
-        return s.replace("'", "''").replace("%", "\\%").replace("_", "\\_");
-    }
-
     private Long parseLong(String s) {
         try {
             return Long.parseLong(s);
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private String escapeLikeParameter(String s) {
+        return s.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     private LambdaQueryWrapper<CostItem> buildFilterWrapper(
@@ -173,21 +173,22 @@ public class CostLedgerService {
         if (startDate != null) wrapper.ge(CostItem::getCostDate, startDate);
         if (endDate != null) wrapper.le(CostItem::getCostDate, endDate);
         if (StringUtils.hasText(keyword)) {
-            Long idMatch = parseLong(keyword);
-            // Use nested sql: ID exact match OR text fields LIKE OR cross-table name EXISTS
-            List<String> andList = new ArrayList<>();
-            if (idMatch != null) andList.add("cost_item.id = " + idMatch);
-            String escapedLike = "%" + escapeLike(keyword) + "%";
-            andList.add("(cost_item.cost_type LIKE '" + escapedLike + "'");
-            andList.add(" OR cost_item.source_type LIKE '" + escapedLike + "'");
-            andList.add(" OR cost_item.cost_status LIKE '" + escapedLike + "'");
-            andList.add(" OR cost_item.remark LIKE '" + escapedLike + "')");
-            andList.add(" OR EXISTS (SELECT 1 FROM pm_project p WHERE p.id = cost_item.project_id AND p.project_name LIKE '" + escapedLike + "')");
-            andList.add(" OR EXISTS (SELECT 1 FROM ct_contract c WHERE c.id = cost_item.contract_id AND (c.contract_name LIKE '" + escapedLike + "' OR c.contract_code LIKE '" + escapedLike + "') )");
-            andList.add(" OR EXISTS (SELECT 1 FROM md_partner mp WHERE mp.id = cost_item.partner_id AND mp.partner_name LIKE '" + escapedLike + "')");
-            andList.add(" OR EXISTS (SELECT 1 FROM cost_subject cs WHERE cs.id = cost_item.cost_subject_id AND cs.subject_name LIKE '" + escapedLike + "')");
-            String whereClause = String.join(" ", andList);
-            wrapper.apply("(" + whereClause + ")");
+            String trimmedKeyword = keyword.trim();
+            Long idMatch = parseLong(trimmedKeyword);
+            String like = "%" + escapeLikeParameter(trimmedKeyword) + "%";
+            wrapper.and(w -> {
+                if (idMatch != null) {
+                    w.eq(CostItem::getId, idMatch).or();
+                }
+                w.apply("cost_item.cost_type LIKE {0} ESCAPE '!'", like) // SQL-SAFETY: parameterized-like
+                        .or().apply("cost_item.source_type LIKE {0} ESCAPE '!'", like) // SQL-SAFETY: parameterized-like
+                        .or().apply("cost_item.cost_status LIKE {0} ESCAPE '!'", like) // SQL-SAFETY: parameterized-like
+                        .or().apply("cost_item.remark LIKE {0} ESCAPE '!'", like) // SQL-SAFETY: parameterized-like
+                        .or().apply("EXISTS (SELECT 1 FROM pm_project p WHERE p.id = cost_item.project_id AND p.project_name LIKE {0} ESCAPE '!')", like) // SQL-SAFETY: parameterized-exists
+                        .or().apply("EXISTS (SELECT 1 FROM ct_contract c WHERE c.id = cost_item.contract_id AND (c.contract_name LIKE {0} ESCAPE '!' OR c.contract_code LIKE {0} ESCAPE '!'))", like) // SQL-SAFETY: parameterized-exists
+                        .or().apply("EXISTS (SELECT 1 FROM md_partner mp WHERE mp.id = cost_item.partner_id AND mp.partner_name LIKE {0} ESCAPE '!')", like) // SQL-SAFETY: parameterized-exists
+                        .or().apply("EXISTS (SELECT 1 FROM cost_subject cs WHERE cs.id = cost_item.cost_subject_id AND cs.subject_name LIKE {0} ESCAPE '!')", like); // SQL-SAFETY: parameterized-exists
+            });
         }
         wrapper.orderByDesc(CostItem::getCostDate, CostItem::getCreatedAt);
         return wrapper;

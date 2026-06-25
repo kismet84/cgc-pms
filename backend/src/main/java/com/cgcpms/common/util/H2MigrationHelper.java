@@ -26,7 +26,7 @@ public class H2MigrationHelper {
         String upper = tableName.toUpperCase(java.util.Locale.ROOT);
 
         // 只从 INDEXES 视图收集（它同时包含 CONSTRAINT 创建的索引和纯 UNIQUE INDEX）
-        try (Statement st = conn.createStatement()) {
+        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
             ResultSet rs = st.executeQuery(
                 "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES " +
                 "WHERE TABLE_SCHEMA='PUBLIC' AND UPPER(TABLE_NAME)='" + upper + "' " +
@@ -38,7 +38,7 @@ public class H2MigrationHelper {
         }
 
         // 用单独的 Statement 执行 DROP
-        try (Statement st = conn.createStatement()) {
+        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
             for (String name : names) {
                 // 先尝试作为索引删除
                 try {
@@ -57,7 +57,7 @@ public class H2MigrationHelper {
     public static String dropUniqueConstraintsAndIndex(Connection conn, String tableName, String indexName)
             throws Exception {
         dropUniqueConstraints(conn, tableName);
-        try (Statement st = conn.createStatement()) {
+        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
             st.execute("DROP INDEX IF EXISTS " + indexName);
         }
         return null;

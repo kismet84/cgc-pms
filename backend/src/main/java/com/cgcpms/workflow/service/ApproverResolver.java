@@ -73,7 +73,7 @@ public class ApproverResolver {
             case "USER" -> resolveUser(config, tenantId);
             case "ROLE" -> resolveRole(config, tenantId);
             case "POSITION" -> resolvePosition(config, tenantId);
-            case "PROJECT_ROLE" -> resolveProjectRole(config, projectId);
+            case "PROJECT_ROLE" -> resolveProjectRole(config, tenantId, projectId);
             default -> throw new BusinessException("UNSUPPORTED_APPROVER_TYPE",
                     "不支持的审批人类型: " + type);
         };
@@ -151,7 +151,7 @@ public class ApproverResolver {
         return users.stream().map(SysUser::getId).toList();
     }
 
-    private List<Long> resolveProjectRole(JsonNode config, Long projectId) {
+    private List<Long> resolveProjectRole(JsonNode config, Long tenantId, Long projectId) {
         if (!config.has("roleCode")) {
             throw new BusinessException("INVALID_APPROVER_CONFIG", "PROJECT_ROLE类型配置缺少roleCode");
         }
@@ -162,6 +162,7 @@ public class ApproverResolver {
 
         List<PmProjectMember> members = pmProjectMemberMapper.selectList(
                 new LambdaQueryWrapper<PmProjectMember>()
+                        .eq(tenantId != null, PmProjectMember::getTenantId, tenantId)
                         .eq(PmProjectMember::getProjectId, projectId)
                         .eq(PmProjectMember::getRoleCode, roleCode)
                         .eq(PmProjectMember::getStatus, "ACTIVE"));

@@ -52,7 +52,7 @@ public abstract class H2SoftDeleteUniqueMigration extends BaseJavaMigration {
         String upper = tableName.toUpperCase();
         List<String> names = new ArrayList<>();
 
-        try (Statement st = conn.createStatement();
+        try (Statement st = conn.createStatement(); // SQL-SAFETY: migration-ddl
              ResultSet rs = st.executeQuery(
                  "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS " +
                  "WHERE UPPER(CONSTRAINT_SCHEMA)='PUBLIC' AND UPPER(TABLE_NAME)='" + upper + "' " +
@@ -65,7 +65,7 @@ public abstract class H2SoftDeleteUniqueMigration extends BaseJavaMigration {
             }
         }
 
-        try (Statement st = conn.createStatement();
+        try (Statement st = conn.createStatement(); // SQL-SAFETY: migration-ddl
              ResultSet rs = st.executeQuery(
                  "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES " +
                  "WHERE UPPER(TABLE_SCHEMA)='PUBLIC' AND UPPER(TABLE_NAME)='" + upper + "' " +
@@ -78,7 +78,7 @@ public abstract class H2SoftDeleteUniqueMigration extends BaseJavaMigration {
             }
         }
 
-        try (Statement st = conn.createStatement()) {
+        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
             for (String name : names) {
                 try {
                     st.execute("ALTER TABLE " + tableName + " DROP CONSTRAINT \"" + name + "\"");

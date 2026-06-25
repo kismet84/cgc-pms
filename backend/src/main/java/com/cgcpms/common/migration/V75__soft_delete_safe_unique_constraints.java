@@ -50,7 +50,7 @@ public class V75__soft_delete_safe_unique_constraints extends BaseJavaMigration 
         }
 
         // stl_settlement 特殊处理: 有多余的 named index
-        try (Statement st = conn.createStatement()) {
+        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
             st.execute("DROP INDEX IF EXISTS uk_stl_settlement_contract");
         }
         H2SoftDeleteUniqueMigration.rebuildUniqueConstraints(conn, "stl_settlement",
@@ -59,7 +59,7 @@ public class V75__soft_delete_safe_unique_constraints extends BaseJavaMigration 
         );
 
         // pay_record: named UNIQUE INDEX
-        try (Statement st = conn.createStatement()) {
+        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
             st.execute("DROP INDEX IF EXISTS uk_external_txn_no");
             st.execute("CREATE UNIQUE INDEX uk_external_txn_no ON pay_record(external_txn_no, deleted_flag)");
         }

@@ -15,3 +15,4 @@
 - [H2 V78 缺失收入子科目种子修复 2026-06-24](h2-v78-missing-contract-revenue-subject-seed-2026-06-24.md) — H2 的 V78 少了 6001.01~6001.04，新增 V92 回填后才能稳定覆盖 ContractRevenueService 精确分支
 - [cost_item 测试前置数据必须补 project_id 2026-06-24](cost-item-h2-project-id-required-in-service-tests-2026-06-24.md) — 手工插入 cost_item 做服务测试前置时，H2 要求 project_id 非空，否则会触发 DataIntegrityViolationException
 - [结算提交审批测试需要 workflow 用户种子 2026-06-24](settlement-submit-workflow-user-seed-required-2026-06-24.md) — StlSettlementWriteService 的 submitForApproval 测试若不补 sys_user 1~3，会在 ApproverResolver 报审批人不属于当前租户
+- [ChatGPT Desktop AppContainer 初始化失败 2026-06-25](chatgpt-desktop-appcontainer-init-failure-2026-06-25.md) — Win11 25H2 预览版上 ChatGPT Desktop 包状态正常但 AppsFolder / 直接 exe 启动都失败，按 AppX 兼容性问题处理

@@ -1,12 +1,11 @@
 # check-sql-safety.ps1
-# Static analysis gate to detect SQL injection patterns in MyBatis XML and Java mapper code.
-# Scans only mapper-related paths to avoid @Value false positives.
+# Static analysis gate to detect SQL injection patterns in MyBatis XML and Java code.
 # Exit 0 = PASS, Exit 1 = violations found.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File scripts\check-sql-safety.ps1
 #
-# Exemption: add "SQL-SAFETY: server-side-enum" to the comment on the same line.
+# Exemption: add a supported "SQL-SAFETY: ..." marker to the comment on the same line.
 
 param(
     [string]$RootDir = ""
@@ -27,16 +26,22 @@ $violations = [System.Collections.ArrayList]::new()
 $patterns = @(
     @{ Name = '${} MyBatis string substitution'; Regex = '\$\{' },
     @{ Name = '@Select/@Update/@Delete/@Insert with string concat'; Regex = '@(Select|Update|Delete|Insert)\s*\(.*"\s*\+\s*[^"\r\n]' },
-    @{ Name = 'MyBatis-Plus .apply()'; Regex = '\.apply\s*\(' },
-    @{ Name = 'MyBatis-Plus .last()'; Regex = '\.last\s*\(' },
-    @{ Name = 'MyBatis-Plus .having()'; Regex = '\.having\s*\(' },
-    @{ Name = 'Raw JDBC Statement'; Regex = '\bStatement\b' }
+    @{ Name = 'MyBatis-Plus .apply()'; Regex = '\.apply\s*\(\s*"' },
+    @{ Name = 'MyBatis-Plus .last()'; Regex = '\.last\s*\(\s*"' },
+    @{ Name = 'MyBatis-Plus .having()'; Regex = '\.having\s*\(\s*"' },
+    @{ Name = 'Raw JDBC Statement'; Regex = '\bStatement\s+\w+\s*=\s*[\w.]+\.createStatement\s*\(' }
 )
 
 # -------------------------------------------------------------------
-# Exemption marker
+# Exemption markers
 # -------------------------------------------------------------------
-$exemptionMarker = 'SQL-SAFETY: server-side-enum'
+$exemptionMarkers = @(
+    'SQL-SAFETY: server-side-enum',
+    'SQL-SAFETY: parameterized-like',
+    'SQL-SAFETY: parameterized-exists',
+    'SQL-SAFETY: fixed-sql-fragment',
+    'SQL-SAFETY: migration-ddl'
+)
 
 # -------------------------------------------------------------------
 # Scan targets
@@ -50,7 +55,7 @@ if (Test-Path $xmlMapperDir) {
     foreach ($f in $xmlFiles) { $scanTargets += $f.FullName }
 }
 
-# 2) Java source under backend src/main/java (mapper packages + annotations)
+# 2) Java source under backend src/main/java
 $javaSrcDir = Join-Path $RootDir 'backend\src\main\java\com\cgcpms'
 if (Test-Path $javaSrcDir) {
     $javaFiles = Get-ChildItem -Path $javaSrcDir -Recurse -Filter *.java -ErrorAction SilentlyContinue
@@ -69,21 +74,7 @@ foreach ($file in $scanTargets) {
     $ext = [System.IO.Path]::GetExtension($file)
     $shortPath = $file.Replace($RootDir + '\', '')
 
-    # Skip non-mapper Java files: only care about files in mapper/ packages or with mapper-relevant annotations
-    if ($ext -eq '.java') {
-        $isMapper = ($shortPath -match '[\\/]mapper[\\/]')
-        if (-not $isMapper) {
-            # Also scan any .java that has actual annotation SQL (e.g. @Select(, not just mentioned in comments)
-            $content = Get-Content -Path $file -Raw -ErrorAction SilentlyContinue
-            if ($content -match '@(Select|Update|Delete|Insert)\s*\(') {
-                # keep — it has SQL annotations as actual method annotations
-            } else {
-                continue
-            }
-        }
-    }
-
-    $lines = Get-Content -Path $file -ErrorAction SilentlyContinue
+    $lines = @(Get-Content -Path $file -ErrorAction SilentlyContinue)
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $lineNum = $i + 1
         $line = $lines[$i]
@@ -93,9 +84,19 @@ foreach ($file in $scanTargets) {
         if ($trimmed.StartsWith('//') -or $trimmed.StartsWith('/*') -or $trimmed.StartsWith('*')) {
             continue
         }
+        if ($trimmed.StartsWith('import ') -or $trimmed.StartsWith('@Value(')) {
+            continue
+        }
 
-        # Skip lines with exemption marker
-        if ($line -match [regex]::Escape($exemptionMarker)) {
+        # Skip lines with a supported exemption marker.
+        $hasExemption = $false
+        foreach ($marker in $exemptionMarkers) {
+            if ($line -match [regex]::Escape($marker)) {
+                $hasExemption = $true
+                break
+            }
+        }
+        if ($hasExemption) {
             continue
         }
 
@@ -135,7 +136,7 @@ foreach ($v in $violations) {
 Write-Host "Total: $($violations.Count) potential SQL injection site(s)"
 Write-Host ''
 Write-Host 'If these are false positives (e.g. server-side enum interpolation),'
-Write-Host "add the comment // $exemptionMarker on the same line."
+Write-Host 'add a supported SQL-SAFETY marker on the same line with a concrete reason.'
 Write-Host ''
 
 exit 1

@@ -86,6 +86,8 @@ jobs:
           cache-dependency-path: frontend-admin/pnpm-lock.yaml
       - name: Install & Build
         run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm build
+      - name: Check frontend bundle size
+        run: cd frontend-admin && pnpm check:bundle-size
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v4

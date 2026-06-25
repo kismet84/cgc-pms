@@ -1,6 +1,7 @@
 package com.cgcpms.cost.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -8,6 +9,8 @@ import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.vo.CostLedgerSummaryVO;
 import com.cgcpms.cost.vo.CostLedgerVO;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,9 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,12 +32,16 @@ import static org.junit.jupiter.api.Assertions.*;
 class CostLedgerServiceTest {
 
     private static final long PROJECT_ID = 10001L;
+    private static final long TEST_KEYWORD_PROJECT_ID = 99010001L;
 
     @Autowired
     private CostLedgerService costLedgerService;
 
     @Autowired
     private CostItemMapper costItemMapper;
+
+    @Autowired
+    private PmProjectMapper pmProjectMapper;
 
     @BeforeEach
     void setUp() {
@@ -44,6 +53,9 @@ class CostLedgerServiceTest {
         costItemMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
                 .eq(CostItem::getProjectId, PROJECT_ID)
                 .likeRight(CostItem::getSourceType, "SUMMARY_"));
+        costItemMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getProjectId, TEST_KEYWORD_PROJECT_ID));
+        pmProjectMapper.deleteById(TEST_KEYWORD_PROJECT_ID);
     }
 
     @AfterEach
@@ -273,6 +285,69 @@ class CostLedgerServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("keyword查询使用参数绑定且不把恶意字符拼入SQL")
+    @SuppressWarnings("unchecked")
+    void keywordFilterUsesBoundParametersForLikeSearch() {
+        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        String maliciousKeyword = "x%' OR 1=1 --";
+
+        LambdaQueryWrapper<CostItem> wrapper = (LambdaQueryWrapper<CostItem>) ReflectionTestUtils.invokeMethod(
+                costLedgerService,
+                "buildFilterWrapper",
+                PROJECT_ID, null, null, null,
+                null, null, null,
+                null, null, maliciousKeyword);
+
+        assertNotNull(wrapper);
+        String sqlSegment = wrapper.getCustomSqlSegment();
+        assertFalse(sqlSegment.contains(maliciousKeyword),
+                "keyword原文不应出现在SQL片段中，必须通过参数绑定传入");
+        assertFalse(sqlSegment.contains("OR 1=1"),
+                "恶意布尔表达式不应进入SQL文本");
+        Map<String, Object> params = wrapper.getParamNameValuePairs();
+        assertTrue(params.values().stream().anyMatch("%x!%' OR 1=1 --%"::equals),
+                "LIKE keyword应保留为带ESCAPE的绑定参数，避免手工拼接SQL");
+    }
+
+    @Test
+    @DisplayName("keyword查询支持普通字段、数字ID、特殊字符、长字符串和跨表项目名")
+    void keywordSearchHandlesRegressionCases() {
+        PmProject project = new PmProject();
+        project.setId(TEST_KEYWORD_PROJECT_ID);
+        project.setTenantId(TestUserContext.TENANT_0);
+        project.setProjectCode("TEST-KW-PROJ");
+        project.setProjectName("成本台账关键字项目");
+        project.setProjectType("BUILDING");
+        project.setStatus("ACTIVE");
+        pmProjectMapper.insert(project);
+
+        String specialRemark = "特殊字符 ' \\ % _ keyword";
+        CostItem specialItem = buildCostItem("TEST_KEYWORD_SPECIAL", new BigDecimal("321.00"),
+                BigDecimal.ZERO, TEST_KEYWORD_PROJECT_ID, "TEST_KEYWORD_MATERIAL");
+        specialItem.setRemark(specialRemark);
+        costItemMapper.insert(specialItem);
+
+        CostItem longKeywordItem = buildCostItem("TEST_KEYWORD_LONG", new BigDecimal("654.00"),
+                BigDecimal.ZERO, TEST_KEYWORD_PROJECT_ID, "LABOR");
+        String longKeyword = "LONGKEYWORD_" + "A".repeat(180);
+        longKeywordItem.setRemark("prefix-" + longKeyword + "-suffix");
+        costItemMapper.insert(longKeywordItem);
+
+        try {
+            assertKeywordFindsItem("TEST_KEYWORD_MATERIAL", specialItem.getId());
+            assertKeywordFindsItem(specialItem.getId().toString(), specialItem.getId());
+            assertKeywordFindsItem(specialRemark, specialItem.getId());
+            assertKeywordFindsItem(longKeyword, longKeywordItem.getId());
+            assertKeywordFindsItem("关键字项目", specialItem.getId());
+            assertKeywordFindsItem("关键字项目", longKeywordItem.getId());
+        } finally {
+            costItemMapper.deleteById(specialItem.getId());
+            costItemMapper.deleteById(longKeywordItem.getId());
+            pmProjectMapper.deleteById(TEST_KEYWORD_PROJECT_ID);
+        }
+    }
+
     // ── Test helpers ──
 
     private CostItem buildCostItem(String sourceType, BigDecimal amount, BigDecimal taxAmount,
@@ -302,5 +377,16 @@ class CostLedgerServiceTest {
         CostItem item = buildCostItem(sourceType, amount, taxAmount, projectId, "MATERIAL");
         costItemMapper.insert(item);
         return item.getId();
+    }
+
+    private void assertKeywordFindsItem(String keyword, Long expectedId) {
+        IPage<CostLedgerVO> page = Assertions.assertDoesNotThrow(
+                () -> costLedgerService.getPage(1, 20,
+                        TEST_KEYWORD_PROJECT_ID, null, null, null,
+                        null, null, null, null, null, keyword));
+
+        assertTrue(page.getRecords().stream()
+                        .anyMatch(vo -> expectedId.toString().equals(vo.getId())),
+                "keyword should find cost item " + expectedId + ": " + keyword);
     }
 }

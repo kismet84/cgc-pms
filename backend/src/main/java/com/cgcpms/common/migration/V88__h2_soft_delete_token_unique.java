@@ -55,7 +55,7 @@ public class V88__h2_soft_delete_token_unique extends BaseJavaMigration {
         java.sql.Connection conn = context.getConnection();
 
         // 1. 为所有 14 个表添加 deleted_token BIGINT 列
-        try (Statement st = conn.createStatement()) {
+        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
             for (String[] entry : TABLES) {
                 st.execute("ALTER TABLE " + entry[0] + " ADD COLUMN deleted_token BIGINT DEFAULT NULL");
             }
