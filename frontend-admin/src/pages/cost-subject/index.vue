@@ -267,7 +267,7 @@ onMounted(() => {
 
     <div class="cs-layout">
       <!-- Left: Tree -->
-      <div class="lg-table-wrap cs-tree-panel">
+      <div class="cs-tree-panel">
         <div class="cs-tree-header">
           <span class="cs-tree-title">科目树</span>
           <a-button type="link" size="small" @click="fetchTree">刷新</a-button>
@@ -296,7 +296,7 @@ onMounted(() => {
       </div>
 
       <!-- Right: Detail -->
-      <div class="lg-table-wrap cs-detail-panel">
+      <div class="cs-detail-panel">
         <template v-if="selectedNode">
           <div class="cs-detail-header">
             <span class="cs-detail-title">{{ selectedNode.subjectName }}</span>
@@ -417,12 +417,16 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
   gap: 16px;
-  min-height: 500px;
+  align-items: stretch;
+  min-height: 560px;
 }
 
 .cs-tree-panel {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
   overflow: hidden;
   border: 0;
   border-radius: var(--radius-md);
@@ -446,6 +450,7 @@ onMounted(() => {
 
 .cs-tree-body {
   flex: 1;
+  min-height: 0;
   padding: 16px 20px;
   overflow: auto;
 }
@@ -454,21 +459,32 @@ onMounted(() => {
   display: inline-flex;
   gap: 8px;
   align-items: center;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .cs-tree-code {
+  flex: 0 0 auto;
   font-size: 12px;
   color: var(--muted);
   font-family: monospace;
 }
 
 .cs-tree-name {
+  min-width: 0;
+  overflow: hidden;
   font-size: 14px;
   color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cs-detail-panel {
+  min-width: 0;
+  min-height: 0;
   padding: 20px;
+  background: var(--surface);
+  overflow: auto;
   border: 0;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
@@ -478,15 +494,20 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .cs-detail-title {
+  min-width: 0;
+  overflow: hidden;
   font-size: 15px;
   font-weight: 700;
   color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cs-detail-empty {

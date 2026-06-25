@@ -481,7 +481,6 @@ onMounted(() => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #orderType="{ row }">
                 <a-tag :color="ORDER_TYPE_COLOR[row.orderType]">

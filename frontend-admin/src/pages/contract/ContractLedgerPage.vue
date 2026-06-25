@@ -168,7 +168,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #contractCode="{ row }">
                 <a class="lg-link">{{ row.contractCode }}</a>

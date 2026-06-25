@@ -299,7 +299,6 @@ onMounted(() => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #amount="{ row }">
                 <span class="ct-money">{{ fmtAmount(row.totalTargetAmount) }}</span>

@@ -282,7 +282,6 @@ onMounted(() => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #status="{ row }">
                 <a-tag :color="STATUS_COLOR[row.status]">

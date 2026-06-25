@@ -198,7 +198,6 @@ onMounted(() => {
             stripe
             border="inner"
             size="small"
-            max-height="480"
           >
             <template #totalAmount="{ row }">
               <span v-if="row.totalAmount" class="lg-money">

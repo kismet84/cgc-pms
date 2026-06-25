@@ -179,7 +179,6 @@ defineExpose({
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #invoiceType="{ row }">
                 <a-tag

@@ -285,7 +285,6 @@ onMounted(async () => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #projectId="{ row }">
                 <span class="al-muted">{{ getProjectName(row.projectId) }}</span>

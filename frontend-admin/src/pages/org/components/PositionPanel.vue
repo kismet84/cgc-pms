@@ -116,7 +116,6 @@ function getDeptName(departmentId: string | undefined, flatDeptList: FlatDeptIte
       stripe
       border="inner"
       size="small"
-      max-height="480"
     >
       <template #posCompanyId="{ row }: { row: Record<string, unknown> }">
         {{ getCompanyName(row.companyId as string | undefined, companyData) }}

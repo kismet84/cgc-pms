@@ -569,7 +569,6 @@ onMounted(() => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #subTaskName="{ row }">
                 <span v-if="row.subTaskName">{{ row.subTaskName }}</span>

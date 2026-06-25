@@ -171,7 +171,6 @@ watch(
             stripe
             border="inner"
             size="small"
-            max-height="480"
           >
             <template #title="{ row }">
               <a class="lg-link" @click="handleDetail(row as { instanceId: string })">{{

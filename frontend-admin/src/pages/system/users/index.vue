@@ -287,7 +287,6 @@ onMounted(() => {
             stripe
             border="inner"
             size="small"
-            max-height="480"
           >
             <template #roleNames="{ row }">
               <template v-if="row.roleNames && row.roleNames.length">

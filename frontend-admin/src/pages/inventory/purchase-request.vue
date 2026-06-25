@@ -485,7 +485,6 @@ onMounted(() => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #approvalStatus="{ row }">
                 <ApprovalStatusTag :status="row.approvalStatus" />

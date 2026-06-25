@@ -365,7 +365,6 @@ onMounted(() => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #taskName="{ row }">
                 <a class="lg-link">{{ row.taskName }}</a>

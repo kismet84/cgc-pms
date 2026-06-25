@@ -492,7 +492,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #sourceType="{ row }">
                 <a-tag

@@ -33,7 +33,6 @@ const emit = defineEmits<{
       stripe
       border="inner"
       size="small"
-      max-height="480"
       @sort-change="
         (params: { field: string; order: 'asc' | 'desc' | null }) => emit('sortChange', params)
       "

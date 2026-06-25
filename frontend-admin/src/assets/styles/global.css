@@ -2279,6 +2279,59 @@ body {
 .lg-list-page .lg-list-table-panel .lg-table-wrap {
   flex: 1 1 auto;
   min-height: 0;
+  --lg-table-row-height: 56px;
+  background-color: var(--surface);
+}
+
+.lg-list-page .lg-table-wrap .vxe-grid,
+.lg-list-page .lg-table-wrap .vxe-table,
+.lg-list-page .lg-table-wrap .vxe-table--render-wrapper,
+.lg-list-page .lg-table-wrap .vxe-table--main-wrapper {
+  height: 100% !important;
+  min-height: 100%;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--render-wrapper,
+.lg-list-page .lg-table-wrap .vxe-table--main-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--layout-wrapper {
+  flex: 1 1 auto;
+  height: calc(100% - var(--vxe-ui-table-view-scrollbar-height)) !important;
+  min-height: 0;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--scroll-x-virtual {
+  position: absolute !important;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--vxe-ui-table-view-scrollbar-height) !important;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--header-wrapper {
+  flex: 0 0 auto;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--body-wrapper,
+.lg-list-page .lg-table-wrap .ant-table-body,
+.lg-list-page .lg-table-wrap .ant-table-content {
+  flex: 1 1 auto;
+  height: auto !important;
+  min-height: 0;
+  background-color: var(--surface);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--surface) 0,
+    var(--surface) calc(var(--lg-table-row-height) - 1px),
+    var(--border-subtle) calc(var(--lg-table-row-height) - 1px),
+    var(--border-subtle) var(--lg-table-row-height)
+  );
+  background-size: 100% var(--lg-table-row-height);
+  background-position-y: 1px;
 }
 
 .lg-pagination,

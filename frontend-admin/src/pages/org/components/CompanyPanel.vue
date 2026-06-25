@@ -78,7 +78,6 @@ const emit = defineEmits<{
       stripe
       border="inner"
       size="small"
-      max-height="480"
       @row-click="
         ({ row }: { row: Record<string, unknown> }) => emit('rowClick', row as OrgCompanyVO)
       "

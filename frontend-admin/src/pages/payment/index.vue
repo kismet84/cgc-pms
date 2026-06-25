@@ -479,7 +479,6 @@ onMounted(() => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #applyAmount="{ row }">
                 <span class="lg-money">{{ fmtWan(row.applyAmount) }} 万</span>

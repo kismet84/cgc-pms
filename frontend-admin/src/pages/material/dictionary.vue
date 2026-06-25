@@ -292,7 +292,6 @@ onMounted(fetchData)
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #defaultTaxRate="{ row }">
                 <span>{{ row.defaultTaxRate || '-' }}</span>

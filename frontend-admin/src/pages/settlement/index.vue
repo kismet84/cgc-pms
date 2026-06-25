@@ -390,7 +390,6 @@ const colorMap: Record<string, string> = {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #settlementAmount="{ row }">
                 <span>{{ fmtWan(row.settlementAmount) }}</span>

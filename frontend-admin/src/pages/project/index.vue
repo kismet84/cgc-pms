@@ -750,12 +750,11 @@ const gridColumns = computed(() => [
               :columns="gridColumns"
               :loading="loading"
               :column-config="{ resizable: true, useKey: true }"
-              show-overflow="tooltip"
-              show-header-overflow="tooltip"
+              show-overflow="title"
+              show-header-overflow="title"
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #projectName="{ row }">
                 <a class="lg-link" @click="router.push(`/project/${row.id}/overview`)">{{

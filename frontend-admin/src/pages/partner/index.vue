@@ -347,7 +347,6 @@ onMounted(() => {
               stripe
               border="inner"
               size="small"
-              max-height="480"
             >
               <template #partnerType="{ row }">
                 <a-tag :color="partnerTypeColor(row.partnerType)">
