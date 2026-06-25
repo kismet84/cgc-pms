@@ -12,7 +12,7 @@ Construction General Contracting Project Management System
 | 缓存 | Redis 7 |
 | 文件存储 | MinIO (S3 兼容) |
 | 部署 | Docker + Docker Compose + Nginx HTTPS |
-| UI 语言 | 清爽企业级工作台 — 30 页面统一 pt-* 设计系统 |
+| UI 语言 | 清爽企业级工作台 — 66 页面/组件统一 lg-* 设计系统 |
 
 ## 快速启动
 
@@ -96,7 +96,7 @@ cgc-pms/
 │   └── src/
 │       ├── components/              # 共享组件
 │       ├── stores/                  # Pinia 状态管理
-│       ├── pages/                   # 30 页面 (dashboard/contract/project/cost/payment/purchase/subcontract/settlement/variation/inventory/invoice/approval/alert/org/material/system/settings)
+│       ├── pages/                   # 管理后台页面 (dashboard/contract/project/cost/payment/purchase/subcontract/settlement/variation/inventory/invoice/approval/alert/org/material/system/settings)
 │       └── router/                  # 路由配置
 ├── deploy/                          # Docker Compose + .env.example
 └── .github/workflows/ci.yml        # CI/CD 流水线
@@ -121,17 +121,31 @@ cgc-pms/
 
 | 层级 | 框架 | 用例 | 通过率 |
 |------|------|------|--------|
-| 后端 | JUnit 5 + MockMvc | 1,198 | 99.7% (2 既有 H2 分页 + 1 表锁) |
-| 前端 | Vitest | 174 | 100% |
-| E2E | Playwright | 83 | 16 spec 覆盖 |
+| 后端 | JUnit 5 + MockMvc | 1,270 基线 | 上线前需重新跑通 `mvn verify` |
+| 前端 | Vitest | 174 基线 | 上线前需修复 `test:coverage` 回归 |
+| E2E | Playwright | 84 | 17 spec 覆盖 |
 
-覆盖率: 后端 73% instruction / 53% branch · 前端 9.79% (CI 阈值对齐基线)
+覆盖率基线: 后端 79.8% instruction / 57.6% branch · 前端 9.79% (CI 阈值对齐基线)
 
 ```bash
-cd backend && ./mvnw test          # 后端 (1198 tests)
+cd backend && ./mvnw verify -Djasypt.encryptor.password=dev-jasypt-key
 cd frontend-admin && pnpm build    # 前端构建 + 类型检查
-cd frontend-admin && pnpm vitest   # 前端测试 (174 tests)
+cd frontend-admin && pnpm test:coverage
+cd frontend-admin && pnpm check:bundle-size
 ```
+
+## 最近更新 (2026-06-25)
+
+- **发布前审计**: 新增上线前复审报告，当前结论为“不建议上线”，需先清零 Nginx 模板化、后端 verify、前端 coverage、生产清库接口、依赖 High 风险等阻断项
+- **SQL 安全加固**: 成本台账查询改为参数绑定；SQL safety scan 扩展到 Service 层 Java 源码，覆盖 `.apply()` / `.last()`
+- **审批租户边界**: 项目角色审批人解析显式使用 `tenantId`，降低跨租户误解析风险
+- **前端性能门禁**: Vite vendor 拆包后无超过 500KB 的 JS chunk，新增 `pnpm check:bundle-size` 并接入 CI
+
+## 最近更新 (2026-06-24)
+
+- **第二批功能包**: 分包计量关联任务、领料申请、项目归档通知、发票强制关联付款记录已完成
+- **全系统 UI 重构**: 66 页面/组件统一到 `lg-*` 体系，CSS Token 固化，通用 PageHeader/SearchBar/Toolbar/KpiCard/EmptyState 组件落地
+- **运维基础设施**: SQL Safety CI、Prometheus 指标、监控配置、数据库备份恢复脚本完成
 
 ## 最近更新 (2026-06-23)
 
@@ -208,4 +222,7 @@ docker restart cgc-pms-backend-dev
 | 测试规范 | `docs/09-测试规范.md` |
 | 部署运维手册 | `docs/10-部署运维手册.md` |
 | 安全规范 | `docs/11-安全规范.md` |
+| 质量审计 | `docs/quality/` |
+| 历史开发记录 | `docs/历史开发记录.md` |
+| 未来开发计划 | `docs/未来开发计划.md` |
 | 历史归档 | `archive/` |

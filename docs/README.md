@@ -20,6 +20,16 @@ CGC-PMS 项目文档中心，面向开发者和运维人员。
 | — | [历史开发记录](历史开发记录.md) | 全体开发者 |
 | — | [未来开发计划](未来开发计划.md) | 项目负责人、全体开发者 |
 
+## 质量与审计
+
+| 日期 | 文档 | 结论 |
+|------|------|------|
+| 2026-06-25 | [上线前代码审计报告](quality/code-audit-2026-06-25-pre-release.md) | 不建议上线，需先清零发布阻断项 |
+| 2026-06-25 | [全量代码审计报告](quality/code-audit-2026-06-25-full-repo.md) | 修复后合并，重点为 SQL 安全与扫描门禁 |
+| 2026-06-25 | [Vite 大 chunk 警告专项审计](quality/code-audit-2026-06-25-vite-large-chunk-warning.md) | 专项可合并，建议保留 bundle size 门禁 |
+| 2026-06-24 | [UI 重构检查清单](quality/ui-refactor-checklist.md) | 66 页面/组件迁移追踪 |
+| 2026-06-23 | [质量加固验收](quality/quality-hardening-acceptance.md) | 质量加固验收记录 |
+
 ## 其他
 
 - `agents/` — 多 agent 协作工作流文档（被 `AGENTS.md` 引用）
