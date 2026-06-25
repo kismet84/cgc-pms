@@ -6,6 +6,8 @@ import axios from 'axios'
 import { getRoles } from '@/api/modules/system'
 import type { SysRoleVO } from '@/types/system'
 import PermissionModal from './PermissionModal.vue'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const loading = ref(false)
 const allRoles = ref<SysRoleVO[]>([])
@@ -37,6 +39,13 @@ const gridColumns = computed(() => [
   { field: 'createdAt', title: '创建时间', width: 160 },
   { title: '操作', width: 76, slots: { default: 'action' } },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('system_roles_cols', gridColumns)
 
 const filteredRoles = computed(() => {
   return normalizeArray<SysRoleVO>(allRoles.value).filter((r) => {
@@ -148,13 +157,20 @@ onMounted(fetchData)
               <template #icon><ReloadOutlined /></template>
             </a-button>
           </div>
+          <div class="lg-toolbar-right">
+            <ColumnSettingsButton
+              :columns="columnSettings"
+              :visible="colVisible"
+              @toggle="toggleCol"
+            />
+          </div>
         </div>
 
         <!-- 表格 -->
         <div class="lg-table-wrap">
           <vxe-grid
             :data="tableData"
-            :columns="gridColumns"
+            :columns="visibleGridColumns"
             :loading="loading"
             :column-config="{ resizable: true }"
             stripe

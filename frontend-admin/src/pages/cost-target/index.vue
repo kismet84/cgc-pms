@@ -20,6 +20,8 @@ import {
   TARGET_STATUS_LABEL,
   TARGET_STATUS_COLOR,
 } from '@/types/costTarget'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // ---- Dropdown data ----
 const referenceStore = useReferenceStore()
@@ -168,7 +170,7 @@ function fmtAmount(val: string): string {
 }
 
 // ---- VxeGrid columns ----
-const columns = [
+const columns = computed(() => [
   { field: 'versionNo', title: '版本号', width: 130 },
   { field: 'versionName', title: '版本名称', minWidth: 160 },
   { field: 'projectName', title: '所属项目', width: 150 },
@@ -184,7 +186,14 @@ const columns = [
   { field: 'status', title: '业务状态', width: 108, slots: { default: 'status' } },
   { field: 'isActive', title: '版本标识', width: 108, slots: { default: 'isActive' } },
   { title: '操作', width: 76, slots: { default: 'ops' } },
-]
+])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('cost_target_cols', columns)
 
 const targetStats = computed(() => ({
   total: total.value,
@@ -289,12 +298,19 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
               </a-button>
             </div>
+            <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+            </div>
           </div>
 
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="columns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

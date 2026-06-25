@@ -9,6 +9,8 @@ import {
   updateMaterialStatus,
 } from '@/api/modules/material'
 import type { MaterialVO } from '@/types/material'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   keyword: '',
@@ -64,6 +66,13 @@ const gridColumns = computed(() => [
   { field: 'createdAt', title: '创建时间', width: 150 },
   { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('material_dict_cols', gridColumns)
 
 const materialStats = computed(() => ({
   total: total.value,
@@ -279,14 +288,20 @@ onMounted(fetchData)
                 <template #icon><ReloadOutlined /></template>
               </a-button>
             </div>
-            <div class="lg-toolbar-right" />
+            <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+            </div>
           </div>
 
           <!-- 表格 -->
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

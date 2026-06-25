@@ -12,6 +12,8 @@ import {
 import { useReferenceStore } from '@/stores/reference'
 import type { SubTaskVO } from '@/types/subcontract'
 import type { SelectOption } from '@/types/ui'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -96,6 +98,13 @@ const gridColumns = computed(() => [
   { field: 'plannedEndDate', title: '计划结束', width: 112 },
   { title: '操作', width: 76, slots: { default: 'action' } },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('subcontract_task_cols', gridColumns)
 
 async function fetchData() {
   loading.value = true
@@ -340,6 +349,11 @@ onMounted(() => {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-select
                 v-model:value="filter.projectId"
                 placeholder="全部项目"
@@ -359,7 +373,7 @@ onMounted(() => {
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

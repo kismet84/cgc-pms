@@ -19,6 +19,8 @@ import type {
 } from '@/types/settlement'
 import { SETTLEMENT_STATUS_LABEL, SETTLEMENT_STATUS_COLOR } from '@/types/settlement'
 import type { PageResult } from '@/types/api'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const router = useRouter()
 const referenceStore = useReferenceStore()
@@ -236,6 +238,13 @@ const gridColumns = computed(() => [
   { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
 
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('settlement_list_cols', gridColumns)
+
 // ---- Mobile detection ----
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
@@ -365,6 +374,11 @@ const colorMap: Record<string, string> = {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-select
                 v-model:value="filter.projectId"
                 placeholder="全部项目"
@@ -384,7 +398,7 @@ const colorMap: Record<string, string> = {
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

@@ -12,6 +12,8 @@ import { useInvoiceList, fmtAmount } from './composables/useInvoiceList'
 import InvoiceFormModal from './components/InvoiceFormModal.vue'
 import InvoiceKpiStrip from './components/InvoiceKpiStrip.vue'
 import InvoiceVerifyPanel from './components/InvoiceVerifyPanel.vue'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const {
   filter,
@@ -31,6 +33,13 @@ const {
   handleVerify,
   init,
 } = useInvoiceList()
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('invoice_list_cols', gridColumns)
 
 const modalVisible = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
@@ -142,6 +151,11 @@ defineExpose({
               </a-button>
             </div>
             <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-select
                 v-model:value="filter.payRecordId"
                 placeholder="全部付款记录"
@@ -173,7 +187,7 @@ defineExpose({
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

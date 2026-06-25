@@ -9,6 +9,8 @@ import { getProjectList } from '@/api/modules/project'
 import type { SelectOption } from '@/types/ui'
 import type { CostSummaryVO } from '@/types/cost'
 import type { ProjectVO } from '@/types/project'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const projectList = ref<ProjectVO[]>([])
 const selectedProjectId = ref<string | undefined>(undefined)
@@ -150,6 +152,13 @@ const gridColumns = computed(() => [
     slots: { default: 'costDeviation' },
   },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('cost_summary_cols', gridColumns)
 
 const summarySubjects = computed(() =>
   summary.value ? normalizeArray<CostSummaryVO['subjects'][number]>(summary.value.subjects) : [],
@@ -394,6 +403,11 @@ onMounted(() => {
             </a-button>
           </div>
           <div class="lg-toolbar-right">
+            <ColumnSettingsButton
+              :columns="columnSettings"
+              :visible="colVisible"
+              @toggle="toggleCol"
+            />
             <a-select
               v-model:value="selectedProjectId"
               placeholder="请选择项目"
@@ -530,7 +544,7 @@ onMounted(() => {
             </div>
             <vxe-grid
               :data="summarySubjects"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

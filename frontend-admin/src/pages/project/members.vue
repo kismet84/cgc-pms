@@ -7,6 +7,8 @@ import { useProjectStore } from '@/stores/project'
 import { getUserList, type SysUserBrief } from '@/api/modules/system'
 import type { MemberVO, MemberFormParams } from '@/types/project'
 import type { SelectOption } from '@/types/ui'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const route = useRoute()
 const router = useRouter()
@@ -155,14 +157,21 @@ function goBack() {
 }
 
 // ── Table columns ──
-const columns = [
+const columns = computed(() => [
   { title: '姓名', dataIndex: 'userId', width: 140 },
   { title: '角色', dataIndex: 'roleCode', width: 160 },
   { title: '岗位', dataIndex: 'positionName', width: 140 },
   { title: '开始日期', dataIndex: 'startDate', width: 130 },
   { title: '状态', dataIndex: 'status', width: 90 },
   { title: '操作', dataIndex: 'ops', width: 76 },
-]
+])
+
+const {
+  visibleColumns: visibleColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('project_members_cols', columns)
 </script>
 
 <template>
@@ -178,6 +187,7 @@ const columns = [
         </div>
       </div>
       <div class="pt-head-actions">
+        <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
         <a-button @click="goBack">
           <ArrowLeftOutlined />
           返回项目
@@ -213,7 +223,7 @@ const columns = [
         <div class="pt-panel-header">成员清单</div>
         <a-table
           :data-source="members"
-          :columns="columns"
+          :columns="visibleColumns"
           :loading="store.membersLoading"
           :pagination="false"
           row-key="id"

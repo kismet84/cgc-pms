@@ -16,6 +16,8 @@ import type { PurchaseRequestVO, PurchaseRequestItemVO } from '@/types/inventory
 import { getContractLedger } from '@/api/modules/contract'
 import type { ContractVO } from '@/types/contract'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -93,6 +95,13 @@ const gridColumns = computed(() => [
   { field: 'createdTime', title: '创建时间', width: 140 },
   { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('purchase_request_cols', gridColumns)
 
 async function fetchData() {
   loading.value = true
@@ -460,6 +469,11 @@ onMounted(() => {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-select
                 v-model:value="filter.projectId"
                 placeholder="全部项目"
@@ -479,7 +493,7 @@ onMounted(() => {
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

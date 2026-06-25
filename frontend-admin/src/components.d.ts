@@ -68,6 +68,7 @@ declare module 'vue' {
     ATree: typeof import('ant-design-vue/es')['Tree']
     ATreeSelect: typeof import('ant-design-vue/es')['TreeSelect']
     AUpload: typeof import('ant-design-vue/es')['Upload']
+    ColumnSettingsButton: typeof import('./components/list-page/ColumnSettingsButton.vue')['default']
     ContractChangeList: typeof import('./components/ContractChangeList.vue')['default']
     ContractItemEditor: typeof import('./components/ContractItemEditor.vue')['default']
     ContractStatusTag: typeof import('./components/ContractStatusTag.vue')['default']

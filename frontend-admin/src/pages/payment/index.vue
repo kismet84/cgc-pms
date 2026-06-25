@@ -20,6 +20,8 @@ import type { PayApplicationVO, PayApplicationBasisVO } from '@/types/payment'
 import { PAY_TYPE_LABEL, PAY_TYPE_COLOR, PAY_STATUS_LABEL, PAY_STATUS_COLOR } from '@/types/payment'
 import type { MatReceiptVO } from '@/types/receipt'
 import type { SubMeasureVO } from '@/types/subcontract'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -329,6 +331,13 @@ const gridColumns = computed(() => [
   { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('payment_list_cols', gridColumns)
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({})
@@ -467,13 +476,20 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
               </a-button>
             </div>
+            <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+            </div>
           </div>
 
           <!-- 表格 -->
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

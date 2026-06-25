@@ -14,6 +14,8 @@ import {
 import { useReceiptForm } from './composables/useReceiptForm'
 import ReceiptKpiStrip from './components/ReceiptKpiStrip.vue'
 import ReceiptFormModal from './components/ReceiptFormModal.vue'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
@@ -43,6 +45,13 @@ const {
   handleSubmitApproval,
   init,
 } = useReceiptList()
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('receipt_list_cols', gridColumns)
 
 const {
   modalVisible,
@@ -141,6 +150,11 @@ onMounted(() => {
             </a-button>
           </div>
           <div class="lg-toolbar-right">
+            <ColumnSettingsButton
+              :columns="columnSettings"
+              :visible="colVisible"
+              @toggle="toggleCol"
+            />
             <a-select
               v-model:value="filter.projectId"
               placeholder="全部项目"
@@ -201,7 +215,7 @@ onMounted(() => {
         <div class="lg-table-wrap">
           <vxe-grid
             :data="tableData"
-            :columns="gridColumns"
+            :columns="visibleGridColumns"
             :loading="loading"
             :column-config="{ resizable: true }"
             stripe

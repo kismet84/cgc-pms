@@ -10,6 +10,8 @@ import {
 } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import type { WarehouseVO } from '@/types/inventory'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -56,6 +58,13 @@ const gridColumns = computed(() => [
   { field: 'createdAt', title: '创建时间', width: 140 },
   { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('warehouse_list_cols', gridColumns)
 
 async function fetchData() {
   loading.value = true
@@ -257,6 +266,11 @@ onMounted(() => {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-select
                 v-model:value="filter.projectId"
                 placeholder="全部项目"
@@ -276,7 +290,7 @@ onMounted(() => {
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

@@ -5,6 +5,8 @@ import { MoreOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-
 import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { RULE_TYPE_LABELS, SEVERITY_COLOR, type AlertLogVO } from '@/types/alert'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const store = useAlertStore()
 
@@ -148,6 +150,13 @@ const gridColumns = computed(() => [
   { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('alert_list_cols', gridColumns)
+
 function getProjectName(projectId: string): string {
   const p = projectOptions.value.find((o) => String(o.id) === String(projectId))
   return p ? `${p.projectCode} ${p.projectName}` : `项目#${projectId}`
@@ -259,6 +268,11 @@ onMounted(async () => {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-select
                 v-model:value="filter.projectId"
                 placeholder="全部项目"
@@ -279,7 +293,7 @@ onMounted(async () => {
           <div class="lg-table-wrap">
             <vxe-grid
               :data="filteredAlerts"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="store.loading"
               :column-config="{ resizable: true }"
               stripe

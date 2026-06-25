@@ -1,9 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { OrgPositionVO, OrgCompanyVO } from '@/types/org'
 import type { FlatDeptItem } from '../utils'
 import { MoreOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
-defineProps<{
+const props = defineProps<{
   canAdd: boolean
   canEdit: boolean
   canDelete: boolean
@@ -25,6 +28,14 @@ defineProps<{
   flatDeptList: FlatDeptItem[]
   companyData: OrgCompanyVO[]
 }>()
+
+const gridColumnsSource = computed(() => props.gridColumns)
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('org_position_cols', gridColumnsSource)
 
 const emit = defineEmits<{
   search: []
@@ -56,10 +67,13 @@ function getDeptName(departmentId: string | undefined, flatDeptList: FlatDeptIte
         <span class="org-panel-title">岗位管理</span>
         <p>岗位作为项目成员职责和流程节点的稳定枚举。</p>
       </div>
-      <a-button v-if="canAdd" type="primary" size="small" @click="emit('add')">
-        <template #icon><PlusOutlined /></template>
-        新增
-      </a-button>
+      <div class="org-panel-actions">
+        <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
+        <a-button v-if="canAdd" type="primary" size="small" @click="emit('add')">
+          <template #icon><PlusOutlined /></template>
+          新增
+        </a-button>
+      </div>
     </div>
 
     <div class="lg-search-bar position">
@@ -110,7 +124,7 @@ function getDeptName(departmentId: string | undefined, flatDeptList: FlatDeptIte
     <vxe-grid
       class="org-table"
       :data="data"
-      :columns="gridColumns"
+      :columns="visibleGridColumns"
       :loading="loading"
       :column-config="{ resizable: true }"
       stripe

@@ -14,6 +14,8 @@ import {
 import { getRoles } from '@/api/modules/system'
 import type { SysUserVO } from '@/types/user'
 import type { SysRoleVO } from '@/types/system'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const loading = ref(false)
 const tableData = ref<SysUserVO[]>([])
@@ -57,6 +59,14 @@ const gridColumns = computed(() => [
   { field: 'createdAt', title: '创建时间', width: 160 },
   { title: '操作', width: 76, slots: { default: 'action' } },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('system_users_cols', gridColumns)
+
 const userStatusSummary = computed(() => [
   {
     label: '启用用户',
@@ -276,12 +286,19 @@ onMounted(() => {
               <template #icon><ReloadOutlined /></template>
             </a-button>
           </div>
+          <div class="lg-toolbar-right">
+            <ColumnSettingsButton
+              :columns="columnSettings"
+              :visible="colVisible"
+              @toggle="toggleCol"
+            />
+          </div>
         </div>
 
         <div class="lg-table-wrap">
           <vxe-grid
             :data="tableData"
-            :columns="gridColumns"
+            :columns="visibleGridColumns"
             :loading="loading"
             :column-config="{ resizable: true }"
             stripe

@@ -5,6 +5,8 @@ import { MoreOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant
 import { getDictDataByCode } from '@/api/modules/dict'
 import { getPartnerList, createPartner, updatePartner, deletePartner } from '@/api/modules/partner'
 import type { PartnerVO } from '@/types/partner'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   partnerCode: '',
@@ -104,6 +106,13 @@ const gridColumns = computed(() => [
   { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('partner_list_cols', gridColumns)
 
 const partnerStats = computed(() => ({
   total: total.value,
@@ -334,14 +343,20 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
               </a-button>
             </div>
-            <div class="lg-toolbar-right" />
+            <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+            </div>
           </div>
 
           <!-- 表格 -->
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

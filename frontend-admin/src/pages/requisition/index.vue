@@ -10,6 +10,8 @@ import { useRequisitionList, fmtAmount } from './composables/useRequisitionList'
 import { useRequisitionForm } from './composables/useRequisitionForm'
 import RequisitionKpiStrip from './components/RequisitionKpiStrip.vue'
 import RequisitionFormModal from './components/RequisitionFormModal.vue'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
@@ -37,6 +39,13 @@ const {
   handleSubmitApproval,
   init,
 } = useRequisitionList()
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('requisition_list_cols', gridColumns)
 
 const {
   modalVisible,
@@ -137,6 +146,11 @@ onMounted(() => {
             </a-button>
           </div>
           <div class="lg-toolbar-right">
+            <ColumnSettingsButton
+              :columns="columnSettings"
+              :visible="colVisible"
+              @toggle="toggleCol"
+            />
             <a-select
               v-model:value="filter.projectId"
               placeholder="全部项目"
@@ -192,7 +206,7 @@ onMounted(() => {
         <div class="lg-table-wrap">
           <vxe-grid
             :data="tableData"
-            :columns="gridColumns"
+            :columns="visibleGridColumns"
             :loading="loading"
             :column-config="{ resizable: true }"
             stripe

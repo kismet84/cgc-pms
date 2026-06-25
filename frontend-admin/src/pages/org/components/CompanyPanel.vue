@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { OrgCompanyVO } from '@/types/org'
 import { MoreOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
-defineProps<{
+const props = defineProps<{
   canAdd: boolean
   canEdit: boolean
   canDelete: boolean
@@ -18,6 +21,14 @@ defineProps<{
   }
   gridColumns: Record<string, unknown>[]
 }>()
+
+const gridColumnsSource = computed(() => props.gridColumns)
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('org_company_cols', gridColumnsSource)
 
 const emit = defineEmits<{
   search: []
@@ -40,10 +51,13 @@ const emit = defineEmits<{
         <span class="org-panel-title">公司管理</span>
         <p>点击公司行后，右侧部门架构自动聚焦。</p>
       </div>
-      <a-button v-if="canAdd" type="primary" size="small" @click="emit('add')">
-        <template #icon><PlusOutlined /></template>
-        新增
-      </a-button>
+      <div class="org-panel-actions">
+        <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
+        <a-button v-if="canAdd" type="primary" size="small" @click="emit('add')">
+          <template #icon><PlusOutlined /></template>
+          新增
+        </a-button>
+      </div>
     </div>
 
     <div class="lg-search-bar">
@@ -72,7 +86,7 @@ const emit = defineEmits<{
     <vxe-grid
       class="org-table"
       :data="data"
-      :columns="gridColumns"
+      :columns="visibleGridColumns"
       :loading="loading"
       :column-config="{ resizable: true }"
       stripe

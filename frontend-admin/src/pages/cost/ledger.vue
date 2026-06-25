@@ -23,6 +23,8 @@ import type {
 import { SOURCE_TYPE_LABEL, SOURCE_TYPE_COLOR } from '@/types/cost'
 import type { PageResult } from '@/types/api'
 import { useReferenceStore } from '@/stores/reference'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
@@ -319,6 +321,13 @@ const gridColumns = computed(() => [
   { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
 
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('cost_ledger_cols', gridColumns)
+
 // ---- Init ----
 onMounted(() => {
   window.addEventListener('resize', onResize)
@@ -468,6 +477,11 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </a-button>
             </div>
             <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-select
                 v-model:value="filter.projectId"
                 placeholder="全部项目"
@@ -487,7 +501,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

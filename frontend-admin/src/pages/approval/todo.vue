@@ -12,6 +12,8 @@ import {
   type WfCcVO,
 } from '@/api/modules/workflow'
 import type { PageResult } from '@/types/api'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const router = useRouter()
 const route = useRoute()
@@ -88,6 +90,13 @@ const gridColumns = computed(() => [
   { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('approval_todo_cols', gridColumns)
+
 const tabs = [
   { key: 'todo', label: '我的待办' },
   { key: 'done', label: '我的已办' },
@@ -161,12 +170,17 @@ watch(
           <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
             <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label" />
           </a-tabs>
+          <ColumnSettingsButton
+            :columns="columnSettings"
+            :visible="colVisible"
+            @toggle="toggleCol"
+          />
         </div>
 
         <div class="lg-table-wrap">
           <vxe-grid
             :data="tableData"
-            :columns="gridColumns"
+            :columns="visibleGridColumns"
             :loading="loading"
             :column-config="{ resizable: true }"
             stripe

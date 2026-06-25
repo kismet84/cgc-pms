@@ -14,6 +14,8 @@ import {
 } from '@/api/modules/purchase'
 import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchase'
 import type { SelectOption } from '@/types/ui'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -111,6 +113,13 @@ const gridColumns = computed(() => [
   { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
   { title: '操作', width: 76, slots: { default: 'action' } },
 ])
+
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('purchase_order_cols', gridColumns)
 
 async function fetchData() {
   loading.value = true
@@ -456,6 +465,11 @@ onMounted(() => {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-select
                 v-model:value="filter.projectId"
                 placeholder="全部项目"
@@ -475,7 +489,7 @@ onMounted(() => {
           <div class="lg-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

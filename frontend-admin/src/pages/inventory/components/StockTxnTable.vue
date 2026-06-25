@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { MatStockTxnVO } from '@/types/inventory'
 import { MoreOutlined } from '@ant-design/icons-vue'
 import {
@@ -7,13 +8,23 @@ import {
   getSourceTypeColor,
   getSourceTypeLabel,
 } from '../composables/useStockLedger'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
-defineProps<{
+const props = defineProps<{
   txnList: MatStockTxnVO[]
   loading: boolean
   gridColumns: Record<string, unknown>[]
   fmtQty: (val: string | number) => string
 }>()
+
+const gridColumnsSource = computed(() => props.gridColumns)
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('stock_txn_cols', gridColumnsSource)
 
 const emit = defineEmits<{
   sortChange: [params: { field: string; order: 'asc' | 'desc' | null }]
@@ -23,12 +34,13 @@ const emit = defineEmits<{
 
 <template>
   <div class="lg-table-wrap">
-    <div style="padding: 12px 14px 0 14px; font-weight: 600; font-size: 14px; color: var(--text)">
-      出入库流水
+    <div class="stock-txn-header">
+      <span>出入库流水</span>
+      <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
     </div>
     <vxe-grid
       :data="txnList"
-      :columns="gridColumns"
+      :columns="visibleGridColumns"
       :loading="loading"
       :column-config="{ resizable: true }"
       stripe
@@ -90,3 +102,16 @@ const emit = defineEmits<{
     </vxe-grid>
   </div>
 </template>
+
+<style scoped>
+.stock-txn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+</style>
