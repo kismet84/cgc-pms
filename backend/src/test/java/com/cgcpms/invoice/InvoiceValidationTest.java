@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -45,6 +46,9 @@ class InvoiceValidationTest {
     @Autowired
     private PayRecordMapper payRecordMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static final long SEED_PAY_RECORD_ID = 90001L;
 
     private Cookie adminCookie() {
@@ -57,8 +61,15 @@ class InvoiceValidationTest {
 
     @BeforeEach
     void setUp() {
-        // Seed pay_record for mandatory payRecordId linkage
-        payRecordMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PayRecord>().gt(PayRecord::getId, 0));
+        jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
+        jdbcTemplate.update("""
+                DELETE FROM pay_invoice
+                WHERE invoice_no LIKE 'INV-VAL-%'
+                   OR invoice_no LIKE 'INV-SEC-%'
+                   OR invoice_no LIKE 'INV-FILTER-%'
+                """);
+        jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
+
         PayRecord seed = new PayRecord();
         seed.setId(SEED_PAY_RECORD_ID);
         seed.setTenantId(0L);

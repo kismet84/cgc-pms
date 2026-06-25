@@ -31,13 +31,23 @@ async function handleSubmit() {
     userStore.setUserInfo(result.userInfo)
 
     message.success('登录成功')
-    const redirect = (route.query.redirect as string) || '/'
-    router.push(redirect)
+    router.push(normalizeRedirect(route.query.redirect))
   } catch (err) {
     message.error(err instanceof Error ? err.message : '登录失败，请重试')
   } finally {
     loading.value = false
   }
+}
+
+function normalizeRedirect(value: unknown) {
+  const redirect = Array.isArray(value) ? value[0] : value
+  if (typeof redirect !== 'string') {
+    return '/'
+  }
+  if (!redirect.startsWith('/') || redirect.startsWith('//')) {
+    return '/'
+  }
+  return redirect
 }
 
 function handleForgotPassword() {

@@ -38,7 +38,7 @@ vi.mock('@/stores/user', () => ({
 // ── Mock icons ──
 vi.mock('@ant-design/icons-vue', () => ({
   MenuFoldOutlined: { template: '<span class="icon-stub hamburger-icon"><slot /></span>' },
-  QuestionCircleOutlined: { template: '<span class="icon-stub help-icon"><slot /></span>' },
+  ProjectOutlined: { template: '<span class="icon-stub project-icon"><slot /></span>' },
 }))
 
 // ── Mock sub-components ──
@@ -152,18 +152,6 @@ describe('BasicLayout click handlers', () => {
 
     expect(mockPush).toHaveBeenCalledTimes(1)
     expect(mockPush).toHaveBeenCalledWith('/settings')
-  })
-
-  it('navigates to /help when help icon (QuestionCircleOutlined) is clicked', async () => {
-    const wrapper = createWrapper()
-
-    const helpIcon = wrapper.find('[aria-label="帮助"]')
-    expect(helpIcon.exists()).toBe(true)
-
-    await helpIcon.trigger('click')
-
-    expect(mockPush).toHaveBeenCalledTimes(1)
-    expect(mockPush).toHaveBeenCalledWith('/help')
   })
 
   it('navigates to /login when "退出登录" is clicked (existing handler still works)', async () => {

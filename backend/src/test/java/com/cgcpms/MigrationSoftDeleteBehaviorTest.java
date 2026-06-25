@@ -38,7 +38,7 @@ class MigrationSoftDeleteBehaviorTest {
 
     private static final long TENANT_ID = 1L;
     private static final long USER_ID = 1L;
-    private static final long SEED_PAY_RECORD_ID = 90001L;
+    private static final long SEED_PAY_RECORD_ID = 92001L;
 
     @Autowired
     private MatStockMapper matStockMapper;
@@ -69,9 +69,9 @@ class MigrationSoftDeleteBehaviorTest {
                 .build();
         UserContext.set(claims);
 
-        // Insert seed pay record so invoice creation (now mandatory payRecordId) succeeds
-        // Use JDBC physical delete to avoid logical-delete PK conflicts
-        jdbcTemplate.update("DELETE FROM pay_record WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
+        jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
+
         PayRecord seed = new PayRecord();
         seed.setId(SEED_PAY_RECORD_ID);
         seed.setTenantId(TENANT_ID);

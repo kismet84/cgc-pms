@@ -2,5 +2,9 @@ allowBuilds:
   core-js: true
   esbuild: true
   vue-demi: true
+overrides:
+  form-data: ^4.0.6
+  ini: ^1.3.8
+  undici: ^7.28.0
 patchedDependencies:
   ant-design-vue@4.2.6: patches/ant-design-vue@4.2.6.patch

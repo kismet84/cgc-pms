@@ -29,7 +29,7 @@ class InvoiceServiceTest {
 
     private static final long TENANT_ID = 1L;
     private static final long USER_ADMIN = 1L;
-    private static final long SEED_PAY_RECORD_ID = 90001L;
+    private static final long SEED_PAY_RECORD_ID = 91001L;
 
     @Autowired
     private InvoiceService invoiceService;
@@ -54,9 +54,10 @@ class InvoiceServiceTest {
                 .build();
         UserContext.set(claims);
 
-        // 物理清理本测试关心的表，防止数据污染（MyBatis-Plus delete 走逻辑删，会触发 PK 冲突）
+        // 物理清理本测试关心的数据，防止逻辑删除和并行测试类复用固定主键触发 PK 冲突。
+        jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE tenant_id = ?", TENANT_ID);
-        jdbcTemplate.update("DELETE FROM pay_record WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
 
         // 插入种子付款记录，供发票创建时关联使用
         PayRecord seed = new PayRecord();

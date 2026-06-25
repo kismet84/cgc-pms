@@ -35,7 +35,7 @@ vi.mock('@/stores/user', () => ({
 // ── Mock icons (inheritAttrs: true so aria-label and class are applied to root) ──
 vi.mock('@ant-design/icons-vue', () => ({
   MenuFoldOutlined: { template: '<span class="icon-stub"><slot /></span>' },
-  QuestionCircleOutlined: { template: '<span class="icon-stub"><slot /></span>' },
+  ProjectOutlined: { template: '<span class="icon-stub"><slot /></span>' },
 }))
 
 // ── Mock sub-components ──
@@ -58,6 +58,7 @@ const antdStubs = [
   'a-menu-item',
   'a-menu-divider',
   'a-badge',
+  'router-view',
 ]
 
 // Helper: create a stub object from names
@@ -132,14 +133,4 @@ describe('BasicLayout accessibility', () => {
     vi.useRealTimers()
   })
 
-  it('renders help icon with aria-label', () => {
-    const wrapper = mount(BasicLayout, {
-      global: {
-        stubs: makeStubs(antdStubs),
-      },
-    })
-
-    const helpIcon = wrapper.find('[aria-label="帮助"]')
-    expect(helpIcon.exists()).toBe(true)
-  })
 })

@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { login } from '@/api/modules/auth'
 import LoginPage from '../index.vue'
 
 // ── Mock router ──
 const mockPush = vi.fn()
-const mockRoute = { query: {} as Record<string, string> }
+const mockRoute = { query: {} as Record<string, string | string[]> }
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
   useRoute: () => mockRoute,
@@ -36,6 +37,7 @@ vi.mock('ant-design-vue', async () => {
 describe('login/index.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRoute.query = {}
     setActivePinia(createPinia())
   })
 
@@ -60,5 +62,75 @@ describe('login/index.vue', () => {
     expect(wrapper.html()).toBeTruthy()
     // 登录页面应有表单元素
     expect(wrapper.find('form').exists()).toBe(true)
+  })
+
+  it('登录成功后允许跳转站内 redirect 路径', async () => {
+    mockRoute.query = { redirect: '/contract/list?status=pending' }
+    const wrapper = mount(LoginPage)
+
+    wrapper.vm.formState.password = 'secret'
+    await wrapper.vm.handleSubmit()
+
+    expect(mockPush).toHaveBeenCalledWith('/contract/list?status=pending')
+  })
+
+  it('登录成功后拒绝外部 redirect 路径并回到首页', async () => {
+    mockRoute.query = { redirect: 'https://evil.example/phishing' }
+    const wrapper = mount(LoginPage)
+
+    wrapper.vm.formState.password = 'secret'
+    await wrapper.vm.handleSubmit()
+
+    expect(mockPush).toHaveBeenCalledWith('/')
+  })
+
+  it('登录成功后拒绝双斜杠 redirect 路径并回到首页', async () => {
+    mockRoute.query = { redirect: '//evil.example/phishing' }
+    const wrapper = mount(LoginPage)
+
+    wrapper.vm.formState.password = 'secret'
+    await wrapper.vm.handleSubmit()
+
+    expect(mockPush).toHaveBeenCalledWith('/')
+  })
+
+  it('登录成功后使用 redirect 数组中的第一个站内路径', async () => {
+    mockRoute.query = { redirect: ['/invoice', 'https://evil.example'] }
+    const wrapper = mount(LoginPage)
+
+    wrapper.vm.formState.password = 'secret'
+    await wrapper.vm.handleSubmit()
+
+    expect(mockPush).toHaveBeenCalledWith('/invoice')
+  })
+
+  it('用户名或密码为空时不提交登录', async () => {
+    const wrapper = mount(LoginPage)
+
+    wrapper.vm.formState.username = ''
+    wrapper.vm.formState.password = ''
+    await wrapper.vm.handleSubmit()
+
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(mockUserStore.setUserInfo).not.toHaveBeenCalled()
+  })
+
+  it('登录成功且无 redirect 时回到首页', async () => {
+    const wrapper = mount(LoginPage)
+
+    wrapper.vm.formState.password = 'secret'
+    await wrapper.vm.handleSubmit()
+
+    expect(mockPush).toHaveBeenCalledWith('/')
+  })
+
+  it('登录失败时不跳转', async () => {
+    vi.mocked(login).mockRejectedValueOnce(new Error('bad credentials'))
+    const wrapper = mount(LoginPage)
+
+    wrapper.vm.formState.password = 'wrong'
+    await wrapper.vm.handleSubmit()
+
+    expect(mockPush).not.toHaveBeenCalled()
   })
 })

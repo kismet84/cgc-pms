@@ -116,6 +116,21 @@ jobs:
           name: frontend-coverage
           path: frontend-admin/coverage
 
+  frontend-dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+      - name: Audit frontend dependencies with official registry
+        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm audit --audit-level high --registry=https://registry.npmjs.org
+
   e2e:
     runs-on: ubuntu-latest
     needs: [backend-test-mysql, frontend-build]

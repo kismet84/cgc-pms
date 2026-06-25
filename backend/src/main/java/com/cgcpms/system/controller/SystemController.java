@@ -3,6 +3,7 @@ package com.cgcpms.system.controller;
 import com.cgcpms.common.result.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,7 @@ import java.util.List;
  */
 @Slf4j
 @RestController
+@Profile("!prod")
 @RequestMapping("/system")
 @RequiredArgsConstructor
 public class SystemController {

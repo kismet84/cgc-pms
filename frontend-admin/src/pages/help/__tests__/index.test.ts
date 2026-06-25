@@ -10,17 +10,6 @@ const ATypographyTitle = defineComponent({
   },
 })
 
-const ACard = defineComponent({
-  props: { title: String },
-  setup(props, { slots }) {
-    return () =>
-      h('div', { class: 'stub-card' }, [
-        h('div', { class: 'stub-card-title' }, props.title),
-        h('div', { class: 'stub-card-body' }, slots.default?.()),
-      ])
-  },
-})
-
 const ATable = defineComponent({
   props: { columns: Array, dataSource: Array, pagination: [Object, Boolean], size: String },
   setup(props) {
@@ -83,7 +72,6 @@ const stubs = {
   'a-breadcrumb': { template: '<div class="stub-breadcrumb"><slot /></div>' },
   'a-breadcrumb-item': { template: '<span class="stub-breadcrumb-item"><slot /></span>' },
   'a-typography-title': ATypographyTitle,
-  'a-card': ACard,
   'a-table': ATable,
   'a-collapse': ACollapse,
   'a-collapse-panel': ACollapsePanel,
@@ -98,10 +86,10 @@ describe('HelpPage', () => {
   const mountHelp = () => mount(HelpPage, { global: { stubs } })
 
   /* ── Test 1: renders all 3 section titles ── */
-  it('renders three section cards: 快捷键, 常见问题, 联系我们', () => {
+  it('renders three sections: 快捷键, 常见问题, 联系我们', () => {
     const wrapper = mountHelp()
 
-    const titles = wrapper.findAll('.stub-card-title')
+    const titles = wrapper.findAll('.lg-section-title')
     expect(titles.length).toBe(3)
     expect(titles[0].text()).toBe('快捷键')
     expect(titles[1].text()).toBe('常见问题')
@@ -163,12 +151,13 @@ describe('HelpPage', () => {
     expect(lastRowCells.some((td) => td.text() === '切换输入框')).toBe(true)
   })
 
-  /* ── Test 5: page has a help center title ── */
-  it('renders the help center title', () => {
+  /* ── Test 5: page has help center breadcrumb ── */
+  it('renders the help center breadcrumb', () => {
     const wrapper = mountHelp()
 
-    const h2 = wrapper.find('h2')
-    expect(h2.exists()).toBe(true)
-    expect(h2.text()).toBe('帮助中心')
+    const breadcrumb = wrapper.find('.stub-breadcrumb')
+    expect(breadcrumb.exists()).toBe(true)
+    expect(breadcrumb.text()).toContain('首页')
+    expect(breadcrumb.text()).toContain('帮助中心')
   })
 })

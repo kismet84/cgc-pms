@@ -6,8 +6,9 @@ RUN corepack enable && corepack prepare pnpm@11.0.9 --activate
 
 WORKDIR /app
 
-# Copy package manifests for layer caching
-COPY package.json pnpm-lock.yaml ./
+# Copy package manifests and pnpm workspace config for layer caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches/ ./patches/
 
 # --ignore-scripts: pnpm v10+ requires explicit build approval per package; skip scripts for speed
 RUN pnpm install --frozen-lockfile --ignore-scripts
@@ -26,8 +27,8 @@ FROM nginx:1.27-alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb9
 # Copy built assets from builder stage
 COPY --from=builder /app/dist/ /usr/share/nginx/html/
 
-# Copy nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy nginx config as an official nginx template so BACKEND_URL is substituted at startup.
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # SSL certificate directory (mount certificates at runtime via volume or secret)
 # For dev: generate self-signed cert with openssl and mount as volume

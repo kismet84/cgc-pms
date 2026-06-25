@@ -253,6 +253,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      BACKEND_URL: backend:8080
     volumes:
       # SSL certificates — place server.crt and server.key here before starting
       - ./ssl:/etc/nginx/ssl:ro

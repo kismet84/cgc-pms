@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  form-data: ^4.0.6
+  ini: ^1.3.8
+  undici: ^7.28.0
+
 patchedDependencies:
   ant-design-vue@4.2.6: 81e577955f10d21460a3ce21bdd4c06b421dd96bdacba3ffa75584e8153dd85c
 
@@ -47,10 +52,10 @@ importers:
     devDependencies:
       '@axe-core/playwright':
         specifier: ^4.11.3
-        version: 4.11.3(playwright-core@1.48.0)
+        version: 4.11.3(playwright-core@1.61.1)
       '@playwright/test':
-        specifier: ^1.48.0
-        version: 1.48.0
+        specifier: ^1.55.1
+        version: 1.61.1
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.18.0
         version: 8.61.0(@typescript-eslint/parser@8.61.0(eslint@9.39.4)(typescript@5.6.3))(eslint@9.39.4)(typescript@5.6.3)
@@ -468,8 +473,8 @@ packages:
     resolution: {integrity: sha512-SEeaJLb3qBNF/OaXnaR1NmmBbFYk1zC0ZH/52fATcRPLFg/p791YrcyFFy44Bo9sLaGuSuLp5Q6axbb/O+v/RA==}
     engines: {node: ^14.18.0 || >=16.0.0}
 
-  '@playwright/test@1.48.0':
-    resolution: {integrity: sha512-W5lhqPUVPqhtc/ySvZI5Q8X2ztBOUgZ8LbAFy0JQgrXZs2xaILrUcNO3rQjwbLPfGK13+rZsDa1FpG+tqYkT5w==}
+  '@playwright/test@1.61.1':
+    resolution: {integrity: sha512-8nKv6+0RJSL9FE4jYOEGXnPeM/Hg12qZpmqzZjRh3qM0Y7c3z1mrOTfFLids72RDQYVh9WpLEfR5WdpNX4fkig==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1272,8 +1277,8 @@ packages:
     resolution: {integrity: sha512-lXeSPRCndWPaipZbtI4CkvTZpF6OPsy19dkvf7+5AHeJD+w+iAKPc9Q78xWBmX4SdR+8xrtY9jTXs/YDv8q+Ug==}
     engines: {node: '>=14'}
 
-  form-data@4.0.5:
-    resolution: {integrity: sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==}
+  form-data@4.0.6:
+    resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
     engines: {node: '>= 6'}
 
   fsevents@2.3.2:
@@ -1369,9 +1374,8 @@ packages:
     resolution: {integrity: sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==}
     engines: {node: '>=0.8.19'}
 
-  ini@1.3.4:
-    resolution: {integrity: sha512-VUA7WAWNCWfm6/8f9kAb8Y6iGBWnmCfgFS5dTrv2C38LLm1KUmpY388mCVCJCsMKQomvOQ1oW8/edXdChd9ZXQ==}
-    deprecated: Please update to ini >=1.3.6 to avoid a prototype pollution issue
+  ini@1.3.8:
+    resolution: {integrity: sha512-JV/yugV2uzW5iMRSiZAyDtQd+nxtUnjeLt0acNdw98kKLrvuRVyB80tsREOE7yvGVgalhZ6RNXCmEHkUKBKxew==}
 
   is-binary-path@2.1.0:
     resolution: {integrity: sha512-ZMERYes6pDydyuGidse7OsHxtbI7WVeUEozgR/g7rd0xUimYNlvZRE/K2MgZTjWy725IfelLeVcEM97mmtRGXw==}
@@ -1638,13 +1642,13 @@ packages:
   pkg-types@1.3.1:
     resolution: {integrity: sha512-/Jm5M4RvtBFVkKWRu2BLUTNP8/M2a+UwuAX+ae4770q1qVGtfjG+WTCupoZixokjmHiry8uI+dlY8KXYV5HVVQ==}
 
-  playwright-core@1.48.0:
-    resolution: {integrity: sha512-RBvzjM9rdpP7UUFrQzRwR8L/xR4HyC1QXMzGYTbf1vjw25/ya9NRAVnXi/0fvFopjebvyPzsmoK58xxeEOaVvA==}
+  playwright-core@1.61.1:
+    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
     engines: {node: '>=18'}
     hasBin: true
 
-  playwright@1.48.0:
-    resolution: {integrity: sha512-qPqFaMEHuY/ug8o0uteYJSRfMGFikhUysk8ZvAtfKmUK3kc/6oNl/y3EczF8OFGYIi/Ex2HspMfzYArk6+XQSA==}
+  playwright@1.61.1:
+    resolution: {integrity: sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -1854,8 +1858,8 @@ packages:
   ufo@1.6.4:
     resolution: {integrity: sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA==}
 
-  undici@7.27.2:
-    resolution: {integrity: sha512-uZsKNuzQxDMUY6M3pIMvy5tvlGmtq8XJ2oLAkfRKGNu+1VQAIvLy2xIVG5ATZl5wDXl/tddByAWCizRbOme+TA==}
+  undici@7.28.0:
+    resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
     engines: {node: '>=20.18.1'}
 
   unplugin-vue-components@0.27.5:
@@ -2144,10 +2148,10 @@ snapshots:
 
   '@asamuzakjp/nwsapi@2.3.9': {}
 
-  '@axe-core/playwright@4.11.3(playwright-core@1.48.0)':
+  '@axe-core/playwright@4.11.3(playwright-core@1.61.1)':
     dependencies:
       axe-core: 4.11.4
-      playwright-core: 1.48.0
+      playwright-core: 1.61.1
 
   '@babel/helper-string-parser@7.29.7': {}
 
@@ -2376,9 +2380,9 @@ snapshots:
 
   '@pkgr/core@0.3.6': {}
 
-  '@playwright/test@1.48.0':
+  '@playwright/test@1.61.1':
     dependencies:
-      playwright: 1.48.0
+      playwright: 1.61.1
 
   '@rolldown/pluginutils@1.0.1': {}
 
@@ -2850,7 +2854,7 @@ snapshots:
   axios@1.17.0:
     dependencies:
       follow-redirects: 1.16.0
-      form-data: 4.0.5
+      form-data: 4.0.6
       https-proxy-agent: 5.0.1
       proxy-from-env: 2.1.0
     transitivePeerDependencies:
@@ -2932,7 +2936,7 @@ snapshots:
 
   config-chain@1.1.13:
     dependencies:
-      ini: 1.3.4
+      ini: 1.3.8
       proto-list: 1.2.4
 
   convert-source-map@2.0.0: {}
@@ -3234,7 +3238,7 @@ snapshots:
       cross-spawn: 7.0.6
       signal-exit: 4.1.0
 
-  form-data@4.0.5:
+  form-data@4.0.6:
     dependencies:
       asynckit: 0.4.0
       combined-stream: 1.0.8
@@ -3333,7 +3337,7 @@ snapshots:
 
   imurmurhash@0.1.4: {}
 
-  ini@1.3.4: {}
+  ini@1.3.8: {}
 
   is-binary-path@2.1.0:
     dependencies:
@@ -3409,7 +3413,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.1
-      undici: 7.27.2
+      undici: 7.28.0
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -3592,11 +3596,11 @@ snapshots:
       mlly: 1.8.2
       pathe: 2.0.3
 
-  playwright-core@1.48.0: {}
+  playwright-core@1.61.1: {}
 
-  playwright@1.48.0:
+  playwright@1.61.1:
     dependencies:
-      playwright-core: 1.48.0
+      playwright-core: 1.61.1
     optionalDependencies:
       fsevents: 2.3.2
 
@@ -3794,7 +3798,7 @@ snapshots:
 
   ufo@1.6.4: {}
 
-  undici@7.27.2: {}
+  undici@7.28.0: {}
 
   unplugin-vue-components@0.27.5(@babel/parser@7.29.7)(rollup@4.61.1)(vue@3.5.35(typescript@5.6.3)):
     dependencies:
