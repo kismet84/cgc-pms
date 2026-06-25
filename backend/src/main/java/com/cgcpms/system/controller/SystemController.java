@@ -1,5 +1,6 @@
 package com.cgcpms.system.controller;
 
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import java.util.List;
 public class SystemController {
 
     private final JdbcTemplate jdbcTemplate;
+    static final String CLEAR_DATABASE_CONFIRMATION = "CLEAR_NON_PROD_DATABASE";
 
     /** Tables to KEEP (not cleared): system tables and Flyway history */
     private static final List<String> PROTECTED_TABLES = List.of(
@@ -41,7 +43,12 @@ public class SystemController {
      */
     @DeleteMapping("/clear-database")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    public ApiResponse<String> clearDatabase() {
+    public ApiResponse<String> clearDatabase(@RequestParam String confirm) {
+        if (!CLEAR_DATABASE_CONFIRMATION.equals(confirm)) {
+            log.warn("Rejected clear database request because confirmation code did not match");
+            throw new BusinessException("CONFIRM_REQUIRED", "需要显式确认清空非生产数据库");
+        }
+
         log.warn("SUPER_ADMIN clearing database...");
 
         // Disable FK checks for TRUNCATE — ensure re-enable in finally

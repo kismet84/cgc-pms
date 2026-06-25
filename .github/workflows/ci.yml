@@ -109,12 +109,14 @@ jobs:
           cache-dependency-path: frontend-admin/pnpm-lock.yaml
       - name: Install & Test with coverage
         run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm test:coverage
+        env:
+          COVERAGE_DIR: coverage-ci
       - name: Upload frontend coverage
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: frontend-coverage
-          path: frontend-admin/coverage
+          path: frontend-admin/coverage-ci
 
   frontend-dependency-audit:
     runs-on: ubuntu-latest

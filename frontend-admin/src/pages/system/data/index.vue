@@ -16,7 +16,11 @@ function handleClearDatabase() {
     onOk: async () => {
       clearing.value = true
       try {
-        const msg = await request<string>({ url: '/system/clear-database', method: 'DELETE' })
+        const msg = await request<string>({
+          url: '/system/clear-database',
+          method: 'DELETE',
+          params: { confirm: 'CLEAR_NON_PROD_DATABASE' },
+        })
         message.success(msg || '数据库已清空')
       } catch (e: unknown) {
         console.error(e)
