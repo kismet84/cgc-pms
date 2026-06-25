@@ -354,7 +354,7 @@ export function useStockLedger() {
         ]
       : []),
     ...(colVisible.ops
-      ? [{ title: '操作', width: 84, align: 'center' as const, slots: { default: 'ops' } }]
+      ? [{ title: '操作', width: 76, align: 'center' as const, slots: { default: 'ops' } }]
       : []),
   ])
 

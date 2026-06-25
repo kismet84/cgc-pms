@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OrgCompanyVO } from '@/types/org'
-import { PlusOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined } from '@ant-design/icons-vue'
 
 defineProps<{
   canAdd: boolean
@@ -88,17 +88,21 @@ const emit = defineEmits<{
         </a-tag>
       </template>
       <template #companyOps="{ row }: { row: Record<string, unknown> }">
-        <a-button v-if="canEdit" size="small" type="link" @click="emit('edit', row as OrgCompanyVO)"
-          >编辑</a-button
-        >
-        <a-button
-          v-if="canDelete"
-          size="small"
-          type="link"
-          danger
-          @click="emit('delete', row as OrgCompanyVO)"
-          >删除</a-button
-        >
+        <a-dropdown :trigger="['click']">
+          <a-button class="lg-row-action-trigger" size="small" type="text">
+            <MoreOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item v-if="canEdit" @click="emit('edit', row as OrgCompanyVO)">
+                编辑
+              </a-menu-item>
+              <a-menu-item v-if="canDelete" danger @click="emit('delete', row as OrgCompanyVO)">
+                删除
+              </a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
       </template>
     </vxe-grid>
 

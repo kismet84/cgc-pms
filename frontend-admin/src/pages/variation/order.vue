@@ -744,7 +744,7 @@ onMounted(() => {
               }}</span></template
             ></a-table-column
           >
-          <a-table-column title="操作" width="60"
+          <a-table-column title="操作" width="76"
             ><template #default="{ index }"
               ><a-button type="link" size="small" danger @click="handleRemoveItem(index)"
                 >删除</a-button

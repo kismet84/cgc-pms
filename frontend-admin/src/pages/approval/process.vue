@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Modal, message } from 'ant-design-vue'
+import { MoreOutlined } from '@ant-design/icons-vue'
 import {
   createWorkflowTemplateNode,
   deleteWorkflowTemplateNode,
@@ -103,7 +104,7 @@ const templateColumns = [
   { title: '金额范围', key: 'amountRange', width: 180 },
   { title: '状态', dataIndex: 'enabled', key: 'enabled', width: 92 },
   { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 170 },
-  { title: '操作', key: 'action', width: 112 },
+  { title: '操作', key: 'action', width: 76 },
 ]
 
 const nodeColumns = [
@@ -114,7 +115,7 @@ const nodeColumns = [
   { title: '审批人配置', dataIndex: 'approverConfig', key: 'approverConfig', ellipsis: true },
   { title: '转办', dataIndex: 'allowTransfer', key: 'allowTransfer', width: 80 },
   { title: '加签', dataIndex: 'allowAddSign', key: 'allowAddSign', width: 80 },
-  { title: '操作', key: 'action', width: 190 },
+  { title: '操作', key: 'action', width: 76 },
 ]
 
 const nodes = computed(() => currentTemplate.value?.nodes ?? [])
@@ -477,7 +478,16 @@ onMounted(fetchTemplates)
               </a-tag>
             </template>
             <template v-else-if="column.key === 'action'">
-              <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
+              <a-dropdown :trigger="['click']">
+                <a-button class="lg-row-action-trigger" size="small" type="text">
+                  <MoreOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item @click="handleEdit(record)">编辑</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </template>
           </template>
         </a-table>
@@ -569,28 +579,26 @@ onMounted(fetchTemplates)
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'action'">
-                <a-space>
-                  <a-button
-                    type="link"
-                    size="small"
-                    :disabled="index === 0"
-                    @click="moveNode(record, -1)"
-                  >
-                    上移
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
                   </a-button>
-                  <a-button
-                    type="link"
-                    size="small"
-                    :disabled="index === nodes.length - 1"
-                    @click="moveNode(record, 1)"
-                  >
-                    下移
-                  </a-button>
-                  <a-button type="link" size="small" @click="handleEditNode(record)">编辑</a-button>
-                  <a-button type="link" size="small" danger @click="handleDeleteNode(record)">
-                    删除节点
-                  </a-button>
-                </a-space>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item :disabled="index === 0" @click="moveNode(record, -1)">
+                        上移
+                      </a-menu-item>
+                      <a-menu-item
+                        :disabled="index === nodes.length - 1"
+                        @click="moveNode(record, 1)"
+                      >
+                        下移
+                      </a-menu-item>
+                      <a-menu-item @click="handleEditNode(record)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDeleteNode(record)">删除节点</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </template>
           </a-table>

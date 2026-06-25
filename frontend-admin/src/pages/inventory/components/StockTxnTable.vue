@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { MatStockTxnVO } from '@/types/inventory'
+import { MoreOutlined } from '@ant-design/icons-vue'
 import {
   TXN_TYPE_COLOR,
   TXN_TYPE_LABEL,
@@ -75,7 +76,16 @@ const emit = defineEmits<{
         <span v-else style="color: #9ca3af">-</span>
       </template>
       <template #ops="{ row }: { row: MatStockTxnVO }">
-        <a class="lg-link" @click="emit('showDetail', row)">详情</a>
+        <a-dropdown :trigger="['click']">
+          <a-button class="lg-row-action-trigger" size="small" type="text">
+            <MoreOutlined />
+          </a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="emit('showDetail', row)">详情</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
       </template>
     </vxe-grid>
   </div>

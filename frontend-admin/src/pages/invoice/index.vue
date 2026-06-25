@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import type { InvoiceVO, InvoiceRecognizeResultVO } from '@/types/invoice'
 import {
   INVOICE_TYPE_LABEL,
@@ -216,16 +216,20 @@ defineExpose({
                 </a-tag>
               </template>
               <template #action="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                  <a
-                    v-if="row.verifyStatus === 'PENDING'"
-                    class="lg-link"
-                    @click="handleVerify(row)"
-                    >核验</a
-                  >
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                      <a-menu-item v-if="row.verifyStatus === 'PENDING'" @click="handleVerify(row)">
+                        核验
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

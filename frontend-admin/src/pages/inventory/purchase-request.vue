@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   getPurchaseRequestList,
   createPurchaseRequest,
@@ -77,7 +77,7 @@ const itemColumns = [
   { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 120 },
   { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 160 },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 160 },
-  { title: '操作', key: 'action', width: 112 },
+  { title: '操作', key: 'action', width: 76 },
 ]
 
 const filterOption = (input: string, option: { label?: string }) =>
@@ -91,7 +91,7 @@ const gridColumns = computed(() => [
   { field: 'status', title: '业务状态', width: 108, slots: { default: 'status' } },
   { field: 'createdBy', title: '创建人', width: 90 },
   { field: 'createdTime', title: '创建时间', width: 140 },
-  { title: '操作', width: 190, slots: { default: 'ops' } },
+  { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
 
 async function fetchData() {
@@ -495,17 +495,20 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template #ops="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                  <a
-                    v-if="row.approvalStatus === 'DRAFT'"
-                    class="lg-link"
-                    style="color: #1677ff"
-                    @click="handleSubmit(row)"
-                    >提交审批</a
-                  >
-                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item v-if="row.approvalStatus === 'DRAFT'" @click="handleSubmit(row)">
+                        提交审批
+                      </a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

@@ -147,7 +147,7 @@ const emit = defineEmits<{
             <a-input v-model:value="item.batchNo" size="small" placeholder="批号" />
           </template>
         </a-table-column>
-        <a-table-column title="操作" width="60">
+        <a-table-column title="操作" width="76">
           <template #default="{ index }">
             <a-button size="small" danger type="link" @click="emit('removeItem', index)"
               >删除</a-button

@@ -2,7 +2,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, ArrowLeftOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, ArrowLeftOutlined, MoreOutlined } from '@ant-design/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { getUserList, type SysUserBrief } from '@/api/modules/system'
 import type { MemberVO, MemberFormParams } from '@/types/project'
@@ -161,7 +161,7 @@ const columns = [
   { title: '岗位', dataIndex: 'positionName', width: 140 },
   { title: '开始日期', dataIndex: 'startDate', width: 130 },
   { title: '状态', dataIndex: 'status', width: 90 },
-  { title: '操作', dataIndex: 'ops', width: 92 },
+  { title: '操作', dataIndex: 'ops', width: 76 },
 ]
 </script>
 
@@ -246,14 +246,16 @@ const columns = [
             </template>
 
             <template v-else-if="column.dataIndex === 'ops'">
-              <a-popconfirm
-                title="确定移除该成员？"
-                ok-text="确认"
-                cancel-text="取消"
-                @confirm="handleDelete(record)"
-              >
-                <a class="pt-link pt-danger">移除</a>
-              </a-popconfirm>
+              <a-dropdown :trigger="['click']">
+                <a-button class="lg-row-action-trigger" size="small" type="text">
+                  <MoreOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item danger @click="handleDelete(record)">移除</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </template>
           </template>
         </a-table>

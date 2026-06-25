@@ -77,7 +77,7 @@ export function useReceiptList() {
       width: 108,
       slots: { default: 'approvalStatus' },
     },
-    { title: '操作', width: 180, slots: { default: 'action' } },
+    { title: '操作', width: 76, slots: { default: 'action' } },
   ])
 
   async function fetchData() {

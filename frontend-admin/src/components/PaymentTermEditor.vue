@@ -44,7 +44,7 @@ const columns = [
   { title: '付款金额(元)', dataIndex: 'paymentAmount', width: 140, align: 'right' as const },
   { title: '付款条件', dataIndex: 'paymentCondition', minWidth: 180 },
   { title: '计划付款日期', dataIndex: 'plannedDate', width: 150 },
-  { title: '操作', dataIndex: 'ops', width: 70, align: 'center' as const, fixed: 'right' as const },
+  { title: '操作', dataIndex: 'ops', width: 76, align: 'center' as const },
 ]
 
 function fmtMoney(val: string | number | undefined): string {

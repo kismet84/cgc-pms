@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { MoreOutlined } from '@ant-design/icons-vue'
 import {
   getMyTodos,
   getMyDone,
@@ -84,7 +85,7 @@ const gridColumns = computed(() => [
   { field: 'businessType', title: '业务类型', width: 120, slots: { default: 'businessType' } },
   { field: 'timeCol', title: '时间', width: 160, slots: { default: 'timeCol' } },
   { field: 'instanceStatus', title: '状态', width: 100, slots: { default: 'instanceStatus' } },
-  { title: '操作', width: 120, slots: { default: 'action' } },
+  { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
 const tabs = [
@@ -192,11 +193,18 @@ watch(
               <a-tag v-else>{{ row.instanceStatus }}</a-tag>
             </template>
             <template #action="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleDetail(row as { instanceId: string })">
-                  {{ getActionLabel() }}
-                </a>
-              </div>
+              <a-dropdown :trigger="['click']">
+                <a-button class="lg-row-action-trigger" size="small" type="text">
+                  <MoreOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item @click="handleDetail(row as { instanceId: string })">
+                      {{ getActionLabel() }}
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </template>
           </vxe-grid>
         </div>

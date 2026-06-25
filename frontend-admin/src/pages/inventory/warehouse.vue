@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { SearchOutlined, ReloadOutlined, PlusOutlined, MoreOutlined } from '@ant-design/icons-vue'
 import {
   getWarehouseList,
   createWarehouse,
@@ -54,7 +54,7 @@ const gridColumns = computed(() => [
   { field: 'projectName', title: '所属项目', minWidth: 160, ellipsis: true },
   { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 140 },
-  { title: '操作', width: 130, slots: { default: 'ops' } },
+  { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
 
 async function fetchData() {
@@ -289,10 +289,17 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template #ops="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

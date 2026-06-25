@@ -5,6 +5,7 @@ import { message } from 'ant-design-vue'
 import {
   DollarOutlined,
   LockOutlined,
+  MoreOutlined,
   ToolOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -315,7 +316,7 @@ const gridColumns = computed(() => [
   },
   { field: 'costDate', title: '成本日期', width: 110 },
   { field: 'costStatus', title: '状态', width: 90, slots: { default: 'costStatus' } },
-  { title: '操作', width: 92, slots: { default: 'ops' } },
+  { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
 
 // ---- Init ----
@@ -525,7 +526,16 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 </a-tag>
               </template>
               <template #ops="{ row }">
-                <a class="lg-link" @click="showDetail(row)">详情</a>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="showDetail(row)">详情</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

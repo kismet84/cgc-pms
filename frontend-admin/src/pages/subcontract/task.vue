@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
-import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { SearchOutlined, PlusOutlined, ReloadOutlined, MoreOutlined } from '@ant-design/icons-vue'
 import {
   getSubTaskList,
   createSubTask,
@@ -94,7 +94,7 @@ const gridColumns = computed(() => [
   { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'plannedStartDate', title: '计划开始', width: 112 },
   { field: 'plannedEndDate', title: '计划结束', width: 112 },
-  { title: '操作', width: 124, slots: { default: 'action' } },
+  { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
 async function fetchData() {
@@ -385,10 +385,17 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template #action="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

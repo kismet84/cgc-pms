@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import type { MatReceiptVO } from '@/types/receipt'
 import type { SelectOption } from '@/types/ui'
@@ -223,16 +223,23 @@ onMounted(() => {
               <ApprovalStatusTag :status="row.approvalStatus" />
             </template>
             <template #action="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                <a
-                  v-if="row.approvalStatus === 'DRAFT'"
-                  class="lg-link"
-                  @click="handleSubmitApproval(row)"
-                  >提交审批</a
-                >
-              </div>
+              <a-dropdown :trigger="['click']">
+                <a-button class="lg-row-action-trigger" size="small" type="text">
+                  <MoreOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                    <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    <a-menu-item
+                      v-if="row.approvalStatus === 'DRAFT'"
+                      @click="handleSubmitApproval(row)"
+                    >
+                      提交审批
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </template>
           </vxe-grid>
         </div>

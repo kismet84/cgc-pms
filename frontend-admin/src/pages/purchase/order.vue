@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { SearchOutlined, PlusOutlined, ReloadOutlined, MoreOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import {
   getOrderList,
@@ -109,7 +109,7 @@ const gridColumns = computed(() => [
   { field: 'deliveryDate', title: '交货日期', width: 112 },
   { field: 'orderStatus', title: '订单状态', width: 108, slots: { default: 'orderStatus' } },
   { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
-  { title: '操作', width: 160, slots: { default: 'action' } },
+  { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
 async function fetchData() {
@@ -502,15 +502,23 @@ onMounted(() => {
                 <ApprovalStatusTag :status="row.approvalStatus" />
               </template>
               <template #action="{ row }">
-                <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>
-                <a-button type="link" size="small" danger @click="handleDelete(row)">删除</a-button>
-                <a-button
-                  v-if="row.approvalStatus === 'DRAFT'"
-                  type="link"
-                  size="small"
-                  @click="handleSubmitApproval(row)"
-                  >提交审批</a-button
-                >
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                      <a-menu-item
+                        v-if="row.approvalStatus === 'DRAFT'"
+                        @click="handleSubmitApproval(row)"
+                      >
+                        提交审批
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>
@@ -706,7 +714,7 @@ onMounted(() => {
               }}</span>
             </template>
           </a-table-column>
-          <a-table-column title="操作" width="60">
+          <a-table-column title="操作" width="76">
             <template #default="{ index }">
               <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
                 >删除</a-button

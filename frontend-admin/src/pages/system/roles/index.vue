@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message } from 'ant-design-vue'
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
 import { getRoles } from '@/api/modules/system'
 import type { SysRoleVO } from '@/types/system'
@@ -35,7 +35,7 @@ const gridColumns = computed(() => [
   { field: 'roleType', title: '角色类型', width: 120 },
   { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 160 },
-  { title: '操作', width: 112, slots: { default: 'action' } },
+  { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
 const filteredRoles = computed(() => {
@@ -167,9 +167,16 @@ onMounted(fetchData)
               </a-tag>
             </template>
             <template #action="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleEditPermission(row)">编辑权限</a>
-              </div>
+              <a-dropdown :trigger="['click']">
+                <a-button class="lg-row-action-trigger" size="small" type="text">
+                  <MoreOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item @click="handleEditPermission(row)">编辑权限</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </template>
           </vxe-grid>
         </div>

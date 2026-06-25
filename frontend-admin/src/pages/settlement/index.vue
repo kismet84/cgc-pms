@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReferenceStore } from '@/stores/reference'
 import { storeToRefs } from 'pinia'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   getSettlementList,
@@ -233,7 +233,7 @@ const gridColumns = computed(() => [
     slots: { default: 'settlementStatus' },
   },
   { field: 'createdAt', title: '创建时间', width: 160 },
-  { title: '操作', width: 120, slots: { default: 'ops' } },
+  { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
 
 // ---- Mobile detection ----
@@ -403,15 +403,23 @@ const colorMap: Record<string, string> = {
                 </a-tag>
               </template>
               <template #ops="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleView(row)">查看</a>
-                  <a
-                    v-if="settlementStatusOf(row) !== 'FINALIZED'"
-                    class="lg-link lg-del"
-                    @click="handleDelete(row)"
-                    >删除</a
-                  >
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleView(row)">查看</a-menu-item>
+                      <a-menu-item
+                        v-if="settlementStatusOf(row) !== 'FINALIZED'"
+                        danger
+                        @click="handleDelete(row)"
+                      >
+                        删除
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

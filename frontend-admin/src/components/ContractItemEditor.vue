@@ -62,7 +62,7 @@ const columns = [
   { title: '金额(元)', dataIndex: 'amount', width: 130, align: 'right' as const },
   { title: '税率(%)', dataIndex: 'taxRate', width: 100, align: 'right' as const },
   { title: '税额(元)', dataIndex: 'taxAmount', width: 130, align: 'right' as const },
-  { title: '操作', dataIndex: 'ops', width: 70, align: 'center' as const, fixed: 'right' as const },
+  { title: '操作', dataIndex: 'ops', width: 76, align: 'center' as const },
 ]
 
 function fmtMoney(val: string | number | undefined): string {

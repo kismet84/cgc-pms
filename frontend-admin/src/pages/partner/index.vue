@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { getDictDataByCode } from '@/api/modules/dict'
 import { getPartnerList, createPartner, updatePartner, deletePartner } from '@/api/modules/partner'
 import type { PartnerVO } from '@/types/partner'
@@ -102,7 +102,7 @@ const gridColumns = computed(() => [
   { field: 'blacklistFlag', title: '黑名单', width: 92, slots: { default: 'blacklistFlag' } },
   { field: 'riskLevel', title: '风险等级', width: 104, slots: { default: 'riskLevel' } },
   { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
-  { title: '操作', width: 124, slots: { default: 'ops' } },
+  { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
 
 const partnerStats = computed(() => ({
@@ -368,10 +368,17 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template #ops="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

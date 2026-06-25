@@ -949,6 +949,8 @@ a {
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
+  font-size: 16px;
+  border-radius: var(--radius-sm);
 }
 
 .lg-row-action-trigger:hover {
@@ -1108,7 +1110,19 @@ a {
   padding: 0 14px;
   color: var(--text);
   font-size: 14px;
+  font-weight: 400;
   white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table,
+.lg-list-page .lg-table-wrap .ant-table {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table .vxe-cell,
+.lg-list-page .lg-table-wrap .ant-table-cell {
+  line-height: 22px;
 }
 
 .lg-list-page .lg-table-wrap .vxe-cell {
@@ -1150,12 +1164,16 @@ a {
   padding: 11px 16px;
   color: var(--text-secondary);
   font-size: 14px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .lg-list-page .lg-table-wrap .ant-table-tbody > tr > td {
   height: 54px;
   padding: 12px 16px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
   white-space: nowrap;
 }
 

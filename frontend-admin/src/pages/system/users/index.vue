@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
 import {
   getUserList,
@@ -55,7 +55,7 @@ const gridColumns = computed(() => [
   { field: 'email', title: '邮箱', minWidth: 180, ellipsis: true },
   { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 160 },
-  { title: '操作', width: 180, slots: { default: 'action' } },
+  { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 const userStatusSummary = computed(() => [
   {
@@ -302,17 +302,20 @@ onMounted(() => {
               </a-tag>
             </template>
             <template #action="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                <a
-                  class="lg-link"
-                  :class="{ 'lg-del': row.status === 'ENABLE' }"
-                  @click="handleToggleStatus(row)"
-                >
-                  {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
-                </a>
-                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-              </div>
+              <a-dropdown :trigger="['click']">
+                <a-button class="lg-row-action-trigger" size="small" type="text">
+                  <MoreOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                    <a-menu-item :danger="row.status === 'ENABLE'" @click="handleToggleStatus(row)">
+                      {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
+                    </a-menu-item>
+                    <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </template>
           </vxe-grid>
         </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { RULE_TYPE_LABELS, SEVERITY_COLOR, type AlertLogVO } from '@/types/alert'
@@ -145,7 +145,7 @@ const gridColumns = computed(() => [
   { field: 'ruleType', title: '规则类型', width: 116, slots: { default: 'ruleType' } },
   { field: 'triggeredAt', title: '触发时间', width: 160 },
   { field: 'isRead', title: '状态', width: 82, slots: { default: 'isRead' } },
-  { title: '操作', width: 92, slots: { default: 'action' } },
+  { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
 function getProjectName(projectId: string): string {
@@ -302,16 +302,22 @@ onMounted(async () => {
                 <span v-else class="al-muted">已读</span>
               </template>
               <template #action="{ row }">
-                <a-button
-                  v-if="row.isRead === 0"
-                  type="link"
-                  size="small"
-                  :loading="store.markingRead.has(row.id)"
-                  @click="handleMarkRead(row)"
-                >
-                  标为已读
-                </a-button>
-                <span v-else class="al-muted">—</span>
+                <a-dropdown v-if="row.isRead === 0" :trigger="['click']">
+                  <a-button
+                    class="lg-row-action-trigger"
+                    size="small"
+                    type="text"
+                    :loading="store.markingRead.has(row.id)"
+                  >
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleMarkRead(row)">标为已读</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+                <span v-else class="al-muted">-</span>
               </template>
             </vxe-grid>
           </div>

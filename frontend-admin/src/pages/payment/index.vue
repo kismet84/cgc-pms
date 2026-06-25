@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   getApplicationList,
   createApplication,
@@ -326,7 +326,7 @@ const gridColumns = computed(() => [
   { field: 'payType', title: '付款类型', width: 108, slots: { default: 'payType' } },
   { field: 'payStatus', title: '支付状态', width: 108, slots: { default: 'payStatus' } },
   { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
-  { title: '操作', width: 170, slots: { default: 'action' } },
+  { title: '操作', width: 76, slots: { default: 'action' } },
 ])
 
 onMounted(() => {
@@ -515,22 +515,29 @@ onMounted(() => {
                 >
               </template>
               <template #action="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                  <a
-                    v-if="row.approvalStatus === 'DRAFT'"
-                    class="lg-link"
-                    @click="handleApproval(row)"
-                    >提交审批</a
-                  >
-                  <a
-                    v-if="row.approvalStatus === 'APPROVED' && row.payStatus !== 'PAID'"
-                    class="lg-link"
-                    @click="openWriteback(row)"
-                    >付款回写</a
-                  >
-                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item
+                        v-if="row.approvalStatus === 'DRAFT'"
+                        @click="handleApproval(row)"
+                      >
+                        提交审批
+                      </a-menu-item>
+                      <a-menu-item
+                        v-if="row.approvalStatus === 'APPROVED' && row.payStatus !== 'PAID'"
+                        @click="openWriteback(row)"
+                      >
+                        付款回写
+                      </a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>
@@ -724,7 +731,7 @@ onMounted(() => {
                 style="width: 100%"
                 placeholder="金额" /></template
           ></a-table-column>
-          <a-table-column title="操作" width="60"
+          <a-table-column title="操作" width="76"
             ><template #default="{ index }"
               ><a-button type="link" size="small" danger @click="handleRemoveBasis(index)"
                 >删除</a-button

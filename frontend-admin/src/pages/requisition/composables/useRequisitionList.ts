@@ -63,7 +63,7 @@ export function useRequisitionList() {
       width: 108,
       slots: { default: 'approvalStatus' },
     },
-    { title: '操作', width: 200, slots: { default: 'action' } },
+    { title: '操作', width: 76, slots: { default: 'action' } },
   ])
 
   async function fetchData() {

@@ -64,7 +64,7 @@ export function useInvoiceList() {
     { field: 'verifyStatus', title: '核验状态', width: 108, slots: { default: 'verifyStatus' } },
     { field: 'remark', title: '备注', minWidth: 140, ellipsis: true },
     { field: 'createdAt', title: '创建时间', width: 150 },
-    { title: '操作', width: 150, slots: { default: 'action' } },
+    { title: '操作', width: 76, slots: { default: 'action' } },
   ])
 
   async function fetchData() {

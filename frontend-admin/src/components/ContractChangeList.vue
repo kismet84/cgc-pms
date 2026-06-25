@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { MoreOutlined } from '@ant-design/icons-vue'
 import {
   getContractChangeList,
   createContractChange,
@@ -98,7 +99,7 @@ const columns = [
     width: 80,
     align: 'center' as const,
   },
-  { title: '操作', key: 'action', width: 220, fixed: 'right' as const },
+  { title: '操作', key: 'action', width: 76 },
 ]
 
 // ---- Data fetching ----
@@ -360,35 +361,35 @@ onMounted(() => {
             </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" size="small" @click="handleViewDetail(record)">详情</a-button>
-              <a-button
-                v-if="record.approvalStatus === 'DRAFT' && record.costGeneratedFlag !== 1"
-                type="link"
-                size="small"
-                @click="handleEdit(record)"
-              >
-                编辑
+            <a-dropdown :trigger="['click']">
+              <a-button class="lg-row-action-trigger" size="small" type="text">
+                <MoreOutlined />
               </a-button>
-              <a-button
-                v-if="record.approvalStatus === 'DRAFT' && record.costGeneratedFlag !== 1"
-                type="link"
-                size="small"
-                danger
-                @click="handleDelete(record)"
-              >
-                删除
-              </a-button>
-              <a-button
-                v-if="record.approvalStatus === 'DRAFT'"
-                type="link"
-                size="small"
-                style="color: #1677ff"
-                @click="handleSubmitApproval(record)"
-              >
-                提交审批
-              </a-button>
-            </a-space>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item @click="handleViewDetail(record)">详情</a-menu-item>
+                  <a-menu-item
+                    v-if="record.approvalStatus === 'DRAFT' && record.costGeneratedFlag !== 1"
+                    @click="handleEdit(record)"
+                  >
+                    编辑
+                  </a-menu-item>
+                  <a-menu-item
+                    v-if="record.approvalStatus === 'DRAFT' && record.costGeneratedFlag !== 1"
+                    danger
+                    @click="handleDelete(record)"
+                  >
+                    删除
+                  </a-menu-item>
+                  <a-menu-item
+                    v-if="record.approvalStatus === 'DRAFT'"
+                    @click="handleSubmitApproval(record)"
+                  >
+                    提交审批
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
           </template>
         </template>
       </a-table>

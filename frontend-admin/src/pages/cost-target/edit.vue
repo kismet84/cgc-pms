@@ -401,7 +401,7 @@ const itemColumns = [
   { title: '序号', dataIndex: 'index', width: 60, align: 'center' as const },
   { title: '成本科目', dataIndex: 'costSubjectId', minWidth: 200 },
   { title: '目标金额(元)', dataIndex: 'targetAmount', width: 160, align: 'right' as const },
-  { title: '操作', dataIndex: 'ops', width: 84, align: 'center' as const },
+  { title: '操作', dataIndex: 'ops', width: 76, align: 'center' as const },
 ]
 
 // ---- Helpers ----
