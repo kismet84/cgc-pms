@@ -467,7 +467,8 @@ onMounted(() => {
   flex: 0 0 auto;
   font-size: 12px;
   color: var(--muted);
-  font-family: monospace;
+  font-family: var(--font-family);
+  font-variant-numeric: tabular-nums;
 }
 
 .cs-tree-name {

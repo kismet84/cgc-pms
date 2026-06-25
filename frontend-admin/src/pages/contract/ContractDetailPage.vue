@@ -197,7 +197,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <a-descriptions-item label="甲方">{{ contract.partyAName || '-' }}</a-descriptions-item>
             <a-descriptions-item label="乙方">{{ contract.partyBName || '-' }}</a-descriptions-item>
             <a-descriptions-item label="合同金额(含税)">
-              <span style="font-weight: 600; color: #1890ff"
+              <span style="font-weight: 600; color: var(--primary)"
                 >{{ formatAmount(contract.contractAmount) }} 元</span
               >
             </a-descriptions-item>
@@ -591,7 +591,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 .cd-info-money {
   font-weight: 700;
-  color: #1890ff;
+  color: var(--primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -634,7 +634,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .cd-mc-code {
   font-size: 11px;
   color: var(--text-secondary);
-  font-family: monospace;
+  font-family: var(--font-family);
+  font-variant-numeric: tabular-nums;
 }
 .cd-mc-name {
   font-size: 13px;
@@ -663,7 +664,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 .cd-mc-money {
   font-weight: 600;
-  color: #1890ff;
+  color: var(--primary);
   font-variant-numeric: tabular-nums;
 }
 .cd-mc-row {

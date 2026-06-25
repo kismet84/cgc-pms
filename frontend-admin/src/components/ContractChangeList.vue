@@ -642,18 +642,21 @@ onMounted(() => {
 
 .cc-amount-before {
   color: var(--text-secondary);
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--font-family);
+  font-variant-numeric: tabular-nums;
 }
 
 .cc-amount-change {
   font-weight: 600;
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--font-family);
+  font-variant-numeric: tabular-nums;
 }
 
 .cc-amount-after {
   font-weight: 600;
   color: #15803d;
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--font-family);
+  font-variant-numeric: tabular-nums;
 }
 
 .cc-amount-arrow {
@@ -701,7 +704,8 @@ onMounted(() => {
 .cc-impact-card-value {
   font-size: 18px;
   font-weight: 700;
-  font-family: 'Consolas', 'Monaco', monospace;
+  font-family: var(--font-family);
+  font-variant-numeric: tabular-nums;
 }
 
 .cc-impact-arrow {

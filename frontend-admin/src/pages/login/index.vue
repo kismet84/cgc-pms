@@ -168,7 +168,7 @@ function handleForgotPassword() {
 }
 
 .forgot {
-  color: #1677ff;
+  color: var(--primary);
   font-size: 14px;
 }
 

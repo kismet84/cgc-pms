@@ -665,7 +665,8 @@ onMounted(() => {
 .dc-type-code {
   font-size: 12px;
   color: var(--muted);
-  font-family: monospace;
+  font-family: var(--font-family);
+  font-variant-numeric: tabular-nums;
 }
 
 .dc-type-actions {

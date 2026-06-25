@@ -255,7 +255,7 @@ onUnmounted(() => {
 }
 
 .nb-trigger:hover {
-  color: #1677ff;
+  color: var(--primary);
 }
 
 /* ── Panel ── */
@@ -329,7 +329,7 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #1677ff;
+  background: var(--primary);
   margin-top: 6px;
   flex-shrink: 0;
 }

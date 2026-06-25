@@ -31,8 +31,8 @@
   --success-soft: #eafaf0;
   --warning-soft: #fff7e8;
   --error-soft: #fff0f0;
-  --kpi-total: #1677ff;
-  --kpi-amount: #1677ff;
+  --kpi-total: var(--primary);
+  --kpi-amount: var(--primary);
   --kpi-paid: #52c41a;
   --kpi-unpaid: #faad14;
   --kpi-overdue: #ff4d4f;
@@ -3301,6 +3301,243 @@ body {
 .project-content-layout .lg-analysis-rail {
   display: flex;
   flex-direction: column;
+}
+
+/* ---- Final typography system: all pages ---- */
+html,
+body,
+#app,
+.ant-app,
+.ant-layout,
+.ant-modal-root,
+.ant-drawer,
+.ant-popover,
+.ant-dropdown,
+.vxe-table,
+.vxe-pulldown--panel {
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  letter-spacing: 0;
+}
+
+.app-page,
+.lg-page,
+.lg-list-page,
+.lg-page-shell,
+.project-list-page,
+.project-target-redesign,
+.pt-page,
+.dashboard,
+.profile-page,
+.settings-page,
+.org-page,
+.ant-modal,
+.ant-drawer,
+.ant-popover {
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1.57;
+}
+
+.app-page h1,
+.lg-page h1,
+.lg-list-page h1,
+.app-page-title,
+.lg-page-head-title,
+.pt-page-title {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.app-page h2,
+.lg-page h2,
+.lg-list-page h2,
+.lg-detail-title,
+.profile-name {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.app-page h3,
+.lg-page h3,
+.lg-list-page h3,
+.lg-section-title,
+.lg-card-title,
+.lg-panel-title,
+.pt-panel-header,
+.ant-card-head-title,
+.ant-modal-title,
+.ant-drawer-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+.app-page p,
+.lg-page p,
+.lg-list-page p,
+.app-page-subtitle,
+.lg-detail-meta,
+.profile-role,
+.profile-info,
+.ant-form-extra,
+.ant-form-item-explain,
+.ant-descriptions-item-label,
+.ant-descriptions-item-content {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.app-page a,
+.lg-page a,
+.lg-list-page a,
+.ant-modal a,
+.ant-drawer a,
+.lg-link {
+  color: var(--primary);
+}
+
+.app-page a:hover,
+.lg-page a:hover,
+.lg-list-page a:hover,
+.ant-modal a:hover,
+.ant-drawer a:hover,
+.lg-link:hover {
+  color: var(--primary-hover);
+}
+
+.ant-breadcrumb,
+.ant-breadcrumb a,
+.ant-breadcrumb li,
+.lg-breadcrumb,
+.lg-page-head-breadcrumb,
+.pt-breadcrumb {
+  color: var(--muted) !important;
+  font-size: 13px !important;
+  font-weight: 400;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-number,
+.ant-input-number-input,
+.ant-select,
+.ant-select-selector,
+.ant-select-selection-item,
+.ant-select-selection-placeholder,
+.ant-picker,
+.ant-picker-input > input,
+.ant-cascader-picker,
+.ant-radio-wrapper,
+.ant-checkbox-wrapper,
+.ant-form-item,
+.ant-form-item-label > label,
+.ant-btn,
+.ant-dropdown-menu,
+.ant-dropdown-menu-item,
+.ant-menu,
+.ant-menu-item,
+.ant-tabs,
+.ant-tabs-tab,
+.ant-pagination,
+.ant-pagination-item,
+.ant-pagination-options,
+.ant-tag {
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  letter-spacing: 0;
+}
+
+.ant-input,
+.ant-input-number,
+.ant-input-number-input,
+.ant-select-selection-item,
+.ant-picker-input > input,
+.ant-radio-wrapper,
+.ant-checkbox-wrapper {
+  color: var(--text);
+}
+
+.ant-input::placeholder,
+.ant-select-selection-placeholder,
+.ant-picker-input > input::placeholder {
+  color: var(--muted);
+}
+
+.ant-form-item-label > label,
+.ant-descriptions-item-label,
+.ant-table-thead > tr > th,
+.vxe-header--column {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ant-table,
+.ant-table-wrapper,
+.vxe-table {
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+}
+
+.ant-table-tbody > tr > td,
+.vxe-body--column,
+.vxe-cell {
+  color: var(--text);
+  font-size: var(--font-size-base);
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.ant-table-thead > tr > th,
+.vxe-header--column {
+  line-height: 22px;
+}
+
+.ant-table-cell .ant-btn-link,
+.ant-table-cell .ant-btn-text,
+.vxe-cell .ant-btn-link,
+.vxe-cell .ant-btn-text,
+.lg-ops,
+.lg-row-action-trigger {
+  font-size: var(--font-size-base);
+}
+
+.ant-tag,
+.lg-tag {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.ant-statistic-title,
+.ant-empty-description,
+.ant-list-item-meta-description,
+.ant-upload-hint,
+.text-muted,
+.lg-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ant-statistic-content,
+.lg-money,
+.amount,
+.money {
+  color: var(--text);
+  font-weight: 700;
 }
 
 @media (max-width: 768px) {

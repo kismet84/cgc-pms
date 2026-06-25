@@ -95,7 +95,9 @@ async function handlePasswordChange() {
             :size="100"
             :src="userStore.userInfo?.avatar"
             class="profile-avatar"
-            :style="{ backgroundColor: userStore.userInfo?.avatar ? 'transparent' : '#1677ff' }"
+            :style="{
+              backgroundColor: userStore.userInfo?.avatar ? 'transparent' : 'var(--primary)',
+            }"
           >
             <template v-if="!userStore.userInfo?.avatar">
               {{ userStore.userInfo?.realName?.charAt(0) }}

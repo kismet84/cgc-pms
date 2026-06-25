@@ -498,7 +498,7 @@ const gridColumns = computed(() => [
         class="lg-search-input"
         @press-enter="handleSearch"
       >
-        <template #prefix><SearchOutlined style="color: #8c8c8c" /></template>
+        <template #prefix><SearchOutlined style="color: var(--muted)" /></template>
       </a-input>
       <div class="lg-search-actions">
         <a-button type="primary" @click="handleSearch">查询</a-button>
@@ -670,7 +670,7 @@ const gridColumns = computed(() => [
         <div class="lg-kpi-strip">
           <div class="lg-kpi-card">
             <div class="lg-kpi-card-label">
-              <FileTextOutlined style="color: #1890ff; margin-right: 4px" />
+              <FileTextOutlined style="color: var(--primary); margin-right: 4px" />
               项目总数
             </div>
             <div class="lg-kpi-card-value">{{ projectStats.total || 0 }} <small>个</small></div>
@@ -867,16 +867,16 @@ const gridColumns = computed(() => [
 
 <style scoped>
 .project-list-page {
-  --project-primary: #1890ff;
-  --project-primary-hover: #40a9ff;
-  --project-primary-light: #e6f7ff;
-  --project-primary-text: #0050b3;
+  --project-primary: var(--primary);
+  --project-primary-hover: var(--primary-hover);
+  --project-primary-light: var(--primary-soft);
+  --project-primary-text: var(--primary-active);
   --project-bg: var(--bg);
   --project-surface: #fff;
-  --project-text: #333333;
-  --project-text-secondary: #8c8c8c;
-  --project-border: #f0f0f0;
-  --project-control-border: #d9d9d9;
+  --project-text: var(--text);
+  --project-text-secondary: var(--text-secondary);
+  --project-border: var(--border-subtle);
+  --project-control-border: var(--border);
   --project-success: #52c41a;
   --project-success-bg: #f6ffed;
   --project-warning: #faad14;
