@@ -2323,15 +2323,6 @@ body {
   height: auto !important;
   min-height: 0;
   background-color: var(--surface);
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--surface) 0,
-    var(--surface) calc(var(--lg-table-row-height) - 1px),
-    var(--border-subtle) calc(var(--lg-table-row-height) - 1px),
-    var(--border-subtle) var(--lg-table-row-height)
-  );
-  background-size: 100% var(--lg-table-row-height);
-  background-position-y: 1px;
 }
 
 .lg-pagination,
