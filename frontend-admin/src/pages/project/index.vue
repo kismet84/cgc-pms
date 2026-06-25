@@ -407,15 +407,14 @@ const recentProjects = computed(() =>
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
   ...(colVisible.projectCode
-    ? [{ field: 'projectCode', title: '项目编号', width: 148, showOverflow: 'tooltip' }]
+    ? [{ field: 'projectCode', title: '项目编号', width: 176, showOverflow: 'tooltip' }]
     : []),
   ...(colVisible.projectName
     ? [
         {
           field: 'projectName',
           title: '项目名称',
-          minWidth: 88,
-          width: 96,
+          minWidth: 200,
           showOverflow: 'tooltip',
           slots: { default: 'projectName' },
         },
@@ -426,7 +425,7 @@ const gridColumns = computed(() => [
         {
           field: 'projectType',
           title: '项目类型',
-          width: 98,
+          width: 116,
           showOverflow: 'tooltip',
           slots: { default: 'projectType' },
         },
@@ -437,9 +436,10 @@ const gridColumns = computed(() => [
         {
           field: 'contractAmount',
           title: '合同金额',
-          width: 112,
+          width: 172,
+          minWidth: 172,
           align: 'right' as const,
-          showOverflow: 'tooltip',
+          showOverflow: false,
           slots: { default: 'contractAmount' },
         },
       ]
@@ -449,7 +449,7 @@ const gridColumns = computed(() => [
         {
           field: 'plannedStartDate',
           title: '计划工期',
-          width: 76,
+          width: 156,
           showOverflow: 'tooltip',
           slots: { default: 'plannedDuration' },
         },
@@ -460,7 +460,7 @@ const gridColumns = computed(() => [
         {
           field: 'status',
           title: '状态',
-          width: 74,
+          width: 90,
           showOverflow: 'tooltip',
           slots: { default: 'status' },
         },
@@ -471,13 +471,13 @@ const gridColumns = computed(() => [
         {
           field: 'approvalStatus',
           title: '审批状态',
-          width: 86,
+          width: 108,
           showOverflow: 'tooltip',
           slots: { default: 'approvalStatus' },
         },
       ]
     : []),
-  ...(colVisible.ops ? [{ title: '操作', width: 138, slots: { default: 'ops' } }] : []),
+  ...(colVisible.ops ? [{ title: '操作', width: 150, slots: { default: 'ops' } }] : []),
 ])
 </script>
 
@@ -662,151 +662,157 @@ const gridColumns = computed(() => [
       </a-form>
     </a-modal>
 
-    <!-- KPI 卡片 -->
-    <div class="lg-kpi-strip">
-      <div class="lg-kpi-card">
-        <div class="lg-kpi-card-label">
-          <FileTextOutlined style="color: #1890ff; margin-right: 4px" />
-          项目总数
-        </div>
-        <div class="lg-kpi-card-value">{{ projectStats.total || 0 }} <small>个</small></div>
-      </div>
-      <div class="lg-kpi-card">
-        <div class="lg-kpi-card-label">
-          <DollarOutlined style="color: #faad14; margin-right: 4px" />
-          合同总金额
-        </div>
-        <div class="lg-kpi-card-value">
-          {{
-            totalContractAmount
-              ? (totalContractAmount / 10000).toLocaleString('zh-CN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })
-              : '0.00'
-          }}
-          <small>万元</small>
-        </div>
-      </div>
-      <div class="lg-kpi-card">
-        <div class="lg-kpi-card-label">
-          <SafetyCertificateOutlined style="color: #52c41a; margin-right: 4px" />
-          在建项目
-        </div>
-        <div class="lg-kpi-card-value">{{ projectStats.ongoing || 0 }} <small>个</small></div>
-      </div>
-      <div class="lg-kpi-card">
-        <div class="lg-kpi-card-label">
-          <FlagOutlined style="color: #52c41a; margin-right: 4px" />
-          已竣工项目
-        </div>
-        <div class="lg-kpi-card-value">{{ projectStats.completed || 0 }} <small>个</small></div>
-      </div>
-      <div class="lg-kpi-card is-warn">
-        <div class="lg-kpi-card-label">
-          <WarningOutlined style="color: #ff4d4f; margin-right: 4px" />
-          风险项目
-        </div>
-        <div class="lg-kpi-card-value">{{ projectStats.risk || 0 }} <small>个</small></div>
-      </div>
-    </div>
-
-    <div class="project-content-layout">
+    <div class="lg-grid">
       <!-- 左列 -->
-      <div class="project-table-panel">
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleCreateModalOpen">
-              <template #icon><PlusOutlined /></template>
-              新建项目
-            </a-button>
-            <a-dropdown :trigger="['click']">
-              <a-button>
-                <template #icon><SettingOutlined /></template>
-                列设置
-              </a-button>
-              <template #overlay>
-                <a-menu>
-                  <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
-                    <a-checkbox :checked="colVisible[key]">
-                      {{ colLabels[key] }}
-                    </a-checkbox>
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
+      <div class="lg-left">
+        <!-- KPI 卡片 -->
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <div class="lg-kpi-card-label">
+              <FileTextOutlined style="color: #1890ff; margin-right: 4px" />
+              项目总数
+            </div>
+            <div class="lg-kpi-card-value">{{ projectStats.total || 0 }} <small>个</small></div>
+          </div>
+          <div class="lg-kpi-card">
+            <div class="lg-kpi-card-label">
+              <DollarOutlined style="color: #faad14; margin-right: 4px" />
+              合同总金额
+            </div>
+            <div class="lg-kpi-card-value">
+              {{
+                totalContractAmount
+                  ? (totalContractAmount / 10000).toLocaleString('zh-CN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })
+                  : '0.00'
+              }}
+              <small>万元</small>
+            </div>
+          </div>
+          <div class="lg-kpi-card">
+            <div class="lg-kpi-card-label">
+              <SafetyCertificateOutlined style="color: #52c41a; margin-right: 4px" />
+              在建项目
+            </div>
+            <div class="lg-kpi-card-value">{{ projectStats.ongoing || 0 }} <small>个</small></div>
+          </div>
+          <div class="lg-kpi-card">
+            <div class="lg-kpi-card-label">
+              <FlagOutlined style="color: #52c41a; margin-right: 4px" />
+              已竣工项目
+            </div>
+            <div class="lg-kpi-card-value">{{ projectStats.completed || 0 }} <small>个</small></div>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <div class="lg-kpi-card-label">
+              <WarningOutlined style="color: #ff4d4f; margin-right: 4px" />
+              风险项目
+            </div>
+            <div class="lg-kpi-card-value">{{ projectStats.risk || 0 }} <small>个</small></div>
           </div>
         </div>
 
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true, useKey: true }"
-            show-overflow="tooltip"
-            show-header-overflow="tooltip"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #projectName="{ row }">
-              <a class="lg-link" @click="router.push(`/project/${row.id}/overview`)">{{
-                row.projectName
-              }}</a>
-            </template>
-            <template #projectType="{ row }">
-              <span class="lg-tag">{{ row.projectType }}</span>
-            </template>
-            <template #contractAmount="{ row }">
-              <span class="lg-money">{{ fmtAmount(row.contractAmount) }}</span>
-            </template>
-            <template #plannedDuration="{ row }">
-              <span>{{
-                row.plannedStartDate || row.plannedEndDate
-                  ? `${row.plannedStartDate || '-'} ~ ${row.plannedEndDate || '-'}`
-                  : '-'
-              }}</span>
-            </template>
-            <template #status="{ row }">
-              <span class="lg-tag lg-tag--pill" :class="getStatusTagClass(row.status)">{{
-                STATUS_LABEL[row.status] ?? row.status
-              }}</span>
-            </template>
-            <template #approvalStatus="{ row }">
-              <span class="lg-tag lg-tag--pill" :class="getApprovalTagClass(row.approvalStatus)">{{
-                row.approvalStatus
-              }}</span>
-            </template>
-            <template #ops="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="router.push(`/project/${row.id}/overview`)">查看</a>
-                <a class="lg-link" @click="handleEditModalOpen(row)">编辑</a>
-                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-              </div>
-            </template>
-          </vxe-grid>
-        </div>
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-button type="primary" @click="handleCreateModalOpen">
+                <template #icon><PlusOutlined /></template>
+                新建项目
+              </a-button>
+              <a-dropdown :trigger="['click']">
+                <a-button>
+                  <template #icon><SettingOutlined /></template>
+                  列设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
+                      <a-checkbox :checked="colVisible[key]">
+                        {{ colLabels[key] }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+              </a-button>
+            </div>
+          </div>
 
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
+          <!-- 表格 -->
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="gridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true, useKey: true }"
+              show-overflow="tooltip"
+              show-header-overflow="tooltip"
+              stripe
+              border="inner"
+              size="small"
+              max-height="480"
+            >
+              <template #projectName="{ row }">
+                <a class="lg-link" @click="router.push(`/project/${row.id}/overview`)">{{
+                  row.projectName
+                }}</a>
+              </template>
+              <template #projectType="{ row }">
+                <span class="lg-tag">{{ row.projectType }}</span>
+              </template>
+              <template #contractAmount="{ row }">
+                <span class="lg-money project-contract-amount">{{
+                  fmtAmount(row.contractAmount)
+                }}</span>
+              </template>
+              <template #plannedDuration="{ row }">
+                <span>{{
+                  row.plannedStartDate || row.plannedEndDate
+                    ? `${row.plannedStartDate || '-'} ~ ${row.plannedEndDate || '-'}`
+                    : '-'
+                }}</span>
+              </template>
+              <template #status="{ row }">
+                <span class="lg-tag lg-tag--pill" :class="getStatusTagClass(row.status)">{{
+                  STATUS_LABEL[row.status] ?? row.status
+                }}</span>
+              </template>
+              <template #approvalStatus="{ row }">
+                <span
+                  class="lg-tag lg-tag--pill"
+                  :class="getApprovalTagClass(row.approvalStatus)"
+                  >{{ row.approvalStatus }}</span
+                >
+              </template>
+              <template #ops="{ row }">
+                <div class="lg-ops">
+                  <a class="lg-link" @click="router.push(`/project/${row.id}/overview`)">查看</a>
+                  <a class="lg-link" @click="handleEditModalOpen(row)">编辑</a>
+                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+                </div>
+              </template>
+            </vxe-grid>
+          </div>
+
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              @change="handlePageChange"
+              @show-size-change="handlePageSizeChange"
+            />
+          </div>
+        </main>
       </div>
 
       <!-- 右侧分析面板 -->
@@ -883,30 +889,10 @@ const gridColumns = computed(() => [
   font-size: 14px;
 }
 
-.project-content-layout {
-  display: flex;
-  gap: 16px;
-  align-items: stretch;
-}
-
-.project-table-panel {
-  flex: 1;
-  min-width: 0;
-  padding: 16px 0;
-  background: var(--project-surface);
-  border-radius: var(--project-radius);
-  box-shadow: var(--project-shadow);
-}
-
 /* lg-table-wrap 已提供全局 vxe-table/Ant Table 统一样式；仅保留页面级溢出控制 */
 
 .pj-create-form {
   padding-top: 16px;
-}
-
-.project-content-layout .lg-analysis-rail {
-  width: 290px;
-  flex-shrink: 0;
 }
 
 .project-list-page :deep(.ant-btn-primary) {
@@ -1039,6 +1025,21 @@ const gridColumns = computed(() => [
 
 .project-list-page .lg-money {
   font-weight: 400;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.project-list-page .lg-table-wrap :deep(.lg-money) {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.project-list-page .lg-table-wrap :deep(.project-contract-amount) {
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 
 .project-list-page .lg-ops {
@@ -1050,31 +1051,6 @@ const gridColumns = computed(() => [
 .project-list-page .lg-ops :deep(.lg-link) {
   flex: 0 0 auto;
   max-width: none;
-}
-
-.project-list-page .lg-pagination {
-  gap: 16px;
-  min-height: auto;
-  padding: 16px 20px 0;
-  margin-top: 16px;
-}
-
-.project-list-page .lg-pagination :deep(.ant-pagination-options-quick-jumper) {
-  display: none;
-}
-
-.project-list-page .lg-pagination :deep(.ant-pagination-item),
-.project-list-page .lg-pagination :deep(.ant-pagination-prev),
-.project-list-page .lg-pagination :deep(.ant-pagination-next) {
-  min-width: 28px;
-  height: 28px;
-  line-height: 26px;
-  border-radius: 4px;
-}
-
-.project-list-page .lg-pagination :deep(.ant-select-selector) {
-  height: 28px !important;
-  border-radius: 4px !important;
 }
 
 .project-list-page .lg-panel :deep(.echarts) {
@@ -1106,11 +1082,11 @@ const gridColumns = computed(() => [
 }
 
 @media (max-width: 1024px) {
-  .project-content-layout {
+  .lg-grid {
     display: block;
   }
 
-  .project-content-layout .lg-analysis-rail {
+  .lg-analysis-rail {
     display: none;
   }
 }
@@ -1130,7 +1106,7 @@ const gridColumns = computed(() => [
     justify-content: flex-end;
   }
 
-  .project-content-layout .lg-pagination {
+  .lg-pagination {
     align-items: flex-end;
     flex-direction: column;
   }

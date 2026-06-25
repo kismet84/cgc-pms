@@ -21,7 +21,7 @@ export function useCompany(selectedCompanyId: Ref<string | null>) {
   const gridColumns = computed(() => [
     { field: 'companyCode', title: '公司编号', width: 120 },
     { field: 'companyName', title: '公司名称', minWidth: 140 },
-    { field: 'status', title: '状态', width: 80, slots: { default: 'companyStatus' } },
+    { field: 'status', title: '状态', width: 88, slots: { default: 'companyStatus' } },
     { field: 'createdAt', title: '创建时间', width: 150 },
     { title: '操作', width: 120, align: 'right' as const, slots: { default: 'companyOps' } },
   ])

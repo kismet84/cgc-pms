@@ -95,20 +95,20 @@ const ORDER_STATUS_COLOR: Record<string, string> = {
 
 const gridColumns = computed(() => [
   { field: 'orderCode', title: '订单编号', minWidth: 150, ellipsis: true },
-  { field: 'orderType', title: '订单类型', width: 90, slots: { default: 'orderType' } },
+  { field: 'orderType', title: '订单类型', width: 108, slots: { default: 'orderType' } },
   { field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true },
   { field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true },
   { field: 'partnerName', title: '供应商', minWidth: 140, ellipsis: true },
   {
     field: 'totalAmount',
     title: '总金额',
-    width: 110,
+    width: 128,
     align: 'right' as const,
     slots: { default: 'totalAmount' },
   },
-  { field: 'deliveryDate', title: '交货日期', width: 100 },
-  { field: 'orderStatus', title: '订单状态', width: 90, slots: { default: 'orderStatus' } },
-  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
+  { field: 'deliveryDate', title: '交货日期', width: 112 },
+  { field: 'orderStatus', title: '订单状态', width: 108, slots: { default: 'orderStatus' } },
+  { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
   { title: '操作', width: 160, slots: { default: 'action' } },
 ])
 
@@ -443,92 +443,94 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleAdd">
-              <template #icon><PlusOutlined /></template>
-              新建订单
-            </a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
-          </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 160px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-          </div>
-        </div>
-
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #orderType="{ row }">
-              <a-tag :color="ORDER_TYPE_COLOR[row.orderType]">
-                {{ ORDER_TYPE_LABEL[row.orderType] ?? row.orderType }}
-              </a-tag>
-            </template>
-            <template #totalAmount="{ row }">
-              <span v-if="row.totalAmount" class="lg-money">{{
-                Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-              }}</span>
-              <span v-else :style="{ color: 'var(--muted)' }">-</span>
-            </template>
-            <template #orderStatus="{ row }">
-              <a-tag :color="ORDER_STATUS_COLOR[row.orderStatus]">
-                {{ ORDER_STATUS_LABEL[row.orderStatus] ?? row.orderStatus }}
-              </a-tag>
-            </template>
-            <template #approvalStatus="{ row }">
-              <ApprovalStatusTag :status="row.approvalStatus" />
-            </template>
-            <template #action="{ row }">
-              <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>
-              <a-button type="link" size="small" danger @click="handleDelete(row)">删除</a-button>
-              <a-button
-                v-if="row.approvalStatus === 'DRAFT'"
-                type="link"
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-button type="primary" @click="handleAdd">
+                <template #icon><PlusOutlined /></template>
+                新建订单
+              </a-button>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+              </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部项目"
+                allow-clear
+                style="width: 160px"
                 size="small"
-                @click="handleSubmitApproval(row)"
-                >提交审批</a-button
+                @change="handleSearch"
               >
-            </template>
-          </vxe-grid>
-        </div>
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </div>
 
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
+          <!-- 表格 -->
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="gridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
+              size="small"
+              max-height="480"
+            >
+              <template #orderType="{ row }">
+                <a-tag :color="ORDER_TYPE_COLOR[row.orderType]">
+                  {{ ORDER_TYPE_LABEL[row.orderType] ?? row.orderType }}
+                </a-tag>
+              </template>
+              <template #totalAmount="{ row }">
+                <span v-if="row.totalAmount" class="lg-money">{{
+                  Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+                }}</span>
+                <span v-else :style="{ color: 'var(--muted)' }">-</span>
+              </template>
+              <template #orderStatus="{ row }">
+                <a-tag :color="ORDER_STATUS_COLOR[row.orderStatus]">
+                  {{ ORDER_STATUS_LABEL[row.orderStatus] ?? row.orderStatus }}
+                </a-tag>
+              </template>
+              <template #approvalStatus="{ row }">
+                <ApprovalStatusTag :status="row.approvalStatus" />
+              </template>
+              <template #action="{ row }">
+                <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>
+                <a-button type="link" size="small" danger @click="handleDelete(row)">删除</a-button>
+                <a-button
+                  v-if="row.approvalStatus === 'DRAFT'"
+                  type="link"
+                  size="small"
+                  @click="handleSubmitApproval(row)"
+                  >提交审批</a-button
+                >
+              </template>
+            </vxe-grid>
+          </div>
+
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              show-quick-jumper
+              @change="handlePageChange"
+              @show-size-change="handlePageSizeChange"
+            />
+          </div>
+        </main>
       </div>
 
       <!-- 右侧分析面板 -->

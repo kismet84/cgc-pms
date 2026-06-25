@@ -77,7 +77,7 @@ const itemColumns = [
   { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 120 },
   { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 160 },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 160 },
-  { title: '操作', key: 'action', width: 100 },
+  { title: '操作', key: 'action', width: 112 },
 ]
 
 const filterOption = (input: string, option: { label?: string }) =>
@@ -87,8 +87,8 @@ const gridColumns = computed(() => [
   { field: 'requestCode', title: '申请编号', minWidth: 150, ellipsis: true },
   { field: 'projectName', title: '所属项目', minWidth: 150, ellipsis: true },
   { field: 'contractName', title: '关联合同', minWidth: 150, ellipsis: true },
-  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
-  { field: 'status', title: '业务状态', width: 80, slots: { default: 'status' } },
+  { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
+  { field: 'status', title: '业务状态', width: 108, slots: { default: 'status' } },
   { field: 'createdBy', title: '创建人', width: 90 },
   { field: 'createdTime', title: '创建时间', width: 140 },
   { title: '操作', width: 190, slots: { default: 'ops' } },
@@ -430,99 +430,103 @@ onMounted(() => {
       </a-button>
     </div>
 
-    <!-- KPI 横条 -->
-    <div class="lg-kpi-strip">
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">申请数</span>
-        <span class="lg-kpi-card-value">{{ kpiReqTotal }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"
-          ><span style="width: 100%; background: var(--kpi-total)"></span
-        ></span>
-      </div>
-      <div class="lg-kpi-card is-warn">
-        <span class="lg-kpi-card-label">待审批</span>
-        <span class="lg-kpi-card-value">{{ kpiReqPending }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"><span style="width: 100%; background: #f59e0b"></span></span>
-      </div>
-    </div>
-
     <div class="lg-grid">
-      <main class="lg-list-table-panel">
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleAdd">新建申请</a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
+      <div class="lg-left">
+        <!-- KPI 横条 -->
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">申请数</span>
+            <span class="lg-kpi-card-value">{{ kpiReqTotal }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 160px"
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">待审批</span>
+            <span class="lg-kpi-card-value">{{ kpiReqPending }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: #f59e0b"></span
+            ></span>
+          </div>
+        </div>
+
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-button type="primary" @click="handleAdd">新建申请</a-button>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+              </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部项目"
+                allow-clear
+                style="width: 160px"
+                size="small"
+                @change="handleSearch"
+              >
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </div>
+
+          <!-- 表格 -->
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="gridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
               size="small"
-              @change="handleSearch"
+              max-height="480"
             >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
+              <template #approvalStatus="{ row }">
+                <ApprovalStatusTag :status="row.approvalStatus" />
+              </template>
+              <template #status="{ row }">
+                <a-tag :color="STATUS_COLOR[row.status]">
+                  {{ STATUS_LABEL[row.status] ?? row.status }}
+                </a-tag>
+              </template>
+              <template #ops="{ row }">
+                <div class="lg-ops">
+                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                  <a
+                    v-if="row.approvalStatus === 'DRAFT'"
+                    class="lg-link"
+                    style="color: #1677ff"
+                    @click="handleSubmit(row)"
+                    >提交审批</a
+                  >
+                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+                </div>
+              </template>
+            </vxe-grid>
           </div>
-        </div>
 
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #approvalStatus="{ row }">
-              <ApprovalStatusTag :status="row.approvalStatus" />
-            </template>
-            <template #status="{ row }">
-              <a-tag :color="STATUS_COLOR[row.status]">
-                {{ STATUS_LABEL[row.status] ?? row.status }}
-              </a-tag>
-            </template>
-            <template #ops="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                <a
-                  v-if="row.approvalStatus === 'DRAFT'"
-                  class="lg-link"
-                  style="color: #1677ff"
-                  @click="handleSubmit(row)"
-                  >提交审批</a
-                >
-                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-              </div>
-            </template>
-          </vxe-grid>
-        </div>
-
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
-      </main>
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              show-quick-jumper
+              @change="handlePageChange"
+              @show-size-change="handlePageSizeChange"
+            />
+          </div>
+        </main>
+      </div>
 
       <aside class="lg-analysis-rail">
         <section class="lg-panel">

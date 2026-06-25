@@ -39,18 +39,18 @@ export function useInvoiceList() {
 
   const gridColumns = computed(() => [
     { field: 'invoiceNo', title: '发票号码', minWidth: 150, ellipsis: true },
-    { field: 'invoiceType', title: '发票类型', width: 100, slots: { default: 'invoiceType' } },
+    { field: 'invoiceType', title: '发票类型', width: 108, slots: { default: 'invoiceType' } },
     {
       field: 'invoiceAmount',
       title: '发票金额',
-      width: 110,
+      width: 128,
       align: 'right' as const,
       slots: { default: 'invoiceAmount' },
     },
     {
       field: 'taxRate',
       title: '税率(%)',
-      width: 80,
+      width: 92,
       slots: { default: 'taxRate' },
     },
     {
@@ -61,7 +61,7 @@ export function useInvoiceList() {
       slots: { default: 'taxAmount' },
     },
     { field: 'invoiceDate', title: '开票日期', width: 110 },
-    { field: 'verifyStatus', title: '核验状态', width: 90, slots: { default: 'verifyStatus' } },
+    { field: 'verifyStatus', title: '核验状态', width: 108, slots: { default: 'verifyStatus' } },
     { field: 'remark', title: '备注', minWidth: 140, ellipsis: true },
     { field: 'createdAt', title: '创建时间', width: 150 },
     { title: '操作', width: 150, slots: { default: 'action' } },

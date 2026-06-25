@@ -75,7 +75,9 @@ function emptySummary(): CostLedgerSummaryVO {
   }
 }
 
-function normalizeSummary(value: Partial<CostLedgerSummaryVO> | null | undefined): CostLedgerSummaryVO {
+function normalizeSummary(
+  value: Partial<CostLedgerSummaryVO> | null | undefined,
+): CostLedgerSummaryVO {
   return {
     ...emptySummary(),
     ...(value ?? {}),
@@ -152,18 +154,20 @@ async function fetchData() {
 
 async function fetchSummary() {
   try {
-    summary.value = normalizeSummary(await getCostLedgerSummary({
-      projectId: filter.projectId,
-      contractId: filter.contractId,
-      partnerId: filter.partnerId,
-      costSubjectId: filter.costSubjectId,
-      costType: filter.costType,
-      sourceType: filter.sourceType,
-      costStatus: filter.costStatus,
-      startDate: filter.dateRange[0],
-      endDate: filter.dateRange[1],
-      keyword: filter.keyword || undefined,
-    }))
+    summary.value = normalizeSummary(
+      await getCostLedgerSummary({
+        projectId: filter.projectId,
+        contractId: filter.contractId,
+        partnerId: filter.partnerId,
+        costSubjectId: filter.costSubjectId,
+        costType: filter.costType,
+        sourceType: filter.sourceType,
+        costStatus: filter.costStatus,
+        startDate: filter.dateRange[0],
+        endDate: filter.dateRange[1],
+        keyword: filter.keyword || undefined,
+      }),
+    )
   } catch (e: unknown) {
     console.error(e)
     summary.value = emptySummary()
@@ -301,17 +305,17 @@ function barPercent(amount: string): string {
 const gridColumns = computed(() => [
   { field: 'id', title: '编号', width: 180, ellipsis: true },
   { field: 'costSubjectName', title: '成本科目', width: 130, ellipsis: true },
-  { field: 'sourceType', title: '来源类型', width: 110, slots: { default: 'sourceType' } },
+  { field: 'sourceType', title: '来源类型', width: 120, slots: { default: 'sourceType' } },
   {
     field: 'amount',
     title: '金额(万元)',
-    width: 110,
+    width: 128,
     align: 'right' as const,
     slots: { default: 'amount' },
   },
   { field: 'costDate', title: '成本日期', width: 110 },
   { field: 'costStatus', title: '状态', width: 90, slots: { default: 'costStatus' } },
-  { title: '操作', width: 80, slots: { default: 'ops' } },
+  { title: '操作', width: 92, slots: { default: 'ops' } },
 ])
 
 // ---- Init ----
@@ -454,92 +458,94 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
         </div>
 
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button @click="handleSearch">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar cost-toolbar">
+            <div class="lg-toolbar-left">
+              <a-button @click="handleSearch">
+                <template #icon><ReloadOutlined /></template>
+              </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部项目"
+                allow-clear
+                style="width: 200px"
+                size="small"
+                @change="onProjectChange"
+              >
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </div>
           </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 160px"
+
+          <!-- 表格 -->
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="gridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
               size="small"
-              @change="onProjectChange"
+              max-height="480"
             >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
+              <template #sourceType="{ row }">
+                <a-tag
+                  :color="SOURCE_TYPE_COLOR[row.sourceType as SourceType] || 'default'"
+                  size="small"
+                >
+                  {{ SOURCE_TYPE_LABEL[row.sourceType as SourceType] || row.sourceType }}
+                </a-tag>
+              </template>
+              <template #amount="{ row }">
+                <span class="lg-money">{{ fmtWan(row.amount) }}</span>
+              </template>
+              <template #costStatus="{ row }">
+                <a-tag
+                  :color="
+                    row.costStatus === 'CONFIRMED'
+                      ? 'success'
+                      : row.costStatus === 'PENDING'
+                        ? 'processing'
+                        : 'default'
+                  "
+                  size="small"
+                >
+                  {{
+                    row.costStatus === 'CONFIRMED'
+                      ? '已确认'
+                      : row.costStatus === 'PENDING'
+                        ? '待确认'
+                        : row.costStatus
+                  }}
+                </a-tag>
+              </template>
+              <template #ops="{ row }">
+                <a class="lg-link" @click="showDetail(row)">详情</a>
+              </template>
+            </vxe-grid>
           </div>
-        </div>
 
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #sourceType="{ row }">
-              <a-tag
-                :color="SOURCE_TYPE_COLOR[row.sourceType as SourceType] || 'default'"
-                size="small"
-              >
-                {{ SOURCE_TYPE_LABEL[row.sourceType as SourceType] || row.sourceType }}
-              </a-tag>
-            </template>
-            <template #amount="{ row }">
-              <span class="lg-money">{{ fmtWan(row.amount) }}</span>
-            </template>
-            <template #costStatus="{ row }">
-              <a-tag
-                :color="
-                  row.costStatus === 'CONFIRMED'
-                    ? 'success'
-                    : row.costStatus === 'PENDING'
-                      ? 'processing'
-                      : 'default'
-                "
-                size="small"
-              >
-                {{
-                  row.costStatus === 'CONFIRMED'
-                    ? '已确认'
-                    : row.costStatus === 'PENDING'
-                      ? '待确认'
-                      : row.costStatus
-                }}
-              </a-tag>
-            </template>
-            <template #ops="{ row }">
-              <a class="lg-link" @click="showDetail(row)">详情</a>
-            </template>
-          </vxe-grid>
-        </div>
-
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNum"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handleShowSizeChange"
-          />
-        </div>
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNum"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              show-quick-jumper
+              @change="handlePageChange"
+              @show-size-change="handleShowSizeChange"
+            />
+          </div>
+        </main>
       </div>
 
       <!-- 右侧分析面板 -->

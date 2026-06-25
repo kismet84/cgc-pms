@@ -84,27 +84,27 @@ const actionNameMap: Record<string, string> = {
 const variationColumns = [
   { title: '签证编号', dataIndex: 'varCode', key: 'varCode', width: 130, ellipsis: true },
   { title: '签证名称', dataIndex: 'varName', key: 'varName', width: 160, ellipsis: true },
-  { title: '变更类型', dataIndex: 'varType', key: 'varType', width: 90 },
+  { title: '变更类型', dataIndex: 'varType', key: 'varType', width: 108 },
   { title: '方向', dataIndex: 'direction', key: 'direction', width: 80 },
   {
     title: '上报金额',
     dataIndex: 'reportedAmount',
     key: 'reportedAmount',
-    width: 110,
+    width: 118,
     align: 'right' as const,
   },
   {
     title: '审批金额',
     dataIndex: 'approvedAmount',
     key: 'approvedAmount',
-    width: 110,
+    width: 118,
     align: 'right' as const,
   },
   {
     title: '确认金额',
     dataIndex: 'confirmedAmount',
     key: 'confirmedAmount',
-    width: 110,
+    width: 118,
     align: 'right' as const,
   },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 150 },
@@ -112,29 +112,29 @@ const variationColumns = [
 
 const paymentColumns = [
   { title: '申请编号', dataIndex: 'applyCode', key: 'applyCode', width: 140, ellipsis: true },
-  { title: '付款类型', dataIndex: 'payType', key: 'payType', width: 90 },
+  { title: '付款类型', dataIndex: 'payType', key: 'payType', width: 108 },
   {
     title: '申请金额',
     dataIndex: 'applyAmount',
     key: 'applyAmount',
-    width: 110,
+    width: 118,
     align: 'right' as const,
   },
   {
     title: '审批金额',
     dataIndex: 'approvedAmount',
     key: 'approvedAmount',
-    width: 110,
+    width: 118,
     align: 'right' as const,
   },
   {
     title: '实际付款',
     dataIndex: 'actualPayAmount',
     key: 'actualPayAmount',
-    width: 110,
+    width: 118,
     align: 'right' as const,
   },
-  { title: '付款状态', dataIndex: 'payStatus', key: 'payStatus', width: 90 },
+  { title: '付款状态', dataIndex: 'payStatus', key: 'payStatus', width: 108 },
   { title: '付款日期', dataIndex: 'payDate', key: 'payDate', width: 110 },
   { title: '凭证号', dataIndex: 'voucherNo', key: 'voucherNo', width: 130, ellipsis: true },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 150 },
@@ -148,19 +148,19 @@ const costColumns = [
     width: 130,
     ellipsis: true,
   },
-  { title: '费用类型', dataIndex: 'costType', key: 'costType', width: 90 },
-  { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
+  { title: '费用类型', dataIndex: 'costType', key: 'costType', width: 108 },
+  { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 112 },
   { title: '来源单据', dataIndex: 'sourceId', key: 'sourceId', width: 130, ellipsis: true },
-  { title: '金额(含税)', dataIndex: 'amount', key: 'amount', width: 110, align: 'right' as const },
+  { title: '金额(含税)', dataIndex: 'amount', key: 'amount', width: 128, align: 'right' as const },
   { title: '税额', dataIndex: 'taxAmount', key: 'taxAmount', width: 90, align: 'right' as const },
   {
     title: '不含税金额',
     dataIndex: 'amountWithoutTax',
     key: 'amountWithoutTax',
-    width: 110,
+    width: 128,
     align: 'right' as const,
   },
-  { title: '状态', dataIndex: 'costStatus', key: 'costStatus', width: 80 },
+  { title: '状态', dataIndex: 'costStatus', key: 'costStatus', width: 92 },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 150 },
 ]
 
@@ -339,10 +339,7 @@ onMounted(() => {
         </section>
 
         <!-- Tabs -->
-        <a-tabs
-          v-model:activeKey="activeTab"
-          class="settlement-tabs-card"
-        >
+        <a-tabs v-model:activeKey="activeTab" class="settlement-tabs-card">
           <a-tab-pane key="basic" tab="基本信息">
             <div style="padding: 8px 0 20px">
               <div class="pt-panel settlement-basic-card">

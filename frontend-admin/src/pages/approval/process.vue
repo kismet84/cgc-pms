@@ -101,16 +101,16 @@ const templateColumns = [
   { title: '业务类型', dataIndex: 'businessType', key: 'businessType', width: 120 },
   { title: '节点数', dataIndex: 'nodeCount', key: 'nodeCount', width: 90 },
   { title: '金额范围', key: 'amountRange', width: 180 },
-  { title: '状态', dataIndex: 'enabled', key: 'enabled', width: 90 },
+  { title: '状态', dataIndex: 'enabled', key: 'enabled', width: 92 },
   { title: '更新时间', dataIndex: 'updatedAt', key: 'updatedAt', width: 170 },
-  { title: '操作', key: 'action', width: 100 },
+  { title: '操作', key: 'action', width: 112 },
 ]
 
 const nodeColumns = [
-  { title: '节点顺序', dataIndex: 'nodeOrder', key: 'nodeOrder', width: 90 },
-  { title: '节点编码', dataIndex: 'nodeCode', key: 'nodeCode', width: 110 },
+  { title: '节点顺序', dataIndex: 'nodeOrder', key: 'nodeOrder', width: 104 },
+  { title: '节点编码', dataIndex: 'nodeCode', key: 'nodeCode', width: 118 },
   { title: '节点名称', dataIndex: 'nodeName', key: 'nodeName', ellipsis: true },
-  { title: '审批模式', dataIndex: 'approveMode', key: 'approveMode', width: 110 },
+  { title: '审批模式', dataIndex: 'approveMode', key: 'approveMode', width: 118 },
   { title: '审批人配置', dataIndex: 'approverConfig', key: 'approverConfig', ellipsis: true },
   { title: '转办', dataIndex: 'allowTransfer', key: 'allowTransfer', width: 80 },
   { title: '加签', dataIndex: 'allowAddSign', key: 'allowAddSign', width: 80 },

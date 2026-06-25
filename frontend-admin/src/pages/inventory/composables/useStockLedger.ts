@@ -302,7 +302,7 @@ export function useStockLedger() {
 
   // ---- vxe-grid 列定义 ----
   const gridColumns = computed(() => [
-    { type: 'seq' as const, title: '流水号', width: 80, align: 'center' as const },
+    { type: 'seq' as const, title: '流水号', width: 92, align: 'center' as const },
     ...(colVisible.txnType
       ? [{ field: 'txnType', title: '类型', width: 80, slots: { default: 'txnType' } }]
       : []),
@@ -330,7 +330,7 @@ export function useStockLedger() {
         ]
       : []),
     ...(colVisible.sourceType
-      ? [{ field: 'sourceType', title: '来源类型', width: 110, slots: { default: 'sourceType' } }]
+      ? [{ field: 'sourceType', title: '来源类型', width: 120, slots: { default: 'sourceType' } }]
       : []),
     ...(colVisible.sourceId
       ? [
@@ -354,7 +354,7 @@ export function useStockLedger() {
         ]
       : []),
     ...(colVisible.ops
-      ? [{ title: '操作', width: 70, align: 'center' as const, slots: { default: 'ops' } }]
+      ? [{ title: '操作', width: 84, align: 'center' as const, slots: { default: 'ops' } }]
       : []),
   ])
 

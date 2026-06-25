@@ -336,46 +336,60 @@ export function useContractLedger() {
           {
             field: 'contractCode',
             title: '合同编号',
-            minWidth: 150,
-            ellipsis: true,
+            width: 180,
+            showOverflow: 'tooltip',
+            slots: { default: 'contractCode' },
           },
         ]
       : []),
     ...(colVisible.contractName
-      ? [{ field: 'contractName', title: '合同名称', minWidth: 180, ellipsis: true }]
+      ? [{ field: 'contractName', title: '合同名称', minWidth: 180, showOverflow: 'tooltip' }]
       : []),
     ...(colVisible.contractType
       ? [
           {
             field: 'contractType',
             title: '合同类型',
-            width: 100,
+            width: 112,
+            showOverflow: 'tooltip',
             slots: { default: 'contractType' },
           },
         ]
       : []),
     ...(colVisible.partyAName
-      ? [{ field: 'partyAName', title: '甲方', minWidth: 140, ellipsis: true }]
+      ? [{ field: 'partyAName', title: '甲方', minWidth: 140, showOverflow: 'tooltip' }]
       : []),
     ...(colVisible.partyBName
-      ? [{ field: 'partyBName', title: '乙方', minWidth: 140, ellipsis: true }]
+      ? [{ field: 'partyBName', title: '乙方', minWidth: 140, showOverflow: 'tooltip' }]
       : []),
     ...(colVisible.contractAmount
       ? [
           {
             field: 'contractAmount',
             title: '合同金额(含税)',
-            width: 140,
+            width: 172,
+            minWidth: 172,
             align: 'right' as const,
+            showOverflow: false,
             slots: { default: 'amount' },
           },
         ]
       : []),
-    ...(colVisible.signedDate ? [{ field: 'signedDate', title: '签订日期', width: 110 }] : []),
-    ...(colVisible.contractStatus
-      ? [{ field: 'contractStatus', title: '合同状态', width: 100, slots: { default: 'status' } }]
+    ...(colVisible.signedDate
+      ? [{ field: 'signedDate', title: '签订日期', width: 118, showOverflow: 'tooltip' }]
       : []),
-    ...(colVisible.ops ? [{ title: '操作', width: 130, slots: { default: 'ops' } }] : []),
+    ...(colVisible.contractStatus
+      ? [
+          {
+            field: 'contractStatus',
+            title: '合同状态',
+            width: 112,
+            showOverflow: 'tooltip',
+            slots: { default: 'status' },
+          },
+        ]
+      : []),
+    ...(colVisible.ops ? [{ title: '操作', width: 140, slots: { default: 'ops' } }] : []),
   ])
 
   return {

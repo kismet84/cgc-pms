@@ -189,7 +189,7 @@ const dataGridColumns = computed(() => [
   { field: 'dictValue', title: '字典键值', width: 140 },
   { field: 'orderNum', title: '排序', width: 80, align: 'right' as const },
   { field: 'cssClass', title: '样式类名', width: 120 },
-  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 170 },
   { title: '操作', width: 120, slots: { default: 'ops' } },
 ])

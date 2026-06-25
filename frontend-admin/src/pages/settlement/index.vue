@@ -352,88 +352,86 @@ const colorMap: Record<string, string> = {
           </div>
         </div>
 
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="openCreateModal">
-              <template #icon><PlusOutlined /></template>
-              新建结算
-            </a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
-          </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 160px"
-              size="small"
-              @change="onProjectChange"
-            >
-              <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-          </div>
-        </div>
-
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #settlementAmount="{ row }">
-              <span>{{ fmtWan(row.settlementAmount) }}</span>
-            </template>
-            <template #settlementStatus="{ row }">
-              <a-tag
-                :color="
-                  SETTLEMENT_STATUS_COLOR[settlementStatusOf(row)] || 'default'
-                "
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-button type="primary" @click="openCreateModal">
+                <template #icon><PlusOutlined /></template>
+                新建结算
+              </a-button>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+              </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部项目"
+                allow-clear
+                style="width: 160px"
                 size="small"
+                @change="onProjectChange"
               >
-                {{
-                  SETTLEMENT_STATUS_LABEL[settlementStatusOf(row)] ?? settlementStatusOf(row)
-                }}
-              </a-tag>
-            </template>
-            <template #ops="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleView(row)">查看</a>
-                <a
-                  v-if="settlementStatusOf(row) !== 'FINALIZED'"
-                  class="lg-link lg-del"
-                  @click="handleDelete(row)"
-                  >删除</a
-                >
-              </div>
-            </template>
-          </vxe-grid>
-        </div>
+                <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </div>
 
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @showSizeChange="handlePageSizeChange"
-          />
-        </div>
+          <!-- 表格 -->
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="gridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
+              size="small"
+              max-height="480"
+            >
+              <template #settlementAmount="{ row }">
+                <span>{{ fmtWan(row.settlementAmount) }}</span>
+              </template>
+              <template #settlementStatus="{ row }">
+                <a-tag
+                  :color="SETTLEMENT_STATUS_COLOR[settlementStatusOf(row)] || 'default'"
+                  size="small"
+                >
+                  {{ SETTLEMENT_STATUS_LABEL[settlementStatusOf(row)] ?? settlementStatusOf(row) }}
+                </a-tag>
+              </template>
+              <template #ops="{ row }">
+                <div class="lg-ops">
+                  <a class="lg-link" @click="handleView(row)">查看</a>
+                  <a
+                    v-if="settlementStatusOf(row) !== 'FINALIZED'"
+                    class="lg-link lg-del"
+                    @click="handleDelete(row)"
+                    >删除</a
+                  >
+                </div>
+              </template>
+            </vxe-grid>
+          </div>
+
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50']"
+              show-size-changer
+              show-quick-jumper
+              @change="handlePageChange"
+              @showSizeChange="handlePageSizeChange"
+            />
+          </div>
+        </main>
       </div>
 
       <!-- 右侧分析面板 -->

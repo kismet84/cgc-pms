@@ -75,7 +75,7 @@ const STATUS_COLOR: Record<string, string> = {
 // ---- vxe-grid columns ----
 const gridColumns = computed(() => [
   { field: 'measureCode', title: '计量编号', minWidth: 150, ellipsis: true },
-  { field: 'measurePeriod', title: '计量期次', width: 100 },
+  { field: 'measurePeriod', title: '计量期次', width: 112 },
   { field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true },
   { field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true },
   { field: 'partnerName', title: '分包商', minWidth: 140, ellipsis: true },
@@ -89,14 +89,14 @@ const gridColumns = computed(() => [
   {
     field: 'reportedAmount',
     title: '申报金额',
-    width: 100,
+    width: 118,
     align: 'right' as const,
     slots: { default: 'reportedAmount' },
   },
   {
     field: 'approvedAmount',
     title: '审核金额',
-    width: 100,
+    width: 118,
     align: 'right' as const,
     slots: { default: 'approvedAmount' },
   },
@@ -107,10 +107,10 @@ const gridColumns = computed(() => [
     align: 'right' as const,
     slots: { default: 'netAmount' },
   },
-  { field: 'measureDate', title: '计量日期', width: 100 },
-  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
-  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
-  { title: '操作', width: 110, slots: { default: 'action' } },
+  { field: 'measureDate', title: '计量日期', width: 112 },
+  { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
+  { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
+  { title: '操作', width: 124, slots: { default: 'action' } },
 ])
 
 async function fetchData() {
@@ -463,176 +463,183 @@ onMounted(() => {
       </a-button>
     </div>
 
-    <!-- KPI 横条 -->
-    <div class="lg-kpi-strip">
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">计量总数</span>
-        <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"
-          ><span style="width: 100%; background: var(--kpi-total)"></span
-        ></span>
-      </div>
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">申报总额</span>
-        <span class="lg-kpi-card-value">{{ fmtAmount(kpiMeasureTotal) }} <small>元</small></span>
-        <span class="lg-kpi-card-bar"
-          ><span style="width: 100%; background: var(--kpi-amount)"></span
-        ></span>
-      </div>
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">已审核金额</span>
-        <span class="lg-kpi-card-value">{{ fmtAmount(kpiApproved) }} <small>元</small></span>
-        <span class="lg-kpi-card-bar"
-          ><span
-            :style="{
-              width:
-                (kpiMeasureTotal ? Math.round((kpiApproved / kpiMeasureTotal) * 100) : 0) + '%',
-              background: 'var(--kpi-paid)',
-            }"
-          ></span
-        ></span>
-        <span class="lg-kpi-card-hint" v-if="kpiMeasureTotal"
-          >{{ kpiMeasureTotal ? Math.round((kpiApproved / kpiMeasureTotal) * 100) : 0 }}%</span
-        >
-      </div>
-      <div class="lg-kpi-card is-warn" v-if="kpiMeasurePending > 0">
-        <span class="lg-kpi-card-label">待审核</span>
-        <span class="lg-kpi-card-value">{{ kpiMeasurePending }} <small>条</small></span>
-        <span class="lg-kpi-card-bar"
-          ><span
-            :style="{
-              width:
-                (kpiTotalCount ? Math.round((kpiMeasurePending / kpiTotalCount) * 100) : 0) + '%',
-              background: 'var(--kpi-overdue)',
-            }"
-          ></span
-        ></span>
-        <span class="lg-kpi-card-hint" v-if="kpiTotalCount"
-          >{{ kpiTotalCount ? Math.round((kpiMeasurePending / kpiTotalCount) * 100) : 0 }}%</span
-        >
-      </div>
-    </div>
-
     <div class="lg-grid">
-      <main class="lg-list-table-panel">
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleAdd">
-              <template #icon><PlusOutlined /></template>
-              新建计量
-            </a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
+      <div class="lg-left">
+        <!-- KPI 横条 -->
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">计量总数</span>
+            <span class="lg-kpi-card-value">{{ kpiTotalCount }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 160px"
-              size="small"
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-              @change="
-                (v: string | undefined) => {
-                  filter.contractId = undefined
-                  if (v) referenceStore.fetchContracts({ projectId: v })
-                  handleSearch()
-                }
-              "
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">申报总额</span>
+            <span class="lg-kpi-card-value"
+              >{{ fmtAmount(kpiMeasureTotal) }} <small>元</small></span
             >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-amount)"></span
+            ></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">已审核金额</span>
+            <span class="lg-kpi-card-value">{{ fmtAmount(kpiApproved) }} <small>元</small></span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width:
+                    (kpiMeasureTotal ? Math.round((kpiApproved / kpiMeasureTotal) * 100) : 0) + '%',
+                  background: 'var(--kpi-paid)',
+                }"
+              ></span
+            ></span>
+            <span class="lg-kpi-card-hint" v-if="kpiMeasureTotal"
+              >{{ kpiMeasureTotal ? Math.round((kpiApproved / kpiMeasureTotal) * 100) : 0 }}%</span
+            >
+          </div>
+          <div class="lg-kpi-card is-warn" v-if="kpiMeasurePending > 0">
+            <span class="lg-kpi-card-label">待审核</span>
+            <span class="lg-kpi-card-value">{{ kpiMeasurePending }} <small>条</small></span>
+            <span class="lg-kpi-card-bar"
+              ><span
+                :style="{
+                  width:
+                    (kpiTotalCount ? Math.round((kpiMeasurePending / kpiTotalCount) * 100) : 0) +
+                    '%',
+                  background: 'var(--kpi-overdue)',
+                }"
+              ></span
+            ></span>
+            <span class="lg-kpi-card-hint" v-if="kpiTotalCount"
+              >{{
+                kpiTotalCount ? Math.round((kpiMeasurePending / kpiTotalCount) * 100) : 0
+              }}%</span
+            >
           </div>
         </div>
 
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #subTaskName="{ row }">
-              <span v-if="row.subTaskName">{{ row.subTaskName }}</span>
-              <span v-else class="lg-none">-</span>
-            </template>
-            <template #reportedAmount="{ row }">
-              <span v-if="row.reportedAmount" class="lg-money">
-                {{
-                  Number(row.reportedAmount).toLocaleString('zh-CN', {
-                    minimumFractionDigits: 2,
-                  })
-                }}
-              </span>
-              <span v-else class="lg-none">-</span>
-            </template>
-            <template #approvedAmount="{ row }">
-              <span v-if="row.approvedAmount" class="lg-money">
-                {{
-                  Number(row.approvedAmount).toLocaleString('zh-CN', {
-                    minimumFractionDigits: 2,
-                  })
-                }}
-              </span>
-              <span v-else class="lg-none">-</span>
-            </template>
-            <template #netAmount="{ row }">
-              <span v-if="row.netAmount !== undefined && row.netAmount !== null" class="lg-money">
-                {{ Number(row.netAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
-              </span>
-              <span v-else class="lg-none">-</span>
-            </template>
-            <template #status="{ row }">
-              <a-tag :color="STATUS_COLOR[row.status]">
-                {{ STATUS_LABEL[row.status] ?? row.status }}
-              </a-tag>
-            </template>
-            <template #approvalStatus="{ row }">
-              <ApprovalStatusTag :status="row.approvalStatus" />
-            </template>
-            <template #action="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                <a
-                  v-if="row.approvalStatus === 'DRAFT'"
-                  class="lg-link"
-                  @click="handleSubmitApproval(row)"
-                  >提交审批</a
-                >
-              </div>
-            </template>
-          </vxe-grid>
-        </div>
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-button type="primary" @click="handleAdd">
+                <template #icon><PlusOutlined /></template>
+                新建计量
+              </a-button>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+              </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部项目"
+                allow-clear
+                style="width: 160px"
+                size="small"
+                show-search
+                :filter-option="
+                  (input: string, option: SelectOption) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
+                @change="
+                  (v: string | undefined) => {
+                    filter.contractId = undefined
+                    if (v) referenceStore.fetchContracts({ projectId: v })
+                    handleSearch()
+                  }
+                "
+              >
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </div>
 
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
-      </main>
+          <!-- 表格 -->
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="gridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
+              size="small"
+              max-height="480"
+            >
+              <template #subTaskName="{ row }">
+                <span v-if="row.subTaskName">{{ row.subTaskName }}</span>
+                <span v-else class="lg-none">-</span>
+              </template>
+              <template #reportedAmount="{ row }">
+                <span v-if="row.reportedAmount" class="lg-money">
+                  {{
+                    Number(row.reportedAmount).toLocaleString('zh-CN', {
+                      minimumFractionDigits: 2,
+                    })
+                  }}
+                </span>
+                <span v-else class="lg-none">-</span>
+              </template>
+              <template #approvedAmount="{ row }">
+                <span v-if="row.approvedAmount" class="lg-money">
+                  {{
+                    Number(row.approvedAmount).toLocaleString('zh-CN', {
+                      minimumFractionDigits: 2,
+                    })
+                  }}
+                </span>
+                <span v-else class="lg-none">-</span>
+              </template>
+              <template #netAmount="{ row }">
+                <span v-if="row.netAmount !== undefined && row.netAmount !== null" class="lg-money">
+                  {{ Number(row.netAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+                </span>
+                <span v-else class="lg-none">-</span>
+              </template>
+              <template #status="{ row }">
+                <a-tag :color="STATUS_COLOR[row.status]">
+                  {{ STATUS_LABEL[row.status] ?? row.status }}
+                </a-tag>
+              </template>
+              <template #approvalStatus="{ row }">
+                <ApprovalStatusTag :status="row.approvalStatus" />
+              </template>
+              <template #action="{ row }">
+                <div class="lg-ops">
+                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+                  <a
+                    v-if="row.approvalStatus === 'DRAFT'"
+                    class="lg-link"
+                    @click="handleSubmitApproval(row)"
+                    >提交审批</a
+                  >
+                </div>
+              </template>
+            </vxe-grid>
+          </div>
+
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              show-quick-jumper
+              @change="handlePageChange"
+              @show-size-change="handlePageSizeChange"
+            />
+          </div>
+        </main>
+      </div>
 
       <aside class="lg-analysis-rail">
         <div class="lg-panel">

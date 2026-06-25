@@ -173,58 +173,116 @@ const {
 }
 
 .kpi-card {
+  position: relative;
   min-height: 98px;
-  padding: 20px;
+  padding: 18px 20px;
   background: var(--surface);
   border: 0;
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-  display: flex;
-  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 6px;
+  align-items: flex-start;
   overflow: hidden;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.kpi-card::before {
+  display: none;
+}
+
+.kpi-card:hover {
+  background: var(--surface);
+  border-color: rgba(22, 119, 255, 0.24);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
 }
 
 .kpi-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  color: #fff;
+  width: 16px;
+  height: 16px;
+  margin-top: 0;
+  color: var(--primary);
   display: grid;
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: 12px;
+  line-height: 1;
+  background: transparent !important;
+  border-radius: 0;
+  box-shadow: none;
   place-items: center;
+}
+
+.kpi-card:nth-child(2) .kpi-icon {
+  color: #d48806;
+}
+
+.kpi-card:nth-child(3) .kpi-icon {
+  color: #389e0d;
+}
+
+.kpi-card:nth-child(4) .kpi-icon {
+  color: #cf1322;
 }
 
 .kpi-body {
   min-width: 0;
-  flex: 1;
+  min-height: 62px;
+  display: grid;
+  grid-template-rows: 16px 26px 16px;
+  row-gap: 2px;
+  align-content: center;
+}
+
+.kpi-body::after {
+  min-height: 16px;
+  content: '';
+  grid-row: 3;
 }
 
 .kpi-title {
-  margin-bottom: 5px;
+  margin-bottom: 0;
   color: var(--muted);
   font-size: 13px;
   font-weight: 500;
+  line-height: 16px;
+  grid-row: 1;
 }
 
 .kpi-value {
   color: var(--text);
   font-size: 22px;
   font-weight: 800;
+  line-height: 26px;
   font-variant-numeric: tabular-nums;
+  grid-row: 2;
+  word-break: break-word;
 }
 
 .kpi-value small {
   margin-left: 4px;
   color: var(--text-secondary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .kpi-delta {
-  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
   color: var(--muted);
   font-size: 12px;
+  font-weight: 500;
+  grid-row: 3;
 }
 
 .kpi-delta.danger {

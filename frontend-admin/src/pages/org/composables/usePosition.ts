@@ -32,11 +32,11 @@ export function usePosition(deptTreeData: Ref<OrgDepartmentTreeNodeVO[]>) {
   })
 
   const gridColumns = computed(() => [
-    { field: 'companyId', title: '所属公司', width: 100, slots: { default: 'posCompanyId' } },
-    { field: 'departmentId', title: '所属部门', width: 100, slots: { default: 'posDeptId' } },
+    { field: 'companyId', title: '所属公司', width: 112, slots: { default: 'posCompanyId' } },
+    { field: 'departmentId', title: '所属部门', width: 112, slots: { default: 'posDeptId' } },
     { field: 'positionCode', title: '岗位编号', width: 120 },
     { field: 'positionName', title: '岗位名称', minWidth: 140 },
-    { field: 'status', title: '状态', width: 80, slots: { default: 'posStatus' } },
+    { field: 'status', title: '状态', width: 88, slots: { default: 'posStatus' } },
     { field: 'createdAt', title: '创建时间', width: 150 },
     { title: '操作', width: 120, align: 'right' as const, slots: { default: 'posOps' } },
   ])

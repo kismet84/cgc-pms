@@ -7,7 +7,7 @@ export const pmTaskCols = [
 export const pmProjectCols = [
   { title: '项目名称', dataIndex: 'projectName', ellipsis: true },
   { title: '项目编号', dataIndex: 'projectCode', width: 120 },
-  { title: '状态', dataIndex: 'status', width: 80 },
+  { title: '状态', dataIndex: 'status', width: 88 },
 ]
 
 export const pmContractCols = [
@@ -18,7 +18,7 @@ export const pmContractCols = [
 
 export const bmChangeCols = [
   { title: '合同名称', dataIndex: 'contractName', ellipsis: true },
-  { title: '当前金额', dataIndex: 'currentAmount', width: 110, align: 'right' as const },
+  { title: '当前金额', dataIndex: 'currentAmount', width: 128, align: 'right' as const },
 ]
 
 export const bmSettleCols = [
@@ -29,7 +29,7 @@ export const bmSettleCols = [
 export const financePayCols = [
   { title: '合同名称', dataIndex: 'contractName', ellipsis: true },
   { title: '合作方', dataIndex: 'partnerName', width: 120 },
-  { title: '金额', dataIndex: 'payAmount', width: 110, align: 'right' as const },
+  { title: '金额', dataIndex: 'payAmount', width: 128, align: 'right' as const },
 ]
 
 export const alertCols = [
@@ -42,7 +42,7 @@ export const mgmtRankCols = [
   { title: '项目名称', dataIndex: 'projectName', ellipsis: true },
   { title: '合同收入', dataIndex: 'contractIncome', width: 120, align: 'right' as const },
   { title: '预计利润', dataIndex: 'expectedProfit', width: 120, align: 'right' as const },
-  { title: '风险', dataIndex: 'riskCount', width: 70, align: 'center' as const },
+  { title: '风险', dataIndex: 'riskCount', width: 82, align: 'center' as const },
 ]
 
 export const drillCols = [

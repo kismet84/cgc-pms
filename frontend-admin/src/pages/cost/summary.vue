@@ -346,7 +346,7 @@ onMounted(() => {
       <!-- 左列 -->
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div v-if="summary" class="lg-kpi-strip" style="grid-template-columns: repeat(5, 1fr)">
+        <div v-if="summary" class="lg-kpi-strip">
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">目标成本</span>
             <span class="lg-kpi-card-value"
@@ -386,7 +386,7 @@ onMounted(() => {
         </div>
 
         <!-- 工具栏 -->
-        <div class="lg-toolbar">
+        <div class="lg-toolbar cost-toolbar">
           <div class="lg-toolbar-left">
             <a-button type="primary" @click="handleRefresh" :disabled="!selectedProjectId">
               <template #icon><ReloadOutlined /></template>
@@ -604,9 +604,7 @@ onMounted(() => {
   justify-content: center;
   gap: 12px;
   color: var(--muted);
-  background:
-    linear-gradient(135deg, rgba(24, 144, 255, 0.06), transparent 42%),
-    var(--surface);
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.06), transparent 42%), var(--surface);
 }
 
 .cost-summary-empty-icon {

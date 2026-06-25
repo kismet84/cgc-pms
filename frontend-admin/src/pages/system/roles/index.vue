@@ -33,9 +33,9 @@ const gridColumns = computed(() => [
   { field: 'roleName', title: '角色名称', width: 150 },
   { field: 'roleCode', title: '角色编码', width: 150 },
   { field: 'roleType', title: '角色类型', width: 120 },
-  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 160 },
-  { title: '操作', width: 100, slots: { default: 'action' } },
+  { title: '操作', width: 112, slots: { default: 'action' } },
 ])
 
 const filteredRoles = computed(() => {

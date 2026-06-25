@@ -34,20 +34,20 @@ const TYPE_COLOR: Record<ContractType, string> = {
 }
 
 const itemColumns = [
-  { title: '清单编码', dataIndex: 'itemCode', key: 'itemCode', width: 110, ellipsis: true },
+  { title: '清单编码', dataIndex: 'itemCode', key: 'itemCode', width: 118, ellipsis: true },
   { title: '清单名称', dataIndex: 'itemName', key: 'itemName', width: 160, ellipsis: true },
   { title: '规格型号', dataIndex: 'itemSpec', key: 'itemSpec', width: 120, ellipsis: true },
   { title: '单位', dataIndex: 'unit', key: 'unit', width: 70, align: 'center' as const },
   { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 90, align: 'right' as const },
   { title: '单价', dataIndex: 'unitPrice', key: 'unitPrice', width: 100, align: 'right' as const },
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120, align: 'right' as const },
-  { title: '税率(%)', dataIndex: 'taxRate', key: 'taxRate', width: 80, align: 'right' as const },
+  { title: '税率(%)', dataIndex: 'taxRate', key: 'taxRate', width: 92, align: 'right' as const },
   { title: '税额', dataIndex: 'taxAmount', key: 'taxAmount', width: 100, align: 'right' as const },
   {
     title: '不含税金额',
     dataIndex: 'amountWithoutTax',
     key: 'amountWithoutTax',
-    width: 120,
+    width: 132,
     align: 'right' as const,
   },
 ]
@@ -77,7 +77,7 @@ const termColumns = [
   },
   { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 110 },
   { title: '实际日期', dataIndex: 'actualDate', key: 'actualDate', width: 110 },
-  { title: '状态', dataIndex: 'termStatus', key: 'termStatus', width: 80 },
+  { title: '状态', dataIndex: 'termStatus', key: 'termStatus', width: 92 },
 ]
 
 const actionNameMap: Record<string, string> = {

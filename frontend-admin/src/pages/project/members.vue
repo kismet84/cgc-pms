@@ -161,7 +161,7 @@ const columns = [
   { title: '岗位', dataIndex: 'positionName', width: 140 },
   { title: '开始日期', dataIndex: 'startDate', width: 130 },
   { title: '状态', dataIndex: 'status', width: 90 },
-  { title: '操作', dataIndex: 'ops', width: 80 },
+  { title: '操作', dataIndex: 'ops', width: 92 },
 ]
 </script>
 
@@ -211,7 +211,7 @@ const columns = [
     <div class="pt-ledger-layout">
       <main class="pt-panel pt-table-panel">
         <div class="pt-panel-header">成员清单</div>
-          <a-table
+        <a-table
           :data-source="members"
           :columns="columns"
           :loading="store.membersLoading"

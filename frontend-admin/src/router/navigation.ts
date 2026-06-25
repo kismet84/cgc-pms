@@ -12,22 +12,11 @@ export const navigationItems: NavigationItem[] = [
     key: '/workbench',
     label: '工作台',
     icon: 'HomeOutlined',
-    matchPrefixes: ['/dashboard', '/alert'],
+    matchPrefixes: ['/dashboard', '/alert', '/project/list'],
     children: [
       { key: '/dashboard', label: '首页驾驶舱' },
       { key: '/alert', label: '预警中心' },
-    ],
-  },
-  {
-    key: '/master-data',
-    label: '项目与主数据',
-    icon: 'ProjectOutlined',
-    matchPrefixes: ['/project', '/partner', '/org', '/material'],
-    children: [
       { key: '/project/list', label: '项目列表' },
-      { key: '/partner', label: '合作方管理' },
-      { key: '/org', label: '组织架构' },
-      { key: '/material/dictionary', label: '材料字典' },
     ],
   },
   {
@@ -46,10 +35,10 @@ export const navigationItems: NavigationItem[] = [
     icon: 'DollarOutlined',
     matchPrefixes: ['/cost', '/cost-target'],
     children: [
-      { key: '/cost/subject', label: '成本科目' },
       { key: '/cost/ledger', label: '成本台账' },
-      { key: '/cost/summary', label: '动态成本汇总' },
+      { key: '/cost/summary', label: '成本汇总' },
       { key: '/cost-target/index', label: '目标成本' },
+      { key: '/cost/subject', label: '成本科目' },
     ],
   },
   {
@@ -78,21 +67,15 @@ export const navigationItems: NavigationItem[] = [
     ],
   },
   {
-    key: '/payment-invoice',
-    label: '付款与发票',
-    icon: 'AccountBookOutlined',
-    matchPrefixes: ['/payment', '/invoice'],
-    children: [
-      { key: '/payment/application', label: '付款申请' },
-      { key: '/invoice', label: '发票管理' },
-    ],
-  },
-  {
     key: '/settlement-domain',
     label: '结算管理',
     icon: 'AccountBookOutlined',
-    matchPrefixes: ['/settlement'],
-    children: [{ key: '/settlement/list', label: '结算列表' }],
+    matchPrefixes: ['/settlement', '/payment', '/invoice'],
+    children: [
+      { key: '/settlement/list', label: '结算列表' },
+      { key: '/payment/application', label: '付款申请' },
+      { key: '/invoice', label: '发票管理' },
+    ],
   },
   {
     key: '/approval-center',
@@ -108,6 +91,17 @@ export const navigationItems: NavigationItem[] = [
         label: '审批流程管理',
         adminOnly: true,
       },
+    ],
+  },
+  {
+    key: '/master-data',
+    label: '数据中心',
+    icon: 'ProjectOutlined',
+    matchPrefixes: ['/partner', '/org', '/material'],
+    children: [
+      { key: '/partner', label: '合作方管理' },
+      { key: '/org', label: '组织架构' },
+      { key: '/material/dictionary', label: '材料字典' },
     ],
   },
   {

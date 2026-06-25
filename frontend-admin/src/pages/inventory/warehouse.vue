@@ -52,7 +52,7 @@ const gridColumns = computed(() => [
   { field: 'warehouseCode', title: '仓库编号', minWidth: 140, ellipsis: true },
   { field: 'warehouseName', title: '仓库名称', minWidth: 160, ellipsis: true },
   { field: 'projectName', title: '所属项目', minWidth: 160, ellipsis: true },
-  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 140 },
   { title: '操作', width: 130, slots: { default: 'ops' } },
 ])
@@ -204,26 +204,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- KPI strip -->
-    <div class="lg-kpi-strip" style="grid-template-columns: repeat(2, minmax(136px, 1fr))">
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">仓库总数</span>
-        <span class="lg-kpi-card-value">{{ kpiWhTotal }} <small>个</small></span>
-        <span class="lg-kpi-card-bar"
-          ><span style="width: 100%; background: var(--kpi-total)"></span
-        ></span>
-      </div>
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">启用仓库</span>
-        <span class="lg-kpi-card-value" style="color: #22c55e"
-          >{{ kpiWhEnabled }} <small>个</small></span
-        >
-        <span class="lg-kpi-card-bar"
-          ><span style="width: 100%; background: var(--kpi-paid)"></span
-        ></span>
-      </div>
-    </div>
-
     <!-- 搜索栏 -->
     <div class="lg-search-bar">
       <a-input
@@ -243,75 +223,97 @@ onMounted(() => {
     </div>
 
     <div class="lg-grid">
-      <main class="lg-list-table-panel">
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleAdd">
-              <template #icon><PlusOutlined /></template>
-              新建仓库
-            </a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
+      <div class="lg-left">
+        <!-- KPI strip -->
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">仓库总数</span>
+            <span class="lg-kpi-card-value">{{ kpiWhTotal }} <small>个</small></span>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-total)"></span
+            ></span>
           </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 160px"
-              size="small"
-              @change="handleSearch"
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">启用仓库</span>
+            <span class="lg-kpi-card-value" style="color: #22c55e"
+              >{{ kpiWhEnabled }} <small>个</small></span
             >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
+            <span class="lg-kpi-card-bar"
+              ><span style="width: 100%; background: var(--kpi-paid)"></span
+            ></span>
           </div>
         </div>
 
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #status="{ row }">
-              <a-tag :color="STATUS_COLOR[row.status]">
-                {{ STATUS_LABEL[row.status] ?? row.status }}
-              </a-tag>
-            </template>
-            <template #ops="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-              </div>
-            </template>
-          </vxe-grid>
-        </div>
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-button type="primary" @click="handleAdd">
+                <template #icon><PlusOutlined /></template>
+                新建仓库
+              </a-button>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+              </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部项目"
+                allow-clear
+                style="width: 160px"
+                size="small"
+                @change="handleSearch"
+              >
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </div>
 
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
-      </main>
+          <!-- 表格 -->
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="gridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
+              size="small"
+              max-height="480"
+            >
+              <template #status="{ row }">
+                <a-tag :color="STATUS_COLOR[row.status]">
+                  {{ STATUS_LABEL[row.status] ?? row.status }}
+                </a-tag>
+              </template>
+              <template #ops="{ row }">
+                <div class="lg-ops">
+                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+                </div>
+              </template>
+            </vxe-grid>
+          </div>
+
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              show-quick-jumper
+              @change="handlePageChange"
+              @show-size-change="handlePageSizeChange"
+            />
+          </div>
+        </main>
+      </div>
 
       <aside class="lg-analysis-rail">
         <section class="lg-panel">

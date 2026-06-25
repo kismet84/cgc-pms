@@ -133,142 +133,144 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
         </div>
 
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-dropdown v-if="!isMobile">
-              <a-button size="small">
-                <template #icon><SettingOutlined /></template>
-                列设置
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-dropdown v-if="!isMobile">
+                <a-button size="small">
+                  <template #icon><SettingOutlined /></template>
+                  列设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
+                      <a-checkbox :checked="colVisible[key]">
+                        {{
+                          {
+                            txnType: '类型',
+                            quantity: '变动量',
+                            availableAfter: '变动后余量',
+                            sourceType: '来源类型',
+                            sourceId: '关联单据',
+                            createdTime: '操作时间',
+                            ops: '操作',
+                          }[key]
+                        }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+              <a-button @click="handleSearch">
+                <template #icon><ReloadOutlined /></template>
               </a-button>
-              <template #overlay>
-                <a-menu>
-                  <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
-                    <a-checkbox :checked="colVisible[key]">
-                      {{
-                        {
-                          txnType: '类型',
-                          quantity: '变动量',
-                          availableAfter: '变动后余量',
-                          sourceType: '来源类型',
-                          sourceId: '关联单据',
-                          createdTime: '操作时间',
-                          ops: '操作',
-                        }[key]
-                      }}
-                    </a-checkbox>
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
-            <a-button @click="handleSearch">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
-          </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 160px"
-              size="small"
-              @change="onProjectChange"
-            >
-              <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-          </div>
-        </div>
-
-        <!-- 桌面端表格 -->
-        <StockTxnTable
-          v-if="!isMobile"
-          :txn-list="txnList"
-          :loading="loading"
-          :grid-columns="gridColumns"
-          :fmt-qty="fmtQty"
-          @sort-change="handleSortChange"
-          @show-detail="showDetail"
-        />
-
-        <!-- 移动端卡片列表 -->
-        <div v-else class="lg-card-list">
-          <div v-if="loading" class="lg-card-list-loading">
-            <a-spin size="large" />
-          </div>
-          <div v-else-if="!txnList.length" class="lg-card-list-empty">
-            <a-empty />
-          </div>
-          <div v-for="row in txnList" :key="row.id" class="lg-card-item">
-            <div class="lg-card-item-head">
-              <span class="lg-card-code">
-                <a-tag :color="TXN_TYPE_COLOR[row.txnType]">
-                  {{ TXN_TYPE_LABEL[row.txnType] ?? row.txnType }}
-                </a-tag>
-              </span>
-              <span class="lg-card-head-right">
-                <a-tag
-                  v-if="colVisible.sourceType"
-                  :color="getSourceTypeColor(row.sourceType)"
-                  size="small"
-                >
-                  {{ getSourceTypeLabel(row.sourceType) }}
-                </a-tag>
-              </span>
             </div>
-            <div class="lg-card-item-body">
-              <div v-if="colVisible.quantity" class="lg-card-field">
-                <span class="lg-card-label">变动量</span>
-                <span
-                  class="lg-card-value lg-card-money"
-                  :style="{ color: row.txnType === 'OUT' ? '#ef4444' : '#16a34a' }"
-                >
-                  {{ row.txnType === 'OUT' ? '−' : '+' }}{{ fmtQty(row.quantity) }}
-                </span>
-              </div>
-              <div v-if="colVisible.availableAfter" class="lg-card-field">
-                <span class="lg-card-label">变动后余量</span>
-                <span
-                  class="lg-card-value lg-card-money"
-                  :style="{ color: Number(row.availableAfter) < 10 ? '#ef4444' : 'var(--text)' }"
-                >
-                  {{ fmtQty(row.availableAfter) }}
-                </span>
-              </div>
-              <div class="lg-card-field-row">
-                <div v-if="colVisible.sourceId" class="lg-card-field">
-                  <span class="lg-card-label">关联单据</span>
-                  <span class="lg-card-value">{{ row.sourceId || '-' }}</span>
-                </div>
-                <div v-if="colVisible.createdTime" class="lg-card-field">
-                  <span class="lg-card-label">操作时间</span>
-                  <span class="lg-card-value">{{ row.createdTime || '-' }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="lg-card-item-foot">
-              <a-space :size="4">
-                <a-button size="small" type="link" @click="showDetail(row)">详情</a-button>
-              </a-space>
+            <div class="lg-toolbar-right">
+              <a-select
+                v-model:value="filter.projectId"
+                placeholder="全部项目"
+                allow-clear
+                style="width: 160px"
+                size="small"
+                @change="onProjectChange"
+              >
+                <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
             </div>
           </div>
-        </div>
 
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ txnTotal }} 条流水</span>
-          <a-pagination
-            v-model:current="txnPageNo"
-            v-model:page-size="txnPageSize"
-            :total="txnTotal"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handleTxnPageChange"
-            @show-size-change="handleTxnPageSizeChange"
+          <!-- 桌面端表格 -->
+          <StockTxnTable
+            v-if="!isMobile"
+            :txn-list="txnList"
+            :loading="loading"
+            :grid-columns="gridColumns"
+            :fmt-qty="fmtQty"
+            @sort-change="handleSortChange"
+            @show-detail="showDetail"
           />
-        </div>
+
+          <!-- 移动端卡片列表 -->
+          <div v-else class="lg-card-list">
+            <div v-if="loading" class="lg-card-list-loading">
+              <a-spin size="large" />
+            </div>
+            <div v-else-if="!txnList.length" class="lg-card-list-empty">
+              <a-empty />
+            </div>
+            <div v-for="row in txnList" :key="row.id" class="lg-card-item">
+              <div class="lg-card-item-head">
+                <span class="lg-card-code">
+                  <a-tag :color="TXN_TYPE_COLOR[row.txnType]">
+                    {{ TXN_TYPE_LABEL[row.txnType] ?? row.txnType }}
+                  </a-tag>
+                </span>
+                <span class="lg-card-head-right">
+                  <a-tag
+                    v-if="colVisible.sourceType"
+                    :color="getSourceTypeColor(row.sourceType)"
+                    size="small"
+                  >
+                    {{ getSourceTypeLabel(row.sourceType) }}
+                  </a-tag>
+                </span>
+              </div>
+              <div class="lg-card-item-body">
+                <div v-if="colVisible.quantity" class="lg-card-field">
+                  <span class="lg-card-label">变动量</span>
+                  <span
+                    class="lg-card-value lg-card-money"
+                    :style="{ color: row.txnType === 'OUT' ? '#ef4444' : '#16a34a' }"
+                  >
+                    {{ row.txnType === 'OUT' ? '−' : '+' }}{{ fmtQty(row.quantity) }}
+                  </span>
+                </div>
+                <div v-if="colVisible.availableAfter" class="lg-card-field">
+                  <span class="lg-card-label">变动后余量</span>
+                  <span
+                    class="lg-card-value lg-card-money"
+                    :style="{ color: Number(row.availableAfter) < 10 ? '#ef4444' : 'var(--text)' }"
+                  >
+                    {{ fmtQty(row.availableAfter) }}
+                  </span>
+                </div>
+                <div class="lg-card-field-row">
+                  <div v-if="colVisible.sourceId" class="lg-card-field">
+                    <span class="lg-card-label">关联单据</span>
+                    <span class="lg-card-value">{{ row.sourceId || '-' }}</span>
+                  </div>
+                  <div v-if="colVisible.createdTime" class="lg-card-field">
+                    <span class="lg-card-label">操作时间</span>
+                    <span class="lg-card-value">{{ row.createdTime || '-' }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="lg-card-item-foot">
+                <a-space :size="4">
+                  <a-button size="small" type="link" @click="showDetail(row)">详情</a-button>
+                </a-space>
+              </div>
+            </div>
+          </div>
+
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ txnTotal }} 条流水</span>
+            <a-pagination
+              v-model:current="txnPageNo"
+              v-model:page-size="txnPageSize"
+              :total="txnTotal"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              show-quick-jumper
+              @change="handleTxnPageChange"
+              @show-size-change="handleTxnPageSizeChange"
+            />
+          </div>
+        </main>
 
         <!-- 流水详情 Drawer -->
         <StockTxnDetailDrawer

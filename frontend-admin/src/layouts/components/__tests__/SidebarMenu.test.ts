@@ -106,14 +106,13 @@ describe('SidebarMenu', () => {
 
     expect(renderedMenuItems.map((item) => item.label)).toEqual([
       '工作台',
-      '项目与主数据',
       '合同管理',
       '成本管理',
       '采购与库存',
       '分包管理',
-      '付款与发票',
       '结算管理',
       '审批中心',
+      '数据中心',
       '系统管理',
     ])
     expect(wrapper.text()).toContain('目标成本')
@@ -125,12 +124,11 @@ describe('SidebarMenu', () => {
     expect(wrapper.find('.menu-stub').attributes('data-open-keys')).toBe('/workbench')
   })
 
-  it('places master data and target cost under the approved domains', () => {
+  it('places cost subject and target cost under cost domain', () => {
     const wrapper = mountMenu()
 
-    const masterData = renderedMenuItems.find((item) => item.label === '项目与主数据')
+    const masterData = renderedMenuItems.find((item) => item.label === '数据中心')
     expect(masterData?.children?.map((item) => item.label)).toEqual([
-      '项目列表',
       '合作方管理',
       '组织架构',
       '材料字典',
@@ -138,20 +136,25 @@ describe('SidebarMenu', () => {
 
     const cost = renderedMenuItems.find((item) => item.label === '成本管理')
     expect(cost?.children?.map((item) => item.label)).toEqual([
-      '成本科目',
       '成本台账',
-      '动态成本汇总',
+      '成本汇总',
       '目标成本',
+      '成本科目',
     ])
 
     expect(wrapper.find('[data-menu-key="/cost-target/index"]').exists()).toBe(true)
+    expect(wrapper.find('[data-menu-key="/cost/subject"]').exists()).toBe(true)
   })
 
-  it('places invoice under payment and exposes approval center work lists', () => {
+  it('places payment, invoice and approval process under approved domains', () => {
     mountMenu()
 
-    const payment = renderedMenuItems.find((item) => item.label === '付款与发票')
-    expect(payment?.children?.map((item) => item.label)).toEqual(['付款申请', '发票管理'])
+    const settlement = renderedMenuItems.find((item) => item.label === '结算管理')
+    expect(settlement?.children?.map((item) => item.label)).toEqual([
+      '结算列表',
+      '付款申请',
+      '发票管理',
+    ])
 
     const approval = renderedMenuItems.find((item) => item.label === '审批中心')
     expect(approval?.children?.map((item) => item.label)).toEqual([

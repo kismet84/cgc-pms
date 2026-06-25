@@ -44,10 +44,16 @@ const formData = reactive({
 const gridColumns = computed(() => [
   { field: 'username', title: '用户名', minWidth: 120, ellipsis: true },
   { field: 'realName', title: '姓名', minWidth: 100, ellipsis: true },
-  { field: 'roleNames', title: '角色', minWidth: 140, slots: { default: 'roleNames' }, ellipsis: true },
+  {
+    field: 'roleNames',
+    title: '角色',
+    minWidth: 140,
+    slots: { default: 'roleNames' },
+    ellipsis: true,
+  },
   { field: 'phone', title: '手机号', width: 130 },
   { field: 'email', title: '邮箱', minWidth: 180, ellipsis: true },
-  { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
+  { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 160 },
   { title: '操作', width: 180, slots: { default: 'action' } },
 ])

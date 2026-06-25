@@ -141,11 +141,11 @@ const gridColumns = computed(() => [
     ellipsis: true,
     slots: { default: 'projectId' },
   },
-  { field: 'severity', title: '严重度', width: 80, slots: { default: 'severity' } },
-  { field: 'ruleType', title: '规则类型', width: 110, slots: { default: 'ruleType' } },
+  { field: 'severity', title: '严重度', width: 92, slots: { default: 'severity' } },
+  { field: 'ruleType', title: '规则类型', width: 116, slots: { default: 'ruleType' } },
   { field: 'triggeredAt', title: '触发时间', width: 160 },
-  { field: 'isRead', title: '状态', width: 70, slots: { default: 'isRead' } },
-  { title: '操作', width: 80, slots: { default: 'action' } },
+  { field: 'isRead', title: '状态', width: 82, slots: { default: 'isRead' } },
+  { title: '操作', width: 92, slots: { default: 'action' } },
 ])
 
 function getProjectName(projectId: string): string {

@@ -305,27 +305,27 @@ const gridColumns = computed(() => [
   {
     field: 'applyAmount',
     title: '申请金额',
-    width: 100,
+    width: 118,
     align: 'right' as const,
     slots: { default: 'applyAmount' },
   },
   {
     field: 'approvedAmount',
     title: '审批金额',
-    width: 100,
+    width: 118,
     align: 'right' as const,
     slots: { default: 'approvedAmount' },
   },
   {
     field: 'actualPayAmount',
     title: '实付金额',
-    width: 100,
+    width: 118,
     align: 'right' as const,
     slots: { default: 'actualPayAmount' },
   },
-  { field: 'payType', title: '付款类型', width: 90, slots: { default: 'payType' } },
-  { field: 'payStatus', title: '支付状态', width: 90, slots: { default: 'payStatus' } },
-  { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
+  { field: 'payType', title: '付款类型', width: 108, slots: { default: 'payType' } },
+  { field: 'payStatus', title: '支付状态', width: 108, slots: { default: 'payStatus' } },
+  { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
   { title: '操作', width: 170, slots: { default: 'action' } },
 ])
 
@@ -455,100 +455,102 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleAdd">
-              <template #icon><PlusOutlined /></template>
-              新建申请
-            </a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
+        <main class="lg-list-table-panel">
+          <!-- 工具栏 -->
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <a-button type="primary" @click="handleAdd">
+                <template #icon><PlusOutlined /></template>
+                新建申请
+              </a-button>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+              </a-button>
+            </div>
           </div>
-        </div>
 
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="gridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-            max-height="480"
-          >
-            <template #applyAmount="{ row }">
-              <span class="lg-money">{{ fmtWan(row.applyAmount) }} 万</span>
-            </template>
-            <template #approvedAmount="{ row }">
-              <span class="lg-money">{{ fmtWan(row.approvedAmount) }} 万</span>
-            </template>
-            <template #actualPayAmount="{ row }">
-              <span class="lg-money">{{ fmtWan(row.actualPayAmount) }} 万</span>
-            </template>
-            <template #payType="{ row }">
-              <a-tag :color="PAY_TYPE_COLOR[row.payType] || 'default'" size="small">{{
-                PAY_TYPE_LABEL[row.payType] ?? row.payType
-              }}</a-tag>
-            </template>
-            <template #payStatus="{ row }">
-              <a-tag :color="PAY_STATUS_COLOR[row.payStatus] || 'default'" size="small">{{
-                PAY_STATUS_LABEL[row.payStatus] ?? row.payStatus
-              }}</a-tag>
-            </template>
-            <template #approvalStatus="{ row }">
-              <a-tag
-                :color="
-                  row.approvalStatus === 'APPROVED'
-                    ? 'success'
-                    : row.approvalStatus === 'REJECTED'
-                      ? 'error'
-                      : row.approvalStatus === 'APPROVING'
-                        ? 'processing'
-                        : 'default'
-                "
-                size="small"
-                >{{ row.approvalStatus }}</a-tag
-              >
-            </template>
-            <template #action="{ row }">
-              <div class="lg-ops">
-                <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                <a
-                  v-if="row.approvalStatus === 'DRAFT'"
-                  class="lg-link"
-                  @click="handleApproval(row)"
-                  >提交审批</a
+          <!-- 表格 -->
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="gridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
+              size="small"
+              max-height="480"
+            >
+              <template #applyAmount="{ row }">
+                <span class="lg-money">{{ fmtWan(row.applyAmount) }} 万</span>
+              </template>
+              <template #approvedAmount="{ row }">
+                <span class="lg-money">{{ fmtWan(row.approvedAmount) }} 万</span>
+              </template>
+              <template #actualPayAmount="{ row }">
+                <span class="lg-money">{{ fmtWan(row.actualPayAmount) }} 万</span>
+              </template>
+              <template #payType="{ row }">
+                <a-tag :color="PAY_TYPE_COLOR[row.payType] || 'default'" size="small">{{
+                  PAY_TYPE_LABEL[row.payType] ?? row.payType
+                }}</a-tag>
+              </template>
+              <template #payStatus="{ row }">
+                <a-tag :color="PAY_STATUS_COLOR[row.payStatus] || 'default'" size="small">{{
+                  PAY_STATUS_LABEL[row.payStatus] ?? row.payStatus
+                }}</a-tag>
+              </template>
+              <template #approvalStatus="{ row }">
+                <a-tag
+                  :color="
+                    row.approvalStatus === 'APPROVED'
+                      ? 'success'
+                      : row.approvalStatus === 'REJECTED'
+                        ? 'error'
+                        : row.approvalStatus === 'APPROVING'
+                          ? 'processing'
+                          : 'default'
+                  "
+                  size="small"
+                  >{{ row.approvalStatus }}</a-tag
                 >
-                <a
-                  v-if="row.approvalStatus === 'APPROVED' && row.payStatus !== 'PAID'"
-                  class="lg-link"
-                  @click="openWriteback(row)"
-                  >付款回写</a
-                >
-                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-              </div>
-            </template>
-          </vxe-grid>
-        </div>
+              </template>
+              <template #action="{ row }">
+                <div class="lg-ops">
+                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                  <a
+                    v-if="row.approvalStatus === 'DRAFT'"
+                    class="lg-link"
+                    @click="handleApproval(row)"
+                    >提交审批</a
+                  >
+                  <a
+                    v-if="row.approvalStatus === 'APPROVED' && row.payStatus !== 'PAID'"
+                    class="lg-link"
+                    @click="openWriteback(row)"
+                    >付款回写</a
+                  >
+                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+                </div>
+              </template>
+            </vxe-grid>
+          </div>
 
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              show-quick-jumper
+              @change="handlePageChange"
+              @show-size-change="handlePageSizeChange"
+            />
+          </div>
+        </main>
       </div>
 
       <!-- 右侧分析面板 -->
