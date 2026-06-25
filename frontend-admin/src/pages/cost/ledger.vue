@@ -65,6 +65,26 @@ const summary = ref<CostLedgerSummaryVO>({
   byCostType: {},
 })
 
+function emptySummary(): CostLedgerSummaryVO {
+  return {
+    totalAmount: '0',
+    totalTaxAmount: '0',
+    bySourceType: {},
+    byProject: {},
+    byCostType: {},
+  }
+}
+
+function normalizeSummary(value: Partial<CostLedgerSummaryVO> | null | undefined): CostLedgerSummaryVO {
+  return {
+    ...emptySummary(),
+    ...(value ?? {}),
+    bySourceType: value?.bySourceType ?? {},
+    byProject: value?.byProject ?? {},
+    byCostType: value?.byCostType ?? {},
+  }
+}
+
 // ---- Detail drawer ----
 const detailVisible = ref(false)
 const detailItem = ref<CostLedgerVO | null>(null)
@@ -86,8 +106,8 @@ interface TreeNode {
   children?: TreeNode[]
 }
 
-function convertToTreeData(nodes: TreeNode[]): TreeSelectProps['treeData'] {
-  return nodes.map((node) => ({
+function convertToTreeData(nodes: unknown): TreeSelectProps['treeData'] {
+  return (Array.isArray(nodes) ? (nodes as TreeNode[]) : []).map((node) => ({
     value: node.id,
     title: `${node.subjectCode} ${node.subjectName}`,
     children: node.children ? convertToTreeData(node.children) : undefined,
@@ -132,7 +152,7 @@ async function fetchData() {
 
 async function fetchSummary() {
   try {
-    summary.value = await getCostLedgerSummary({
+    summary.value = normalizeSummary(await getCostLedgerSummary({
       projectId: filter.projectId,
       contractId: filter.contractId,
       partnerId: filter.partnerId,
@@ -143,16 +163,10 @@ async function fetchSummary() {
       startDate: filter.dateRange[0],
       endDate: filter.dateRange[1],
       keyword: filter.keyword || undefined,
-    })
+    }))
   } catch (e: unknown) {
     console.error(e)
-    summary.value = {
-      totalAmount: '0',
-      totalTaxAmount: '0',
-      bySourceType: {},
-      byProject: {},
-      byCostType: {},
-    }
+    summary.value = emptySummary()
     message.error('加载成本汇总失败')
   }
 }
@@ -313,7 +327,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <!-- Page head -->
     <div class="lg-page-head">
       <div>

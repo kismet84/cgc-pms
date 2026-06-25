@@ -48,8 +48,8 @@ onBeforeUnmount(() => {
   >
     <a-layout-sider
       v-model:collapsed="collapsed"
-      :width="220"
-      :collapsed-width="64"
+      :width="244"
+      :collapsed-width="72"
       class="sidebar"
       theme="light"
     >
@@ -57,7 +57,7 @@ onBeforeUnmount(() => {
         <ProjectOutlined class="logo" aria-hidden="true" />
         <span v-if="!collapsed" class="brand-text">建筑工程总包项目</span>
       </div>
-      <SidebarMenu />
+      <SidebarMenu :collapsed="collapsed" />
     </a-layout-sider>
     <div
       v-if="isMobile && !collapsed"
@@ -114,7 +114,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .basic-layout {
   min-height: 100vh;
-  background: var(--bg);
+  background:
+    linear-gradient(180deg, rgba(234, 242, 255, 0.78), rgba(246, 248, 251, 0) 280px),
+    var(--bg);
 }
 
 .sidebar {
@@ -122,16 +124,17 @@ onBeforeUnmount(() => {
   inset: 0 auto 0 0;
   z-index: 20;
   overflow: hidden;
-  background: var(--surface) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
   border-right: 1px solid var(--border);
-  box-shadow: none;
+  box-shadow: 8px 0 28px rgba(21, 32, 51, 0.04);
+  backdrop-filter: blur(12px);
 }
 
 .brand {
   height: var(--shell-header-height);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 0 24px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
@@ -143,25 +146,34 @@ onBeforeUnmount(() => {
 }
 
 .logo {
-  color: var(--primary);
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 19px;
+  background: var(--brand-gradient-logo);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
   flex-shrink: 0;
 }
 
 .brand-text {
   min-width: 0;
   overflow: hidden;
-  color: var(--primary);
-  font-size: 16px;
-  font-weight: 600;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0;
   text-overflow: ellipsis;
 }
 
 .topbar {
   height: var(--shell-header-height);
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.82);
   border-bottom: 1px solid var(--border);
-  padding: 0 24px;
+  padding: 0 28px;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -169,14 +181,28 @@ onBeforeUnmount(() => {
   top: 0;
   z-index: 10;
   margin-left: var(--shell-sidebar-width);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
 }
 
 .hamburger {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  font-size: 18px;
   cursor: pointer;
   color: var(--text-secondary);
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.hamburger:hover {
+  background: var(--surface-tint);
+  color: var(--primary);
 }
 
 .flex-1 {
@@ -186,14 +212,26 @@ onBeforeUnmount(() => {
 .top-actions {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
+  min-height: 42px;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.user-info:hover {
+  background: rgba(255, 255, 255, 0.74);
+  border-color: var(--border);
 }
 
 .user-text {
@@ -201,14 +239,14 @@ onBeforeUnmount(() => {
 }
 
 .username {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 800;
   color: var(--text);
 }
 
 .role {
   margin-top: 1px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -216,7 +254,7 @@ onBeforeUnmount(() => {
   padding: 0;
   margin-left: var(--shell-sidebar-width);
   min-height: calc(100vh - var(--shell-header-height));
-  background: var(--bg);
+  background: transparent;
 }
 
 /* 折叠时调整 */

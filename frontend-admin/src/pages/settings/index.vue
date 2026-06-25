@@ -53,43 +53,86 @@ async function handleSave() {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <a-card title="通知设置" :bordered="false" :loading="loading">
-      <a-form layout="horizontal">
-        <a-form-item label="启用通知">
-          <a-switch v-model:checked="preferences.notificationEnabled" />
-        </a-form-item>
-      </a-form>
-    </a-card>
+  <div class="lg-page app-page settings-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="lg-page-head-breadcrumb">
+          <a-breadcrumb-item>系统管理</a-breadcrumb-item>
+          <a-breadcrumb-item>偏好设置</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+    </div>
 
-    <a-card title="界面偏好" :bordered="false" :loading="loading" style="margin-top: 16px">
-      <a-form layout="horizontal">
-        <a-form-item label="主题">
-          <a-radio-group v-model:value="preferences.theme">
-            <a-radio value="light">浅色</a-radio>
-            <a-radio value="dark">深色</a-radio>
-          </a-radio-group>
-        </a-form-item>
+    <div class="lg-page-shell settings-shell">
+      <section class="lg-section">
+        <div class="lg-section-head">
+          <h2 class="lg-section-title">通知设置</h2>
+        </div>
+        <div class="lg-section-body">
+          <a-spin :spinning="loading">
+            <a-form layout="horizontal" class="settings-form">
+              <a-form-item label="启用通知">
+                <a-switch v-model:checked="preferences.notificationEnabled" />
+              </a-form-item>
+            </a-form>
+          </a-spin>
+        </div>
+      </section>
 
-        <a-form-item label="侧边栏">
-          <a-switch v-model:checked="preferences.sidebarCollapsed" />
-          <span style="margin-left: 8px; color: #8c8c8c">默认折叠侧边栏</span>
-        </a-form-item>
+      <section class="lg-section">
+        <div class="lg-section-head">
+          <h2 class="lg-section-title">界面偏好</h2>
+        </div>
+        <div class="lg-section-body">
+          <a-spin :spinning="loading">
+            <a-form layout="horizontal" class="settings-form">
+              <a-form-item label="主题">
+                <a-radio-group v-model:value="preferences.theme">
+                  <a-radio value="light">浅色</a-radio>
+                  <a-radio value="dark">深色</a-radio>
+                </a-radio-group>
+              </a-form-item>
 
-        <a-form-item label="表格密度">
-          <a-radio-group v-model:value="preferences.tableDensity">
-            <a-radio value="default">默认</a-radio>
-            <a-radio value="middle">中等</a-radio>
-            <a-radio value="small">紧凑</a-radio>
-          </a-radio-group>
-        </a-form-item>
-      </a-form>
-    </a-card>
+              <a-form-item label="侧边栏">
+                <a-switch v-model:checked="preferences.sidebarCollapsed" />
+                <span class="settings-hint">默认折叠侧边栏</span>
+              </a-form-item>
 
-    <div style="margin-top: 24px">
-      <a-button type="primary" :loading="saving" @click="handleSave">保存设置</a-button>
+              <a-form-item label="表格密度">
+                <a-radio-group v-model:value="preferences.tableDensity">
+                  <a-radio value="default">默认</a-radio>
+                  <a-radio value="middle">中等</a-radio>
+                  <a-radio value="small">紧凑</a-radio>
+                </a-radio-group>
+              </a-form-item>
+            </a-form>
+          </a-spin>
+        </div>
+      </section>
+
+      <div class="settings-actions">
+        <a-button type="primary" :loading="saving" @click="handleSave">保存设置</a-button>
+      </div>
     </div>
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.settings-shell {
+  max-width: 900px;
+}
+
+.settings-form :deep(.ant-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+.settings-hint {
+  margin-left: 8px;
+  color: var(--muted);
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+</style>

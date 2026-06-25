@@ -95,7 +95,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <!-- 页面头部 -->
     <div class="lg-page-head">
       <div>

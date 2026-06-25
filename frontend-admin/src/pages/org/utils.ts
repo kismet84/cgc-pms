@@ -8,9 +8,9 @@ export interface FlatDeptItem {
 }
 
 /** 将部门树展平为 select 可用的列表（含层级前缀 + companyId） */
-export function flattenDeptTree(nodes: OrgDepartmentTreeNodeVO[], prefix = ''): FlatDeptItem[] {
+export function flattenDeptTree(nodes: unknown, prefix = ''): FlatDeptItem[] {
   const result: FlatDeptItem[] = []
-  for (const node of nodes) {
+  for (const node of Array.isArray(nodes) ? (nodes as OrgDepartmentTreeNodeVO[]) : []) {
     const label = prefix ? `${prefix} / ${node.deptName}` : node.deptName
     result.push({ id: node.id, name: label, companyId: node.companyId })
     if (node.children?.length) {
@@ -21,17 +21,20 @@ export function flattenDeptTree(nodes: OrgDepartmentTreeNodeVO[], prefix = ''): 
 }
 
 /** 递归统计部门树节点总数 */
-export function countDeptNodes(nodes: OrgDepartmentTreeNodeVO[]): number {
-  return nodes.reduce((sum, node) => sum + 1 + countDeptNodes(node.children ?? []), 0)
+export function countDeptNodes(nodes: unknown): number {
+  return (Array.isArray(nodes) ? (nodes as OrgDepartmentTreeNodeVO[]) : []).reduce(
+    (sum, node) => sum + 1 + countDeptNodes(node.children ?? []),
+    0,
+  )
 }
 
 /** 按公司 + 关键词过滤部门树（保持树结构） */
 export function filterDeptNodes(
-  nodes: OrgDepartmentTreeNodeVO[],
+  nodes: unknown,
   companyId?: string | null,
   keyword = '',
 ): OrgDepartmentTreeNodeVO[] {
-  return nodes
+  return (Array.isArray(nodes) ? (nodes as OrgDepartmentTreeNodeVO[]) : [])
     .map((node) => {
       const children = filterDeptNodes(node.children ?? [], companyId, keyword)
       const matchesCompany = !companyId || node.companyId === companyId || children.length > 0
@@ -49,10 +52,10 @@ export function filterDeptNodes(
 
 /** 在部门树中按 ID 查找节点 */
 export function findDeptNode(
-  nodes: OrgDepartmentTreeNodeVO[],
+  nodes: unknown,
   id: string,
 ): OrgDepartmentTreeNodeVO | null {
-  for (const node of nodes) {
+  for (const node of Array.isArray(nodes) ? (nodes as OrgDepartmentTreeNodeVO[]) : []) {
     if (node.id === id) return node
     if (node.children && node.children.length > 0) {
       const found = findDeptNode(node.children, id)

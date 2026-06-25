@@ -42,15 +42,28 @@ const formData = reactive({
 })
 
 const gridColumns = computed(() => [
-  { field: 'username', title: '用户名', width: 120 },
-  { field: 'realName', title: '姓名', width: 100 },
-  { field: 'roleNames', title: '角色', width: 120, slots: { default: 'roleNames' } },
+  { field: 'username', title: '用户名', minWidth: 120, ellipsis: true },
+  { field: 'realName', title: '姓名', minWidth: 100, ellipsis: true },
+  { field: 'roleNames', title: '角色', minWidth: 140, slots: { default: 'roleNames' }, ellipsis: true },
   { field: 'phone', title: '手机号', width: 130 },
-  { field: 'email', title: '邮箱', width: 180, ellipsis: true },
+  { field: 'email', title: '邮箱', minWidth: 180, ellipsis: true },
   { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 160 },
   { title: '操作', width: 180, slots: { default: 'action' } },
 ])
+const userStatusSummary = computed(() => [
+  {
+    label: '启用用户',
+    count: tableData.value.filter((r) => r.status === 'ENABLE').length,
+    color: '#52c41a',
+  },
+  {
+    label: '禁用用户',
+    count: tableData.value.filter((r) => r.status !== 'ENABLE').length,
+    color: '#ff4d4f',
+  },
+])
+const recentUsers = computed(() => tableData.value.slice(0, 4))
 
 async function fetchData() {
   loading.value = true
@@ -220,7 +233,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
         <a-breadcrumb-item>系统设置</a-breadcrumb-item>
@@ -245,69 +258,96 @@ onMounted(() => {
       </a-button>
     </div>
 
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleAdd">
-          <template #icon><PlusOutlined /></template>
-          新增用户
-        </a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
-      </div>
-    </div>
-
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="gridColumns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #roleNames="{ row }">
-          <template v-if="row.roleNames && row.roleNames.length">
-            <a-tag v-for="(r, i) in row.roleNames" :key="i" style="margin-right: 4px">{{
-              r
-            }}</a-tag>
-          </template>
-          <span v-else style="color: var(--muted)">-</span>
-        </template>
-        <template #status="{ row }">
-          <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
-            {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
-          </a-tag>
-        </template>
-        <template #action="{ row }">
-          <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a
-              class="lg-link"
-              :class="{ 'lg-del': row.status === 'ENABLE' }"
-              @click="handleToggleStatus(row)"
-            >
-              {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
-            </a>
-            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新增用户
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+        </div>
 
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-      />
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #roleNames="{ row }">
+              <template v-if="row.roleNames && row.roleNames.length">
+                <a-tag v-for="(r, i) in row.roleNames" :key="i" style="margin-right: 4px">{{
+                  r
+                }}</a-tag>
+              </template>
+              <span v-else style="color: var(--muted)">-</span>
+            </template>
+            <template #status="{ row }">
+              <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
+                {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+              </a-tag>
+            </template>
+            <template #action="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a
+                  class="lg-link"
+                  :class="{ 'lg-del': row.status === 'ENABLE' }"
+                  @click="handleToggleStatus(row)"
+                >
+                  {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
+                </a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <div class="lg-panel">
+          <div class="lg-panel-title">用户状态</div>
+          <div class="lg-type-list">
+            <div v-for="item in userStatusSummary" :key="item.label" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <strong>{{ item.count }}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="lg-panel">
+          <div class="lg-panel-title">近期用户</div>
+          <div class="lg-rail-list">
+            <div v-for="item in recentUsers" :key="item.id" class="lg-rail-item">
+              <span class="lg-type-dot"></span>
+              <span>{{ item.realName || item.username }}</span>
+            </div>
+            <div v-if="!recentUsers.length" class="lg-empty-text">暂无用户</div>
+          </div>
+        </div>
+      </aside>
     </div>
 
     <!-- Add/Edit Modal -->

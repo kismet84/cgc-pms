@@ -15,10 +15,19 @@ const selectedProjectId = ref<string | undefined>(undefined)
 const loading = ref(false)
 const summary = ref<CostSummaryVO | null>(null)
 
+function normalizeArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const records = (value as { records?: unknown }).records
+    if (Array.isArray(records)) return records as T[]
+  }
+  return []
+}
+
 async function fetchProjects() {
   try {
     const res = await getProjectList({ pageNum: 1, pageSize: 50 })
-    projectList.value = res.records
+    projectList.value = normalizeArray<ProjectVO>(res.records)
   } catch (e: unknown) {
     console.error(e)
     projectList.value = []
@@ -142,6 +151,10 @@ const gridColumns = computed(() => [
   },
 ])
 
+const summarySubjects = computed(() =>
+  summary.value ? normalizeArray<CostSummaryVO['subjects'][number]>(summary.value.subjects) : [],
+)
+
 // ---- Chart options ----
 const executionOption = computed(() => {
   if (!summary.value) return {}
@@ -183,8 +196,8 @@ const executionOption = computed(() => {
 })
 
 const compositionOption = computed(() => {
-  if (!summary.value || !summary.value.subjects.length) return {}
-  const data = summary.value.subjects
+  if (!summary.value || !summarySubjects.value.length) return {}
+  const data = summarySubjects.value
     .filter((s) => parseFloat(s.dynamicCost) > 0)
     .map((s) => ({
       name: s.costSubjectName,
@@ -206,8 +219,8 @@ const compositionOption = computed(() => {
 })
 
 const deviationOption = computed(() => {
-  if (!summary.value || !summary.value.subjects.length) return {}
-  const subjects = summary.value.subjects
+  if (!summary.value || !summarySubjects.value.length) return {}
+  const subjects = summarySubjects.value
   return {
     tooltip: { trigger: 'axis' as const },
     grid: { left: 10, right: 20, top: 10, bottom: 10, containLabel: true },
@@ -236,8 +249,8 @@ const deviationOption = computed(() => {
 })
 
 const rankingOption = computed(() => {
-  if (!summary.value || !summary.value.subjects.length) return {}
-  const subjects = [...summary.value.subjects]
+  if (!summary.value || !summarySubjects.value.length) return {}
+  const subjects = [...summarySubjects.value]
     .sort((a, b) => parseFloat(b.dynamicCost) - parseFloat(a.dynamicCost))
     .slice(0, 8)
   return {
@@ -271,12 +284,12 @@ const rankingOption = computed(() => {
 
 const overBudgetItems = computed(() => {
   if (!summary.value) return []
-  return summary.value.subjects.filter((s) => parseFloat(s.costDeviation) > 0)
+  return summarySubjects.value.filter((s) => parseFloat(s.costDeviation) > 0)
 })
 
 const anomalyItems = computed(() => {
   if (!summary.value) return []
-  return summary.value.subjects
+  return summarySubjects.value
     .filter((s) => {
       const dev = parseFloat(s.costDeviation)
       const target = parseFloat(s.targetCost)
@@ -287,8 +300,8 @@ const anomalyItems = computed(() => {
 
 // ---- Right rail: subject composition distribution ----
 const subjectDistribution = computed(() => {
-  if (!summary.value || !summary.value.subjects.length) return []
-  const subjects = summary.value.subjects.filter((s) => parseFloat(s.dynamicCost) > 0)
+  if (!summary.value || !summarySubjects.value.length) return []
+  const subjects = summarySubjects.value.filter((s) => parseFloat(s.dynamicCost) > 0)
   const total = subjects.reduce((acc, s) => acc + parseFloat(s.dynamicCost), 0) || 1
   const colors = [
     '#3b82f6',
@@ -320,7 +333,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <!-- Page head -->
     <div class="lg-page-head">
       <a-breadcrumb style="font-size: 13px; color: var(--muted); margin-bottom: 5px">
@@ -516,7 +529,7 @@ onMounted(() => {
               科目明细
             </div>
             <vxe-grid
-              :data="summary.subjects"
+              :data="summarySubjects"
               :columns="gridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
@@ -550,22 +563,11 @@ onMounted(() => {
         </template>
 
         <template v-else>
-          <div
-            style="
-              text-align: center;
-              padding: 80px 0;
-              color: #9ca3af;
-              font-size: 14px;
-              background: var(--surface);
-              border: 1px solid var(--border);
-              border-radius: var(--radius-md);
-            "
-          >
-            <LineChartOutlined
-              style="font-size: 48px; margin-bottom: 16px; display: block; color: #d1d5db"
-            />
-            请选择一个项目，查看动态成本汇总分析
-          </div>
+          <section class="lg-panel cost-summary-empty">
+            <LineChartOutlined class="cost-summary-empty-icon" />
+            <div class="cost-summary-empty-title">请选择项目</div>
+            <div class="cost-summary-empty-text">选择项目后查看动态成本、成本偏差和科目排行。</div>
+          </section>
         </template>
       </div>
 
@@ -592,3 +594,33 @@ onMounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.cost-summary-empty {
+  min-height: 430px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  background:
+    linear-gradient(135deg, rgba(24, 144, 255, 0.06), transparent 42%),
+    var(--surface);
+}
+
+.cost-summary-empty-icon {
+  font-size: 46px;
+  color: var(--primary);
+}
+
+.cost-summary-empty-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.cost-summary-empty-text {
+  font-size: 13px;
+}
+</style>

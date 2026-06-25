@@ -8,6 +8,15 @@ import {
   type AlertListParams,
 } from '@/api/modules/alert'
 
+function normalizeArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const records = (value as { records?: unknown }).records
+    if (Array.isArray(records)) return records as T[]
+  }
+  return []
+}
+
 export const useAlertStore = defineStore('alert', () => {
   const alerts = ref<AlertLogVO[]>([])
   const loading = ref(false)
@@ -17,7 +26,7 @@ export const useAlertStore = defineStore('alert', () => {
   async function fetchAlerts(params: AlertListParams) {
     loading.value = true
     try {
-      alerts.value = await getAlertList(params)
+      alerts.value = normalizeArray<AlertLogVO>(await getAlertList(params))
     } catch (err) {
       if (import.meta.env.DEV) {
         console.error('AlertStore: 加载预警列表失败', err)

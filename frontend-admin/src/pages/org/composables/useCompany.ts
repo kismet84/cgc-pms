@@ -36,8 +36,9 @@ export function useCompany(selectedCompanyId: Ref<string | null>) {
         companyName: filter.companyName || undefined,
         status: filter.status,
       })
-      data.value = res.records
-      total.value = res.total
+      const records = Array.isArray(res?.records) ? res.records : Array.isArray(res) ? res : []
+      data.value = records
+      total.value = Number(res?.total ?? records.length)
     } catch (e: unknown) {
       console.error(e)
       data.value = []

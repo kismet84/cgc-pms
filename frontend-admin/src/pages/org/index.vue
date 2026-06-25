@@ -129,7 +129,7 @@ onMounted(async () => {
 
 <template>
   <a-spin :spinning="loading">
-    <div class="lg-page app-page org-page">
+    <div class="lg-list-page lg-page app-page org-page">
       <div class="lg-page-head">
         <div>
           <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">

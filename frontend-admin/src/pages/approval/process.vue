@@ -405,7 +405,7 @@ onMounted(fetchTemplates)
 </script>
 
 <template>
-  <div class="project-target-redesign app-page approval-process-page">
+  <div class="project-target-redesign lg-list-page lg-page app-page approval-process-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb">
         <a-breadcrumb-item>审批管理</a-breadcrumb-item>
@@ -416,81 +416,72 @@ onMounted(fetchTemplates)
       </div>
     </div>
 
-    <div class="pt-filter-surface">
-      <div class="pt-filter-row">
-        <div class="pt-field">
-          <label>业务类型：</label>
-          <a-select
-            v-model:value="filter.businessType"
-            :options="businessTypeOptions"
-            allow-clear
-            placeholder="全部业务"
-            style="width: 180px"
-          />
-        </div>
-        <div class="pt-field">
-          <label>状态：</label>
-          <a-select
-            v-model:value="filter.enabled"
-            :options="enabledOptions"
-            allow-clear
-            placeholder="全部状态"
-            style="width: 140px"
-          />
-        </div>
-        <div class="pt-field">
-          <label>流程模板：</label>
-          <a-input
-            v-model:value="filter.keyword"
-            allow-clear
-            placeholder="名称/编码"
-            style="width: 220px"
-            @press-enter="handleSearch"
-          />
-        </div>
-        <div class="pt-filter-surface-actions">
-          <a-button type="primary" @click="handleSearch">查询</a-button>
-          <a-button @click="handleReset">重置</a-button>
-        </div>
+    <div class="lg-search-bar process-search-bar">
+      <a-select
+        v-model:value="filter.businessType"
+        :options="businessTypeOptions"
+        allow-clear
+        placeholder="全部业务"
+        style="width: 180px"
+      />
+      <a-select
+        v-model:value="filter.enabled"
+        :options="enabledOptions"
+        allow-clear
+        placeholder="全部状态"
+        style="width: 140px"
+      />
+      <a-input
+        v-model:value="filter.keyword"
+        allow-clear
+        placeholder="搜索流程模板名称/编码"
+        style="flex: 1; min-width: 220px"
+        @press-enter="handleSearch"
+      />
+      <div class="lg-search-actions">
+        <a-button type="primary" @click="handleSearch">查询</a-button>
+        <a-button @click="handleReset">重置</a-button>
       </div>
     </div>
 
-    <div class="pt-table-panel">
-      <a-table
-        :columns="templateColumns"
-        :data-source="templates"
-        :loading="loading"
-        row-key="id"
-        size="small"
-        :pagination="{
-          current: pageNo,
-          pageSize,
-          total,
-          showSizeChanger: true,
-          showTotal: (value: number) => `共 ${value} 条`,
-        }"
-        @change="handleTableChange"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'templateName'">
-            <a @click="handleEdit(record)">{{ record.templateName }}</a>
+    <div class="lg-list-table-panel process-table-panel">
+      <div class="lg-table-wrap">
+        <a-table
+          :columns="templateColumns"
+          :data-source="templates"
+          :loading="loading"
+          row-key="id"
+          size="small"
+          :pagination="{
+            current: pageNo,
+            pageSize,
+            total,
+            showSizeChanger: true,
+            showTotal: (value: number) => `共 ${value} 条`,
+          }"
+          @change="handleTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'templateName'">
+              <a @click="handleEdit(record)">{{ record.templateName }}</a>
+            </template>
+            <template v-else-if="column.key === 'businessType'">
+              <a-tag>{{ businessTypeLabel(record.businessType) }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'amountRange'">
+              {{ formatAmountRange(record) }}
+            </template>
+            <template v-else-if="column.key === 'enabled'">
+              <a-tag :color="record.enabled === 1 ? 'success' : 'default'">
+                {{ record.enabled === 1 ? '启用' : '停用' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
+            </template>
           </template>
-          <template v-else-if="column.key === 'businessType'">
-            <a-tag>{{ businessTypeLabel(record.businessType) }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'amountRange'">
-            {{ formatAmountRange(record) }}
-          </template>
-          <template v-else-if="column.key === 'enabled'">
-            <a-tag :color="record.enabled === 1 ? 'success' : 'default'">
-              {{ record.enabled === 1 ? '启用' : '停用' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" size="small" @click="handleEdit(record)">编辑</a-button>
-          </template>
-        </template>
-      </a-table>
+        </a-table>
+      </div>
     </div>
 
     <a-drawer
@@ -657,11 +648,12 @@ onMounted(fetchTemplates)
 }
 
 .process-section {
-  padding: 16px;
+  padding: 20px;
   margin-bottom: 16px;
-  border: 1px solid #edf1f7;
-  border-radius: var(--radius-lg);
-  background: #fff;
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .process-section-head {
@@ -673,17 +665,29 @@ onMounted(fetchTemplates)
 
 .process-section-head h3 {
   margin: 0 0 4px;
-  font-size: 16px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .process-section-head p {
   margin: 0;
   color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .process-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 16px;
+}
+
+.process-table-panel {
+  padding: 16px 0;
+}
+
+.process-search-bar :deep(.ant-select-selector),
+.process-search-bar :deep(.ant-input) {
+  height: 40px;
 }
 </style>

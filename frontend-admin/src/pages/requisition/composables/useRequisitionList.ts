@@ -39,10 +39,10 @@ export function useRequisitionList() {
   })
 
   const gridColumns = computed(() => [
-    { field: 'requisitionCode', title: '领料单号', width: 140, ellipsis: true },
-    { field: 'projectName', title: '项目', width: 120, ellipsis: true },
-    { field: 'contractName', title: '合同', width: 120, ellipsis: true },
-    { field: 'partnerName', title: '供应商', width: 120, ellipsis: true },
+    { field: 'requisitionCode', title: '领料单号', minWidth: 150, ellipsis: true },
+    { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
+    { field: 'contractName', title: '合同', minWidth: 150, ellipsis: true },
+    { field: 'partnerName', title: '供应商', minWidth: 140, ellipsis: true },
     { field: 'requisitionDate', title: '领料日期', width: 100 },
     {
       field: 'totalAmount',

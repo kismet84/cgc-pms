@@ -58,6 +58,10 @@ const createForm = reactive({
   settlementType: undefined as string | undefined,
   remark: '',
 })
+
+function settlementStatusOf(row: Partial<SettlementVO>): SettlementStatus {
+  return (row.settlementStatus || 'DRAFT') as SettlementStatus
+}
 const createFormPartnerName = computed(
   () => contracts.value?.find((c) => c.id === createForm.contractId)?.partyBName ?? '',
 )
@@ -88,8 +92,9 @@ async function fetchData() {
   }
   try {
     const res: PageResult<SettlementVO> = await getSettlementList(params)
-    tableData.value = res.records
-    total.value = res.total
+    const records = Array.isArray(res?.records) ? res.records : Array.isArray(res) ? res : []
+    tableData.value = records
+    total.value = Number(res?.total ?? records.length)
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -102,7 +107,7 @@ async function fetchData() {
 
 async function fetchKpi() {
   try {
-    kpi.value = await getSettlementKpi()
+    kpi.value = { ...kpi.value, ...(await getSettlementKpi()) }
   } catch {
     kpi.value = {
       totalCount: 0,
@@ -211,9 +216,9 @@ function kpiPct(value: number, max: number): number {
 
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
-  { field: 'settlementCode', title: '结算编号', width: 160 },
-  { field: 'projectName', title: '项目', width: 140 },
-  { field: 'contractName', title: '合同', width: 140 },
+  { field: 'settlementCode', title: '结算编号', minWidth: 160, ellipsis: true },
+  { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
+  { field: 'contractName', title: '合同', minWidth: 150, ellipsis: true },
   {
     field: 'settlementAmount',
     title: '结算金额(万)',
@@ -251,7 +256,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 const statusBreakdown = computed(() => {
   const m: Record<string, number> = {}
   tableData.value.forEach((r) => {
-    m[r.settlementStatus] = (m[r.settlementStatus] || 0) + 1
+    const status = settlementStatusOf(r)
+    m[status] = (m[status] || 0) + 1
   })
   const total = Object.values(m).reduce((s, v) => s + v, 0) || 1
   return Object.entries(m).map(([k, v]) => ({
@@ -270,7 +276,7 @@ const colorMap: Record<string, string> = {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <!-- 页面头部 -->
     <div class="lg-page-head">
       <div>
@@ -391,13 +397,12 @@ const colorMap: Record<string, string> = {
             <template #settlementStatus="{ row }">
               <a-tag
                 :color="
-                  SETTLEMENT_STATUS_COLOR[row.settlementStatus as SettlementStatus] || 'default'
+                  SETTLEMENT_STATUS_COLOR[settlementStatusOf(row)] || 'default'
                 "
                 size="small"
               >
                 {{
-                  SETTLEMENT_STATUS_LABEL[row.settlementStatus as SettlementStatus] ??
-                  row.settlementStatus
+                  SETTLEMENT_STATUS_LABEL[settlementStatusOf(row)] ?? settlementStatusOf(row)
                 }}
               </a-tag>
             </template>
@@ -405,7 +410,7 @@ const colorMap: Record<string, string> = {
               <div class="lg-ops">
                 <a class="lg-link" @click="handleView(row)">查看</a>
                 <a
-                  v-if="row.settlementStatus !== 'FINALIZED'"
+                  v-if="settlementStatusOf(row) !== 'FINALIZED'"
                   class="lg-link lg-del"
                   @click="handleDelete(row)"
                   >删除</a

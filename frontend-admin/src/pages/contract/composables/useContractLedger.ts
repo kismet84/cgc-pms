@@ -336,12 +336,13 @@ export function useContractLedger() {
           {
             field: 'contractCode',
             title: '合同编号',
-            width: 150,
+            minWidth: 150,
+            ellipsis: true,
           },
         ]
       : []),
     ...(colVisible.contractName
-      ? [{ field: 'contractName', title: '合同名称', minWidth: 120 }]
+      ? [{ field: 'contractName', title: '合同名称', minWidth: 180, ellipsis: true }]
       : []),
     ...(colVisible.contractType
       ? [
@@ -354,10 +355,10 @@ export function useContractLedger() {
         ]
       : []),
     ...(colVisible.partyAName
-      ? [{ field: 'partyAName', title: '甲方', minWidth: 100, ellipsis: true }]
+      ? [{ field: 'partyAName', title: '甲方', minWidth: 140, ellipsis: true }]
       : []),
     ...(colVisible.partyBName
-      ? [{ field: 'partyBName', title: '乙方', minWidth: 100, ellipsis: true }]
+      ? [{ field: 'partyBName', title: '乙方', minWidth: 140, ellipsis: true }]
       : []),
     ...(colVisible.contractAmount
       ? [

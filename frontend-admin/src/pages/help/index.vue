@@ -48,60 +48,63 @@ const faqItems = [
 </script>
 
 <template>
-  <div class="help-page">
-    <a-breadcrumb class="breadcrumb">
-      <a-breadcrumb-item>首页</a-breadcrumb-item>
-      <a-breadcrumb-item>帮助</a-breadcrumb-item>
-    </a-breadcrumb>
+  <div class="lg-page app-page help-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="lg-page-head-breadcrumb">
+          <a-breadcrumb-item>首页</a-breadcrumb-item>
+          <a-breadcrumb-item>帮助中心</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
+    </div>
 
-    <a-typography-title :level="2">帮助中心</a-typography-title>
+    <div class="lg-page-shell help-shell">
+      <section class="lg-section">
+        <div class="lg-section-head">
+          <h2 class="lg-section-title">快捷键</h2>
+        </div>
+        <div class="lg-section-body lg-table-wrap">
+          <a-table
+            :columns="shortcutColumns"
+            :data-source="shortcuts"
+            :pagination="false"
+            size="small"
+          />
+        </div>
+      </section>
 
-    <!-- Section 1: 快捷键 -->
-    <a-card title="快捷键" class="section-card">
-      <a-table
-        :columns="shortcutColumns"
-        :data-source="shortcuts"
-        :pagination="false"
-        size="small"
-      />
-    </a-card>
+      <section class="lg-section">
+        <div class="lg-section-head">
+          <h2 class="lg-section-title">常见问题</h2>
+        </div>
+        <div class="lg-section-body">
+          <a-collapse ghost>
+            <a-collapse-panel v-for="item in faqItems" :key="item.key" :header="item.header">
+              <p>{{ item.answer }}</p>
+            </a-collapse-panel>
+          </a-collapse>
+        </div>
+      </section>
 
-    <!-- Section 2: 常见问题 -->
-    <a-card title="常见问题" class="section-card">
-      <a-collapse>
-        <a-collapse-panel v-for="item in faqItems" :key="item.key" :header="item.header">
-          <p>{{ item.answer }}</p>
-        </a-collapse-panel>
-      </a-collapse>
-    </a-card>
-
-    <!-- Section 3: 联系我们 -->
-    <a-card title="联系我们" class="section-card">
-      <a-descriptions :column="1" size="small">
-        <a-descriptions-item label="技术支持邮箱">support@cgc-pms.com</a-descriptions-item>
-        <a-descriptions-item label="技术支持电话">400-XXX-XXXX</a-descriptions-item>
-        <a-descriptions-item label="工作时间">周一至周五 9:00 - 18:00</a-descriptions-item>
-        <a-descriptions-item label="系统版本">v1.0.0</a-descriptions-item>
-      </a-descriptions>
-    </a-card>
+      <section class="lg-section">
+        <div class="lg-section-head">
+          <h2 class="lg-section-title">联系我们</h2>
+        </div>
+        <div class="lg-section-body">
+          <a-descriptions :column="1" size="small">
+            <a-descriptions-item label="技术支持邮箱">support@cgc-pms.com</a-descriptions-item>
+            <a-descriptions-item label="技术支持电话">400-XXX-XXXX</a-descriptions-item>
+            <a-descriptions-item label="工作时间">周一至周五 9:00 - 18:00</a-descriptions-item>
+            <a-descriptions-item label="系统版本">v1.0.0</a-descriptions-item>
+          </a-descriptions>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.help-page {
+.help-shell {
   max-width: 900px;
-  margin: 0 auto;
-}
-
-.breadcrumb {
-  margin-bottom: 14px;
-}
-
-.section-card {
-  margin-bottom: 16px;
-}
-
-.section-card :deep(.ant-card-body) {
-  padding: 16px;
 }
 </style>

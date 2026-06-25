@@ -20,6 +20,15 @@ const filter = reactive({
 const permissionModalVisible = ref(false)
 const selectedRole = ref<SysRoleVO | null>(null)
 
+function normalizeArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const records = (value as { records?: unknown }).records
+    if (Array.isArray(records)) return records as T[]
+  }
+  return []
+}
+
 const gridColumns = computed(() => [
   { field: 'roleName', title: '角色名称', width: 150 },
   { field: 'roleCode', title: '角色编码', width: 150 },
@@ -30,7 +39,7 @@ const gridColumns = computed(() => [
 ])
 
 const filteredRoles = computed(() => {
-  return allRoles.value.filter((r) => {
+  return normalizeArray<SysRoleVO>(allRoles.value).filter((r) => {
     if (filter.roleName && !r.roleName.includes(filter.roleName)) return false
     if (filter.roleCode && !r.roleCode.includes(filter.roleCode)) return false
     return true
@@ -43,11 +52,24 @@ const tableData = computed(() => {
   const start = (pageNo.value - 1) * pageSize.value
   return filteredRoles.value.slice(start, start + pageSize.value)
 })
+const roleStatusSummary = computed(() => [
+  {
+    label: '启用角色',
+    count: filteredRoles.value.filter((r) => r.status === 'ENABLE').length,
+    color: '#52c41a',
+  },
+  {
+    label: '禁用角色',
+    count: filteredRoles.value.filter((r) => r.status !== 'ENABLE').length,
+    color: '#ff4d4f',
+  },
+])
+const recentRoles = computed(() => tableData.value.slice(0, 4))
 
 async function fetchData() {
   loading.value = true
   try {
-    allRoles.value = await getRoles()
+    allRoles.value = normalizeArray<SysRoleVO>(await getRoles())
   } catch (e: unknown) {
     console.error(e)
     const msg = axios.isAxiosError(e)
@@ -90,7 +112,7 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
@@ -117,53 +139,80 @@ onMounted(fetchData)
       </a-button>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" ghost @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
-      </div>
-    </div>
-
-    <!-- 表格 -->
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="gridColumns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #status="{ row }">
-          <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
-            {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
-          </a-tag>
-        </template>
-        <template #action="{ row }">
-          <div class="lg-ops">
-            <a class="lg-link" @click="handleEditPermission(row)">编辑权限</a>
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" ghost @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+        </div>
 
-    <!-- 分页 -->
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50']"
-        show-size-changer
-        show-quick-jumper
-        size="small"
-        @change="handlePageChange"
-      />
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #status="{ row }">
+              <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
+                {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+              </a-tag>
+            </template>
+            <template #action="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEditPermission(row)">编辑权限</a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50']"
+            show-size-changer
+            show-quick-jumper
+            size="small"
+            @change="handlePageChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <div class="lg-panel">
+          <div class="lg-panel-title">角色状态</div>
+          <div class="lg-type-list">
+            <div v-for="item in roleStatusSummary" :key="item.label" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <strong>{{ item.count }}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="lg-panel">
+          <div class="lg-panel-title">近期角色</div>
+          <div class="lg-rail-list">
+            <div v-for="item in recentRoles" :key="item.id" class="lg-rail-item">
+              <span class="lg-type-dot"></span>
+              <span>{{ item.roleName }}</span>
+            </div>
+            <div v-if="!recentRoles.length" class="lg-empty-text">暂无角色</div>
+          </div>
+        </div>
+      </aside>
     </div>
 
     <!-- Permission Modal -->

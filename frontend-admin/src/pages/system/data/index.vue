@@ -30,21 +30,39 @@ function handleClearDatabase() {
 </script>
 
 <template>
-  <div class="project-target-redesign app-page">
-    <div class="pt-page-head">
-      <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>系统设置</a-breadcrumb-item
-        ><a-breadcrumb-item>数据管理</a-breadcrumb-item></a-breadcrumb
-      >
+  <div class="lg-page app-page system-data-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="lg-page-head-breadcrumb">
+          <a-breadcrumb-item>系统设置</a-breadcrumb-item>
+          <a-breadcrumb-item>数据管理</a-breadcrumb-item>
+        </a-breadcrumb>
+      </div>
     </div>
 
-    <a-card :bordered="false">
-      <a-button type="primary" danger :loading="clearing" @click="handleClearDatabase">
-        清空数据库
-      </a-button>
-      <span style="margin-left: 12px; color: #8c8c8c; font-size: 13px">
-        清空所有业务数据，保留系统用户和菜单
-      </span>
-    </a-card>
+    <section class="lg-section system-data-card">
+      <div class="lg-section-head">
+        <div>
+          <h2 class="lg-section-title">数据库维护</h2>
+          <div class="lg-section-subtitle">清空所有业务数据，保留系统用户和菜单。</div>
+        </div>
+      </div>
+      <div class="lg-section-body system-data-actions">
+        <a-button type="primary" danger :loading="clearing" @click="handleClearDatabase">
+          清空数据库
+        </a-button>
+      </div>
+    </section>
   </div>
 </template>
+
+<style scoped>
+.system-data-card {
+  max-width: 900px;
+}
+
+.system-data-actions {
+  display: flex;
+  align-items: center;
+}
+</style>

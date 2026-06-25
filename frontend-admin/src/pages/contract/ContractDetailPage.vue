@@ -137,9 +137,13 @@ onMounted(() => {
 })
 
 const contract = computed(() => contractStore.currentContract)
-const items = computed(() => contractStore.items)
-const paymentTerms = computed(() => contractStore.paymentTerms)
-const approvalRecords = computed(() => contractStore.approvalRecords)
+const items = computed(() => (Array.isArray(contractStore.items) ? contractStore.items : []))
+const paymentTerms = computed(() =>
+  Array.isArray(contractStore.paymentTerms) ? contractStore.paymentTerms : [],
+)
+const approvalRecords = computed(() =>
+  Array.isArray(contractStore.approvalRecords) ? contractStore.approvalRecords : [],
+)
 const loading = computed(() => contractStore.loading)
 const itemsLoading = computed(() => contractStore.itemsLoading)
 const termsLoading = computed(() => contractStore.termsLoading)
@@ -156,7 +160,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="contract-detail-page" :class="{ 'is-mobile': isMobile }">
+  <div class="contract-detail-page lg-page app-page" :class="{ 'is-mobile': isMobile }">
     <a-page-header title="合同详情" @back="goBack" :class="{ 'cd-header-mobile': isMobile }">
       <template #tags>
         <ContractStatusTag v-if="contract" :status="contract.contractStatus" />
@@ -176,9 +180,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
     </a-page-header>
 
     <a-spin :spinning="loading">
-      <div v-if="contract" class="contract-detail-content">
+      <div v-if="contract" class="contract-detail-content lg-page-shell">
         <!-- Basic Info: desktop -->
-        <a-card v-if="!isMobile" title="基本信息" :bordered="false" class="info-card">
+        <a-card v-if="!isMobile" title="基本信息" :bordered="false" class="info-card lg-section">
           <a-descriptions :column="3" size="small" bordered>
             <a-descriptions-item label="合同名称" :span="3">{{
               contract.contractName
@@ -324,7 +328,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         </div>
 
         <!-- Tabs -->
-        <a-card :bordered="false" class="tabs-card">
+        <a-card :bordered="false" class="tabs-card lg-section">
           <a-tabs v-model:activeKey="activeTab">
             <!-- Items Tab -->
             <a-tab-pane key="items" tab="合同清单">
@@ -338,6 +342,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                   size="small"
                   bordered
                   row-key="id"
+                  class="lg-table-wrap"
                 >
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'quantity'">
@@ -424,6 +429,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                   size="small"
                   bordered
                   row-key="id"
+                  class="lg-table-wrap"
                 >
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'paymentRatio'">
@@ -526,22 +532,22 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </template>
 
 <style scoped>
-.contract-detail-page {
-  padding: 0;
-  background: #f0f2f5;
-  min-height: 100vh;
-}
-
 .contract-detail-content {
-  padding: 16px;
+  padding: 0;
 }
 
-.info-card {
+.contract-detail-page :deep(.ant-page-header) {
   margin-bottom: 16px;
+  padding: 18px 24px;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
-.tabs-card {
-  margin-bottom: 16px;
+.contract-detail-page :deep(.ant-page-header-heading-title) {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 600;
 }
 
 /* ---- Mobile: basic info vertical card ---- */
@@ -599,9 +605,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 /* ---- Mobile: content padding ---- */
-.contract-detail-page.is-mobile .contract-detail-content {
-  padding: 10px;
-}
 .contract-detail-page.is-mobile .info-card,
 .contract-detail-page.is-mobile .tabs-card {
   margin-bottom: 10px;

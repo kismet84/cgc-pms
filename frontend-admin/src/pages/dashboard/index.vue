@@ -32,10 +32,10 @@ const {
 </script>
 
 <template>
-  <div class="dashboard app-page">
-    <div class="dashboard-header">
+  <div class="dashboard lg-list-page lg-page app-page">
+    <div class="dashboard-header lg-page-head">
       <div>
-        <a-breadcrumb class="breadcrumb">
+        <a-breadcrumb class="lg-page-head-breadcrumb">
           <a-breadcrumb-item>首页</a-breadcrumb-item>
           <a-breadcrumb-item>驾驶舱</a-breadcrumb-item>
         </a-breadcrumb>
@@ -50,9 +50,11 @@ const {
       </div>
     </div>
 
-    <a-tabs v-model:activeKey="activeRole" class="role-tabs" size="small">
-      <a-tab-pane v-for="role in availableRoles" :key="role" :tab="roleLabel[role]" />
-    </a-tabs>
+    <div class="lg-card role-tabs-card">
+      <a-tabs v-model:activeKey="activeRole" class="role-tabs" size="small">
+        <a-tab-pane v-for="role in availableRoles" :key="role" :tab="roleLabel[role]" />
+      </a-tabs>
+    </div>
 
     <template v-if="activeRole === 'pm' && pmData">
       <DashboardPmView :data="pmData" :loading="loading" />
@@ -129,15 +131,7 @@ const {
 }
 
 .dashboard-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-.breadcrumb {
-  margin-bottom: 6px;
+  margin-bottom: 16px;
 }
 
 .project-field {
@@ -153,7 +147,12 @@ const {
 }
 
 .role-tabs {
-  margin: 14px 0;
+  margin: 0;
+}
+
+.role-tabs-card {
+  padding: 0 20px;
+  margin-bottom: 16px;
 }
 
 .role-tabs :deep(.ant-tabs-nav) {
@@ -169,15 +168,15 @@ const {
 .role-metric-strip {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .kpi-card {
-  min-height: 88px;
-  padding: 14px;
+  min-height: 98px;
+  padding: 20px;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
   display: flex;
@@ -240,15 +239,15 @@ const {
 .role-panel {
   min-width: 0;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
 .panel-header {
-  min-height: 44px;
-  padding: 12px 16px;
+  min-height: 56px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text);
   display: flex;
@@ -268,15 +267,15 @@ const {
 .role-analysis-grid {
   display: grid;
   grid-template-columns: minmax(320px, 1.2fr) minmax(260px, 0.9fr) minmax(320px, 1fr);
-  gap: 14px;
-  margin-bottom: 14px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 .pm-bottom-grid,
 .role-table-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .pm-chart,
@@ -334,8 +333,9 @@ const {
   text-align: center;
   color: #9ca3af;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .drill-summary {
@@ -343,8 +343,8 @@ const {
   flex-wrap: wrap;
   gap: 16px 20px;
   padding: 16px;
-  background: #f9fafb;
-  border-radius: 8px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-md);
   font-size: 13px;
 }
 

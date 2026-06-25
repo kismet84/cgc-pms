@@ -78,7 +78,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 // ---- vxe-grid columns ----
 const gridColumns = computed(() => [
-  { field: 'taskCode', title: '任务编号', width: 130, ellipsis: true },
+  { field: 'taskCode', title: '任务编号', minWidth: 140, ellipsis: true },
   {
     field: 'taskName',
     title: '任务名称',
@@ -86,10 +86,10 @@ const gridColumns = computed(() => [
     slots: { default: 'taskName' },
     ellipsis: true,
   },
-  { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
-  { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
-  { field: 'partnerName', title: '分包商', width: 120, ellipsis: true },
-  { field: 'workArea', title: '施工区域', width: 100, ellipsis: true },
+  { field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true },
+  { field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true },
+  { field: 'partnerName', title: '分包商', minWidth: 140, ellipsis: true },
+  { field: 'workArea', title: '施工区域', minWidth: 120, ellipsis: true },
   { field: 'progressPercent', title: '进度', width: 90, slots: { default: 'progressPercent' } },
   { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
   { field: 'plannedStartDate', title: '计划开始', width: 100 },
@@ -245,6 +245,13 @@ const kpiInProgress = computed(
 const kpiCompleted = computed(() => tableData.value.filter((r) => r.status === 'COMPLETED').length)
 const kpiPending = computed(() => tableData.value.filter((r) => r.status === 'NOT_STARTED').length)
 const kpiSuspended = computed(() => tableData.value.filter((r) => r.status === 'SUSPENDED').length)
+const taskStatusSummary = computed(() => [
+  { label: '进行中', count: kpiInProgress.value, color: '#1890ff' },
+  { label: '已完成', count: kpiCompleted.value, color: '#52c41a' },
+  { label: '待开始', count: kpiPending.value, color: '#faad14' },
+  { label: '已暂停', count: kpiSuspended.value, color: '#ff4d4f' },
+])
+const recentTasks = computed(() => tableData.value.slice(0, 4))
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -255,7 +262,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
         <a-breadcrumb-item>分包管理</a-breadcrumb-item>
@@ -315,85 +322,112 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleAdd">
-          <template #icon><PlusOutlined /></template>
-          新建任务
-        </a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
-      </div>
-      <div class="lg-toolbar-right">
-        <a-select
-          v-model:value="filter.projectId"
-          placeholder="全部项目"
-          allow-clear
-          style="width: 160px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-      </div>
-    </div>
-
-    <!-- 表格 -->
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="gridColumns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #taskName="{ row }">
-          <a class="lg-link">{{ row.taskName }}</a>
-        </template>
-        <template #progressPercent="{ row }">
-          <a-progress
-            v-if="row.progressPercent"
-            :percent="parseFloat(row.progressPercent)"
-            :stroke-width="8"
-            size="small"
-            :show-info="true"
-          />
-          <span v-else style="color: var(--muted)">-</span>
-        </template>
-        <template #status="{ row }">
-          <a-tag :color="STATUS_COLOR[row.status]">
-            {{ STATUS_LABEL[row.status] ?? row.status }}
-          </a-tag>
-        </template>
-        <template #action="{ row }">
-          <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新建任务
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+          <div class="lg-toolbar-right">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              style="width: 160px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+          </div>
+        </div>
 
-    <!-- 分页 -->
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #taskName="{ row }">
+              <a class="lg-link">{{ row.taskName }}</a>
+            </template>
+            <template #progressPercent="{ row }">
+              <a-progress
+                v-if="row.progressPercent"
+                :percent="parseFloat(row.progressPercent)"
+                :stroke-width="8"
+                size="small"
+                :show-info="true"
+              />
+              <span v-else style="color: var(--muted)">-</span>
+            </template>
+            <template #status="{ row }">
+              <a-tag :color="STATUS_COLOR[row.status]">
+                {{ STATUS_LABEL[row.status] ?? row.status }}
+              </a-tag>
+            </template>
+            <template #action="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <div class="lg-panel">
+          <div class="lg-panel-title">任务状态分布</div>
+          <div class="lg-type-list">
+            <div v-for="item in taskStatusSummary" :key="item.label" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <strong>{{ item.count }}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="lg-panel">
+          <div class="lg-panel-title">近期任务</div>
+          <div class="lg-rail-list">
+            <div v-for="item in recentTasks" :key="item.id" class="lg-rail-item">
+              <span class="lg-type-dot"></span>
+              <span>{{ item.taskName || item.taskCode }}</span>
+            </div>
+            <div v-if="!recentTasks.length" class="lg-empty-text">暂无任务</div>
+          </div>
+        </div>
+      </aside>
     </div>
 
     <!-- Add/Edit Modal -->

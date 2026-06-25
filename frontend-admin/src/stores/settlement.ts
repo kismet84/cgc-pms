@@ -53,6 +53,17 @@ export const useSettlementStore = defineStore('settlement', () => {
     }
   }
 
+  async function fetchDetail(id: string) {
+    await fetchSettlement(id)
+    await Promise.allSettled([
+      fetchVariations(id),
+      fetchPayments(id),
+      fetchCosts(id),
+      fetchAttachments(id),
+      fetchApprovalRecords(id),
+    ])
+  }
+
   async function createSettlement(data: Partial<SettlementVO>) {
     saving.value = true
     try {
@@ -182,6 +193,7 @@ export const useSettlementStore = defineStore('settlement', () => {
 
   return {
     currentSettlement,
+    detail: currentSettlement,
     items,
     variations,
     payments,
@@ -197,6 +209,7 @@ export const useSettlementStore = defineStore('settlement', () => {
     attachmentsLoading,
     recordsLoading,
     fetchSettlement,
+    fetchDetail,
     createSettlement,
     updateSettlement,
     fetchItems,

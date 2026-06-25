@@ -112,6 +112,8 @@ interface EditableItem {
   sortOrder: number
 }
 
+const items = ref<EditableItem[]>([])
+
 // ---- Dirty tracking ----
 watch(
   () => [
@@ -139,8 +141,6 @@ function genKey(): string {
   return `cti_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-const items = ref<EditableItem[]>([])
-
 function addRow() {
   items.value.push({
     _key: genKey(),
@@ -165,18 +165,27 @@ interface TreeNode {
   children?: TreeNode[]
 }
 
+function normalizeTreeNodes(data: unknown): TreeNode[] {
+  if (Array.isArray(data)) return data as TreeNode[]
+  if (data && typeof data === 'object') {
+    const records = (data as { records?: unknown }).records
+    if (Array.isArray(records)) return records as TreeNode[]
+  }
+  return []
+}
+
 function convertToTreeData(nodes: TreeNode[]): TreeSelectProps['treeData'] {
   return nodes.map((node) => ({
     value: node.id,
     title: `${node.subjectCode} ${node.subjectName}`,
-    children: node.children ? convertToTreeData(node.children) : undefined,
+    children: convertToTreeData(normalizeTreeNodes(node.children)),
   }))
 }
 
 async function fetchSubjectTree() {
   try {
     const data = await getCostSubjectTree()
-    subjectTree.value = convertToTreeData(data)
+    subjectTree.value = convertToTreeData(normalizeTreeNodes(data))
   } catch (e: unknown) {
     console.error(e)
     subjectTree.value = []
@@ -227,7 +236,8 @@ async function loadExisting() {
     // Load items
     try {
       const existingItems = await getCostTargetItems(editId.value)
-      items.value = existingItems.map((it, idx) => ({
+      const itemList = Array.isArray(existingItems) ? existingItems : []
+      items.value = itemList.map((it, idx) => ({
         _key: genKey(),
         costSubjectId: String(it.costSubjectId),
         costSubjectName: it.costSubjectName || '',

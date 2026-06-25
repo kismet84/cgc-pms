@@ -407,14 +407,15 @@ const recentProjects = computed(() =>
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
   ...(colVisible.projectCode
-    ? [{ field: 'projectCode', title: '项目编号', minWidth: 150, showOverflow: 'tooltip' }]
+    ? [{ field: 'projectCode', title: '项目编号', width: 148, showOverflow: 'tooltip' }]
     : []),
   ...(colVisible.projectName
     ? [
         {
           field: 'projectName',
           title: '项目名称',
-          minWidth: 140,
+          minWidth: 88,
+          width: 96,
           showOverflow: 'tooltip',
           slots: { default: 'projectName' },
         },
@@ -425,7 +426,7 @@ const gridColumns = computed(() => [
         {
           field: 'projectType',
           title: '项目类型',
-          minWidth: 116,
+          width: 98,
           showOverflow: 'tooltip',
           slots: { default: 'projectType' },
         },
@@ -436,7 +437,7 @@ const gridColumns = computed(() => [
         {
           field: 'contractAmount',
           title: '合同金额',
-          minWidth: 128,
+          width: 112,
           align: 'right' as const,
           showOverflow: 'tooltip',
           slots: { default: 'contractAmount' },
@@ -448,7 +449,7 @@ const gridColumns = computed(() => [
         {
           field: 'plannedStartDate',
           title: '计划工期',
-          minWidth: 110,
+          width: 76,
           showOverflow: 'tooltip',
           slots: { default: 'plannedDuration' },
         },
@@ -459,7 +460,7 @@ const gridColumns = computed(() => [
         {
           field: 'status',
           title: '状态',
-          minWidth: 76,
+          width: 74,
           showOverflow: 'tooltip',
           slots: { default: 'status' },
         },
@@ -470,18 +471,18 @@ const gridColumns = computed(() => [
         {
           field: 'approvalStatus',
           title: '审批状态',
-          minWidth: 92,
+          width: 86,
           showOverflow: 'tooltip',
           slots: { default: 'approvalStatus' },
         },
       ]
     : []),
-  ...(colVisible.ops ? [{ title: '操作', minWidth: 118, slots: { default: 'ops' } }] : []),
+  ...(colVisible.ops ? [{ title: '操作', width: 138, slots: { default: 'ops' } }] : []),
 ])
 </script>
 
 <template>
-  <div class="project-list-page app-page">
+  <div class="project-list-page lg-list-page lg-page app-page">
     <a-breadcrumb class="project-breadcrumb">
       <a-breadcrumb-item>项目管理</a-breadcrumb-item>
       <a-breadcrumb-item>项目列表</a-breadcrumb-item>
@@ -991,7 +992,7 @@ const gridColumns = computed(() => [
 
 .project-list-page .lg-table-wrap :deep(.vxe-header--column) {
   height: 43px;
-  padding: 0 20px;
+  padding: 0 14px;
   background: #fafafa;
   color: var(--project-text-secondary);
   font-size: 14px;
@@ -1000,14 +1001,14 @@ const gridColumns = computed(() => [
 
 .project-list-page .lg-table-wrap :deep(.vxe-body--column) {
   height: 54px;
-  padding: 0 20px;
+  padding: 0 14px;
   color: var(--project-text);
   font-size: 14px;
 }
 
 .project-list-page .lg-table-wrap :deep(.vxe-cell) {
-  padding-left: 20px;
-  padding-right: 20px;
+  padding-left: 14px;
+  padding-right: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1042,7 +1043,13 @@ const gridColumns = computed(() => [
 
 .project-list-page .lg-ops {
   justify-content: flex-start;
-  gap: 12px;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.project-list-page .lg-ops :deep(.lg-link) {
+  flex: 0 0 auto;
+  max-width: none;
 }
 
 .project-list-page .lg-pagination {

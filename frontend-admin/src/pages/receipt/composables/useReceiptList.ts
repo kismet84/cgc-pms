@@ -58,10 +58,10 @@ export function useReceiptList() {
   })
 
   const gridColumns = computed(() => [
-    { field: 'receiptCode', title: '验收单号', width: 140, ellipsis: true },
-    { field: 'orderCode', title: '采购订单', width: 130, ellipsis: true },
-    { field: 'projectName', title: '项目', width: 120, ellipsis: true },
-    { field: 'partnerName', title: '供应商', width: 120, ellipsis: true },
+    { field: 'receiptCode', title: '验收单号', minWidth: 150, ellipsis: true },
+    { field: 'orderCode', title: '采购订单', minWidth: 140, ellipsis: true },
+    { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
+    { field: 'partnerName', title: '供应商', minWidth: 140, ellipsis: true },
     { field: 'receiptDate', title: '验收日期', width: 100 },
     {
       field: 'totalAmount',

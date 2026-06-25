@@ -43,7 +43,8 @@ async function fetchTypeList() {
       pageSize: 50,
       dictName: typeFilter.value || undefined,
     })
-    typeList.value = res.records
+    const records = Array.isArray(res?.records) ? res.records : Array.isArray(res) ? res : []
+    typeList.value = records
     // 如果当前没有选中项，默认选中第一个
     if (typeList.value.length > 0 && !selectedTypeId.value) {
       selectedTypeId.value = typeList.value[0].id
@@ -208,8 +209,9 @@ async function fetchDataList() {
       dictLabel: dataFilter.dictLabel || undefined,
       status: dataFilter.status,
     })
-    dataTableData.value = res.records
-    dataTotal.value = res.total
+    const records = Array.isArray(res?.records) ? res.records : Array.isArray(res) ? res : []
+    dataTableData.value = records
+    dataTotal.value = Number(res?.total ?? records.length)
   } catch (e: unknown) {
     console.error(e)
     dataTableData.value = []
@@ -346,7 +348,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page dict-page">
     <div class="lg-page-head">
       <a-breadcrumb class="lg-breadcrumb"
         ><a-breadcrumb-item>系统设置</a-breadcrumb-item
@@ -565,7 +567,7 @@ onMounted(() => {
   min-height: 500px;
   overflow: hidden;
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
 }
@@ -576,7 +578,7 @@ onMounted(() => {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .dc-left-header {
@@ -678,6 +680,7 @@ onMounted(() => {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  background: var(--surface);
 }
 
 .dc-right-header {

@@ -64,18 +64,30 @@ const formData = reactive<Partial<CostSubjectVO>>({
 })
 
 const subjectTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([])
+const fallbackSubjectTypeOptions = [
+  { dictLabel: '材料费', dictValue: 'MATERIAL' },
+  { dictLabel: '人工费', dictValue: 'LABOR' },
+  { dictLabel: '机械费', dictValue: 'MACHINERY' },
+  { dictLabel: '分包费', dictValue: 'SUBCONTRACT' },
+  { dictLabel: '其他费用', dictValue: 'OTHER' },
+]
+function normalizeArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const records = (value as { records?: unknown }).records
+    if (Array.isArray(records)) return records as T[]
+  }
+  return []
+}
 async function fetchSubjectTypes() {
   try {
-    subjectTypeOptions.value = await getDictDataByCode('cost_subject_type')
+    const options = normalizeArray<{ dictLabel: string; dictValue: string }>(
+      await getDictDataByCode('cost_subject_type'),
+    )
+    subjectTypeOptions.value = options.length ? options : fallbackSubjectTypeOptions
   } catch (e: unknown) {
     console.error(e)
-    subjectTypeOptions.value = [
-      { dictLabel: '材料费', dictValue: 'MATERIAL' },
-      { dictLabel: '人工费', dictValue: 'LABOR' },
-      { dictLabel: '机械费', dictValue: 'MACHINERY' },
-      { dictLabel: '分包费', dictValue: 'SUBCONTRACT' },
-      { dictLabel: '其他费用', dictValue: 'OTHER' },
-    ]
+    subjectTypeOptions.value = fallbackSubjectTypeOptions
   }
 }
 
@@ -85,7 +97,7 @@ async function fetchTree() {
   treeLoading.value = true
   try {
     // 不传 category，一次性加载全部科目
-    treeData.value = await getCostSubjectTree()
+    treeData.value = normalizeArray<CostSubjectTreeNode>(await getCostSubjectTree())
   } catch (e: unknown) {
     console.error(e)
     message.error('加载科目树失败')
@@ -239,7 +251,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page cost-subject-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="cl-breadcrumb">
@@ -252,15 +264,6 @@ onMounted(() => {
         <a-button @click="handleAddChild" :disabled="!selectedNode">新增子节点</a-button>
       </div>
     </div>
-
-    <!-- Category Tabs -->
-    <a-tabs
-      v-model:activeKey="activeCategory"
-      @change="handleCategoryChange"
-      class="cs-category-tabs"
-    >
-      <a-tab-pane v-for="tab in categoryTabs" :key="tab.key" :tab="tab.tab" />
-    </a-tabs>
 
     <div class="cs-layout">
       <!-- Left: Tree -->
@@ -410,41 +413,40 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.cs-category-tabs {
-  margin-bottom: 0;
-}
-
 .cs-layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
   gap: 16px;
   min-height: 500px;
 }
 
 .cs-tree-panel {
-  width: 320px;
-  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .cs-tree-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px 8px;
-  border-bottom: 1px solid var(--border);
+  min-height: 56px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .cs-tree-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text);
 }
 
 .cs-tree-body {
   flex: 1;
-  padding: 8px 12px;
+  padding: 16px 20px;
   overflow: auto;
 }
 
@@ -466,8 +468,10 @@ onMounted(() => {
 }
 
 .cs-detail-panel {
-  flex: 1;
-  padding: 16px;
+  padding: 20px;
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 
 .cs-detail-header {
@@ -475,13 +479,13 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .cs-detail-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text);
 }
 
@@ -490,5 +494,13 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   min-height: 400px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.06), transparent 46%), #fff;
+}
+
+@media (max-width: 980px) {
+  .cs-layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

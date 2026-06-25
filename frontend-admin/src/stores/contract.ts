@@ -17,6 +17,15 @@ import {
   getContractApprovalRecords,
 } from '@/api/modules/contract'
 
+function normalizeArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const records = (value as { records?: unknown }).records
+    if (Array.isArray(records)) return records as T[]
+  }
+  return []
+}
+
 export const useContractStore = defineStore('contract', () => {
   const currentContract = ref<ContractVO | null>(null)
   const items = ref<ContractItem[]>([])
@@ -73,7 +82,7 @@ export const useContractStore = defineStore('contract', () => {
   async function fetchItems(contractId: string) {
     itemsLoading.value = true
     try {
-      items.value = await getContractItems(contractId)
+      items.value = normalizeArray<ContractItem>(await getContractItems(contractId))
     } catch (e) {
       if (import.meta.env.DEV) {
         console.error('Contract store error:', e)
@@ -102,7 +111,7 @@ export const useContractStore = defineStore('contract', () => {
   async function fetchPaymentTerms(contractId: string) {
     termsLoading.value = true
     try {
-      paymentTerms.value = await getContractPaymentTerms(contractId)
+      paymentTerms.value = normalizeArray<ContractPaymentTerm>(await getContractPaymentTerms(contractId))
     } catch (e) {
       if (import.meta.env.DEV) {
         console.error('Contract store error:', e)
@@ -131,7 +140,9 @@ export const useContractStore = defineStore('contract', () => {
   async function fetchApprovalRecords(contractId: string) {
     recordsLoading.value = true
     try {
-      approvalRecords.value = await getContractApprovalRecords(contractId)
+      approvalRecords.value = normalizeArray<ContractApprovalRecord>(
+        await getContractApprovalRecords(contractId),
+      )
     } catch (e) {
       if (import.meta.env.DEV) {
         console.error('Contract store error:', e)

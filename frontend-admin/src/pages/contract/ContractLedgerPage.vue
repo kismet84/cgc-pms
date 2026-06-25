@@ -62,7 +62,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="cl-breadcrumb">
@@ -109,9 +109,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <template #icon><PlusOutlined /></template>
               新建合同
             </a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
             <a-dropdown v-if="!isMobile">
               <a-button>
                 <template #icon><SettingOutlined /></template>
@@ -139,6 +136,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 </a-menu>
               </template>
             </a-dropdown>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
           <div class="lg-toolbar-right">
             <a-select

@@ -44,8 +44,22 @@ const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([
   { dictLabel: '乙方', dictValue: 'PARTY_B' },
   { dictLabel: '其他', dictValue: 'OTHER' },
 ])
+const fallbackPartnerTypeOptions = [
+  { dictLabel: '甲方', dictValue: 'PARTY_A' },
+  { dictLabel: '乙方', dictValue: 'PARTY_B' },
+  { dictLabel: '其他', dictValue: 'OTHER' },
+]
+function normalizeArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const records = (value as { records?: unknown }).records
+    if (Array.isArray(records)) return records as T[]
+  }
+  return []
+}
 const partnerTypeLabel = (val: string) => {
-  const fromDict = partnerTypeOptions.value.find((o) => o.dictValue === val)
+  const options = Array.isArray(partnerTypeOptions.value) ? partnerTypeOptions.value : []
+  const fromDict = options.find((o) => o.dictValue === val)
   if (fromDict) return fromDict.dictLabel
   const fallback: Record<string, string> = { PARTY_A: '甲方', PARTY_B: '乙方', OTHER: '其他' }
   return fallback[val] ?? val
@@ -57,14 +71,13 @@ const partnerTypeColor = (val: string): string => {
 
 async function fetchPartnerTypes() {
   try {
-    partnerTypeOptions.value = await getDictDataByCode('partner_type')
+    const options = normalizeArray<{ dictLabel: string; dictValue: string }>(
+      await getDictDataByCode('partner_type'),
+    )
+    partnerTypeOptions.value = options.length ? options : fallbackPartnerTypeOptions
   } catch (e: unknown) {
     console.error(e)
-    partnerTypeOptions.value = [
-      { dictLabel: '甲方', dictValue: 'PARTY_A' },
-      { dictLabel: '乙方', dictValue: 'PARTY_B' },
-      { dictLabel: '其他', dictValue: 'OTHER' },
-    ]
+    partnerTypeOptions.value = fallbackPartnerTypeOptions
   }
 }
 
@@ -80,17 +93,35 @@ const RISK_LABEL: Record<string, string> = {
 }
 
 const gridColumns = computed(() => [
-  { field: 'partnerCode', title: '合作方编号', width: 130, ellipsis: true },
-  { field: 'partnerName', title: '合作方名称', minWidth: 140, ellipsis: true },
+  { field: 'partnerCode', title: '合作方编号', minWidth: 140, ellipsis: true },
+  { field: 'partnerName', title: '合作方名称', minWidth: 180, ellipsis: true },
   { field: 'partnerType', title: '类型', width: 80, slots: { default: 'partnerType' } },
-  { field: 'contactName', title: '联系人', width: 90 },
-  { field: 'contactPhone', title: '联系电话', width: 120 },
-  { field: 'qualificationLevel', title: '资质等级', width: 90 },
+  { field: 'contactName', title: '联系人', minWidth: 90 },
+  { field: 'contactPhone', title: '联系电话', minWidth: 120 },
+  { field: 'qualificationLevel', title: '资质等级', minWidth: 100, ellipsis: true },
   { field: 'blacklistFlag', title: '黑名单', width: 80, slots: { default: 'blacklistFlag' } },
   { field: 'riskLevel', title: '风险等级', width: 90, slots: { default: 'riskLevel' } },
   { field: 'status', title: '状态', width: 80, slots: { default: 'status' } },
   { title: '操作', width: 110, slots: { default: 'ops' } },
 ])
+
+const partnerStats = computed(() => ({
+  total: total.value,
+  partyA: tableData.value.filter((item) => item.partnerType === 'PARTY_A').length,
+  partyB: tableData.value.filter((item) => item.partnerType === 'PARTY_B').length,
+  risk: tableData.value.filter((item) => item.riskLevel === 'HIGH' || item.blacklistFlag).length,
+}))
+
+const partnerTypeSummary = computed(() =>
+  ['PARTY_A', 'PARTY_B', 'OTHER'].map((type) => ({
+    key: type,
+    label: partnerTypeLabel(type),
+    count: tableData.value.filter((item) => item.partnerType === type).length,
+    color: type === 'PARTY_A' ? '#1890ff' : type === 'PARTY_B' ? '#52c41a' : '#8c8c8c',
+  })),
+)
+
+const recentPartners = computed(() => tableData.value.slice(0, 4))
 
 async function fetchData() {
   loading.value = true
@@ -103,7 +134,7 @@ async function fetchData() {
       partnerType: filter.partnerType,
       status: filter.status,
     })
-    tableData.value = res.records
+    tableData.value = normalizeArray<PartnerVO>(res.records)
     tableData.value.sort((a, b) =>
       a.partnerType === 'PARTY_A' ? -1 : b.partnerType === 'PARTY_A' ? 1 : 0,
     )
@@ -244,7 +275,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
@@ -271,73 +302,118 @@ onMounted(() => {
       </a-button>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleAdd">
-          <template #icon><PlusOutlined /></template>
-          新建合作方
-        </a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">合作方总数</span>
+        <span class="lg-kpi-card-value">{{ partnerStats.total }} <small>个</small></span>
       </div>
-      <div class="lg-toolbar-right" />
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">甲方单位</span>
+        <span class="lg-kpi-card-value">{{ partnerStats.partyA }} <small>个</small></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">乙方单位</span>
+        <span class="lg-kpi-card-value">{{ partnerStats.partyB }} <small>个</small></span>
+      </div>
+      <div class="lg-kpi-card is-warn">
+        <span class="lg-kpi-card-label">风险合作方</span>
+        <span class="lg-kpi-card-value">{{ partnerStats.risk }} <small>个</small></span>
+      </div>
     </div>
 
-    <!-- 表格 -->
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="gridColumns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #partnerType="{ row }">
-          <a-tag :color="partnerTypeColor(row.partnerType)">
-            {{ partnerTypeLabel(row.partnerType) }}
-          </a-tag>
-        </template>
-        <template #blacklistFlag="{ row }">
-          <a-tag v-if="row.blacklistFlag" color="error">黑名单</a-tag>
-          <span v-else class="lg-none">-</span>
-        </template>
-        <template #riskLevel="{ row }">
-          <a-tag :color="RISK_COLOR[row.riskLevel]">
-            {{ RISK_LABEL[row.riskLevel] ?? row.riskLevel }}
-          </a-tag>
-        </template>
-        <template #status="{ row }">
-          <a-tag :color="row.status === 'ENABLE' ? 'success' : 'default'">
-            {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
-          </a-tag>
-        </template>
-        <template #ops="{ row }">
-          <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新建合作方
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+          <div class="lg-toolbar-right" />
+        </div>
 
-    <!-- 分页 -->
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #partnerType="{ row }">
+              <a-tag :color="partnerTypeColor(row.partnerType)">
+                {{ partnerTypeLabel(row.partnerType) }}
+              </a-tag>
+            </template>
+            <template #blacklistFlag="{ row }">
+              <a-tag v-if="row.blacklistFlag" color="error">黑名单</a-tag>
+              <span v-else class="lg-none">-</span>
+            </template>
+            <template #riskLevel="{ row }">
+              <a-tag :color="RISK_COLOR[row.riskLevel]">
+                {{ RISK_LABEL[row.riskLevel] ?? row.riskLevel }}
+              </a-tag>
+            </template>
+            <template #status="{ row }">
+              <a-tag :color="row.status === 'ENABLE' ? 'success' : 'default'">
+                {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+              </a-tag>
+            </template>
+            <template #ops="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">合作方类型分布</div>
+          <div class="lg-type-list">
+            <div v-for="item in partnerTypeSummary" :key="item.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span style="margin-left: auto">{{ item.count }} 个</span>
+            </div>
+          </div>
+        </section>
+        <section class="lg-panel">
+          <div class="lg-panel-title">近期合作方</div>
+          <div class="lg-type-list">
+            <div v-for="item in recentPartners" :key="item.id" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #1890ff"></span>
+              <span class="lg-type-label">{{ item.partnerName }}</span>
+            </div>
+            <div v-if="!recentPartners.length" class="lg-warning-empty">暂无合作方</div>
+          </div>
+        </section>
+      </aside>
     </div>
 
     <!-- Add/Edit Modal -->

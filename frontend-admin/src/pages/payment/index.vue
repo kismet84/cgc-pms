@@ -119,6 +119,16 @@ function handleSearch() {
   pageNo.value = 1
   fetchData()
 }
+function handleReset() {
+  filter.projectId = undefined
+  filter.contractId = undefined
+  filter.partnerId = undefined
+  filter.payType = undefined
+  filter.payStatus = undefined
+  filter.approvalStatus = undefined
+  pageNo.value = 1
+  fetchData()
+}
 function handlePageChange(page: number) {
   pageNo.value = page
   fetchData()
@@ -288,10 +298,10 @@ function kpiPct(value: number, max: number): number {
 
 // vxe-grid columns
 const gridColumns = computed(() => [
-  { field: 'applyCode', title: '申请编号', width: 150, ellipsis: true },
-  { field: 'projectName', title: '项目', width: 120, ellipsis: true },
-  { field: 'contractName', title: '合同', width: 120, ellipsis: true },
-  { field: 'partnerName', title: '合作方', width: 120, ellipsis: true },
+  { field: 'applyCode', title: '申请编号', minWidth: 150, ellipsis: true },
+  { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
+  { field: 'contractName', title: '合同', minWidth: 150, ellipsis: true },
+  { field: 'partnerName', title: '合作方', minWidth: 140, ellipsis: true },
   {
     field: 'applyAmount',
     title: '申请金额',
@@ -330,7 +340,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <!-- 页面头部 -->
     <div class="lg-page-head">
       <div>
@@ -338,6 +348,66 @@ onMounted(() => {
           <a-breadcrumb-item>付款管理</a-breadcrumb-item>
           <a-breadcrumb-item>付款申请</a-breadcrumb-item>
         </a-breadcrumb>
+      </div>
+    </div>
+
+    <div class="lg-search-bar">
+      <a-select
+        v-model:value="filter.projectId"
+        placeholder="全部项目"
+        allow-clear
+        size="large"
+        @change="
+          (v: string | undefined) => {
+            filter.contractId = undefined
+            if (v) referenceStore.fetchContracts({ projectId: v })
+            handleSearch()
+          }
+        "
+      >
+        <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
+          {{ p.projectName }}
+        </a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.contractId"
+        placeholder="全部合同"
+        allow-clear
+        size="large"
+        @change="handleSearch"
+      >
+        <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">
+          {{ c.contractName }}
+        </a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.payType"
+        placeholder="全部类型"
+        allow-clear
+        size="large"
+        @change="handleSearch"
+      >
+        <a-select-option v-for="(label, key) in PAY_TYPE_LABEL" :key="key" :value="key">
+          {{ label }}
+        </a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.payStatus"
+        placeholder="全部状态"
+        allow-clear
+        size="large"
+        @change="handleSearch"
+      >
+        <a-select-option v-for="(label, key) in PAY_STATUS_LABEL" :key="key" :value="key">
+          {{ label }}
+        </a-select-option>
+      </a-select>
+      <div class="lg-search-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
       </div>
     </div>
 
@@ -395,62 +465,6 @@ onMounted(() => {
             <a-button @click="fetchData">
               <template #icon><ReloadOutlined /></template>
             </a-button>
-          </div>
-          <div class="lg-toolbar-right">
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 140px"
-              size="small"
-              @change="
-                (v: string | undefined) => {
-                  filter.contractId = undefined
-                  if (v) referenceStore.fetchContracts({ projectId: v })
-                  handleSearch()
-                }
-              "
-            >
-              <a-select-option v-for="p in projects" :key="p.id" :value="p.id">{{
-                p.projectName
-              }}</a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.contractId"
-              placeholder="全部合同"
-              allow-clear
-              style="width: 140px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">{{
-                c.contractName
-              }}</a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.payType"
-              placeholder="全部类型"
-              allow-clear
-              style="width: 110px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="(label, key) in PAY_TYPE_LABEL" :key="key" :value="key">{{
-                label
-              }}</a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.payStatus"
-              placeholder="全部状态"
-              allow-clear
-              style="width: 110px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="(label, key) in PAY_STATUS_LABEL" :key="key" :value="key">{{
-                label
-              }}</a-select-option>
-            </a-select>
           </div>
         </div>
 

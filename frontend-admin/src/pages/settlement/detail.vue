@@ -246,7 +246,7 @@ onMounted(() => {
 })
 </script>
 <template>
-  <div class="app-page">
+  <div class="settlement-detail-page lg-page app-page project-target-redesign">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"
         ><a-breadcrumb-item>结算管理</a-breadcrumb-item
@@ -283,7 +283,7 @@ onMounted(() => {
     <a-spin :spinning="loading">
       <template v-if="detail">
         <!-- Info summary -->
-        <section class="pt-panel" style="padding: 20px; margin-bottom: 12px">
+        <section class="pt-panel settlement-summary-card">
           <div
             style="
               display: grid;
@@ -341,11 +341,11 @@ onMounted(() => {
         <!-- Tabs -->
         <a-tabs
           v-model:activeKey="activeTab"
-          style="background: #fff; border-radius: 6px; padding: 0 20px; border: 1px solid #edf1f7"
+          class="settlement-tabs-card"
         >
           <a-tab-pane key="basic" tab="基本信息">
             <div style="padding: 8px 0 20px">
-              <div class="pt-panel" style="padding: 16px 20px">
+              <div class="pt-panel settlement-basic-card">
                 <div class="pt-panel-header">结算信息</div>
                 <div
                   style="
@@ -397,6 +397,7 @@ onMounted(() => {
                 :pagination="false"
                 size="small"
                 row-key="id"
+                class="lg-table-wrap"
                 style="margin: 8px 0 20px"
               >
                 <template #bodyCell="{ column, record }"
@@ -425,6 +426,7 @@ onMounted(() => {
                 :pagination="false"
                 size="small"
                 row-key="id"
+                class="lg-table-wrap"
                 style="margin: 8px 0 20px"
               >
                 <template #bodyCell="{ column, record }"
@@ -456,6 +458,7 @@ onMounted(() => {
                 :pagination="false"
                 size="small"
                 row-key="id"
+                class="lg-table-wrap"
                 style="margin: 8px 0 20px"
               >
                 <template #bodyCell="{ column, record }"
@@ -502,6 +505,7 @@ onMounted(() => {
                 :pagination="false"
                 size="small"
                 row-key="id"
+                class="lg-table-wrap"
                 style="margin: 8px 0 20px"
                 ><template #bodyCell="{ column, record }"
                   ><template v-if="column.key === 'originalName'"
@@ -548,4 +552,34 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.settlement-summary-card {
+  padding: 20px 24px !important;
+  margin-bottom: 16px !important;
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.settlement-tabs-card {
+  border: 0 !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-soft);
+}
+
+.settlement-basic-card {
+  padding: 0 !important;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.settlement-basic-card > div:last-child {
+  padding: 20px 24px;
+}
+
+.settlement-detail-page :deep(.ant-tabs-nav) {
+  margin-bottom: 16px;
+}
+</style>

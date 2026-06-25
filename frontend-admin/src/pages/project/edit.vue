@@ -86,7 +86,7 @@ function handleCancel() {
 </script>
 
 <template>
-  <div class="pj-page app-page project-target-redesign">
+  <div class="pj-page lg-page app-page project-target-redesign">
     <div class="pt-page-head">
       <div>
         <a-breadcrumb class="pt-breadcrumb">
@@ -193,9 +193,6 @@ function handleCancel() {
 </template>
 
 <style scoped>
-.pj-page {
-  padding: 4px 0;
-}
 .pj-form-panel {
   max-width: 920px;
   margin-bottom: 10px;
@@ -226,7 +223,7 @@ function handleCancel() {
 
 .pj-empty-text {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--muted);
   margin-bottom: 20px;
 }
 </style>

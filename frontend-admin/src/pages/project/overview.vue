@@ -59,6 +59,11 @@ function roleLabel(code: string): string {
   return roleLabels[code] ?? code
 }
 
+const members = computed(() => (Array.isArray(data.value?.members) ? data.value.members : []))
+const projectManagerName = computed(
+  () => members.value.find((member) => member.roleCode === 'PM')?.userName || '待维护',
+)
+
 /* ── Members table columns ── */
 const memberCols = [
   { title: '姓名', dataIndex: 'userName', width: 120 },
@@ -124,7 +129,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="overview app-page project-target-redesign">
+  <div class="overview lg-page app-page project-target-redesign">
     <div class="pt-page-head">
       <div>
         <a-breadcrumb class="pt-breadcrumb">
@@ -164,7 +169,7 @@ onMounted(() => {
           </div>
           <div class="summary-cell">
             <span>项目经理</span>
-            <b>{{ data.members.find((m) => m.roleCode === 'PM')?.userName || '待维护' }}</b>
+            <b>{{ projectManagerName }}</b>
           </div>
           <div class="summary-cell">
             <span>合同数量</span>
@@ -254,7 +259,7 @@ onMounted(() => {
             </div>
             <a-table
               :columns="memberCols"
-              :data-source="data.members"
+              :data-source="members"
               :pagination="false"
               size="small"
               row-key="userId"
@@ -265,7 +270,7 @@ onMounted(() => {
                 </template>
               </template>
             </a-table>
-            <div v-if="!data.members.length" class="empty-hint">暂无成员数据</div>
+            <div v-if="!members.length" class="empty-hint">暂无成员数据</div>
           </section>
         </div>
       </template>
@@ -282,7 +287,6 @@ onMounted(() => {
 <style scoped>
 .overview {
   min-height: 100%;
-  padding: 4px 0;
 }
 .overview-summary {
   display: flex;
@@ -341,11 +345,11 @@ onMounted(() => {
 .empty-page {
   padding: 80px 20px;
   text-align: center;
-  color: #9ca3af;
+  color: var(--muted);
   font-size: 14px;
-  background: #fff;
-  border-radius: 10px;
-  border: 1px solid #edf1f7;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
 }
 @media (max-width: 1100px) {
   .overview-analysis-grid,

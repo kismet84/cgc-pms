@@ -391,7 +391,8 @@ async function loadContractDetail() {
 
     try {
       const existingItems = await getContractItems(contractId.value)
-      items.value = existingItems.map((it, idx) => ({
+      const itemList = Array.isArray(existingItems) ? existingItems : []
+      items.value = itemList.map((it, idx) => ({
         _key: genItemKey(),
         id: it.id,
         itemCode: it.itemCode ?? '',
@@ -414,7 +415,8 @@ async function loadContractDetail() {
 
     try {
       const existingTerms = await getPaymentTerms(contractId.value)
-      terms.value = existingTerms.map((t, idx) => ({
+      const termList = Array.isArray(existingTerms) ? existingTerms : []
+      terms.value = termList.map((t, idx) => ({
         _key: genTermKey(),
         id: t.id,
         termName: t.termName ?? '',

@@ -74,7 +74,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="cl-breadcrumb">
@@ -136,9 +136,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         <!-- 工具栏 -->
         <div class="lg-toolbar">
           <div class="lg-toolbar-left">
-            <a-button @click="handleSearch">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
             <a-dropdown v-if="!isMobile">
               <a-button size="small">
                 <template #icon><SettingOutlined /></template>
@@ -164,6 +161,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 </a-menu>
               </template>
             </a-dropdown>
+            <a-button @click="handleSearch">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
           <div class="lg-toolbar-right">
             <a-select

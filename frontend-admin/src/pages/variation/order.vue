@@ -137,10 +137,10 @@ const COL_LABELS: Record<string, string> = {
 const gridColumns = computed(() => [
   { type: 'seq' as const, width: 50, fixed: 'left' as const },
   ...(colVisible.varCode
-    ? [{ field: 'varCode', title: '变更编号', width: 140, ellipsis: true }]
+    ? [{ field: 'varCode', title: '变更编号', minWidth: 140, ellipsis: true }]
     : []),
   ...(colVisible.varName
-    ? [{ field: 'varName', title: '变更名称', width: 140, ellipsis: true }]
+    ? [{ field: 'varName', title: '变更名称', minWidth: 150, ellipsis: true }]
     : []),
   ...(colVisible.varType
     ? [{ field: 'varType', title: '变更类型', width: 90, slots: { default: 'varType' } }]
@@ -149,13 +149,13 @@ const gridColumns = computed(() => [
     ? [{ field: 'direction', title: '方向', width: 70, slots: { default: 'direction' } }]
     : []),
   ...(colVisible.projectName
-    ? [{ field: 'projectName', title: '项目名称', width: 120, ellipsis: true }]
+    ? [{ field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true }]
     : []),
   ...(colVisible.contractName
-    ? [{ field: 'contractName', title: '合同名称', width: 120, ellipsis: true }]
+    ? [{ field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true }]
     : []),
   ...(colVisible.partnerName
-    ? [{ field: 'partnerName', title: '合作方', width: 120, ellipsis: true }]
+    ? [{ field: 'partnerName', title: '合作方', minWidth: 140, ellipsis: true }]
     : []),
   ...(colVisible.reportedAmount
     ? [
@@ -365,6 +365,22 @@ function handleItemPriceChange(idx: number) {
 
 const itemsTotalAmount = computed(() => itemList.value.reduce((sum, i) => sum + (i.amount ?? 0), 0))
 
+const variationStats = computed(() => ({
+  total: total.value,
+  draft: tableData.value.filter((item) => item.approvalStatus === 'DRAFT').length,
+  approved: tableData.value.filter((item) => item.approvalStatus === 'APPROVED').length,
+  cost: tableData.value.filter((item) => item.direction === 'COST').length,
+}))
+
+const variationTypeSummary = computed(() =>
+  VAR_TYPE_OPTIONS.map((option) => ({
+    label: option.label,
+    count: tableData.value.filter((item) => item.varType === option.value).length,
+  })),
+)
+
+const recentVariations = computed(() => tableData.value.slice(0, 4))
+
 function fmtWan(val: string | undefined): string {
   if (!val) return '0.00'
   const n = parseFloat(val)
@@ -380,7 +396,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
@@ -407,124 +423,169 @@ onMounted(() => {
       </a-button>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleAdd">
-          <template #icon><PlusOutlined /></template>
-          新建
-        </a-button>
-        <a-dropdown>
-          <a-button>
-            <template #icon><SettingOutlined /></template>
-            列设置
-          </a-button>
-          <template #overlay>
-            <a-menu>
-              <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
-                <a-checkbox :checked="colVisible[key]">
-                  {{ COL_LABELS[key] }}
-                </a-checkbox>
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">签证总数</span>
+        <span class="lg-kpi-card-value">{{ variationStats.total }} <small>单</small></span>
       </div>
-      <div class="lg-toolbar-right">
-        <a-select
-          v-model:value="filter.projectId"
-          placeholder="全部项目"
-          allow-clear
-          style="width: 140px"
-          size="small"
-          @change="
-            (v: string | undefined) => {
-              filter.contractId = undefined
-              if (v) referenceStore.fetchContracts({ projectId: v })
-              handleSearch()
-            }
-          "
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">已通过</span>
+        <span class="lg-kpi-card-value">{{ variationStats.approved }} <small>单</small></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">成本方向</span>
+        <span class="lg-kpi-card-value">{{ variationStats.cost }} <small>单</small></span>
+      </div>
+      <div class="lg-kpi-card is-warn">
+        <span class="lg-kpi-card-label">草稿待提</span>
+        <span class="lg-kpi-card-value">{{ variationStats.draft }} <small>单</small></span>
       </div>
     </div>
 
-    <!-- 表格 -->
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="gridColumns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #varType="{ row }">
-          <a-tag size="small">{{ VAR_TYPE_LABEL[row.varType] ?? row.varType }}</a-tag>
-        </template>
-        <template #direction="{ row }">
-          <a-tag :color="row.direction === 'COST' ? 'red' : 'green'" size="small">{{
-            row.direction === 'COST' ? '成本' : row.direction
-          }}</a-tag>
-        </template>
-        <template #reportedAmount="{ row }">
-          <span>{{ fmtWan(row.reportedAmount) }} 万</span>
-        </template>
-        <template #approvedAmount="{ row }">
-          <span>{{ fmtWan(row.approvedAmount) }} 万</span>
-        </template>
-        <template #confirmedAmount="{ row }">
-          <span>{{ fmtWan(row.confirmedAmount) }} 万</span>
-        </template>
-        <template #approvalStatus="{ row }">
-          <a-tag
-            :color="
-              row.approvalStatus === 'APPROVED'
-                ? 'success'
-                : row.approvalStatus === 'REJECTED'
-                  ? 'error'
-                  : 'processing'
-            "
-            size="small"
-            >{{ row.approvalStatus }}</a-tag
-          >
-        </template>
-        <template #ops="{ row }">
-          <div class="lg-ops">
-            <a
-              v-if="row.approvalStatus === 'DRAFT'"
-              class="lg-link"
-              @click="handleSubmitApproval(row)"
-              >提交审批</a
-            >
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新建
+            </a-button>
+            <a-dropdown>
+              <a-button>
+                <template #icon><SettingOutlined /></template>
+                列设置
+              </a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
+                    <a-checkbox :checked="colVisible[key]">
+                      {{ COL_LABELS[key] }}
+                    </a-checkbox>
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+          <div class="lg-toolbar-right">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              style="width: 140px"
+              size="small"
+              @change="
+                (v: string | undefined) => {
+                  filter.contractId = undefined
+                  if (v) referenceStore.fetchContracts({ projectId: v })
+                  handleSearch()
+                }
+              "
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+          </div>
+        </div>
 
-    <!-- 分页 -->
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #varType="{ row }">
+              <a-tag size="small">{{ VAR_TYPE_LABEL[row.varType] ?? row.varType }}</a-tag>
+            </template>
+            <template #direction="{ row }">
+              <a-tag :color="row.direction === 'COST' ? 'red' : 'green'" size="small">{{
+                row.direction === 'COST' ? '成本' : row.direction
+              }}</a-tag>
+            </template>
+            <template #reportedAmount="{ row }">
+              <span>{{ fmtWan(row.reportedAmount) }} 万</span>
+            </template>
+            <template #approvedAmount="{ row }">
+              <span>{{ fmtWan(row.approvedAmount) }} 万</span>
+            </template>
+            <template #confirmedAmount="{ row }">
+              <span>{{ fmtWan(row.confirmedAmount) }} 万</span>
+            </template>
+            <template #approvalStatus="{ row }">
+              <a-tag
+                :color="
+                  row.approvalStatus === 'APPROVED'
+                    ? 'success'
+                    : row.approvalStatus === 'REJECTED'
+                      ? 'error'
+                      : 'processing'
+                "
+                size="small"
+                >{{ row.approvalStatus }}</a-tag
+              >
+            </template>
+            <template #ops="{ row }">
+              <div class="lg-ops">
+                <a
+                  v-if="row.approvalStatus === 'DRAFT'"
+                  class="lg-link"
+                  @click="handleSubmitApproval(row)"
+                  >提交审批</a
+                >
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">变更类型分布</div>
+          <div class="lg-type-list">
+            <div v-for="item in variationTypeSummary" :key="item.label" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #1890ff"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span style="margin-left: auto">{{ item.count }} 单</span>
+            </div>
+          </div>
+        </section>
+        <section class="lg-panel">
+          <div class="lg-panel-title">近期签证</div>
+          <div class="lg-type-list">
+            <div v-for="item in recentVariations" :key="item.id" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #52c41a"></span>
+              <span class="lg-type-label">{{ item.varName }}</span>
+            </div>
+            <div v-if="!recentVariations.length" class="lg-warning-empty">暂无变更签证</div>
+          </div>
+        </section>
+      </aside>
     </div>
 
     <!-- Modal unchanged -->

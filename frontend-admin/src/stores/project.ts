@@ -10,6 +10,15 @@ import {
   removeMember as removeMemberApi,
 } from '@/api/modules/project'
 
+function normalizeArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const records = (value as { records?: unknown }).records
+    if (Array.isArray(records)) return records as T[]
+  }
+  return []
+}
+
 export const useProjectStore = defineStore('project', () => {
   const currentProject = ref<ProjectVO | null>(null)
   const members = ref<MemberVO[]>([])
@@ -34,11 +43,15 @@ export const useProjectStore = defineStore('project', () => {
     membersLoading.value = true
     try {
       const res = await getMemberList(projectId, { pageNum: pageNo, pageSize })
-      members.value = res.records
-      membersTotal.value = res.total
+      members.value = normalizeArray<MemberVO>(res.records)
+      membersTotal.value = Number(res.total) || members.value.length
     } catch (error) {
       message.error('加载项目成员失败')
-      throw error
+      members.value = []
+      membersTotal.value = 0
+      if (import.meta.env.DEV) {
+        console.error('Project store error:', error)
+      }
     } finally {
       membersLoading.value = false
     }

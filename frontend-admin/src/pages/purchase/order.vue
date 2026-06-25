@@ -94,11 +94,11 @@ const ORDER_STATUS_COLOR: Record<string, string> = {
 }
 
 const gridColumns = computed(() => [
-  { field: 'orderCode', title: '订单编号', width: 140, ellipsis: true },
+  { field: 'orderCode', title: '订单编号', minWidth: 150, ellipsis: true },
   { field: 'orderType', title: '订单类型', width: 90, slots: { default: 'orderType' } },
-  { field: 'projectName', title: '项目名称', width: 120, ellipsis: true },
-  { field: 'contractName', title: '合同名称', width: 120, ellipsis: true },
-  { field: 'partnerName', title: '供应商', width: 120, ellipsis: true },
+  { field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true },
+  { field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true },
+  { field: 'partnerName', title: '供应商', minWidth: 140, ellipsis: true },
   {
     field: 'totalAmount',
     title: '总金额',
@@ -377,7 +377,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">

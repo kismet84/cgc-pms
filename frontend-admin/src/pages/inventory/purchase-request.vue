@@ -84,9 +84,9 @@ const filterOption = (input: string, option: { label?: string }) =>
   option.label?.toLowerCase().includes(input.toLowerCase())
 
 const gridColumns = computed(() => [
-  { field: 'requestCode', title: '申请编号', width: 140, ellipsis: true },
-  { field: 'projectName', title: '所属项目', width: 130, ellipsis: true },
-  { field: 'contractName', title: '关联合同', width: 130, ellipsis: true },
+  { field: 'requestCode', title: '申请编号', minWidth: 150, ellipsis: true },
+  { field: 'projectName', title: '所属项目', minWidth: 150, ellipsis: true },
+  { field: 'contractName', title: '关联合同', minWidth: 150, ellipsis: true },
   { field: 'approvalStatus', title: '审批状态', width: 90, slots: { default: 'approvalStatus' } },
   { field: 'status', title: '业务状态', width: 80, slots: { default: 'status' } },
   { field: 'createdBy', title: '创建人', width: 90 },
@@ -389,6 +389,10 @@ const kpiReqPending = computed(
     tableData.value.filter((r) => r.approvalStatus === 'DRAFT' || r.approvalStatus === 'APPROVING')
       .length,
 )
+const kpiReqConverted = computed(
+  () => tableData.value.filter((r) => r.status === 'CONVERTED').length,
+)
+const recentRequests = computed(() => tableData.value.slice(0, 4))
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -398,7 +402,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="cl-breadcrumb">
@@ -442,79 +446,111 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleAdd">新建申请</a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
-      </div>
-      <div class="lg-toolbar-right">
-        <a-select
-          v-model:value="filter.projectId"
-          placeholder="全部项目"
-          allow-clear
-          style="width: 160px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-      </div>
-    </div>
-
-    <!-- 表格 -->
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="gridColumns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #approvalStatus="{ row }">
-          <ApprovalStatusTag :status="row.approvalStatus" />
-        </template>
-        <template #status="{ row }">
-          <a-tag :color="STATUS_COLOR[row.status]">
-            {{ STATUS_LABEL[row.status] ?? row.status }}
-          </a-tag>
-        </template>
-        <template #ops="{ row }">
-          <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a
-              v-if="row.approvalStatus === 'DRAFT'"
-              class="lg-link"
-              style="color: #1677ff"
-              @click="handleSubmit(row)"
-              >提交审批</a
-            >
-            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">新建申请</a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+          <div class="lg-toolbar-right">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              style="width: 160px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+          </div>
+        </div>
 
-    <!-- 分页 -->
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #approvalStatus="{ row }">
+              <ApprovalStatusTag :status="row.approvalStatus" />
+            </template>
+            <template #status="{ row }">
+              <a-tag :color="STATUS_COLOR[row.status]">
+                {{ STATUS_LABEL[row.status] ?? row.status }}
+              </a-tag>
+            </template>
+            <template #ops="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a
+                  v-if="row.approvalStatus === 'DRAFT'"
+                  class="lg-link"
+                  style="color: #1677ff"
+                  @click="handleSubmit(row)"
+                  >提交审批</a
+                >
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">申请状态分布</div>
+          <div class="lg-type-list">
+            <div class="lg-type-row">
+              <span class="lg-type-dot" style="background: #faad14"></span>
+              <span class="lg-type-label">待审批</span>
+              <span style="margin-left: auto">{{ kpiReqPending }} 条</span>
+            </div>
+            <div class="lg-type-row">
+              <span class="lg-type-dot" style="background: #1890ff"></span>
+              <span class="lg-type-label">已转PO</span>
+              <span style="margin-left: auto">{{ kpiReqConverted }} 条</span>
+            </div>
+          </div>
+        </section>
+        <section class="lg-panel">
+          <div class="lg-panel-title">近期申请</div>
+          <div class="lg-type-list">
+            <div v-for="item in recentRequests" :key="item.id" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #52c41a"></span>
+              <span class="lg-type-label">{{ item.requestCode }}</span>
+            </div>
+            <div v-if="!recentRequests.length" class="lg-warning-empty">暂无采购申请</div>
+          </div>
+        </section>
+      </aside>
     </div>
 
     <!-- Add/Edit Modal -->

@@ -12,6 +12,7 @@ import { useReferenceStore } from '@/stores/reference'
 import CostTargetEditPage from './edit.vue'
 import type { CostTargetVO, CostTargetQueryParams } from '@/types/costTarget'
 import type { SelectOption } from '@/types/ui'
+import type { PageResult } from '@/types/api'
 import {
   APPROVAL_STATUS_LABEL,
   APPROVAL_STATUS_COLOR,
@@ -54,9 +55,14 @@ async function fetchData() {
     isActive: filter.isActive,
   }
   try {
-    const res: PageResult<CostTargetVO> = await getCostTargetList(params)
-    tableData.value = res.records
-    total.value = Number(res.total) || 0
+    const res: PageResult<CostTargetVO> | CostTargetVO[] = await getCostTargetList(params)
+    const records = Array.isArray(res)
+      ? res
+      : Array.isArray(res?.records)
+        ? res.records
+        : []
+    tableData.value = records
+    total.value = Array.isArray(res) ? records.length : Number(res?.total ?? records.length)
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -183,6 +189,28 @@ const columns = [
   { title: '操作', width: 160, slots: { default: 'ops' } },
 ]
 
+const targetStats = computed(() => ({
+  total: total.value,
+  active: tableData.value.filter((item) => item.isActive === 1).length,
+  approved: tableData.value.filter((item) => item.approvalStatus === 'APPROVED').length,
+  draft: tableData.value.filter((item) => item.approvalStatus === 'DRAFT').length,
+}))
+
+const targetStatusSummary = computed(() => [
+  { label: '已通过', count: targetStats.value.approved, color: '#52c41a' },
+  { label: '草稿', count: targetStats.value.draft, color: '#faad14' },
+  {
+    label: '其他状态',
+    count: Math.max(
+      0,
+      tableData.value.length - targetStats.value.approved - targetStats.value.draft,
+    ),
+    color: '#8c8c8c',
+  },
+])
+
+const recentTargets = computed(() => tableData.value.slice(0, 4))
+
 onMounted(() => {
   referenceStore.fetchProjects()
   fetchData()
@@ -190,7 +218,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
         <a-breadcrumb-item>目标管理</a-breadcrumb-item>
@@ -212,99 +240,145 @@ onMounted(() => {
       <a-button @click="handleReset">重置</a-button>
     </div>
 
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleCreate">
-          <template #icon><PlusOutlined /></template>
-          新建目标成本
-        </a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">版本总数</span>
+        <span class="lg-kpi-card-value">{{ targetStats.total }} <small>个</small></span>
       </div>
-      <div class="lg-toolbar-right">
-        <a-select
-          v-model:value="filter.projectId"
-          placeholder="全部项目"
-          allow-clear
-          style="width: 160px"
-          size="small"
-          show-search
-          :filter-option="
-            (input: string, option: SelectOption) =>
-              option.label?.toLowerCase().includes(input.toLowerCase())
-          "
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
-            p.projectName
-          }}</a-select-option>
-        </a-select>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">当前版本</span>
+        <span class="lg-kpi-card-value">{{ targetStats.active }} <small>个</small></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">已审批</span>
+        <span class="lg-kpi-card-value">{{ targetStats.approved }} <small>个</small></span>
+      </div>
+      <div class="lg-kpi-card is-warn">
+        <span class="lg-kpi-card-label">草稿版本</span>
+        <span class="lg-kpi-card-value">{{ targetStats.draft }} <small>个</small></span>
       </div>
     </div>
 
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="columns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #amount="{ row }">
-          <span class="ct-money">{{ fmtAmount(row.totalTargetAmount) }}</span>
-        </template>
-        <template #approvalStatus="{ row }">
-          <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'">
-            {{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus }}
-          </a-tag>
-        </template>
-        <template #status="{ row }">
-          <a-tag :color="TARGET_STATUS_COLOR[row.status] || 'default'">
-            {{ TARGET_STATUS_LABEL[row.status] || row.status }}
-          </a-tag>
-        </template>
-        <template #isActive="{ row }">
-          <a-tag v-if="row.isActive === 1" color="green">当前版本</a-tag>
-          <span v-else class="ct-muted">历史版本</span>
-        </template>
-        <template #ops="{ row }">
-          <div class="ct-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a
-              v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
-              class="lg-link"
-              :class="{ 'lg-link--disabled': activating }"
-              @click="handleActivate(row)"
-            >
-              <CheckCircleOutlined style="margin-right: 4px" />切换版本
-            </a>
-            <a
-              v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
-              class="lg-link lg-link--danger"
-              @click="handleDelete(row)"
-              >删除</a
-            >
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleCreate">
+              <template #icon><PlusOutlined /></template>
+              新建目标成本
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+          <div class="lg-toolbar-right">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              style="width: 160px"
+              size="small"
+              show-search
+              :filter-option="
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
+                p.projectName
+              }}</a-select-option>
+            </a-select>
+          </div>
+        </div>
 
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="columns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #amount="{ row }">
+              <span class="ct-money">{{ fmtAmount(row.totalTargetAmount) }}</span>
+            </template>
+            <template #approvalStatus="{ row }">
+              <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'">
+                {{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus }}
+              </a-tag>
+            </template>
+            <template #status="{ row }">
+              <a-tag :color="TARGET_STATUS_COLOR[row.status] || 'default'">
+                {{ TARGET_STATUS_LABEL[row.status] || row.status }}
+              </a-tag>
+            </template>
+            <template #isActive="{ row }">
+              <a-tag v-if="row.isActive === 1" color="green">当前版本</a-tag>
+              <span v-else class="ct-muted">历史版本</span>
+            </template>
+            <template #ops="{ row }">
+              <div class="ct-ops lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a
+                  v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
+                  class="lg-link"
+                  :class="{ 'lg-link--disabled': activating }"
+                  @click="handleActivate(row)"
+                >
+                  <CheckCircleOutlined style="margin-right: 4px" />切换版本
+                </a>
+                <a
+                  v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+                  class="lg-link lg-link--danger"
+                  @click="handleDelete(row)"
+                  >删除</a
+                >
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">审批状态分布</div>
+          <div class="lg-type-list">
+            <div v-for="item in targetStatusSummary" :key="item.label" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span style="margin-left: auto">{{ item.count }} 个</span>
+            </div>
+          </div>
+        </section>
+        <section class="lg-panel">
+          <div class="lg-panel-title">近期版本</div>
+          <div class="lg-type-list">
+            <div v-for="item in recentTargets" :key="item.id" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #1890ff"></span>
+              <span class="lg-type-label">{{ item.versionName }}</span>
+            </div>
+            <div v-if="!recentTargets.length" class="lg-warning-empty">暂无目标成本版本</div>
+          </div>
+        </section>
+      </aside>
     </div>
 
     <a-modal
@@ -343,8 +417,6 @@ onMounted(() => {
 }
 .ct-ops {
   display: flex;
-  gap: 10px;
-  justify-content: center;
 }
 .ct-muted {
   color: #9ca3af;

@@ -29,15 +29,17 @@ const ROLE_MAP: Record<string, string> = Object.fromEntries(
   ROLE_OPTIONS.map((r) => [r.value, r.label]),
 )
 
+const members = computed(() => (Array.isArray(store.members) ? store.members : []))
+
 const memberStats = computed(() => ({
-  total: store.membersTotal || store.members.length,
-  manager: store.members.filter((item) => item.roleCode === 'PM').length,
-  business: store.members.filter((item) => ['CM', 'CSTM', 'FIN'].includes(item.roleCode)).length,
-  pending: store.members.filter((item) => item.status !== 'ACTIVE').length,
+  total: store.membersTotal || members.value.length,
+  manager: members.value.filter((item) => item.roleCode === 'PM').length,
+  business: members.value.filter((item) => ['CM', 'CSTM', 'FIN'].includes(item.roleCode)).length,
+  pending: members.value.filter((item) => item.status !== 'ACTIVE').length,
 }))
 
 const roleDistribution = computed(() => {
-  const counts = store.members.reduce<Record<string, number>>((acc, item) => {
+  const counts = members.value.reduce<Record<string, number>>((acc, item) => {
     acc[item.roleCode] = (acc[item.roleCode] || 0) + 1
     return acc
   }, {})
@@ -164,7 +166,7 @@ const columns = [
 </script>
 
 <template>
-  <div class="pm-page app-page project-target-redesign">
+  <div class="pm-page lg-page app-page project-target-redesign">
     <div class="pt-page-head">
       <div>
         <a-breadcrumb class="pt-breadcrumb">
@@ -209,8 +211,8 @@ const columns = [
     <div class="pt-ledger-layout">
       <main class="pt-panel pt-table-panel">
         <div class="pt-panel-header">成员清单</div>
-        <a-table
-          :data-source="store.members"
+          <a-table
+          :data-source="members"
           :columns="columns"
           :loading="store.membersLoading"
           :pagination="false"
@@ -256,7 +258,7 @@ const columns = [
           </template>
         </a-table>
         <a-empty
-          v-if="!store.membersLoading && store.members.length === 0"
+          v-if="!store.membersLoading && members.length === 0"
           description="暂无项目成员，点击上方按钮添加"
           style="padding: 48px 0"
         />
@@ -346,14 +348,10 @@ const columns = [
 </template>
 
 <style scoped>
-.pm-page {
-  padding: 4px 0;
-}
-
 .pm-title-project {
   margin-top: 4px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--muted);
 }
 
 /* ── User cell ── */
@@ -371,7 +369,7 @@ const columns = [
 
 .pm-user-name {
   font-size: 14px;
-  color: #111827;
+  color: var(--text);
   font-weight: 500;
 }
 

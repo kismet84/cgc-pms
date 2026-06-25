@@ -54,6 +54,21 @@ const {
   handleModalCancel,
 } = useRequisitionForm(fetchData)
 
+const requisitionStatusSummary = computed(() => [
+  {
+    label: '已出库',
+    count: tableData.value.filter((item) => item.stockOutFlag === 1).length,
+    color: '#52c41a',
+  },
+  {
+    label: '未出库',
+    count: tableData.value.filter((item) => item.stockOutFlag !== 1).length,
+    color: '#faad14',
+  },
+])
+
+const recentRequisitions = computed(() => tableData.value.slice(0, 4))
+
 async function fetchUsers() {
   try {
     const res = await getUserList({ pageNo: 1, pageSize: 200 })
@@ -73,7 +88,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="lg-breadcrumb">
@@ -108,123 +123,150 @@ onMounted(() => {
       :fmt-amount="fmtAmount"
     />
 
-    <!-- 工具栏 -->
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleAdd">
-          <template #icon><PlusOutlined /></template>
-          新增领料申请
-        </a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
-      </div>
-      <div class="lg-toolbar-right">
-        <a-select
-          v-model:value="filter.projectId"
-          placeholder="全部项目"
-          allow-clear
-          style="width: 160px"
-          size="small"
-          show-search
-          :filter-option="
-            (input: string, option: SelectOption) =>
-              option.label?.toLowerCase().includes(input.toLowerCase())
-          "
-          @change="
-            (v: string | undefined) => {
-              filter.contractId = undefined
-              if (v) referenceStore.fetchContracts({ projectId: v })
-              handleSearch()
-            }
-          "
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.warehouseId"
-          placeholder="全部仓库"
-          allow-clear
-          style="width: 160px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-            {{ w.warehouseName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.approvalStatus"
-          placeholder="全部审批状态"
-          allow-clear
-          style="width: 140px"
-          size="small"
-          @change="handleSearch"
-        >
-          <a-select-option value="DRAFT">草稿</a-select-option>
-          <a-select-option value="APPROVING">审批中</a-select-option>
-          <a-select-option value="APPROVED">已通过</a-select-option>
-          <a-select-option value="REJECTED">已驳回</a-select-option>
-        </a-select>
-      </div>
-    </div>
-
-    <!-- 表格 -->
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="gridColumns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #totalAmount="{ row }">
-          <span v-if="row.totalAmount" class="lg-money">
-            {{ Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
-          </span>
-          <span v-else class="lg-none">-</span>
-        </template>
-        <template #stockOutFlag="{ row }">
-          <a-tag :color="row.stockOutFlag === 1 ? 'success' : 'default'">
-            {{ row.stockOutFlag === 1 ? '已出库' : '未出库' }}
-          </a-tag>
-        </template>
-        <template #approvalStatus="{ row }">
-          <ApprovalStatusTag :status="row.approvalStatus" />
-        </template>
-        <template #action="{ row }">
-          <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-            <a
-              v-if="row.approvalStatus === 'DRAFT'"
-              class="lg-link"
-              @click="handleSubmitApproval(row)"
-              >提交审批</a
-            >
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <!-- 工具栏 -->
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新增领料申请
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+          <div class="lg-toolbar-right">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              style="width: 160px"
+              size="small"
+              show-search
+              :filter-option="
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+              @change="
+                (v: string | undefined) => {
+                  filter.contractId = undefined
+                  if (v) referenceStore.fetchContracts({ projectId: v })
+                  handleSearch()
+                }
+              "
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.warehouseId"
+              placeholder="全部仓库"
+              allow-clear
+              style="width: 160px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
+                {{ w.warehouseName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.approvalStatus"
+              placeholder="全部审批状态"
+              allow-clear
+              style="width: 140px"
+              size="small"
+              @change="handleSearch"
+            >
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="APPROVING">审批中</a-select-option>
+              <a-select-option value="APPROVED">已通过</a-select-option>
+              <a-select-option value="REJECTED">已驳回</a-select-option>
+            </a-select>
+          </div>
+        </div>
 
-    <!-- 分页 -->
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #totalAmount="{ row }">
+              <span v-if="row.totalAmount" class="lg-money">
+                {{ Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+              </span>
+              <span v-else class="lg-none">-</span>
+            </template>
+            <template #stockOutFlag="{ row }">
+              <a-tag :color="row.stockOutFlag === 1 ? 'success' : 'default'">
+                {{ row.stockOutFlag === 1 ? '已出库' : '未出库' }}
+              </a-tag>
+            </template>
+            <template #approvalStatus="{ row }">
+              <ApprovalStatusTag :status="row.approvalStatus" />
+            </template>
+            <template #action="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
+                <a
+                  v-if="row.approvalStatus === 'DRAFT'"
+                  class="lg-link"
+                  @click="handleSubmitApproval(row)"
+                  >提交审批</a
+                >
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">出库状态分布</div>
+          <div class="lg-type-list">
+            <div v-for="item in requisitionStatusSummary" :key="item.label" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span style="margin-left: auto">{{ item.count }} 单</span>
+            </div>
+          </div>
+        </section>
+        <section class="lg-panel">
+          <div class="lg-panel-title">近期领料</div>
+          <div class="lg-type-list">
+            <div v-for="item in recentRequisitions" :key="item.id" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #1890ff"></span>
+              <span class="lg-type-label">{{ item.requisitionCode }}</span>
+            </div>
+            <div v-if="!recentRequisitions.length" class="lg-warning-empty">暂无领料申请</div>
+          </div>
+        </section>
+      </aside>
     </div>
 
     <!-- Add/Edit Modal -->

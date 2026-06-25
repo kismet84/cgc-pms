@@ -78,134 +78,148 @@ async function handlePasswordChange() {
 </script>
 
 <template>
-  <div class="profile-page">
-    <!-- Left column: user info display -->
-    <div class="profile-left">
-      <div class="profile-avatar-section">
-        <a-avatar
-          :size="100"
-          :src="userStore.userInfo?.avatar"
-          class="profile-avatar"
-          :style="{ backgroundColor: userStore.userInfo?.avatar ? 'transparent' : '#1677ff' }"
-        >
-          <template v-if="!userStore.userInfo?.avatar">
-            {{ userStore.userInfo?.realName?.charAt(0) }}
-          </template>
-        </a-avatar>
-        <div class="profile-name">{{ userStore.userInfo?.realName }}</div>
-        <div class="profile-role">{{ userStore.userInfo?.roleName }}</div>
+  <div class="lg-page app-page profile-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="lg-page-head-breadcrumb">
+          <a-breadcrumb-item>系统管理</a-breadcrumb-item>
+          <a-breadcrumb-item>个人资料</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
-
-      <a-divider />
-
-      <a-descriptions :column="1" size="small" class="profile-info">
-        <a-descriptions-item label="用户名">
-          {{ userStore.userInfo?.username }}
-        </a-descriptions-item>
-        <a-descriptions-item label="手机号">
-          {{ userStore.userInfo?.phone || '未设置' }}
-        </a-descriptions-item>
-        <a-descriptions-item label="邮箱">
-          {{ userStore.userInfo?.email || '未设置' }}
-        </a-descriptions-item>
-      </a-descriptions>
     </div>
 
-    <!-- Right column: edit forms -->
-    <div class="profile-right">
-      <!-- Profile edit card -->
-      <a-card title="个人资料" class="profile-card">
-        <a-form :model="profileForm" layout="vertical" @finish="handleProfileSave">
-          <a-form-item label="真实姓名" name="realName">
-            <a-input
-              v-model:value="profileForm.realName"
-              placeholder="请输入真实姓名"
-              allow-clear
-            />
-          </a-form-item>
+    <div class="profile-layout">
+      <aside class="lg-card profile-left">
+        <div class="profile-avatar-section">
+          <a-avatar
+            :size="100"
+            :src="userStore.userInfo?.avatar"
+            class="profile-avatar"
+            :style="{ backgroundColor: userStore.userInfo?.avatar ? 'transparent' : '#1677ff' }"
+          >
+            <template v-if="!userStore.userInfo?.avatar">
+              {{ userStore.userInfo?.realName?.charAt(0) }}
+            </template>
+          </a-avatar>
+          <div class="profile-name">{{ userStore.userInfo?.realName }}</div>
+          <div class="profile-role">{{ userStore.userInfo?.roleName }}</div>
+        </div>
 
-          <a-form-item label="手机号" name="phone">
-            <a-input v-model:value="profileForm.phone" placeholder="请输入手机号" allow-clear />
-          </a-form-item>
+        <a-divider />
 
-          <a-form-item label="邮箱" name="email">
-            <a-input v-model:value="profileForm.email" placeholder="请输入邮箱" allow-clear />
-          </a-form-item>
+        <a-descriptions :column="1" size="small" class="profile-info">
+          <a-descriptions-item label="用户名">
+            {{ userStore.userInfo?.username }}
+          </a-descriptions-item>
+          <a-descriptions-item label="手机号">
+            {{ userStore.userInfo?.phone || '未设置' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="邮箱">
+            {{ userStore.userInfo?.email || '未设置' }}
+          </a-descriptions-item>
+        </a-descriptions>
+      </aside>
 
-          <a-form-item label="头像地址" name="avatar">
-            <a-input
-              v-model:value="profileForm.avatar"
-              placeholder="请输入头像图片地址"
-              allow-clear
-            />
-          </a-form-item>
+      <main class="profile-right">
+        <section class="lg-section">
+          <div class="lg-section-head">
+            <h2 class="lg-section-title">个人资料</h2>
+          </div>
+          <div class="lg-section-body">
+            <a-form :model="profileForm" layout="vertical" @finish="handleProfileSave">
+              <a-form-item label="真实姓名" name="realName">
+                <a-input
+                  v-model:value="profileForm.realName"
+                  placeholder="请输入真实姓名"
+                  allow-clear
+                />
+              </a-form-item>
 
-          <a-form-item>
-            <a-button type="primary" html-type="submit" :loading="profileLoading"> 保存 </a-button>
-          </a-form-item>
-        </a-form>
-      </a-card>
+              <a-form-item label="手机号" name="phone">
+                <a-input v-model:value="profileForm.phone" placeholder="请输入手机号" allow-clear />
+              </a-form-item>
 
-      <!-- Password change card -->
-      <a-card title="修改密码" class="profile-card">
-        <a-form :model="passwordForm" layout="vertical" @finish="handlePasswordChange">
-          <!-- hidden username field for password manager context -->
-          <input
-            type="text"
-            autocomplete="username"
-            :value="userStore.userInfo?.username"
-            readonly
-            hidden
-          />
+              <a-form-item label="邮箱" name="email">
+                <a-input v-model:value="profileForm.email" placeholder="请输入邮箱" allow-clear />
+              </a-form-item>
 
-          <a-form-item label="原密码" name="oldPassword">
-            <a-input-password
-              v-model:value="passwordForm.oldPassword"
-              placeholder="请输入原密码"
-              autocomplete="current-password"
-            />
-          </a-form-item>
+              <a-form-item label="头像地址" name="avatar">
+                <a-input
+                  v-model:value="profileForm.avatar"
+                  placeholder="请输入头像图片地址"
+                  allow-clear
+                />
+              </a-form-item>
 
-          <a-form-item label="新密码" name="newPassword">
-            <a-input-password
-              v-model:value="passwordForm.newPassword"
-              placeholder="请输入新密码"
-              autocomplete="new-password"
-            />
-          </a-form-item>
+              <a-form-item>
+                <a-button type="primary" html-type="submit" :loading="profileLoading">
+                  保存
+                </a-button>
+              </a-form-item>
+            </a-form>
+          </div>
+        </section>
 
-          <a-form-item label="确认新密码" name="confirmPassword">
-            <a-input-password
-              v-model:value="passwordForm.confirmPassword"
-              placeholder="请再次输入新密码"
-              autocomplete="new-password"
-            />
-          </a-form-item>
+        <section class="lg-section">
+          <div class="lg-section-head">
+            <h2 class="lg-section-title">修改密码</h2>
+          </div>
+          <div class="lg-section-body">
+            <a-form :model="passwordForm" layout="vertical" @finish="handlePasswordChange">
+              <!-- hidden username field for password manager context -->
+              <input
+                type="text"
+                autocomplete="username"
+                :value="userStore.userInfo?.username"
+                readonly
+                hidden
+              />
 
-          <a-form-item>
-            <a-button :loading="passwordLoading" html-type="submit"> 修改密码 </a-button>
-          </a-form-item>
-        </a-form>
-      </a-card>
+              <a-form-item label="原密码" name="oldPassword">
+                <a-input-password
+                  v-model:value="passwordForm.oldPassword"
+                  placeholder="请输入原密码"
+                  autocomplete="current-password"
+                />
+              </a-form-item>
+
+              <a-form-item label="新密码" name="newPassword">
+                <a-input-password
+                  v-model:value="passwordForm.newPassword"
+                  placeholder="请输入新密码"
+                  autocomplete="new-password"
+                />
+              </a-form-item>
+
+              <a-form-item label="确认新密码" name="confirmPassword">
+                <a-input-password
+                  v-model:value="passwordForm.confirmPassword"
+                  placeholder="请再次输入新密码"
+                  autocomplete="new-password"
+                />
+              </a-form-item>
+
+              <a-form-item>
+                <a-button :loading="passwordLoading" html-type="submit"> 修改密码 </a-button>
+              </a-form-item>
+            </a-form>
+          </div>
+        </section>
+      </main>
     </div>
   </div>
 </template>
 
 <style scoped>
-.profile-page {
-  display: flex;
-  gap: 24px;
-  padding: 24px;
+.profile-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
   max-width: 1100px;
 }
 
 .profile-left {
-  width: 280px;
-  flex-shrink: 0;
-  background: #fff;
-  border-radius: 8px;
   padding: 32px 24px 24px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .profile-avatar-section {
@@ -223,13 +237,13 @@ async function handlePasswordChange() {
 .profile-name {
   font-size: 18px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text);
   margin-bottom: 4px;
 }
 
 .profile-role {
   font-size: 13px;
-  color: #9ca3af;
+  color: var(--muted);
 }
 
 .profile-info {
@@ -237,14 +251,15 @@ async function handlePasswordChange() {
 }
 
 .profile-right {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
 }
 
-.profile-card {
-  border-radius: 8px;
+@media (max-width: 900px) {
+  .profile-layout {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

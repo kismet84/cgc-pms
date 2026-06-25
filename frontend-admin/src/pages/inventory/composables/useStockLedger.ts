@@ -92,13 +92,15 @@ export function useStockLedger() {
   const txnPageSize = ref(20)
 
   // ---- KPI 状态 ----
-  const kpi = ref<StockKpiVO>({
+  const emptyKpi: StockKpiVO = {
     warehouseCount: 0,
     lowStockCount: 0,
     txnInCount: 0,
     txnOutCount: 0,
     materialTypeCount: 0,
-  })
+  }
+
+  const kpi = ref<StockKpiVO>({ ...emptyKpi })
 
   // ---- 仓库下拉 ----
   const warehouseList = ref<WarehouseVO[]>([])
@@ -190,19 +192,14 @@ export function useStockLedger() {
 
   async function fetchKpi() {
     try {
-      kpi.value = await getStockKpi({
+      const res = await getStockKpi({
         warehouseId: filter.warehouseId,
         projectId: filter.projectId,
       })
+      kpi.value = { ...emptyKpi, ...(res || {}) }
     } catch (e: unknown) {
       console.error(e)
-      kpi.value = {
-        warehouseCount: 0,
-        lowStockCount: 0,
-        txnInCount: 0,
-        txnOutCount: 0,
-        materialTypeCount: 0,
-      }
+      kpi.value = { ...emptyKpi }
     }
   }
 
@@ -273,6 +270,7 @@ export function useStockLedger() {
     txnOutCount: Math.max(kpi.value.txnOutCount, 1),
   }))
   function kpiPct(value: number, max: number): number {
+    if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return 0
     return Math.min(Math.round((value / max) * 100), 100)
   }
 
@@ -293,10 +291,12 @@ export function useStockLedger() {
   })
 
   const inOutStats = computed(() => {
-    const total = kpi.value.txnInCount + kpi.value.txnOutCount || 1
+    const inCount = Number(kpi.value.txnInCount) || 0
+    const outCount = Number(kpi.value.txnOutCount) || 0
+    const total = inCount + outCount || 1
     return {
-      inPct: Math.round((kpi.value.txnInCount / total) * 100),
-      outPct: Math.round((kpi.value.txnOutCount / total) * 100),
+      inPct: Math.round((inCount / total) * 100),
+      outPct: Math.round((outCount / total) * 100),
     }
   })
 

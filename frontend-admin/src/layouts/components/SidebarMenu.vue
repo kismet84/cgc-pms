@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, type Component } from 'vue'
+import { computed, h, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { navigationItems } from '@/router/navigation'
+import { navigationItems, type NavigationItem } from '@/router/navigation'
 import { useUserStore } from '@/stores/user'
 import {
   AccountBookOutlined,
@@ -15,196 +15,287 @@ import {
   ShoppingCartOutlined,
 } from '@ant-design/icons-vue'
 
-interface MenuEntry {
+interface MenuItem {
   key: string
   label: string
-  target: string
-  icon?: Component
-  matchPrefixes?: string[]
+  icon?: () => ReturnType<typeof h>
+  children?: MenuItem[]
 }
 
-interface MenuSection {
-  title?: string
-  items: MenuEntry[]
+const iconMap: Record<string, Component> = {
+  AccountBookOutlined,
+  AuditOutlined,
+  BranchesOutlined,
+  DollarOutlined,
+  FileTextOutlined,
+  HomeOutlined,
+  ProjectOutlined,
+  SettingOutlined,
+  ShoppingCartOutlined,
 }
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
+const props = defineProps<{
+  collapsed?: boolean
+}>()
+
 const isAdmin = computed(() => {
   return userStore.roles.includes('ADMIN') || userStore.roles.includes('SUPER_ADMIN')
 })
 
-function isMenuVisible(item: { adminOnly?: boolean }) {
-  if (item.adminOnly && !isAdmin.value) return false
+function isMenuVisible(item: Pick<NavigationItem, 'adminOnly'>) {
+  if (item.adminOnly && userStore.roles.length > 0 && !isAdmin.value) return false
   return true
 }
 
-function findTop(key: string) {
-  return navigationItems.find((item) => item.key === key)
-}
+function buildMenuItem(navigation: NavigationItem): MenuItem | undefined {
+  if (!isMenuVisible(navigation)) return undefined
 
-function childEntry(parentKey: string, childKey: string, icon: Component): MenuEntry | undefined {
-  const parent = findTop(parentKey)
-  const child = parent?.children?.find((item) => item.key === childKey)
-  if (!parent || !child || !isMenuVisible(parent) || !isMenuVisible(child)) return undefined
-  return {
-    key: child.key,
-    target: child.key,
-    label: child.label,
-    icon,
-    matchPrefixes: [child.key],
+  const iconName = navigation.icon
+  const item: MenuItem = {
+    key: navigation.key,
+    label: navigation.label,
+    icon: iconName && iconMap[iconName] ? () => h(iconMap[iconName]) : undefined,
   }
-}
 
-function parentEntry(parentKey: string, icon: Component): MenuEntry | undefined {
-  const parent = findTop(parentKey)
-  if (!parent || !isMenuVisible(parent)) return undefined
-  const target = parent.children?.find((item) => isMenuVisible(item))?.key ?? parent.key
-  return {
-    key: parent.key,
-    target,
-    label: parent.label,
-    icon,
-    matchPrefixes: parent.matchPrefixes,
+  if (navigation.children?.length) {
+    item.children = navigation.children
+      .map((child) => buildMenuItem(child))
+      .filter(Boolean) as MenuItem[]
   }
+
+  return item.children?.length || !navigation.children?.length ? item : undefined
 }
 
-function compact(items: Array<MenuEntry | undefined>) {
-  return items.filter(Boolean) as MenuEntry[]
-}
+const menuItems = computed(() => {
+  return navigationItems.map((item) => buildMenuItem(item)).filter(Boolean) as MenuItem[]
+})
 
-const menuSections = computed<MenuSection[]>(() => [
-  {
-    items: compact([parentEntry('/workbench', HomeOutlined)]),
-  },
-  {
-    title: '项目与主数据',
-    items: compact([
-      childEntry('/master-data', '/project/list', ProjectOutlined),
-      childEntry('/master-data', '/partner', AccountBookOutlined),
-      childEntry('/master-data', '/org', BranchesOutlined),
-      childEntry('/master-data', '/material/dictionary', FileTextOutlined),
-    ]),
-  },
-  {
-    title: '经营与风控',
-    items: compact([
-      parentEntry('/contract-domain', FileTextOutlined),
-      parentEntry('/cost-domain', DollarOutlined),
-      parentEntry('/procurement-inventory', ShoppingCartOutlined),
-      parentEntry('/subcontract-domain', BranchesOutlined),
-      parentEntry('/payment-invoice', AccountBookOutlined),
-      parentEntry('/settlement-domain', AccountBookOutlined),
-      parentEntry('/approval-center', AuditOutlined),
-      parentEntry('/system-management', SettingOutlined),
-    ]),
-  },
-])
+const selectedKeys = computed(() => {
+  const child = navigationItems
+    .flatMap((item) => item.children || [])
+    .filter((item) => isMenuVisible(item))
+    .find((item) => route.path === item.key || route.path.startsWith(`${item.key}/`))
 
-function isActive(entry: MenuEntry) {
-  return (
-    route.path === entry.key ||
-    route.path === entry.target ||
-    entry.matchPrefixes?.some((prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`))
+  if (child) return [child.key]
+
+  const parent = navigationItems.find((item) =>
+    item.matchPrefixes?.some(
+      (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
+    ),
   )
+  return parent ? [parent.key] : [route.path]
+})
+
+function computeOpenKeys(): string[] {
+  const parent = navigationItems.find((item) =>
+    item.matchPrefixes?.some(
+      (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
+    ),
+  )
+  return parent ? [parent.key] : []
 }
 
-function handleMenuClick(entry: MenuEntry) {
-  router.push(entry.target)
+const openKeys = ref<string[]>(computeOpenKeys())
+
+watch(
+  () => route.path,
+  () => {
+    openKeys.value = computeOpenKeys()
+  },
+  { immediate: true },
+)
+
+function handleMenuClick({ key }: { key: string }) {
+  const target = String(key)
+  if (target.startsWith('/')) {
+    router.push(target)
+  }
+}
+
+function handleSectionClick(item: MenuItem) {
+  const target = item.children?.[0]?.key || item.key
+  if (target.startsWith('/')) {
+    router.push(target)
+  }
 }
 </script>
 
 <template>
-  <nav class="sidebar-menu" tabindex="0" role="menu" aria-label="主导航菜单">
-    <template v-for="section in menuSections" :key="section.title || 'root'">
-      <div v-if="section.title" class="menu-group">{{ section.title }}</div>
-      <button
-        v-for="item in section.items"
-        :key="item.key"
-        type="button"
-        class="menu-item"
-        :class="{ 'menu-item--active': isActive(item) }"
-        role="menuitem"
-        @click="handleMenuClick(item)"
-      >
-        <component :is="item.icon" class="menu-icon" />
-        <span class="menu-label">{{ item.label }}</span>
-      </button>
-    </template>
+  <nav v-if="props.collapsed" class="sidebar-menu sidebar-menu--collapsed" aria-label="主导航菜单">
+    <button
+      v-for="item in menuItems"
+      :key="item.key"
+      type="button"
+      class="collapsed-menu-item"
+      :class="{ 'collapsed-menu-item--active': openKeys.includes(item.key) }"
+      :title="item.label"
+      @click="handleSectionClick(item)"
+    >
+      <component :is="item.icon" v-if="item.icon" class="collapsed-menu-icon" />
+    </button>
   </nav>
+  <a-menu
+    v-else
+    v-model:open-keys="openKeys"
+    :selected-keys="selectedKeys"
+    :items="menuItems"
+    mode="inline"
+    class="sidebar-menu"
+    tabindex="0"
+    role="menu"
+    aria-label="主导航菜单"
+    @click="handleMenuClick"
+  />
 </template>
 
 <style scoped>
 .sidebar-menu {
   height: calc(100vh - var(--shell-header-height));
-  padding: 16px 0;
+  padding: 14px 10px 18px;
   overflow-y: auto;
   background: transparent;
+  border-right: 0;
 }
 
-.menu-group {
-  padding: 8px 24px;
-  margin-top: 8px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.4;
+.sidebar-menu--collapsed {
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
+  width: var(--shell-sidebar-collapsed-width);
 }
 
-.menu-item {
+.collapsed-menu-item {
   display: flex;
   align-items: center;
-  width: 100%;
-  height: 44px;
-  padding: 0 24px;
-  border: 0;
-  border-right: 3px solid transparent;
+  justify-content: center;
+  width: 48px;
+  height: 42px;
+  margin: 3px auto;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
   background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-  text-align: left;
+  color: var(--text-secondary);
   cursor: pointer;
   transition:
-    background 0.2s,
-    color 0.2s;
+    background 0.16s ease,
+    color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
-.menu-item:hover {
-  background: #f5f5f5;
-}
-
-.menu-item--active {
-  background: #e6f7ff;
+.collapsed-menu-item:hover {
+  background: var(--surface-tint);
   color: var(--primary);
-  border-right-color: var(--primary);
 }
 
-.menu-icon {
-  width: 20px;
-  margin-right: 10px;
+.collapsed-menu-item--active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: rgba(37, 99, 235, 0.14);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+}
+
+.collapsed-menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+}
+
+:deep(.ant-menu) {
+  color: var(--text);
+  background: transparent;
+}
+
+:deep(.ant-menu-submenu-title),
+:deep(.ant-menu-item) {
+  height: 40px;
+  margin: 3px 0;
+  padding-inline: 14px !important;
+  border-radius: 10px;
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 40px;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
 }
 
-.menu-item--active .menu-icon {
-  color: var(--primary);
+:deep(.ant-menu-submenu-title:hover),
+:deep(.ant-menu-item:hover) {
+  background: #f4f8ff !important;
+  color: var(--primary) !important;
 }
 
-:global(.ant-layout-sider-collapsed) .menu-group,
-:global(.ant-layout-sider-collapsed) .menu-label {
+:deep(.ant-menu-submenu-selected > .ant-menu-submenu-title),
+:deep(.ant-menu-item-selected) {
+  background: var(--primary-soft) !important;
+  color: var(--primary) !important;
+  font-weight: 800;
+}
+
+:deep(.ant-menu-item-selected) {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+:deep(.ant-menu-item .ant-menu-title-content),
+:deep(.ant-menu-submenu-title .ant-menu-title-content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.ant-menu-sub .ant-menu-item) {
+  height: 34px;
+  margin: 0;
+  padding-left: 42px !important;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 34px;
+}
+
+:deep(.ant-menu-inline-collapsed) {
+  width: var(--shell-sidebar-collapsed-width);
+}
+
+:global(.ant-layout-sider-collapsed) .sidebar-menu,
+:deep(.ant-menu-inline-collapsed) {
+  padding-top: 16px;
+}
+
+:global(.ant-layout-sider-collapsed) .sidebar-menu :deep(.ant-menu-submenu-title),
+:global(.ant-layout-sider-collapsed) .sidebar-menu :deep(.ant-menu-item),
+:deep(.ant-menu-inline-collapsed > .ant-menu-submenu > .ant-menu-submenu-title),
+:deep(.ant-menu-inline-collapsed > .ant-menu-item) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0 !important;
+}
+
+:global(.ant-layout-sider-collapsed) .sidebar-menu :deep(.ant-menu-title-content),
+:global(.ant-layout-sider-collapsed) .sidebar-menu :deep(.ant-menu-submenu-arrow),
+:deep(.ant-menu-inline-collapsed .ant-menu-title-content),
+:deep(.ant-menu-inline-collapsed .ant-menu-submenu-arrow) {
   display: none;
 }
 
-:global(.ant-layout-sider-collapsed) .menu-item {
+:global(.ant-layout-sider-collapsed) .sidebar-menu :deep(.ant-menu-item-icon),
+:global(.ant-layout-sider-collapsed) .sidebar-menu :deep(.anticon),
+:deep(.ant-menu-inline-collapsed .ant-menu-item-icon),
+:deep(.ant-menu-inline-collapsed .anticon) {
+  display: inline-flex !important;
+  align-items: center;
   justify-content: center;
-  padding: 0;
-  border-right-color: transparent;
-}
-
-:global(.ant-layout-sider-collapsed) .menu-icon {
-  margin-right: 0;
+  margin-inline-end: 0;
   font-size: 17px;
+  opacity: 1;
+  visibility: visible;
 }
 </style>

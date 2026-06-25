@@ -66,6 +66,14 @@ const taskStatusMap: Record<string, { text: string; color: string }> = {
 }
 
 const isRunning = computed(() => detail.value?.instanceStatus === 'RUNNING')
+const availableActions = computed(() =>
+  Array.isArray(detail.value?.availableActions) ? detail.value.availableActions : [],
+)
+const nodes = computed(() => (Array.isArray(detail.value?.nodes) ? detail.value.nodes : []))
+const records = computed(() => (Array.isArray(detail.value?.records) ? detail.value.records : []))
+const completedNodeCount = computed(
+  () => nodes.value.filter((node) => node.nodeStatus === 'COMPLETED').length,
+)
 
 async function fetchDetail() {
   loading.value = true
@@ -107,8 +115,9 @@ function handleAction(action: string) {
 async function handleApprove() {
   actionLoading.value = true
   try {
-    const activeNode = detail.value?.nodes.find((n) => n.nodeStatus === 'ACTIVE')
-    const myTask = activeNode?.tasks.find((t) => t.taskStatus === 'PENDING')
+    const activeNode = nodes.value.find((n) => n.nodeStatus === 'ACTIVE')
+    const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
+    const myTask = tasks.find((t) => t.taskStatus === 'PENDING')
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -137,8 +146,9 @@ async function handleReject() {
   }
   actionLoading.value = true
   try {
-    const activeNode = detail.value?.nodes.find((n) => n.nodeStatus === 'ACTIVE')
-    const myTask = activeNode?.tasks.find((t) => t.taskStatus === 'PENDING')
+    const activeNode = nodes.value.find((n) => n.nodeStatus === 'ACTIVE')
+    const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
+    const myTask = tasks.find((t) => t.taskStatus === 'PENDING')
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -167,8 +177,9 @@ async function handleTransfer() {
   }
   actionLoading.value = true
   try {
-    const activeNode = detail.value?.nodes.find((n) => n.nodeStatus === 'ACTIVE')
-    const myTask = activeNode?.tasks.find((t) => t.taskStatus === 'PENDING')
+    const activeNode = nodes.value.find((n) => n.nodeStatus === 'ACTIVE')
+    const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
+    const myTask = tasks.find((t) => t.taskStatus === 'PENDING')
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -197,8 +208,9 @@ async function handleAddSign() {
   }
   actionLoading.value = true
   try {
-    const activeNode = detail.value?.nodes.find((n) => n.nodeStatus === 'ACTIVE')
-    const myTask = activeNode?.tasks.find((t) => t.taskStatus === 'PENDING')
+    const activeNode = nodes.value.find((n) => n.nodeStatus === 'ACTIVE')
+    const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
+    const myTask = tasks.find((t) => t.taskStatus === 'PENDING')
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -303,43 +315,43 @@ onMounted(() => {
         </div>
 
         <!-- Action Bar -->
-        <div v-if="detail.availableActions.length > 0 && isRunning" class="wf-actions">
+        <div v-if="availableActions.length > 0 && isRunning" class="wf-actions">
           <a-space>
             <a-button
-              v-if="detail.availableActions.includes('approve')"
+              v-if="availableActions.includes('approve')"
               type="primary"
               @click="handleAction('approve')"
             >
               同意
             </a-button>
             <a-button
-              v-if="detail.availableActions.includes('reject')"
+              v-if="availableActions.includes('reject')"
               danger
               @click="handleAction('reject')"
             >
               驳回
             </a-button>
             <a-button
-              v-if="detail.availableActions.includes('transfer')"
+              v-if="availableActions.includes('transfer')"
               @click="handleAction('transfer')"
             >
               转办
             </a-button>
             <a-button
-              v-if="detail.availableActions.includes('addSign')"
+              v-if="availableActions.includes('addSign')"
               @click="handleAction('addSign')"
             >
               加签
             </a-button>
             <a-button
-              v-if="detail.availableActions.includes('withdraw')"
+              v-if="availableActions.includes('withdraw')"
               @click="handleAction('withdraw')"
             >
               撤回
             </a-button>
           </a-space>
         </div>
-        <div v-if="detail.availableActions.includes('resubmit') && !isRunning" class="wf-actions">
+        <div v-if="availableActions.includes('resubmit') && !isRunning" class="wf-actions">
           <a-button type="primary" @click="handleAction('resubmit')">重新提交</a-button>
         </div>
 
@@ -347,11 +359,11 @@ onMounted(() => {
         <div class="pt-panel">
           <h4 style="margin-top: 0">审批流程</h4>
           <a-steps
-            :current="detail.nodes.filter((n) => n.nodeStatus === 'COMPLETED').length"
+            :current="completedNodeCount"
             size="small"
             direction="vertical"
           >
-            <a-step v-for="node in detail.nodes" :key="node.id">
+            <a-step v-for="node in nodes" :key="node.id">
               <template #title>
                 {{ node.nodeName }}
                 <a-tag :color="nodeStatusMap[node.nodeStatus]?.color" style="margin-left: 8px">
@@ -359,7 +371,7 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template #description>
-                <div v-if="node.tasks.length > 0" class="wf-node-tasks">
+                <div v-if="Array.isArray(node.tasks) && node.tasks.length > 0" class="wf-node-tasks">
                   <div v-for="task in node.tasks" :key="task.id" class="wf-node-task-item">
                     <span>{{ task.approverName }}</span>
                     <a-tag :color="taskStatusMap[task.taskStatus]?.color" size="small">
@@ -379,7 +391,7 @@ onMounted(() => {
         <div class="pt-panel">
           <h4 style="margin-top: 0">审批记录</h4>
           <a-timeline>
-            <a-timeline-item v-for="record in detail.records" :key="record.id">
+            <a-timeline-item v-for="record in records" :key="record.id">
               <div>
                 <strong>{{ record.operatorName }}</strong>
                 <a-tag style="margin-left: 8px">{{

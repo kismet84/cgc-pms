@@ -7,6 +7,15 @@ import type { PageResult } from '@/types/api'
 import { flattenDeptTree } from '../utils'
 import type { OrgDepartmentTreeNodeVO } from '@/types/org'
 
+function normalizeArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[]
+  if (value && typeof value === 'object') {
+    const records = (value as { records?: unknown }).records
+    if (Array.isArray(records)) return records as T[]
+  }
+  return []
+}
+
 export function usePosition(deptTreeData: Ref<OrgDepartmentTreeNodeVO[]>) {
   const loading = ref(false)
   const data = ref<OrgPositionVO[]>([])
@@ -58,8 +67,8 @@ export function usePosition(deptTreeData: Ref<OrgDepartmentTreeNodeVO[]>) {
         positionName: filter.positionName || undefined,
         status: filter.status,
       })
-      data.value = res.records
-      total.value = res.total
+      data.value = normalizeArray<OrgPositionVO>(res.records)
+      total.value = Number(res.total) || data.value.length
     } catch (e: unknown) {
       console.error(e)
       data.value = []

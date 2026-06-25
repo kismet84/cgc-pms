@@ -48,11 +48,11 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 const gridColumns = computed(() => [
-  { field: 'materialCode', title: '材料编码', width: 130, ellipsis: true },
-  { field: 'materialName', title: '材料名称', minWidth: 150, ellipsis: true },
-  { field: 'specification', title: '规格型号', width: 120, ellipsis: true },
+  { field: 'materialCode', title: '材料编码', minWidth: 140, ellipsis: true },
+  { field: 'materialName', title: '材料名称', minWidth: 180, ellipsis: true },
+  { field: 'specification', title: '规格型号', minWidth: 140, ellipsis: true },
   { field: 'unit', title: '单位', width: 70 },
-  { field: 'brand', title: '品牌', width: 100, ellipsis: true },
+  { field: 'brand', title: '品牌', minWidth: 110, ellipsis: true },
   {
     field: 'defaultTaxRate',
     title: '默认税率(%)',
@@ -64,6 +64,26 @@ const gridColumns = computed(() => [
   { field: 'createdAt', title: '创建时间', width: 150 },
   { title: '操作', width: 130, slots: { default: 'ops' } },
 ])
+
+const materialStats = computed(() => ({
+  total: total.value,
+  enabled: tableData.value.filter((item) => item.status === 'ENABLE').length,
+  disabled: tableData.value.filter((item) => item.status === 'DISABLE').length,
+  taxRated: tableData.value.filter((item) => item.defaultTaxRate).length,
+}))
+
+const materialUnitSummary = computed(() => {
+  const counts = tableData.value.reduce<Record<string, number>>((acc, item) => {
+    const key = item.unit || '未维护'
+    acc[key] = (acc[key] || 0) + 1
+    return acc
+  }, {})
+  return Object.entries(counts)
+    .slice(0, 5)
+    .map(([unit, count]) => ({ unit, count }))
+})
+
+const recentMaterials = computed(() => tableData.value.slice(0, 4))
 
 async function fetchData() {
   loading.value = true
@@ -199,7 +219,7 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="lg-page app-page">
+  <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="lg-breadcrumb">
@@ -227,64 +247,110 @@ onMounted(fetchData)
       </a-button>
     </div>
 
-    <!-- 工具栏 -->
-    <div class="lg-toolbar">
-      <div class="lg-toolbar-left">
-        <a-button type="primary" @click="handleAdd">
-          <template #icon><PlusOutlined /></template>
-          新增材料
-        </a-button>
-        <a-button @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-        </a-button>
+    <div class="lg-kpi-strip">
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">材料总数</span>
+        <span class="lg-kpi-card-value">{{ materialStats.total }} <small>项</small></span>
       </div>
-      <div class="lg-toolbar-right" />
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">启用材料</span>
+        <span class="lg-kpi-card-value">{{ materialStats.enabled }} <small>项</small></span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">已维护税率</span>
+        <span class="lg-kpi-card-value">{{ materialStats.taxRated }} <small>项</small></span>
+      </div>
+      <div class="lg-kpi-card is-warn">
+        <span class="lg-kpi-card-label">禁用材料</span>
+        <span class="lg-kpi-card-value">{{ materialStats.disabled }} <small>项</small></span>
+      </div>
     </div>
 
-    <!-- 表格 -->
-    <div class="lg-table-wrap">
-      <vxe-grid
-        :data="tableData"
-        :columns="gridColumns"
-        :loading="loading"
-        :column-config="{ resizable: true }"
-        stripe
-        border="inner"
-        size="small"
-        max-height="480"
-      >
-        <template #defaultTaxRate="{ row }">
-          <span>{{ row.defaultTaxRate || '-' }}</span>
-        </template>
-        <template #status="{ row }">
-          <a-tag :color="STATUS_COLOR[row.status]">
-            {{ STATUS_LABEL[row.status] ?? row.status }}
-          </a-tag>
-        </template>
-        <template #ops="{ row }">
-          <div class="lg-ops">
-            <a class="lg-link" @click="handleEdit(row)">编辑</a>
-            <a class="lg-link lg-del" @click="handleToggleStatus(row)">
-              {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
-            </a>
+    <div class="lg-grid">
+      <main class="lg-list-table-panel">
+        <div class="lg-toolbar">
+          <div class="lg-toolbar-left">
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新增材料
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+            </a-button>
           </div>
-        </template>
-      </vxe-grid>
-    </div>
+          <div class="lg-toolbar-right" />
+        </div>
 
-    <!-- 分页 -->
-    <div class="lg-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
-      <a-pagination
-        v-model:current="pageNo"
-        v-model:page-size="pageSize"
-        :total="total"
-        :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
-        @change="handlePageChange"
-        @show-size-change="handlePageSizeChange"
-      />
+        <!-- 表格 -->
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="gridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
+            max-height="480"
+          >
+            <template #defaultTaxRate="{ row }">
+              <span>{{ row.defaultTaxRate || '-' }}</span>
+            </template>
+            <template #status="{ row }">
+              <a-tag :color="STATUS_COLOR[row.status]">
+                {{ STATUS_LABEL[row.status] ?? row.status }}
+              </a-tag>
+            </template>
+            <template #ops="{ row }">
+              <div class="lg-ops">
+                <a class="lg-link" @click="handleEdit(row)">编辑</a>
+                <a class="lg-link lg-del" @click="handleToggleStatus(row)">
+                  {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
+                </a>
+              </div>
+            </template>
+          </vxe-grid>
+        </div>
+
+        <!-- 分页 -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
+
+      <aside class="lg-analysis-rail">
+        <section class="lg-panel">
+          <div class="lg-panel-title">计量单位分布</div>
+          <div class="lg-type-list">
+            <div v-for="item in materialUnitSummary" :key="item.unit" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #1890ff"></span>
+              <span class="lg-type-label">{{ item.unit }}</span>
+              <span style="margin-left: auto">{{ item.count }} 项</span>
+            </div>
+            <div v-if="!materialUnitSummary.length" class="lg-warning-empty">暂无材料</div>
+          </div>
+        </section>
+        <section class="lg-panel">
+          <div class="lg-panel-title">近期材料</div>
+          <div class="lg-type-list">
+            <div v-for="item in recentMaterials" :key="item.id" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #52c41a"></span>
+              <span class="lg-type-label">{{ item.materialName }}</span>
+            </div>
+            <div v-if="!recentMaterials.length" class="lg-warning-empty">暂无材料</div>
+          </div>
+        </section>
+      </aside>
     </div>
 
     <!-- Modal -->

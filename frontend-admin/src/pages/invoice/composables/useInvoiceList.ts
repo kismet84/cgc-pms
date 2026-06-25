@@ -38,7 +38,7 @@ export function useInvoiceList() {
   const payRecordList = ref<PayRecordBrief[]>([])
 
   const gridColumns = computed(() => [
-    { field: 'invoiceNo', title: '发票号码', width: 140, ellipsis: true },
+    { field: 'invoiceNo', title: '发票号码', minWidth: 150, ellipsis: true },
     { field: 'invoiceType', title: '发票类型', width: 100, slots: { default: 'invoiceType' } },
     {
       field: 'invoiceAmount',
@@ -62,7 +62,7 @@ export function useInvoiceList() {
     },
     { field: 'invoiceDate', title: '开票日期', width: 110 },
     { field: 'verifyStatus', title: '核验状态', width: 90, slots: { default: 'verifyStatus' } },
-    { field: 'remark', title: '备注', width: 120, ellipsis: true },
+    { field: 'remark', title: '备注', minWidth: 140, ellipsis: true },
     { field: 'createdAt', title: '创建时间', width: 150 },
     { title: '操作', width: 150, slots: { default: 'action' } },
   ])
