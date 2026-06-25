@@ -942,6 +942,20 @@ a {
   justify-content: flex-start;
   gap: 12px;
 }
+.lg-row-action-trigger {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.lg-row-action-trigger:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
 .lg-del {
   color: var(--error);
 }
@@ -1165,6 +1179,11 @@ a {
 
 .lg-list-page .lg-table-wrap .ant-table-cell:has(.lg-ops) {
   min-width: 132px;
+  max-width: none;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-cell:has(.lg-row-action-trigger) {
+  min-width: 76px;
   max-width: none;
 }
 

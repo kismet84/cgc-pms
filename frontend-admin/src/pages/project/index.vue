@@ -6,6 +6,7 @@ import {
   DollarOutlined,
   FileTextOutlined,
   FlagOutlined,
+  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
@@ -477,7 +478,7 @@ const gridColumns = computed(() => [
         },
       ]
     : []),
-  ...(colVisible.ops ? [{ title: '操作', width: 150, slots: { default: 'ops' } }] : []),
+  ...(colVisible.ops ? [{ title: '操作', width: 76, slots: { default: 'ops' } }] : []),
 ])
 </script>
 
@@ -789,11 +790,20 @@ const gridColumns = computed(() => [
                 >
               </template>
               <template #ops="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="router.push(`/project/${row.id}/overview`)">查看</a>
-                  <a class="lg-link" @click="handleEditModalOpen(row)">编辑</a>
-                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="router.push(`/project/${row.id}/overview`)">
+                        查看
+                      </a-menu-item>
+                      <a-menu-item @click="handleEditModalOpen(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

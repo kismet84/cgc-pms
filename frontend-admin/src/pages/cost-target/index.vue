@@ -5,6 +5,7 @@ import {
   ReloadOutlined,
   CheckCircleOutlined,
   SearchOutlined,
+  MoreOutlined,
 } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { getCostTargetList, activateCostTarget, deleteCostTarget } from '@/api/modules/costTarget'
@@ -182,7 +183,7 @@ const columns = [
   { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
   { field: 'status', title: '业务状态', width: 108, slots: { default: 'status' } },
   { field: 'isActive', title: '版本标识', width: 108, slots: { default: 'isActive' } },
-  { title: '操作', width: 160, slots: { default: 'ops' } },
+  { title: '操作', width: 76, slots: { default: 'ops' } },
 ]
 
 const targetStats = computed(() => ({
@@ -318,23 +319,30 @@ onMounted(() => {
                 <span v-else class="ct-muted">历史版本</span>
               </template>
               <template #ops="{ row }">
-                <div class="ct-ops lg-ops">
-                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                  <a
-                    v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
-                    class="lg-link"
-                    :class="{ 'lg-link--disabled': activating }"
-                    @click="handleActivate(row)"
-                  >
-                    <CheckCircleOutlined style="margin-right: 4px" />切换版本
-                  </a>
-                  <a
-                    v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
-                    class="lg-link lg-link--danger"
-                    @click="handleDelete(row)"
-                    >删除</a
-                  >
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item
+                        v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
+                        :disabled="activating"
+                        @click="handleActivate(row)"
+                      >
+                        <CheckCircleOutlined style="margin-right: 4px" />切换版本
+                      </a-menu-item>
+                      <a-menu-item
+                        v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+                        danger
+                        @click="handleDelete(row)"
+                      >
+                        删除
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

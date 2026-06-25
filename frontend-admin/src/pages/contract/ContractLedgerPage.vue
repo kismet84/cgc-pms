@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import {
+  MoreOutlined,
   PlusOutlined,
   SettingOutlined,
   ReloadOutlined,
@@ -188,11 +189,18 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 <ContractStatusTag :status="row.contractStatus as ContractStatus" />
               </template>
               <template #ops="{ row }">
-                <div class="lg-ops">
-                  <a class="lg-link" @click="handleView(row)">查看</a>
-                  <a class="lg-link" @click="handleEdit(row)">编辑</a>
-                  <a class="lg-link lg-del" @click="handleDelete(row)">删除</a>
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleView(row)">查看</a-menu-item>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>

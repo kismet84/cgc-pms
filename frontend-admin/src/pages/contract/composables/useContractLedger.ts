@@ -389,7 +389,7 @@ export function useContractLedger() {
           },
         ]
       : []),
-    ...(colVisible.ops ? [{ title: '操作', width: 140, slots: { default: 'ops' } }] : []),
+    ...(colVisible.ops ? [{ title: '操作', width: 76, slots: { default: 'ops' } }] : []),
   ])
 
   return {
