@@ -291,7 +291,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   <a-modal
     v-model:open="contractModalVisible"
     :title="contractModalMode === 'edit' ? '编辑合同' : '新建合同'"
-    :width="1180"
+    :width="800"
     :destroy-on-close="true"
     :footer="null"
     :mask-closable="false"
@@ -311,8 +311,22 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
 <style scoped>
 .cl-contract-modal :deep(.ant-modal-body) {
-  max-height: 82vh;
+  max-height: calc(100vh - 96px);
   overflow: auto;
+  padding: 12px 16px 0;
+}
+
+.cl-contract-modal :deep(.ant-modal-header) {
+  padding: 12px 16px;
+}
+
+.cl-contract-modal :deep(.ant-modal-close) {
+  top: 10px;
+}
+
+.cl-contract-modal :deep(.ant-modal-title) {
+  font-size: 15px;
+  line-height: 22px;
 }
 
 .cl-redesign-page {

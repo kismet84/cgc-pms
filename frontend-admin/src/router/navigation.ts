@@ -33,12 +33,11 @@ export const navigationItems: NavigationItem[] = [
     key: '/cost-domain',
     label: '成本管理',
     icon: 'DollarOutlined',
-    matchPrefixes: ['/cost', '/cost-target'],
+    matchPrefixes: ['/cost/ledger', '/cost/summary', '/cost-target'],
     children: [
       { key: '/cost/ledger', label: '成本台账' },
-      { key: '/cost/summary', label: '成本汇总' },
+      { key: '/cost/summary', label: '成本明细' },
       { key: '/cost-target/index', label: '目标成本' },
-      { key: '/cost/subject', label: '成本科目' },
     ],
   },
   {
@@ -97,11 +96,12 @@ export const navigationItems: NavigationItem[] = [
     key: '/master-data',
     label: '数据中心',
     icon: 'ProjectOutlined',
-    matchPrefixes: ['/partner', '/org', '/material'],
+    matchPrefixes: ['/partner', '/org', '/material', '/cost/subject'],
     children: [
       { key: '/partner', label: '合作方管理' },
       { key: '/org', label: '组织架构' },
       { key: '/material/dictionary', label: '材料字典' },
+      { key: '/cost/subject', label: '成本科目' },
     ],
   },
   {

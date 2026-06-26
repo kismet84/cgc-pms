@@ -176,7 +176,7 @@ const columns = computed(() => [
   { field: 'projectName', title: '所属项目', width: 150 },
   {
     field: 'totalTargetAmount',
-    title: '目标成本合计(万元)',
+    title: '目标成本',
     width: 150,
     align: 'right' as const,
     slots: { default: 'amount' },
@@ -224,12 +224,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
-        <a-breadcrumb-item>目标管理</a-breadcrumb-item>
-        <a-breadcrumb-item>目标成本</a-breadcrumb-item>
-      </a-breadcrumb>
+  <div class="lg-list-page lg-page app-page ct-page">
+    <div class="lg-page-head ct-page-head">
+      <div class="ct-page-meta-row">
+        <a-breadcrumb class="ct-breadcrumb">
+          <a-breadcrumb-item>成本管理</a-breadcrumb-item>
+          <a-breadcrumb-item>目标成本</a-breadcrumb-item>
+        </a-breadcrumb>
+        <span class="ct-page-subtitle">统一管理目标成本版本、审批状态与当前生效版本</span>
+      </div>
     </div>
 
     <div class="lg-search-bar ct-search-bar">
@@ -239,9 +242,10 @@ onMounted(() => {
           class="ct-search-input"
           placeholder="搜索版本号…"
           allow-clear
+          size="large"
           @press-enter="handleSearch"
         >
-          <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
+          <template #prefix><SearchOutlined class="ct-search-prefix-icon" /></template>
         </a-input>
         <a-select
           v-model:value="filter.projectId"
@@ -249,6 +253,7 @@ onMounted(() => {
           placeholder="全部项目"
           allow-clear
           show-search
+          size="large"
           :filter-option="
             (input: string, option: SelectOption) =>
               option.label?.toLowerCase().includes(input.toLowerCase())
@@ -260,9 +265,12 @@ onMounted(() => {
           }}</a-select-option>
         </a-select>
       </div>
-      <div class="lg-search-actions">
-        <a-button type="primary" @click="handleSearch">查询</a-button>
-        <a-button @click="handleReset">重置</a-button>
+      <div class="ct-search-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
       </div>
     </div>
 
@@ -287,27 +295,31 @@ onMounted(() => {
           </div>
         </div>
 
-        <section class="lg-list-table-panel">
-          <div class="lg-toolbar">
+        <section class="lg-list-table-panel ct-table-panel">
+          <div class="lg-toolbar ct-table-toolbar">
             <div class="lg-toolbar-left">
-              <a-button type="primary" @click="handleCreate">
-                <template #icon><PlusOutlined /></template>
-                新建目标成本
-              </a-button>
-              <a-button @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
-              </a-button>
-            </div>
-            <div class="lg-toolbar-right">
+              <span class="ct-table-title">目标成本版本</span>
+              <span class="ct-table-count">共 {{ total }} 条</span>
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
               />
+              <a-button aria-label="刷新目标成本" title="刷新目标成本" @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
+              <a-button type="primary" @click="handleCreate">
+                <template #icon><PlusOutlined /></template>
+                新建目标成本
+              </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <span class="ct-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
             </div>
           </div>
 
-          <div class="lg-table-wrap">
+          <div class="lg-table-wrap ct-table-wrap">
             <vxe-grid
               :data="tableData"
               :columns="visibleGridColumns"
@@ -406,7 +418,7 @@ onMounted(() => {
     <a-modal
       v-model:open="targetModalVisible"
       :title="targetModalMode === 'edit' ? '编辑目标成本' : '新建目标成本'"
-      :width="1160"
+      :width="800"
       :destroy-on-close="true"
       :footer="null"
       :mask-closable="false"
@@ -427,8 +439,19 @@ onMounted(() => {
 
 <style scoped>
 .ct-target-modal :deep(.ant-modal-body) {
-  max-height: 82vh;
+  max-height: calc(100vh - 96px);
   overflow: auto;
+  padding: 12px 16px 0;
+}
+.ct-target-modal :deep(.ant-modal-header) {
+  padding: 12px 16px;
+}
+.ct-target-modal :deep(.ant-modal-close) {
+  top: 10px;
+}
+.ct-target-modal :deep(.ant-modal-title) {
+  font-size: 15px;
+  line-height: 22px;
 }
 .lg-link--disabled {
   color: var(--muted);
@@ -443,6 +466,31 @@ onMounted(() => {
 .ct-muted {
   color: var(--muted);
   font-size: 13px;
+}
+.ct-page {
+  gap: 14px;
+}
+.ct-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+.ct-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+.ct-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+.ct-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
 }
 .ct-content-grid {
   align-items: start;
@@ -461,6 +509,9 @@ onMounted(() => {
 }
 .ct-search-bar {
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
 }
 .ct-search-fields {
   display: flex;
@@ -470,20 +521,61 @@ onMounted(() => {
   min-width: 0;
 }
 .ct-search-input {
-  width: auto;
-  min-width: 240px;
+  width: min(560px, 34vw);
+  min-width: 360px;
   flex: 1 1 auto;
 }
+.ct-search-prefix-icon {
+  color: var(--text-secondary);
+}
 .ct-search-select {
-  width: 200px;
-  flex: 0 0 200px;
+  width: 180px;
+  flex: 0 0 180px;
+}
+.ct-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+.ct-table-panel {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+.ct-table-toolbar {
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ct-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+.ct-table-count,
+.ct-toolbar-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.ct-table-wrap {
+  min-height: 520px;
+}
+.ct-table-wrap :deep(.vxe-header--column .vxe-cell) {
+  justify-content: center;
+  text-align: center;
 }
 @media (max-width: 768px) {
+  .ct-page-head,
+  .ct-search-bar,
   .ct-search-fields,
   .ct-search-input,
   .ct-search-select {
+    align-items: stretch;
     width: 100%;
     flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .ct-search-actions {
+    justify-content: flex-start;
   }
 }
 </style>

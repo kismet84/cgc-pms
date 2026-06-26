@@ -3804,3 +3804,109 @@ body,
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Business modal standard: 800px compact dialog with persistent actions ---- */
+.ant-modal:not(.ant-modal-confirm) {
+  width: min(800px, calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px);
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 96px);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-modal-header {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-modal-title {
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-modal-close {
+  top: 10px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: calc(100vh - 178px);
+  overflow: auto;
+  padding: 12px 16px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-modal-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 0;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-modal-footer .ant-btn + .ant-btn {
+  margin-left: 0;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-form-item {
+  margin-bottom: 8px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-form-item-label {
+  padding-bottom: 2px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-form-item-label > label {
+  height: 18px;
+  font-size: 12px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-input,
+.ant-modal:not(.ant-modal-confirm) .ant-input-affix-wrapper,
+.ant-modal:not(.ant-modal-confirm) .ant-input-number,
+.ant-modal:not(.ant-modal-confirm) .ant-select-selector,
+.ant-modal:not(.ant-modal-confirm) .ant-picker {
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-input-number-input,
+.ant-modal:not(.ant-modal-confirm) .ant-picker-input > input,
+.ant-modal:not(.ant-modal-confirm) .ant-select-selection-item,
+.ant-modal:not(.ant-modal-confirm) .ant-select-selection-placeholder {
+  font-size: 12px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-btn {
+  height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-btn-sm {
+  height: 24px;
+  padding: 1px 7px;
+}
+
+.ant-modal:not(.ant-modal-confirm) .ant-table-thead > tr > th,
+.ant-modal:not(.ant-modal-confirm) .ant-table-tbody > tr > td,
+.ant-modal:not(.ant-modal-confirm) .ant-table-footer {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.ant-modal:not(.ant-modal-confirm) textarea.ant-input {
+  min-height: 48px;
+}

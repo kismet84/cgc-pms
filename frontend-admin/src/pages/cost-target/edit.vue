@@ -398,10 +398,10 @@ function finishClose() {
 
 // ---- Table columns ----
 const itemColumns = [
-  { title: '序号', dataIndex: 'index', width: 60, align: 'center' as const },
-  { title: '成本科目', dataIndex: 'costSubjectId', minWidth: 200 },
-  { title: '目标金额(元)', dataIndex: 'targetAmount', width: 160, align: 'right' as const },
-  { title: '操作', dataIndex: 'ops', width: 76, align: 'center' as const },
+  { title: '序号', dataIndex: 'index', width: 46, align: 'center' as const },
+  { title: '成本科目', dataIndex: 'costSubjectId', minWidth: 180 },
+  { title: '目标金额(元)', dataIndex: 'targetAmount', width: 128, align: 'right' as const },
+  { title: '操作', dataIndex: 'ops', width: 54, align: 'center' as const },
 ]
 
 // ---- Helpers ----
@@ -588,12 +588,18 @@ onMounted(() => {
           <div class="pt-panel-header">审批与备注</div>
           <div class="pt-panel-body">
             <a-form-item label="备注" name="remark">
-              <a-textarea v-model:value="formData.remark" :rows="4" placeholder="请输入备注信息" />
+              <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注信息" />
             </a-form-item>
           </div>
         </section>
       </a-form>
     </a-spin>
+
+    <div v-if="isEmbedded" class="cte-modal-actions">
+      <a-button :disabled="saving" @click="handleCancel">取消</a-button>
+      <a-button :loading="saving" @click="handleSave">保存</a-button>
+      <a-button type="primary" :loading="saving" @click="handleSubmit">提交审批</a-button>
+    </div>
   </div>
 </template>
 
@@ -605,21 +611,34 @@ onMounted(() => {
   background: transparent;
   min-height: 0;
   padding: 0;
+  font-size: 12px;
+}
+.cte-modal-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 8px -16px 0;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border-subtle);
 }
 .cte-section {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .cte-section-sub {
   margin-left: auto;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--muted);
 }
 .cte-toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 /* Table footer */
@@ -628,7 +647,7 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   justify-content: flex-end;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text);
 }
 .cte-total {
@@ -640,24 +659,85 @@ onMounted(() => {
 .cte-warn-text {
   color: #ef4444;
   font-weight: 400;
-  font-size: 12px;
+  font-size: 11px;
 }
 .cte-amount-check {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 4px;
+  gap: 2px;
+  padding-top: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .cte-amount-check b {
   color: var(--text);
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
 }
 
 /* Empty */
 .cte-empty {
-  padding: 12px 0;
+  padding: 4px 0;
+}
+.project-target-redesign.cte-embedded :deep(.pt-panel) {
+  border-radius: 6px;
+}
+.project-target-redesign.cte-embedded :deep(.pt-panel-header) {
+  min-height: 34px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.project-target-redesign.cte-embedded :deep(.pt-panel-body) {
+  padding: 10px 12px;
+}
+.project-target-redesign.cte-embedded :deep(.pt-form-grid) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 10px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-form-item) {
+  margin-bottom: 8px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-form-item-label) {
+  padding-bottom: 2px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-form-item-label > label) {
+  height: 18px;
+  font-size: 12px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-input),
+.project-target-redesign.cte-embedded :deep(.ant-input-number),
+.project-target-redesign.cte-embedded :deep(.ant-select-selector),
+.project-target-redesign.cte-embedded :deep(.ant-picker) {
+  min-height: 30px;
+  font-size: 12px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-btn) {
+  height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-btn-sm) {
+  height: 24px;
+  padding: 1px 7px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-table-thead > tr > th),
+.project-target-redesign.cte-embedded :deep(.ant-table-tbody > tr > td),
+.project-target-redesign.cte-embedded :deep(.ant-table-footer) {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-empty) {
+  margin: 6px 0;
+}
+.project-target-redesign.cte-embedded :deep(.ant-empty-image) {
+  height: 40px;
+  margin-bottom: 4px;
+}
+.project-target-redesign.cte-embedded :deep(.ant-empty-description) {
+  font-size: 12px;
+}
+.project-target-redesign.cte-embedded :deep(textarea.ant-input) {
+  min-height: 48px;
 }
 </style>

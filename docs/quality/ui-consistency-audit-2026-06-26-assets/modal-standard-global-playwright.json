@@ -1,0 +1,94 @@
+{
+  "noConsoleErrors": true,
+  "consoleErrors": [],
+  "results": [
+    {
+      "name": "目标成本",
+      "configuredWidth": 800,
+      "inlineWidth": "800px",
+      "contentMaxHeight": "1029px",
+      "bodyOverflowY": "auto",
+      "footerPosition": "sticky",
+      "footerVisibleInViewport": true,
+      "hasFooter": true,
+      "footerButtons": [
+        {
+          "text": "取消",
+          "primary": false
+        },
+        {
+          "text": "保存",
+          "primary": false
+        },
+        {
+          "text": "提交审批",
+          "primary": true
+        }
+      ],
+      "hasPrimaryFooterButton": true
+    },
+    {
+      "name": "新建合同",
+      "configuredWidth": 800,
+      "inlineWidth": "800px",
+      "contentMaxHeight": "1029px",
+      "bodyOverflowY": "auto",
+      "footerPosition": "sticky",
+      "footerVisibleInViewport": true,
+      "hasFooter": true,
+      "footerButtons": [
+        {
+          "text": "取消",
+          "primary": false
+        },
+        {
+          "text": "下一步",
+          "primary": true
+        }
+      ],
+      "hasPrimaryFooterButton": true
+    },
+    {
+      "name": "新建项目",
+      "configuredWidth": 800,
+      "inlineWidth": "520px",
+      "contentMaxHeight": "1029px",
+      "bodyOverflowY": "auto",
+      "footerPosition": "sticky",
+      "footerVisibleInViewport": true,
+      "hasFooter": true,
+      "footerButtons": [
+        {
+          "text": "取消",
+          "primary": false
+        },
+        {
+          "text": "创建",
+          "primary": true
+        }
+      ],
+      "hasPrimaryFooterButton": true
+    },
+    {
+      "name": "采购订单",
+      "configuredWidth": 800,
+      "inlineWidth": "900px",
+      "contentMaxHeight": "1029px",
+      "bodyOverflowY": "auto",
+      "footerPosition": "sticky",
+      "footerVisibleInViewport": true,
+      "hasFooter": true,
+      "footerButtons": [
+        {
+          "text": "取消",
+          "primary": false
+        },
+        {
+          "text": "确定",
+          "primary": true
+        }
+      ],
+      "hasPrimaryFooterButton": true
+    }
+  ]
+}

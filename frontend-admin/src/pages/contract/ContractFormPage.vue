@@ -627,7 +627,7 @@ function genTermKey(): string {
                   <a-textarea
                     v-model:value="formData.remark"
                     placeholder="请输入备注信息"
-                    :rows="3"
+                    :rows="2"
                     @change="dirty = true"
                   />
                 </a-form-item>
@@ -738,6 +738,34 @@ function genTermKey(): string {
         <a-button type="text" :disabled="submitting" @click="handleCancel">取消</a-button>
       </div>
     </div>
+
+    <div v-if="isEmbedded" class="cf-modal-actions">
+      <a-button :disabled="submitting" @click="handleCancel">取消</a-button>
+      <a-button v-if="current > 0" :disabled="submitting" @click="handlePrev">上一步</a-button>
+      <a-button
+        v-if="current < stepConfig.length - 1"
+        type="primary"
+        :loading="submitting"
+        @click="handleNext"
+      >
+        下一步
+      </a-button>
+      <a-button
+        v-if="current === stepConfig.length - 1"
+        :loading="submitting"
+        @click="handleSaveDraft"
+      >
+        保存草稿
+      </a-button>
+      <a-button
+        v-if="current === stepConfig.length - 1"
+        type="primary"
+        :loading="submitting"
+        @click="handleSubmit"
+      >
+        提交审批
+      </a-button>
+    </div>
   </div>
 </template>
 
@@ -750,6 +778,7 @@ function genTermKey(): string {
   background: transparent;
   min-height: 0;
   padding: 0;
+  font-size: 12px;
 }
 .pt-breadcrumb {
   margin-bottom: 4px;
@@ -799,5 +828,96 @@ function genTermKey(): string {
   position: absolute;
   top: 28px;
   right: 32px;
+}
+
+.cf-modal-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin: 8px -16px 0;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.project-target-redesign.cf-embedded :deep(.sw-actions) {
+  display: none;
+}
+
+.project-target-redesign.cf-embedded :deep(.step-wizard) {
+  gap: 10px;
+}
+
+.project-target-redesign.cf-embedded :deep(.sw-steps) {
+  padding: 12px 20px 0;
+}
+
+.project-target-redesign.cf-embedded :deep(.sw-content) {
+  min-height: 0;
+  padding: 0 12px 10px;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-steps-item-title) {
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-steps-item-description) {
+  font-size: 11px;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-row) {
+  margin-left: -5px !important;
+  margin-right: -5px !important;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-col) {
+  padding-left: 5px !important;
+  padding-right: 5px !important;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-form-item) {
+  margin-bottom: 8px;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-form-item-label) {
+  padding-bottom: 2px;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-form-item-label > label) {
+  height: 18px;
+  font-size: 12px;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-input),
+.project-target-redesign.cf-embedded :deep(.ant-input-number),
+.project-target-redesign.cf-embedded :deep(.ant-select-selector),
+.project-target-redesign.cf-embedded :deep(.ant-picker) {
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-btn) {
+  height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.project-target-redesign.cf-embedded :deep(.pt-panel) {
+  border-radius: 6px;
+}
+
+.project-target-redesign.cf-embedded :deep(textarea.ant-input) {
+  min-height: 48px;
+}
+
+.project-target-redesign.cf-embedded :deep(.ant-table-thead > tr > th),
+.project-target-redesign.cf-embedded :deep(.ant-table-tbody > tr > td),
+.project-target-redesign.cf-embedded :deep(.ant-table-footer) {
+  padding: 5px 8px;
+  font-size: 12px;
 }
 </style>

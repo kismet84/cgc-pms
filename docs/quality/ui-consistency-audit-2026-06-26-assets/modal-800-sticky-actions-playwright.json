@@ -1,0 +1,25 @@
+{
+  "noConsoleErrors": true,
+  "consoleErrors": [],
+  "costTarget": {
+    "configuredWidth": 800,
+    "inlineWidth": "800px",
+    "actionsPosition": "sticky",
+    "actionsVisibleInViewport": true,
+    "visible": {
+      "取消": true,
+      "保存": true,
+      "提交审批": true
+    }
+  },
+  "contract": {
+    "configuredWidth": 800,
+    "inlineWidth": "800px",
+    "actionsPosition": "sticky",
+    "actionsVisibleInViewport": true,
+    "visible": {
+      "取消": true,
+      "下一步": true
+    }
+  }
+}
