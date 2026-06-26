@@ -3,11 +3,14 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  FileTextOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SettingOutlined,
   SearchOutlined,
+  WalletOutlined,
 } from '@ant-design/icons-vue'
 import {
   getVarOrderList,
@@ -20,6 +23,7 @@ import {
 } from '@/api/modules/variation'
 import { useReferenceStore } from '@/stores/reference'
 import type { VarOrderVO, VarOrderItemVO } from '@/types/variation'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -42,6 +46,7 @@ const { projects: projectList, contracts: contractList } = storeToRefs(reference
 const modalVisible = ref(false)
 const modalTitle = ref('新建变更签证')
 const editingId = ref<string | null>(null)
+const modalReadonly = ref(false)
 const formData = reactive<Partial<VarOrderVO>>({
   projectId: undefined,
   contractId: undefined,
@@ -88,19 +93,37 @@ const VAR_TYPE_LABEL: Record<string, string> = {
   索赔: '索赔',
   洽商: '洽商',
 }
+const VAR_TYPE_COLOR: Record<string, string> = {
+  设计变更: 'blue',
+  现场签证: 'orange',
+  索赔: 'purple',
+  洽商: 'cyan',
+}
+const APPROVAL_STATUS_LABEL: Record<string, string> = {
+  DRAFT: '草稿',
+  PENDING: '审批中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+}
+const APPROVAL_STATUS_COLOR: Record<string, string> = {
+  DRAFT: 'processing',
+  PENDING: 'warning',
+  APPROVED: 'success',
+  REJECTED: 'error',
+}
 
 // ---- Column visibility ----
-const COLS_KEY = 'var_order_cols'
+const COLS_KEY = 'var_order_cols_v2'
 const defaultCols: Record<string, boolean> = {
   varCode: true,
   varName: true,
   varType: true,
   direction: true,
   projectName: true,
-  contractName: true,
-  partnerName: true,
-  reportedAmount: true,
-  approvedAmount: true,
+  contractName: false,
+  partnerName: false,
+  reportedAmount: false,
+  approvedAmount: false,
   confirmedAmount: true,
   approvalStatus: true,
   ops: true,
@@ -134,11 +157,24 @@ const COL_LABELS: Record<string, string> = {
   ops: '操作',
 }
 
+function calcCodeColumnWidth(values: Array<string | undefined>, title = '变更编号') {
+  const longest = Math.max(title.length, ...values.map((value) => String(value ?? '').length))
+  return Math.min(Math.max(longest * 9 + 42, 128), 240)
+}
+
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
-  { type: 'seq' as const, width: 50 },
   ...(colVisible.varCode
-    ? [{ field: 'varCode', title: '变更编号', minWidth: 140, ellipsis: true }]
+    ? [
+        {
+          field: 'varCode',
+          title: '变更编号',
+          width: calcCodeColumnWidth(tableData.value.map((item) => item.varCode)),
+          minWidth: 128,
+          showOverflow: false,
+          slots: { default: 'varCode' },
+        },
+      ]
     : []),
   ...(colVisible.varName
     ? [{ field: 'varName', title: '变更名称', minWidth: 150, ellipsis: true }]
@@ -218,7 +254,7 @@ async function fetchData() {
       varCode: filter.varCode || undefined,
     })
     tableData.value = res.records
-    total.value = res.total
+    total.value = Number(res.total) || 0
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -243,6 +279,11 @@ function handleReset() {
   pageNo.value = 1
   fetchData()
 }
+function handleProjectChange(val: string | undefined) {
+  filter.contractId = undefined
+  if (val) referenceStore.fetchContracts({ projectId: val })
+  handleSearch()
+}
 function handlePageChange(page: number) {
   pageNo.value = page
   fetchData()
@@ -256,6 +297,7 @@ function handlePageSizeChange(_cur: number, size: number) {
 function handleAdd() {
   modalTitle.value = '新建变更签证'
   editingId.value = null
+  modalReadonly.value = false
   Object.assign(formData, {
     projectId: undefined,
     contractId: undefined,
@@ -272,9 +314,10 @@ function handleAdd() {
   modalVisible.value = true
 }
 
-async function handleEdit(record: VarOrderVO) {
-  modalTitle.value = '编辑变更签证'
+async function openVarOrderModal(record: VarOrderVO, readonly: boolean) {
+  modalTitle.value = readonly ? '查看变更签证' : '编辑变更签证'
   editingId.value = record.id
+  modalReadonly.value = readonly
   Object.assign(formData, {
     projectId: record.projectId,
     contractId: record.contractId,
@@ -295,6 +338,14 @@ async function handleEdit(record: VarOrderVO) {
     return
   }
   modalVisible.value = true
+}
+
+async function handleView(record: VarOrderVO) {
+  await openVarOrderModal(record, true)
+}
+
+async function handleEdit(record: VarOrderVO) {
+  await openVarOrderModal(record, false)
 }
 
 async function handleSubmitApproval(record: VarOrderVO) {
@@ -322,6 +373,7 @@ async function handleDelete(record: VarOrderVO) {
 }
 
 async function handleSubmit() {
+  if (modalReadonly.value) return
   const id = editingId.value
   try {
     if (id) {
@@ -364,6 +416,14 @@ function handleItemPriceChange(idx: number) {
 
 const itemsTotalAmount = computed(() => itemList.value.reduce((sum, i) => sum + (i.amount ?? 0), 0))
 
+const columnSettings = computed(() =>
+  Object.keys(defaultCols).map((key) => ({
+    key,
+    label: COL_LABELS[key],
+    required: key === 'varCode',
+  })),
+)
+
 const variationStats = computed(() => ({
   total: total.value,
   draft: tableData.value.filter((item) => item.approvalStatus === 'DRAFT').length,
@@ -371,12 +431,40 @@ const variationStats = computed(() => ({
   cost: tableData.value.filter((item) => item.direction === 'COST').length,
 }))
 
+function calcPercent(count: number): number {
+  const denominator = Number(total.value)
+  if (!Number.isFinite(denominator) || denominator <= 0) return 0
+  return Math.round((count / denominator) * 100)
+}
+
 const variationTypeSummary = computed(() =>
-  VAR_TYPE_OPTIONS.map((option) => ({
-    label: option.label,
-    count: tableData.value.filter((item) => item.varType === option.value).length,
-  })),
+  VAR_TYPE_OPTIONS.map((option) => {
+    const count = tableData.value.filter((item) => item.varType === option.value).length
+    return {
+      label: option.label,
+      count,
+      percent: calcPercent(count),
+    }
+  }),
 )
+
+const approvalStatusSummary = computed(() => {
+  const labels: Record<string, string> = {
+    DRAFT: '草稿',
+    PENDING: '审批中',
+    APPROVED: '已通过',
+    REJECTED: '已驳回',
+  }
+  return Object.entries(labels).map(([key, label]) => {
+    const count = tableData.value.filter((item) => item.approvalStatus === key).length
+    return {
+      key,
+      label,
+      count,
+      percent: calcPercent(count),
+    }
+  })
+})
 
 const recentVariations = computed(() => tableData.value.slice(0, 4))
 
@@ -395,107 +483,125 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+  <div class="lg-list-page lg-page app-page variation-page">
+    <div class="lg-page-head vo-page-head">
+      <div class="vo-page-meta-row">
+        <a-breadcrumb class="vo-breadcrumb">
+          <a-breadcrumb-item>合同管理</a-breadcrumb-item>
           <a-breadcrumb-item>变更签证</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="vo-page-subtitle">统一查看合同变更、现场签证、审批与金额影响</span>
       </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <div class="lg-search-bar">
-      <a-input
-        v-model:value="filter.varCode"
-        placeholder="搜索变更编号…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
-    </div>
+    <section class="lg-search-bar vo-query-panel" aria-label="变更签证查询条件">
+      <div class="vo-query-primary">
+        <a-input
+          v-model:value="filter.varCode"
+          class="vo-keyword-search"
+          placeholder="搜索变更编号、名称"
+          allow-clear
+          size="large"
+          @press-enter="handleSearch"
+        >
+          <template #prefix><SearchOutlined class="vo-search-prefix-icon" /></template>
+        </a-input>
+        <a-select
+          v-model:value="filter.projectId"
+          class="vo-query-select"
+          placeholder="全部项目"
+          allow-clear
+          size="large"
+          @change="handleProjectChange"
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.varType"
+          class="vo-query-select"
+          placeholder="变更类型"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">
+            {{ o.label }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.direction"
+          class="vo-query-select"
+          placeholder="方向"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="o in DIRECTION_OPTIONS" :key="o.value" :value="o.value">
+            {{ o.label }}
+          </a-select-option>
+        </a-select>
+      </div>
+      <div class="vo-query-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
+      </div>
+    </section>
 
-    <div class="lg-grid">
-      <!-- 左列 -->
-      <div class="lg-left">
-        <!-- KPI -->
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">签证总数</span>
-            <span class="lg-kpi-card-value">{{ variationStats.total }} <small>单</small></span>
+    <div class="lg-grid vo-workspace">
+      <div class="lg-left vo-main-column">
+        <div class="vo-kpi-summary" aria-label="变更签证关键指标">
+          <div class="vo-kpi-item">
+            <span class="vo-kpi-icon is-total"><FileTextOutlined /></span>
+            <span class="vo-kpi-label">签证总数</span>
+            <span class="vo-kpi-value">{{ variationStats.total }} <small>单</small></span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">已通过</span>
-            <span class="lg-kpi-card-value">{{ variationStats.approved }} <small>单</small></span>
+          <div class="vo-kpi-item">
+            <span class="vo-kpi-icon is-approved"><CheckCircleOutlined /></span>
+            <span class="vo-kpi-label">已通过</span>
+            <span class="vo-kpi-value">{{ variationStats.approved }} <small>单</small></span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">成本方向</span>
-            <span class="lg-kpi-card-value">{{ variationStats.cost }} <small>单</small></span>
+          <div class="vo-kpi-item">
+            <span class="vo-kpi-icon is-cost"><WalletOutlined /></span>
+            <span class="vo-kpi-label">成本方向</span>
+            <span class="vo-kpi-value">{{ variationStats.cost }} <small>单</small></span>
           </div>
-          <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">草稿待提</span>
-            <span class="lg-kpi-card-value">{{ variationStats.draft }} <small>单</small></span>
+          <div class="vo-kpi-item is-warn">
+            <span class="vo-kpi-icon is-draft"><ExclamationCircleOutlined /></span>
+            <span class="vo-kpi-label">草稿待提</span>
+            <span class="vo-kpi-value">{{ variationStats.draft }} <small>单</small></span>
           </div>
         </div>
 
-        <main class="lg-list-table-panel">
-          <!-- 工具栏 -->
-          <div class="lg-toolbar">
+        <main class="lg-list-table-panel vo-table-panel">
+          <div class="lg-toolbar vo-table-toolbar">
             <div class="lg-toolbar-left">
+              <span class="vo-table-title">变更签证列表</span>
+              <span class="vo-table-count">共 {{ total }} 条</span>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+              <a-button aria-label="刷新变更签证列表" title="刷新" @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
               <a-button type="primary" @click="handleAdd">
                 <template #icon><PlusOutlined /></template>
-                新建
-              </a-button>
-              <a-dropdown>
-                <a-button>
-                  <template #icon><SettingOutlined /></template>
-                  列设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
-                      <a-checkbox :checked="colVisible[key]">
-                        {{ COL_LABELS[key] }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-              <a-button @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
+                新建签证
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部项目"
-                allow-clear
-                style="width: 140px"
-                size="small"
-                @change="
-                  (v: string | undefined) => {
-                    filter.contractId = undefined
-                    if (v) referenceStore.fetchContracts({ projectId: v })
-                    handleSearch()
-                  }
-                "
-              >
-                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
+              <span class="vo-toolbar-hint">固定表头 / 金额右对齐 / 编号可查看详情</span>
             </div>
           </div>
 
-          <!-- 表格 -->
-          <div class="lg-table-wrap">
+          <div class="lg-table-wrap vo-table-wrap">
             <vxe-grid
               :data="tableData"
               :columns="gridColumns"
@@ -505,8 +611,15 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #varCode="{ row }">
+                <a-button class="vo-var-link" type="link" @click="handleView(row)">
+                  {{ row.varCode }}
+                </a-button>
+              </template>
               <template #varType="{ row }">
-                <a-tag size="small">{{ VAR_TYPE_LABEL[row.varType] ?? row.varType }}</a-tag>
+                <a-tag :color="VAR_TYPE_COLOR[row.varType]" size="small">
+                  {{ VAR_TYPE_LABEL[row.varType] ?? row.varType }}
+                </a-tag>
               </template>
               <template #direction="{ row }">
                 <a-tag :color="row.direction === 'COST' ? 'red' : 'green'" size="small">{{
@@ -523,17 +636,9 @@ onMounted(() => {
                 <span>{{ fmtWan(row.confirmedAmount) }} 万</span>
               </template>
               <template #approvalStatus="{ row }">
-                <a-tag
-                  :color="
-                    row.approvalStatus === 'APPROVED'
-                      ? 'success'
-                      : row.approvalStatus === 'REJECTED'
-                        ? 'error'
-                        : 'processing'
-                  "
-                  size="small"
-                  >{{ row.approvalStatus }}</a-tag
-                >
+                <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus]" size="small">
+                  {{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}
+                </a-tag>
               </template>
               <template #ops="{ row }">
                 <a-dropdown :trigger="['click']">
@@ -557,8 +662,7 @@ onMounted(() => {
             </vxe-grid>
           </div>
 
-          <!-- 分页 -->
-          <div class="lg-pagination">
+          <div class="lg-pagination vo-pagination">
             <span class="lg-total">共 {{ total }} 条</span>
             <a-pagination
               v-model:current="pageNo"
@@ -574,33 +678,59 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">变更类型分布</div>
-          <div class="lg-type-list">
-            <div v-for="item in variationTypeSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" style="background: #1890ff"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span style="margin-left: auto">{{ item.count }} 单</span>
+      <aside class="lg-analysis-rail vo-analysis-rail" aria-label="变更签证辅助分析">
+        <div class="vo-analysis-panel">
+          <header class="vo-analysis-head">
+            <div>
+              <div class="vo-analysis-title">签证分析</div>
+              <div class="vo-analysis-subtitle">类型、状态与近期记录</div>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">近期签证</div>
-          <div class="lg-type-list">
+          </header>
+
+          <section class="vo-analysis-section">
+            <div class="vo-section-title">变更类型分布</div>
+            <div v-for="item in variationTypeSummary" :key="item.label" class="lg-type-row">
+              <span class="lg-type-dot vo-dot-primary"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ item.percent }}%</span>
+            </div>
+          </section>
+
+          <section class="vo-analysis-section">
+            <div class="vo-section-title">审批状态</div>
+            <div v-for="item in approvalStatusSummary" :key="item.key" class="lg-type-row">
+              <span class="lg-type-dot vo-dot-success"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ item.percent }}%</span>
+            </div>
+          </section>
+
+          <section class="vo-analysis-section">
+            <div class="vo-warning-head">
+              <div class="vo-section-title">近期签证</div>
+              <span class="vo-warning-count">{{ recentVariations.length }} 项</span>
+            </div>
             <div v-for="item in recentVariations" :key="item.id" class="lg-type-row">
-              <span class="lg-type-dot" style="background: #52c41a"></span>
+              <span class="lg-type-dot vo-dot-warning"></span>
               <span class="lg-type-label">{{ item.varName }}</span>
             </div>
             <div v-if="!recentVariations.length" class="lg-warning-empty">暂无变更签证</div>
-          </div>
-        </section>
+          </section>
+        </div>
       </aside>
     </div>
 
     <!-- Modal unchanged -->
-    <a-modal v-model:open="modalVisible" :title="modalTitle" :width="860" @ok="handleSubmit">
-      <a-form layout="vertical" :model="formData">
+    <a-modal
+      v-model:open="modalVisible"
+      :title="modalTitle"
+      :width="860"
+      :footer="modalReadonly ? null : undefined"
+      @ok="handleSubmit"
+    >
+      <a-form layout="vertical" :model="formData" :disabled="modalReadonly">
         <a-row :gutter="16">
           <a-col :span="8"
             ><a-form-item label="项目"
@@ -696,7 +826,9 @@ onMounted(() => {
           "
         >
           <span style="font-weight: 600; font-size: 14px">变更明细</span
-          ><a-button type="dashed" size="small" @click="handleAddItem">+ 添加明细</a-button>
+          ><a-button type="dashed" size="small" :disabled="modalReadonly" @click="handleAddItem"
+            >+ 添加明细</a-button
+          >
         </div>
         <a-table
           :data-source="itemList"
@@ -710,6 +842,7 @@ onMounted(() => {
               ><a-input
                 v-model:value="item.itemName"
                 placeholder="名称"
+                :disabled="modalReadonly"
                 style="width: 100%" /></template
           ></a-table-column>
           <a-table-column title="单位" width="70"
@@ -717,6 +850,7 @@ onMounted(() => {
               ><a-input
                 v-model:value="item.unit"
                 placeholder="单位"
+                :disabled="modalReadonly"
                 style="width: 100%" /></template
           ></a-table-column>
           <a-table-column title="数量" width="120"
@@ -725,6 +859,7 @@ onMounted(() => {
                 v-model:value="item.quantity"
                 :min="0"
                 :precision="4"
+                :disabled="modalReadonly"
                 style="width: 100%"
                 @change="handleItemQtyChange(index)" /></template
           ></a-table-column>
@@ -734,6 +869,7 @@ onMounted(() => {
                 v-model:value="item.unitPrice"
                 :min="0"
                 :precision="4"
+                :disabled="modalReadonly"
                 style="width: 100%"
                 @change="handleItemPriceChange(index)" /></template
           ></a-table-column>
@@ -746,7 +882,12 @@ onMounted(() => {
           >
           <a-table-column title="操作" width="76"
             ><template #default="{ index }"
-              ><a-button type="link" size="small" danger @click="handleRemoveItem(index)"
+              ><a-button
+                type="link"
+                size="small"
+                danger
+                :disabled="modalReadonly"
+                @click="handleRemoveItem(index)"
                 >删除</a-button
               ></template
             ></a-table-column
@@ -763,3 +904,293 @@ onMounted(() => {
     </a-modal>
   </div>
 </template>
+
+<style scoped>
+.variation-page {
+  gap: 14px;
+}
+
+.vo-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
+.vo-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.vo-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.vo-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.vo-query-panel {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
+}
+
+.vo-query-primary {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vo-keyword-search {
+  width: min(640px, 34vw);
+  min-width: 420px;
+}
+
+.vo-search-prefix-icon {
+  color: var(--text-secondary);
+}
+
+.vo-query-select {
+  width: 160px;
+}
+
+.vo-query-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.vo-workspace {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.vo-main-column {
+  gap: 12px;
+}
+
+.vo-kpi-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  min-height: 84px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.vo-kpi-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 19px 27px;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.vo-kpi-item:last-child {
+  border-right: 0;
+}
+
+.vo-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.vo-kpi-icon.is-approved {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.vo-kpi-icon.is-cost {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.vo-kpi-icon.is-draft {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+.vo-kpi-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vo-kpi-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vo-kpi-value small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vo-table-panel {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.vo-table-toolbar {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.vo-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.vo-table-count,
+.vo-toolbar-hint,
+.vo-analysis-subtitle,
+.vo-warning-count {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.vo-table-wrap {
+  min-height: 520px;
+}
+
+.vo-table-wrap :deep(.vxe-header--column .vxe-cell) {
+  justify-content: center;
+  text-align: center;
+}
+
+.vo-var-link {
+  height: auto;
+  padding: 0;
+  font-weight: 700;
+}
+
+.vo-var-link,
+.vo-var-link:hover,
+.vo-var-link:focus {
+  background: transparent;
+}
+
+.vo-pagination {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.vo-analysis-rail {
+  width: 336px;
+}
+
+.vo-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.vo-analysis-head,
+.vo-warning-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vo-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.vo-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.vo-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.vo-analysis-section :deep(.lg-type-row),
+.vo-analysis-section .lg-type-row {
+  grid-template-columns: 9px minmax(60px, 1fr) 28px 38px;
+}
+
+.vo-dot-primary {
+  background: var(--primary);
+}
+
+.vo-dot-success {
+  background: var(--success);
+}
+
+.vo-dot-warning {
+  background: var(--warning);
+}
+
+@media (max-width: 1200px) {
+  .vo-page-head,
+  .vo-query-panel,
+  .vo-query-primary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vo-query-actions {
+    justify-content: flex-start;
+  }
+
+  .vo-keyword-search,
+  .vo-query-select,
+  .vo-analysis-rail {
+    width: 100%;
+    min-width: 0;
+  }
+}
+</style>

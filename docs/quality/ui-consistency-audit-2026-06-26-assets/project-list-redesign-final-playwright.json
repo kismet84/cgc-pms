@@ -1,0 +1,177 @@
+{
+  "generatedAt": "2026-06-26T09:40:39.799Z",
+  "screenshot": "D:\\projects-test\\cgc-pms\\docs\\quality\\ui-consistency-audit-2026-06-26-assets\\20-project-list-redesign-final.png",
+  "consoleItems": [],
+  "report": {
+    "headers": [
+      "项目编号",
+      "项目名称",
+      "项目类型",
+      "合同金额",
+      "计划工期",
+      "状态",
+      "操作"
+    ],
+    "codeChecks": [
+      {
+        "text": "XM-20260616-002",
+        "clientWidth": 0,
+        "scrollWidth": 0,
+        "complete": true
+      },
+      {
+        "text": "XM-20260616-001",
+        "clientWidth": 0,
+        "scrollWidth": 0,
+        "complete": true
+      }
+    ],
+    "nameChecks": [
+      {
+        "text": "auto-project-001",
+        "clientWidth": 119,
+        "scrollWidth": 119,
+        "complete": true
+      },
+      {
+        "text": "123",
+        "clientWidth": 26,
+        "scrollWidth": 26,
+        "complete": true
+      }
+    ],
+    "tags": [
+      {
+        "text": "施工总承包",
+        "className": "ant-tag css-dev-only-do-not-override-6ia0cf ant-tag-blue",
+        "color": "rgb(9, 88, 217)",
+        "backgroundColor": "rgb(230, 244, 255)",
+        "borderColor": "rgb(9, 88, 217)"
+      },
+      {
+        "text": "前期",
+        "className": "ant-tag css-dev-only-do-not-override-6ia0cf ant-tag-processing",
+        "color": "rgb(14, 165, 233)",
+        "backgroundColor": "rgb(230, 251, 255)",
+        "borderColor": "rgb(14, 165, 233)"
+      },
+      {
+        "text": "施工总承包",
+        "className": "ant-tag css-dev-only-do-not-override-6ia0cf ant-tag-blue",
+        "color": "rgb(9, 88, 217)",
+        "backgroundColor": "rgb(230, 244, 255)",
+        "borderColor": "rgb(9, 88, 217)"
+      },
+      {
+        "text": "前期",
+        "className": "ant-tag css-dev-only-do-not-override-6ia0cf ant-tag-processing",
+        "color": "rgb(14, 165, 233)",
+        "backgroundColor": "rgb(230, 251, 255)",
+        "borderColor": "rgb(14, 165, 233)"
+      }
+    ],
+    "kpiValues": [
+      {
+        "text": "2 个",
+        "clientWidth": 95,
+        "scrollWidth": 95,
+        "complete": true
+      },
+      {
+        "text": "1,000.00 万元",
+        "clientWidth": 142,
+        "scrollWidth": 142,
+        "complete": true
+      },
+      {
+        "text": "0 个",
+        "clientWidth": 95,
+        "scrollWidth": 95,
+        "complete": true
+      },
+      {
+        "text": "0 个",
+        "clientWidth": 95,
+        "scrollWidth": 95,
+        "complete": true
+      },
+      {
+        "text": "0 个",
+        "clientWidth": 96,
+        "scrollWidth": 96,
+        "complete": true
+      }
+    ],
+    "cells": [
+      {
+        "text": "XM-20260616-002",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      {
+        "text": "auto-project-001",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      {
+        "text": "施工总承包",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      {
+        "text": "0.00 万元",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      {
+        "text": "-",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      {
+        "text": "前期",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      {
+        "text": "",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      },
+      {
+        "text": "XM-20260616-001",
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "22px"
+      }
+    ],
+    "tableScrollWidth": 946,
+    "tableClientWidth": 946,
+    "hasHorizontalOverflow": false,
+    "bodyHasNaN": false,
+    "viewport": {
+      "width": 1600,
+      "height": 1200
+    }
+  },
+  "assertions": {
+    "hasExpectedHeaders": true,
+    "defaultApprovalHidden": true,
+    "codeComplete": true,
+    "nameComplete": true,
+    "kpiComplete": true,
+    "typeTagsColored": true,
+    "noEmptyTags": true,
+    "noBackendEnumStatus": true,
+    "noHorizontalOverflow": true,
+    "noNaN": true,
+    "noConsoleErrors": true
+  }
+}

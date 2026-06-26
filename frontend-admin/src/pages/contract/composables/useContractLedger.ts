@@ -135,6 +135,11 @@ export function useContractLedger() {
     overdueCount: 0,
   })
 
+  function calcCodeColumnWidth(values: Array<string | undefined>, title = '合同编号') {
+    const longest = Math.max(title.length, ...values.map((value) => String(value ?? '').length))
+    return Math.min(Math.max(longest * 9 + 42, 128), 240)
+  }
+
   // ---- Column visibility ----
   const COLS_KEY = 'contract_ledger_cols_v2'
   const defaultCols: Record<string, boolean> = {
@@ -335,8 +340,9 @@ export function useContractLedger() {
           {
             field: 'contractCode',
             title: '合同编号',
-            width: 138,
-            showOverflow: 'tooltip',
+            width: calcCodeColumnWidth(tableData.value.map((item) => item.contractCode)),
+            minWidth: 128,
+            showOverflow: false,
             slots: { default: 'contractCode' },
           },
         ]

@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-06-26T08:55:07.176Z",
+  "viewport": {
+    "width": 1600,
+    "height": 1200
+  },
+  "clean": {
+    "toolbarText": "变更签证列表共 1 条列设置刷新新建签证固定表头 / 金额右对齐 / 编号可查看详情",
+    "headerTexts": [
+      "序号",
+      "变更编号",
+      "变更名称",
+      "变更类型",
+      "方向",
+      "项目名称",
+      "合同名称",
+      "合作方",
+      "上报金额",
+      "审定金额",
+      "确认金额",
+      "审批状态",
+      "操作"
+    ],
+    "hasSeqTitle": true,
+    "firstHeader": "序号",
+    "hasVarCodeLink": true,
+    "hasNaN": false,
+    "horizontalOverflow": false
+  },
+  "modal": {
+    "modalOpen": true,
+    "modalTitle": "查看变更签证",
+    "modalFooterVisible": false
+  },
+  "summary": {
+    "consoleWarnings": 0,
+    "consoleErrors": 0,
+    "horizontalOverflow": false,
+    "hasNaN": false,
+    "hasSeqTitle": true,
+    "hasVarCodeLink": true,
+    "modalOpenedByVarCode": true
+  },
+  "consoleMessages": []
+}

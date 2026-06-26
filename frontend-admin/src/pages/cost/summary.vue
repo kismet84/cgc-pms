@@ -11,6 +11,7 @@ import type { CostSummaryVO } from '@/types/cost'
 import type { ProjectVO } from '@/types/project'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { chartPalette } from '@/theme/tokens'
 
 const projectList = ref<ProjectVO[]>([])
 const selectedProjectId = ref<string | undefined>(undefined)
@@ -91,11 +92,11 @@ function fmtDeviation(val: string | undefined): string {
 }
 
 function getDeviationColor(val: string | undefined): string {
-  if (!val) return 'var(--text-secondary)'
+  if (!val) return chartPalette.semantic.neutral
   const n = parseFloat(val)
-  if (n > 0) return '#ef4444'
-  if (n < 0) return '#22c55e'
-  return 'var(--text-secondary)'
+  if (n > 0) return chartPalette.semantic.negative
+  if (n < 0) return chartPalette.semantic.positive
+  return chartPalette.semantic.neutral
 }
 
 function fmtPercent(val: string | undefined, base: string | undefined): string {
@@ -194,8 +195,8 @@ const executionOption = computed(() => {
           borderRadius: [4, 4, 0, 0],
 
           color: (params: CallbackDataParams) => {
-            const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e', '#ef4444']
-            return colors[params.dataIndex ?? 0] ?? '#3b82f6'
+            const colors = chartPalette.categorical
+            return colors[params.dataIndex ?? 0] ?? chartPalette.categorical[0]
           },
         },
         barMaxWidth: 32,
@@ -221,7 +222,7 @@ const compositionOption = computed(() => {
         center: ['50%', '55%'],
         data,
         label: { fontSize: 11 },
-        emphasis: { itemStyle: { shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.15)' } },
+        emphasis: { itemStyle: { shadowBlur: 8, shadowColor: chartPalette.shadow.emphasis } },
       },
     ],
   }
@@ -249,7 +250,9 @@ const deviationOption = computed(() => {
         itemStyle: {
           borderRadius: [3, 3, 0, 0],
           color: (params: CallbackDataParams) =>
-            ((params.value as number) ?? 0) > 0 ? '#ef4444' : '#22c55e',
+            ((params.value as number) ?? 0) > 0
+              ? chartPalette.semantic.negative
+              : chartPalette.semantic.positive,
         },
         barMaxWidth: 24,
       },
@@ -281,7 +284,7 @@ const rankingOption = computed(() => {
         itemStyle: {
           borderRadius: [0, 3, 3, 0],
           color: (params: CallbackDataParams) => {
-            const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef']
+            const colors = chartPalette.extended
             return colors[(params.dataIndex ?? 0) % colors.length]
           },
         },
@@ -312,16 +315,7 @@ const subjectDistribution = computed(() => {
   if (!summary.value || !summarySubjects.value.length) return []
   const subjects = summarySubjects.value.filter((s) => parseFloat(s.dynamicCost) > 0)
   const total = subjects.reduce((acc, s) => acc + parseFloat(s.dynamicCost), 0) || 1
-  const colors = [
-    '#3b82f6',
-    '#8b5cf6',
-    '#f59e0b',
-    '#22c55e',
-    '#ef4444',
-    '#6366f1',
-    '#a855f7',
-    '#d946ef',
-  ]
+  const colors = chartPalette.extended
   return subjects.slice(0, 8).map((s, i) => ({
     key: s.costSubjectId,
     label: s.costSubjectName,
@@ -343,18 +337,44 @@ onMounted(() => {
 
 <template>
   <div class="lg-list-page lg-page app-page">
-    <!-- Page head -->
-    <div class="lg-page-head">
-      <a-breadcrumb style="font-size: 13px; color: var(--muted); margin-bottom: 5px">
-        <a-breadcrumb-item>成本管理</a-breadcrumb-item>
-        <a-breadcrumb-item>动态成本汇总</a-breadcrumb-item>
-      </a-breadcrumb>
+    <div class="lg-page-head cost-summary-page-head">
+      <div class="cost-summary-meta-row">
+        <a-breadcrumb class="cost-summary-breadcrumb">
+          <a-breadcrumb-item>成本管理</a-breadcrumb-item>
+          <a-breadcrumb-item>动态成本汇总</a-breadcrumb-item>
+        </a-breadcrumb>
+        <span class="cost-summary-subtitle">
+          按项目查看目标成本、锁定成本、实际成本与偏差风险
+        </span>
+      </div>
+    </div>
+
+    <div class="lg-search-bar cost-summary-search">
+      <a-select
+        v-model:value="selectedProjectId"
+        placeholder="请选择项目"
+        allow-clear
+        class="cost-summary-project-select"
+        show-search
+        :filter-option="
+          (input: string, option: SelectOption) =>
+            option.label?.toLowerCase().includes(input.toLowerCase())
+        "
+        @change="handleProjectChange"
+      >
+        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+          {{ p.projectName }}
+        </a-select-option>
+      </a-select>
+      <a-button type="primary" :disabled="!selectedProjectId" @click="fetchSummary">查询</a-button>
+      <a-button :disabled="!selectedProjectId" @click="handleRefresh" aria-label="刷新动态成本汇总">
+        <template #icon><ReloadOutlined /></template>
+        刷新
+      </a-button>
     </div>
 
     <div class="lg-grid">
-      <!-- 左列 -->
       <div class="lg-left">
-        <!-- KPI 横条 -->
         <div v-if="summary" class="lg-kpi-strip">
           <div class="lg-kpi-card">
             <span class="lg-kpi-card-label">目标成本</span>
@@ -394,198 +414,141 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 工具栏 -->
-        <div class="lg-toolbar cost-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleRefresh" :disabled="!selectedProjectId">
-              <template #icon><ReloadOutlined /></template>
-              刷新
-            </a-button>
-          </div>
-          <div class="lg-toolbar-right">
-            <ColumnSettingsButton
-              :columns="columnSettings"
-              :visible="colVisible"
-              @toggle="toggleCol"
-            />
-            <a-select
-              v-model:value="selectedProjectId"
-              placeholder="请选择项目"
-              allow-clear
-              style="width: 200px"
-              size="small"
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-              @change="handleProjectChange"
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-          </div>
-        </div>
-
-        <template v-if="summary">
-          <!-- Row 1: 成本执行概览 + 成本构成分析 -->
-          <div
-            style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
-          >
-            <section class="lg-panel">
-              <div class="lg-panel-title">成本执行概览</div>
-              <div style="padding: 0 4px 4px">
-                <v-chart :option="executionOption" autoresize style="width: 100%; height: 260px" />
-              </div>
-            </section>
-            <section class="lg-panel">
-              <div class="lg-panel-title">成本构成分析</div>
-              <div style="padding: 0 4px 4px">
-                <v-chart
-                  :option="compositionOption"
-                  autoresize
-                  style="width: 100%; height: 260px"
-                />
-              </div>
-            </section>
-          </div>
-
-          <!-- Row 2: 偏差趋势分析 + 超预算预警 -->
-          <div
-            style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
-          >
-            <section class="lg-panel">
-              <div class="lg-panel-title">偏差趋势分析</div>
-              <div style="padding: 0 4px 4px">
-                <v-chart :option="deviationOption" autoresize style="width: 100%; height: 260px" />
-              </div>
-            </section>
-            <section class="lg-panel">
-              <div class="lg-panel-title">超预算预警</div>
-              <div style="padding: 12px 14px">
-                <div v-if="overBudgetItems.length" class="lg-type-list">
-                  <div
-                    v-for="item in overBudgetItems.slice(0, 6)"
-                    :key="item.costSubjectId"
-                    class="lg-type-row"
-                    style="grid-template-columns: 1fr 80px"
-                  >
-                    <span style="font-size: 13px; color: var(--text-secondary)">{{
-                      item.costSubjectName
-                    }}</span>
-                    <span
-                      style="text-align: right; font-weight: 700; color: #ef4444; font-size: 13px"
-                      >+{{ fmtDeviation(item.costDeviation) }} 万</span
-                    >
-                  </div>
-                </div>
-                <div
-                  v-else
-                  style="font-size: 13px; color: var(--muted); padding: 12px 0; text-align: center"
-                >
-                  无超预算科目
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <!-- Row 3: 成本科目排行 + 异常明细 -->
-          <div
-            style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px"
-          >
-            <section class="lg-panel">
-              <div class="lg-panel-title">成本科目排行</div>
-              <div style="padding: 0 4px 4px">
-                <v-chart :option="rankingOption" autoresize style="width: 100%; height: 260px" />
-              </div>
-            </section>
-            <section class="lg-panel">
-              <div class="lg-panel-title">异常明细</div>
-              <div style="padding: 12px 14px">
-                <div v-if="anomalyItems.length" class="lg-type-list">
-                  <div
-                    v-for="item in anomalyItems.slice(0, 5)"
-                    :key="'anomaly-' + item.costSubjectId"
-                    class="lg-type-row"
-                    style="grid-template-columns: 1fr 80px"
-                  >
-                    <span style="font-size: 13px; color: var(--text-secondary)">{{
-                      item.costSubjectName
-                    }}</span>
-                    <span
-                      style="text-align: right; font-weight: 700; color: #ef4444; font-size: 13px"
-                      >偏差 +{{ fmtDeviation(item.costDeviation) }} 万</span
-                    >
-                  </div>
-                </div>
-                <div
-                  v-else
-                  style="font-size: 13px; color: var(--muted); padding: 12px 0; text-align: center"
-                >
-                  无异常科目
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <!-- Subject detail table -->
-          <div class="lg-table-wrap" style="margin-bottom: 0">
-            <div
-              style="
-                padding: 12px 14px;
-                border-bottom: 1px solid var(--border-subtle);
-                color: var(--text);
-                font-size: 15px;
-                font-weight: 700;
-              "
-            >
-              科目明细
+        <section class="lg-list-table-panel cost-summary-panel">
+          <div class="lg-toolbar cost-toolbar">
+            <div class="lg-toolbar-left">
+              <strong>成本明细</strong>
+              <span class="cost-toolbar-meta">
+                {{ summary ? `共 ${summarySubjects.length} 个科目` : '选择项目后查看科目明细' }}
+              </span>
             </div>
-            <vxe-grid
-              :data="summarySubjects"
-              :columns="visibleGridColumns"
-              :loading="loading"
-              :column-config="{ resizable: true }"
-              stripe
-              border="inner"
-              size="small"
-              max-height="420"
-            >
-              <template #targetCost="{ row }">
-                <span>{{ fmtAmount(row.targetCost) }}</span>
-              </template>
-              <template #contractLockedCost="{ row }">
-                <span>{{ fmtAmount(row.contractLockedCost) }}</span>
-              </template>
-              <template #actualCost="{ row }">
-                <span>{{ fmtAmount(row.actualCost) }}</span>
-              </template>
-              <template #paidAmount="{ row }">
-                <span>{{ fmtAmount(row.paidAmount) }}</span>
-              </template>
-              <template #dynamicCost="{ row }">
-                <span>{{ fmtAmount(row.dynamicCost) }}</span>
-              </template>
-              <template #costDeviation="{ row }">
-                <span :style="{ color: getDeviationColor(row.costDeviation), fontWeight: 600 }">
-                  {{ fmtDeviation(row.costDeviation) }}
-                </span>
-              </template>
-            </vxe-grid>
+            <div class="lg-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+            </div>
           </div>
-        </template>
 
-        <template v-else>
-          <section class="lg-panel cost-summary-empty">
-            <LineChartOutlined class="cost-summary-empty-icon" />
-            <div class="cost-summary-empty-title">请选择项目</div>
-            <div class="cost-summary-empty-text">选择项目后查看动态成本、成本偏差和科目排行。</div>
-          </section>
-        </template>
+          <template v-if="summary">
+            <div class="cost-chart-grid">
+              <section class="lg-panel">
+                <div class="lg-panel-title">成本执行概览</div>
+                <div class="cost-chart-box">
+                  <v-chart :option="executionOption" autoresize class="cost-chart" />
+                </div>
+              </section>
+              <section class="lg-panel">
+                <div class="lg-panel-title">成本构成分析</div>
+                <div class="cost-chart-box">
+                  <v-chart :option="compositionOption" autoresize class="cost-chart" />
+                </div>
+              </section>
+            </div>
+
+            <div class="cost-chart-grid">
+              <section class="lg-panel">
+                <div class="lg-panel-title">偏差趋势分析</div>
+                <div class="cost-chart-box">
+                  <v-chart :option="deviationOption" autoresize class="cost-chart" />
+                </div>
+              </section>
+              <section class="lg-panel">
+                <div class="lg-panel-title">超预算预警</div>
+                <div class="cost-summary-list-body">
+                  <div v-if="overBudgetItems.length" class="lg-type-list">
+                    <div
+                      v-for="item in overBudgetItems.slice(0, 6)"
+                      :key="item.costSubjectId"
+                      class="lg-type-row cost-summary-risk-row"
+                    >
+                      <span class="cost-summary-row-label">{{ item.costSubjectName }}</span>
+                      <span class="cost-summary-risk-value"
+                        >+{{ fmtDeviation(item.costDeviation) }} 万</span
+                      >
+                    </div>
+                  </div>
+                  <div v-else class="cost-summary-muted-state">无超预算科目</div>
+                </div>
+              </section>
+            </div>
+
+            <div class="cost-chart-grid">
+              <section class="lg-panel">
+                <div class="lg-panel-title">成本科目排行</div>
+                <div class="cost-chart-box">
+                  <v-chart :option="rankingOption" autoresize class="cost-chart" />
+                </div>
+              </section>
+              <section class="lg-panel">
+                <div class="lg-panel-title">异常明细</div>
+                <div class="cost-summary-list-body">
+                  <div v-if="anomalyItems.length" class="lg-type-list">
+                    <div
+                      v-for="item in anomalyItems.slice(0, 5)"
+                      :key="'anomaly-' + item.costSubjectId"
+                      class="lg-type-row cost-summary-risk-row"
+                    >
+                      <span class="cost-summary-row-label">{{ item.costSubjectName }}</span>
+                      <span class="cost-summary-risk-value"
+                        >偏差 +{{ fmtDeviation(item.costDeviation) }} 万</span
+                      >
+                    </div>
+                  </div>
+                  <div v-else class="cost-summary-muted-state">无异常科目</div>
+                </div>
+              </section>
+            </div>
+
+            <div class="lg-table-wrap cost-summary-table">
+              <div class="cost-summary-table-title">科目明细</div>
+              <vxe-grid
+                :data="summarySubjects"
+                :columns="visibleGridColumns"
+                :loading="loading"
+                :column-config="{ resizable: true }"
+                stripe
+                border="inner"
+                size="small"
+                max-height="420"
+              >
+                <template #targetCost="{ row }">
+                  <span>{{ fmtAmount(row.targetCost) }}</span>
+                </template>
+                <template #contractLockedCost="{ row }">
+                  <span>{{ fmtAmount(row.contractLockedCost) }}</span>
+                </template>
+                <template #actualCost="{ row }">
+                  <span>{{ fmtAmount(row.actualCost) }}</span>
+                </template>
+                <template #paidAmount="{ row }">
+                  <span>{{ fmtAmount(row.paidAmount) }}</span>
+                </template>
+                <template #dynamicCost="{ row }">
+                  <span>{{ fmtAmount(row.dynamicCost) }}</span>
+                </template>
+                <template #costDeviation="{ row }">
+                  <span class="cost-summary-deviation" :style="{ color: getDeviationColor(row.costDeviation) }">
+                    {{ fmtDeviation(row.costDeviation) }}
+                  </span>
+                </template>
+              </vxe-grid>
+            </div>
+          </template>
+
+          <template v-else>
+            <section class="cost-summary-empty">
+              <LineChartOutlined class="cost-summary-empty-icon" />
+              <div class="cost-summary-empty-title">请选择项目</div>
+              <div class="cost-summary-empty-text">
+                选择项目后查看动态成本、成本偏差和科目排行。
+              </div>
+            </section>
+          </template>
+        </section>
       </div>
 
-      <!-- 右侧分析面板 -->
       <aside v-if="summary" class="lg-analysis-rail">
         <section class="lg-panel">
           <div class="lg-panel-title">科目动态成本分布</div>
@@ -610,15 +573,128 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.cost-summary-breadcrumb {
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+  line-height: 20px;
+}
+
+.cost-summary-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
+.cost-summary-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.cost-summary-subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.cost-summary-search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.cost-summary-project-select {
+  width: 320px;
+}
+
+.cost-summary-panel {
+  overflow: hidden;
+}
+
+.cost-toolbar {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cost-toolbar-meta {
+  margin-left: var(--spacing-xs);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}
+
+.cost-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--spacing-sm);
+  margin: var(--spacing-sm);
+}
+
+.cost-chart-box {
+  padding: 0 4px 4px;
+}
+
+.cost-chart {
+  width: 100%;
+  height: 260px;
+}
+
+.cost-summary-list-body {
+  padding: var(--spacing-sm) 14px;
+}
+
+.cost-summary-risk-row {
+  grid-template-columns: 1fr 96px;
+}
+
+.cost-summary-row-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.cost-summary-risk-value {
+  color: var(--error);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  text-align: right;
+}
+
+.cost-summary-muted-state {
+  padding: var(--spacing-sm) 0;
+  color: var(--muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.cost-summary-table {
+  margin: var(--spacing-sm);
+}
+
+.cost-summary-table-title {
+  padding: var(--spacing-sm) 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cost-summary-deviation {
+  font-weight: 600;
+}
+
 .cost-summary-empty {
   min-height: 430px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: var(--spacing-sm);
   color: var(--muted);
-  background: linear-gradient(135deg, rgba(24, 144, 255, 0.06), transparent 42%), var(--surface);
+  background: var(--surface);
 }
 
 .cost-summary-empty-icon {
@@ -627,12 +703,28 @@ onMounted(() => {
 }
 
 .cost-summary-empty-title {
-  font-size: 18px;
+  font-size: var(--font-size-xl);
   font-weight: 700;
   color: var(--text);
 }
 
 .cost-summary-empty-text {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 1280px) {
+  .cost-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+  .cost-summary-search {
+    flex-wrap: wrap;
+  }
+
+  .cost-summary-project-select {
+    width: min(100%, 360px);
+  }
 }
 </style>

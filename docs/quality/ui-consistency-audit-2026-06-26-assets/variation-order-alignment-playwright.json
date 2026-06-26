@@ -1,0 +1,125 @@
+{
+  "generatedAt": "2026-06-26T08:41:09.100Z",
+  "viewport": {
+    "width": 1600,
+    "height": 1200
+  },
+  "pages": [
+    {
+      "name": "contract-ledger",
+      "url": "http://localhost:5173/contract/ledger",
+      "title": "合同管理/合同台账/统一查看合同履约、回款与风险状态",
+      "horizontalOverflow": false,
+      "viewport": {
+        "width": 1600,
+        "height": 1200
+      },
+      "bodyScroll": {
+        "width": 1600,
+        "height": 1200
+      },
+      "header": {
+        "x": 272,
+        "y": 22,
+        "width": 1300,
+        "height": 20
+      },
+      "search": {
+        "x": 272,
+        "y": 70,
+        "width": 1300,
+        "height": 91
+      },
+      "grid": {
+        "x": 272,
+        "y": 191,
+        "width": 1300,
+        "height": 931
+      },
+      "kpi": null,
+      "tablePanel": {
+        "x": 272,
+        "y": 291,
+        "width": 948,
+        "height": 831
+      },
+      "analysisRail": {
+        "x": 1236,
+        "y": 191,
+        "width": 336,
+        "height": 931
+      },
+      "hasColumnSettings": true,
+      "hasNewAction": true,
+      "hasErrorOverlay": false,
+      "hasNaNText": false,
+      "toolbarText": "合同列表共 2 条列设置刷新新建合同固定表头 / 金额右对齐 / 行操作可展开",
+      "screenshot": "D:\\projects-test\\cgc-pms\\docs\\quality\\ui-consistency-audit-2026-06-26-assets\\10-contract-ledger-variation-baseline.png",
+      "consoleMessages": []
+    },
+    {
+      "name": "variation-order",
+      "url": "http://localhost:5173/variation/order",
+      "title": "合同管理/变更签证/统一查看合同变更、现场签证、审批与金额影响",
+      "horizontalOverflow": false,
+      "viewport": {
+        "width": 1600,
+        "height": 1200
+      },
+      "bodyScroll": {
+        "width": 1600,
+        "height": 1200
+      },
+      "header": {
+        "x": 272,
+        "y": 22,
+        "width": 1300,
+        "height": 20
+      },
+      "search": {
+        "x": 272,
+        "y": 70,
+        "width": 1300,
+        "height": 84
+      },
+      "grid": {
+        "x": 272,
+        "y": 184,
+        "width": 1300,
+        "height": 938
+      },
+      "kpi": {
+        "x": 272,
+        "y": 184,
+        "width": 948,
+        "height": 104
+      },
+      "tablePanel": {
+        "x": 272,
+        "y": 300,
+        "width": 948,
+        "height": 822
+      },
+      "analysisRail": {
+        "x": 1236,
+        "y": 184,
+        "width": 336,
+        "height": 938
+      },
+      "hasColumnSettings": true,
+      "hasNewAction": true,
+      "hasErrorOverlay": false,
+      "hasNaNText": false,
+      "toolbarText": "变更签证列表共 1 条列设置新建签证",
+      "screenshot": "D:\\projects-test\\cgc-pms\\docs\\quality\\ui-consistency-audit-2026-06-26-assets\\13-variation-order-desktop-final-clean.png",
+      "consoleMessages": []
+    }
+  ],
+  "summary": {
+    "consoleWarnings": 0,
+    "consoleErrors": 0,
+    "horizontalOverflowPages": [],
+    "pagesWithNaNText": []
+  },
+  "allConsoleMessages": []
+}
