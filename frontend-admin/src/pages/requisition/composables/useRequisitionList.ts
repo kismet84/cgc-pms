@@ -79,7 +79,7 @@ export function useRequisitionList() {
         approvalStatus: filter.approvalStatus,
       })
       tableData.value = res.records
-      total.value = res.total
+      total.value = Number(res.total ?? 0)
     } catch (e: unknown) {
       console.error(e)
       tableData.value = []

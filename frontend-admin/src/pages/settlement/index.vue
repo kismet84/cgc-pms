@@ -3,7 +3,16 @@ import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReferenceStore } from '@/stores/reference'
 import { storeToRefs } from 'pinia'
-import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import {
+  CheckCircleOutlined,
+  DollarOutlined,
+  FileDoneOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  WalletOutlined,
+} from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   getSettlementList,
@@ -201,12 +210,6 @@ function fmtWan(val: string | undefined): string {
     : (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ---- Computed KPI ----
-const progressPct = computed(() => {
-  const t = kpi.value.draftCount + kpi.value.finalizedCount
-  return t > 0 ? ((kpi.value.finalizedCount / t) * 100).toFixed(0) + '%' : '0%'
-})
-
 const kpiMax = computed(() => ({
   totalAmount: Math.max(parseFloat(kpi.value.totalFinalAmount), 1),
 }))
@@ -282,115 +285,181 @@ const colorMap: Record<string, string> = {
   FINALIZED: '#31c48d',
   CANCELLED: '#ef4444',
 }
+
+const amountBreakdown = computed(() => {
+  const finalAmount = parseFloat(kpi.value.totalFinalAmount) || 0
+  const paidAmount = parseFloat(kpi.value.totalPaidAmount) || 0
+  const unpaidAmount = parseFloat(kpi.value.totalUnpaidAmount) || 0
+  const changeAmount = parseFloat(kpi.value.totalChangeAmount) || 0
+  const max = Math.max(finalAmount, paidAmount, unpaidAmount, changeAmount, 1)
+  return [
+    { key: 'final', label: '定案金额', value: finalAmount, color: '#2563eb' },
+    { key: 'paid', label: '已付金额', value: paidAmount, color: '#31c48d' },
+    { key: 'unpaid', label: '未付金额', value: unpaidAmount, color: '#ef4444' },
+    { key: 'change', label: '变更金额', value: changeAmount, color: '#f59e0b' },
+  ].map((item) => ({
+    ...item,
+    display: fmtWan(String(item.value)),
+    percent: kpiPct(item.value, max),
+  }))
+})
+
+const paymentWarnings = computed(() =>
+  tableData.value
+    .map((row) => {
+      const unpaid = parseFloat(row.unpaidAmount || '0') || 0
+      return {
+        id: row.id,
+        project: row.projectName || '-',
+        title: row.settlementCode || row.contractName || '-',
+        amount: fmtWan(String(unpaid)),
+        unpaid,
+      }
+    })
+    .filter((row) => row.unpaid > 0)
+    .sort((a, b) => b.unpaid - a.unpaid)
+    .slice(0, 4),
+)
+
+function rowSettlementAmount(row: SettlementVO): string {
+  return row.finalAmount || row.contractAmount || '0'
+}
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
+  <div class="lg-list-page lg-page app-page settlement-page">
     <!-- 页面头部 -->
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+    <div class="lg-page-head settlement-page-head">
+      <div class="settlement-page-meta-row">
+        <a-breadcrumb class="settlement-breadcrumb">
           <a-breadcrumb-item>结算管理</a-breadcrumb-item>
           <a-breadcrumb-item>结算列表</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="settlement-page-subtitle">按合同核对结算金额、定案状态与付款缺口。</span>
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <div class="lg-search-bar">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索结算编号、项目、合同…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
+    <div class="lg-search-bar settlement-search-bar">
+      <div class="settlement-search-fields">
+        <a-input
+          v-model:value="filter.keyword"
+          class="settlement-search-input"
+          placeholder="搜索结算编号、项目、合同"
+          allow-clear
+          size="large"
+          @press-enter="handleSearch"
+        >
+          <template #prefix><SearchOutlined class="settlement-search-prefix-icon" /></template>
+        </a-input>
+        <a-select
+          v-model:value="filter.projectId"
+          class="settlement-search-select"
+          placeholder="全部项目"
+          allow-clear
+          size="large"
+          @change="onProjectChange"
+        >
+          <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.settlementStatus"
+          class="settlement-search-select is-compact"
+          placeholder="状态"
+          allow-clear
+          size="large"
+        >
+          <a-select-option value="DRAFT">草稿</a-select-option>
+          <a-select-option value="FINALIZED">已定案</a-select-option>
+          <a-select-option value="CANCELLED">已作废</a-select-option>
+        </a-select>
+      </div>
+      <div class="settlement-search-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
+      </div>
     </div>
 
-    <div class="lg-grid">
+    <div class="lg-grid settlement-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div v-if="!isMobile" class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">累计结算金额</span>
-            <span class="lg-kpi-card-value"
-              >{{ fmtWan(kpi.totalFinalAmount) }} <small>万元</small></span
-            >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-amount)"></span
-            ></span>
+        <div v-if="!isMobile" class="settlement-kpi-summary" aria-label="结算关键指标">
+          <div class="settlement-kpi-item">
+            <span class="settlement-kpi-icon is-total"><FileDoneOutlined /></span>
+            <span class="settlement-kpi-label">结算总数</span>
+            <span class="settlement-kpi-value">{{ kpi.totalCount }} <small>单</small></span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">待审核金额</span>
-            <span class="lg-kpi-card-value"
+          <div class="settlement-kpi-item is-wide">
+            <span class="settlement-kpi-icon is-amount"><DollarOutlined /></span>
+            <span class="settlement-kpi-label">合同金额</span>
+            <span class="settlement-kpi-value"
               >{{ fmtWan(kpi.totalContractAmount) }} <small>万元</small></span
             >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-total)"></span
-            ></span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">已确认金额</span>
-            <span class="lg-kpi-card-value"
-              >{{ fmtWan(kpi.totalPaidAmount) }} <small>万元</small></span
+          <div class="settlement-kpi-item is-progress">
+            <span class="settlement-kpi-icon is-final"><CheckCircleOutlined /></span>
+            <span class="settlement-kpi-label">定案金额</span>
+            <span class="settlement-kpi-value"
+              >{{ fmtWan(kpi.totalFinalAmount) }} <small>万元</small></span
             >
-            <span class="lg-kpi-card-bar"
-              ><span
+            <span class="settlement-kpi-progress">
+              <span
                 :style="{
-                  width: kpiPct(parseFloat(kpi.totalPaidAmount), kpiMax.totalAmount) + '%',
-                  background: 'var(--kpi-paid)',
+                  width: kpiPct(parseFloat(kpi.totalFinalAmount), kpiMax.totalAmount) + '%',
                 }"
               ></span
             ></span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">结算进度</span>
-            <span class="lg-kpi-card-value">{{ progressPct }} <small>已定案</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span
-                :style="{ width: parseFloat(progressPct) + '%', background: 'var(--kpi-unpaid)' }"
+          <div class="settlement-kpi-item is-progress is-paid">
+            <span class="settlement-kpi-icon is-paid"><WalletOutlined /></span>
+            <span class="settlement-kpi-label">已付金额</span>
+            <span class="settlement-kpi-value"
+              >{{ fmtWan(kpi.totalPaidAmount) }} <small>万元</small></span
+            >
+            <span class="settlement-kpi-progress">
+              <span
+                :style="{
+                  width: kpiPct(parseFloat(kpi.totalPaidAmount), kpiMax.totalAmount) + '%',
+                }"
               ></span
             ></span>
           </div>
+          <div class="settlement-kpi-item is-unpaid">
+            <span class="settlement-kpi-icon is-unpaid"><WalletOutlined /></span>
+            <span class="settlement-kpi-label">未付金额</span>
+            <span class="settlement-kpi-value"
+              >{{ fmtWan(kpi.totalUnpaidAmount) }} <small>万元</small></span
+            >
+          </div>
         </div>
 
-        <main class="lg-list-table-panel">
+        <main class="lg-list-table-panel settlement-table-panel">
           <!-- 工具栏 -->
-          <div class="lg-toolbar">
+          <div class="lg-toolbar settlement-toolbar">
             <div class="lg-toolbar-left">
+              <span class="settlement-table-title">结算记录</span>
+              <span class="settlement-table-count">共 {{ total }} 条</span>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-button type="primary" @click="openCreateModal">
                 <template #icon><PlusOutlined /></template>
                 新建结算
               </a-button>
               <a-button @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
+                刷新
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部项目"
-                allow-clear
-                style="width: 160px"
-                size="small"
-                @change="onProjectChange"
-              >
-                <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
+              <span class="settlement-toolbar-hint">固定表头 / 金额核对 / 行操作展开</span>
             </div>
           </div>
 
@@ -406,7 +475,7 @@ const colorMap: Record<string, string> = {
               size="small"
             >
               <template #settlementAmount="{ row }">
-                <span>{{ fmtWan(row.settlementAmount) }}</span>
+                <span>{{ fmtWan(rowSettlementAmount(row)) }}</span>
               </template>
               <template #settlementStatus="{ row }">
                 <a-tag
@@ -456,10 +525,18 @@ const colorMap: Record<string, string> = {
       </div>
 
       <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">结算状态分布</div>
-          <div class="lg-type-list">
+      <aside class="lg-analysis-rail settlement-analysis-rail" aria-label="结算辅助分析">
+        <div class="settlement-analysis-panel">
+          <header class="settlement-analysis-head">
+            <div>
+              <div class="settlement-analysis-title">结算分析</div>
+              <div class="settlement-analysis-subtitle">状态、金额结构与付款提醒</div>
+            </div>
+            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
+          </header>
+
+          <section class="settlement-analysis-section">
+            <div class="settlement-section-title">结算状态分布</div>
             <div v-for="it in statusBreakdown" :key="it.key" class="lg-type-row">
               <span
                 class="lg-type-dot"
@@ -475,71 +552,39 @@ const colorMap: Record<string, string> = {
               <span class="lg-type-num">{{ it.count }}</span>
               <span class="lg-type-pct">{{ it.pct }}%</span>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">草稿/定案概览</div>
-          <div class="lg-type-list">
-            <div class="lg-type-row">
-              <span class="lg-type-dot" style="background: #f59e0b"></span>
-              <span class="lg-type-label">草稿</span>
+            <div v-if="!statusBreakdown.length" class="settlement-analysis-empty">
+              暂无结算状态数据
+            </div>
+          </section>
+
+          <section class="settlement-analysis-section">
+            <div class="settlement-section-title">金额结构</div>
+            <div v-for="item in amountBreakdown" :key="item.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
               <span class="lg-type-bar-wrap">
                 <span
                   class="lg-type-bar"
-                  :style="{
-                    width:
-                      (kpi.totalCount > 0
-                        ? ((kpi.draftCount / kpi.totalCount) * 100).toFixed(0)
-                        : '0') + '%',
-                    background: '#f59e0b',
-                  }"
+                  :style="{ width: item.percent + '%', background: item.color }"
                 ></span>
               </span>
-              <span class="lg-type-num">{{ kpi.draftCount }}</span>
-              <span class="lg-type-pct"
-                >{{
-                  kpi.totalCount > 0 ? ((kpi.draftCount / kpi.totalCount) * 100).toFixed(0) : '0'
-                }}%</span
-              >
+              <span class="settlement-type-amount">{{ item.display }}</span>
             </div>
-            <div class="lg-type-row">
-              <span class="lg-type-dot" style="background: #31c48d"></span>
-              <span class="lg-type-label">已定案</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{
-                    width:
-                      (kpi.totalCount > 0
-                        ? ((kpi.finalizedCount / kpi.totalCount) * 100).toFixed(0)
-                        : '0') + '%',
-                    background: '#31c48d',
-                  }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ kpi.finalizedCount }}</span>
-              <span class="lg-type-pct"
-                >{{
-                  kpi.totalCount > 0
-                    ? ((kpi.finalizedCount / kpi.totalCount) * 100).toFixed(0)
-                    : '0'
-                }}%</span
-              >
+          </section>
+
+          <section class="settlement-analysis-section">
+            <div class="settlement-warning-head">
+              <div class="settlement-section-title">未付金额提醒</div>
+              <span class="settlement-warning-count">{{ paymentWarnings.length }} 项</span>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">未付金额提醒</div>
-          <div class="lg-type-list">
-            <div class="lg-type-row">
-              <span class="lg-type-dot" style="background: #ef4444"></span>
-              <span class="lg-type-label">未付金额</span>
-              <span class="lg-type-num" style="color: #ef4444; font-weight: 600"
-                >{{ fmtWan(kpi.totalUnpaidAmount) }} 万</span
-              >
+            <div v-for="item in paymentWarnings" :key="item.id" class="lg-warning-item">
+              <span class="lg-warning-project">{{ item.project }}</span>
+              <span class="lg-warning-title">{{ item.title }}</span>
+              <span class="settlement-warning-amount">{{ item.amount }}万</span>
             </div>
-          </div>
-        </section>
+            <div v-if="!paymentWarnings.length" class="lg-warning-empty">暂无未付提醒</div>
+          </section>
+        </div>
       </aside>
     </div>
   </div>
@@ -588,5 +633,318 @@ const colorMap: Record<string, string> = {
 </template>
 
 <style scoped>
-/* 页面专属样式 — 其余已由 lg-* 全局类覆盖 */
+.settlement-page {
+  gap: 14px;
+}
+
+.settlement-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
+.settlement-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.settlement-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.settlement-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.settlement-search-bar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
+}
+
+.settlement-search-fields {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.settlement-search-input {
+  width: min(520px, 31vw);
+  min-width: 320px;
+  flex: 1 1 auto;
+}
+
+.settlement-search-prefix-icon {
+  color: var(--text-secondary);
+}
+
+.settlement-search-select {
+  width: 180px;
+  flex: 0 0 180px;
+}
+
+.settlement-search-select.is-compact {
+  width: 150px;
+  flex-basis: 150px;
+}
+
+.settlement-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.settlement-workspace {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.settlement-kpi-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  gap: 0;
+  overflow: hidden;
+  min-height: 84px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.settlement-kpi-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 19px 27px 8px;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.settlement-kpi-item:last-child {
+  border-right: 0;
+}
+
+.settlement-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.settlement-kpi-icon.is-amount {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.settlement-kpi-icon.is-final,
+.settlement-kpi-icon.is-paid {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.settlement-kpi-icon.is-unpaid {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+.settlement-kpi-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlement-kpi-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settlement-kpi-value small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settlement-kpi-progress {
+  display: block;
+  overflow: hidden;
+  height: 4px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-sm);
+  grid-column: 2;
+}
+
+.settlement-kpi-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--kpi-paid);
+  border-radius: var(--radius-sm);
+}
+
+.settlement-kpi-item.is-paid .settlement-kpi-progress > span {
+  background: var(--kpi-unpaid);
+}
+
+.settlement-table-panel {
+  min-height: 754px;
+}
+
+.settlement-toolbar {
+  align-items: center;
+}
+
+.settlement-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.settlement-table-count,
+.settlement-toolbar-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settlement-analysis-rail {
+  width: 336px;
+}
+
+.settlement-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.settlement-analysis-head,
+.settlement-warning-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settlement-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.settlement-analysis-subtitle,
+.settlement-warning-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settlement-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settlement-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.settlement-analysis-empty {
+  padding: 10px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.settlement-analysis-section :deep(.lg-type-row),
+.lg-type-row {
+  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
+}
+
+.settlement-type-amount {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.settlement-warning-amount {
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .settlement-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settlement-kpi-item {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .settlement-analysis-rail {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .settlement-page-meta-row,
+  .settlement-search-bar,
+  .settlement-search-fields {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settlement-page-subtitle {
+    white-space: normal;
+  }
+
+  .settlement-search-input,
+  .settlement-search-select,
+  .settlement-search-select.is-compact {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
+}
 </style>

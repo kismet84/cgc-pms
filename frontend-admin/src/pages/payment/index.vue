@@ -2,7 +2,17 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
-import { MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  DollarOutlined,
+  MoreOutlined,
+  PayCircleOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  WalletOutlined,
+} from '@ant-design/icons-vue'
 import {
   getApplicationList,
   createApplication,
@@ -90,7 +100,7 @@ async function fetchData() {
       approvalStatus: filter.approvalStatus,
     })
     tableData.value = res.records
-    total.value = res.total
+    total.value = Number(res.total ?? 0)
   } catch (e) {
     console.error(e)
     tableData.value = []
@@ -267,6 +277,12 @@ function fmtWan(val: string | undefined): string {
   const n = parseFloat(val)
   return isNaN(n) ? '0.00' : (n / 10000).toFixed(2)
 }
+const kpiTotalApply = computed(() =>
+  tableData.value.reduce((s, r) => s + (parseFloat(r.applyAmount) || 0), 0),
+)
+const kpiActualPaid = computed(() =>
+  tableData.value.reduce((s, r) => s + (parseFloat(r.actualPayAmount || '0') || 0), 0),
+)
 const kpiUnpaid = computed(() =>
   tableData.value
     .filter((r) => r.payStatus === 'UNPAID' || r.payStatus === 'PARTIAL')
@@ -286,8 +302,59 @@ const statusBreakdown = computed(() => {
   tableData.value.forEach((r) => {
     m[r.payStatus] = (m[r.payStatus] || 0) + 1
   })
-  return Object.entries(m).map(([k, v]) => ({ label: PAY_STATUS_LABEL[k] ?? k, count: v }))
+  const max = Math.max(total.value, tableData.value.length, 1)
+  return Object.entries(m).map(([k, v]) => ({
+    key: k,
+    label: PAY_STATUS_LABEL[k] ?? k,
+    count: v,
+    percent: kpiPct(v, max),
+    color: k === 'PAID' ? '#31c48d' : k === 'PARTIAL' ? '#f59e0b' : '#94a3b8',
+  }))
 })
+
+const approvalBreakdown = computed(() => {
+  const m: Record<string, number> = {}
+  tableData.value.forEach((r) => {
+    m[r.approvalStatus || 'DRAFT'] = (m[r.approvalStatus || 'DRAFT'] || 0) + 1
+  })
+  const max = Math.max(total.value, tableData.value.length, 1)
+  const labels: Record<string, string> = {
+    DRAFT: '草稿',
+    APPROVING: '审批中',
+    APPROVED: '已通过',
+    REJECTED: '已驳回',
+  }
+  const colors: Record<string, string> = {
+    DRAFT: '#94a3b8',
+    APPROVING: '#2563eb',
+    APPROVED: '#31c48d',
+    REJECTED: '#ef4444',
+  }
+  return Object.entries(m).map(([k, v]) => ({
+    key: k,
+    label: labels[k] ?? k,
+    count: v,
+    percent: kpiPct(v, max),
+    color: colors[k] ?? '#94a3b8',
+  }))
+})
+
+const pendingPayments = computed(() =>
+  tableData.value
+    .filter((r) => r.approvalStatus === 'APPROVED' && r.payStatus !== 'PAID')
+    .map((row) => ({
+      id: row.id,
+      project: row.projectName || '-',
+      title: row.applyCode || row.contractName || '-',
+      amount: fmtWan(row.approvedAmount || row.applyAmount),
+    }))
+    .slice(0, 4),
+)
+
+const paidPct = computed(() => kpiPct(kpiActualPaid.value, Math.max(kpiTotalApply.value, 1)))
+function fmtAmountText(value: number): string {
+  return fmtWan(String(value))
+}
 
 const kpiMax = computed(() => ({
   unpaid: Math.max(kpiUnpaid.value, 1),
@@ -349,69 +416,77 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
+  <div class="lg-list-page lg-page app-page payment-page">
     <!-- 页面头部 -->
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+    <div class="lg-page-head payment-page-head">
+      <div class="payment-page-meta-row">
+        <a-breadcrumb class="payment-breadcrumb">
           <a-breadcrumb-item>付款管理</a-breadcrumb-item>
           <a-breadcrumb-item>付款申请</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="payment-page-subtitle">按合同跟踪申请金额、审批状态与支付回写。</span>
       </div>
     </div>
 
-    <div class="lg-search-bar">
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部项目"
-        allow-clear
-        size="large"
-        @change="
-          (v: string | undefined) => {
-            filter.contractId = undefined
-            if (v) referenceStore.fetchContracts({ projectId: v })
-            handleSearch()
-          }
-        "
-      >
-        <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.contractId"
-        placeholder="全部合同"
-        allow-clear
-        size="large"
-        @change="handleSearch"
-      >
-        <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">
-          {{ c.contractName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.payType"
-        placeholder="全部类型"
-        allow-clear
-        size="large"
-        @change="handleSearch"
-      >
-        <a-select-option v-for="(label, key) in PAY_TYPE_LABEL" :key="key" :value="key">
-          {{ label }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.payStatus"
-        placeholder="全部状态"
-        allow-clear
-        size="large"
-        @change="handleSearch"
-      >
-        <a-select-option v-for="(label, key) in PAY_STATUS_LABEL" :key="key" :value="key">
-          {{ label }}
-        </a-select-option>
-      </a-select>
-      <div class="lg-search-actions">
+    <div class="lg-search-bar payment-search-bar">
+      <div class="payment-search-fields">
+        <a-select
+          v-model:value="filter.projectId"
+          class="payment-search-select"
+          placeholder="全部项目"
+          allow-clear
+          size="large"
+          @change="
+            (v: string | undefined) => {
+              filter.contractId = undefined
+              if (v) referenceStore.fetchContracts({ projectId: v })
+              handleSearch()
+            }
+          "
+        >
+          <template #suffixIcon><SearchOutlined /></template>
+          <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.contractId"
+          class="payment-search-select"
+          placeholder="全部合同"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">
+            {{ c.contractName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.payType"
+          class="payment-search-select is-compact"
+          placeholder="类型"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="(label, key) in PAY_TYPE_LABEL" :key="key" :value="key">
+            {{ label }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.payStatus"
+          class="payment-search-select is-compact"
+          placeholder="状态"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="(label, key) in PAY_STATUS_LABEL" :key="key" :value="key">
+            {{ label }}
+          </a-select-option>
+        </a-select>
+      </div>
+      <div class="payment-search-actions">
         <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
         <a-button size="large" @click="handleReset">
           <template #icon><ReloadOutlined /></template>
@@ -420,68 +495,73 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="lg-grid">
+    <div class="lg-grid payment-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">待付款金额</span>
-            <span class="lg-kpi-card-value" style="color: #ef4444"
-              >{{ kpiUnpaid.toLocaleString() }} <small>元</small></span
+        <div class="payment-kpi-summary" aria-label="付款关键指标">
+          <div class="payment-kpi-item">
+            <span class="payment-kpi-icon is-total"><PayCircleOutlined /></span>
+            <span class="payment-kpi-label">申请总数</span>
+            <span class="payment-kpi-value">{{ total }} <small>单</small></span>
+          </div>
+          <div class="payment-kpi-item is-wide">
+            <span class="payment-kpi-icon is-amount"><DollarOutlined /></span>
+            <span class="payment-kpi-label">申请金额</span>
+            <span class="payment-kpi-value"
+              >{{ fmtAmountText(kpiTotalApply) }} <small>万元</small></span
             >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: #ef4444"></span
-            ></span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">已审批未支付</span>
-            <span class="lg-kpi-card-value"
-              >{{ kpiApprovedUnpaid.toLocaleString() }} <small>元</small></span
+          <div class="payment-kpi-item is-progress">
+            <span class="payment-kpi-icon is-paid"><CheckCircleOutlined /></span>
+            <span class="payment-kpi-label">已付金额</span>
+            <span class="payment-kpi-value"
+              >{{ fmtAmountText(kpiActualPaid) }} <small>万元</small></span
             >
-            <span class="lg-kpi-card-bar"
-              ><span
-                :style="{
-                  width: kpiPct(kpiApprovedUnpaid, kpiMax.unpaid) + '%',
-                  background: 'var(--kpi-unpaid)',
-                }"
-              ></span
-            ></span>
-            <span class="lg-kpi-card-hint">{{ kpiPct(kpiApprovedUnpaid, kpiMax.unpaid) }}%</span>
-          </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">今日应付</span>
-            <span class="lg-kpi-card-value">-<small>元</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 0%; background: var(--muted)"></span
+            <span class="payment-kpi-progress"
+              ><span :style="{ width: paidPct + '%' }"></span
             ></span>
           </div>
-          <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">超比例付款</span>
-            <span class="lg-kpi-card-value">0<small>条</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 0%; background: var(--kpi-overdue)"></span
-            ></span>
+          <div class="payment-kpi-item is-progress is-unpaid">
+            <span class="payment-kpi-icon is-unpaid"><WalletOutlined /></span>
+            <span class="payment-kpi-label">待付款金额</span>
+            <span class="payment-kpi-value"
+              >{{ fmtAmountText(kpiUnpaid) }} <small>万元</small></span
+            >
+            <span class="payment-kpi-progress">
+              <span :style="{ width: kpiPct(kpiUnpaid, kpiMax.unpaid) + '%' }"></span>
+            </span>
+          </div>
+          <div class="payment-kpi-item">
+            <span class="payment-kpi-icon is-pending"><ClockCircleOutlined /></span>
+            <span class="payment-kpi-label">已批未付</span>
+            <span class="payment-kpi-value"
+              >{{ fmtAmountText(kpiApprovedUnpaid) }} <small>万元</small></span
+            >
           </div>
         </div>
 
-        <main class="lg-list-table-panel">
+        <main class="lg-list-table-panel payment-table-panel">
           <!-- 工具栏 -->
-          <div class="lg-toolbar">
+          <div class="lg-toolbar payment-toolbar">
             <div class="lg-toolbar-left">
+              <span class="payment-table-title">付款申请</span>
+              <span class="payment-table-count">共 {{ total }} 条</span>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-button type="primary" @click="handleAdd">
                 <template #icon><PlusOutlined /></template>
                 新建申请
               </a-button>
               <a-button @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
+                刷新
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
+              <span class="payment-toolbar-hint">固定表头 / 状态标签 / 行操作展开</span>
             </div>
           </div>
 
@@ -576,52 +656,69 @@ onMounted(() => {
       </div>
 
       <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">付款状态统计</div>
-          <div class="lg-type-list">
+      <aside class="lg-analysis-rail payment-analysis-rail" aria-label="付款辅助分析">
+        <div class="payment-analysis-panel">
+          <header class="payment-analysis-head">
+            <div>
+              <div class="payment-analysis-title">付款分析</div>
+              <div class="payment-analysis-subtitle">支付状态、审批状态与待付款</div>
+            </div>
+            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
+          </header>
+
+          <section class="payment-analysis-section">
+            <div class="payment-section-title">付款状态统计</div>
             <div v-for="it in statusBreakdown" :key="it.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
+              <span class="lg-type-dot" :style="{ background: it.color }"></span>
               <span class="lg-type-label">{{ it.label }}</span>
               <span class="lg-type-bar-wrap">
                 <span
                   class="lg-type-bar"
-                  :style="{
-                    width: kpiPct(it.count, total || 1) + '%',
-                    background: 'var(--kpi-paid)',
-                  }"
+                  :style="{ width: it.percent + '%', background: it.color }"
                 ></span>
               </span>
               <span class="lg-type-num">{{ it.count }}</span>
-              <span class="lg-type-pct">{{ kpiPct(it.count, total || 1) }}%</span>
+              <span class="lg-type-pct">{{ it.percent }}%</span>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">资金风险</div>
-          <div class="lg-type-list">
-            <div class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: '#ef4444' }"></span>
-              <span class="lg-type-label">待付款总额</span>
+            <div v-if="!statusBreakdown.length" class="payment-analysis-empty">
+              暂无付款状态数据
+            </div>
+          </section>
+
+          <section class="payment-analysis-section">
+            <div class="payment-section-title">审批状态</div>
+            <div v-for="it in approvalBreakdown" :key="it.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: it.color }"></span>
+              <span class="lg-type-label">{{ it.label }}</span>
               <span class="lg-type-bar-wrap">
-                <span class="lg-type-bar" style="width: 100%; background: #ef4444"></span>
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: it.percent + '%', background: it.color }"
+                ></span>
               </span>
-              <span class="lg-type-num" style="color: #ef4444">{{
-                kpiUnpaid.toLocaleString()
-              }}</span>
-              <span class="lg-type-pct">元</span>
+              <span class="lg-type-num">{{ it.count }}</span>
+              <span class="lg-type-pct">{{ it.percent }}%</span>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">临期付款</div>
-          暂无临期付款
-        </section>
+          </section>
+
+          <section class="payment-analysis-section">
+            <div class="payment-warning-head">
+              <div class="payment-section-title">待付款提醒</div>
+              <span class="payment-warning-count">{{ pendingPayments.length }} 项</span>
+            </div>
+            <div v-for="item in pendingPayments" :key="item.id" class="lg-warning-item">
+              <span class="lg-warning-project">{{ item.project }}</span>
+              <span class="lg-warning-title">{{ item.title }}</span>
+              <span class="payment-warning-amount">{{ item.amount }}万</span>
+            </div>
+            <div v-if="!pendingPayments.length" class="lg-warning-empty">暂无待付款提醒</div>
+          </section>
+        </div>
       </aside>
     </div>
 
     <!-- Create/Edit Modal -->
-    <a-modal v-model:open="modalVisible" :title="modalTitle" :width="760" @ok="handleSubmit">
+    <a-modal v-model:open="modalVisible" :title="modalTitle" :width="800" @ok="handleSubmit">
       <a-form layout="vertical" :model="formData">
         <a-row :gutter="16">
           <a-col :span="12"
@@ -797,4 +894,299 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.payment-page {
+  gap: 14px;
+}
+
+.payment-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
+.payment-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.payment-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.payment-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.payment-search-bar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 91px;
+}
+
+.payment-search-fields {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.payment-search-select {
+  width: 230px;
+  flex: 0 0 230px;
+}
+
+.payment-search-select.is-compact {
+  width: 150px;
+  flex-basis: 150px;
+}
+
+.payment-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.payment-workspace {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.payment-kpi-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  gap: 0;
+  overflow: hidden;
+  min-height: 84px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.payment-kpi-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 19px 27px 8px;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.payment-kpi-item:last-child {
+  border-right: 0;
+}
+
+.payment-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.payment-kpi-icon.is-amount {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.payment-kpi-icon.is-paid {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.payment-kpi-icon.is-unpaid,
+.payment-kpi-icon.is-pending {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+.payment-kpi-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-kpi-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.payment-kpi-value small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.payment-kpi-progress {
+  display: block;
+  overflow: hidden;
+  height: 4px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-sm);
+  grid-column: 2;
+}
+
+.payment-kpi-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--kpi-paid);
+  border-radius: var(--radius-sm);
+}
+
+.payment-kpi-item.is-unpaid .payment-kpi-progress > span {
+  background: var(--kpi-unpaid);
+}
+
+.payment-table-panel {
+  min-height: 754px;
+}
+
+.payment-toolbar {
+  align-items: center;
+}
+
+.payment-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.payment-table-count,
+.payment-toolbar-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.payment-analysis-rail {
+  width: 336px;
+}
+
+.payment-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.payment-analysis-head,
+.payment-warning-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.payment-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.payment-analysis-subtitle,
+.payment-warning-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.payment-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.payment-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.payment-analysis-empty {
+  padding: 10px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.payment-analysis-section :deep(.lg-type-row),
+.lg-type-row {
+  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
+}
+
+.payment-warning-amount {
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .payment-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .payment-kpi-item {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .payment-analysis-rail {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .payment-page-meta-row,
+  .payment-search-bar,
+  .payment-search-fields {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .payment-page-subtitle {
+    white-space: normal;
+  }
+
+  .payment-search-select,
+  .payment-search-select.is-compact {
+    width: 100%;
+    flex-basis: auto;
+  }
+}
+</style>

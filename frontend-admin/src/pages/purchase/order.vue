@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { SearchOutlined, PlusOutlined, ReloadOutlined, MoreOutlined } from '@ant-design/icons-vue'
+import {
+  ClockCircleOutlined,
+  DollarOutlined,
+  FileDoneOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  ShoppingCartOutlined,
+  WalletOutlined,
+} from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import {
   getOrderList,
@@ -135,7 +145,7 @@ async function fetchData() {
       orderCode: filter.keyword || filter.orderCode || undefined,
     })
     tableData.value = res.records
-    total.value = res.total
+    total.value = Number(res.total ?? 0)
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -367,14 +377,79 @@ const kpiUnreceived = computed(() =>
     .filter((r) => r.orderStatus !== 'COMPLETED' && r.orderStatus !== 'CANCELLED')
     .reduce((s, r) => s + (parseFloat(r.totalAmount) || 0), 0),
 )
+function fmtWan(value: number): string {
+  return (value / 10000).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+function kpiPct(value: number, max: number): number {
+  if (max === 0) return 0
+  return Math.min(Math.round((value / max) * 100), 100)
+}
+const kpiMax = computed(() => ({
+  totalAmount: Math.max(kpiOrderedAmount.value, kpiUnreceived.value, 1),
+  totalCount: Math.max(total.value, tableData.value.length, 1),
+}))
 const orderStatusBreakdown = computed(() => {
   const m: Record<string, number> = {}
   tableData.value.forEach((r) => {
-    m[ORDER_STATUS_LABEL[r.orderStatus] ?? r.orderStatus] =
-      (m[ORDER_STATUS_LABEL[r.orderStatus] ?? r.orderStatus] || 0) + 1
+    const key = r.orderStatus || 'DRAFT'
+    m[key] = (m[key] || 0) + 1
   })
-  return Object.entries(m).map(([k, v]) => ({ label: k, count: v }))
+  return Object.entries(m).map(([key, count]) => ({
+    key,
+    label: ORDER_STATUS_LABEL[key] ?? key,
+    count,
+    pct: kpiPct(count, kpiMax.value.totalCount),
+    color:
+      key === 'COMPLETED'
+        ? '#31c48d'
+        : key === 'CANCELLED'
+          ? '#ef4444'
+          : key === 'APPROVING'
+            ? '#2563eb'
+            : '#f59e0b',
+  }))
 })
+const orderTypeBreakdown = computed(() => {
+  const m: Record<string, number> = {}
+  tableData.value.forEach((r) => {
+    const key = r.orderType || 'OTHER'
+    m[key] = (m[key] || 0) + 1
+  })
+  return Object.entries(m).map(([key, count]) => ({
+    key,
+    label: ORDER_TYPE_LABEL[key] ?? key,
+    count,
+    pct: kpiPct(count, kpiMax.value.totalCount),
+    color:
+      key === 'MATERIAL'
+        ? '#2563eb'
+        : key === 'EQUIPMENT'
+          ? '#0891b2'
+          : key === 'SERVICE'
+            ? '#8b5cf6'
+            : '#94a3b8',
+  }))
+})
+const pendingOrders = computed(() =>
+  tableData.value
+    .filter((row) => row.orderStatus !== 'COMPLETED' && row.orderStatus !== 'CANCELLED')
+    .map((row) => ({
+      id: row.id,
+      project: row.projectName || '-',
+      title: row.orderCode || row.contractName || '-',
+      amount: fmtWan(parseFloat(row.totalAmount || '0') || 0),
+    }))
+    .slice(0, 4),
+)
+
+function onFilterProjectChange(v: string | undefined) {
+  filter.contractId = undefined
+  if (v) referenceStore.fetchContracts({ projectId: v, contractType: 'PURCHASE' })
+  handleSearch()
+}
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -386,102 +461,141 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+  <div class="lg-list-page lg-page app-page purchase-order-page">
+    <div class="lg-page-head purchase-order-page-head">
+      <div class="purchase-order-page-meta-row">
+        <a-breadcrumb class="purchase-order-breadcrumb">
           <a-breadcrumb-item>采购管理</a-breadcrumb-item>
           <a-breadcrumb-item>采购订单</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="purchase-order-page-subtitle">按项目跟踪采购订单、履约状态与未入库金额。</span>
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <div class="lg-search-bar">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索订单编号、名称…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
+    <div class="lg-search-bar purchase-order-search-bar">
+      <div class="purchase-order-search-fields">
+        <a-input
+          v-model:value="filter.keyword"
+          class="purchase-order-search-input"
+          placeholder="搜索订单编号、名称"
+          allow-clear
+          size="large"
+          @press-enter="handleSearch"
+        >
+          <template #prefix><SearchOutlined class="purchase-order-search-prefix-icon" /></template>
+        </a-input>
+        <a-select
+          v-model:value="filter.projectId"
+          class="purchase-order-search-select"
+          placeholder="全部项目"
+          allow-clear
+          size="large"
+          @change="onFilterProjectChange"
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.orderType"
+          class="purchase-order-search-select is-compact"
+          placeholder="类型"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="(label, key) in ORDER_TYPE_LABEL" :key="key" :value="key">
+            {{ label }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.orderStatus"
+          class="purchase-order-search-select is-compact"
+          placeholder="状态"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="(label, key) in ORDER_STATUS_LABEL" :key="key" :value="key">
+            {{ label }}
+          </a-select-option>
+        </a-select>
+      </div>
+      <div class="purchase-order-search-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
+      </div>
     </div>
 
-    <div class="lg-grid">
+    <div class="lg-grid purchase-order-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">采购订单数</span>
-            <span class="lg-kpi-card-value">{{ kpiOrderTotal }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-total)"></span
-            ></span>
+        <div class="purchase-order-kpi-summary" aria-label="采购订单关键指标">
+          <div class="purchase-order-kpi-item">
+            <span class="purchase-order-kpi-icon is-total"><ShoppingCartOutlined /></span>
+            <span class="purchase-order-kpi-label">采购订单数</span>
+            <span class="purchase-order-kpi-value">{{ kpiOrderTotal }} <small>单</small></span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">待审批</span>
-            <span class="lg-kpi-card-value">{{ kpiOrderPending }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: #f59e0b"></span
-            ></span>
-          </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">已下单金额</span>
-            <span class="lg-kpi-card-value"
-              >{{ kpiOrderedAmount.toLocaleString() }} <small>元</small></span
+          <div class="purchase-order-kpi-item is-wide">
+            <span class="purchase-order-kpi-icon is-amount"><DollarOutlined /></span>
+            <span class="purchase-order-kpi-label">已下单金额</span>
+            <span class="purchase-order-kpi-value"
+              >{{ fmtWan(kpiOrderedAmount) }} <small>万元</small></span
             >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-amount)"></span
-            ></span>
           </div>
-          <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">未入库金额</span>
-            <span class="lg-kpi-card-value" style="color: #f59e0b"
-              >{{ kpiUnreceived.toLocaleString() }} <small>元</small></span
+          <div class="purchase-order-kpi-item is-progress">
+            <span class="purchase-order-kpi-icon is-pending"><ClockCircleOutlined /></span>
+            <span class="purchase-order-kpi-label">待审批</span>
+            <span class="purchase-order-kpi-value">{{ kpiOrderPending }} <small>单</small></span>
+            <span class="purchase-order-kpi-progress">
+              <span :style="{ width: kpiPct(kpiOrderPending, kpiMax.totalCount) + '%' }"></span>
+            </span>
+          </div>
+          <div class="purchase-order-kpi-item is-progress is-unreceived">
+            <span class="purchase-order-kpi-icon is-unreceived"><WalletOutlined /></span>
+            <span class="purchase-order-kpi-label">未入库金额</span>
+            <span class="purchase-order-kpi-value"
+              >{{ fmtWan(kpiUnreceived) }} <small>万元</small></span
             >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: #f59e0b"></span
-            ></span>
+            <span class="purchase-order-kpi-progress">
+              <span :style="{ width: kpiPct(kpiUnreceived, kpiMax.totalAmount) + '%' }"></span>
+            </span>
+          </div>
+          <div class="purchase-order-kpi-item">
+            <span class="purchase-order-kpi-icon is-done"><FileDoneOutlined /></span>
+            <span class="purchase-order-kpi-label">已完成订单</span>
+            <span class="purchase-order-kpi-value">
+              {{ tableData.filter((r) => r.orderStatus === 'COMPLETED').length }} <small>单</small>
+            </span>
           </div>
         </div>
 
-        <main class="lg-list-table-panel">
+        <main class="lg-list-table-panel purchase-order-table-panel">
           <!-- 工具栏 -->
-          <div class="lg-toolbar">
+          <div class="lg-toolbar purchase-order-toolbar">
             <div class="lg-toolbar-left">
+              <span class="purchase-order-table-title">采购订单</span>
+              <span class="purchase-order-table-count">共 {{ total }} 条</span>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-button type="primary" @click="handleAdd">
                 <template #icon><PlusOutlined /></template>
                 新建订单
               </a-button>
               <a-button @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
+                刷新
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部项目"
-                allow-clear
-                style="width: 160px"
-                size="small"
-                @change="handleSearch"
-              >
-                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
+              <span class="purchase-order-toolbar-hint">固定表头 / 审批状态 / 行操作展开</span>
             </div>
           </div>
 
@@ -555,17 +669,64 @@ onMounted(() => {
       </div>
 
       <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">订单状态分布</div>
-          <div class="lg-type-list">
-            <div v-for="it in orderStatusBreakdown" :key="it.label" class="lg-type-row">
-              <span class="lg-type-label">{{ it.label }}</span>
-              <span class="lg-type-num">{{ it.count }}</span>
-              <span class="lg-type-pct">条</span>
+      <aside class="lg-analysis-rail purchase-order-analysis-rail" aria-label="采购订单辅助分析">
+        <div class="purchase-order-analysis-panel">
+          <header class="purchase-order-analysis-head">
+            <div>
+              <div class="purchase-order-analysis-title">订单分析</div>
+              <div class="purchase-order-analysis-subtitle">状态、类型与待履约金额</div>
             </div>
-          </div>
-        </section>
+            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
+          </header>
+
+          <section class="purchase-order-analysis-section">
+            <div class="purchase-order-section-title">订单状态分布</div>
+            <div v-for="it in orderStatusBreakdown" :key="it.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: it.color }"></span>
+              <span class="lg-type-label">{{ it.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: it.pct + '%', background: it.color }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ it.count }}</span>
+              <span class="lg-type-pct">{{ it.pct }}%</span>
+            </div>
+            <div v-if="!orderStatusBreakdown.length" class="purchase-order-analysis-empty">
+              暂无订单状态数据
+            </div>
+          </section>
+
+          <section class="purchase-order-analysis-section">
+            <div class="purchase-order-section-title">订单类型分布</div>
+            <div v-for="it in orderTypeBreakdown" :key="it.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: it.color }"></span>
+              <span class="lg-type-label">{{ it.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: it.pct + '%', background: it.color }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ it.count }}</span>
+              <span class="lg-type-pct">{{ it.pct }}%</span>
+            </div>
+          </section>
+
+          <section class="purchase-order-analysis-section">
+            <div class="purchase-order-warning-head">
+              <div class="purchase-order-section-title">待履约订单</div>
+              <span class="purchase-order-warning-count">{{ pendingOrders.length }} 项</span>
+            </div>
+            <div v-for="item in pendingOrders" :key="item.id" class="lg-warning-item">
+              <span class="lg-warning-project">{{ item.project }}</span>
+              <span class="lg-warning-title">{{ item.title }}</span>
+              <span class="purchase-order-warning-amount">{{ item.amount }}万</span>
+            </div>
+            <div v-if="!pendingOrders.length" class="lg-warning-empty">暂无待履约订单</div>
+          </section>
+        </div>
       </aside>
     </div>
 
@@ -573,7 +734,7 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="900"
+      :width="800"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
     >
@@ -748,3 +909,316 @@ onMounted(() => {
     </a-modal>
   </div>
 </template>
+
+<style scoped>
+.purchase-order-page {
+  gap: 14px;
+}
+
+.purchase-order-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
+.purchase-order-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.purchase-order-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.purchase-order-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.purchase-order-search-bar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
+}
+
+.purchase-order-search-fields {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.purchase-order-search-input {
+  width: min(520px, 31vw);
+  min-width: 320px;
+  flex: 1 1 auto;
+}
+
+.purchase-order-search-prefix-icon {
+  color: var(--text-secondary);
+}
+
+.purchase-order-search-select {
+  width: 180px;
+  flex: 0 0 180px;
+}
+
+.purchase-order-search-select.is-compact {
+  width: 150px;
+  flex-basis: 150px;
+}
+
+.purchase-order-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.purchase-order-workspace {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.purchase-order-kpi-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  gap: 0;
+  overflow: hidden;
+  min-height: 84px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.purchase-order-kpi-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 19px 27px 8px;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.purchase-order-kpi-item:last-child {
+  border-right: 0;
+}
+
+.purchase-order-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.purchase-order-kpi-icon.is-amount {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.purchase-order-kpi-icon.is-pending {
+  color: var(--primary);
+  background: var(--surface-tint);
+}
+
+.purchase-order-kpi-icon.is-unreceived {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+.purchase-order-kpi-icon.is-done {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.purchase-order-kpi-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-order-kpi-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-order-kpi-value small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.purchase-order-kpi-progress {
+  display: block;
+  overflow: hidden;
+  height: 4px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-sm);
+  grid-column: 2;
+}
+
+.purchase-order-kpi-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--kpi-paid);
+  border-radius: var(--radius-sm);
+}
+
+.purchase-order-kpi-item.is-unreceived .purchase-order-kpi-progress > span {
+  background: var(--kpi-unpaid);
+}
+
+.purchase-order-table-panel {
+  min-height: 754px;
+}
+
+.purchase-order-toolbar {
+  align-items: center;
+}
+
+.purchase-order-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.purchase-order-table-count,
+.purchase-order-toolbar-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.purchase-order-analysis-rail {
+  width: 336px;
+}
+
+.purchase-order-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.purchase-order-analysis-head,
+.purchase-order-warning-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.purchase-order-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.purchase-order-analysis-subtitle,
+.purchase-order-warning-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.purchase-order-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.purchase-order-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.purchase-order-analysis-empty {
+  padding: 10px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.purchase-order-analysis-section :deep(.lg-type-row),
+.lg-type-row {
+  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
+}
+
+.purchase-order-warning-amount {
+  color: var(--error);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .purchase-order-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .purchase-order-kpi-item {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .purchase-order-analysis-rail {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .purchase-order-page-meta-row,
+  .purchase-order-search-bar,
+  .purchase-order-search-fields {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .purchase-order-page-subtitle {
+    white-space: normal;
+  }
+
+  .purchase-order-search-input,
+  .purchase-order-search-select,
+  .purchase-order-search-select.is-compact {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
+}
+</style>

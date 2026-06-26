@@ -78,7 +78,7 @@ export function useInvoiceList() {
         verifyStatus: filter.verifyStatus,
       })
       tableData.value = res.records
-      total.value = res.total
+      total.value = Number(res.total ?? 0)
     } catch (e: unknown) {
       console.error(e)
       tableData.value = []
@@ -188,7 +188,7 @@ export function useInvoiceList() {
       .reduce((s, r) => s + (parseFloat(r.invoiceAmount) || 0), 0),
   )
   const kpiAbnormal = computed(
-    () => tableData.value.filter((r) => r.verifyStatus === 'FAILED').length,
+    () => tableData.value.filter((r) => r.verifyStatus === 'ABNORMAL').length,
   )
 
   const kpiMax = computed(() => ({

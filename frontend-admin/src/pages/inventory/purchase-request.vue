@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { MoreOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  FileDoneOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  ShoppingCartOutlined,
+  WalletOutlined,
+} from '@ant-design/icons-vue'
 import {
   getPurchaseRequestList,
   createPurchaseRequest,
@@ -115,7 +125,7 @@ async function fetchData() {
       requestCode: filter.keyword || filter.requestCode || undefined,
     })
     tableData.value = res.records
-    total.value = res.total
+    total.value = Number(res.total ?? 0)
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -402,6 +412,54 @@ const kpiReqConverted = computed(
   () => tableData.value.filter((r) => r.status === 'CONVERTED').length,
 )
 const recentRequests = computed(() => tableData.value.slice(0, 4))
+const kpiReqDraft = computed(() => tableData.value.filter((r) => r.status === 'DRAFT').length)
+const kpiMax = computed(() => ({
+  totalCount: Math.max(total.value, tableData.value.length, 1),
+}))
+function kpiPct(value: number, max: number): number {
+  if (max === 0) return 0
+  return Math.min(Math.round((value / max) * 100), 100)
+}
+const statusBreakdown = computed(() => {
+  const m: Record<string, number> = {}
+  tableData.value.forEach((r) => {
+    const key = r.status || 'DRAFT'
+    m[key] = (m[key] || 0) + 1
+  })
+  return Object.entries(m).map(([key, count]) => ({
+    key,
+    label: STATUS_LABEL[key] ?? key,
+    count,
+    pct: kpiPct(count, kpiMax.value.totalCount),
+    color: key === 'CONVERTED' ? '#31c48d' : '#f59e0b',
+  }))
+})
+const approvalBreakdown = computed(() => {
+  const m: Record<string, number> = {}
+  tableData.value.forEach((r) => {
+    const key = r.approvalStatus || 'DRAFT'
+    m[key] = (m[key] || 0) + 1
+  })
+  const labels: Record<string, string> = {
+    DRAFT: '草稿',
+    APPROVING: '审批中',
+    APPROVED: '已通过',
+    REJECTED: '已驳回',
+  }
+  const colors: Record<string, string> = {
+    DRAFT: '#94a3b8',
+    APPROVING: '#2563eb',
+    APPROVED: '#31c48d',
+    REJECTED: '#ef4444',
+  }
+  return Object.entries(m).map(([key, count]) => ({
+    key,
+    label: labels[key] ?? key,
+    count,
+    pct: kpiPct(count, kpiMax.value.totalCount),
+    color: colors[key] ?? '#94a3b8',
+  }))
+})
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -411,81 +469,139 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb class="cl-breadcrumb">
+  <div class="lg-list-page lg-page app-page purchase-request-page">
+    <div class="lg-page-head purchase-request-page-head">
+      <div class="purchase-request-page-meta-row">
+        <a-breadcrumb class="purchase-request-breadcrumb">
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>采购申请</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="purchase-request-page-subtitle">按项目跟踪采购申请、审批状态与转单进度。</span>
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <div class="lg-search-bar">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索申请编号…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
+    <div class="lg-search-bar purchase-request-search-bar">
+      <div class="purchase-request-search-fields">
+        <a-input
+          v-model:value="filter.keyword"
+          class="purchase-request-search-input"
+          placeholder="搜索申请编号"
+          allow-clear
+          size="large"
+          @press-enter="handleSearch"
+        >
+          <template #prefix
+            ><SearchOutlined class="purchase-request-search-prefix-icon"
+          /></template>
+        </a-input>
+        <a-select
+          v-model:value="filter.projectId"
+          class="purchase-request-search-select"
+          placeholder="全部项目"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.approvalStatus"
+          class="purchase-request-search-select is-compact"
+          placeholder="审批状态"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option value="DRAFT">草稿</a-select-option>
+          <a-select-option value="APPROVING">审批中</a-select-option>
+          <a-select-option value="APPROVED">已通过</a-select-option>
+          <a-select-option value="REJECTED">已驳回</a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.status"
+          class="purchase-request-search-select is-compact"
+          placeholder="业务状态"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option value="DRAFT">草稿</a-select-option>
+          <a-select-option value="CONVERTED">已转PO</a-select-option>
+        </a-select>
+      </div>
+      <div class="purchase-request-search-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
+      </div>
     </div>
 
-    <div class="lg-grid">
+    <div class="lg-grid purchase-request-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">申请数</span>
-            <span class="lg-kpi-card-value">{{ kpiReqTotal }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-total)"></span
-            ></span>
+        <div class="purchase-request-kpi-summary" aria-label="采购申请关键指标">
+          <div class="purchase-request-kpi-item">
+            <span class="purchase-request-kpi-icon is-total"><ShoppingCartOutlined /></span>
+            <span class="purchase-request-kpi-label">申请总数</span>
+            <span class="purchase-request-kpi-value">{{ kpiReqTotal }} <small>单</small></span>
           </div>
-          <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">待审批</span>
-            <span class="lg-kpi-card-value">{{ kpiReqPending }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: #f59e0b"></span
-            ></span>
+          <div class="purchase-request-kpi-item is-wide">
+            <span class="purchase-request-kpi-icon is-draft"><FileDoneOutlined /></span>
+            <span class="purchase-request-kpi-label">草稿申请</span>
+            <span class="purchase-request-kpi-value">{{ kpiReqDraft }} <small>单</small></span>
+          </div>
+          <div class="purchase-request-kpi-item is-progress">
+            <span class="purchase-request-kpi-icon is-pending"><ClockCircleOutlined /></span>
+            <span class="purchase-request-kpi-label">待审批</span>
+            <span class="purchase-request-kpi-value">{{ kpiReqPending }} <small>单</small></span>
+            <span class="purchase-request-kpi-progress">
+              <span :style="{ width: kpiPct(kpiReqPending, kpiMax.totalCount) + '%' }"></span>
+            </span>
+          </div>
+          <div class="purchase-request-kpi-item is-progress is-converted">
+            <span class="purchase-request-kpi-icon is-converted"><CheckCircleOutlined /></span>
+            <span class="purchase-request-kpi-label">已转PO</span>
+            <span class="purchase-request-kpi-value">{{ kpiReqConverted }} <small>单</small></span>
+            <span class="purchase-request-kpi-progress">
+              <span :style="{ width: kpiPct(kpiReqConverted, kpiMax.totalCount) + '%' }"></span>
+            </span>
+          </div>
+          <div class="purchase-request-kpi-item">
+            <span class="purchase-request-kpi-icon is-recent"><WalletOutlined /></span>
+            <span class="purchase-request-kpi-label">近期申请</span>
+            <span class="purchase-request-kpi-value"
+              >{{ recentRequests.length }} <small>单</small></span
+            >
           </div>
         </div>
 
-        <main class="lg-list-table-panel">
+        <main class="lg-list-table-panel purchase-request-table-panel">
           <!-- 工具栏 -->
-          <div class="lg-toolbar">
+          <div class="lg-toolbar purchase-request-toolbar">
             <div class="lg-toolbar-left">
-              <a-button type="primary" @click="handleAdd">新建申请</a-button>
-              <a-button @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
-              </a-button>
-            </div>
-            <div class="lg-toolbar-right">
+              <span class="purchase-request-table-title">采购申请</span>
+              <span class="purchase-request-table-count">共 {{ total }} 条</span>
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
               />
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部项目"
-                allow-clear
-                style="width: 160px"
-                size="small"
-                @change="handleSearch"
-              >
-                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
+              <a-button type="primary" @click="handleAdd">
+                <template #icon><PlusOutlined /></template>
+                新建申请
+              </a-button>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <span class="purchase-request-toolbar-hint">固定表头 / 审批状态 / 行操作展开</span>
             </div>
           </div>
 
@@ -544,32 +660,63 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">申请状态分布</div>
-          <div class="lg-type-list">
-            <div class="lg-type-row">
-              <span class="lg-type-dot" style="background: #faad14"></span>
-              <span class="lg-type-label">待审批</span>
-              <span style="margin-left: auto">{{ kpiReqPending }} 条</span>
+      <aside class="lg-analysis-rail purchase-request-analysis-rail" aria-label="采购申请辅助分析">
+        <div class="purchase-request-analysis-panel">
+          <header class="purchase-request-analysis-head">
+            <div>
+              <div class="purchase-request-analysis-title">申请分析</div>
+              <div class="purchase-request-analysis-subtitle">业务状态、审批状态与近期申请</div>
             </div>
-            <div class="lg-type-row">
-              <span class="lg-type-dot" style="background: #1890ff"></span>
-              <span class="lg-type-label">已转PO</span>
-              <span style="margin-left: auto">{{ kpiReqConverted }} 条</span>
+            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
+          </header>
+
+          <section class="purchase-request-analysis-section">
+            <div class="purchase-request-section-title">业务状态分布</div>
+            <div v-for="item in statusBreakdown" :key="item.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: item.pct + '%', background: item.color }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ item.pct }}%</span>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">近期申请</div>
-          <div class="lg-type-list">
-            <div v-for="item in recentRequests" :key="item.id" class="lg-type-row">
-              <span class="lg-type-dot" style="background: #52c41a"></span>
-              <span class="lg-type-label">{{ item.requestCode }}</span>
+            <div v-if="!statusBreakdown.length" class="purchase-request-analysis-empty">
+              暂无业务状态数据
+            </div>
+          </section>
+
+          <section class="purchase-request-analysis-section">
+            <div class="purchase-request-section-title">审批状态</div>
+            <div v-for="item in approvalBreakdown" :key="item.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: item.pct + '%', background: item.color }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ item.pct }}%</span>
+            </div>
+          </section>
+
+          <section class="purchase-request-analysis-section">
+            <div class="purchase-request-warning-head">
+              <div class="purchase-request-section-title">近期申请</div>
+              <span class="purchase-request-warning-count">{{ recentRequests.length }} 项</span>
+            </div>
+            <div v-for="item in recentRequests" :key="item.id" class="lg-warning-item">
+              <span class="lg-warning-project">{{ item.projectName || '-' }}</span>
+              <span class="lg-warning-title">{{ item.requestCode }}</span>
             </div>
             <div v-if="!recentRequests.length" class="lg-warning-empty">暂无采购申请</div>
-          </div>
-        </section>
+          </section>
+        </div>
       </aside>
     </div>
 
@@ -577,7 +724,7 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="900"
+      :width="800"
       :confirm-loading="submitting"
       destroy-on-close
       @ok="handleModalOk"
@@ -715,6 +862,271 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.purchase-request-page {
+  gap: 14px;
+}
+
+.purchase-request-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
+.purchase-request-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.purchase-request-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.purchase-request-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.purchase-request-search-bar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
+}
+
+.purchase-request-search-fields {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.purchase-request-search-input {
+  width: min(520px, 31vw);
+  min-width: 320px;
+  flex: 1 1 auto;
+}
+
+.purchase-request-search-prefix-icon {
+  color: var(--text-secondary);
+}
+
+.purchase-request-search-select {
+  width: 180px;
+  flex: 0 0 180px;
+}
+
+.purchase-request-search-select.is-compact {
+  width: 150px;
+  flex-basis: 150px;
+}
+
+.purchase-request-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.purchase-request-workspace {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.purchase-request-kpi-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  gap: 0;
+  overflow: hidden;
+  min-height: 84px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.purchase-request-kpi-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 19px 27px 8px;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.purchase-request-kpi-item:last-child {
+  border-right: 0;
+}
+
+.purchase-request-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.purchase-request-kpi-icon.is-draft {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.purchase-request-kpi-icon.is-pending,
+.purchase-request-kpi-icon.is-recent {
+  color: var(--primary);
+  background: var(--surface-tint);
+}
+
+.purchase-request-kpi-icon.is-converted {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.purchase-request-kpi-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-request-kpi-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-request-kpi-value small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.purchase-request-kpi-progress {
+  display: block;
+  overflow: hidden;
+  height: 4px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-sm);
+  grid-column: 2;
+}
+
+.purchase-request-kpi-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--kpi-paid);
+  border-radius: var(--radius-sm);
+}
+
+.purchase-request-kpi-item.is-converted .purchase-request-kpi-progress > span {
+  background: var(--kpi-unpaid);
+}
+
+.purchase-request-table-panel {
+  min-height: 754px;
+}
+
+.purchase-request-toolbar {
+  align-items: center;
+}
+
+.purchase-request-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.purchase-request-table-count,
+.purchase-request-toolbar-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.purchase-request-analysis-rail {
+  width: 336px;
+}
+
+.purchase-request-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.purchase-request-analysis-head,
+.purchase-request-warning-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.purchase-request-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.purchase-request-analysis-subtitle,
+.purchase-request-warning-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.purchase-request-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.purchase-request-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.purchase-request-analysis-empty {
+  padding: 10px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.purchase-request-analysis-section :deep(.lg-type-row),
+.lg-type-row {
+  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
+}
+
 .pr-items-section {
   border-top: 1px solid #f0f0f0;
   padding-top: 12px;
@@ -751,5 +1163,40 @@ onMounted(() => {
   width: 240px !important;
   min-width: 240px !important;
   max-width: 240px !important;
+}
+
+@media (max-width: 1200px) {
+  .purchase-request-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .purchase-request-kpi-item {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .purchase-request-analysis-rail {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .purchase-request-page-meta-row,
+  .purchase-request-search-bar,
+  .purchase-request-search-fields {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .purchase-request-page-subtitle {
+    white-space: normal;
+  }
+
+  .purchase-request-search-input,
+  .purchase-request-search-select,
+  .purchase-request-search-select.is-compact {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
 }
 </style>

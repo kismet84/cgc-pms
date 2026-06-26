@@ -66,17 +66,58 @@ const {
 const requisitionStatusSummary = computed(() => [
   {
     label: '已出库',
-    count: tableData.value.filter((item) => item.stockOutFlag === 1).length,
+    count: stockedCount.value,
     color: '#52c41a',
+    pct: statusPct(stockedCount.value),
   },
   {
     label: '未出库',
-    count: tableData.value.filter((item) => item.stockOutFlag !== 1).length,
+    count: unstockedCount.value,
     color: '#faad14',
+    pct: statusPct(unstockedCount.value),
   },
 ])
 
+const stockedCount = computed(
+  () => tableData.value.filter((item) => item.stockOutFlag === 1).length,
+)
+const unstockedCount = computed(
+  () => tableData.value.filter((item) => item.stockOutFlag !== 1).length,
+)
+const pendingApprovalCount = computed(
+  () =>
+    tableData.value.filter((item) => ['DRAFT', 'APPROVING'].includes(item.approvalStatus ?? ''))
+      .length,
+)
+const approvalSummary = computed(() => [
+  {
+    label: '草稿',
+    count: tableData.value.filter((item) => item.approvalStatus === 'DRAFT').length,
+    color: '#94a3b8',
+  },
+  {
+    label: '审批中',
+    count: tableData.value.filter((item) => item.approvalStatus === 'APPROVING').length,
+    color: '#1677ff',
+  },
+  {
+    label: '已通过',
+    count: tableData.value.filter((item) => item.approvalStatus === 'APPROVED').length,
+    color: '#52c41a',
+  },
+  {
+    label: '已驳回',
+    count: tableData.value.filter((item) => item.approvalStatus === 'REJECTED').length,
+    color: '#ff4d4f',
+  },
+])
 const recentRequisitions = computed(() => tableData.value.slice(0, 4))
+
+function statusPct(count: number) {
+  const base = tableData.value.length || 0
+  if (!base) return 0
+  return Math.round((count / base) * 100)
+}
 
 async function fetchUsers() {
   try {
@@ -97,18 +138,21 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <div>
+  <div class="lg-list-page lg-page app-page requisition-page">
+    <div class="lg-page-head requisition-page-head">
+      <div class="requisition-title-block">
         <a-breadcrumb class="lg-breadcrumb">
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>领料申请</a-breadcrumb-item>
         </a-breadcrumb>
+        <div class="requisition-title-row">
+          <h1>领料申请</h1>
+          <span>统一查看项目领料、出库状态、审批进度与金额汇总。</span>
+        </div>
       </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <div class="lg-search-bar">
+    <div class="lg-search-bar requisition-search-bar">
       <a-input
         v-model:value="filter.requisitionCode"
         placeholder="搜索领料单号…"
@@ -118,6 +162,51 @@ onMounted(() => {
       >
         <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
       </a-input>
+      <a-select
+        v-model:value="filter.projectId"
+        placeholder="全部项目"
+        allow-clear
+        size="large"
+        show-search
+        :filter-option="
+          (input: string, option: SelectOption) =>
+            option.label?.toLowerCase().includes(input.toLowerCase())
+        "
+        @change="
+          (v: string | undefined) => {
+            filter.contractId = undefined
+            if (v) referenceStore.fetchContracts({ projectId: v })
+            handleSearch()
+          }
+        "
+      >
+        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+          {{ p.projectName }}
+        </a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.warehouseId"
+        placeholder="全部仓库"
+        allow-clear
+        size="large"
+        @change="handleSearch"
+      >
+        <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
+          {{ w.warehouseName }}
+        </a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.approvalStatus"
+        placeholder="全部审批状态"
+        allow-clear
+        size="large"
+        @change="handleSearch"
+      >
+        <a-select-option value="DRAFT">草稿</a-select-option>
+        <a-select-option value="APPROVING">审批中</a-select-option>
+        <a-select-option value="APPROVED">已通过</a-select-option>
+        <a-select-option value="REJECTED">已驳回</a-select-option>
+      </a-select>
       <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
       <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
@@ -125,167 +214,162 @@ onMounted(() => {
       </a-button>
     </div>
 
-    <!-- KPI 横条 -->
-    <RequisitionKpiStrip
-      :total-count="kpiTotalCount"
-      :total-amount="kpiTotalAmount"
-      :fmt-amount="fmtAmount"
-    />
-
     <div class="lg-grid">
-      <main class="lg-list-table-panel">
-        <!-- 工具栏 -->
-        <div class="lg-toolbar">
-          <div class="lg-toolbar-left">
-            <a-button type="primary" @click="handleAdd">
-              <template #icon><PlusOutlined /></template>
-              新增领料申请
-            </a-button>
-            <a-button @click="fetchData">
-              <template #icon><ReloadOutlined /></template>
-            </a-button>
+      <div class="requisition-main-column">
+        <RequisitionKpiStrip
+          :total-count="kpiTotalCount"
+          :total-amount="kpiTotalAmount"
+          :stocked-count="stockedCount"
+          :unstocked-count="unstockedCount"
+          :pending-count="pendingApprovalCount"
+          :fmt-amount="fmtAmount"
+        />
+
+        <main class="lg-list-table-panel requisition-table-panel">
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <div class="requisition-table-title">
+                <strong>领料明细</strong>
+                <span>共 {{ total }} 条</span>
+              </div>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+              <a-button type="primary" @click="handleAdd">
+                <template #icon><PlusOutlined /></template>
+                新建领料
+              </a-button>
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
+            </div>
           </div>
-          <div class="lg-toolbar-right">
-            <ColumnSettingsButton
-              :columns="columnSettings"
-              :visible="colVisible"
-              @toggle="toggleCol"
+
+          <div class="lg-table-wrap">
+            <vxe-grid
+              :data="tableData"
+              :columns="visibleGridColumns"
+              :loading="loading"
+              :column-config="{ resizable: true }"
+              stripe
+              border="inner"
+              size="small"
+            >
+              <template #totalAmount="{ row }">
+                <span v-if="row.totalAmount" class="lg-money">
+                  {{
+                    Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+                  }}
+                </span>
+                <span v-else class="lg-none">-</span>
+              </template>
+              <template #stockOutFlag="{ row }">
+                <a-tag :color="row.stockOutFlag === 1 ? 'success' : 'default'">
+                  {{ row.stockOutFlag === 1 ? '已出库' : '未出库' }}
+                </a-tag>
+              </template>
+              <template #approvalStatus="{ row }">
+                <ApprovalStatusTag :status="row.approvalStatus" />
+              </template>
+              <template #action="{ row }">
+                <a-dropdown :trigger="['click']">
+                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                      <a-menu-item
+                        v-if="row.approvalStatus === 'DRAFT'"
+                        @click="handleSubmitApproval(row)"
+                      >
+                        提交审批
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+              </template>
+            </vxe-grid>
+          </div>
+
+          <!-- 分页 -->
+          <div class="lg-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :page-size-options="['10', '20', '50', '100']"
+              show-size-changer
+              show-quick-jumper
+              @change="handlePageChange"
+              @show-size-change="handlePageSizeChange"
             />
-            <a-select
-              v-model:value="filter.projectId"
-              placeholder="全部项目"
-              allow-clear
-              style="width: 160px"
-              size="small"
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-              @change="
-                (v: string | undefined) => {
-                  filter.contractId = undefined
-                  if (v) referenceStore.fetchContracts({ projectId: v })
-                  handleSearch()
-                }
-              "
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.warehouseId"
-              placeholder="全部仓库"
-              allow-clear
-              style="width: 160px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-                {{ w.warehouseName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-model:value="filter.approvalStatus"
-              placeholder="全部审批状态"
-              allow-clear
-              style="width: 140px"
-              size="small"
-              @change="handleSearch"
-            >
-              <a-select-option value="DRAFT">草稿</a-select-option>
-              <a-select-option value="APPROVING">审批中</a-select-option>
-              <a-select-option value="APPROVED">已通过</a-select-option>
-              <a-select-option value="REJECTED">已驳回</a-select-option>
-            </a-select>
           </div>
-        </div>
+        </main>
+      </div>
 
-        <!-- 表格 -->
-        <div class="lg-table-wrap">
-          <vxe-grid
-            :data="tableData"
-            :columns="visibleGridColumns"
-            :loading="loading"
-            :column-config="{ resizable: true }"
-            stripe
-            border="inner"
-            size="small"
-          >
-            <template #totalAmount="{ row }">
-              <span v-if="row.totalAmount" class="lg-money">
-                {{ Number(row.totalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+      <aside class="lg-analysis-rail requisition-analysis-rail" aria-label="领料申请辅助分析">
+        <div class="requisition-analysis-panel">
+          <section class="requisition-analysis-section">
+            <div class="requisition-section-head">
+              <strong>出库状态分布</strong>
+              <span>{{ tableData.length }} 单</span>
+            </div>
+            <div class="requisition-bar-list">
+              <div
+                v-for="item in requisitionStatusSummary"
+                :key="item.label"
+                class="requisition-bar-row"
+              >
+                <div class="requisition-bar-meta">
+                  <span><i :style="{ background: item.color }"></i>{{ item.label }}</span>
+                  <strong>{{ item.count }} 单</strong>
+                </div>
+                <div class="requisition-bar-track">
+                  <span :style="{ width: item.pct + '%', background: item.color }"></span>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="requisition-analysis-section">
+            <div class="requisition-section-head">
+              <strong>审批状态</strong>
+              <span>{{ pendingApprovalCount }} 待处理</span>
+            </div>
+            <div class="requisition-chip-list">
+              <span
+                v-for="item in approvalSummary"
+                :key="item.label"
+                class="requisition-chip"
+                :style="{ borderColor: item.color, color: item.color }"
+              >
+                {{ item.label }} {{ item.count }}
               </span>
-              <span v-else class="lg-none">-</span>
-            </template>
-            <template #stockOutFlag="{ row }">
-              <a-tag :color="row.stockOutFlag === 1 ? 'success' : 'default'">
-                {{ row.stockOutFlag === 1 ? '已出库' : '未出库' }}
-              </a-tag>
-            </template>
-            <template #approvalStatus="{ row }">
-              <ApprovalStatusTag :status="row.approvalStatus" />
-            </template>
-            <template #action="{ row }">
-              <a-dropdown :trigger="['click']">
-                <a-button class="lg-row-action-trigger" size="small" type="text">
-                  <MoreOutlined />
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                    <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
-                    <a-menu-item
-                      v-if="row.approvalStatus === 'DRAFT'"
-                      @click="handleSubmitApproval(row)"
-                    >
-                      提交审批
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </template>
-          </vxe-grid>
-        </div>
-
-        <!-- 分页 -->
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
-          <a-pagination
-            v-model:current="pageNo"
-            v-model:page-size="pageSize"
-            :total="total"
-            :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
-            @change="handlePageChange"
-            @show-size-change="handlePageSizeChange"
-          />
-        </div>
-      </main>
-
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">出库状态分布</div>
-          <div class="lg-type-list">
-            <div v-for="item in requisitionStatusSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.color }"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span style="margin-left: auto">{{ item.count }} 单</span>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">近期领料</div>
-          <div class="lg-type-list">
-            <div v-for="item in recentRequisitions" :key="item.id" class="lg-type-row">
-              <span class="lg-type-dot" style="background: #1890ff"></span>
-              <span class="lg-type-label">{{ item.requisitionCode }}</span>
+          </section>
+          <section class="requisition-analysis-section">
+            <div class="requisition-section-head">
+              <strong>近期领料</strong>
+              <span>最新 4 单</span>
             </div>
-            <div v-if="!recentRequisitions.length" class="lg-warning-empty">暂无领料申请</div>
-          </div>
-        </section>
+            <div class="requisition-recent-list">
+              <div
+                v-for="item in recentRequisitions"
+                :key="item.id"
+                class="requisition-recent-item"
+              >
+                <span>{{ item.requisitionCode }}</span>
+                <strong>{{ item.stockOutFlag === 1 ? '已出库' : '未出库' }}</strong>
+              </div>
+              <div v-if="!recentRequisitions.length" class="requisition-empty">暂无领料申请</div>
+            </div>
+          </section>
+        </div>
       </aside>
     </div>
 
@@ -311,8 +395,218 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.requisition-page {
+  color: #0f172a;
+}
+
+.requisition-page-head {
+  margin-bottom: 7px;
+}
+
 .lg-breadcrumb {
   margin-bottom: 5px;
   font-size: 13px;
+}
+
+.requisition-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.requisition-title-row h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.requisition-title-row span {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.requisition-search-bar {
+  min-height: 74px;
+  display: grid;
+  grid-template-columns:
+    minmax(240px, 1.7fr) minmax(180px, 1fr) minmax(160px, 0.9fr)
+    150px auto auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.requisition-main-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.requisition-table-panel {
+  min-height: 754px;
+}
+
+.requisition-table-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-right: 4px;
+}
+
+.requisition-table-title strong {
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.requisition-table-title span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.requisition-analysis-rail {
+  width: 336px;
+}
+
+.requisition-analysis-panel {
+  height: 856px;
+  min-height: 856px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.requisition-analysis-section {
+  padding: 18px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.requisition-analysis-section:last-child {
+  border-bottom: 0;
+}
+
+.requisition-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.requisition-section-head strong {
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.requisition-section-head span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.requisition-bar-list,
+.requisition-recent-list,
+.requisition-chip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.requisition-bar-meta,
+.requisition-recent-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.requisition-bar-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  color: #334155;
+}
+
+.requisition-bar-meta i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.requisition-bar-meta strong,
+.requisition-recent-item strong {
+  color: #0f172a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.requisition-bar-track {
+  margin-top: 7px;
+  height: 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.requisition-bar-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.requisition-chip-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.requisition-chip {
+  padding: 5px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 18px;
+  background: #fff;
+}
+
+.requisition-recent-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.requisition-recent-item:last-child {
+  border-bottom: 0;
+}
+
+.requisition-recent-item span {
+  min-width: 0;
+  overflow: hidden;
+  color: #334155;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requisition-empty {
+  padding: 18px 0;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 13px;
+}
+
+@media (max-width: 1280px) {
+  .requisition-search-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .requisition-analysis-rail {
+    width: 100%;
+  }
 }
 </style>

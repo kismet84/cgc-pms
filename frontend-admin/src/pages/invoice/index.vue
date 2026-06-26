@@ -104,82 +104,92 @@ defineExpose({
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
+  <div class="lg-list-page lg-page app-page invoice-page">
     <!-- 页面头部 -->
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+    <div class="lg-page-head invoice-page-head">
+      <div class="invoice-page-meta-row">
+        <a-breadcrumb class="invoice-breadcrumb">
           <a-breadcrumb-item>发票管理</a-breadcrumb-item>
           <a-breadcrumb-item>发票列表</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="invoice-page-subtitle">按付款记录核验发票金额、认证状态与异常风险。</span>
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <div class="lg-search-bar">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索发票号码…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
+    <div class="lg-search-bar invoice-search-bar">
+      <div class="invoice-search-fields">
+        <a-input
+          v-model:value="filter.keyword"
+          class="invoice-search-input"
+          placeholder="搜索发票号码"
+          allow-clear
+          size="large"
+          @press-enter="handleSearch"
+        >
+          <template #prefix><SearchOutlined class="invoice-search-prefix-icon" /></template>
+        </a-input>
+        <a-select
+          v-model:value="filter.payRecordId"
+          class="invoice-search-select"
+          placeholder="全部付款记录"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
+            {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.verifyStatus"
+          class="invoice-search-select is-compact"
+          placeholder="核验状态"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option value="PENDING">待核验</a-select-option>
+          <a-select-option value="VERIFIED">已认证</a-select-option>
+          <a-select-option value="ABNORMAL">异常</a-select-option>
+        </a-select>
+      </div>
+      <div class="invoice-search-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
+      </div>
     </div>
 
-    <div class="lg-grid">
+    <div class="lg-grid invoice-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
         <InvoiceKpiStrip :data="tableData" />
 
-        <main class="lg-list-table-panel">
+        <main class="lg-list-table-panel invoice-table-panel">
           <!-- 工具栏 -->
-          <div class="lg-toolbar">
+          <div class="lg-toolbar invoice-toolbar">
             <div class="lg-toolbar-left">
+              <span class="invoice-table-title">发票记录</span>
+              <span class="invoice-table-count">共 {{ total }} 条</span>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-button type="primary" @click="handleAdd">
                 <template #icon><PlusOutlined /></template>
                 新增发票
               </a-button>
               <a-button @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
+                刷新
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-              <a-select
-                v-model:value="filter.payRecordId"
-                placeholder="全部付款记录"
-                allow-clear
-                style="width: 180px"
-                size="small"
-                @change="handleSearch"
-              >
-                <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
-                  {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
-                </a-select-option>
-              </a-select>
-              <a-select
-                v-model:value="filter.verifyStatus"
-                placeholder="全部核验状态"
-                allow-clear
-                style="width: 130px"
-                size="small"
-                @change="handleSearch"
-              >
-                <a-select-option value="PENDING">待核验</a-select-option>
-                <a-select-option value="VERIFIED">已认证</a-select-option>
-                <a-select-option value="ABNORMAL">异常</a-select-option>
-              </a-select>
+              <span class="invoice-toolbar-hint">固定表头 / 核验状态 / 行操作展开</span>
             </div>
           </div>
 
@@ -282,4 +292,122 @@ defineExpose({
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.invoice-page {
+  gap: 14px;
+}
+
+.invoice-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
+.invoice-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.invoice-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.invoice-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.invoice-search-bar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
+}
+
+.invoice-search-fields {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.invoice-search-input {
+  width: min(520px, 31vw);
+  min-width: 320px;
+  flex: 1 1 auto;
+}
+
+.invoice-search-prefix-icon {
+  color: var(--text-secondary);
+}
+
+.invoice-search-select {
+  width: 220px;
+  flex: 0 0 220px;
+}
+
+.invoice-search-select.is-compact {
+  width: 150px;
+  flex-basis: 150px;
+}
+
+.invoice-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.invoice-workspace {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.invoice-table-panel {
+  min-height: 754px;
+}
+
+.invoice-toolbar {
+  align-items: center;
+}
+
+.invoice-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.invoice-table-count,
+.invoice-toolbar-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .invoice-page-meta-row,
+  .invoice-search-bar,
+  .invoice-search-fields {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .invoice-page-subtitle {
+    white-space: normal;
+  }
+
+  .invoice-search-input,
+  .invoice-search-select,
+  .invoice-search-select.is-compact {
+    width: 100%;
+    min-width: 0;
+    flex-basis: auto;
+  }
+}
+</style>
