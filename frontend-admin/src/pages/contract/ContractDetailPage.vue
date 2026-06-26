@@ -197,7 +197,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <a-descriptions-item label="甲方">{{ contract.partyAName || '-' }}</a-descriptions-item>
             <a-descriptions-item label="乙方">{{ contract.partyBName || '-' }}</a-descriptions-item>
             <a-descriptions-item label="合同金额(含税)">
-              <span style="font-weight: 600; color: var(--primary)"
+              <span class="contract-detail-contract-amount"
                 >{{ formatAmount(contract.contractAmount) }} 元</span
               >
             </a-descriptions-item>
@@ -495,23 +495,17 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                   <a-timeline-item v-for="record in approvalRecords" :key="record.id">
                     <div>
                       <strong>{{ record.operatorName }}</strong>
-                      <a-tag style="margin-left: 8px">
+                      <a-tag class="contract-detail-action-tag">
                         {{ actionNameMap[record.actionType] || record.actionName }}
                       </a-tag>
                     </div>
-                    <div
-                      v-if="record.nodeName"
-                      style="color: var(--text-secondary); font-size: 13px; margin-top: 2px"
-                    >
+                    <div v-if="record.nodeName" class="contract-detail-record-node">
                       {{ record.nodeName }}
                     </div>
-                    <div
-                      v-if="record.comment"
-                      style="color: var(--text-secondary); font-size: 13px; margin-top: 4px"
-                    >
+                    <div v-if="record.comment" class="contract-detail-record-comment">
                       {{ record.comment }}
                     </div>
-                    <div style="color: var(--muted); font-size: 12px; margin-top: 2px">
+                    <div class="contract-detail-record-time">
                       {{ record.createdAt }}
                     </div>
                   </a-timeline-item>
@@ -540,8 +534,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   margin-bottom: 16px;
   padding: 18px 24px;
   background: var(--surface);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
+  border: 1px solid var(--border-subtle);
 }
 
 .contract-detail-page :deep(.ant-page-header-heading-title) {
@@ -552,11 +545,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
 /* ---- Mobile: basic info vertical card ---- */
 .cd-info-mobile {
-  background: var(--surface, #fff);
-  border-radius: var(--radius-md, 8px);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
   padding: 14px;
   margin-bottom: 12px;
-  box-shadow: var(--shadow-soft, 0 1px 4px rgba(0, 0, 0, 0.04));
 }
 .cd-info-mobile-title {
   font-size: 14px;
@@ -570,7 +562,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   gap: 10px;
   padding: 6px 0;
   font-size: 13px;
-  border-bottom: 1px solid var(--border-subtle, #f0f0f0);
+  border-bottom: 1px solid var(--border-subtle);
 }
 .cd-info-row:last-of-type {
   border-bottom: none;
@@ -583,7 +575,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   padding-top: 1px;
 }
 .cd-info-value {
-  color: var(--text, #333);
+  color: var(--text);
   word-break: break-all;
 }
 .cd-info-name {
@@ -591,8 +583,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 .cd-info-money {
   font-weight: 700;
-  color: var(--primary);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Mobile: header tweaks ---- */
@@ -617,9 +607,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   gap: 8px;
 }
 .cd-mobile-card {
-  background: var(--surface, #fff);
-  border: 1px solid var(--border-subtle, #f0f0f0);
-  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
   padding: 10px 12px;
 }
 .cd-mc-head {
@@ -628,7 +617,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   justify-content: space-between;
   gap: 8px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-subtle, #f0f0f0);
+  border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 8px;
 }
 .cd-mc-code {
@@ -660,12 +649,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   flex-shrink: 0;
 }
 .cd-mc-val {
-  color: var(--text, #333);
+  color: var(--text);
 }
 .cd-mc-money {
   font-weight: 600;
-  color: var(--primary);
-  font-variant-numeric: tabular-nums;
 }
 .cd-mc-row {
   display: flex;
@@ -679,5 +666,40 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 /* ---- Mobile: timeline tighter ---- */
 .cd-timeline-mobile :deep(.ant-timeline-item-content) {
   margin-left: 0;
+}
+
+.contract-detail-contract-amount,
+.cd-info-money,
+.cd-mc-money {
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.contract-detail-contract-amount {
+  font-weight: 600;
+}
+
+.contract-detail-action-tag {
+  margin-left: 8px;
+}
+
+.contract-detail-record-node,
+.contract-detail-record-comment {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.contract-detail-record-node,
+.contract-detail-record-time {
+  margin-top: 2px;
+}
+
+.contract-detail-record-comment {
+  margin-top: 4px;
+}
+
+.contract-detail-record-time {
+  color: var(--muted);
+  font-size: 12px;
 }
 </style>

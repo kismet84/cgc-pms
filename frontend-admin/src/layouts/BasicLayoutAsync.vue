@@ -53,41 +53,33 @@ onBeforeUnmount(() => {
       class="sidebar"
       theme="light"
     >
-      <div class="brand" :class="{ 'brand--collapsed': collapsed }">
-        <ProjectOutlined class="logo" aria-hidden="true" />
-        <span v-if="!collapsed" class="brand-text">建筑工程总包项目</span>
-      </div>
-      <SidebarMenu :collapsed="collapsed" />
-    </a-layout-sider>
-    <div
-      v-if="isMobile && !collapsed"
-      class="sidebar-mask"
-      aria-hidden="true"
-      @click="collapsed = true"
-    ></div>
+      <div class="sidebar-shell">
+        <div class="brand" :class="{ 'brand--collapsed': collapsed }">
+          <ProjectOutlined class="logo" aria-hidden="true" />
+          <span v-if="!collapsed" class="brand-text">建筑工程总包项目</span>
+        </div>
+        <SidebarMenu :collapsed="collapsed" />
 
-    <a-layout>
-      <a-layout-header class="topbar">
-        <MenuFoldOutlined
-          class="hamburger"
-          :aria-label="collapsed ? '展开菜单' : '折叠菜单'"
-          @click="collapsed = !collapsed"
-        />
-        <div class="flex-1"></div>
-        <div class="top-actions">
-          <span v-if="bellReady" aria-label="通知"><NotificationBell /></span>
+        <div class="sidebar-footer" :class="{ 'sidebar-footer--collapsed': collapsed }">
+          <button
+            type="button"
+            class="sidebar-tool-button sidebar-toggle"
+            :aria-label="collapsed ? '展开菜单' : '折叠菜单'"
+            @click="collapsed = !collapsed"
+          >
+            <MenuFoldOutlined class="sidebar-tool-icon" aria-hidden="true" />
+            <span v-if="!collapsed">折叠菜单</span>
+          </button>
+          <div class="sidebar-tool-button sidebar-bell">
+            <span v-if="bellReady" aria-label="通知"><NotificationBell /></span>
+            <span v-if="!collapsed" class="sidebar-bell-label">通知中心</span>
+          </div>
           <a-dropdown>
-            <div class="user-info">
-              <a-avatar
-                :size="32"
-                :style="{
-                  background:
-                    'var(--brand-gradient-avatar, linear-gradient(135deg, #8ac1ff, #006dff))',
-                }"
-              >
+            <div class="sidebar-user" :class="{ 'sidebar-user--collapsed': collapsed }">
+              <a-avatar :size="32" class="user-avatar">
                 {{ userInfo?.realName?.[0] || '●' }}
               </a-avatar>
-              <div class="user-text">
+              <div v-if="!collapsed" class="user-text">
                 <div class="username">{{ userInfo?.realName || '张三' }}</div>
                 <div class="role">{{ userInfo?.roleName || '项目经理' }}</div>
               </div>
@@ -102,8 +94,16 @@ onBeforeUnmount(() => {
             </template>
           </a-dropdown>
         </div>
-      </a-layout-header>
+      </div>
+    </a-layout-sider>
+    <div
+      v-if="isMobile && !collapsed"
+      class="sidebar-mask"
+      aria-hidden="true"
+      @click="collapsed = true"
+    ></div>
 
+    <a-layout>
       <a-layout-content class="main-content">
         <router-view />
       </a-layout-content>
@@ -114,9 +114,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .basic-layout {
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(234, 242, 255, 0.78), rgba(246, 248, 251, 0) 280px),
-    var(--bg);
+  background: var(--shell-bg);
 }
 
 .sidebar {
@@ -124,10 +122,16 @@ onBeforeUnmount(() => {
   inset: 0 auto 0 0;
   z-index: 20;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.94) !important;
+  background: var(--shell-sidebar-bg) !important;
   border-right: 1px solid var(--border);
-  box-shadow: 8px 0 28px rgba(21, 32, 51, 0.04);
   backdrop-filter: blur(12px);
+}
+
+.sidebar-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .brand {
@@ -151,11 +155,10 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  color: #fff;
+  border-radius: var(--radius-md);
+  color: var(--brand-logo-fg);
   font-size: 19px;
   background: var(--brand-gradient-logo);
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
   flex-shrink: 0;
 }
 
@@ -169,69 +172,100 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 
-.topbar {
-  height: var(--shell-header-height);
-  background: rgba(255, 255, 255, 0.82);
-  border-bottom: 1px solid var(--border);
-  padding: 0 28px;
+.sidebar-footer {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  margin-left: var(--shell-sidebar-width);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  gap: 8px;
+  margin-top: auto;
+  padding: 12px;
+  border-top: 1px solid var(--border);
 }
 
-.hamburger {
-  display: inline-flex;
+.sidebar-footer--collapsed {
+  padding: 12px 8px;
+}
+
+.sidebar-tool-button,
+.sidebar-user {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  font-size: 18px;
-  cursor: pointer;
+  width: 100%;
+  min-height: 40px;
   color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.sidebar-tool-button {
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 0 10px;
+  font-size: 13px;
+  cursor: pointer;
   transition:
     background 0.16s ease,
+    border-color 0.16s ease,
     color 0.16s ease;
 }
 
-.hamburger:hover {
+.sidebar-tool-button:hover,
+.sidebar-user:hover {
+  color: var(--primary);
   background: var(--surface-tint);
+  border-color: var(--border);
+}
+
+.sidebar-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.sidebar-footer--collapsed .sidebar-tool-button,
+.sidebar-footer--collapsed .sidebar-user {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar-bell {
+  justify-content: flex-start;
+  padding: 0 10px;
+}
+
+.sidebar-bell-label {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.sidebar-bell:hover .sidebar-bell-label {
   color: var(--primary);
 }
 
-.flex-1 {
-  flex: 1;
+.sidebar-footer--collapsed .sidebar-bell {
+  justify-content: center;
+  padding: 0;
 }
 
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
+.sidebar-user {
   gap: 11px;
-  min-height: 42px;
   padding: 4px 8px 4px 4px;
-  border: 1px solid transparent;
-  border-radius: 12px;
   cursor: pointer;
   transition:
     background 0.16s ease,
     border-color 0.16s ease;
 }
 
-.user-info:hover {
-  background: rgba(255, 255, 255, 0.74);
-  border-color: var(--border);
+.sidebar-user--collapsed {
+  padding: 4px;
+}
+
+.user-avatar {
+  background: var(--brand-gradient-avatar);
 }
 
 .user-text {
@@ -253,12 +287,11 @@ onBeforeUnmount(() => {
 .main-content {
   padding: 0;
   margin-left: var(--shell-sidebar-width);
-  min-height: calc(100vh - var(--shell-header-height));
+  min-height: 100vh;
   background: transparent;
 }
 
 /* 折叠时调整 */
-:deep(.ant-layout-sider-collapsed) + .ant-layout .topbar,
 :deep(.ant-layout-sider-collapsed) + .ant-layout .main-content {
   margin-left: var(--shell-sidebar-collapsed-width);
 }
@@ -274,41 +307,28 @@ onBeforeUnmount(() => {
 
   .sidebar {
     z-index: 30;
-    transform: translateX(-100%);
-    transition: transform 0.22s ease;
-    box-shadow: 10px 0 30px rgba(15, 23, 42, 0.16);
+    transform: translateX(0);
+    transition: width 0.22s ease;
   }
 
   .basic-layout--mobile-nav-open .sidebar {
     transform: translateX(0);
   }
 
-  .topbar,
   .main-content {
-    margin-left: 0;
+    margin-left: var(--shell-sidebar-collapsed-width);
   }
 
-  :deep(.ant-layout-sider-collapsed) + .ant-layout .topbar,
   :deep(.ant-layout-sider-collapsed) + .ant-layout .main-content {
-    margin-left: 0;
-  }
-
-  .topbar {
-    width: 100%;
-    padding: 0 12px;
-    gap: 12px;
+    margin-left: var(--shell-sidebar-collapsed-width);
   }
 
   .main-content {
-    width: 100%;
-    max-width: 100vw;
-    min-height: calc(100vh - var(--shell-header-height));
+    width: calc(100% - var(--shell-sidebar-collapsed-width));
+    max-width: calc(100vw - var(--shell-sidebar-collapsed-width));
+    min-height: 100vh;
     padding: 12px;
     overflow-x: hidden;
-  }
-
-  .top-actions {
-    gap: 12px;
   }
 
   .user-text {
@@ -320,7 +340,7 @@ onBeforeUnmount(() => {
     inset: 0;
     z-index: 25;
     display: block;
-    background: rgba(15, 23, 42, 0.34);
+    background: var(--shell-mask-bg);
   }
 }
 </style>

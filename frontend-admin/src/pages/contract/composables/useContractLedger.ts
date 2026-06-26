@@ -28,12 +28,12 @@ export const TYPE_COLOR: Record<ContractType, string> = {
   SERVICE: 'cyan',
 }
 
-export const TYPE_COLOR_HEX: Record<ContractType, string> = {
-  MAIN: '#2f7df6',
-  SUB: '#31c48d',
-  PURCHASE: '#f59e0b',
-  LEASE: '#8b5cf6',
-  SERVICE: '#22c7d7',
+export const TYPE_CHART_COLOR: Record<ContractType, string> = {
+  MAIN: 'var(--primary)',
+  SUB: 'var(--success)',
+  PURCHASE: 'var(--warning)',
+  LEASE: 'var(--info)',
+  SERVICE: 'var(--text-secondary)',
 }
 
 export const STATUS_LABEL: Record<ContractStatus, string> = {
@@ -43,10 +43,10 @@ export const STATUS_LABEL: Record<ContractStatus, string> = {
   TERMINATED: '已终止',
 }
 export const STATUS_COLOR: Record<ContractStatus, string> = {
-  DRAFT: '#94a3b8',
-  PERFORMING: '#2f7df6',
-  SETTLED: '#31c48d',
-  TERMINATED: '#ef4444',
+  DRAFT: 'var(--text-secondary)',
+  PERFORMING: 'var(--primary)',
+  SETTLED: 'var(--success)',
+  TERMINATED: 'var(--error)',
 }
 
 export function useContractLedger() {
@@ -136,15 +136,15 @@ export function useContractLedger() {
   })
 
   // ---- Column visibility ----
-  const COLS_KEY = 'contract_ledger_cols'
+  const COLS_KEY = 'contract_ledger_cols_v2'
   const defaultCols: Record<string, boolean> = {
     contractCode: true,
     contractName: true,
     contractType: true,
-    partyAName: true,
+    partyAName: false,
     partyBName: true,
     contractAmount: true,
-    signedDate: true,
+    signedDate: false,
     contractStatus: true,
     ops: true,
   }
@@ -268,7 +268,7 @@ export function useContractLedger() {
         key,
         label: TYPE_LABEL[key],
         value: counts[key],
-        color: TYPE_COLOR_HEX[key],
+        color: TYPE_CHART_COLOR[key],
       }))
       .filter((item) => item.value > 0)
   })
@@ -335,39 +335,39 @@ export function useContractLedger() {
           {
             field: 'contractCode',
             title: '合同编号',
-            width: 180,
+            width: 138,
             showOverflow: 'tooltip',
             slots: { default: 'contractCode' },
           },
         ]
       : []),
     ...(colVisible.contractName
-      ? [{ field: 'contractName', title: '合同名称', minWidth: 180, showOverflow: 'tooltip' }]
+      ? [{ field: 'contractName', title: '合同名称', minWidth: 118, showOverflow: 'tooltip' }]
       : []),
     ...(colVisible.contractType
       ? [
           {
             field: 'contractType',
             title: '合同类型',
-            width: 112,
+            width: 88,
             showOverflow: 'tooltip',
             slots: { default: 'contractType' },
           },
         ]
       : []),
     ...(colVisible.partyAName
-      ? [{ field: 'partyAName', title: '甲方', minWidth: 140, showOverflow: 'tooltip' }]
+      ? [{ field: 'partyAName', title: '甲方', minWidth: 116, showOverflow: 'tooltip' }]
       : []),
     ...(colVisible.partyBName
-      ? [{ field: 'partyBName', title: '乙方', minWidth: 140, showOverflow: 'tooltip' }]
+      ? [{ field: 'partyBName', title: '乙方', minWidth: 104, showOverflow: 'tooltip' }]
       : []),
     ...(colVisible.contractAmount
       ? [
           {
             field: 'contractAmount',
             title: '合同金额(含税)',
-            width: 172,
-            minWidth: 172,
+            width: 132,
+            minWidth: 132,
             align: 'right' as const,
             showOverflow: false,
             slots: { default: 'amount' },
@@ -375,14 +375,14 @@ export function useContractLedger() {
         ]
       : []),
     ...(colVisible.signedDate
-      ? [{ field: 'signedDate', title: '签订日期', width: 118, showOverflow: 'tooltip' }]
+      ? [{ field: 'signedDate', title: '签订日期', width: 94, showOverflow: 'tooltip' }]
       : []),
     ...(colVisible.contractStatus
       ? [
           {
             field: 'contractStatus',
             title: '合同状态',
-            width: 112,
+            width: 88,
             showOverflow: 'tooltip',
             slots: { default: 'status' },
           },

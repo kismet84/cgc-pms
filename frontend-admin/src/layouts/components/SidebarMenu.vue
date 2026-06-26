@@ -154,7 +154,8 @@ function handleSectionClick(item: MenuItem) {
 
 <style scoped>
 .sidebar-menu {
-  height: calc(100vh - var(--shell-header-height));
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 14px 10px 18px;
   overflow-y: auto;
   background: transparent;
@@ -177,15 +178,14 @@ function handleSectionClick(item: MenuItem) {
   margin: 3px auto;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   transition:
     background 0.16s ease,
     color 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease;
+    border-color 0.16s ease;
 }
 
 .collapsed-menu-item:hover {
@@ -196,8 +196,7 @@ function handleSectionClick(item: MenuItem) {
 .collapsed-menu-item--active {
   background: var(--primary-soft);
   color: var(--primary);
-  border-color: rgba(37, 99, 235, 0.14);
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+  border-color: var(--primary-border-soft);
 }
 
 .collapsed-menu-icon {
@@ -217,7 +216,8 @@ function handleSectionClick(item: MenuItem) {
   height: 40px;
   margin: 3px 0;
   padding-inline: 14px !important;
-  border-radius: 10px;
+  border-inline-start: 3px solid transparent;
+  border-radius: var(--radius-lg);
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 600;
@@ -229,7 +229,7 @@ function handleSectionClick(item: MenuItem) {
 
 :deep(.ant-menu-submenu-title:hover),
 :deep(.ant-menu-item:hover) {
-  background: #f4f8ff !important;
+  background: var(--primary-hover-bg) !important;
   color: var(--primary) !important;
 }
 
@@ -241,7 +241,7 @@ function handleSectionClick(item: MenuItem) {
 }
 
 :deep(.ant-menu-item-selected) {
-  box-shadow: inset 3px 0 0 var(--primary);
+  border-inline-start-color: var(--primary);
 }
 
 :deep(.ant-menu-item .ant-menu-title-content),

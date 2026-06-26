@@ -69,47 +69,42 @@ function makeStubs(names: string[]) {
 }
 
 describe('BasicLayout accessibility', () => {
-  it('renders hamburger with aria-label attribute', () => {
+  it('renders sidebar toggle with aria-label attribute', () => {
     const wrapper = mount(BasicLayout, {
       global: {
         stubs: makeStubs(antdStubs),
       },
     })
 
-    const hamburger = wrapper.find('.hamburger')
-    expect(hamburger.exists()).toBe(true)
+    const toggle = wrapper.find('.sidebar-toggle')
+    expect(toggle.exists()).toBe(true)
     // Default collapsed=false → aria-label should be "折叠菜单"
-    expect(hamburger.attributes('aria-label')).toBe('折叠菜单')
+    expect(toggle.attributes('aria-label')).toBe('折叠菜单')
   })
 
-  it('updates hamburger aria-label when collapsed changes', async () => {
+  it('updates sidebar toggle aria-label when collapsed changes', async () => {
     const wrapper = mount(BasicLayout, {
       global: {
         stubs: makeStubs(antdStubs),
       },
     })
 
-    const hamburger = wrapper.find('.hamburger')
-
-    // Toggle collapsed by simulating click (the @click handler sets collapsed = !collapsed)
-    // Since we mocked MenuFoldOutlined as a simple component, the click event may not bubble properly.
-    // Instead, directly check the reactive state change.
-    // We verify the aria-label binding exists via the component's collapsed ref.
+    const toggle = wrapper.find('.sidebar-toggle')
 
     // Verify initial state
-    expect(hamburger.attributes('aria-label')).toBe('折叠菜单')
+    expect(toggle.attributes('aria-label')).toBe('折叠菜单')
 
     // Click to toggle — the component should react and update the aria-label
-    await hamburger.trigger('click')
+    await toggle.trigger('click')
     await wrapper.vm.$nextTick()
 
     // After click, collapsed should toggle to true
-    expect(hamburger.attributes('aria-label')).toBe('展开菜单')
+    expect(toggle.attributes('aria-label')).toBe('展开菜单')
 
     // Click again
-    await hamburger.trigger('click')
+    await toggle.trigger('click')
     await wrapper.vm.$nextTick()
-    expect(hamburger.attributes('aria-label')).toBe('折叠菜单')
+    expect(toggle.attributes('aria-label')).toBe('折叠菜单')
   })
 
   it('renders notification bell wrapper with aria-label after lazy load delay', async () => {
@@ -129,6 +124,7 @@ describe('BasicLayout accessibility', () => {
 
     const bellWrapper = wrapper.find('span[aria-label="通知"]')
     expect(bellWrapper.exists()).toBe(true)
+    expect(wrapper.find('.sidebar-bell-label').text()).toBe('通知中心')
 
     vi.useRealTimers()
   })

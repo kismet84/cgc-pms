@@ -63,38 +63,85 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <div>
+  <div class="lg-list-page lg-page app-page cl-redesign-page">
+    <div class="lg-page-head cl-page-head">
+      <div class="cl-page-meta-row">
         <a-breadcrumb class="cl-breadcrumb">
           <a-breadcrumb-item>合同管理</a-breadcrumb-item>
           <a-breadcrumb-item>合同台账</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="cl-page-subtitle">统一查看合同履约、回款与风险状态</span>
       </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <div class="lg-search-bar">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索合同编号、名称、甲方、乙方…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
-    </div>
+    <section class="lg-search-bar cl-query-panel" aria-label="合同台账查询条件">
+      <div class="cl-query-primary">
+        <a-input
+          v-model:value="filter.keyword"
+          class="cl-keyword-search"
+          placeholder="搜索合同编号、名称、甲方、乙方…"
+          allow-clear
+          size="large"
+          @press-enter="handleSearch"
+        >
+          <template #prefix><SearchOutlined class="cl-search-prefix-icon" /></template>
+        </a-input>
+        <a-select
+          v-model:value="filter.projectId"
+          placeholder="全部项目"
+          allow-clear
+          class="cl-query-select"
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.contractType"
+          placeholder="合同类型"
+          allow-clear
+          class="cl-query-select"
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="(label, value) in TYPE_LABEL" :key="value" :value="value">
+            {{ label }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.contractStatus"
+          placeholder="合同状态"
+          allow-clear
+          class="cl-query-select"
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option value="DRAFT">草稿</a-select-option>
+          <a-select-option value="PERFORMING">履约中</a-select-option>
+          <a-select-option value="SETTLED">已完成</a-select-option>
+          <a-select-option value="TERMINATED">已终止</a-select-option>
+        </a-select>
+        <a-range-picker
+          v-model:value="filter.dateRange"
+          class="cl-date-filter"
+          value-format="YYYY-MM-DD"
+          size="large"
+          @change="handleSearch"
+        />
+      </div>
+      <div class="cl-query-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
+      </div>
+    </section>
 
-    <div class="lg-grid">
-      <!-- 左列 -->
-      <div class="lg-left">
-        <!-- KPI -->
+    <div class="lg-grid cl-workspace">
+      <div class="lg-left cl-main-column">
         <ContractKpiStrip
           :kpi="kpi"
           :is-mobile="isMobile"
@@ -103,14 +150,11 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           :kpi-pct="kpiPct"
         />
 
-        <main class="lg-list-table-panel">
-          <!-- 工具栏 -->
-          <div class="lg-toolbar">
+        <main class="lg-list-table-panel cl-table-panel">
+          <div class="lg-toolbar cl-table-toolbar">
             <div class="lg-toolbar-left">
-              <a-button type="primary" @click="handleCreate">
-                <template #icon><PlusOutlined /></template>
-                新建合同
-              </a-button>
+              <span class="cl-table-title">合同列表</span>
+              <span class="cl-table-count">共 {{ total }} 条</span>
               <a-dropdown v-if="!isMobile">
                 <a-button>
                   <template #icon><SettingOutlined /></template>
@@ -138,28 +182,21 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                   </a-menu>
                 </template>
               </a-dropdown>
-              <a-button @click="fetchData">
+              <a-button aria-label="刷新合同台账" title="刷新合同台账" @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
+              <a-button type="primary" @click="handleCreate">
+                <template #icon><PlusOutlined /></template>
+                新建合同
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部项目"
-                allow-clear
-                style="width: 160px"
-                size="small"
-                @change="handleSearch"
-              >
-                <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
+              <span class="cl-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
             </div>
           </div>
 
-          <!-- 表格：桌面/平板 -->
-          <div v-if="!isMobile" class="lg-table-wrap">
+          <div v-if="!isMobile" class="lg-table-wrap cl-table-wrap">
             <vxe-grid
               :data="tableData"
               :columns="gridColumns"
@@ -170,7 +207,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               size="small"
             >
               <template #contractCode="{ row }">
-                <a class="lg-link">{{ row.contractCode }}</a>
+                <a-button class="cl-contract-link" type="link" @click="handleView(row)">
+                  {{ row.contractCode }}
+                </a-button>
               </template>
               <template #contractType="{ row }">
                 <a-tag :color="TYPE_COLOR[row.contractType as ContractType]">
@@ -188,23 +227,29 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 <ContractStatusTag :status="row.contractStatus as ContractStatus" />
               </template>
               <template #ops="{ row }">
-                <a-dropdown :trigger="['click']">
-                  <a-button class="lg-row-action-trigger" size="small" type="text">
-                    <MoreOutlined />
-                  </a-button>
-                  <template #overlay>
-                    <a-menu>
-                      <a-menu-item @click="handleView(row)">查看</a-menu-item>
-                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
+                <div class="cl-row-actions">
+                  <a-dropdown :trigger="['click']">
+                    <a-button
+                      class="lg-row-action-trigger"
+                      size="small"
+                      type="text"
+                      :aria-label="`打开合同操作菜单：${row.contractCode}`"
+                      :title="`打开合同操作菜单：${row.contractCode}`"
+                    >
+                      <MoreOutlined />
+                    </a-button>
+                    <template #overlay>
+                      <a-menu>
+                        <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                        <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                      </a-menu>
+                    </template>
+                  </a-dropdown>
+                </div>
               </template>
             </vxe-grid>
           </div>
 
-          <!-- 移动端卡片列表 -->
           <ContractMobileCardList
             v-else
             :data="tableData"
@@ -217,9 +262,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             @delete="handleDelete"
           />
 
-          <!-- 分页 -->
-          <div class="lg-pagination">
-            <span class="lg-total">共 {{ total }} 条</span>
+          <div class="lg-pagination cl-pagination">
+            <span class="lg-total">第 {{ pageNo }} 页</span>
             <a-pagination
               v-model:current="pageNo"
               v-model:page-size="pageSize"
@@ -234,7 +278,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         </main>
       </div>
 
-      <!-- 右侧分析面板 -->
       <ContractAnalysisPanel
         :type-distribution="typeDistribution"
         :type-percent="typePercent"
@@ -267,14 +310,160 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </template>
 
 <style scoped>
-/* 仅保留页面专属样式 — 其余已由 lg-* 全局类覆盖 */
-
 .cl-contract-modal :deep(.ant-modal-body) {
   max-height: 82vh;
   overflow: auto;
 }
+
+.cl-redesign-page {
+  gap: 14px;
+}
+
+.cl-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
 .cl-breadcrumb {
-  margin-bottom: 5px;
   font-size: 13px;
+  line-height: 20px;
+}
+
+.cl-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.cl-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.cl-query-panel {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
+}
+
+.cl-query-primary {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cl-keyword-search {
+  width: min(640px, 34vw);
+  min-width: 420px;
+}
+
+.cl-search-prefix-icon {
+  color: var(--text-secondary);
+}
+
+.cl-query-select {
+  width: 160px;
+}
+
+.cl-date-filter {
+  width: 260px;
+}
+
+.cl-query-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.cl-workspace {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.cl-main-column {
+  gap: 12px;
+}
+
+.cl-table-panel {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.cl-table-toolbar {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cl-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cl-table-count,
+.cl-toolbar-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.cl-table-wrap {
+  min-height: 520px;
+}
+
+.cl-table-wrap :deep(.vxe-header--column .vxe-cell) {
+  justify-content: center;
+  text-align: center;
+}
+
+.cl-contract-link {
+  height: auto;
+  padding: 0;
+  font-weight: 700;
+}
+
+.cl-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  width: 100%;
+}
+
+.cl-row-actions :deep(.ant-btn-link) {
+  height: 26px;
+  padding: 0 4px;
+  font-size: 13px;
+}
+
+.cl-pagination {
+  border-top: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 1200px) {
+  .cl-page-head,
+  .cl-query-panel,
+  .cl-query-primary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cl-query-actions {
+    justify-content: flex-start;
+  }
+
+  .cl-keyword-search,
+  .cl-query-select,
+  .cl-date-filter {
+    width: 100%;
+    min-width: 0;
+  }
 }
 </style>

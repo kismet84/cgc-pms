@@ -460,7 +460,7 @@ function genTermKey(): string {
       </a-breadcrumb>
     </div>
 
-    <div class="pt-panel" style="position: relative; padding-bottom: 12px">
+    <div class="cf-wizard-panel pt-panel">
       <StepWizard
         :current="current"
         :steps="stepConfig"
@@ -522,7 +522,7 @@ function genTermKey(): string {
                     :min="0"
                     :precision="2"
                     placeholder="请输入合同金额"
-                    style="width: 100%"
+                    class="cf-full-control"
                     @change="dirty = true"
                   />
                 </a-form-item>
@@ -575,7 +575,7 @@ function genTermKey(): string {
                   <a-date-picker
                     v-model:value="formData.signedDate"
                     value-format="YYYY-MM-DD"
-                    style="width: 100%"
+                    class="cf-date-picker"
                     @change="dirty = true"
                   />
                 </a-form-item>
@@ -585,7 +585,7 @@ function genTermKey(): string {
                   <a-date-picker
                     v-model:value="formData.startDate"
                     value-format="YYYY-MM-DD"
-                    style="width: 100%"
+                    class="cf-date-picker"
                     @change="dirty = true"
                   />
                 </a-form-item>
@@ -595,7 +595,7 @@ function genTermKey(): string {
                   <a-date-picker
                     v-model:value="formData.endDate"
                     value-format="YYYY-MM-DD"
-                    style="width: 100%"
+                    class="cf-date-picker"
                     @change="dirty = true"
                   />
                 </a-form-item>
@@ -756,10 +756,17 @@ function genTermKey(): string {
   font-size: 14px;
 }
 .pt-panel {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   position: relative;
+}
+.cf-wizard-panel {
+  padding-bottom: 12px;
+}
+.cf-full-control,
+.cf-date-picker {
+  width: 100%;
 }
 .cf-review {
   display: flex;
