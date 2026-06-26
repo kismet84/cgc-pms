@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { MoreOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import {
+  AlertOutlined,
+  ClockCircleOutlined,
+  CheckCircleOutlined,
+  FileTextOutlined,
+  MoreOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  WarningOutlined,
+} from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { RULE_TYPE_LABELS, SEVERITY_COLOR, type AlertLogVO } from '@/types/alert'
@@ -97,11 +106,15 @@ async function handleBatchEvaluate() {
 const kpi = computed(() => {
   const all = store.alerts
   const highCount = all.filter((a) => a.severity === 'HIGH').length
+  const mediumCount = all.filter((a) => a.severity === 'MEDIUM').length
   const unreadCount = all.filter((a) => a.isRead === 0).length
+  const readCount = all.filter((a) => a.isRead === 1).length
   return {
     total: all.length,
     high: highCount,
+    medium: mediumCount,
     unread: unreadCount,
+    read: readCount,
   }
 })
 
@@ -127,10 +140,27 @@ const severitySummary = computed(() => [
     color: '#52c41a',
   },
 ])
+const readStatusSummary = computed(() => [
+  {
+    label: '未读',
+    count: kpi.value.unread,
+    color: '#1677ff',
+  },
+  {
+    label: '已读',
+    count: kpi.value.read,
+    color: '#52c41a',
+  },
+])
 const recentUnreadAlerts = computed(() => store.alerts.filter((a) => a.isRead === 0).slice(0, 4))
 function kpiPct(value: number, max: number): number {
   if (max === 0) return 0
   return Math.min(Math.round((value / max) * 100), 100)
+}
+
+function alertPercent(value: number): number {
+  if (!kpi.value.total) return 0
+  return Math.min(Math.round((value / kpi.value.total) * 100), 100)
 }
 
 // ── Columns ──
@@ -187,74 +217,128 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <div>
+  <div class="lg-list-page lg-page app-page alert-page">
+    <div class="lg-page-head alert-page-head">
+      <div class="alert-page-meta-row">
         <a-breadcrumb class="al-breadcrumb">
           <a-breadcrumb-item>预警中心</a-breadcrumb-item>
           <a-breadcrumb-item>预警列表</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="alert-page-subtitle">统一管理风险等级、阅读状态与规则触发记录</span>
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <div class="lg-search-bar">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索预警内容、项目、规则类型…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
+    <div class="lg-search-bar alert-search-bar">
+      <div class="alert-search-fields">
+        <a-input
+          v-model:value="filter.keyword"
+          class="alert-search-input"
+          placeholder="搜索预警内容、项目、规则类型…"
+          allow-clear
+          size="large"
+          @press-enter="handleSearch"
+        >
+          <template #prefix><SearchOutlined class="alert-search-prefix-icon" /></template>
+        </a-input>
+        <a-select
+          v-model:value="filter.projectId"
+          class="alert-search-select"
+          placeholder="全部项目"
+          allow-clear
+          size="large"
+          :loading="projectsLoading"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in projectOptions" :key="p.id" :value="p.id">
+            {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.severity"
+          class="alert-search-select is-compact"
+          placeholder="预警等级"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option value="HIGH">高危</a-select-option>
+          <a-select-option value="MEDIUM">中危</a-select-option>
+          <a-select-option value="LOW">低危</a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.isRead"
+          class="alert-search-select is-compact"
+          placeholder="阅读状态"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option :value="0">未读</a-select-option>
+          <a-select-option :value="1">已读</a-select-option>
+        </a-select>
+      </div>
+      <div class="alert-search-actions">
+        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button size="large" @click="handleReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
+      </div>
     </div>
 
-    <div class="lg-grid">
+    <div class="lg-grid alert-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">预警总数</span>
-            <span class="lg-kpi-card-value">{{ kpi.total }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-total)"></span
-            ></span>
+        <div class="alert-kpi-summary" aria-label="预警关键指标">
+          <div class="alert-kpi-item">
+            <span class="alert-kpi-icon is-total"><FileTextOutlined /></span>
+            <span class="alert-kpi-label">预警总数</span>
+            <span class="alert-kpi-value">{{ kpi.total }} <small>条</small></span>
           </div>
-          <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">高危预警</span>
-            <span class="lg-kpi-card-value">{{ kpi.high }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span
-                :style="{
-                  width: kpiPct(kpi.high, kpiMax.total) + '%',
-                  background: 'var(--kpi-overdue)',
-                }"
-              ></span
-            ></span>
-            <span class="lg-kpi-card-hint">占 {{ kpiPct(kpi.high, kpiMax.total) }}%</span>
+          <div class="alert-kpi-item is-wide">
+            <span class="alert-kpi-icon is-overdue"><AlertOutlined /></span>
+            <span class="alert-kpi-label">高危预警</span>
+            <span class="alert-kpi-value">{{ kpi.high }} <small>条</small></span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">未读预警</span>
-            <span class="lg-kpi-card-value">{{ kpi.unread }} <small>条</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span
-                :style="{ width: kpiPct(kpi.unread, kpiMax.total) + '%', background: '#2f7df6' }"
-              ></span
-            ></span>
-            <span class="lg-kpi-card-hint">占 {{ kpiPct(kpi.unread, kpiMax.total) }}%</span>
+          <div class="alert-kpi-item is-progress">
+            <span class="alert-kpi-icon is-amount"><WarningOutlined /></span>
+            <span class="alert-kpi-label">中危预警</span>
+            <span class="alert-kpi-value">{{ kpi.medium }} <small>条</small></span>
+            <span class="alert-kpi-progress">
+              <span :style="{ width: kpiPct(kpi.medium, kpiMax.total) + '%' }"></span>
+            </span>
+          </div>
+          <div class="alert-kpi-item is-progress is-unread">
+            <span class="alert-kpi-icon is-unpaid"><ClockCircleOutlined /></span>
+            <span class="alert-kpi-label">未读预警</span>
+            <span class="alert-kpi-value">{{ kpi.unread }} <small>条</small></span>
+            <span class="alert-kpi-progress">
+              <span :style="{ width: kpiPct(kpi.unread, kpiMax.total) + '%' }"></span>
+            </span>
+          </div>
+          <div class="alert-kpi-item">
+            <span class="alert-kpi-icon is-paid"><CheckCircleOutlined /></span>
+            <span class="alert-kpi-label">已读预警</span>
+            <span class="alert-kpi-value">{{ kpi.read }} <small>条</small></span>
           </div>
         </div>
 
-        <main class="lg-list-table-panel">
+        <main class="lg-list-table-panel alert-table-panel">
           <!-- 工具栏 -->
-          <div class="lg-toolbar">
+          <div class="lg-toolbar alert-toolbar">
             <div class="lg-toolbar-left">
+              <span class="alert-table-title">预警记录</span>
+              <span class="alert-table-count">共 {{ total }} 条</span>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+              <a-button @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
               <a-button
                 type="primary"
                 danger
@@ -263,29 +347,9 @@ onMounted(async () => {
               >
                 触发评估
               </a-button>
-              <a-button @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
-              </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部项目"
-                allow-clear
-                style="width: 160px"
-                size="small"
-                :loading="projectsLoading"
-                @change="handleSearch"
-              >
-                <a-select-option v-for="p in projectOptions" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
+              <span class="alert-toolbar-hint">固定表头 / 风险分级 / 行操作可展开</span>
             </div>
           </div>
 
@@ -353,26 +417,59 @@ onMounted(async () => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail">
-        <div class="lg-panel">
-          <div class="lg-panel-title">预警等级分布</div>
-          <div class="lg-type-list">
+      <aside class="lg-analysis-rail alert-analysis-rail" aria-label="预警辅助分析">
+        <div class="alert-analysis-panel">
+          <header class="alert-analysis-head">
+            <div>
+              <div class="alert-analysis-title">预警分析</div>
+              <div class="alert-analysis-subtitle">等级、状态与未读风险</div>
+            </div>
+            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
+          </header>
+
+          <section class="alert-analysis-section">
+            <div class="alert-section-title">预警等级分布</div>
             <div v-for="item in severitySummary" :key="item.label" class="lg-type-row">
               <span class="lg-type-dot" :style="{ background: item.color }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: alertPercent(item.count) + '%', background: item.color }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ alertPercent(item.count) }}%</span>
             </div>
-          </div>
-        </div>
-        <div class="lg-panel">
-          <div class="lg-panel-title">未读预警</div>
-          <div class="lg-rail-list">
-            <div v-for="item in recentUnreadAlerts" :key="item.id" class="lg-rail-item">
-              <span class="lg-type-dot"></span>
-              <span>{{ item.message }}</span>
+          </section>
+
+          <section class="alert-analysis-section">
+            <div class="alert-section-title">阅读状态</div>
+            <div v-for="item in readStatusSummary" :key="item.label" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: alertPercent(item.count) + '%', background: item.color }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ alertPercent(item.count) }}%</span>
             </div>
-            <div v-if="!recentUnreadAlerts.length" class="lg-empty-text">暂无未读预警</div>
-          </div>
+          </section>
+
+          <section class="alert-analysis-section">
+            <div class="lg-warning-head">
+              <div class="alert-section-title">未读预警</div>
+              <span class="alert-warning-count">{{ recentUnreadAlerts.length }} 项</span>
+            </div>
+            <div v-for="item in recentUnreadAlerts" :key="item.id" class="lg-warning-item">
+              <span class="lg-warning-project">{{ getProjectName(item.projectId) }}</span>
+              <span class="lg-warning-title">{{ item.message }}</span>
+            </div>
+            <div v-if="!recentUnreadAlerts.length" class="lg-warning-empty">暂无未读预警</div>
+          </section>
         </div>
       </aside>
     </div>
@@ -380,11 +477,330 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.al-breadcrumb {
-  margin-bottom: 5px;
-  font-size: 13px;
+.alert-page {
+  gap: 14px;
 }
+
+.alert-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+}
+
+.alert-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.al-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.alert-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
 .al-muted {
   color: var(--muted);
+}
+
+.alert-search-bar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 74px;
+}
+
+.alert-search-fields {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.alert-search-input {
+  width: min(520px, 31vw);
+  min-width: 320px;
+  flex: 1 1 auto;
+}
+
+.alert-search-prefix-icon {
+  color: var(--text-secondary);
+}
+
+.alert-search-select {
+  width: 180px;
+  flex: 0 0 180px;
+}
+
+.alert-search-select.is-compact {
+  width: 150px;
+  flex-basis: 150px;
+}
+
+.alert-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-workspace {
+  align-items: stretch;
+  min-height: 0;
+}
+
+.alert-kpi-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  gap: 0;
+  overflow: hidden;
+  min-height: 84px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.alert-kpi-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 19px 27px 8px;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.alert-kpi-item:last-child {
+  border-right: 0;
+}
+
+.alert-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.alert-kpi-icon.is-amount {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.alert-kpi-icon.is-paid {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.alert-kpi-icon.is-unpaid {
+  color: var(--primary);
+  background: var(--surface-tint);
+}
+
+.alert-kpi-icon.is-overdue {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+.alert-kpi-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert-kpi-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert-kpi-value small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.alert-kpi-progress {
+  display: block;
+  overflow: hidden;
+  height: 4px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-sm);
+  grid-column: 2;
+}
+
+.alert-kpi-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--warning);
+  border-radius: var(--radius-sm);
+}
+
+.alert-kpi-item.is-unread .alert-kpi-progress > span {
+  background: var(--primary);
+}
+
+.alert-table-panel {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.alert-toolbar {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.alert-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.alert-table-count,
+.alert-toolbar-hint {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.alert-analysis-rail {
+  width: 336px;
+}
+
+.alert-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.alert-analysis-head,
+.alert-analysis-section .lg-warning-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.alert-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.alert-analysis-subtitle,
+.alert-warning-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.alert-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.alert-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.alert-analysis-section :deep(.lg-type-row),
+.alert-analysis-section .lg-type-row {
+  display: grid;
+  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.alert-analysis-section .lg-type-dot {
+  margin-top: 0;
+}
+
+.alert-analysis-section .lg-type-label {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .alert-page-head,
+  .alert-search-bar,
+  .alert-search-fields {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .alert-page-meta-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .alert-search-input,
+  .alert-search-select,
+  .alert-search-select.is-compact {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .alert-search-actions {
+    justify-content: flex-start;
+  }
+
+  .alert-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .alert-kpi-item {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .alert-analysis-rail {
+    width: 100%;
+  }
+
+  .alert-toolbar-hint {
+    display: none;
+  }
 }
 </style>

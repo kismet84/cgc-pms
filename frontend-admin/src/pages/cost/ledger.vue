@@ -242,6 +242,12 @@ function fmtAmountYuan(val: string | undefined): string {
 
 // ---- Cost type label map ----
 const COST_TYPE_LABEL: Record<string, string> = {
+  CONTRACT_LOCKED: '合同锁定成本',
+  ACTUAL_COST: '实际成本',
+  TARGET_COST: '目标成本',
+  PAID_AMOUNT: '已付款',
+  DYNAMIC_COST: '动态成本',
+  CT_CONTRACT: '合同锁定成本',
   CT_DIRECT: '直接成本',
   CT_INDIRECT: '间接成本',
   CT_MATERIAL: '材料成本',
@@ -253,15 +259,18 @@ const COST_TYPE_LABEL: Record<string, string> = {
 // ---- Computed KPI ----
 const lockedAmount = computed(() => {
   const bySource = summary.value.bySourceType
-  return bySource['CT_CONTRACT'] ?? summary.value.totalAmount
+  const byCostType = summary.value.byCostType
+  return bySource['CT_CONTRACT'] ?? byCostType['CONTRACT_LOCKED'] ?? summary.value.totalAmount
 })
 
 const kpiStats = computed(() => {
   const total = parseFloat(summary.value.totalAmount) || 0
   const locked = parseFloat(lockedAmount.value) || 0
+  const actual = total
   return {
     total,
     locked,
+    actual,
     dynamic: total,
     deviation: total - locked,
   }
@@ -430,51 +439,47 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       <!-- 左列 -->
       <div class="lg-left">
         <!-- KPI strip -->
-        <div v-if="!isMobile" class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">成本总额</span>
-            <span class="lg-kpi-card-value"
-              >{{ fmtWan(String(kpiStats.total)) }} <small>万元</small></span
-            >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-total)"></span
-            ></span>
+        <div v-if="!isMobile" class="cost-ledger-kpi-summary" aria-label="成本关键指标">
+          <div class="cost-ledger-kpi-item">
+            <span class="cost-ledger-kpi-icon is-total"><DollarOutlined /></span>
+            <span class="cost-ledger-kpi-label">成本总额</span>
+            <span class="cost-ledger-kpi-value">
+              {{ fmtWan(String(kpiStats.total)) }} <small>万元</small>
+            </span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">锁定成本</span>
-            <span class="lg-kpi-card-value"
-              >{{ fmtWan(String(kpiStats.locked)) }} <small>万元</small></span
-            >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-amount)"></span
-            ></span>
+          <div class="cost-ledger-kpi-item is-wide">
+            <span class="cost-ledger-kpi-icon is-amount"><LockOutlined /></span>
+            <span class="cost-ledger-kpi-label">锁定成本</span>
+            <span class="cost-ledger-kpi-value">
+              {{ fmtWan(String(kpiStats.locked)) }} <small>万元</small>
+            </span>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">动态成本</span>
-            <span class="lg-kpi-card-value"
-              >{{ fmtWan(String(kpiStats.dynamic)) }} <small>万元</small></span
-            >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-paid)"></span
-            ></span>
+          <div class="cost-ledger-kpi-item is-progress">
+            <span class="cost-ledger-kpi-icon is-paid"><ToolOutlined /></span>
+            <span class="cost-ledger-kpi-label">实际成本</span>
+            <span class="cost-ledger-kpi-value">
+              {{ fmtWan(String(kpiStats.actual)) }} <small>万元</small>
+            </span>
+            <span class="cost-ledger-kpi-progress">
+              <span :style="{ width: barPercent(String(kpiStats.actual)) }"></span>
+            </span>
           </div>
-          <div class="lg-kpi-card is-warn" v-if="kpiStats.deviation !== 0">
-            <span class="lg-kpi-card-label">偏差金额</span>
-            <span class="lg-kpi-card-value"
-              >{{ fmtWan(String(kpiStats.deviation)) }} <small>万元</small></span
-            >
-            <span class="lg-kpi-card-bar"
-              ><span
-                :style="{
-                  width:
-                    Math.min(
-                      100,
-                      (Math.abs(kpiStats.deviation) / Math.max(kpiStats.total, 1)) * 100,
-                    ) + '%',
-                  background: 'var(--kpi-overdue)',
-                }"
-              ></span
-            ></span>
+          <div class="cost-ledger-kpi-item is-progress is-dynamic">
+            <span class="cost-ledger-kpi-icon is-unpaid"><ToolOutlined /></span>
+            <span class="cost-ledger-kpi-label">动态成本</span>
+            <span class="cost-ledger-kpi-value">
+              {{ fmtWan(String(kpiStats.dynamic)) }} <small>万元</small>
+            </span>
+            <span class="cost-ledger-kpi-progress">
+              <span :style="{ width: barPercent(String(kpiStats.dynamic)) }"></span>
+            </span>
+          </div>
+          <div class="cost-ledger-kpi-item is-overdue">
+            <span class="cost-ledger-kpi-icon is-overdue"><AlertOutlined /></span>
+            <span class="cost-ledger-kpi-label">偏差金额</span>
+            <span class="cost-ledger-kpi-value">
+              {{ fmtWan(String(kpiStats.deviation)) }} <small>万元</small>
+            </span>
           </div>
         </div>
 
@@ -620,10 +625,18 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
 
       <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">成本科目占比</div>
-          <div class="lg-type-list">
+      <aside class="lg-analysis-rail cost-ledger-analysis-rail" aria-label="成本辅助分析">
+        <div class="cost-ledger-analysis-panel">
+          <header class="cost-ledger-analysis-head">
+            <div>
+              <div class="cost-ledger-analysis-title">成本分析</div>
+              <div class="cost-ledger-analysis-subtitle">科目、来源与超预算风险</div>
+            </div>
+            <a-button type="link" size="small" @click="handleSearch">刷新</a-button>
+          </header>
+
+          <section class="cost-ledger-analysis-section">
+            <div class="cost-ledger-section-title">成本科目占比</div>
             <div v-for="item in subjectBreakdown" :key="item.label" class="lg-type-row">
               <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
@@ -636,12 +649,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <span class="lg-type-num">{{ fmtWan(item.amount) }}</span>
               <span class="lg-type-pct">{{ barPercent(item.amount) }}</span>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="lg-panel">
-          <div class="lg-panel-title">来源类型分布</div>
-          <div class="lg-type-list">
+          <section class="cost-ledger-analysis-section">
+            <div class="cost-ledger-section-title">来源类型分布</div>
             <div v-for="item in sourceBreakdown" :key="item.label" class="lg-type-row">
               <span class="lg-type-dot" :style="{ background: 'var(--kpi-amount)' }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
@@ -654,14 +665,15 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <span class="lg-type-num">{{ fmtWan(item.amount) }}</span>
               <span class="lg-type-pct">{{ barPercent(item.amount) }}</span>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="lg-panel">
-          <div class="lg-warning-head">
-            <div class="lg-panel-title" style="margin-bottom: 0">超预算预警</div>
-          </div>
-          <div class="lg-warning-list">
+          <section class="cost-ledger-analysis-section">
+            <div class="lg-warning-head">
+              <div class="cost-ledger-section-title">超预算预警</div>
+              <span class="cost-ledger-warning-count">
+                {{ sourceBreakdown.filter((i) => parseFloat(i.amount) > 0).length }} 项
+              </span>
+            </div>
             <div
               v-for="item in sourceBreakdown.filter((i) => parseFloat(i.amount) > 0).slice(0, 5)"
               :key="'warn-' + item.label"
@@ -676,8 +688,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             >
               暂无超预算项
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </aside>
     </div>
 
@@ -835,6 +847,188 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   text-align: center;
 }
 
+.cost-ledger-kpi-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  gap: 0;
+  overflow: hidden;
+  min-height: 84px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.cost-ledger-kpi-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 19px 27px 8px;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.cost-ledger-kpi-item:last-child {
+  border-right: 0;
+}
+
+.cost-ledger-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.cost-ledger-kpi-icon.is-amount {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.cost-ledger-kpi-icon.is-paid {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.cost-ledger-kpi-icon.is-unpaid {
+  color: var(--primary);
+  background: var(--surface-tint);
+}
+
+.cost-ledger-kpi-icon.is-overdue {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+.cost-ledger-kpi-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cost-ledger-kpi-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cost-ledger-kpi-value small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cost-ledger-kpi-progress {
+  display: block;
+  overflow: hidden;
+  height: 4px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-sm);
+  grid-column: 2;
+}
+
+.cost-ledger-kpi-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--kpi-paid);
+  border-radius: var(--radius-sm);
+}
+
+.cost-ledger-kpi-item.is-dynamic .cost-ledger-kpi-progress > span {
+  background: var(--kpi-unpaid);
+}
+
+.cost-ledger-analysis-rail {
+  width: 336px;
+}
+
+.cost-ledger-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 100%;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.cost-ledger-analysis-head,
+.cost-ledger-analysis-section .lg-warning-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cost-ledger-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.cost-ledger-analysis-subtitle,
+.cost-ledger-warning-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.cost-ledger-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cost-ledger-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.cost-ledger-analysis-section :deep(.lg-type-row),
+.cost-ledger-analysis-section .lg-type-row {
+  display: grid;
+  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 42px 46px;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.cost-ledger-analysis-section .lg-type-dot {
+  margin-top: 0;
+}
+
+.cost-ledger-analysis-section .lg-type-label {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 1200px) {
   .cost-ledger-page-head,
   .cost-ledger-query-panel,
@@ -852,6 +1046,18 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   .cost-ledger-status-select {
     width: 100%;
     min-width: 0;
+  }
+
+  .cost-ledger-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cost-ledger-kpi-item {
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .cost-ledger-analysis-rail {
+    width: 100%;
   }
 }
 </style>
