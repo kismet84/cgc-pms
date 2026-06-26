@@ -63,9 +63,6 @@ login-snapshot.yml
 # Superpowers visual brainstorming working files
 .superpowers/
 
-# Graphify knowledge graph (excluded from repo)
-graphify-out/
-
 # Claude-mem agent runtime (excluded from repo)
 .agent-runtime/
 
