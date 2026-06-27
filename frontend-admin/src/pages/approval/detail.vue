@@ -283,7 +283,7 @@ onMounted(() => {
   <div class="project-target-redesign app-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb"
-        ><a-breadcrumb-item>审批管理</a-breadcrumb-item
+        ><a-breadcrumb-item>审批中心</a-breadcrumb-item
         ><a-breadcrumb-item>审批详情</a-breadcrumb-item></a-breadcrumb
       >
       <div class="pt-head-actions">
@@ -354,12 +354,12 @@ onMounted(() => {
 
         <!-- Node Flow -->
         <div class="pt-panel">
-          <h4 style="margin-top: 0">审批流程</h4>
+          <h4 class="wf-section-title">审批流程</h4>
           <a-steps :current="completedNodeCount" size="small" direction="vertical">
             <a-step v-for="node in nodes" :key="node.id">
               <template #title>
                 {{ node.nodeName }}
-                <a-tag :color="nodeStatusMap[node.nodeStatus]?.color" style="margin-left: 8px">
+                <a-tag :color="nodeStatusMap[node.nodeStatus]?.color" class="wf-inline-tag">
                   {{ nodeStatusMap[node.nodeStatus]?.text || node.nodeStatus }}
                 </a-tag>
               </template>
@@ -373,9 +373,7 @@ onMounted(() => {
                     <a-tag :color="taskStatusMap[task.taskStatus]?.color" size="small">
                       {{ taskStatusMap[task.taskStatus]?.text || task.taskStatus }}
                     </a-tag>
-                    <span v-if="task.comment" style="color: var(--muted); font-size: 12px">{{
-                      task.comment
-                    }}</span>
+                    <span v-if="task.comment" class="wf-task-comment">{{ task.comment }}</span>
                   </div>
                 </div>
               </template>
@@ -385,22 +383,19 @@ onMounted(() => {
 
         <!-- Approval Records Timeline -->
         <div class="pt-panel">
-          <h4 style="margin-top: 0">审批记录</h4>
+          <h4 class="wf-section-title">审批记录</h4>
           <a-timeline>
             <a-timeline-item v-for="record in records" :key="record.id">
               <div>
                 <strong>{{ record.operatorName }}</strong>
-                <a-tag style="margin-left: 8px">{{
+                <a-tag class="wf-inline-tag">{{
                   actionNameMap[record.actionType] || record.actionName
                 }}</a-tag>
               </div>
-              <div
-                v-if="record.comment"
-                style="color: var(--text-secondary); font-size: 13px; margin-top: 4px"
-              >
+              <div v-if="record.comment" class="wf-record-comment">
                 {{ record.comment }}
               </div>
-              <div style="color: var(--muted); font-size: 12px; margin-top: 2px">
+              <div class="wf-record-time">
                 {{ record.createdAt }}
               </div>
             </a-timeline-item>
@@ -413,7 +408,11 @@ onMounted(() => {
     <a-modal
       v-model:open="showApproveModal"
       title="审批通过"
+      :width="800"
+      class="lg-modal-form is-compact"
       :confirm-loading="actionLoading"
+      ok-text="同意"
+      cancel-text="取消"
       @ok="handleApprove"
     >
       <a-textarea v-model:value="approvalComment" placeholder="审批意见（选填）" :rows="3" />
@@ -423,7 +422,11 @@ onMounted(() => {
     <a-modal
       v-model:open="showRejectModal"
       title="驳回"
+      :width="800"
+      class="lg-modal-form is-compact"
       :confirm-loading="actionLoading"
+      ok-text="驳回"
+      cancel-text="取消"
       @ok="handleReject"
     >
       <a-textarea v-model:value="approvalComment" placeholder="请输入驳回原因（必填）" :rows="3" />
@@ -433,7 +436,11 @@ onMounted(() => {
     <a-modal
       v-model:open="showTransferModal"
       title="转办"
+      :width="800"
+      class="lg-modal-form is-compact"
       :confirm-loading="actionLoading"
+      ok-text="转办"
+      cancel-text="取消"
       @ok="handleTransfer"
     >
       <a-form layout="vertical">
@@ -450,7 +457,11 @@ onMounted(() => {
     <a-modal
       v-model:open="showAddSignModal"
       title="加签"
+      :width="800"
+      class="lg-modal-form is-compact"
       :confirm-loading="actionLoading"
+      ok-text="加签"
+      cancel-text="取消"
       @ok="handleAddSign"
     >
       <a-form layout="vertical">
@@ -459,7 +470,7 @@ onMounted(() => {
             v-model:value="addSignUserIds"
             mode="tags"
             placeholder="请输入审批人用户ID（可输入多个）"
-            style="width: 100%"
+            class="lg-full-control"
           />
         </a-form-item>
         <a-form-item label="加签说明">
@@ -470,4 +481,28 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.wf-section-title {
+  margin-top: 0;
+}
+
+.wf-inline-tag {
+  margin-left: 8px;
+}
+
+.wf-task-comment,
+.wf-record-time {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wf-record-comment {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.wf-record-time {
+  margin-top: 2px;
+}
+</style>

@@ -45,7 +45,7 @@ function onCompanyChange(_val: string) {
         <a-select
           v-model:value="form.companyId"
           placeholder="请选择公司"
-          style="width: 100%"
+          class="lg-full-control"
           @change="onCompanyChange"
         >
           <a-select-option v-for="c in companyOptions" :key="c.id" :value="c.id">
@@ -57,7 +57,7 @@ function onCompanyChange(_val: string) {
         <a-select
           v-model:value="form.departmentId"
           placeholder="请先选择公司"
-          style="width: 100%"
+          class="lg-full-control"
           :disabled="!form.companyId"
         >
           <a-select-option v-for="d in deptOptions" :key="d.id" :value="d.id">
@@ -72,7 +72,7 @@ function onCompanyChange(_val: string) {
         <a-input v-model:value="form.positionName" placeholder="请输入岗位名称" />
       </a-form-item>
       <a-form-item label="状态">
-        <a-select v-model:value="form.status" style="width: 100%">
+        <a-select v-model:value="form.status" class="lg-full-control">
           <a-select-option value="ENABLED">启用</a-select-option>
           <a-select-option value="DISABLED">禁用</a-select-option>
         </a-select>

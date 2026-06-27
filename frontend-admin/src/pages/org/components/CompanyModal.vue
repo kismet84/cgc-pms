@@ -37,7 +37,7 @@ defineEmits<{
         <a-input v-model:value="form.companyName" placeholder="请输入公司名称" />
       </a-form-item>
       <a-form-item label="状态">
-        <a-select v-model:value="form.status" style="width: 100%">
+        <a-select v-model:value="form.status" class="lg-full-control">
           <a-select-option value="ENABLED">启用</a-select-option>
           <a-select-option value="DISABLED">禁用</a-select-option>
         </a-select>

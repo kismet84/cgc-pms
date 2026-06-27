@@ -83,9 +83,10 @@ async function handleSave() {
   <a-modal
     :open="open"
     :title="modalTitle"
-    :width="520"
+    :width="800"
+    class="lg-modal-form is-compact"
     :confirm-loading="saving"
-    ok-text="保存"
+    ok-text="保存权限"
     cancel-text="取消"
     @ok="handleSave"
     @cancel="emit('update:open', false)"
@@ -100,9 +101,17 @@ async function handleSave() {
         default-expand-all
         block-node
       />
-      <div v-else-if="!loading" style="text-align: center; padding: 24px; color: var(--muted)">
+      <div v-else-if="!loading" class="permission-empty">
         暂无菜单数据
       </div>
     </a-spin>
   </a-modal>
 </template>
+
+<style scoped>
+.permission-empty {
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+</style>

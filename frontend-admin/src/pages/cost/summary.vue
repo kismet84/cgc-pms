@@ -111,11 +111,11 @@ function fmtDeviation(val: string | undefined): string {
   return abs
 }
 
-function getDeviationColor(val: string | undefined): string {
+function getDeviationTone(val: string | undefined): string {
   const n = parseAmount(val)
-  if (n > 0) return 'var(--error)'
-  if (n < 0) return 'var(--success)'
-  return 'var(--text-secondary)'
+  if (n > 0) return 'danger'
+  if (n < 0) return 'success'
+  return 'neutral'
 }
 
 function fmtPercent(val: string | undefined, base: string | undefined): string {
@@ -380,7 +380,7 @@ onMounted(() => {
               <span class="lg-kpi-card-label">成本偏差</span>
               <span
                 class="lg-kpi-card-value"
-                :style="{ color: getDeviationColor(summary.costDeviation) }"
+                :class="`is-${getDeviationTone(summary.costDeviation)}`"
               >
                 {{ fmtDeviation(summary.costDeviation) }} <small>万元</small>
               </span>
@@ -464,7 +464,7 @@ onMounted(() => {
                 <template #costDeviation="{ row }">
                   <span
                     class="cost-summary-deviation"
-                    :style="{ color: getDeviationColor(row.costDeviation) }"
+                    :class="`is-${getDeviationTone(row.costDeviation)}`"
                   >
                     {{ fmtDeviation(row.costDeviation) }}
                   </span>
@@ -716,21 +716,36 @@ onMounted(() => {
   font-weight: 600;
 }
 
+.cost-summary-deviation.is-danger,
+.lg-kpi-card-value.is-danger {
+  color: var(--error);
+}
+
+.cost-summary-deviation.is-success,
+.lg-kpi-card-value.is-success {
+  color: var(--success);
+}
+
+.cost-summary-deviation.is-neutral,
+.lg-kpi-card-value.is-neutral {
+  color: var(--text-secondary);
+}
+
 .cost-check-tag {
   margin-right: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .cost-check-tag.is-overrun {
   color: var(--error);
   background: var(--error-soft);
-  border-color: rgba(239, 68, 68, 0.22);
+  border-color: var(--border-subtle);
 }
 
 .cost-check-tag.is-saving {
   color: var(--success);
   background: var(--success-soft);
-  border-color: rgba(22, 163, 74, 0.22);
+  border-color: var(--border-subtle);
 }
 
 .cost-check-tag.is-balanced {
