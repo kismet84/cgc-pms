@@ -17,28 +17,28 @@ defineProps<{
 
 <template>
   <div class="org-metric-strip">
-    <div class="org-metric">
+    <div class="org-metric lg-kpi-card">
       <div class="org-metric-icon company"><BankOutlined /></div>
       <div>
         <span>公司</span>
         <strong>{{ companyTotal }}</strong>
       </div>
     </div>
-    <div class="org-metric">
+    <div class="org-metric lg-kpi-card">
       <div class="org-metric-icon dept"><ClusterOutlined /></div>
       <div>
         <span>{{ currentCompanyName }}部门</span>
         <strong>{{ departmentCount }}</strong>
       </div>
     </div>
-    <div class="org-metric">
+    <div class="org-metric lg-kpi-card">
       <div class="org-metric-icon position"><TeamOutlined /></div>
       <div>
         <span>岗位</span>
         <strong>{{ positionTotal }}</strong>
       </div>
     </div>
-    <div class="org-metric">
+    <div class="org-metric lg-kpi-card">
       <div class="org-metric-icon health"><SafetyCertificateOutlined /></div>
       <div>
         <span>启用率</span>
@@ -63,8 +63,8 @@ defineProps<{
   min-height: 80px;
   padding: 16px 20px 20px;
   background: var(--surface);
-  border: 0;
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
 }
 
@@ -74,22 +74,22 @@ defineProps<{
   flex-shrink: 0;
   width: 44px;
   height: 44px;
-  color: #fff;
+  color: var(--surface);
   font-size: 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .org-metric-icon.company {
-  background: #1890ff;
+  background: var(--primary);
 }
 .org-metric-icon.dept {
-  background: #1890ff;
+  background: var(--primary);
 }
 .org-metric-icon.position {
-  background: #18c4c0;
+  background: var(--info);
 }
 .org-metric-icon.health {
-  background: #43c51a;
+  background: var(--success);
 }
 
 .org-metric span {
@@ -130,7 +130,7 @@ defineProps<{
   left: 80px;
   height: 4px;
   content: '';
-  background: #43c51a;
+  background: var(--success);
   border-radius: 99px;
 }
 

@@ -132,8 +132,8 @@ onMounted(async () => {
     <div class="lg-list-page lg-page app-page org-page">
       <div class="lg-page-head">
         <div>
-          <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
-            <a-breadcrumb-item>系统管理</a-breadcrumb-item>
+          <a-breadcrumb class="lg-page-head-breadcrumb">
+            <a-breadcrumb-item>数据中心</a-breadcrumb-item>
             <a-breadcrumb-item>组织架构</a-breadcrumb-item>
           </a-breadcrumb>
         </div>
@@ -271,7 +271,7 @@ onMounted(async () => {
 .org-panel-header > :deep(.ant-btn) {
   height: 34px;
   padding: 0 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 500;
 }
@@ -289,7 +289,7 @@ onMounted(async () => {
   overflow: hidden;
   background: var(--surface);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
 }
 
@@ -339,7 +339,7 @@ onMounted(async () => {
 .lg-search-bar :deep(.ant-select-selector),
 .lg-search-bar :deep(.ant-btn) {
   height: 34px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
 }
 
@@ -355,7 +355,7 @@ onMounted(async () => {
 
 .org-table :deep(.ant-table-thead > tr > th) {
   color: var(--text-secondary);
-  background: #fff;
+  background: var(--surface);
   border-bottom-color: var(--border-subtle);
   font-size: 14px;
   font-weight: 500;
@@ -369,7 +369,7 @@ onMounted(async () => {
 
 .org-table :deep(.ant-table-tbody > tr:hover > td),
 .org-table :deep(.ant-table-tbody > tr.org-row-selected > td) {
-  background: #eef6ff;
+  background: var(--primary-soft);
 }
 
 .org-table :deep(.ant-btn-link) {
@@ -430,12 +430,12 @@ onMounted(async () => {
 
 .org-tree-wrap :deep(.ant-tree-node-content-wrapper:hover),
 .org-tree-wrap :deep(.ant-tree-node-selected) {
-  background: #eef6ff !important;
+  background: var(--primary-soft) !important;
 }
 
 .org-empty-hint {
   padding: 40px 12px;
-  color: #94a3b8;
+  color: var(--muted);
   font-size: 14px;
   text-align: center;
 }
@@ -454,7 +454,7 @@ onMounted(async () => {
 }
 
 .org-table :deep(.vxe-header--column) {
-  background: #fff;
+  background: var(--surface);
   color: var(--muted);
   font-size: 14px;
   font-weight: 500;
@@ -471,7 +471,7 @@ onMounted(async () => {
 .org-table :deep(.vxe-body--row:hover .vxe-body--column),
 .org-table :deep(.vxe-body--row.org-row-selected),
 .org-table :deep(.vxe-body--row.org-row-selected .vxe-body--column) {
-  background: #f5f9ff;
+  background: var(--primary-soft);
 }
 
 .org-page :deep(.org-panel-header p) {
@@ -510,7 +510,7 @@ onMounted(async () => {
 .org-page :deep(.org-position-panel .org-panel-header > .ant-btn) {
   height: 34px;
   padding: 0 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 500;
 }
@@ -547,6 +547,14 @@ onMounted(async () => {
   width: 160px;
 }
 
+.org-page :deep(.org-position-company-select) {
+  width: 140px;
+}
+
+.org-page :deep(.org-position-dept-select) {
+  width: 160px;
+}
+
 .org-page :deep(.lg-search-bar.one-line .ant-input-affix-wrapper) {
   width: 100%;
 }
@@ -555,7 +563,7 @@ onMounted(async () => {
 .org-page :deep(.lg-search-bar .ant-select-selector),
 .org-page :deep(.lg-search-bar .ant-btn) {
   height: 34px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
 }
 
@@ -566,7 +574,7 @@ onMounted(async () => {
 
 .org-page :deep(.org-table .vxe-header--column) {
   height: 42px;
-  background: #fff;
+  background: var(--surface);
   color: var(--muted);
   font-size: 14px;
   font-weight: 500;
@@ -582,7 +590,7 @@ onMounted(async () => {
 .org-page :deep(.org-table .vxe-body--row:hover .vxe-body--column),
 .org-page :deep(.org-table .vxe-body--row.org-row-selected),
 .org-page :deep(.org-table .vxe-body--row.org-row-selected .vxe-body--column) {
-  background: #fafafa;
+  background: var(--surface-subtle);
 }
 
 .org-page :deep(.org-table .ant-btn-link) {
@@ -652,7 +660,7 @@ onMounted(async () => {
 .org-page :deep(.org-list li.active) {
   padding-left: 8px;
   color: var(--primary);
-  background: #fafafa;
+  background: var(--surface-subtle);
 }
 
 @media (max-width: 1180px) {

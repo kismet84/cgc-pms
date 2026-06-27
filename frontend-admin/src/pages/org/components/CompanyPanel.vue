@@ -103,7 +103,13 @@ const emit = defineEmits<{
       </template>
       <template #companyOps="{ row }: { row: Record<string, unknown> }">
         <a-dropdown :trigger="['click']">
-          <a-button class="lg-row-action-trigger" size="small" type="text">
+          <a-button
+            class="lg-row-action-trigger"
+            size="small"
+            type="text"
+            title="公司操作"
+            aria-label="公司操作"
+          >
             <MoreOutlined />
           </a-button>
           <template #overlay>

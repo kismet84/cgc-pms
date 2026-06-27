@@ -436,6 +436,22 @@ a {
   color: var(--error);
 }
 
+.lg-search-prefix-icon {
+  color: var(--text-secondary);
+}
+
+.lg-muted-text {
+  color: var(--muted);
+}
+
+.lg-full-control {
+  width: 100%;
+}
+
+.system-tag-gap {
+  margin-right: 4px;
+}
+
 .pt-pagination {
   display: flex;
   align-items: center;

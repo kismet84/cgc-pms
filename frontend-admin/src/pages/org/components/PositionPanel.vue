@@ -82,7 +82,7 @@ function getDeptName(departmentId: string | undefined, flatDeptList: FlatDeptIte
         placeholder="所属公司"
         size="small"
         allow-clear
-        style="width: 140px"
+        class="org-position-company-select"
       >
         <a-select-option v-for="c in companyOptions" :key="c.id" :value="c.id">
           {{ c.companyName }}
@@ -93,7 +93,7 @@ function getDeptName(departmentId: string | undefined, flatDeptList: FlatDeptIte
         placeholder="所属部门"
         size="small"
         allow-clear
-        style="width: 160px"
+        class="org-position-dept-select"
       >
         <a-select-option v-for="d in filterDeptList" :key="d.id" :value="d.id">
           {{ d.name }}
@@ -144,7 +144,13 @@ function getDeptName(departmentId: string | undefined, flatDeptList: FlatDeptIte
       </template>
       <template #posOps="{ row }: { row: Record<string, unknown> }">
         <a-dropdown :trigger="['click']">
-          <a-button class="lg-row-action-trigger" size="small" type="text">
+          <a-button
+            class="lg-row-action-trigger"
+            size="small"
+            type="text"
+            title="岗位操作"
+            aria-label="岗位操作"
+          >
             <MoreOutlined />
           </a-button>
           <template #overlay>

@@ -413,7 +413,7 @@ onMounted(() => {
               <a-input
                 v-model:value="dataFilter.dictLabel"
                 placeholder="搜索字典标签"
-                style="width: 160px"
+                class="dict-filter-input"
                 allow-clear
                 size="small"
                 @press-enter="handleDataSearch"
@@ -422,7 +422,7 @@ onMounted(() => {
                 v-model:value="dataFilter.status"
                 placeholder="全部状态"
                 allow-clear
-                style="width: 110px"
+                class="dict-filter-status"
                 size="small"
               >
                 <a-select-option value="ENABLED">启用</a-select-option>
@@ -453,7 +453,13 @@ onMounted(() => {
               </template>
               <template #ops="{ row }">
                 <a-dropdown :trigger="['click']">
-                  <a-button class="lg-row-action-trigger" size="small" type="text">
+                  <a-button
+                    class="lg-row-action-trigger"
+                    size="small"
+                    type="text"
+                    title="字典数据操作"
+                    aria-label="字典数据操作"
+                  >
                     <MoreOutlined />
                   </a-button>
                   <template #overlay>
@@ -515,7 +521,7 @@ onMounted(() => {
           <a-input v-model:value="typeForm.dictName" placeholder="请输入字典名称" />
         </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="typeForm.status" style="width: 120px">
+          <a-select v-model:value="typeForm.status" class="dict-status-select">
             <a-select-option value="ENABLED">启用</a-select-option>
             <a-select-option value="DISABLED">禁用</a-select-option>
           </a-select>
@@ -543,7 +549,7 @@ onMounted(() => {
           <a-input v-model:value="dataForm.dictValue" placeholder="请输入字典键值" />
         </a-form-item>
         <a-form-item label="排序号">
-          <a-input-number v-model:value="dataForm.orderNum" :min="0" style="width: 100%" />
+          <a-input-number v-model:value="dataForm.orderNum" :min="0" class="lg-full-control" />
         </a-form-item>
         <a-form-item label="CSS类名">
           <a-input v-model:value="dataForm.cssClass" placeholder="如：text-danger bg-warning" />
@@ -552,7 +558,7 @@ onMounted(() => {
           <a-input v-model:value="dataForm.listClass" placeholder="如：default primary success" />
         </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="dataForm.status" style="width: 120px">
+          <a-select v-model:value="dataForm.status" class="dict-status-select">
             <a-select-option value="ENABLED">启用</a-select-option>
             <a-select-option value="DISABLED">禁用</a-select-option>
           </a-select>
@@ -630,21 +636,21 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
 }
 
 .dc-type-item:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--surface-subtle);
 }
 
 .dc-type-item--active {
-  background: var(--primary-light, #e6f4ff);
+  background: var(--primary-soft);
 }
 
 .dc-type-item--active:hover {
-  background: var(--primary-light, #d6ecff);
+  background: var(--primary-soft);
 }
 
 .dc-type-info {
@@ -710,5 +716,14 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.dict-filter-input {
+  width: 160px;
+}
+
+.dict-filter-status,
+.dict-status-select {
+  width: 120px;
 }
 </style>
