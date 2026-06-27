@@ -8,6 +8,10 @@ import { scanContent } from '../../../../scripts/check-ui-style-consistency.mjs'
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const sourcePath = 'src/pages/contract/ContractLedgerPage.vue'
 const source = readFileSync(resolve(currentDir, '../ContractLedgerPage.vue'), 'utf-8')
+const composableSource = readFileSync(
+  resolve(currentDir, '../composables/useContractLedger.ts'),
+  'utf-8',
+)
 
 describe('ContractLedgerPage UI consistency', () => {
   it('uses tokenized classes for the redesigned ledger workspace', () => {
@@ -32,8 +36,15 @@ describe('ContractLedgerPage UI consistency', () => {
     expect(source).toContain('class="cl-contract-link"')
     expect(source).toContain('@click="handleView(row)"')
     expect(source).toContain('class="cl-row-actions"')
-    expect(source).toContain("partyAName: '甲方'")
-    expect(source).toContain("signedDate: '签订日期'")
+    expect(source).toContain('ColumnSettingsButton')
+    expect(source).toContain(':columns="columnSettings"')
+    expect(source).toContain(':visible="colVisible"')
+    expect(source).toContain('@toggle="toggleCol"')
+    expect(source).toContain(':columns="visibleColumns"')
+    expect(composableSource).toContain("title: '甲方'")
+    expect(composableSource).toContain("title: '签订日期'")
+    expect(composableSource).toContain('partyAName: false')
+    expect(composableSource).toContain('signedDate: false')
     expect(source).toContain('color: var(--text-secondary)')
     expect(source).toContain('aria-label="刷新合同台账"')
     expect(source).toContain(':aria-label="`打开合同操作菜单：${row.contractCode}`"')

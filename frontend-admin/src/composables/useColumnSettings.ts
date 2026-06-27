@@ -26,9 +26,18 @@ function loadSavedColumns(storageKey: string, defaults: Record<string, boolean>)
   }
 }
 
-export function useColumnSettings(storageKey: string, columns: ComputedRef<GridColumn[]>) {
+export function useColumnSettings(
+  storageKey: string,
+  columns: ComputedRef<GridColumn[]>,
+  defaultVisibility: Record<string, boolean> = {},
+) {
   const defaultCols = computed<Record<string, boolean>>(() =>
-    Object.fromEntries(columns.value.map((column, index) => [getColumnKey(column, index), true])),
+    Object.fromEntries(
+      columns.value.map((column, index) => {
+        const key = getColumnKey(column, index)
+        return [key, defaultVisibility[key] ?? true]
+      }),
+    ),
   )
 
   const colVisible = reactive<Record<string, boolean>>(

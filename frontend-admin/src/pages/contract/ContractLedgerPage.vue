@@ -1,12 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import {
-  MoreOutlined,
-  PlusOutlined,
-  SettingOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-} from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import ContractFormPage from './ContractFormPage.vue'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import ContractKpiStrip from './components/ContractKpiStrip.vue'
@@ -14,6 +8,7 @@ import ContractMobileCardList from './components/ContractMobileCardList.vue'
 import ContractAnalysisPanel from './components/ContractAnalysisPanel.vue'
 import { useContractLedger, TYPE_LABEL, TYPE_COLOR } from './composables/useContractLedger'
 import type { ContractVO, ContractType, ContractStatus } from '@/types/contract'
+import { ColumnSettingsButton } from '@/components/list-page'
 
 const {
   contractModalVisible,
@@ -35,7 +30,7 @@ const {
   pageSize,
   kpi,
   colVisible,
-  defaultCols,
+  columnSettings,
   toggleCol,
   fetchData,
   handleSearch,
@@ -49,7 +44,7 @@ const {
   typePercent,
   statusBars,
   warningRows,
-  gridColumns,
+  visibleColumns,
 } = useContractLedger()
 
 // ---- Mobile detection ----
@@ -155,33 +150,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <div class="lg-toolbar-left">
               <span class="cl-table-title">合同列表</span>
               <span class="cl-table-count">共 {{ total }} 条</span>
-              <a-dropdown v-if="!isMobile">
-                <a-button>
-                  <template #icon><SettingOutlined /></template>
-                  列设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
-                      <a-checkbox :checked="colVisible[key]">
-                        {{
-                          {
-                            contractCode: '合同编号',
-                            contractName: '合同名称',
-                            contractType: '合同类型',
-                            partyAName: '甲方',
-                            partyBName: '乙方',
-                            contractAmount: '合同金额',
-                            signedDate: '签订日期',
-                            contractStatus: '合同状态',
-                            ops: '操作',
-                          }[key]
-                        }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
+              <ColumnSettingsButton
+                v-if="!isMobile"
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-button aria-label="刷新合同台账" title="刷新合同台账" @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
                 刷新
@@ -199,7 +173,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <div v-if="!isMobile" class="lg-table-wrap cl-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

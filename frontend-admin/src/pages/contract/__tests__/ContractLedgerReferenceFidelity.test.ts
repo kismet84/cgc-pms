@@ -14,13 +14,19 @@ const analysisSource = readFileSync(
   'utf-8',
 )
 const kpiSource = readFileSync(resolve(currentDir, '../components/ContractKpiStrip.vue'), 'utf-8')
+const columnSettingsSource = readFileSync(
+  resolve(currentDir, '../../../components/list-page/ColumnSettingsButton.vue'),
+  'utf-8',
+)
 
 describe('ContractLedger reference fidelity', () => {
   it('keeps the approved ledger copy and adds the reference analysis rail structure', () => {
     // Page-level strings
-    for (const label of ['新建合同', '列设置', '合同管理', '合同台账']) {
+    for (const label of ['新建合同', '合同管理', '合同台账']) {
       expect(ledgerSource).toContain(label)
     }
+    expect(ledgerSource).toContain('ColumnSettingsButton')
+    expect(columnSettingsSource).toContain('列设置')
     // Analysis panel strings (moved to component)
     for (const label of ['合同类型分布', '合同状态', '逾期预警', '合同总金额', '未付款金额']) {
       expect(

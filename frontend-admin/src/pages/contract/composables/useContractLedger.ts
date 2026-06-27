@@ -11,6 +11,7 @@ import type {
   ContractStatus,
 } from '@/types/contract'
 import type { PageResult } from '@/types/api'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // ---- Constants ----
 export const TYPE_LABEL: Record<ContractType, string> = {
@@ -140,9 +141,7 @@ export function useContractLedger() {
     return Math.min(Math.max(longest * 9 + 42, 128), 240)
   }
 
-  // ---- Column visibility ----
-  const COLS_KEY = 'contract_ledger_cols_v2'
-  const defaultCols: Record<string, boolean> = {
+  const defaultColumnVisibility: Record<string, boolean> = {
     contractCode: true,
     contractName: true,
     contractType: true,
@@ -152,19 +151,6 @@ export function useContractLedger() {
     signedDate: false,
     contractStatus: true,
     ops: true,
-  }
-  let saved: Record<string, boolean> = defaultCols
-  try {
-    const raw = localStorage.getItem(COLS_KEY)
-    if (raw) saved = JSON.parse(raw)
-  } catch (e: unknown) {
-    console.error(e)
-    localStorage.removeItem(COLS_KEY)
-  }
-  const colVisible = reactive<Record<string, boolean>>({ ...defaultCols, ...saved })
-  function toggleCol(key: string) {
-    colVisible[key] = !colVisible[key]
-    localStorage.setItem(COLS_KEY, JSON.stringify(colVisible))
   }
 
   // ---- Fetch ----
@@ -335,67 +321,48 @@ export function useContractLedger() {
 
   // ---- VxeGrid columns ----
   const gridColumns = computed(() => [
-    ...(colVisible.contractCode
-      ? [
-          {
-            field: 'contractCode',
-            title: '合同编号',
-            width: calcCodeColumnWidth(tableData.value.map((item) => item.contractCode)),
-            minWidth: 128,
-            showOverflow: false,
-            slots: { default: 'contractCode' },
-          },
-        ]
-      : []),
-    ...(colVisible.contractName
-      ? [{ field: 'contractName', title: '合同名称', minWidth: 118, showOverflow: 'tooltip' }]
-      : []),
-    ...(colVisible.contractType
-      ? [
-          {
-            field: 'contractType',
-            title: '合同类型',
-            width: 88,
-            showOverflow: 'tooltip',
-            slots: { default: 'contractType' },
-          },
-        ]
-      : []),
-    ...(colVisible.partyAName
-      ? [{ field: 'partyAName', title: '甲方', minWidth: 116, showOverflow: 'tooltip' }]
-      : []),
-    ...(colVisible.partyBName
-      ? [{ field: 'partyBName', title: '乙方', minWidth: 104, showOverflow: 'tooltip' }]
-      : []),
-    ...(colVisible.contractAmount
-      ? [
-          {
-            field: 'contractAmount',
-            title: '合同金额(含税)',
-            width: 132,
-            minWidth: 132,
-            align: 'right' as const,
-            showOverflow: false,
-            slots: { default: 'amount' },
-          },
-        ]
-      : []),
-    ...(colVisible.signedDate
-      ? [{ field: 'signedDate', title: '签订日期', width: 94, showOverflow: 'tooltip' }]
-      : []),
-    ...(colVisible.contractStatus
-      ? [
-          {
-            field: 'contractStatus',
-            title: '合同状态',
-            width: 88,
-            showOverflow: 'tooltip',
-            slots: { default: 'status' },
-          },
-        ]
-      : []),
-    ...(colVisible.ops ? [{ title: '操作', width: 76, slots: { default: 'ops' } }] : []),
+    {
+      field: 'contractCode',
+      title: '合同编号',
+      width: calcCodeColumnWidth(tableData.value.map((item) => item.contractCode)),
+      minWidth: 128,
+      showOverflow: false,
+      slots: { default: 'contractCode' },
+    },
+    { field: 'contractName', title: '合同名称', minWidth: 118, showOverflow: 'tooltip' },
+    {
+      field: 'contractType',
+      title: '合同类型',
+      width: 88,
+      showOverflow: 'tooltip',
+      slots: { default: 'contractType' },
+    },
+    { field: 'partyAName', title: '甲方', minWidth: 116, showOverflow: 'tooltip' },
+    { field: 'partyBName', title: '乙方', minWidth: 104, showOverflow: 'tooltip' },
+    {
+      field: 'contractAmount',
+      title: '合同金额(含税)',
+      width: 132,
+      minWidth: 132,
+      align: 'right' as const,
+      showOverflow: false,
+      slots: { default: 'amount' },
+    },
+    { field: 'signedDate', title: '签订日期', width: 94, showOverflow: 'tooltip' },
+    {
+      field: 'contractStatus',
+      title: '合同状态',
+      width: 88,
+      showOverflow: 'tooltip',
+      slots: { default: 'status' },
+    },
+    { field: 'ops', title: '操作', width: 76, slots: { default: 'ops' } },
   ])
+  const { visibleColumns, columnSettings, colVisible, toggleCol } = useColumnSettings(
+    'contract_ledger_cols_v2',
+    gridColumns,
+    defaultColumnVisibility,
+  )
 
   return {
     // Modal state
@@ -422,7 +389,7 @@ export function useContractLedger() {
     kpi,
     // Column visibility
     colVisible,
-    defaultCols,
+    columnSettings,
     toggleCol,
     // Fetch
     fetchData,
@@ -441,5 +408,6 @@ export function useContractLedger() {
     warningRows,
     // Grid
     gridColumns,
+    visibleColumns,
   }
 }

@@ -181,7 +181,9 @@ const dataForm = reactive({
 })
 
 const STATUS_LABEL: Record<string, string> = {
+  ENABLE: '启用',
   ENABLED: '启用',
+  DISABLE: '禁用',
   DISABLED: '禁用',
 }
 
@@ -190,7 +192,7 @@ const dataGridColumns = computed(() => [
   { field: 'dictValue', title: '字典键值', width: 140 },
   { field: 'orderNum', title: '排序', width: 80, align: 'right' as const },
   { field: 'cssClass', title: '样式类名', width: 120 },
-  { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
+  { field: 'statusLabel', title: '状态', width: 88 },
   { field: 'createdAt', title: '创建时间', width: 170 },
   { title: '操作', width: 76, slots: { default: 'ops' } },
 ])
@@ -211,7 +213,10 @@ async function fetchDataList() {
       status: dataFilter.status,
     })
     const records = Array.isArray(res?.records) ? res.records : Array.isArray(res) ? res : []
-    dataTableData.value = records
+    dataTableData.value = records.map((item) => ({
+      ...item,
+      statusLabel: STATUS_LABEL[item.status] ?? item.status,
+    }))
     dataTotal.value = Number(res?.total ?? records.length)
   } catch (e: unknown) {
     console.error(e)
@@ -350,26 +355,28 @@ onMounted(() => {
 
 <template>
   <div class="lg-list-page lg-page app-page dict-page">
-    <div class="lg-page-head">
-      <a-breadcrumb class="lg-breadcrumb"
-        ><a-breadcrumb-item>系统设置</a-breadcrumb-item
-        ><a-breadcrumb-item>字典管理</a-breadcrumb-item></a-breadcrumb
-      >
+    <div class="lg-page-head dict-page-head">
+      <div class="dict-page-meta-row">
+        <a-breadcrumb class="dict-breadcrumb">
+          <a-breadcrumb-item>系统设置</a-breadcrumb-item>
+          <a-breadcrumb-item>字典管理</a-breadcrumb-item>
+        </a-breadcrumb>
+        <span class="dict-page-subtitle">维护业务状态、类型与枚举字典，统一系统字段展示口径</span>
+      </div>
     </div>
 
-    <div class="dc-panel">
+    <main class="dc-panel">
       <!-- 左侧：字典类型列表 -->
       <div class="dc-left">
         <div class="dc-left-header">
           <span class="dc-left-title">字典类型</span>
-          <a-button type="primary" size="small" @click="handleAddType">新增</a-button>
+          <a-button type="primary" @click="handleAddType">新增</a-button>
         </div>
 
         <div class="dc-left-search">
           <a-input-search
             v-model:value="typeFilter"
             placeholder="搜索字典名称"
-            size="small"
             @search="handleTypeSearch"
           />
         </div>
@@ -404,7 +411,7 @@ onMounted(() => {
         <template v-if="selectedTypeId">
           <div class="dc-right-header">
             <span class="dc-right-title">{{ selectedTypeName || '字典数据' }}</span>
-            <a-button type="primary" size="small" @click="handleAddData">新增数据</a-button>
+            <a-button type="primary" @click="handleAddData">新增数据</a-button>
           </div>
 
           <!-- 数据筛选工具栏 -->
@@ -415,7 +422,6 @@ onMounted(() => {
                 placeholder="搜索字典标签"
                 class="dict-filter-input"
                 allow-clear
-                size="small"
                 @press-enter="handleDataSearch"
               />
               <a-select
@@ -423,15 +429,14 @@ onMounted(() => {
                 placeholder="全部状态"
                 allow-clear
                 class="dict-filter-status"
-                size="small"
               >
                 <a-select-option value="ENABLED">启用</a-select-option>
                 <a-select-option value="DISABLED">禁用</a-select-option>
               </a-select>
             </div>
             <div class="lg-toolbar-right">
-              <a-button type="primary" size="small" @click="handleDataSearch">查询</a-button>
-              <a-button size="small" @click="handleDataReset">重置</a-button>
+              <a-button type="primary" @click="handleDataSearch">查询</a-button>
+              <a-button @click="handleDataReset">重置</a-button>
             </div>
           </div>
 
@@ -495,7 +500,7 @@ onMounted(() => {
           <a-empty description="请在左侧选择一个字典类型" />
         </div>
       </div>
-    </div>
+    </main>
 
     <!-- 字典类型弹窗 -->
     <a-modal
@@ -570,23 +575,54 @@ onMounted(() => {
 
 <style scoped>
 /* 页面专属样式 — 左右分栏 + 类型列表交互 */
-.lg-breadcrumb {
-  margin-bottom: 5px;
+.dict-page {
+  gap: var(--space-16);
+}
+
+.dict-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.dict-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.dict-breadcrumb {
+  flex: none;
   font-size: 13px;
+  line-height: 20px;
+}
+
+.dict-page-subtitle {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dc-panel {
   display: flex;
-  min-height: 500px;
+  min-height: calc(100vh - 180px);
   overflow: hidden;
   background: var(--surface);
-  border: 0;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-soft);
+  padding: 0;
 }
 
 .dc-left {
-  width: 260px;
+  width: 280px;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   display: flex;
@@ -598,7 +634,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px 10px;
+  min-height: 58px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
 }
 
 .dc-left-title {
@@ -608,13 +646,14 @@ onMounted(() => {
 }
 
 .dc-left-search {
-  padding: 0 16px 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .dc-left-list {
   flex: 1;
   overflow: auto;
-  padding: 0 8px;
+  padding: 8px;
 }
 
 .dc-left-empty {
@@ -635,7 +674,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  min-height: 58px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s;
@@ -701,7 +741,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px 10px;
+  min-height: 58px;
+  padding: 12px 18px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -719,11 +760,25 @@ onMounted(() => {
 }
 
 .dict-filter-input {
-  width: 160px;
+  width: 220px;
 }
 
 .dict-filter-status,
 .dict-status-select {
   width: 120px;
+}
+
+.dc-right .lg-toolbar {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.dc-right .lg-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.dc-right .lg-pagination {
+  padding: 12px 18px;
 }
 </style>
