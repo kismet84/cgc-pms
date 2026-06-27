@@ -110,8 +110,8 @@ public class RateLimitAspect {
         long count = counterStore.increment(limitKey, rateLimit.windowSeconds());
 
         if (count > rateLimit.maxRequests()) {
-            log.warn("Rate limit exceeded: key={}, endpoint={}, count={}, limit={}",
-                    limitKey, endpoint, count, rateLimit.maxRequests());
+            log.warn("Rate limit exceeded: keyDigest={}, endpoint={}, count={}, limit={}",
+                    safeKeyDigest(limitKey), endpoint, count, rateLimit.maxRequests());
             throw new RateLimitExceededException(
                     String.format("请求过于频繁，请在 %d 秒后重试", rateLimit.windowSeconds()));
         }
@@ -254,5 +254,16 @@ public class RateLimitAspect {
             return servletRequestAttributes.getRequest();
         }
         return null;
+    }
+
+    private String safeKeyDigest(String limitKey) {
+        if (limitKey == null) {
+            return "null";
+        }
+        int length = limitKey.length();
+        if (length <= 16) {
+            return "len=" + length;
+        }
+        return "len=" + length + ":" + Integer.toHexString(limitKey.hashCode());
     }
 }

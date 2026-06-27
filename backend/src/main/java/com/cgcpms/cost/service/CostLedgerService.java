@@ -46,17 +46,7 @@ public class CostLedgerService {
                                        Long projectId, Long contractId, Long partnerId, Long costSubjectId,
                                        String costType, String sourceType, String costStatus,
                                        LocalDate startDate, LocalDate endDate, String keyword) {
-        log.info("Querying cost ledger: projectId={}, contractId={}, partnerId={}, costSubjectId={}, costType={}, sourceType={}, costStatus={}, startDate={}, endDate={}, keyword={}, pageNo={}",
-                projectId != null ? projectId : "ALL",
-                contractId != null ? contractId : "ALL",
-                partnerId != null ? partnerId : "ALL",
-                costSubjectId != null ? costSubjectId : "ALL",
-                costType != null ? costType : "ALL",
-                sourceType != null ? sourceType : "ALL",
-                costStatus != null ? costStatus : "ALL",
-                startDate, endDate,
-                keyword != null ? keyword : "ALL",
-                pageNo);
+        log.info("cost ledger query request: pageNo={}", pageNo);
         LambdaQueryWrapper<CostItem> wrapper = buildFilterWrapper(
                 projectId, contractId, partnerId, costSubjectId,
                 costType, sourceType, costStatus,

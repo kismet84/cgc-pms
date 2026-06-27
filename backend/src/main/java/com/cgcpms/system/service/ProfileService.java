@@ -61,7 +61,7 @@ public class ProfileService {
 
         if (changed) {
             sysUserMapper.updateById(user);
-            log.info("User {} updated profile", user.getUsername());
+            log.info("用户资料更新完成");
         }
 
         return buildUserInfo(user);
@@ -90,7 +90,7 @@ public class ProfileService {
         update.setId(userId);
         update.setPassword(encoded);
         sysUserMapper.updateById(update);
-        log.info("User changed password successfully");
+        log.info("用户密码更新完成");
     }
 
     /**

@@ -43,8 +43,8 @@ public class TokenBlacklistService {
             redisTemplate.opsForValue().set(key, "1", Duration.ofMillis(ttlMillis));
             log.debug("Token blacklisted with TTL: {}ms", ttlMillis);
         } catch (RuntimeException e) {
-            log.warn("TOKEN_BLACKLIST_WRITE_FAILED: Redis不可用，令牌黑名单写入失败, ttl={}ms, token_prefix={}",
-                    ttlMillis, token.length() > 20 ? token.substring(0, 20) + "..." : token, e);
+            log.warn("TOKEN_BLACKLIST_WRITE_FAILED: Redis不可用，令牌黑名单写入失败, ttl={}ms",
+                    ttlMillis, e);
         }
     }
 
@@ -60,8 +60,7 @@ public class TokenBlacklistService {
         try {
             return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + tokenKey(token)));
         } catch (RuntimeException e) {
-            log.warn("TOKEN_BLACKLIST_CHECK_FAILED: Redis不可用，黑名单检查回退为拒绝（fail-close），token_prefix={}",
-                    token.length() > 20 ? token.substring(0, 20) + "..." : token, e);
+            log.warn("TOKEN_BLACKLIST_CHECK_FAILED: Redis不可用，黑名单检查回退为拒绝（fail-close）", e);
             return true;
         }
     }

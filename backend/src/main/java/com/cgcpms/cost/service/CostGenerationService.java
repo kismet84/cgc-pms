@@ -40,7 +40,7 @@ public class CostGenerationService {
                         CostGenerationStrategy::supportSourceType,
                         Function.identity()
                 ));
-        log.info("成本生成策略已注册: {}", strategyMap.keySet());
+        log.info("成本生成策略完成初始化");
     }
 
     /**

@@ -38,7 +38,11 @@ import java.util.List;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final List<String> SKIP_PATHS = List.of(SecurityConfig.WHITELIST_PATHS);
+    private static final List<String> SKIP_PATHS = List.of(
+            SecurityConfig.AUTH_WHITELIST_PATHS,
+            SecurityConfig.DOC_WHITELIST_PATHS,
+            SecurityConfig.HEALTH_WHITELIST_PATHS
+    ).stream().flatMap(java.util.Arrays::stream).toList();
 
     private final JwtUtils jwtUtils;
     private final JwtProperties jwtProperties;
@@ -91,10 +95,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Check blacklist
         TokenBlacklistService blacklistService = tokenBlacklistServiceProvider.getIfAvailable();
         if (blacklistService == null) {
-            log.warn("BLACKLIST_UNAVAILABLE: TokenBlacklistService 不可用（Redis 未配置），黑名单保护缺失，令牌仅依赖过期时间校验");
+            log.warn("BLACKLIST_UNAVAILABLE: TokenBlacklistService 不可用（Redis 未配置），黑名单保护缺失");
         } else if (blacklistService.isBlacklisted(token)) {
-            log.warn("BLACKLISTED_TOKEN: 已黑名单令牌尝试访问, token_prefix={}",
-                    token.length() > 20 ? token.substring(0, 20) + "..." : token);
+            log.warn("BLACKLISTED_TOKEN: 已黑名单令牌尝试访问");
             writeUnauthorized(response);
             return;
         }

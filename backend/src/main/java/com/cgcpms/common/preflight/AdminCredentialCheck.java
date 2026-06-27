@@ -38,11 +38,8 @@ public class AdminCredentialCheck {
         if (count > 0) {
             log.error("=".repeat(72));
             log.error("安全阻断：检测到固定管理员凭据 (admin/admin123)");
-            log.error("生产环境禁止使用默认管理员密码启动。");
-            log.error("处置步骤：");
-            log.error("  1. 登录数据库执行: UPDATE sys_user SET password=<新密码BCrypt哈希> WHERE username='admin'");
-            log.error("  2. 或删除固定管理员: DELETE FROM sys_user_role WHERE user_id=1; DELETE FROM sys_user WHERE id=1 AND username='admin'");
-            log.error("  3. 通过安全初始化流程创建新的管理员账号");
+            log.error("生产环境禁止使用默认管理员口令启动，阻断成功。");
+            log.error("请立即在生产系统中重置 admin 账号口令，并审计初始化凭据流转。");
             log.error("=".repeat(72));
             throw new IllegalStateException(
                     "生产环境拒绝启动：检测到固定管理员凭据。请参阅日志中的处置步骤。");

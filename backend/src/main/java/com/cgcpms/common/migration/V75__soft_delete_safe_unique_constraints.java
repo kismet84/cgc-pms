@@ -1,9 +1,9 @@
 package com.cgcpms.common.migration;
 
-import java.sql.Statement;
-
 import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
+
+import java.sql.PreparedStatement;
 
 /**
  * V75: 将 19 个表的唯一约束全部加入 deleted_flag（软删除安全）。
@@ -50,8 +50,8 @@ public class V75__soft_delete_safe_unique_constraints extends BaseJavaMigration 
         }
 
         // stl_settlement 特殊处理: 有多余的 named index
-        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
-            st.execute("DROP INDEX IF EXISTS uk_stl_settlement_contract");
+        try (PreparedStatement st = conn.prepareStatement("DROP INDEX IF EXISTS uk_stl_settlement_contract")) { // SQL-SAFETY: migration-ddl
+            st.execute();
         }
         H2SoftDeleteUniqueMigration.rebuildUniqueConstraints(conn, "stl_settlement",
             "ALTER TABLE stl_settlement ADD UNIQUE KEY uk_stl_settlement_code_del (tenant_id, settlement_code, deleted_flag)",
@@ -59,9 +59,12 @@ public class V75__soft_delete_safe_unique_constraints extends BaseJavaMigration 
         );
 
         // pay_record: named UNIQUE INDEX
-        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
-            st.execute("DROP INDEX IF EXISTS uk_external_txn_no");
-            st.execute("CREATE UNIQUE INDEX uk_external_txn_no ON pay_record(external_txn_no, deleted_flag)");
+        try (PreparedStatement st = conn.prepareStatement("DROP INDEX IF EXISTS uk_external_txn_no")) { // SQL-SAFETY: migration-ddl
+            st.execute();
+        }
+        try (PreparedStatement st = conn.prepareStatement(
+                "CREATE UNIQUE INDEX uk_external_txn_no ON pay_record(external_txn_no, deleted_flag)")) { // SQL-SAFETY: migration-ddl
+            st.execute();
         }
     }
 }

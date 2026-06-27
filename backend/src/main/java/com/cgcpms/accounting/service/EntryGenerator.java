@@ -42,7 +42,7 @@ public class EntryGenerator {
                 .collect(Collectors.toMap(
                         EntryGenerationStrategy::supportSourceType,
                         Function.identity()));
-        log.info("会计凭证策略已注册: {}", strategyMap.keySet());
+        log.info("会计凭证策略完成初始化");
     }
 
     /**

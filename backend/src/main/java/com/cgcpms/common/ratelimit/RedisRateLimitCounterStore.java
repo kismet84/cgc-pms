@@ -28,7 +28,7 @@ public class RedisRateLimitCounterStore implements RateLimitCounterStore {
     public long increment(String key, int windowSeconds) {
         Long count = redisTemplate.opsForValue().increment(key);
         if (count == null) {
-            log.error("Redis INCR returned null for key={}, falling back to reject", key);
+            log.error("Redis INCR returned null for rate-limit counter; fall back to fail-close");
             return Long.MAX_VALUE;
         }
         // Set TTL only when the key was freshly created (count == 1)

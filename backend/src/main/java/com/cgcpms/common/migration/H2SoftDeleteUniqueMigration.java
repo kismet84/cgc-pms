@@ -3,11 +3,12 @@ package com.cgcpms.common.migration;
 import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * H2 软删除安全唯一约束 — Java 迁移基类。
@@ -44,55 +45,78 @@ public abstract class H2SoftDeleteUniqueMigration extends BaseJavaMigration {
     /**
      * 收集并删除指定表的所有 UNIQUE 约束/索引，然后执行给定的重建 SQL。
      *
-     * @param conn    JDBC 连接
+     * @param conn     JDBC 连接
      * @param tableName 表名（大小写不敏感，将转为大写匹配）
-     * @param addSqls   重建约束/索引的 DDL 语句
+     * @param addSqls  重建约束/索引的 DDL 语句
      */
     protected static void rebuildUniqueConstraints(java.sql.Connection conn, String tableName, String... addSqls) throws SQLException {
-        String upper = tableName.toUpperCase();
+        validateIdentifier(tableName);
+        String upper = tableName.toUpperCase(Locale.ROOT);
         List<String> names = new ArrayList<>();
+        String quotedTable = quoteIdentifier(tableName);
 
-        try (Statement st = conn.createStatement(); // SQL-SAFETY: migration-ddl
-             ResultSet rs = st.executeQuery(
-                 "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS " +
-                 "WHERE UPPER(CONSTRAINT_SCHEMA)='PUBLIC' AND UPPER(TABLE_NAME)='" + upper + "' " +
-                 "AND CONSTRAINT_TYPE = 'UNIQUE'")) {
-            while (rs.next()) {
-                String name = rs.getString(1);
-                if (!names.contains(name)) {
-                    names.add(name);
-                }
-            }
-        }
-
-        try (Statement st = conn.createStatement(); // SQL-SAFETY: migration-ddl
-             ResultSet rs = st.executeQuery(
-                 "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES " +
-                 "WHERE UPPER(TABLE_SCHEMA)='PUBLIC' AND UPPER(TABLE_NAME)='" + upper + "' " +
-                 "AND INDEX_TYPE_NAME = 'UNIQUE INDEX'")) {
-            while (rs.next()) {
-                String name = rs.getString(1);
-                if (!names.contains(name)) {
-                    names.add(name);
-                }
-            }
-        }
-
-        try (Statement st = conn.createStatement()) { // SQL-SAFETY: migration-ddl
-            for (String name : names) {
-                try {
-                    st.execute("ALTER TABLE " + tableName + " DROP CONSTRAINT \"" + name + "\"");
-                } catch (SQLException ignored) {
-                    try {
-                        st.execute("DROP INDEX \"" + name + "\"");
-                    } catch (SQLException ignoredAgain) {
-                        // If both forms fail, continue — the add SQL below will surface any remaining issue.
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS " +
+                        "WHERE UPPER(CONSTRAINT_SCHEMA)='PUBLIC' AND UPPER(TABLE_NAME)=? " +
+                        "AND CONSTRAINT_TYPE = 'UNIQUE'")) { // SQL-SAFETY: migration-ddl
+            ps.setString(1, upper);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String name = rs.getString(1);
+                    if (name != null && !name.isBlank() && !names.contains(name)) {
+                        names.add(name);
                     }
                 }
             }
-            for (String sql : addSqls) {
-                st.execute(sql);
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES " +
+                        "WHERE UPPER(TABLE_SCHEMA)='PUBLIC' AND UPPER(TABLE_NAME)=? " +
+                        "AND INDEX_TYPE_NAME = 'UNIQUE INDEX'")) { // SQL-SAFETY: migration-ddl
+            ps.setString(1, upper);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String name = rs.getString(1);
+                    if (name != null && !name.isBlank() && !names.contains(name)) {
+                        names.add(name);
+                    }
+                }
             }
+        }
+
+        for (String name : names) {
+            validateIdentifier(name);
+            String quotedName = quoteIdentifier(name);
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "ALTER TABLE " + quotedTable + " DROP CONSTRAINT " + quotedName)) { // SQL-SAFETY: migration-ddl
+                ps.execute();
+            } catch (SQLException ignored) {
+                try (PreparedStatement ps = conn.prepareStatement("DROP INDEX " + quotedName)) { // SQL-SAFETY: migration-ddl
+                    ps.execute();
+                } catch (SQLException ignoredAgain) {
+                    // If both forms fail, continue — the add SQL below will surface any remaining issue.
+                }
+            }
+        }
+
+        for (String sql : addSqls) {
+            if (sql == null || sql.isBlank()) {
+                continue;
+            }
+            try (PreparedStatement ps = conn.prepareStatement(sql)) { // SQL-SAFETY: migration-ddl
+                ps.execute();
+            }
+        }
+    }
+
+    private static String quoteIdentifier(String identifier) {
+        return "\"" + identifier.replace("\"", "\"\"") + "\"";
+    }
+
+    private static void validateIdentifier(String value) throws SQLException {
+        if (value == null || value.isBlank()) {
+            throw new SQLException("Invalid identifier");
         }
     }
 }
