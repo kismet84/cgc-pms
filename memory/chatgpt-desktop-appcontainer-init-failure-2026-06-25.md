@@ -1,1 +1,0 @@
-- ChatGPT Desktop 在 Win11 25H2 预览版上出现 AppContainer 初始化失败：包状态正常，但 AppsFolder/直接 exe 启动都失败，建议优先按兼容性问题处理。
