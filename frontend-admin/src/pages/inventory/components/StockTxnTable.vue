@@ -8,8 +8,6 @@ import {
   getSourceTypeColor,
   getSourceTypeLabel,
 } from '../composables/useStockLedger'
-import { ColumnSettingsButton } from '@/components/list-page'
-import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const props = defineProps<{
   txnList: MatStockTxnVO[]
@@ -18,13 +16,7 @@ const props = defineProps<{
   fmtQty: (val: string | number) => string
 }>()
 
-const gridColumnsSource = computed(() => props.gridColumns)
-const {
-  visibleColumns: visibleGridColumns,
-  columnSettings,
-  colVisible,
-  toggleCol,
-} = useColumnSettings('stock_txn_cols', gridColumnsSource)
+const visibleGridColumns = computed(() => props.gridColumns)
 
 const emit = defineEmits<{
   sortChange: [params: { field: string; order: 'asc' | 'desc' | null }]
@@ -34,10 +26,6 @@ const emit = defineEmits<{
 
 <template>
   <div class="lg-table-wrap">
-    <div class="stock-txn-header">
-      <span>出入库流水</span>
-      <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
-    </div>
     <vxe-grid
       :data="txnList"
       :columns="visibleGridColumns"
@@ -102,16 +90,3 @@ const emit = defineEmits<{
     </vxe-grid>
   </div>
 </template>
-
-<style scoped>
-.stock-txn-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px 0;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 600;
-}
-</style>

@@ -221,7 +221,12 @@ function kpiPct(value: number, max: number): number {
 
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
-  { field: 'settlementCode', title: '结算编号', minWidth: 160, ellipsis: true },
+  {
+    field: 'settlementCode',
+    title: '结算编号',
+    minWidth: 160,
+    slots: { default: 'settlementCode' },
+  },
   { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
   { field: 'contractName', title: '合同', minWidth: 150, ellipsis: true },
   {
@@ -246,7 +251,11 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('settlement_list_cols', gridColumns)
+} = useColumnSettings('settlement_list_cols_v2', gridColumns)
+
+if (!localStorage.getItem('settlement_list_cols_v2')) {
+  colVisible.createdAt = false
+}
 
 // ---- Mobile detection ----
 const MOBILE_BP = 768
@@ -474,6 +483,11 @@ function rowSettlementAmount(row: SettlementVO): string {
               border="inner"
               size="small"
             >
+              <template #settlementCode="{ row }">
+                <a-button class="settlement-code-link" type="link" @click="handleView(row)">
+                  {{ row.settlementCode || '-' }}
+                </a-button>
+              </template>
               <template #settlementAmount="{ row }">
                 <span>{{ fmtWan(rowSettlementAmount(row)) }}</span>
               </template>

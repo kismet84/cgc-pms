@@ -1,9 +1,26 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { MoreOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import {
+  BankOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SafetyCertificateOutlined,
+  SearchOutlined,
+  TeamOutlined,
+  WarningOutlined,
+} from '@ant-design/icons-vue'
 import { getDictDataByCode } from '@/api/modules/dict'
-import { getPartnerList, createPartner, updatePartner, deletePartner } from '@/api/modules/partner'
+import {
+  getPartnerList,
+  getPartnerDetail,
+  createPartner,
+  updatePartner,
+  deletePartner,
+} from '@/api/modules/partner'
 import type { PartnerVO } from '@/types/partner'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
@@ -25,6 +42,9 @@ const modalVisible = ref(false)
 const modalTitle = ref('新建合作方')
 const editingId = ref<string | null>(null)
 const formLoading = ref(false)
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detailPartner = ref<PartnerVO | null>(null)
 const formData = reactive<Partial<PartnerVO>>({
   partnerCode: '',
   partnerName: '',
@@ -95,7 +115,13 @@ const RISK_LABEL: Record<string, string> = {
 }
 
 const gridColumns = computed(() => [
-  { field: 'partnerCode', title: '合作方编号', minWidth: 140, ellipsis: true },
+  {
+    field: 'partnerCode',
+    title: '合作方编号',
+    minWidth: 150,
+    ellipsis: true,
+    slots: { default: 'partnerCode' },
+  },
   { field: 'partnerName', title: '合作方名称', minWidth: 180, ellipsis: true },
   { field: 'partnerType', title: '类型', width: 80, slots: { default: 'partnerType' } },
   { field: 'contactName', title: '联系人', minWidth: 90 },
@@ -112,12 +138,20 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('partner_list_cols', gridColumns)
+} = useColumnSettings('partner_list_cols_v2', gridColumns)
+
+if (!localStorage.getItem('partner_list_cols_v2')) {
+  colVisible.partnerType = false
+  colVisible.qualificationLevel = false
+  colVisible.blacklistFlag = false
+  colVisible.riskLevel = false
+}
 
 const partnerStats = computed(() => ({
   total: total.value,
   partyA: tableData.value.filter((item) => item.partnerType === 'PARTY_A').length,
   partyB: tableData.value.filter((item) => item.partnerType === 'PARTY_B').length,
+  enabled: tableData.value.filter((item) => item.status === 'ENABLE').length,
   risk: tableData.value.filter((item) => item.riskLevel === 'HIGH' || item.blacklistFlag).length,
 }))
 
@@ -131,6 +165,26 @@ const partnerTypeSummary = computed(() =>
 )
 
 const recentPartners = computed(() => tableData.value.slice(0, 4))
+
+const partnerStatusSummary = computed(() => [
+  {
+    key: 'ENABLE',
+    label: '启用',
+    count: tableData.value.filter((item) => item.status === 'ENABLE').length,
+    color: '#31c48d',
+  },
+  {
+    key: 'DISABLE',
+    label: '禁用',
+    count: tableData.value.filter((item) => item.status === 'DISABLE').length,
+    color: '#94a3b8',
+  },
+])
+
+function summaryPct(value: number): number {
+  const base = tableData.value.length || 1
+  return Math.round((value / base) * 100)
+}
 
 async function fetchData() {
   loading.value = true
@@ -147,7 +201,7 @@ async function fetchData() {
     tableData.value.sort((a, b) =>
       a.partnerType === 'PARTY_A' ? -1 : b.partnerType === 'PARTY_A' ? 1 : 0,
     )
-    total.value = res.total
+    total.value = Number(res.total ?? 0)
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -199,6 +253,20 @@ function handleAdd() {
     status: 'ENABLE',
   })
   modalVisible.value = true
+}
+
+async function handleView(record: PartnerVO) {
+  detailPartner.value = record
+  detailVisible.value = true
+  detailLoading.value = true
+  try {
+    detailPartner.value = await getPartnerDetail(record.id)
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载合作方详情失败')
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 function handleEdit(record: PartnerVO) {
@@ -284,17 +352,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+  <div class="lg-list-page lg-page app-page partner-page">
+    <div class="lg-page-head partner-page-head">
+      <div class="partner-page-meta-row">
+        <a-breadcrumb class="partner-breadcrumb">
           <a-breadcrumb-item>合作方管理</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="partner-page-subtitle"
+          >维护甲方、乙方与供应商基础信息，跟踪资质、状态与风险</span
+        >
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <div class="lg-search-bar">
+    <div class="lg-search-bar partner-search-bar">
       <a-input
         v-model:value="filter.partnerName"
         placeholder="搜索合作方名称…"
@@ -313,42 +384,52 @@ onMounted(() => {
 
     <div class="lg-grid">
       <div class="lg-left">
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">合作方总数</span>
-            <span class="lg-kpi-card-value">{{ partnerStats.total }} <small>个</small></span>
+        <div class="partner-kpi-summary" aria-label="合作方关键指标">
+          <div class="partner-kpi-item">
+            <span class="partner-kpi-icon is-blue"><TeamOutlined /></span>
+            <span class="partner-kpi-label">合作方总数</span>
+            <strong>{{ partnerStats.total }} <small>个</small></strong>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">甲方单位</span>
-            <span class="lg-kpi-card-value">{{ partnerStats.partyA }} <small>个</small></span>
+          <div class="partner-kpi-item">
+            <span class="partner-kpi-icon is-cyan"><BankOutlined /></span>
+            <span class="partner-kpi-label">甲方单位</span>
+            <strong>{{ partnerStats.partyA }} <small>个</small></strong>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">乙方单位</span>
-            <span class="lg-kpi-card-value">{{ partnerStats.partyB }} <small>个</small></span>
+          <div class="partner-kpi-item">
+            <span class="partner-kpi-icon is-green"><SafetyCertificateOutlined /></span>
+            <span class="partner-kpi-label">乙方单位</span>
+            <strong>{{ partnerStats.partyB }} <small>个</small></strong>
           </div>
-          <div class="lg-kpi-card is-warn">
-            <span class="lg-kpi-card-label">风险合作方</span>
-            <span class="lg-kpi-card-value">{{ partnerStats.risk }} <small>个</small></span>
+          <div class="partner-kpi-item">
+            <span class="partner-kpi-icon is-purple"><CheckCircleOutlined /></span>
+            <span class="partner-kpi-label">启用合作方</span>
+            <strong>{{ partnerStats.enabled }} <small>个</small></strong>
+          </div>
+          <div class="partner-kpi-item">
+            <span class="partner-kpi-icon is-red"><WarningOutlined /></span>
+            <span class="partner-kpi-label">风险合作方</span>
+            <strong>{{ partnerStats.risk }} <small>个</small></strong>
           </div>
         </div>
 
         <main class="lg-list-table-panel">
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
+              <span class="partner-table-title">合作方列表</span>
+              <span class="partner-table-count">共 {{ total }} 条</span>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-button type="primary" @click="handleAdd">
                 <template #icon><PlusOutlined /></template>
                 新建合作方
               </a-button>
               <a-button @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
+                刷新
               </a-button>
-            </div>
-            <div class="lg-toolbar-right">
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
             </div>
           </div>
 
@@ -363,6 +444,11 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #partnerCode="{ row }">
+                <a-button class="partner-code-link" type="link" @click="handleView(row)">
+                  {{ row.partnerCode || '-' }}
+                </a-button>
+              </template>
               <template #partnerType="{ row }">
                 <a-tag :color="partnerTypeColor(row.partnerType)">
                   {{ partnerTypeLabel(row.partnerType) }}
@@ -415,27 +501,60 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">合作方类型分布</div>
-          <div class="lg-type-list">
-            <div v-for="item in partnerTypeSummary" :key="item.key" class="lg-type-row">
+      <aside class="lg-analysis-rail partner-analysis-rail" aria-label="合作方辅助分析">
+        <div class="partner-analysis-panel">
+          <header class="partner-analysis-head">
+            <div>
+              <div class="partner-analysis-title">合作方分析</div>
+              <div class="partner-analysis-subtitle">类型、状态与近期维护</div>
+            </div>
+          </header>
+          <section class="partner-analysis-section">
+            <div class="partner-section-title">合作方类型分布</div>
+            <div>
+              <div v-for="item in partnerTypeSummary" :key="item.key" class="lg-type-row">
+                <span class="lg-type-dot" :style="{ background: item.color }"></span>
+                <span class="lg-type-label">{{ item.label }}</span>
+                <span class="lg-type-bar-wrap">
+                  <span
+                    class="lg-type-bar"
+                    :style="{ width: summaryPct(item.count) + '%', background: item.color }"
+                  ></span>
+                </span>
+                <span class="lg-type-num">{{ item.count }}</span>
+                <span class="lg-type-pct">{{ summaryPct(item.count) }}%</span>
+              </div>
+            </div>
+          </section>
+          <section class="partner-analysis-section">
+            <div class="partner-section-title">合作方状态</div>
+            <div v-for="item in partnerStatusSummary" :key="item.key" class="lg-type-row">
               <span class="lg-type-dot" :style="{ background: item.color }"></span>
               <span class="lg-type-label">{{ item.label }}</span>
-              <span style="margin-left: auto">{{ item.count }} 个</span>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: summaryPct(item.count) + '%', background: item.color }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ summaryPct(item.count) }}%</span>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">近期合作方</div>
-          <div class="lg-type-list">
-            <div v-for="item in recentPartners" :key="item.id" class="lg-type-row">
-              <span class="lg-type-dot" style="background: #1890ff"></span>
-              <span class="lg-type-label">{{ item.partnerName }}</span>
+          </section>
+          <section class="partner-analysis-section">
+            <div class="partner-section-title">近期合作方</div>
+            <div>
+              <div v-for="item in recentPartners" :key="item.id" class="lg-type-row">
+                <span class="lg-type-dot" style="background: #2563eb"></span>
+                <span class="lg-type-label">{{ item.partnerName }}</span>
+                <span class="lg-type-bar-wrap"></span>
+                <span class="lg-type-num"><ClockCircleOutlined /></span>
+                <span class="lg-type-pct"></span>
+              </div>
+              <div v-if="!recentPartners.length" class="lg-warning-empty">暂无合作方</div>
             </div>
-            <div v-if="!recentPartners.length" class="lg-warning-empty">暂无合作方</div>
-          </div>
-        </section>
+          </section>
+        </div>
       </aside>
     </div>
 
@@ -448,11 +567,12 @@ onMounted(() => {
       class="lg-modal-form"
       ok-text="保存"
       cancel-text="取消"
-      width="640px"
+      width="800px"
+      wrap-class-name="compact-partner-modal"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
     >
-      <a-form>
+      <a-form size="small" :label-col="{ span: 6 }" :wrapper-col="{ span: 17 }">
         <a-form-item label="合作方名称" required>
           <a-input v-model:value="formData.partnerName" placeholder="请输入合作方名称" />
         </a-form-item>
@@ -506,12 +626,279 @@ onMounted(() => {
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="detailVisible"
+      title="合作方详情"
+      :footer="null"
+      :width="800"
+      wrap-class-name="compact-partner-detail-modal"
+    >
+      <a-spin :spinning="detailLoading">
+        <a-descriptions
+          v-if="detailPartner"
+          bordered
+          size="small"
+          :column="2"
+          class="partner-detail-descriptions"
+        >
+          <a-descriptions-item label="合作方编号">
+            {{ detailPartner.partnerCode || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="合作方名称">
+            {{ detailPartner.partnerName || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="合作方类型">
+            <a-tag :color="partnerTypeColor(detailPartner.partnerType)">
+              {{ partnerTypeLabel(detailPartner.partnerType) }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="状态">
+            <a-tag :color="detailPartner.status === 'ENABLE' ? 'success' : 'default'">
+              {{ detailPartner.status === 'ENABLE' ? '启用' : '禁用' }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="统一信用代码">
+            {{ detailPartner.creditCode || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="法人代表">
+            {{ detailPartner.legalPerson || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="联系人">
+            {{ detailPartner.contactName || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="联系电话">
+            {{ detailPartner.contactPhone || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="开户银行">
+            {{ detailPartner.bankName || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="银行账号">
+            {{ detailPartner.bankAccount || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="资质等级">
+            {{ detailPartner.qualificationLevel || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="风险等级">
+            <a-tag v-if="detailPartner.riskLevel" :color="RISK_COLOR[detailPartner.riskLevel]">
+              {{ RISK_LABEL[detailPartner.riskLevel] ?? detailPartner.riskLevel }}
+            </a-tag>
+            <span v-else>-</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="黑名单">
+            <a-tag v-if="detailPartner.blacklistFlag" color="error">黑名单</a-tag>
+            <span v-else>-</span>
+          </a-descriptions-item>
+          <a-descriptions-item label="创建时间">
+            {{ detailPartner.createdAt || '-' }}
+          </a-descriptions-item>
+        </a-descriptions>
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
 <style scoped>
-/* 页面专属样式 — 其余已由 lg-* 全局类覆盖 */
 .lg-none {
   color: var(--muted);
+}
+
+.partner-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  margin-bottom: 7px;
+  padding: 0;
+}
+
+.partner-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.partner-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.partner-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.partner-search-bar {
+  margin-top: 21px;
+  min-height: 74px;
+}
+
+.partner-page .lg-grid {
+  margin-top: 14px;
+}
+
+.partner-kpi-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  height: 88px;
+  min-height: 88px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.partner-kpi-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 20px 30px;
+  column-gap: 10px;
+  align-content: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.partner-kpi-item:last-child {
+  border-right: 0;
+}
+
+.partner-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.partner-kpi-icon.is-blue {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.partner-kpi-icon.is-cyan {
+  color: #0891b2;
+  background: #ecfeff;
+}
+.partner-kpi-icon.is-green {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.partner-kpi-icon.is-purple {
+  color: #7c3aed;
+  background: #f3e8ff;
+}
+.partner-kpi-icon.is-red {
+  color: var(--error);
+  background: var(--error-soft);
+}
+
+.partner-kpi-label,
+.partner-table-count,
+.partner-analysis-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.partner-kpi-item strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.partner-kpi-item small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.partner-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.partner-code-link {
+  height: auto;
+  padding: 0;
+  font-weight: 700;
+}
+
+.partner-analysis-rail {
+  width: 336px;
+}
+
+.partner-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 856px;
+  min-height: 856px;
+  box-sizing: border-box;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.partner-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.partner-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.partner-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.partner-analysis-section :deep(.lg-type-row),
+.partner-analysis-section .lg-type-row {
+  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
+}
+
+:global(.compact-partner-modal .ant-modal-body) {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-top: 14px;
+  padding-bottom: 8px;
+}
+
+:global(.compact-partner-modal .ant-form-item) {
+  margin-bottom: 10px;
+}
+
+:global(.compact-partner-detail-modal .ant-modal-body) {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+
+.partner-detail-descriptions :deep(.ant-descriptions-item-label) {
+  width: 116px;
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 </style>

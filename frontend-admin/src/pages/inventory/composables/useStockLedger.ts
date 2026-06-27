@@ -173,7 +173,7 @@ export function useStockLedger() {
       stock.value = res.stock
       if (res.txns) {
         txnList.value = res.txns.records ?? []
-        txnTotal.value = res.txns.total ?? 0
+        txnTotal.value = Number(res.txns.total ?? 0)
       } else {
         txnList.value = []
         txnTotal.value = 0

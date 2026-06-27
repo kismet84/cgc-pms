@@ -3910,3 +3910,17 @@ body,
 .ant-modal:not(.ant-modal-confirm) textarea.ant-input {
   min-height: 48px;
 }
+
+.vxe-table [class$='-code-link'].ant-btn-link {
+  height: auto;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 22px;
+  background: transparent;
+}
+
+.vxe-table [class$='-code-link'].ant-btn-link:hover,
+.vxe-table [class$='-code-link'].ant-btn-link:focus {
+  background: transparent;
+}

@@ -58,7 +58,7 @@ export function useReceiptList() {
   })
 
   const gridColumns = computed(() => [
-    { field: 'receiptCode', title: '验收单号', minWidth: 150, ellipsis: true },
+    { field: 'receiptCode', title: '验收单号', minWidth: 150, slots: { default: 'receiptCode' } },
     { field: 'orderCode', title: '采购订单', minWidth: 140, ellipsis: true },
     { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
     { field: 'partnerName', title: '供应商', minWidth: 140, ellipsis: true },

@@ -4,12 +4,17 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { MoreOutlined } from '@ant-design/icons-vue'
 import {
+  approveTask,
+  getInstanceDetail,
   getMyTodos,
   getMyDone,
   getMyCc,
+  rejectTask,
+  withdrawInstance,
   type WfTaskVO,
   type WfRecordVO,
   type WfCcVO,
+  type WfInstanceVO,
 } from '@/api/modules/workflow'
 import type { PageResult } from '@/types/api'
 import { ColumnSettingsButton } from '@/components/list-page'
@@ -28,12 +33,52 @@ const total = ref(0)
 const todoData = ref<WfTaskVO[]>([])
 const doneData = ref<WfRecordVO[]>([])
 const ccData = ref<WfCcVO[]>([])
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detail = ref<WfInstanceVO | null>(null)
+const actionLoading = ref(false)
+const approvalComment = ref('')
+const showApproveModal = ref(false)
+const showRejectModal = ref(false)
 
 const businessTypeMap: Record<string, string> = {
   CONTRACT_APPROVAL: '合同审批',
   PAY_REQUEST: '付款申请',
   VAR_ORDER: '签证变更',
   MAT_RECEIPT: '材料验收',
+}
+
+const statusMap: Record<string, { text: string; color: string }> = {
+  RUNNING: { text: '审批中', color: 'processing' },
+  APPROVED: { text: '已通过', color: 'success' },
+  REJECTED: { text: '已驳回', color: 'error' },
+  WITHDRAWN: { text: '已撤回', color: 'default' },
+}
+
+const actionNameMap: Record<string, string> = {
+  SUBMIT: '提交审批',
+  APPROVE: '同意',
+  REJECT: '驳回',
+  WITHDRAW: '撤回',
+  RESUBMIT: '重新提交',
+  TRANSFER: '转办',
+  ADD_SIGN: '加签',
+}
+
+const nodeStatusMap: Record<string, { text: string; color: string }> = {
+  WAITING: { text: '等待', color: 'default' },
+  ACTIVE: { text: '审批中', color: 'processing' },
+  COMPLETED: { text: '已完成', color: 'success' },
+  REJECTED: { text: '已驳回', color: 'error' },
+  SKIPPED: { text: '已跳过', color: 'default' },
+}
+
+const taskStatusMap: Record<string, { text: string; color: string }> = {
+  PENDING: { text: '待处理', color: 'processing' },
+  APPROVED: { text: '已同意', color: 'success' },
+  REJECTED: { text: '已驳回', color: 'error' },
+  CANCELLED: { text: '已取消', color: 'default' },
+  TRANSFERRED: { text: '已转办', color: 'warning' },
 }
 
 async function fetchData() {
@@ -44,15 +89,15 @@ async function fetchData() {
     if (activeTab.value === 'todo') {
       const res: PageResult<WfTaskVO> = await getMyTodos(params)
       todoData.value = res.records
-      total.value = res.total
+      total.value = Number(res.total ?? 0)
     } else if (activeTab.value === 'done') {
       const res: PageResult<WfRecordVO> = await getMyDone(params)
       doneData.value = res.records
-      total.value = res.total
+      total.value = Number(res.total ?? 0)
     } else {
       const res: PageResult<WfCcVO> = await getMyCc(params)
       ccData.value = res.records
-      total.value = res.total
+      total.value = Number(res.total ?? 0)
     }
   } catch (e: unknown) {
     console.error(e)
@@ -78,8 +123,17 @@ function handlePageChange(pno: number, psize: number) {
   fetchData()
 }
 
-function handleDetail(record: { instanceId: string }) {
-  router.push(`/approval/${record.instanceId}`)
+async function handleDetail(record: { instanceId: string }) {
+  detailVisible.value = true
+  detailLoading.value = true
+  try {
+    detail.value = await getInstanceDetail(record.instanceId)
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载审批详情失败')
+  } finally {
+    detailLoading.value = false
+  }
 }
 
 const gridColumns = computed(() => [
@@ -114,6 +168,106 @@ const approvalSummary = computed(() => [
   { label: '抄送我的', count: ccData.value.length, color: '#faad14' },
 ])
 const recentApprovals = computed(() => tableData.value.slice(0, 4))
+const detailNodes = computed(() => (Array.isArray(detail.value?.nodes) ? detail.value.nodes : []))
+const detailRecords = computed(() =>
+  Array.isArray(detail.value?.records) ? detail.value.records : [],
+)
+const completedNodeCount = computed(
+  () => detailNodes.value.filter((node) => node.nodeStatus === 'COMPLETED').length,
+)
+const availableActions = computed(() =>
+  Array.isArray(detail.value?.availableActions) ? detail.value.availableActions : [],
+)
+const isDetailRunning = computed(() => detail.value?.instanceStatus === 'RUNNING')
+
+function findMyPendingTask() {
+  const activeNode = detailNodes.value.find((node) => node.nodeStatus === 'ACTIVE')
+  const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
+  return tasks.find((task) => task.taskStatus === 'PENDING')
+}
+
+function openApproveModal() {
+  approvalComment.value = ''
+  showApproveModal.value = true
+}
+
+function openRejectModal() {
+  approvalComment.value = ''
+  showRejectModal.value = true
+}
+
+async function refreshDetail() {
+  if (!detail.value?.id) return
+  detail.value = await getInstanceDetail(detail.value.id)
+  fetchData()
+}
+
+async function handleApprove() {
+  const task = findMyPendingTask()
+  if (!task) {
+    message.error('未找到待处理任务')
+    return
+  }
+  actionLoading.value = true
+  try {
+    await approveTask(task.id, {
+      action: 'APPROVE',
+      comment: approvalComment.value,
+      idempotencyKey: `${task.id}-${Date.now()}`,
+    })
+    message.success('审批通过')
+    showApproveModal.value = false
+    await refreshDetail()
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('审批操作失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function handleReject() {
+  if (!approvalComment.value.trim()) {
+    message.warning('请输入驳回原因')
+    return
+  }
+  const task = findMyPendingTask()
+  if (!task) {
+    message.error('未找到待处理任务')
+    return
+  }
+  actionLoading.value = true
+  try {
+    await rejectTask(task.id, {
+      action: 'REJECT',
+      comment: approvalComment.value,
+      idempotencyKey: `${task.id}-${Date.now()}`,
+    })
+    message.success('已驳回')
+    showRejectModal.value = false
+    await refreshDetail()
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('审批操作失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
+
+async function handleWithdraw() {
+  if (!detail.value?.id) return
+  actionLoading.value = true
+  try {
+    await withdrawInstance(detail.value.id)
+    message.success('已撤回')
+    await refreshDetail()
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('撤回失败')
+  } finally {
+    actionLoading.value = false
+  }
+}
 
 function getTimeCol(record: Record<string, unknown>): string {
   if (activeTab.value === 'todo') return (record.receivedAt as string) ?? ''
@@ -264,7 +418,188 @@ watch(
         </div>
       </aside>
     </div>
+
+    <a-modal
+      v-model:open="detailVisible"
+      title="审批详情"
+      :footer="null"
+      :width="800"
+      wrap-class-name="approval-detail-modal"
+    >
+      <a-spin :spinning="detailLoading">
+        <div v-if="detail" class="approval-detail-content">
+          <div class="approval-detail-head">
+            <div>
+              <strong>{{ detail.title }}</strong>
+              <span>{{ businessTypeMap[detail.businessType] || detail.businessType }}</span>
+            </div>
+            <a-tag :color="statusMap[detail.instanceStatus]?.color">
+              {{ statusMap[detail.instanceStatus]?.text || detail.instanceStatus }}
+            </a-tag>
+          </div>
+
+          <a-descriptions bordered size="small" :column="2">
+            <a-descriptions-item label="审批标题">{{ detail.title }}</a-descriptions-item>
+            <a-descriptions-item label="模板名称">{{ detail.templateName }}</a-descriptions-item>
+            <a-descriptions-item label="发起人">{{ detail.initiatorName }}</a-descriptions-item>
+            <a-descriptions-item label="发起时间">{{ detail.startedAt }}</a-descriptions-item>
+            <a-descriptions-item v-if="detail.amount" label="金额">
+              {{ Number(detail.amount).toLocaleString('zh-CN') }} 元
+            </a-descriptions-item>
+            <a-descriptions-item label="当前轮次">
+              第 {{ detail.currentRound }} 轮
+            </a-descriptions-item>
+            <a-descriptions-item v-if="detail.businessSummary" label="业务摘要" :span="2">
+              {{ detail.businessSummary }}
+            </a-descriptions-item>
+          </a-descriptions>
+
+          <div v-if="availableActions.length > 0 && isDetailRunning" class="approval-actions">
+            <a-button
+              v-if="availableActions.includes('approve')"
+              type="primary"
+              :loading="actionLoading"
+              @click="openApproveModal"
+            >
+              同意
+            </a-button>
+            <a-button
+              v-if="availableActions.includes('reject')"
+              danger
+              :loading="actionLoading"
+              @click="openRejectModal"
+            >
+              驳回
+            </a-button>
+            <a-button
+              v-if="availableActions.includes('withdraw')"
+              :loading="actionLoading"
+              @click="handleWithdraw"
+            >
+              撤回
+            </a-button>
+          </div>
+
+          <section class="approval-detail-section">
+            <h3>审批流程</h3>
+            <a-steps :current="completedNodeCount" size="small" direction="vertical">
+              <a-step v-for="node in detailNodes" :key="node.id">
+                <template #title>
+                  {{ node.nodeName }}
+                  <a-tag :color="nodeStatusMap[node.nodeStatus]?.color">
+                    {{ nodeStatusMap[node.nodeStatus]?.text || node.nodeStatus }}
+                  </a-tag>
+                </template>
+                <template #description>
+                  <div v-if="Array.isArray(node.tasks)" class="approval-node-tasks">
+                    <span v-for="task in node.tasks" :key="task.id">
+                      {{ task.approverName }}
+                      <a-tag :color="taskStatusMap[task.taskStatus]?.color">
+                        {{ taskStatusMap[task.taskStatus]?.text || task.taskStatus }}
+                      </a-tag>
+                    </span>
+                  </div>
+                </template>
+              </a-step>
+            </a-steps>
+          </section>
+
+          <section class="approval-detail-section">
+            <h3>审批记录</h3>
+            <a-timeline>
+              <a-timeline-item v-for="record in detailRecords" :key="record.id">
+                <strong>{{ record.operatorName }}</strong>
+                <a-tag>{{ actionNameMap[record.actionType] || record.actionName }}</a-tag>
+                <p v-if="record.comment">{{ record.comment }}</p>
+                <small>{{ record.createdAt }}</small>
+              </a-timeline-item>
+            </a-timeline>
+            <div v-if="!detailRecords.length" class="lg-empty-text">暂无审批记录</div>
+          </section>
+        </div>
+      </a-spin>
+    </a-modal>
+
+    <a-modal
+      v-model:open="showApproveModal"
+      title="审批通过"
+      :confirm-loading="actionLoading"
+      @ok="handleApprove"
+    >
+      <a-textarea v-model:value="approvalComment" placeholder="审批意见（选填）" :rows="3" />
+    </a-modal>
+
+    <a-modal
+      v-model:open="showRejectModal"
+      title="驳回"
+      :confirm-loading="actionLoading"
+      @ok="handleReject"
+    >
+      <a-textarea v-model:value="approvalComment" placeholder="请输入驳回原因（必填）" :rows="3" />
+    </a-modal>
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.approval-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.approval-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.approval-detail-head > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.approval-detail-head strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.approval-detail-head span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 0 2px;
+}
+
+.approval-detail-section h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.approval-node-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.approval-detail-section p {
+  margin: 4px 0 2px;
+  color: var(--text-secondary);
+}
+
+.approval-detail-section small {
+  color: var(--muted);
+}
+
+:global(.approval-detail-modal .ant-modal-body) {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+</style>

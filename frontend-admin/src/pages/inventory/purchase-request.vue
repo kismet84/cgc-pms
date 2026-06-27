@@ -96,7 +96,7 @@ const filterOption = (input: string, option: { label?: string }) =>
   option.label?.toLowerCase().includes(input.toLowerCase())
 
 const gridColumns = computed(() => [
-  { field: 'requestCode', title: '申请编号', minWidth: 150, ellipsis: true },
+  { field: 'requestCode', title: '申请编号', minWidth: 150, slots: { default: 'requestCode' } },
   { field: 'projectName', title: '所属项目', minWidth: 150, ellipsis: true },
   { field: 'contractName', title: '关联合同', minWidth: 150, ellipsis: true },
   { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
@@ -111,7 +111,12 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('purchase_request_cols', gridColumns)
+} = useColumnSettings('purchase_request_cols_v2', gridColumns)
+
+if (!localStorage.getItem('purchase_request_cols_v2')) {
+  colVisible.createdBy = false
+  colVisible.createdTime = false
+}
 
 async function fetchData() {
   loading.value = true
@@ -202,6 +207,11 @@ async function handleEdit(record: PurchaseRequestVO) {
   }
   modalDirty.value = false
   modalVisible.value = true
+}
+
+async function handleView(record: PurchaseRequestVO) {
+  await handleEdit(record)
+  modalTitle.value = '查看采购申请'
 }
 
 async function loadContractsByProject(projectId?: string) {
@@ -616,6 +626,11 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #requestCode="{ row }">
+                <a-button class="purchase-request-code-link" type="link" @click="handleView(row)">
+                  {{ row.requestCode || '-' }}
+                </a-button>
+              </template>
               <template #approvalStatus="{ row }">
                 <ApprovalStatusTag :status="row.approvalStatus" />
               </template>

@@ -74,18 +74,22 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb class="cl-breadcrumb">
+  <div class="lg-list-page lg-page app-page stock-page">
+    <div class="lg-page-head stock-page-head">
+      <div class="stock-page-meta-row">
+        <a-breadcrumb class="stock-breadcrumb">
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>库存台账</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="stock-page-subtitle"
+          >按仓库和物料核对库存余额，追踪出入库流水与低库存风险</span
+        >
       </div>
     </div>
 
     <!-- 搜索栏 -->
     <StockSearchBar
+      class="stock-search-bar"
       :keyword="filter.keyword"
       :warehouse-id="filter.warehouseId"
       :material-id="filter.materialId"
@@ -137,8 +141,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <!-- 工具栏 -->
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
+              <span class="stock-table-title">出入库流水</span>
+              <span class="stock-table-count">共 {{ txnTotal }} 条</span>
               <a-dropdown v-if="!isMobile">
-                <a-button size="small">
+                <a-button>
                   <template #icon><SettingOutlined /></template>
                   列设置
                 </a-button>
@@ -164,6 +170,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </a-dropdown>
               <a-button @click="handleSearch">
                 <template #icon><ReloadOutlined /></template>
+                刷新
               </a-button>
             </div>
             <div class="lg-toolbar-right">
@@ -290,8 +297,50 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </template>
 
 <style scoped>
-.cl-breadcrumb {
-  margin-bottom: 5px;
+.stock-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  margin-bottom: 7px;
+  padding: 0;
+}
+
+.stock-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.stock-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.stock-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.stock-search-bar {
+  margin-top: 21px;
+  min-height: 74px;
+}
+
+.stock-page .lg-grid {
+  margin-top: 14px;
+}
+
+.stock-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.stock-table-count {
+  color: var(--text-secondary);
   font-size: 13px;
 }
 </style>

@@ -133,7 +133,7 @@ async function fetchTemplates() {
     }
     const res: PageResult<WfTemplateVO> = await getWorkflowTemplates(params)
     templates.value = res.records
-    total.value = res.total
+    total.value = Number(res.total ?? 0)
   } catch (e: unknown) {
     console.error(e)
     templates.value = []
@@ -494,11 +494,13 @@ onMounted(fetchTemplates)
       </div>
     </div>
 
-    <a-drawer
+    <a-modal
       v-model:open="drawerVisible"
-      width="920"
       title="编辑审批流程"
+      :width="800"
       :destroy-on-close="false"
+      :footer="null"
+      wrap-class-name="approval-process-detail-modal"
     >
       <template v-if="currentTemplate">
         <div class="process-section">
@@ -604,7 +606,7 @@ onMounted(fetchTemplates)
           </a-table>
         </div>
       </template>
-    </a-drawer>
+    </a-modal>
 
     <a-modal
       v-model:open="nodeModalVisible"
@@ -697,5 +699,10 @@ onMounted(fetchTemplates)
 .process-search-bar :deep(.ant-select-selector),
 .process-search-bar :deep(.ant-input) {
   height: 40px;
+}
+
+:global(.approval-process-detail-modal .ant-modal-body) {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
 }
 </style>

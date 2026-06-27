@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { SearchOutlined, ReloadOutlined, PlusOutlined, MoreOutlined } from '@ant-design/icons-vue'
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  DatabaseOutlined,
+  FolderOpenOutlined,
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  StopOutlined,
+} from '@ant-design/icons-vue'
 import {
   getWarehouseList,
   createWarehouse,
@@ -78,7 +88,7 @@ async function fetchData() {
       status: filter.status,
     })
     tableData.value = res.records
-    total.value = res.total
+    total.value = Number(res.total ?? 0)
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
@@ -193,7 +203,31 @@ function handleModalCancel() {
 const kpiWhTotal = computed(() => total.value)
 const kpiWhEnabled = computed(() => tableData.value.filter((r) => r.status === 'ENABLE').length)
 const kpiWhDisabled = computed(() => tableData.value.filter((r) => r.status === 'DISABLE').length)
+const kpiProjectCount = computed(
+  () => new Set(tableData.value.map((r) => r.projectId).filter(Boolean)).size,
+)
 const recentWarehouses = computed(() => tableData.value.slice(0, 4))
+
+const warehouseStatusSummary = computed(() => [
+  { key: 'ENABLE', label: '启用仓库', count: kpiWhEnabled.value, color: '#31c48d' },
+  { key: 'DISABLE', label: '停用仓库', count: kpiWhDisabled.value, color: '#ef4444' },
+])
+
+const projectSummary = computed(() => {
+  const counts = tableData.value.reduce<Record<string, number>>((acc, item) => {
+    const key = item.projectName || '未关联项目'
+    acc[key] = (acc[key] || 0) + 1
+    return acc
+  }, {})
+  return Object.entries(counts)
+    .slice(0, 4)
+    .map(([name, count]) => ({ name, count }))
+})
+
+function summaryPct(value: number): number {
+  const base = tableData.value.length || 1
+  return Math.round((value / base) * 100)
+}
 
 onMounted(() => {
   referenceStore.fetchProjects()
@@ -202,19 +236,22 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
+  <div class="lg-list-page lg-page app-page warehouse-page">
     <!-- Page head -->
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+    <div class="lg-page-head warehouse-page-head">
+      <div class="warehouse-page-meta-row">
+        <a-breadcrumb class="warehouse-breadcrumb">
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>仓库</a-breadcrumb-item>
         </a-breadcrumb>
+        <span class="warehouse-page-subtitle"
+          >维护项目仓库基础信息，控制启停状态并支撑库存台账筛选</span
+        >
       </div>
     </div>
 
     <!-- 搜索栏 -->
-    <div class="lg-search-bar">
+    <div class="lg-search-bar warehouse-search-bar">
       <a-input
         v-model:value="filter.keyword"
         placeholder="搜索仓库编号、名称…"
@@ -224,6 +261,18 @@ onMounted(() => {
       >
         <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
       </a-input>
+      <a-select
+        v-model:value="filter.projectId"
+        placeholder="全部项目"
+        allow-clear
+        style="min-width: 220px"
+        size="large"
+        @change="handleSearch"
+      >
+        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+          {{ p.projectName }}
+        </a-select-option>
+      </a-select>
       <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
       <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
@@ -234,22 +283,31 @@ onMounted(() => {
     <div class="lg-grid">
       <div class="lg-left">
         <!-- KPI strip -->
-        <div class="lg-kpi-strip">
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">仓库总数</span>
-            <span class="lg-kpi-card-value">{{ kpiWhTotal }} <small>个</small></span>
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-total)"></span
-            ></span>
+        <div class="warehouse-kpi-summary" aria-label="仓库关键指标">
+          <div class="warehouse-kpi-item">
+            <span class="warehouse-kpi-icon is-blue"><DatabaseOutlined /></span>
+            <span class="warehouse-kpi-label">仓库总数</span>
+            <strong>{{ kpiWhTotal }} <small>个</small></strong>
           </div>
-          <div class="lg-kpi-card">
-            <span class="lg-kpi-card-label">启用仓库</span>
-            <span class="lg-kpi-card-value" style="color: #22c55e"
-              >{{ kpiWhEnabled }} <small>个</small></span
-            >
-            <span class="lg-kpi-card-bar"
-              ><span style="width: 100%; background: var(--kpi-paid)"></span
-            ></span>
+          <div class="warehouse-kpi-item">
+            <span class="warehouse-kpi-icon is-green"><CheckCircleOutlined /></span>
+            <span class="warehouse-kpi-label">启用仓库</span>
+            <strong>{{ kpiWhEnabled }} <small>个</small></strong>
+          </div>
+          <div class="warehouse-kpi-item">
+            <span class="warehouse-kpi-icon is-red"><StopOutlined /></span>
+            <span class="warehouse-kpi-label">停用仓库</span>
+            <strong>{{ kpiWhDisabled }} <small>个</small></strong>
+          </div>
+          <div class="warehouse-kpi-item">
+            <span class="warehouse-kpi-icon is-cyan"><FolderOpenOutlined /></span>
+            <span class="warehouse-kpi-label">关联项目</span>
+            <strong>{{ kpiProjectCount }} <small>个</small></strong>
+          </div>
+          <div class="warehouse-kpi-item">
+            <span class="warehouse-kpi-icon is-purple"><ClockCircleOutlined /></span>
+            <span class="warehouse-kpi-label">本页记录</span>
+            <strong>{{ tableData.length }} <small>条</small></strong>
           </div>
         </div>
 
@@ -257,32 +315,21 @@ onMounted(() => {
           <!-- 工具栏 -->
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
+              <span class="warehouse-table-title">仓库列表</span>
+              <span class="warehouse-table-count">共 {{ total }} 条</span>
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-button type="primary" @click="handleAdd">
                 <template #icon><PlusOutlined /></template>
                 新建仓库
               </a-button>
               <a-button @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
+                刷新
               </a-button>
-            </div>
-            <div class="lg-toolbar-right">
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部项目"
-                allow-clear
-                style="width: 160px"
-                size="small"
-                @change="handleSearch"
-              >
-                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
             </div>
           </div>
 
@@ -335,32 +382,59 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail">
-        <section class="lg-panel">
-          <div class="lg-panel-title">仓库状态分布</div>
-          <div class="lg-type-list">
-            <div class="lg-type-row">
-              <span class="lg-type-dot" style="background: #52c41a"></span>
-              <span class="lg-type-label">启用仓库</span>
-              <span style="margin-left: auto">{{ kpiWhEnabled }} 个</span>
+      <aside class="lg-analysis-rail warehouse-analysis-rail" aria-label="仓库辅助分析">
+        <div class="warehouse-analysis-panel">
+          <header class="warehouse-analysis-head">
+            <div>
+              <div class="warehouse-analysis-title">仓库分析</div>
+              <div class="warehouse-analysis-subtitle">状态、项目与近期维护</div>
             </div>
-            <div class="lg-type-row">
-              <span class="lg-type-dot" style="background: #ff4d4f"></span>
-              <span class="lg-type-label">停用仓库</span>
-              <span style="margin-left: auto">{{ kpiWhDisabled }} 个</span>
+          </header>
+          <section class="warehouse-analysis-section">
+            <div class="warehouse-section-title">仓库状态分布</div>
+            <div v-for="item in warehouseStatusSummary" :key="item.key" class="lg-type-row">
+              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-label">{{ item.label }}</span>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: summaryPct(item.count) + '%', background: item.color }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ summaryPct(item.count) }}%</span>
             </div>
-          </div>
-        </section>
-        <section class="lg-panel">
-          <div class="lg-panel-title">近期仓库</div>
-          <div class="lg-type-list">
-            <div v-for="item in recentWarehouses" :key="item.id" class="lg-type-row">
-              <span class="lg-type-dot" style="background: #1890ff"></span>
-              <span class="lg-type-label">{{ item.warehouseName }}</span>
+          </section>
+          <section class="warehouse-analysis-section">
+            <div class="warehouse-section-title">项目仓库分布</div>
+            <div v-for="item in projectSummary" :key="item.name" class="lg-type-row">
+              <span class="lg-type-dot" style="background: #2563eb"></span>
+              <span class="lg-type-label">{{ item.name }}</span>
+              <span class="lg-type-bar-wrap">
+                <span
+                  class="lg-type-bar"
+                  :style="{ width: summaryPct(item.count) + '%', background: '#2563eb' }"
+                ></span>
+              </span>
+              <span class="lg-type-num">{{ item.count }}</span>
+              <span class="lg-type-pct">{{ summaryPct(item.count) }}%</span>
             </div>
-            <div v-if="!recentWarehouses.length" class="lg-warning-empty">暂无仓库</div>
-          </div>
-        </section>
+            <div v-if="!projectSummary.length" class="lg-warning-empty">暂无项目仓库</div>
+          </section>
+          <section class="warehouse-analysis-section">
+            <div class="warehouse-section-title">近期仓库</div>
+            <div>
+              <div v-for="item in recentWarehouses" :key="item.id" class="lg-type-row">
+                <span class="lg-type-dot" style="background: #1890ff"></span>
+                <span class="lg-type-label">{{ item.warehouseName }}</span>
+                <span class="lg-type-bar-wrap"></span>
+                <span class="lg-type-num"><ClockCircleOutlined /></span>
+                <span class="lg-type-pct"></span>
+              </div>
+              <div v-if="!recentWarehouses.length" class="lg-warning-empty">暂无仓库</div>
+            </div>
+          </section>
+        </div>
       </aside>
     </div>
 
@@ -368,11 +442,12 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="560"
+      :width="800"
+      wrap-class-name="compact-warehouse-modal"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
     >
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
+      <a-form size="small" :label-col="{ span: 6 }" :wrapper-col="{ span: 17 }">
         <a-form-item label="所属项目" required>
           <a-select v-model:value="formData.projectId" placeholder="请选择项目">
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -404,4 +479,186 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.warehouse-page-head {
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  margin-bottom: 7px;
+  padding: 0;
+}
+
+.warehouse-page-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5em;
+  min-width: 0;
+}
+
+.warehouse-breadcrumb {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.warehouse-page-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.warehouse-search-bar {
+  margin-top: 21px;
+  min-height: 74px;
+}
+
+.warehouse-page .lg-grid {
+  margin-top: 14px;
+}
+
+.warehouse-kpi-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  height: 88px;
+  min-height: 88px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.warehouse-kpi-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 20px 30px;
+  column-gap: 10px;
+  align-content: center;
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.warehouse-kpi-item:last-child {
+  border-right: 0;
+}
+
+.warehouse-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  grid-row: 1 / span 2;
+}
+
+.warehouse-kpi-icon.is-blue {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+.warehouse-kpi-icon.is-green {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.warehouse-kpi-icon.is-red {
+  color: var(--error);
+  background: var(--error-soft);
+}
+.warehouse-kpi-icon.is-cyan {
+  color: #0891b2;
+  background: #ecfeff;
+}
+.warehouse-kpi-icon.is-purple {
+  color: #7c3aed;
+  background: #f3e8ff;
+}
+
+.warehouse-kpi-label,
+.warehouse-table-count,
+.warehouse-analysis-subtitle {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.warehouse-kpi-item strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warehouse-kpi-item small {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.warehouse-table-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.warehouse-analysis-rail {
+  width: 336px;
+}
+
+.warehouse-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  height: 856px;
+  min-height: 856px;
+  box-sizing: border-box;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.warehouse-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.warehouse-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.warehouse-section-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.warehouse-analysis-section :deep(.lg-type-row),
+.warehouse-analysis-section .lg-type-row {
+  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
+}
+
+:global(.compact-warehouse-modal .ant-modal-body) {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-top: 14px;
+  padding-bottom: 8px;
+}
+
+:global(.compact-warehouse-modal .ant-form-item) {
+  margin-bottom: 10px;
+}
+</style>

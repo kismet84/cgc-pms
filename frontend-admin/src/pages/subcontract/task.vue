@@ -90,7 +90,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 // ---- vxe-grid columns ----
 const gridColumns = computed(() => [
-  { field: 'taskCode', title: '任务编号', minWidth: 140, ellipsis: true },
+  { field: 'taskCode', title: '任务编号', minWidth: 150, slots: { default: 'taskCode' } },
   {
     field: 'taskName',
     title: '任务名称',
@@ -114,7 +114,12 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('subcontract_task_cols', gridColumns)
+} = useColumnSettings('subcontract_task_cols_v2', gridColumns)
+
+if (!localStorage.getItem('subcontract_task_cols_v2')) {
+  colVisible.plannedStartDate = false
+  colVisible.plannedEndDate = false
+}
 
 async function fetchData() {
   loading.value = true
@@ -206,6 +211,11 @@ function handleEdit(record: SubTaskVO) {
     remark: record.remark,
   })
   modalVisible.value = true
+}
+
+function handleView(record: SubTaskVO) {
+  handleEdit(record)
+  modalTitle.value = '查看分包任务'
 }
 
 function handleDelete(record: SubTaskVO) {
@@ -447,6 +457,11 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #taskCode="{ row }">
+                <a-button class="subcontract-task-code-link" type="link" @click="handleView(row)">
+                  {{ row.taskCode || '-' }}
+                </a-button>
+              </template>
               <template #taskName="{ row }">
                 <a class="lg-link">{{ row.taskName }}</a>
               </template>

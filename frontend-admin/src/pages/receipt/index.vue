@@ -50,7 +50,12 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('receipt_list_cols', gridColumns)
+} = useColumnSettings('receipt_list_cols_v2', gridColumns)
+
+if (!localStorage.getItem('receipt_list_cols_v2')) {
+  colVisible.receiptDate = false
+  colVisible.approvalStatus = false
+}
 
 const {
   modalVisible,
@@ -68,6 +73,11 @@ const {
   handleModalOk,
   handleModalCancel,
 } = useReceiptForm(fetchData, orderList)
+
+async function handleView(row: Parameters<typeof handleEdit>[0]) {
+  await handleEdit(row)
+  modalTitle.value = '查看材料验收'
+}
 
 const receiptStatusSummary = computed(() => [
   {
@@ -197,7 +207,7 @@ onMounted(() => {
     </div>
 
     <div class="lg-grid">
-      <div class="receipt-main-column">
+      <div class="lg-left receipt-main-column">
         <ReceiptKpiStrip
           :total-count="kpiTotalCount"
           :total-amount="kpiTotalAmount"
@@ -239,6 +249,11 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #receiptCode="{ row }">
+                <a-button class="receipt-code-link" type="link" @click="handleView(row)">
+                  {{ row.receiptCode || '-' }}
+                </a-button>
+              </template>
               <template #totalAmount="{ row }">
                 <span v-if="row.totalAmount" class="lg-money">
                   {{

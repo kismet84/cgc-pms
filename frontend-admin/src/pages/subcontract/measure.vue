@@ -86,7 +86,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 // ---- vxe-grid columns ----
 const gridColumns = computed(() => [
-  { field: 'measureCode', title: '计量编号', minWidth: 150, ellipsis: true },
+  { field: 'measureCode', title: '计量编号', minWidth: 150, slots: { default: 'measureCode' } },
   { field: 'measurePeriod', title: '计量期次', width: 112 },
   { field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true },
   { field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true },
@@ -130,7 +130,12 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('subcontract_measure_cols', gridColumns)
+} = useColumnSettings('subcontract_measure_cols_v2', gridColumns)
+
+if (!localStorage.getItem('subcontract_measure_cols_v2')) {
+  colVisible.measureDate = false
+  colVisible.approvalStatus = false
+}
 
 async function fetchData() {
   loading.value = true
@@ -264,6 +269,11 @@ async function handleEdit(record: SubMeasureVO) {
     itemList.value = []
   }
   modalVisible.value = true
+}
+
+async function handleView(record: SubMeasureVO) {
+  await handleEdit(record)
+  modalTitle.value = '查看分包计量'
 }
 
 function handleDelete(record: SubMeasureVO) {
@@ -620,6 +630,15 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #measureCode="{ row }">
+                <a-button
+                  class="subcontract-measure-code-link"
+                  type="link"
+                  @click="handleView(row)"
+                >
+                  {{ row.measureCode || '-' }}
+                </a-button>
+              </template>
               <template #subTaskName="{ row }">
                 <span v-if="row.subTaskName">{{ row.subTaskName }}</span>
                 <span v-else class="lg-none">-</span>

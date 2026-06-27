@@ -45,7 +45,12 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('requisition_list_cols', gridColumns)
+} = useColumnSettings('requisition_list_cols_v2', gridColumns)
+
+if (!localStorage.getItem('requisition_list_cols_v2')) {
+  colVisible.requisitionDate = false
+  colVisible.approvalStatus = false
+}
 
 const {
   modalVisible,
@@ -62,6 +67,11 @@ const {
   handleModalOk,
   handleModalCancel,
 } = useRequisitionForm(fetchData)
+
+async function handleView(row: Parameters<typeof handleEdit>[0]) {
+  await handleEdit(row)
+  modalTitle.value = '查看领料申请'
+}
 
 const requisitionStatusSummary = computed(() => [
   {
@@ -215,7 +225,7 @@ onMounted(() => {
     </div>
 
     <div class="lg-grid">
-      <div class="requisition-main-column">
+      <div class="lg-left requisition-main-column">
         <RequisitionKpiStrip
           :total-count="kpiTotalCount"
           :total-amount="kpiTotalAmount"
@@ -258,6 +268,11 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #requisitionCode="{ row }">
+                <a-button class="requisition-code-link" type="link" @click="handleView(row)">
+                  {{ row.requisitionCode || '-' }}
+                </a-button>
+              </template>
               <template #totalAmount="{ row }">
                 <span v-if="row.totalAmount" class="lg-money">
                   {{

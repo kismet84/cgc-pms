@@ -106,7 +106,7 @@ const ORDER_STATUS_COLOR: Record<string, string> = {
 }
 
 const gridColumns = computed(() => [
-  { field: 'orderCode', title: '订单编号', minWidth: 150, ellipsis: true },
+  { field: 'orderCode', title: '订单编号', minWidth: 150, slots: { default: 'orderCode' } },
   { field: 'orderType', title: '订单类型', width: 108, slots: { default: 'orderType' } },
   { field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true },
   { field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true },
@@ -129,7 +129,12 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('purchase_order_cols', gridColumns)
+} = useColumnSettings('purchase_order_cols_v2', gridColumns)
+
+if (!localStorage.getItem('purchase_order_cols_v2')) {
+  colVisible.deliveryDate = false
+  colVisible.approvalStatus = false
+}
 
 async function fetchData() {
   loading.value = true
@@ -228,6 +233,11 @@ async function handleEdit(record: MatPurchaseOrderVO) {
     itemList.value = []
   }
   modalVisible.value = true
+}
+
+async function handleView(record: MatPurchaseOrderVO) {
+  await handleEdit(record)
+  modalTitle.value = '查看采购订单'
 }
 
 function handleDelete(record: MatPurchaseOrderVO) {
@@ -610,6 +620,11 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #orderCode="{ row }">
+                <a-button class="purchase-order-code-link" type="link" @click="handleView(row)">
+                  {{ row.orderCode || '-' }}
+                </a-button>
+              </template>
               <template #orderType="{ row }">
                 <a-tag :color="ORDER_TYPE_COLOR[row.orderType]">
                   {{ ORDER_TYPE_LABEL[row.orderType] ?? row.orderType }}
