@@ -73,6 +73,8 @@ login-snapshot.yml
 .sisyphus/
 .superpowers/
 .trae/
+backend/nul
+graphify-out/
 skills-lock.json
 
 # Project config / local docs
