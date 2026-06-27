@@ -98,7 +98,7 @@ public class CodeGenerationService {
                 .likeRight(extractColumnName(codeGetter), fullPrefix)
                 .orderByDesc(extractColumnName(codeGetter));
 
-        return generateNextCodeStr(mapper, wrapper, fullPrefix, includeDeleted, codeGetter);
+        return generateNextCodeStr(mapper, wrapper, fullPrefix, tenantId, includeDeleted, codeGetter);
     }
 
     // ---------------------------------------------------------------------
@@ -151,7 +151,7 @@ public class CodeGenerationService {
                 .likeRight(codeColumn, fullPrefix)
                 .orderByDesc(codeColumn);
 
-        return generateNextCodeStr(mapper, wrapper, fullPrefix, includeDeleted, codeGetter);
+        return generateNextCodeStr(mapper, wrapper, fullPrefix, tenantId, includeDeleted, codeGetter);
     }
 
     // ---------------------------------------------------------------------
@@ -169,10 +169,11 @@ public class CodeGenerationService {
     private <T> String generateNextCode(BaseMapper<T> mapper,
                                         LambdaQueryWrapper<T> wrapper,
                                         String fullPrefix,
+                                        Long tenantId,
                                         boolean includeDeleted,
                                         SFunction<T, String> codeGetter) {
         if (includeDeleted) {
-            return generateWithDeleted(mapper, wrapper, fullPrefix, codeGetter);
+            return generateWithDeleted(mapper, wrapper, fullPrefix, tenantId, codeGetter);
         }
 
         Page<T> page = new Page<>(0, 1);
@@ -183,10 +184,11 @@ public class CodeGenerationService {
     private <T> String generateNextCodeStr(BaseMapper<T> mapper,
                                            QueryWrapper<T> wrapper,
                                            String fullPrefix,
+                                           Long tenantId,
                                            boolean includeDeleted,
                                            SFunction<T, String> codeGetter) {
         if (includeDeleted) {
-            return generateWithDeletedStr(mapper, wrapper, fullPrefix, codeGetter);
+            return generateWithDeletedStr(mapper, wrapper, fullPrefix, tenantId, codeGetter);
         }
 
         Page<T> page = new Page<>(0, 1);
@@ -205,36 +207,55 @@ public class CodeGenerationService {
     private <T> String generateWithDeleted(BaseMapper<T> mapper,
                                            LambdaQueryWrapper<T> wrapper,
                                            String fullPrefix,
+                                           Long tenantId,
                                            SFunction<T, String> codeGetter) {
-        // selectList 仍会被 @TableLogic 拦截
-        // 此处使用 selectPage(Page(0, 1)) 对 LambdaQueryWrapper 执行
-        // 结果与 includeDeleted=false 一致
-        log.warn("includeDeleted=true 需通过 Mapper @Select 注解实现，当前查询不包含软删除记录");
-        Page<T> page = new Page<>(0, 1);
-        Page<T> result = mapper.selectPage(page, wrapper);
-        return parseSeq(result.getRecords(), fullPrefix, codeGetter);
+        String lastCode = null;
+        if (mapper instanceof DeletedCodeSource codeProvider) {
+            lastCode = codeProvider.selectLastCodeByPrefix(fullPrefix, tenantId);
+        } else {
+            log.warn("includeDeleted=true 需通过 Mapper 额外声明查询能力，当前 mapper 不支持（将回退到默认路径）");
+            Page<T> page = new Page<>(0, 1);
+            Page<T> result = mapper.selectPage(page, wrapper);
+            return parseSeq(result.getRecords(), fullPrefix, codeGetter);
+        }
+
+        return parseSeqFromLastCode(lastCode, fullPrefix);
     }
 
     private <T> String generateWithDeletedStr(BaseMapper<T> mapper,
                                               QueryWrapper<T> wrapper,
                                               String fullPrefix,
+                                              Long tenantId,
                                               SFunction<T, String> codeGetter) {
-        log.warn("includeDeleted=true 需通过 Mapper @Select 注解实现，当前查询不包含软删除记录");
-        Page<T> page = new Page<>(0, 1);
-        Page<T> result = mapper.selectPage(page, wrapper);
-        return parseSeq(result.getRecords(), fullPrefix, codeGetter);
+        String lastCode = null;
+        if (mapper instanceof DeletedCodeSource codeProvider) {
+            lastCode = codeProvider.selectLastCodeByPrefix(fullPrefix, tenantId);
+        } else {
+            log.warn("includeDeleted=true 需通过 Mapper 额外声明查询能力，当前 mapper 不支持（将回退到默认路径）");
+            Page<T> page = new Page<>(0, 1);
+            Page<T> result = mapper.selectPage(page, wrapper);
+            return parseSeq(result.getRecords(), fullPrefix, codeGetter);
+        }
+
+        return parseSeqFromLastCode(lastCode, fullPrefix);
     }
 
-    // ---------------------------------------------------------------------
-    // 序列号解析
-    // ---------------------------------------------------------------------
+    private String parseSeqFromLastCode(String lastCode, String fullPrefix) {
+        if (lastCode == null) {
+            return fullPrefix + "001";
+        }
 
-    /**
-     * 从查询结果中解析最大值并返回下一个序列号。
-     * <p>
-     * 无记录或解析失败时均从 {@code 001} 开始。
-     * </p>
-     */
+        int seq = 1;
+        if (lastCode.length() == fullPrefix.length() + SEQ_LENGTH) {
+            try {
+                seq = Integer.parseInt(lastCode.substring(fullPrefix.length())) + 1;
+            } catch (NumberFormatException e) {
+                log.warn("解析编码序列号失败: {}", lastCode, e);
+            }
+        }
+        return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", seq);
+    }
+
     private <T> String parseSeq(List<T> records,
                                 String fullPrefix,
                                 SFunction<T, String> codeGetter) {

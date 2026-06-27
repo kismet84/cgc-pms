@@ -15,6 +15,7 @@ import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
 import com.cgcpms.contract.service.CtContractService;
 import com.cgcpms.contract.vo.ContractApprovalRecordVO;
 import com.cgcpms.contract.vo.CtContractVO;
+import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
@@ -217,6 +218,20 @@ class CtContractServiceTest {
         return term;
     }
 
+    private int parseCodeSuffix(String code, String prefix) {
+        if (code == null || !code.startsWith(prefix)) {
+            return 0;
+        }
+        if (code.length() <= prefix.length()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(code.substring(prefix.length()));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // 分页查询
     // ═══════════════════════════════════════════════════════════════
@@ -416,6 +431,30 @@ class CtContractServiceTest {
         assertEquals(ContractStatusConstants.APPROVAL_DRAFT, saved.getApprovalStatus());
         assertEquals(ContractStatusConstants.STATUS_DRAFT, saved.getContractStatus());
         assertEquals(TENANT_ID, saved.getTenantId());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("创建 — includeDeleted=true 时应兼容软删除编号历史")
+    void testCreateUsesDeletedContractCode() {
+        String codePrefix = "CT-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
+
+        String maxExistingCode = contractMapper.selectLastCodeByPrefix(codePrefix, TENANT_ID);
+        int maxSuffix = parseCodeSuffix(maxExistingCode, codePrefix);
+        int deletedSuffix = maxSuffix + 20;
+
+        CtContract deletedContract = buildDraftContract("软删除合同");
+        deletedContract.setTenantId(TENANT_ID);
+        deletedContract.setContractCode(codePrefix + String.format("%03d", deletedSuffix));
+        deletedContract.setDeletedFlag(1);
+        contractMapper.insert(deletedContract);
+
+        Long id = contractService.create(buildDraftContract("软删除历史命中测试"));
+
+        CtContract saved = contractMapper.selectById(id);
+        assertNotNull(saved);
+        assertEquals(codePrefix + String.format("%03d", deletedSuffix + 1), saved.getContractCode(),
+                "includeDeleted=true 应该基于 soft delete 历史继续递增");
     }
 
     // ═══════════════════════════════════════════════════════════════

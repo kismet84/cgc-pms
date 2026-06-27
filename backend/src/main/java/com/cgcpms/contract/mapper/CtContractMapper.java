@@ -2,12 +2,13 @@ package com.cgcpms.contract.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.common.util.DeletedCodeSource;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 @Mapper
-public interface CtContractMapper extends BaseMapper<CtContract> {
+public interface CtContractMapper extends BaseMapper<CtContract>, DeletedCodeSource {
 
     @Select("SELECT * FROM ct_contract WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
     CtContract selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
