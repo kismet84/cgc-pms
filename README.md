@@ -225,4 +225,4 @@ docker restart cgc-pms-backend-dev
 | 质量审计 | `docs/quality/` |
 | 历史开发记录 | `docs/历史开发记录.md` |
 | 未来开发计划 | `docs/未来开发计划.md` |
-| 历史归档 | `archive/` |
+| 历史归档 | `.archive/` |

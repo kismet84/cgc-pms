@@ -1,20 +1,27 @@
-# Maven
+# GitHub / CI
+!.github/
+!.github/**
+
+# Java / Maven / Gradle
 backend/target/
+backend/.classpath
+backend/.project
+backend/.settings/
 backend/.mvn/wrapper/maven-wrapper.jar
 !backend/.mvn/wrapper/maven-wrapper.properties
-
-# Gradle
 .gradle/
 build/
 
-# Dot-directories (exclude all, with explicit exceptions below)
-.*/
-!.github/
-
-# Node
+# Node / Frontend
 node_modules/
 frontend-admin/dist/
 frontend-admin/.vite/
+frontend-admin/coverage/
+frontend-admin/coverage-result.json
+frontend-admin/playwright-report/
+frontend-admin/test-results/
+frontend-admin/.pnpm-store/
+frontend-admin/.playwright-cli/
 mobile/node_modules/
 mobile/dist/
 
@@ -35,47 +42,42 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Logs
+# Logs / temp
 *.log
 logs/
+*.tmp
+temp/
 
-# Docker volumes
+# Docker volumes / certs
 deploy/mysql/data/
 deploy/redis/data/
 deploy/minio/data/
-
-# SSL certificates (contains private keys, generate locally)
 deploy/ssl/
 
-# Temp
-*.tmp
-temp/
+# Test / snapshot artifacts
 .playwright-mcp/
 *-snapshot.yml
 login-snapshot.yml
 
-# Sisyphus working files
-.sisyphus/
-
-# Archived project artifacts
-/archive/
-
-# Superpowers visual brainstorming working files
-.superpowers/
-
-# Claude-mem agent runtime (excluded from repo)
+# Local AI / tooling state
 .agent-runtime/
+.agents/
+.archive/
+.baoyu-skills/
+.claude/
+.codegraph/
+.codex/
+.omc/
+.omo/
+.opencode/
+.sisyphus/
+.superpowers/
+.trae/
+skills-lock.json
 
-# Project config files (excluded from repo)
+# Project config / local docs
 CLAUDE.md
 AGENTS.md
 docs/agents/
-
-# Claude Code settings (excluded from repo)
-.claude/
-
-
-.opencode/
-frontend-admin/playwright-report/
-frontend-admin/test-results/
-nul
+docs/
+memory/
