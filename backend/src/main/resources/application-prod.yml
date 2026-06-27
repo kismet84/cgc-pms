@@ -68,13 +68,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,prometheus}
   endpoint:
     health:
-      show-details: never
-      show-components: never
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:never}
+      show-components: ${MANAGEMENT_HEALTH_SHOW_COMPONENTS:never}
       probes:
-        enabled: true
+        enabled: ${MANAGEMENT_HEALTH_PROBES_ENABLED:true}
 
 logging:
   level:
