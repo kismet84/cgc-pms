@@ -57,10 +57,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,prometheus}
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:when-authorized}
 
 cors:
   allowed-origins: "http://localhost:5173"
