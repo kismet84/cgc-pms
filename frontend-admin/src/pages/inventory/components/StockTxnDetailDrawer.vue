@@ -22,7 +22,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <a-drawer :open="open" title="流水详情" placement="right" :width="480" @close="emit('close')">
+  <a-drawer :open="open" title="流水详情" placement="right" :width="800" @close="emit('close')">
     <template v-if="detailItem">
       <a-descriptions :column="2" size="small" bordered>
         <a-descriptions-item label="流水编号">{{ detailItem.id }}</a-descriptions-item>

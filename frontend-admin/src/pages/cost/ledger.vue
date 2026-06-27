@@ -698,7 +698,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       :open="detailVisible"
       title="成本明细"
       placement="right"
-      :width="520"
+      :width="800"
       @close="detailVisible = false"
     >
       <template v-if="detailItem">

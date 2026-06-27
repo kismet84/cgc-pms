@@ -416,7 +416,7 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="600"
+      :width="800"
       :confirm-loading="formSubmitting"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
@@ -473,7 +473,7 @@ onMounted(() => {
     </a-modal>
 
     <!-- Detail Modal with Approval Timeline -->
-    <a-modal v-model:open="detailVisible" title="变更详情" :width="700" :footer="null">
+    <a-modal v-model:open="detailVisible" title="变更详情" :width="800" :footer="null">
       <template v-if="detailRecord">
         <a-descriptions :column="2" size="small" bordered>
           <a-descriptions-item label="变更编号">{{ detailRecord.changeCode }}</a-descriptions-item>

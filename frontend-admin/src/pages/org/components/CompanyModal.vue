@@ -22,7 +22,7 @@ defineEmits<{
     :open="open"
     :title="title"
     :confirm-loading="loading"
-    :width="520"
+    :width="800"
     class="lg-modal-form is-vertical"
     ok-text="保存"
     cancel-text="取消"

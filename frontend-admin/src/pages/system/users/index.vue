@@ -385,7 +385,7 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="560"
+      :width="800"
       class="lg-modal-form"
       ok-text="保存"
       cancel-text="取消"

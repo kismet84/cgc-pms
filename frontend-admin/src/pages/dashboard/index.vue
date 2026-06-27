@@ -90,7 +90,7 @@ const {
       v-model:open="drillVisible"
       :title="drillSubject ? `成本明细 - ${drillSubject.costSubjectName}` : '成本明细'"
       :footer="null"
-      width="860px"
+      :width="800"
       @cancel="closeDrill"
     >
       <template v-if="drillSubject">

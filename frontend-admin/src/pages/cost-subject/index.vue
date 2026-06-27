@@ -359,7 +359,7 @@ onMounted(() => {
     <a-modal
       v-model:open="formVisible"
       :title="formMode === 'create' ? '新增成本科目' : '编辑成本科目'"
-      :width="520"
+      :width="800"
       @ok="handleFormSubmit"
       :confirm-loading="formLoading"
     >

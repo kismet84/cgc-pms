@@ -607,6 +607,7 @@ function rowSettlementAmount(row: SettlementVO): string {
   <a-modal
     v-model:open="createModalVisible"
     title="新建结算单"
+    :width="800"
     :confirm-loading="createLoading"
     @ok="handleCreate"
   >

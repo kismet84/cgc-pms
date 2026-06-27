@@ -523,6 +523,7 @@ watch(
     <a-modal
       v-model:open="showApproveModal"
       title="审批通过"
+      :width="800"
       :confirm-loading="actionLoading"
       @ok="handleApprove"
     >
@@ -532,6 +533,7 @@ watch(
     <a-modal
       v-model:open="showRejectModal"
       title="驳回"
+      :width="800"
       :confirm-loading="actionLoading"
       @ok="handleReject"
     >

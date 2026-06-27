@@ -294,7 +294,7 @@ defineExpose({
   <a-modal
     :open="visible"
     :title="modalTitle"
-    :width="680"
+    :width="800"
     @ok="handleModalOk"
     @cancel="handleModalCancel"
   >

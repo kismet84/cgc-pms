@@ -12,6 +12,14 @@ import {
 import type { NotificationVO, SseNotificationEvent } from '@/types/notification'
 import type { PageResult } from '@/types/api'
 
+interface Props {
+  label?: string
+}
+
+withDefaults(defineProps<Props>(), {
+  label: '',
+})
+
 // ── State ──
 const unreadCount = ref(0)
 const notifications = ref<NotificationVO[]>([])
@@ -185,7 +193,7 @@ onUnmounted(() => {
     overlay-class-name="nb-popover"
     @open-change="handlePopoverChange"
   >
-    <span class="nb-trigger">
+    <span class="nb-trigger" :class="{ 'nb-trigger--with-label': label }" aria-label="通知">
       <a-badge
         :count="unreadCount"
         :offset="[-2, 6]"
@@ -194,6 +202,7 @@ onUnmounted(() => {
       >
         <BellOutlined style="font-size: 18px; cursor: pointer" />
       </a-badge>
+      <span v-if="label" class="nb-trigger-label sidebar-bell-label">{{ label }}</span>
     </span>
 
     <template #content>
@@ -250,8 +259,21 @@ onUnmounted(() => {
 .nb-trigger {
   display: inline-flex;
   align-items: center;
+  gap: 16px;
   color: var(--text);
   transition: color 0.2s;
+}
+
+.nb-trigger--with-label {
+  width: 100%;
+  min-height: 40px;
+}
+
+.nb-trigger-label {
+  font-size: 13px;
+  line-height: 20px;
+  color: currentcolor;
+  white-space: nowrap;
 }
 
 .nb-trigger:hover {

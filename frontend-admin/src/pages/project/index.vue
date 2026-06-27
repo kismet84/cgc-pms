@@ -534,6 +534,7 @@ const gridColumns = computed(() => [
     <a-modal
       v-model:open="createVisible"
       title="新建项目"
+      :width="800"
       :confirm-loading="createLoading"
       :mask-closable="false"
       ok-text="创建"
@@ -611,6 +612,7 @@ const gridColumns = computed(() => [
     <a-modal
       v-model:open="editVisible"
       title="编辑项目"
+      :width="800"
       :confirm-loading="editLoading"
       :mask-closable="false"
       ok-text="保存"

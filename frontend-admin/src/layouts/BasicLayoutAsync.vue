@@ -70,10 +70,12 @@ onBeforeUnmount(() => {
             <MenuFoldOutlined class="sidebar-tool-icon" aria-hidden="true" />
             <span v-if="!collapsed">折叠菜单</span>
           </button>
-          <div class="sidebar-tool-button sidebar-bell">
-            <span v-if="bellReady" aria-label="通知"><NotificationBell /></span>
-            <span v-if="!collapsed" class="sidebar-bell-label">通知中心</span>
-          </div>
+          <span class="sidebar-tool-button sidebar-bell" :aria-label="bellReady ? '通知' : undefined">
+            <NotificationBell v-if="bellReady" :label="collapsed ? '' : '通知中心'" />
+            <span v-if="bellReady && !collapsed" class="sidebar-bell-label sidebar-bell-label--sr"
+              >通知中心</span
+            >
+          </span>
           <a-dropdown>
             <div class="sidebar-user" :class="{ 'sidebar-user--collapsed': collapsed }">
               <a-avatar :size="32" class="user-avatar">
@@ -235,20 +237,18 @@ onBeforeUnmount(() => {
   padding: 0 10px;
 }
 
-.sidebar-bell-label {
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.sidebar-bell:hover .sidebar-bell-label {
-  color: var(--primary);
-}
-
 .sidebar-footer--collapsed .sidebar-bell {
   justify-content: center;
   padding: 0;
+}
+
+.sidebar-bell-label--sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .sidebar-user {

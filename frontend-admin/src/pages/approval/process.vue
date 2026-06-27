@@ -612,7 +612,7 @@ onMounted(fetchTemplates)
       v-model:open="nodeModalVisible"
       :title="editingNode ? '编辑节点' : '新增节点'"
       :confirm-loading="savingNode"
-      width="720px"
+      :width="800"
       ok-text="保存节点"
       cancel-text="取消"
       @ok="handleSaveNode"

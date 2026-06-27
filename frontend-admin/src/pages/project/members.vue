@@ -308,6 +308,7 @@ const {
     <a-modal
       v-model:open="addVisible"
       title="添加项目成员"
+      :width="800"
       :confirm-loading="addLoading"
       @ok="handleAdd"
       @cancel="addVisible = false"

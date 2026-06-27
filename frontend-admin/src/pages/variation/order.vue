@@ -726,7 +726,7 @@ onMounted(() => {
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="860"
+      :width="800"
       :footer="modalReadonly ? null : undefined"
       @ok="handleSubmit"
     >

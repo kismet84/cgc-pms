@@ -859,7 +859,7 @@ onMounted(() => {
     <a-modal
       v-model:open="writebackVisible"
       title="付款回写"
-      :width="480"
+      :width="800"
       @ok="handleWritebackOk"
       @cancel="handleWritebackCancel"
     >
