@@ -8,8 +8,8 @@ const pageSource = readFileSync(resolve(currentDir, '../process.vue'), 'utf-8')
 const apiSource = readFileSync(resolve(currentDir, '../../../api/modules/workflow.ts'), 'utf-8')
 
 describe('ApprovalProcessManagement source wiring', () => {
-  it('renders approval process management copy and node operations', () => {
-    expect(pageSource).toContain('审批流程管理')
+  it('renders approval process copy and node operations', () => {
+    expect(pageSource).toContain('审批流程')
     expect(pageSource).toContain('流程模板')
     expect(pageSource).toContain('新增节点')
     expect(pageSource).toContain('删除节点')

@@ -71,12 +71,12 @@ const userStatusSummary = computed(() => [
   {
     label: '启用用户',
     count: tableData.value.filter((r) => r.status === 'ENABLE').length,
-    color: '#52c41a',
+    tone: 'success',
   },
   {
     label: '禁用用户',
     count: tableData.value.filter((r) => r.status !== 'ENABLE').length,
-    color: '#ff4d4f',
+    tone: 'danger',
   },
 ])
 const recentUsers = computed(() => tableData.value.slice(0, 4))
@@ -165,10 +165,10 @@ async function handleModalOk() {
     if (editingId.value) {
       await updateUser(editingId.value, payload)
       await assignUserRoles(editingId.value, formData.roleIds as string[])
-      message.success('更新成功')
+      message.success('已保存')
     } else {
       await createUser(payload)
-      message.success('创建成功')
+      message.success('已创建')
     }
     modalVisible.value = false
     fetchData()
@@ -195,12 +195,12 @@ function handleToggleStatus(record: SysUserVO) {
   Modal.confirm({
     title: `确认${action}`,
     content: `确定要${action}用户"${record.username}"吗？`,
-    okText: '确定',
+    okText: action,
     cancelText: '取消',
     onOk: async () => {
       try {
         await updateUserStatus(record.id, newStatus)
-        message.success(`${action}成功`)
+        message.success(`已${action}`)
         fetchData()
       } catch (e: unknown) {
         console.error(e)
@@ -212,14 +212,15 @@ function handleToggleStatus(record: SysUserVO) {
 
 function handleDelete(record: SysUserVO) {
   Modal.confirm({
-    title: '确认删除',
+    title: '删除用户',
     content: `确定要删除用户"${record.username}"吗？`,
-    okText: '确定',
+    okText: '删除',
+    okType: 'danger',
     cancelText: '取消',
     onOk: async () => {
       try {
         await deleteUser(record.id)
-        message.success('删除成功')
+        message.success('已删除')
         fetchData()
       } catch (e: unknown) {
         console.error(e)
@@ -251,7 +252,7 @@ onMounted(() => {
 <template>
   <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
-      <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+      <a-breadcrumb class="lg-page-head-breadcrumb">
         <a-breadcrumb-item>系统设置</a-breadcrumb-item>
         <a-breadcrumb-item>用户管理</a-breadcrumb-item>
       </a-breadcrumb>
@@ -265,7 +266,7 @@ onMounted(() => {
         size="large"
         @press-enter="handleSearch"
       >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
+        <template #prefix><SearchOutlined class="lg-search-prefix-icon" /></template>
       </a-input>
       <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
       <a-button size="large" @click="handleReset">
@@ -282,8 +283,9 @@ onMounted(() => {
               <template #icon><PlusOutlined /></template>
               新增用户
             </a-button>
-            <a-button @click="fetchData">
+            <a-button title="刷新用户列表" aria-label="刷新用户列表" @click="fetchData">
               <template #icon><ReloadOutlined /></template>
+              刷新
             </a-button>
           </div>
           <div class="lg-toolbar-right">
@@ -307,11 +309,9 @@ onMounted(() => {
           >
             <template #roleNames="{ row }">
               <template v-if="row.roleNames && row.roleNames.length">
-                <a-tag v-for="(r, i) in row.roleNames" :key="i" style="margin-right: 4px">{{
-                  r
-                }}</a-tag>
+                <a-tag v-for="(r, i) in row.roleNames" :key="i" class="system-tag-gap">{{ r }}</a-tag>
               </template>
-              <span v-else style="color: var(--muted)">-</span>
+              <span v-else class="lg-muted-text">-</span>
             </template>
             <template #status="{ row }">
               <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
@@ -320,7 +320,13 @@ onMounted(() => {
             </template>
             <template #action="{ row }">
               <a-dropdown :trigger="['click']">
-                <a-button class="lg-row-action-trigger" size="small" type="text">
+              <a-button
+                class="lg-row-action-trigger"
+                size="small"
+                type="text"
+                title="用户操作"
+                aria-label="用户操作"
+              >
                   <MoreOutlined />
                 </a-button>
                 <template #overlay>
@@ -356,7 +362,7 @@ onMounted(() => {
           <div class="lg-panel-title">用户状态</div>
           <div class="lg-type-list">
             <div v-for="item in userStatusSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-dot" :class="`is-${item.tone}`"></span>
               <span class="lg-type-label">{{ item.label }}</span>
               <strong>{{ item.count }}</strong>
             </div>

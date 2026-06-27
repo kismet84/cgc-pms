@@ -409,8 +409,8 @@ onMounted(fetchTemplates)
   <div class="project-target-redesign lg-list-page lg-page app-page approval-process-page">
     <div class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb">
-        <a-breadcrumb-item>审批管理</a-breadcrumb-item>
-        <a-breadcrumb-item>审批流程管理</a-breadcrumb-item>
+        <a-breadcrumb-item>数据中心</a-breadcrumb-item>
+        <a-breadcrumb-item>审批流程</a-breadcrumb-item>
       </a-breadcrumb>
       <div class="pt-head-actions">
         <a-button @click="fetchTemplates">刷新</a-button>

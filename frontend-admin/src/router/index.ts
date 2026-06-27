@@ -327,7 +327,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'process',
             name: 'ApprovalProcess',
             component: () => import('@/pages/approval/process.vue'),
-            meta: { title: '审批流程管理', adminOnly: true },
+            meta: { title: '审批流程', adminOnly: true },
           },
           {
             path: ':instanceId',

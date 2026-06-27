@@ -80,28 +80,24 @@ export const navigationItems: NavigationItem[] = [
     key: '/approval-center',
     label: '审批中心',
     icon: 'AuditOutlined',
-    matchPrefixes: ['/approval'],
+    matchPrefixes: ['/approval/todo', '/approval/done', '/approval/cc'],
     children: [
       { key: '/approval/todo', label: '我的待办' },
       { key: '/approval/done', label: '我的已办' },
       { key: '/approval/cc', label: '抄送我的' },
-      {
-        key: '/approval/process',
-        label: '审批流程管理',
-        adminOnly: true,
-      },
     ],
   },
   {
     key: '/master-data',
     label: '数据中心',
     icon: 'ProjectOutlined',
-    matchPrefixes: ['/partner', '/org', '/material', '/cost/subject'],
+    matchPrefixes: ['/partner', '/org', '/material', '/cost/subject', '/approval/process'],
     children: [
       { key: '/partner', label: '合作方管理' },
       { key: '/org', label: '组织架构' },
       { key: '/material/dictionary', label: '材料字典' },
       { key: '/cost/subject', label: '成本科目' },
+      { key: '/approval/process', label: '审批流程', adminOnly: true },
     ],
   },
   {

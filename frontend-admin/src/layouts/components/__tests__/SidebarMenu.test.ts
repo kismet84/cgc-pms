@@ -132,14 +132,15 @@ describe('SidebarMenu', () => {
       '合作方管理',
       '组织架构',
       '材料字典',
+      '成本科目',
+      '审批流程',
     ])
 
     const cost = renderedMenuItems.find((item) => item.label === '成本管理')
     expect(cost?.children?.map((item) => item.label)).toEqual([
       '成本台账',
-      '成本汇总',
+      '成本明细',
       '目标成本',
-      '成本科目',
     ])
 
     expect(wrapper.find('[data-menu-key="/cost-target/index"]').exists()).toBe(true)
@@ -161,15 +162,14 @@ describe('SidebarMenu', () => {
       '我的待办',
       '我的已办',
       '抄送我的',
-      '审批流程管理',
     ])
   })
 
-  it('shows approval process management only to administrators', () => {
+  it('shows approval process only to administrators under data center', () => {
     mockRoles.value = ['ADMIN']
     const adminWrapper = mountMenu()
 
-    expect(adminWrapper.text()).toContain('审批流程管理')
+    expect(adminWrapper.text()).toContain('审批流程')
     expect(
       adminWrapper.findAll('[data-menu-key]').map((node) => node.attributes('data-menu-key')),
     ).toContain('/approval/process')
@@ -177,7 +177,7 @@ describe('SidebarMenu', () => {
     mockRoles.value = ['PROJECT_MANAGER']
     const userWrapper = mountMenu()
 
-    expect(userWrapper.text()).not.toContain('审批流程管理')
+    expect(userWrapper.text()).not.toContain('审批流程')
     expect(
       userWrapper.findAll('[data-menu-key]').map((node) => node.attributes('data-menu-key')),
     ).not.toContain('/approval/process')

@@ -907,7 +907,7 @@ function genTermKey(): string {
 }
 
 .project-target-redesign.cf-embedded :deep(.pt-panel) {
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .project-target-redesign.cf-embedded :deep(textarea.ant-input) {

@@ -65,12 +65,12 @@ const roleStatusSummary = computed(() => [
   {
     label: '启用角色',
     count: filteredRoles.value.filter((r) => r.status === 'ENABLE').length,
-    color: '#52c41a',
+    tone: 'success',
   },
   {
     label: '禁用角色',
     count: filteredRoles.value.filter((r) => r.status !== 'ENABLE').length,
-    color: '#ff4d4f',
+    tone: 'danger',
   },
 ])
 const recentRoles = computed(() => tableData.value.slice(0, 4))
@@ -124,7 +124,8 @@ onMounted(fetchData)
   <div class="lg-list-page lg-page app-page">
     <div class="lg-page-head">
       <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+        <a-breadcrumb class="lg-page-head-breadcrumb">
+          <a-breadcrumb-item>系统设置</a-breadcrumb-item>
           <a-breadcrumb-item>角色管理</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
@@ -139,7 +140,7 @@ onMounted(fetchData)
         size="large"
         @press-enter="handleSearch"
       >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
+        <template #prefix><SearchOutlined class="lg-search-prefix-icon" /></template>
       </a-input>
       <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
       <a-button size="large" @click="handleReset">
@@ -153,8 +154,9 @@ onMounted(fetchData)
         <!-- 工具栏 -->
         <div class="lg-toolbar">
           <div class="lg-toolbar-left">
-            <a-button type="primary" ghost @click="fetchData">
+            <a-button title="刷新角色列表" aria-label="刷新角色列表" @click="fetchData">
               <template #icon><ReloadOutlined /></template>
+              刷新
             </a-button>
           </div>
           <div class="lg-toolbar-right">
@@ -184,7 +186,13 @@ onMounted(fetchData)
             </template>
             <template #action="{ row }">
               <a-dropdown :trigger="['click']">
-                <a-button class="lg-row-action-trigger" size="small" type="text">
+              <a-button
+                class="lg-row-action-trigger"
+                size="small"
+                type="text"
+                title="角色操作"
+                aria-label="角色操作"
+              >
                   <MoreOutlined />
                 </a-button>
                 <template #overlay>
@@ -218,7 +226,7 @@ onMounted(fetchData)
           <div class="lg-panel-title">角色状态</div>
           <div class="lg-type-list">
             <div v-for="item in roleStatusSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.color }"></span>
+              <span class="lg-type-dot" :class="`is-${item.tone}`"></span>
               <span class="lg-type-label">{{ item.label }}</span>
               <strong>{{ item.count }}</strong>
             </div>
