@@ -110,8 +110,8 @@ public class RateLimitAspect {
         long count = counterStore.increment(limitKey, rateLimit.windowSeconds());
 
         if (count > rateLimit.maxRequests()) {
-            log.warn("Rate limit exceeded: keyDigest={}, endpoint={}, count={}, limit={}",
-                    safeKeyDigest(limitKey), endpoint, count, rateLimit.maxRequests());
+            log.warn("Rate limit exceeded: keyDigest={}, count={}, limit={}",
+                    safeKeyDigest(limitKey), count, rateLimit.maxRequests());
             throw new RateLimitExceededException(
                     String.format("请求过于频繁，请在 %d 秒后重试", rateLimit.windowSeconds()));
         }
@@ -184,7 +184,7 @@ public class RateLimitAspect {
         long now = System.currentTimeMillis();
         if (now < lockoutUntil) {
             long remainingMinutes = (lockoutUntil - now) / 60_000 + 1;
-            log.warn("Account locked out: ip={}, remaining={}min", ip, remainingMinutes);
+            log.warn("Account locked out: ipDigest={}, remaining={}min", safeIpDigest(ip), remainingMinutes);
             throw new RateLimitExceededException(
                     String.format("登录失败次数过多，账号已锁定，请在 %d 分钟后重试", remainingMinutes));
         }
@@ -265,5 +265,12 @@ public class RateLimitAspect {
             return "len=" + length;
         }
         return "len=" + length + ":" + Integer.toHexString(limitKey.hashCode());
+    }
+
+    private String safeIpDigest(String ip) {
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            return "unknown";
+        }
+        return "ipHash=" + Integer.toHexString(ip.hashCode());
     }
 }
