@@ -57,7 +57,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,prometheus}
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info}
   endpoint:
     health:
       show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:when-authorized}
