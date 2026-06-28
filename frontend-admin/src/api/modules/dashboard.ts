@@ -10,6 +10,13 @@ import type {
 } from '@/types/dashboard'
 import type { ContractVO } from '@/types/contract'
 
+function dashboardParams(projectId?: string, month?: string) {
+  const params: Record<string, string> = {}
+  if (projectId) params.projectId = projectId
+  if (month) params.month = month
+  return Object.keys(params).length ? params : undefined
+}
+
 /** Project Manager dashboard view */
 export function getProjectManagerView(projectId?: string) {
   return request<ProjectManagerDashboardVO>({
@@ -29,11 +36,11 @@ export function getBusinessManagerView(projectId?: string) {
 }
 
 /** Cost Manager dashboard view */
-export function getCostManagerView(projectId?: string) {
+export function getCostManagerView(projectId?: string, month?: string) {
   return request<CostManagerDashboardVO>({
     url: '/dashboard/cost-manager',
     method: 'get',
-    params: projectId ? { projectId } : undefined,
+    params: dashboardParams(projectId, month),
   })
 }
 

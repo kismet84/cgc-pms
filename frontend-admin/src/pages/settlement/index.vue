@@ -251,11 +251,9 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('settlement_list_cols_v2', gridColumns)
-
-if (!localStorage.getItem('settlement_list_cols_v2')) {
-  colVisible.createdAt = false
-}
+} = useColumnSettings('settlement_list_cols_v2', gridColumns, {
+  createdAt: false,
+})
 
 // ---- Mobile detection ----
 const MOBILE_BP = 768

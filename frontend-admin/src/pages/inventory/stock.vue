@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { ReloadOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import {
   useStockLedger,
-  defaultCols,
   TXN_TYPE_COLOR,
   TXN_TYPE_LABEL,
   getSourceTypeColor,
   getSourceTypeLabel,
 } from './composables/useStockLedger'
+import { ColumnSettingsButton } from '@/components/list-page'
 import StockSearchBar from './components/StockSearchBar.vue'
 import StockKpiStrip from './components/StockKpiStrip.vue'
 import StockTxnTable from './components/StockTxnTable.vue'
@@ -31,6 +31,7 @@ const {
   projects,
   materialList,
   colVisible,
+  columnSettings,
   toggleCol,
   handleSortChange,
   detailVisible,
@@ -52,7 +53,7 @@ const {
   kpiPct,
   lowStockWarn,
   inOutStats,
-  gridColumns,
+  visibleGridColumns,
 } = useStockLedger()
 
 // ---- 移动端检测 ----
@@ -143,31 +144,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <div class="lg-toolbar-left">
               <span class="stock-table-title">出入库流水</span>
               <span class="stock-table-count">共 {{ txnTotal }} 条</span>
-              <a-dropdown v-if="!isMobile">
-                <a-button>
-                  <template #icon><SettingOutlined /></template>
-                  列设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item v-for="(_, key) in defaultCols" :key="key" @click="toggleCol(key)">
-                      <a-checkbox :checked="colVisible[key]">
-                        {{
-                          {
-                            txnType: '类型',
-                            quantity: '变动量',
-                            availableAfter: '变动后余量',
-                            sourceType: '来源类型',
-                            sourceId: '关联单据',
-                            createdTime: '操作时间',
-                            ops: '操作',
-                          }[key]
-                        }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
+              <ColumnSettingsButton
+                v-if="!isMobile"
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
               <a-button @click="handleSearch">
                 <template #icon><ReloadOutlined /></template>
                 刷新
@@ -194,7 +176,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             v-if="!isMobile"
             :txn-list="txnList"
             :loading="loading"
-            :grid-columns="gridColumns"
+            :grid-columns="visibleGridColumns"
             :fmt-qty="fmtQty"
             @sort-change="handleSortChange"
             @show-detail="showDetail"

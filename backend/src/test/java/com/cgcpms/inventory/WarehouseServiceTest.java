@@ -10,6 +10,8 @@ import com.cgcpms.inventory.mapper.MatStockMapper;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.service.MatWarehouseService;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 
@@ -38,6 +40,9 @@ class WarehouseServiceTest {
     @Autowired
     private MatStockMapper stockMapper;
 
+    @Autowired
+    private PmProjectMapper projectMapper;
+
     private Long createdWarehouseId;
 
     @BeforeEach
@@ -45,6 +50,13 @@ class WarehouseServiceTest {
         // Clean seed data for test isolation (V42 migration seeds 2 warehouses)
         warehouseMapper.delete(new LambdaQueryWrapper<MatWarehouse>()
                 .eq(MatWarehouse::getTenantId, TENANT_ID));
+        PmProject project = new PmProject();
+        project.setId(PROJECT_ID);
+        project.setTenantId(TENANT_ID);
+        project.setProjectCode("P-WH-100");
+        project.setProjectName("仓库测试项目");
+        project.setStatus("ACTIVE");
+        projectMapper.insertOrUpdate(project);
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
@@ -79,6 +91,7 @@ class WarehouseServiceTest {
         assertEquals("一号仓库", vo.getWarehouseName());
         assertEquals("ENABLE", vo.getStatus());
         assertEquals(String.valueOf(PROJECT_ID), vo.getProjectId());
+        assertEquals("仓库测试项目", vo.getProjectName());
         assertEquals(String.valueOf(TENANT_ID), vo.getTenantId());
 
         createdWarehouseId = id;

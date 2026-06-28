@@ -114,12 +114,10 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('subcontract_task_cols_v2', gridColumns)
-
-if (!localStorage.getItem('subcontract_task_cols_v2')) {
-  colVisible.plannedStartDate = false
-  colVisible.plannedEndDate = false
-}
+} = useColumnSettings('subcontract_task_cols_v2', gridColumns, {
+  plannedStartDate: false,
+  plannedEndDate: false,
+})
 
 async function fetchData() {
   loading.value = true

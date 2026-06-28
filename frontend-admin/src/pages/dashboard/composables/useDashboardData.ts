@@ -22,6 +22,12 @@ import type {
   SubjectBreakdown,
 } from '@/types/dashboard'
 
+export function formatDashboardMonth(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
+}
+
 export function useDashboardData() {
   const userStore = useUserStore()
 
@@ -37,7 +43,10 @@ export function useDashboardData() {
     return roles.length > 0 ? roles : ['pm', 'bm', 'cost', 'finance', 'mgmt']
   })
 
-  const activeRole = ref<DashboardRole>(availableRoles.value[0] ?? 'pm')
+  const initialRole: DashboardRole = availableRoles.value.includes('cost')
+    ? 'cost'
+    : availableRoles.value[0] ?? 'pm'
+  const activeRole = ref<DashboardRole>(initialRole)
 
   const roleLabel: Record<DashboardRole, string> = {
     pm: '项目总',
@@ -49,6 +58,14 @@ export function useDashboardData() {
 
   const projectList = ref<ProjectVO[]>([])
   const selectedProjectId = ref<string | undefined>(undefined)
+  const selectedMonth = ref(formatDashboardMonth(new Date()))
+  const monthOptions = computed(() => {
+    const now = new Date()
+    return Array.from({ length: 12 }, (_, index) => {
+      const month = new Date(now.getFullYear(), now.getMonth() - index, 1)
+      return formatDashboardMonth(month)
+    })
+  })
   const pmData = ref<ProjectManagerDashboardVO | null>(null)
   const bmData = ref<BusinessManagerDashboardVO | null>(null)
   const costData = ref<CostManagerDashboardVO | null>(null)
@@ -56,6 +73,7 @@ export function useDashboardData() {
   const mgmtData = ref<ManagementDashboardVO | null>(null)
   const costBreakdown = ref<CostBreakdownVO | null>(null)
   const loading = ref(false)
+  const bootstrapping = ref(true)
   const drillSubject = ref<SubjectBreakdown | null>(null)
   const drillVisible = ref(false)
   const drillChildren = ref<SubjectBreakdown[]>([])
@@ -76,6 +94,7 @@ export function useDashboardData() {
 
   async function fetchViewData() {
     const pid = selectedProjectId.value || undefined
+    const month = selectedMonth.value || undefined
     loading.value = true
     try {
       switch (activeRole.value) {
@@ -86,7 +105,7 @@ export function useDashboardData() {
           bmData.value = await getBusinessManagerView(pid)
           break
         case 'cost':
-          costData.value = await getCostManagerView(pid)
+          costData.value = await getCostManagerView(pid, month)
           if (pid) {
             costBreakdown.value = await getCostBreakdown(pid)
           } else {
@@ -108,7 +127,8 @@ export function useDashboardData() {
     }
   }
 
-  watch([activeRole, selectedProjectId], () => {
+  watch([activeRole, selectedProjectId, selectedMonth], () => {
+    if (bootstrapping.value) return
     fetchViewData()
   })
 
@@ -131,15 +151,17 @@ export function useDashboardData() {
   }
 
   onMounted(async () => {
-    await fetchProjects()
+    const roleAtBoot = activeRole.value
+    await Promise.allSettled([fetchProjects(), fetchViewData()])
     if (
-      needsProject(activeRole.value) &&
+      needsProject(roleAtBoot) &&
       !selectedProjectId.value &&
       projectList.value.length > 0
     ) {
       selectedProjectId.value = projectList.value[0].id
+      await fetchViewData()
     }
-    await fetchViewData()
+    bootstrapping.value = false
   })
 
   return {
@@ -148,6 +170,8 @@ export function useDashboardData() {
     roleLabel,
     projectList,
     selectedProjectId,
+    selectedMonth,
+    monthOptions,
     pmData,
     bmData,
     costData,

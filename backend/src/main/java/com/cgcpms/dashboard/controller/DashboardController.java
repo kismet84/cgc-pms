@@ -43,8 +43,9 @@ public class DashboardController {
     @GetMapping("/cost-manager")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:cost-manager:view')")
     public ApiResponse<CostManagerDashboardVO> getCostManagerView(
-            @RequestParam(required = false) Long projectId) {
-        return ApiResponse.success(dashboardService.getCostManagerView(projectId));
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getCostManagerView(projectId, month));
     }
 
     /**

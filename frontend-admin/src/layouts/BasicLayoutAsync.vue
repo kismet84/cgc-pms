@@ -48,7 +48,7 @@ onBeforeUnmount(() => {
   >
     <a-layout-sider
       v-model:collapsed="collapsed"
-      :width="244"
+      width="var(--shell-sidebar-width)"
       :collapsed-width="72"
       class="sidebar"
       theme="light"

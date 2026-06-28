@@ -33,7 +33,8 @@ describe('useContractLedger UI consistency', () => {
   it('defaults low-priority ledger columns to hidden while keeping them configurable', () => {
     const source = readFileSync(sourcePath, 'utf8')
 
-    expect(source).toContain("const COLS_KEY = 'contract_ledger_cols_v2'")
+    expect(source).toContain("'contract_ledger_cols_v2'")
+    expect(source).toContain('useColumnSettings(')
     expect(source).toContain('partyAName: false')
     expect(source).toContain('signedDate: false')
   })

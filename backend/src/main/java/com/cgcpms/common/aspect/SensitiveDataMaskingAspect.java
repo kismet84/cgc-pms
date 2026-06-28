@@ -176,6 +176,7 @@ public class SensitiveDataMaskingAspect {
                 || clazz == String.class
                 || Number.class.isAssignableFrom(clazz)
                 || Boolean.class.isAssignableFrom(clazz)
+                || clazz.getPackageName().startsWith("java.time")
                 || clazz.isEnum();
     }
 }

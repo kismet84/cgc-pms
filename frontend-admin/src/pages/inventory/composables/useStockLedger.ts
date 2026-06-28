@@ -3,6 +3,7 @@ import { message } from 'ant-design-vue'
 import { getStockLedger, getStockKpi, getWarehouseList } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import type { WarehouseVO, MatStockTxnVO, StockKpiVO } from '@/types/inventory'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // ---- 交易类型 ----
 export const TXN_TYPE_LABEL: Record<string, string> = {
@@ -17,6 +18,7 @@ export const TXN_TYPE_COLOR: Record<string, string> = {
 }
 
 export const SOURCE_TYPE_LABEL: Record<string, string> = {
+  MAT_RECEIPT: '材料验收入库',
   PURCHASE_IN: '采购入库',
   PURCHASE_RETURN: '采购退货',
   MATERIAL_OUT: '领料出库',
@@ -29,6 +31,7 @@ export const SOURCE_TYPE_LABEL: Record<string, string> = {
   INIT: '期初导入',
 }
 export const SOURCE_TYPE_COLOR: Record<string, string> = {
+  MAT_RECEIPT: 'success',
   PURCHASE_IN: 'success',
   PURCHASE_RETURN: 'warning',
   MATERIAL_OUT: 'error',
@@ -48,18 +51,6 @@ export function getSourceTypeLabel(type: string | null | undefined): string {
 export function getSourceTypeColor(type: string | null | undefined): string {
   if (!type) return 'default'
   return SOURCE_TYPE_COLOR[type] ?? 'default'
-}
-
-// ---- 列可见性 localStorage key ----
-export const COLS_KEY = 'stock_ledger_cols'
-export const defaultCols: Record<string, boolean> = {
-  txnType: true,
-  quantity: true,
-  availableAfter: true,
-  sourceType: true,
-  sourceId: true,
-  createdTime: true,
-  ops: true,
 }
 
 export function useStockLedger() {
@@ -104,21 +95,6 @@ export function useStockLedger() {
 
   // ---- 仓库下拉 ----
   const warehouseList = ref<WarehouseVO[]>([])
-
-  // ---- 列可见性 ----
-  let saved: Record<string, boolean> = defaultCols
-  try {
-    const raw = localStorage.getItem(COLS_KEY)
-    if (raw) saved = JSON.parse(raw)
-  } catch (e: unknown) {
-    console.error(e)
-    localStorage.removeItem(COLS_KEY)
-  }
-  const colVisible = reactive<Record<string, boolean>>({ ...defaultCols, ...saved })
-  function toggleCol(key: string) {
-    colVisible[key] = !colVisible[key]
-    localStorage.setItem(COLS_KEY, JSON.stringify(colVisible))
-  }
 
   // ---- 排序 ----
   const sortField = ref<string>('createdTime')
@@ -303,60 +279,44 @@ export function useStockLedger() {
   // ---- vxe-grid 列定义 ----
   const gridColumns = computed(() => [
     { type: 'seq' as const, title: '流水号', width: 92, align: 'center' as const },
-    ...(colVisible.txnType
-      ? [{ field: 'txnType', title: '类型', width: 80, slots: { default: 'txnType' } }]
-      : []),
-    ...(colVisible.quantity
-      ? [
-          {
-            field: 'quantity',
-            title: '变动量',
-            width: 120,
-            align: 'right' as const,
-            sortable: true,
-            slots: { default: 'quantity' },
-          },
-        ]
-      : []),
-    ...(colVisible.availableAfter
-      ? [
-          {
-            field: 'availableAfter',
-            title: '变动后余量',
-            width: 130,
-            align: 'right' as const,
-            slots: { default: 'availableAfter' },
-          },
-        ]
-      : []),
-    ...(colVisible.sourceType
-      ? [{ field: 'sourceType', title: '来源类型', width: 120, slots: { default: 'sourceType' } }]
-      : []),
-    ...(colVisible.sourceId
-      ? [
-          {
-            field: 'sourceId',
-            title: '关联单据',
-            width: 130,
-            ellipsis: true,
-            slots: { default: 'sourceId' },
-          },
-        ]
-      : []),
-    ...(colVisible.createdTime
-      ? [
-          {
-            field: 'createdTime',
-            title: '操作时间',
-            width: 150,
-            sortable: true,
-          },
-        ]
-      : []),
-    ...(colVisible.ops
-      ? [{ title: '操作', width: 76, align: 'center' as const, slots: { default: 'ops' } }]
-      : []),
+    { field: 'txnType', title: '类型', width: 80, slots: { default: 'txnType' } },
+    {
+      field: 'quantity',
+      title: '变动量',
+      width: 120,
+      align: 'right' as const,
+      sortable: true,
+      slots: { default: 'quantity' },
+    },
+    {
+      field: 'availableAfter',
+      title: '变动后余量',
+      width: 130,
+      align: 'right' as const,
+      slots: { default: 'availableAfter' },
+    },
+    { field: 'sourceType', title: '来源类型', width: 120, slots: { default: 'sourceType' } },
+    {
+      field: 'sourceId',
+      title: '关联单据',
+      width: 130,
+      ellipsis: true,
+      slots: { default: 'sourceId' },
+    },
+    {
+      field: 'createdTime',
+      title: '操作时间',
+      width: 150,
+      sortable: true,
+    },
+    { key: 'ops', title: '操作', width: 76, align: 'center' as const, slots: { default: 'ops' } },
   ])
+  const {
+    visibleColumns: visibleGridColumns,
+    columnSettings,
+    colVisible,
+    toggleCol,
+  } = useColumnSettings('stock_ledger_cols', gridColumns)
 
   return {
     // 状态
@@ -373,6 +333,7 @@ export function useStockLedger() {
     materialList,
     // 列可见性
     colVisible,
+    columnSettings,
     toggleCol,
     // 排序
     sortField,
@@ -401,5 +362,6 @@ export function useStockLedger() {
     lowStockWarn,
     inOutStats,
     gridColumns,
+    visibleGridColumns,
   }
 }

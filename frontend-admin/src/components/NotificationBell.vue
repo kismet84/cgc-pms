@@ -27,6 +27,7 @@ const loading = ref(false)
 const markingIds = ref<Set<string>>(new Set())
 const markingAll = ref(false)
 const popoverOpen = ref(false)
+const initialized = ref(false)
 
 let eventSource: EventSource | null = null
 
@@ -84,6 +85,7 @@ async function fetchNotifications() {
 // ── SSE ──
 function connectSSE() {
   try {
+    if (eventSource) return
     eventSource = createNotificationStream()
 
     eventSource.addEventListener('connected', () => {
@@ -129,6 +131,13 @@ function connectSSE() {
   }
 }
 
+async function ensureInitialized() {
+  if (initialized.value) return
+  initialized.value = true
+  await fetchUnreadCount()
+  connectSSE()
+}
+
 // ── Actions ──
 async function handleMarkRead(record: NotificationVO) {
   if (record.isRead === 1) return
@@ -167,8 +176,8 @@ async function handleMarkAllRead() {
 function handlePopoverChange(visible: boolean) {
   if (visible) {
     popoverOpen.value = true
+    void ensureInitialized()
     fetchNotifications()
-    fetchUnreadCount()
   } else {
     popoverOpen.value = false
   }
@@ -176,8 +185,6 @@ function handlePopoverChange(visible: boolean) {
 
 // ── Lifecycle ──
 onMounted(() => {
-  fetchUnreadCount()
-  connectSSE()
 })
 
 onUnmounted(() => {

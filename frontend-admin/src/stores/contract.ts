@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { normalizeArray } from '@/utils/normalizeArray'
 import type {
   ContractVO,
   ContractItem,
@@ -16,15 +17,6 @@ import {
   saveContractPaymentTerms,
   getContractApprovalRecords,
 } from '@/api/modules/contract'
-
-function normalizeArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (value && typeof value === 'object') {
-    const records = (value as { records?: unknown }).records
-    if (Array.isArray(records)) return records as T[]
-  }
-  return []
-}
 
 export const useContractStore = defineStore('contract', () => {
   const currentContract = ref<ContractVO | null>(null)

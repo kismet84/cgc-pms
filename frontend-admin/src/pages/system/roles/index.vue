@@ -8,6 +8,7 @@ import type { SysRoleVO } from '@/types/system'
 import PermissionModal from './PermissionModal.vue'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { normalizeArray } from '@/utils/normalizeArray'
 
 const loading = ref(false)
 const allRoles = ref<SysRoleVO[]>([])
@@ -21,15 +22,6 @@ const filter = reactive({
 
 const permissionModalVisible = ref(false)
 const selectedRole = ref<SysRoleVO | null>(null)
-
-function normalizeArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (value && typeof value === 'object') {
-    const records = (value as { records?: unknown }).records
-    if (Array.isArray(records)) return records as T[]
-  }
-  return []
-}
 
 const gridColumns = computed(() => [
   { field: 'roleName', title: '角色名称', width: 150 },

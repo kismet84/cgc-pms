@@ -21,6 +21,7 @@ import {
   deleteProject,
 } from '@/api/modules/project'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 
@@ -33,49 +34,6 @@ const tableData = ref<ProjectVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
-
-const COLS_KEY = 'project_list_cols_v3'
-const defaultCols: Record<string, boolean> = {
-  projectCode: true,
-  projectName: true,
-  projectType: true,
-  contractAmount: true,
-  plannedDuration: true,
-  status: true,
-  approvalStatus: false,
-  ops: true,
-}
-const colLabels: Record<string, string> = {
-  projectCode: '项目编号',
-  projectName: '项目名称',
-  projectType: '项目类型',
-  contractAmount: '合同金额',
-  plannedDuration: '计划工期',
-  status: '状态',
-  approvalStatus: '审批状态',
-  ops: '操作',
-}
-let savedCols: Record<string, boolean> = defaultCols
-try {
-  const raw = localStorage.getItem(COLS_KEY)
-  if (raw) savedCols = JSON.parse(raw)
-} catch (e: unknown) {
-  console.error(e)
-  localStorage.removeItem(COLS_KEY)
-}
-const colVisible = reactive<Record<string, boolean>>({ ...defaultCols, ...savedCols })
-function toggleCol(key: string) {
-  colVisible[key] = !colVisible[key]
-  localStorage.setItem(COLS_KEY, JSON.stringify(colVisible))
-}
-
-const columnSettings = computed(() =>
-  Object.keys(defaultCols).map((key) => ({
-    key,
-    label: colLabels[key],
-    required: key === 'projectCode',
-  })),
-)
 
 const createVisible = ref(false)
 const createLoading = ref(false)
@@ -414,88 +372,69 @@ const recentProjects = computed(() =>
 
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
-  ...(colVisible.projectCode
-    ? [
-        {
-          field: 'projectCode',
-          title: '项目编号',
-          width: calcCodeColumnWidth(tableData.value.map((item) => item.projectCode)),
-          minWidth: 128,
-          showOverflow: false,
-          slots: { default: 'projectCode' },
-        },
-      ]
-    : []),
-  ...(colVisible.projectName
-    ? [
-        {
-          field: 'projectName',
-          title: '项目名称',
-          minWidth: 200,
-          showOverflow: 'tooltip',
-          slots: { default: 'projectName' },
-        },
-      ]
-    : []),
-  ...(colVisible.projectType
-    ? [
-        {
-          field: 'projectType',
-          title: '项目类型',
-          width: 108,
-          showOverflow: 'tooltip',
-          slots: { default: 'projectType' },
-        },
-      ]
-    : []),
-  ...(colVisible.contractAmount
-    ? [
-        {
-          field: 'contractAmount',
-          title: '合同金额',
-          width: 140,
-          minWidth: 140,
-          align: 'right' as const,
-          showOverflow: false,
-          slots: { default: 'contractAmount' },
-        },
-      ]
-    : []),
-  ...(colVisible.plannedDuration
-    ? [
-        {
-          field: 'plannedStartDate',
-          title: '计划工期',
-          width: 148,
-          showOverflow: 'tooltip',
-          slots: { default: 'plannedDuration' },
-        },
-      ]
-    : []),
-  ...(colVisible.status
-    ? [
-        {
-          field: 'status',
-          title: '状态',
-          width: 88,
-          showOverflow: 'tooltip',
-          slots: { default: 'status' },
-        },
-      ]
-    : []),
-  ...(colVisible.approvalStatus
-    ? [
-        {
-          field: 'approvalStatus',
-          title: '审批状态',
-          width: 108,
-          showOverflow: 'tooltip',
-          slots: { default: 'approvalStatus' },
-        },
-      ]
-    : []),
-  ...(colVisible.ops ? [{ title: '操作', width: 76, slots: { default: 'ops' } }] : []),
+  {
+    field: 'projectCode',
+    title: '项目编号',
+    width: calcCodeColumnWidth(tableData.value.map((item) => item.projectCode)),
+    minWidth: 128,
+    showOverflow: false,
+    slots: { default: 'projectCode' },
+  },
+  {
+    field: 'projectName',
+    title: '项目名称',
+    minWidth: 200,
+    showOverflow: 'tooltip',
+    slots: { default: 'projectName' },
+  },
+  {
+    field: 'projectType',
+    title: '项目类型',
+    width: 108,
+    showOverflow: 'tooltip',
+    slots: { default: 'projectType' },
+  },
+  {
+    field: 'contractAmount',
+    title: '合同金额',
+    width: 140,
+    minWidth: 140,
+    align: 'right' as const,
+    showOverflow: false,
+    slots: { default: 'contractAmount' },
+  },
+  {
+    field: 'plannedStartDate',
+    key: 'plannedDuration',
+    title: '计划工期',
+    width: 148,
+    showOverflow: 'tooltip',
+    slots: { default: 'plannedDuration' },
+  },
+  {
+    field: 'status',
+    title: '状态',
+    width: 88,
+    showOverflow: 'tooltip',
+    slots: { default: 'status' },
+  },
+  {
+    field: 'approvalStatus',
+    title: '审批状态',
+    width: 108,
+    showOverflow: 'tooltip',
+    slots: { default: 'approvalStatus' },
+  },
+  { key: 'ops', title: '操作', width: 76, slots: { default: 'ops' } },
 ])
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('project_list_cols_v3', gridColumns, {
+  approvalStatus: false,
+})
 </script>
 
 <template>
@@ -755,7 +694,7 @@ const gridColumns = computed(() => [
           <div class="lg-table-wrap project-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true, useKey: true }"
               show-overflow="title"

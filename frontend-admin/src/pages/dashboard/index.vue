@@ -1,8 +1,19 @@
 <script setup lang="ts">
-import { ProjectOutlined } from '@ant-design/icons-vue'
+import { computed } from 'vue'
+import {
+  BankOutlined,
+  DollarOutlined,
+  FullscreenOutlined,
+  ProjectOutlined,
+  ReloadOutlined,
+  SafetyCertificateOutlined,
+  ScheduleOutlined,
+  UserOutlined,
+} from '@ant-design/icons-vue'
 import { useDashboardData } from './composables/useDashboardData'
 import { fmtWan, fmtDeviation, devColor, devSign } from './utils/formatUtils'
 import { drillCols } from './utils/tableColumns'
+import type { DashboardRole } from '@/types/dashboard'
 import DashboardPmView from './components/DashboardPmView.vue'
 import DashboardBmView from './components/DashboardBmView.vue'
 import DashboardCostView from './components/DashboardCostView.vue'
@@ -12,9 +23,10 @@ import DashboardMgmtView from './components/DashboardMgmtView.vue'
 const {
   availableRoles,
   activeRole,
-  roleLabel,
   projectList,
   selectedProjectId,
+  selectedMonth,
+  monthOptions,
   pmData,
   bmData,
   costData,
@@ -28,31 +40,84 @@ const {
   needsProject,
   handleBarClick,
   closeDrill,
+  fetchViewData,
 } = useDashboardData()
+
+const roleTabOrder: DashboardRole[] = ['cost', 'pm', 'finance', 'mgmt', 'bm']
+const roleDisplayLabel: Record<DashboardRole, string> = {
+  cost: '成本经理',
+  pm: '项目经理',
+  finance: '生产经理',
+  mgmt: '安全经理',
+  bm: '商务经理',
+}
+const roleIcon: Record<DashboardRole, unknown> = {
+  cost: DollarOutlined,
+  pm: UserOutlined,
+  finance: ScheduleOutlined,
+  mgmt: SafetyCertificateOutlined,
+  bm: BankOutlined,
+}
+
+if (availableRoles.value.includes('cost')) {
+  activeRole.value = 'cost'
+}
+
+const orderedRoles = computed(() =>
+  roleTabOrder.filter((role) => availableRoles.value.includes(role)),
+)
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen()
+    return
+  }
+  document.exitFullscreen()
+}
 </script>
 
 <template>
   <div class="dashboard lg-list-page lg-page app-page">
-    <div class="dashboard-header lg-page-head">
-      <div>
-        <a-breadcrumb class="lg-page-head-breadcrumb">
-          <a-breadcrumb-item>首页</a-breadcrumb-item>
-          <a-breadcrumb-item>驾驶舱</a-breadcrumb-item>
-        </a-breadcrumb>
+    <div class="dashboard-header">
+      <div class="dashboard-title-block">
+        <div class="dashboard-title-row">
+          <h1>驾驶舱</h1>
+        </div>
       </div>
-      <div v-if="activeRole !== 'mgmt'" class="project-field">
-        <label>选择项目</label>
-        <a-select v-model:value="selectedProjectId" placeholder="请选择项目" style="width: 260px">
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
+      <div class="dashboard-actions">
+        <div v-if="activeRole !== 'mgmt'" class="project-field">
+          <a-select v-model:value="selectedProjectId" placeholder="请选择项目" style="width: 300px">
+            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+              {{ p.projectName }}
+            </a-select-option>
+          </a-select>
+        </div>
+        <a-select v-model:value="selectedMonth" style="width: 112px">
+          <a-select-option v-for="month in monthOptions" :key="month" :value="month">
+            {{ month }}
           </a-select-option>
         </a-select>
+        <a-button type="text" :loading="loading" @click="fetchViewData">
+          <template #icon><ReloadOutlined /></template>
+          刷新
+        </a-button>
+        <a-button type="text" @click="toggleFullscreen">
+          <template #icon><FullscreenOutlined /></template>
+          全屏
+        </a-button>
       </div>
     </div>
 
-    <div class="lg-card role-tabs-card">
+    <div class="role-tabs-card">
       <a-tabs v-model:activeKey="activeRole" class="role-tabs" size="small">
-        <a-tab-pane v-for="role in availableRoles" :key="role" :tab="roleLabel[role]" />
+        <a-tab-pane v-for="role in orderedRoles" :key="role">
+          <template #tab>
+            <span class="role-tab-label">
+              <component :is="roleIcon[role]" />
+              {{ roleDisplayLabel[role] }}
+            </span>
+          </template>
+        </a-tab-pane>
       </a-tabs>
     </div>
 
@@ -125,64 +190,154 @@ const {
   </div>
 </template>
 
-<style scoped>
+<style>
 .dashboard {
   min-height: 100%;
+  color: var(--text);
+  background: #f5f7fb;
 }
 
 .dashboard-header {
+  min-height: 46px;
+  margin-bottom: 10px;
+  padding: 0 0 2px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dashboard-title-block {
+  min-width: 0;
+}
+
+.dashboard-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 0;
+  min-width: 0;
+}
+
+.dashboard-title-row h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 34px;
+  letter-spacing: 0;
+}
+
+.dashboard-title-row span:last-child {
+  max-width: 460px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-header.lg-page-head {
   margin-bottom: 16px;
 }
 
-.project-field {
+.dashboard .project-field {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.project-field label {
+.dashboard .project-field label {
   color: var(--text-secondary);
   font-size: 13px;
   white-space: nowrap;
 }
 
-.role-tabs {
+.dashboard .role-tabs {
   margin: 0;
 }
 
-.role-tabs-card {
-  padding: 0 20px;
-  margin-bottom: 16px;
+.dashboard .role-tabs-card {
+  padding: 0;
+  margin-bottom: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.role-tabs :deep(.ant-tabs-nav) {
+.dashboard .role-tabs :deep(.ant-tabs-nav) {
   margin-bottom: 0;
 }
 
-.role-tabs :deep(.ant-tabs-tab) {
-  padding: 8px 14px;
-  font-size: 13px;
+.dashboard .role-tabs :deep(.ant-tabs-nav::before) {
+  border-bottom-color: #dde5f1;
 }
 
-.kpi-grid,
-.role-metric-strip {
+.dashboard .role-tabs :deep(.ant-tabs-tab) {
+  min-width: 118px;
+  margin: 0 4px 0 0;
+  padding: 9px 18px;
+  background: #fff;
+  border: 1px solid #dfe7f2;
+  border-bottom-color: #dfe7f2;
+  border-radius: 5px 5px 0 0;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dashboard .role-tabs :deep(.ant-tabs-tab-active) {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: #fff;
+}
+
+.dashboard .role-tabs :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: #fff;
+}
+
+.dashboard .role-tabs :deep(.ant-tabs-ink-bar) {
+  display: none;
+}
+
+.dashboard .role-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.dashboard .kpi-grid,
+.dashboard .role-metric-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 12px;
   margin-bottom: 16px;
 }
 
-.kpi-card {
+.dashboard .kpi-card {
   position: relative;
-  min-height: 98px;
-  padding: 18px 20px;
+  min-height: 104px;
+  padding: 18px 20px 16px;
   background: var(--surface);
-  border: 0;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
-  column-gap: 6px;
+  column-gap: 8px;
   align-items: flex-start;
   overflow: hidden;
   transition:
@@ -192,18 +347,18 @@ const {
     transform 0.18s ease;
 }
 
-.kpi-card::before {
+.dashboard .kpi-card::before {
   display: none;
 }
 
-.kpi-card:hover {
+.dashboard .kpi-card:hover {
   background: var(--surface);
   border-color: rgba(22, 119, 255, 0.24);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
 
-.kpi-icon {
+.dashboard .kpi-icon {
   width: 16px;
   height: 16px;
   margin-top: 0;
@@ -218,19 +373,19 @@ const {
   place-items: center;
 }
 
-.kpi-card:nth-child(2) .kpi-icon {
+.dashboard .kpi-card:nth-child(2) .kpi-icon {
   color: #d48806;
 }
 
-.kpi-card:nth-child(3) .kpi-icon {
+.dashboard .kpi-card:nth-child(3) .kpi-icon {
   color: #389e0d;
 }
 
-.kpi-card:nth-child(4) .kpi-icon {
+.dashboard .kpi-card:nth-child(4) .kpi-icon {
   color: #cf1322;
 }
 
-.kpi-body {
+.dashboard .kpi-body {
   min-width: 0;
   min-height: 62px;
   display: grid;
@@ -239,13 +394,13 @@ const {
   align-content: center;
 }
 
-.kpi-body::after {
+.dashboard .kpi-body::after {
   min-height: 16px;
   content: '';
   grid-row: 3;
 }
 
-.kpi-title {
+.dashboard .kpi-title {
   margin-bottom: 0;
   color: var(--muted);
   font-size: 13px;
@@ -254,7 +409,7 @@ const {
   grid-row: 1;
 }
 
-.kpi-value {
+.dashboard .kpi-value {
   color: var(--text);
   font-size: 22px;
   font-weight: 800;
@@ -264,14 +419,14 @@ const {
   word-break: break-word;
 }
 
-.kpi-value small {
+.dashboard .kpi-value small {
   margin-left: 4px;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
 }
 
-.kpi-delta {
+.dashboard .kpi-delta {
   display: inline-flex;
   align-items: center;
   min-height: 16px;
@@ -285,27 +440,27 @@ const {
   grid-row: 3;
 }
 
-.kpi-delta.danger {
+.dashboard .kpi-delta.danger {
   color: var(--error);
 }
 
-.kpi-delta.success {
+.dashboard .kpi-delta.success {
   color: var(--success);
 }
 
-.panel,
-.role-panel {
+.dashboard .panel,
+.dashboard .role-panel {
   min-width: 0;
   background: var(--surface);
-  border: 0;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
   overflow: hidden;
 }
 
-.panel-header {
-  min-height: 56px;
-  padding: 16px 24px;
+.dashboard .panel-header {
+  min-height: 48px;
+  padding: 13px 18px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text);
   display: flex;
@@ -315,64 +470,64 @@ const {
   font-weight: 700;
 }
 
-.panel-hint {
+.dashboard .panel-hint {
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 400;
 }
 
-.pm-reference-grid,
-.role-analysis-grid {
+.dashboard .pm-reference-grid,
+.dashboard .role-analysis-grid {
   display: grid;
   grid-template-columns: minmax(320px, 1.2fr) minmax(260px, 0.9fr) minmax(320px, 1fr);
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 16px;
 }
 
-.pm-bottom-grid,
-.role-table-grid {
+.dashboard .pm-bottom-grid,
+.dashboard .role-table-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
-.pm-chart,
-.pm-donut-chart,
-.role-chart {
+.dashboard .pm-chart,
+.dashboard .pm-donut-chart,
+.dashboard .role-chart {
   width: 100%;
   height: 240px;
 }
 
-.role-mini-chart {
+.dashboard .role-mini-chart {
   width: 100%;
   height: 210px;
 }
 
-.pm-table-panel,
-.role-panel {
+.dashboard .pm-table-panel,
+.dashboard .role-panel {
   min-width: 0;
 }
 
-.pm-table-panel :deep(.ant-table),
-.role-panel :deep(.ant-table) {
+.dashboard .pm-table-panel :deep(.ant-table),
+.dashboard .role-panel :deep(.ant-table) {
   font-size: 13px;
 }
 
-.pm-table-panel :deep(.ant-table-thead > tr > th),
-.role-panel :deep(.ant-table-thead > tr > th) {
+.dashboard .pm-table-panel :deep(.ant-table-thead > tr > th),
+.dashboard .role-panel :deep(.ant-table-thead > tr > th) {
   color: var(--text-secondary);
   background: var(--surface-subtle);
   font-size: 12px;
   font-weight: 700;
 }
 
-.pm-table-panel :deep(.ant-table-tbody > tr > td),
-.role-panel :deep(.ant-table-tbody > tr > td) {
+.dashboard .pm-table-panel :deep(.ant-table-tbody > tr > td),
+.dashboard .role-panel :deep(.ant-table-tbody > tr > td) {
   padding-top: 8px;
   padding-bottom: 8px;
 }
 
-.role-summary-strip {
+.dashboard .role-summary-strip {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 10px 12px;
@@ -381,22 +536,182 @@ const {
   font-size: 13px;
 }
 
-.role-summary-strip b {
+.dashboard .role-summary-strip b {
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
-.empty-page {
+.dashboard .cost-lens-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.85fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.dashboard .cost-main-panel {
+  min-height: 526px;
+}
+
+.dashboard .cost-main-panel .role-chart {
+  height: 294px;
+}
+
+.dashboard .cost-subject-list {
+  padding: 0 18px 18px;
+}
+
+.dashboard .cost-subject-list-head,
+.dashboard .cost-subject-row {
+  display: grid;
+  grid-template-columns: 42px minmax(120px, 1fr) minmax(100px, 1.1fr) 90px 82px;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard .cost-subject-list-head {
+  padding: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard .cost-subject-row {
+  appearance: none;
+  width: 100%;
+  min-height: 38px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  outline: 0;
+}
+
+.dashboard .cost-subject-row:hover {
+  background: rgba(22, 119, 255, 0.04);
+}
+
+.dashboard .cost-subject-row:focus-visible {
+  outline: 2px solid rgba(22, 119, 255, 0.32);
+  outline-offset: -2px;
+}
+
+.dashboard .cost-subject-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard .cost-subject-bar {
+  height: 7px;
+  background: #edf1f7;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dashboard .cost-subject-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #1677ff, #14b8c7);
+  border-radius: inherit;
+}
+
+.dashboard .cost-subject-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard .decision-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard .decision-panel {
+  min-height: 0;
+}
+
+.dashboard .decision-panel :deep(.ant-table-thead > tr > th),
+.dashboard .decision-panel :deep(.ant-table-tbody > tr > td) {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.dashboard .cost-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 18px 18px;
+}
+
+.dashboard .cost-summary-item {
+  padding: 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.dashboard .cost-summary-item span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.dashboard .cost-summary-item b {
+  color: var(--text);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard .cost-ledger-panel {
+  margin-top: 12px;
+}
+
+.dashboard .cost-ledger-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard .cost-ledger-toolbar strong {
+  color: var(--text);
+}
+
+.dashboard .cost-ledger-toolbar span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dashboard .cost-ledger-panel :deep(.ant-table-thead > tr > th) {
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard .cost-ledger-panel :deep(.ant-table-tbody > tr > td) {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.dashboard .empty-page {
   padding: 80px 20px;
   text-align: center;
   color: var(--muted);
   background: var(--surface);
-  border: 0;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
+  box-shadow: none;
 }
 
-.drill-summary {
+.dashboard .drill-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 16px 20px;
@@ -407,10 +722,11 @@ const {
 }
 
 @media (max-width: 1100px) {
-  .pm-reference-grid,
-  .pm-bottom-grid,
-  .role-analysis-grid,
-  .role-table-grid {
+  .dashboard .pm-reference-grid,
+  .dashboard .pm-bottom-grid,
+  .dashboard .role-analysis-grid,
+  .dashboard .role-table-grid,
+  .dashboard .cost-lens-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -421,20 +737,25 @@ const {
     flex-direction: column;
   }
 
-  .project-field {
+  .dashboard-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dashboard .project-field {
     width: 100%;
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .project-field :deep(.ant-select) {
+  .dashboard .project-field :deep(.ant-select) {
     width: 100% !important;
   }
 
-  .pm-chart,
-  .pm-donut-chart,
-  .role-chart,
-  .role-mini-chart {
+  .dashboard .pm-chart,
+  .dashboard .pm-donut-chart,
+  .dashboard .role-chart,
+  .dashboard .role-mini-chart {
     height: 220px;
   }
 }

@@ -50,12 +50,10 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('receipt_list_cols_v2', gridColumns)
-
-if (!localStorage.getItem('receipt_list_cols_v2')) {
-  colVisible.receiptDate = false
-  colVisible.approvalStatus = false
-}
+} = useColumnSettings('receipt_list_cols_v2', gridColumns, {
+  receiptDate: false,
+  approvalStatus: false,
+})
 
 const {
   modalVisible,

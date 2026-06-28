@@ -3,6 +3,7 @@ import { getDictDataByCode } from '@/api/modules/dict'
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { CostSubjectTreeNode, CostSubjectVO } from '@/types/costSubject'
+import { normalizeArray } from '@/utils/normalizeArray'
 import {
   getCostSubjectTree,
   createCostSubject,
@@ -71,14 +72,6 @@ const fallbackSubjectTypeOptions = [
   { dictLabel: '分包费', dictValue: 'SUBCONTRACT' },
   { dictLabel: '其他费用', dictValue: 'OTHER' },
 ]
-function normalizeArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (value && typeof value === 'object') {
-    const records = (value as { records?: unknown }).records
-    if (Array.isArray(records)) return records as T[]
-  }
-  return []
-}
 async function fetchSubjectTypes() {
   try {
     const options = normalizeArray<{ dictLabel: string; dictValue: string }>(

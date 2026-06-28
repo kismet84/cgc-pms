@@ -1,21 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AlertLogVO } from '@/types/alert'
+import { normalizeArray } from '@/utils/normalizeArray'
 import {
   getAlertList,
   markAlertRead,
   batchEvaluate,
   type AlertListParams,
 } from '@/api/modules/alert'
-
-function normalizeArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (value && typeof value === 'object') {
-    const records = (value as { records?: unknown }).records
-    if (Array.isArray(records)) return records as T[]
-  }
-  return []
-}
 
 export const useAlertStore = defineStore('alert', () => {
   const alerts = ref<AlertLogVO[]>([])

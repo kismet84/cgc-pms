@@ -63,4 +63,74 @@ describe('Dashboard reference fidelity', () => {
 
     expect(allSource).not.toContain('目标成本管理')
   })
+
+  it('does not keep local mock data arrays in the cost manager dashboard', () => {
+    for (const forbidden of [
+      'fallbackSubjects',
+      'budgetAlerts = [',
+      'overdueItems = [',
+      'pendingPayments = [',
+      'fallbackLedgerRows',
+      '74,510.00',
+      '13,680.25',
+    ]) {
+      expect(costViewSource).not.toContain(forbidden)
+    }
+  })
+
+  it('wires cost manager contract fields from the API type into the component', () => {
+    const typesSource = readFileSync(resolve(currentDir, '../../../types/dashboard.ts'), 'utf-8')
+    for (const field of [
+      'trendPoints',
+      'subjectRankings',
+      'overdueItems',
+      'pendingPayments',
+      'ledgerRows',
+      'ledgerTotal',
+    ]) {
+      expect(typesSource).toContain(field)
+      expect(costViewSource).toContain(field)
+    }
+  })
+
+  it('wires dashboard header controls instead of leaving static selectors and buttons', () => {
+    expect(indexSource).toContain('v-model:value="selectedMonth"')
+    expect(indexSource).toContain('monthOptions')
+    expect(indexSource).toContain('@click="toggleFullscreen"')
+    expect(indexSource).toContain('requestFullscreen')
+    expect(indexSource).not.toContain('<a-select value="2024-05"')
+    expect(indexSource).not.toContain('<a-button type="text">\n          <template #icon><FullscreenOutlined')
+  })
+
+  it('wires cost ledger tabs, filters, export, and pagination controls', () => {
+    for (const expected of [
+      'activeLedgerTab',
+      'subjectFilter',
+      'statusFilter',
+      'ledgerKeyword',
+      'pagedLedgerRows',
+      'resetLedgerFilters',
+      'exportLedgerCsv',
+      'viewLedgerRow',
+      'drillLedgerRow',
+      'v-model:current="currentPage"',
+      'v-model:value="pageSize"',
+    ]) {
+      expect(costViewSource).toContain(expected)
+    }
+
+    expect(costViewSource).toContain('@click="viewLedgerRow')
+    expect(costViewSource).toContain('@click="drillLedgerRow')
+    expect(costViewSource).not.toContain('<a-select value="all" size="small"')
+    expect(costViewSource).not.toContain('<a-button size="small">重置</a-button>')
+    expect(costViewSource).not.toContain('<a-button size="small" type="primary" ghost>导出</a-button>')
+    expect(costViewSource).not.toContain('<a-pagination :current="1"')
+  })
+
+  it('wires the cost trend cumulative/monthly segmented control', () => {
+    expect(costViewSource).toContain('trendMode')
+    expect(costViewSource).toContain('displayedTrendPoints')
+    expect(costViewSource).toContain('v-model:value="trendMode"')
+    expect(costViewSource).not.toContain(':value="\'累计\'"')
+  })
 })

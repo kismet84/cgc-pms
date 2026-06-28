@@ -24,6 +24,7 @@ import {
 import { useReferenceStore } from '@/stores/reference'
 import type { VarOrderVO, VarOrderItemVO } from '@/types/variation'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -112,51 +113,6 @@ const APPROVAL_STATUS_COLOR: Record<string, string> = {
   REJECTED: 'error',
 }
 
-// ---- Column visibility ----
-const COLS_KEY = 'var_order_cols_v2'
-const defaultCols: Record<string, boolean> = {
-  varCode: true,
-  varName: true,
-  varType: true,
-  direction: true,
-  projectName: true,
-  contractName: false,
-  partnerName: false,
-  reportedAmount: false,
-  approvedAmount: false,
-  confirmedAmount: true,
-  approvalStatus: true,
-  ops: true,
-}
-let saved: Record<string, boolean> = defaultCols
-try {
-  const raw = localStorage.getItem(COLS_KEY)
-  if (raw) saved = JSON.parse(raw)
-} catch (e: unknown) {
-  console.error(e)
-  localStorage.removeItem(COLS_KEY)
-}
-const colVisible = reactive<Record<string, boolean>>({ ...defaultCols, ...saved })
-function toggleCol(key: string) {
-  colVisible[key] = !colVisible[key]
-  localStorage.setItem(COLS_KEY, JSON.stringify(colVisible))
-}
-
-const COL_LABELS: Record<string, string> = {
-  varCode: '变更编号',
-  varName: '变更名称',
-  varType: '变更类型',
-  direction: '方向',
-  projectName: '项目名称',
-  contractName: '合同名称',
-  partnerName: '合作方',
-  reportedAmount: '上报金额',
-  approvedAmount: '审定金额',
-  confirmedAmount: '确认金额',
-  approvalStatus: '审批状态',
-  ops: '操作',
-}
-
 function calcCodeColumnWidth(values: Array<string | undefined>, title = '变更编号') {
   const longest = Math.max(title.length, ...values.map((value) => String(value ?? '').length))
   return Math.min(Math.max(longest * 9 + 42, 128), 240)
@@ -164,81 +120,60 @@ function calcCodeColumnWidth(values: Array<string | undefined>, title = '变更�
 
 // ---- VxeGrid columns ----
 const gridColumns = computed(() => [
-  ...(colVisible.varCode
-    ? [
-        {
-          field: 'varCode',
-          title: '变更编号',
-          width: calcCodeColumnWidth(tableData.value.map((item) => item.varCode)),
-          minWidth: 128,
-          showOverflow: false,
-          slots: { default: 'varCode' },
-        },
-      ]
-    : []),
-  ...(colVisible.varName
-    ? [{ field: 'varName', title: '变更名称', minWidth: 150, ellipsis: true }]
-    : []),
-  ...(colVisible.varType
-    ? [{ field: 'varType', title: '变更类型', width: 108, slots: { default: 'varType' } }]
-    : []),
-  ...(colVisible.direction
-    ? [{ field: 'direction', title: '方向', width: 70, slots: { default: 'direction' } }]
-    : []),
-  ...(colVisible.projectName
-    ? [{ field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true }]
-    : []),
-  ...(colVisible.contractName
-    ? [{ field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true }]
-    : []),
-  ...(colVisible.partnerName
-    ? [{ field: 'partnerName', title: '合作方', minWidth: 140, ellipsis: true }]
-    : []),
-  ...(colVisible.reportedAmount
-    ? [
-        {
-          field: 'reportedAmount',
-          title: '上报金额',
-          width: 118,
-          align: 'right' as const,
-          slots: { default: 'reportedAmount' },
-        },
-      ]
-    : []),
-  ...(colVisible.approvedAmount
-    ? [
-        {
-          field: 'approvedAmount',
-          title: '审定金额',
-          width: 118,
-          align: 'right' as const,
-          slots: { default: 'approvedAmount' },
-        },
-      ]
-    : []),
-  ...(colVisible.confirmedAmount
-    ? [
-        {
-          field: 'confirmedAmount',
-          title: '确认金额',
-          width: 118,
-          align: 'right' as const,
-          slots: { default: 'confirmedAmount' },
-        },
-      ]
-    : []),
-  ...(colVisible.approvalStatus
-    ? [
-        {
-          field: 'approvalStatus',
-          title: '审批状态',
-          width: 108,
-          slots: { default: 'approvalStatus' },
-        },
-      ]
-    : []),
-  ...(colVisible.ops ? [{ title: '操作', width: 76, slots: { default: 'ops' } }] : []),
+  {
+    field: 'varCode',
+    title: '变更编号',
+    width: calcCodeColumnWidth(tableData.value.map((item) => item.varCode)),
+    minWidth: 128,
+    showOverflow: false,
+    slots: { default: 'varCode' },
+  },
+  { field: 'varName', title: '变更名称', minWidth: 150, ellipsis: true },
+  { field: 'varType', title: '变更类型', width: 108, slots: { default: 'varType' } },
+  { field: 'direction', title: '方向', width: 70, slots: { default: 'direction' } },
+  { field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true },
+  { field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true },
+  { field: 'partnerName', title: '合作方', minWidth: 140, ellipsis: true },
+  {
+    field: 'reportedAmount',
+    title: '上报金额',
+    width: 118,
+    align: 'right' as const,
+    slots: { default: 'reportedAmount' },
+  },
+  {
+    field: 'approvedAmount',
+    title: '审定金额',
+    width: 118,
+    align: 'right' as const,
+    slots: { default: 'approvedAmount' },
+  },
+  {
+    field: 'confirmedAmount',
+    title: '确认金额',
+    width: 118,
+    align: 'right' as const,
+    slots: { default: 'confirmedAmount' },
+  },
+  {
+    field: 'approvalStatus',
+    title: '审批状态',
+    width: 108,
+    slots: { default: 'approvalStatus' },
+  },
+  { key: 'ops', title: '操作', width: 76, slots: { default: 'ops' } },
 ])
+const {
+  visibleColumns: visibleGridColumns,
+  columnSettings,
+  colVisible,
+  toggleCol,
+} = useColumnSettings('var_order_cols_v2', gridColumns, {
+  contractName: false,
+  partnerName: false,
+  reportedAmount: false,
+  approvedAmount: false,
+})
 
 async function fetchData() {
   loading.value = true
@@ -415,14 +350,6 @@ function handleItemPriceChange(idx: number) {
 }
 
 const itemsTotalAmount = computed(() => itemList.value.reduce((sum, i) => sum + (i.amount ?? 0), 0))
-
-const columnSettings = computed(() =>
-  Object.keys(defaultCols).map((key) => ({
-    key,
-    label: COL_LABELS[key],
-    required: key === 'varCode',
-  })),
-)
 
 const variationStats = computed(() => ({
   total: total.value,
@@ -604,7 +531,7 @@ onMounted(() => {
           <div class="lg-table-wrap vo-table-wrap">
             <vxe-grid
               :data="tableData"
-              :columns="gridColumns"
+              :columns="visibleGridColumns"
               :loading="loading"
               :column-config="{ resizable: true }"
               stripe

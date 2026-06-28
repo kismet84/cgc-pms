@@ -111,12 +111,10 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('purchase_request_cols_v2', gridColumns)
-
-if (!localStorage.getItem('purchase_request_cols_v2')) {
-  colVisible.createdBy = false
-  colVisible.createdTime = false
-}
+} = useColumnSettings('purchase_request_cols_v2', gridColumns, {
+  createdBy: false,
+  createdTime: false,
+})
 
 async function fetchData() {
   loading.value = true

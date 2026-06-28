@@ -16,6 +16,7 @@ import type { CostSummaryVO } from '@/types/cost'
 import type { ProjectVO } from '@/types/project'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { normalizeArray } from '@/utils/normalizeArray'
 
 type CostSubjectSummary = CostSummaryVO['subjects'][number]
 type CheckStatus = 'overrun' | 'saving' | 'balanced'
@@ -26,15 +27,6 @@ const projectList = ref<ProjectVO[]>([])
 const selectedProjectId = ref<string | undefined>(undefined)
 const loading = ref(false)
 const summary = ref<CostSummaryVO | null>(null)
-
-function normalizeArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (value && typeof value === 'object') {
-    const records = (value as { records?: unknown }).records
-    if (Array.isArray(records)) return records as T[]
-  }
-  return []
-}
 
 function parseAmount(val: string | undefined): number {
   if (!val) return 0

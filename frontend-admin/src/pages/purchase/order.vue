@@ -129,12 +129,10 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('purchase_order_cols_v2', gridColumns)
-
-if (!localStorage.getItem('purchase_order_cols_v2')) {
-  colVisible.deliveryDate = false
-  colVisible.approvalStatus = false
-}
+} = useColumnSettings('purchase_order_cols_v2', gridColumns, {
+  deliveryDate: false,
+  approvalStatus: false,
+})
 
 async function fetchData() {
   loading.value = true

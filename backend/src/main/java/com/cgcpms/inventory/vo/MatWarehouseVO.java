@@ -7,6 +7,7 @@ public class MatWarehouseVO {
     private String id;
     private String tenantId;
     private String projectId;
+    private String projectName;
     private String warehouseCode;
     private String warehouseName;
     private String status;

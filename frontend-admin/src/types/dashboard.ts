@@ -113,7 +113,70 @@ export interface CostManagerDashboardVO {
   estimatedRemainingCost: string
   expectedProfit: string
   contractIncome: string
+  trendPoints: CostManagerTrendPoint[]
+  subjectRankings: CostManagerSubjectRanking[]
   overBudgetAlerts: DashboardAlertItemVO[]
+  overdueItems: CostManagerOverdueItem[]
+  pendingPayments: CostManagerPendingPayment[]
+  ledgerRows: CostManagerLedgerRow[]
+  ledgerTotal: number
+}
+
+export interface CostManagerTrendPoint {
+  month: string
+  targetCost: string
+  dynamicCost: string
+  costDeviation: string
+}
+
+export interface CostManagerSubjectRanking {
+  costSubjectId: string
+  costSubjectName: string
+  targetCost: string
+  actualCost: string
+  dynamicCost: string
+  costDeviation: string
+  ratio: string
+}
+
+export interface CostManagerOverdueItem {
+  taskId: string
+  instanceId: string
+  businessType: string
+  businessId: string
+  title: string
+  overdueDays: number
+  ownerName: string
+  plannedAt: string
+  projectId: string
+  projectName: string
+}
+
+export interface CostManagerPendingPayment {
+  payRecordId: string
+  contractId: string
+  contractName: string
+  partnerName: string
+  payAmount: string
+  payDate: string
+  payStatus: string
+  projectId: string
+  projectName: string
+}
+
+export interface CostManagerLedgerRow {
+  rowType?: 'cost' | 'contract' | 'fund'
+  costSubjectId: string
+  costSubjectName: string
+  contractCode: string
+  contractName: string
+  budgetAmount: string
+  actualAmount: string
+  completionRatio: string
+  deviationAmount: string
+  deviationRatio: string
+  status: string
+  ownerName: string
 }
 
 /** ── Finance View ── */

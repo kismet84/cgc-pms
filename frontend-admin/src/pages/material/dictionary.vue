@@ -93,13 +93,11 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('material_dict_cols_v2', gridColumns)
-
-if (!localStorage.getItem('material_dict_cols_v2')) {
-  colVisible.brand = false
-  colVisible.defaultTaxRate = false
-  colVisible.createdAt = false
-}
+} = useColumnSettings('material_dict_cols_v2', gridColumns, {
+  brand: false,
+  defaultTaxRate: false,
+  createdAt: false,
+})
 
 const materialStats = computed(() => ({
   total: total.value,

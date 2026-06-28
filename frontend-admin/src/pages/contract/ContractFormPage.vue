@@ -15,6 +15,7 @@ import {
   submitForApproval,
 } from '@/api/modules/contract'
 import type { ContractSaveRequest } from '@/api/modules/contract'
+import { getDictDataByCode } from '@/api/modules/dict'
 import { useReferenceStore } from '@/stores/reference'
 import type { ContractType, ContractItem, ContractPaymentTerm } from '@/types/contract'
 
@@ -86,13 +87,14 @@ const current = ref(0)
 const submitting = ref(false)
 
 // ---- Data dictionaries ----
-const contractTypeOptions: { value: ContractType; label: string }[] = [
+const fallbackContractTypeOptions: { value: ContractType; label: string }[] = [
   { value: 'MAIN', label: '总包合同' },
   { value: 'SUB', label: '分包合同' },
   { value: 'PURCHASE', label: '采购合同' },
   { value: 'LEASE', label: '租赁合同' },
   { value: 'SERVICE', label: '服务合同' },
 ]
+const contractTypeOptions = ref([...fallbackContractTypeOptions])
 const paymentMethodOptions = [
   { value: '银行转账', label: '银行转账' },
   { value: '银行承兑汇票', label: '银行承兑汇票' },
@@ -106,13 +108,9 @@ const settlementMethodOptions = [
   { value: '按节点结算', label: '按节点结算' },
 ]
 
-const TYPE_LABEL: Record<ContractType, string> = {
-  MAIN: '总包合同',
-  SUB: '分包合同',
-  PURCHASE: '采购合同',
-  LEASE: '租赁合同',
-  SERVICE: '服务合同',
-}
+const contractTypeLabelMap = computed(() =>
+  Object.fromEntries(contractTypeOptions.value.map((item) => [item.value, item.label])),
+)
 
 // ---- Reactive form data ----
 const formData = reactive({
@@ -158,6 +156,8 @@ const basicRules: Record<string, Rule[]> = {
   contractName: [{ required: true, message: '请输入合同名称', trigger: 'blur' }],
   contractType: [{ required: true, message: '请选择合同类型', trigger: 'change' }],
   projectId: [{ required: true, message: '请选择所属项目', trigger: 'change' }],
+  partyAId: [{ required: true, message: '请选择甲方', trigger: 'change' }],
+  partyBId: [{ required: true, message: '请选择乙方', trigger: 'change' }],
   contractAmount: [{ required: true, message: '请输入合同金额', trigger: 'blur' }],
   signedDate: [{ required: true, message: '请选择签订日期', trigger: 'change' }],
 }
@@ -353,6 +353,10 @@ function fmtMoney(val: string | number | undefined): string {
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function contractTypeLabel(value: ContractType | undefined): string {
+  return value ? (contractTypeLabelMap.value[value] ?? value) : '-'
+}
+
 const itemsTotal = computed(() =>
   items.value.reduce((s, r) => s + (Number(r.amount) || 0), 0).toFixed(2),
 )
@@ -361,7 +365,7 @@ const termsTotal = computed(() =>
 )
 
 onMounted(async () => {
-  await Promise.all([referenceStore.fetchProjects(), referenceStore.fetchPartners()])
+  await Promise.all([referenceStore.fetchProjects(), referenceStore.fetchPartners(), loadContractTypes()])
   if (isEdit.value && contractId.value) {
     try {
       await loadContractDetail()
@@ -371,6 +375,18 @@ onMounted(async () => {
     }
   }
 })
+
+async function loadContractTypes() {
+  try {
+    const rows = await getDictDataByCode('contract_type')
+    const enabled = rows
+      .filter((row) => row.status === 'ENABLE')
+      .map((row) => ({ value: row.dictValue as ContractType, label: row.dictLabel }))
+    if (enabled.length) contractTypeOptions.value = enabled
+  } catch (e: unknown) {
+    console.error(e)
+  }
+}
 
 async function loadContractDetail() {
   loadingDetail.value = true
@@ -528,7 +544,7 @@ function genTermKey(): string {
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="甲方">
+                <a-form-item label="甲方" name="partyAId">
                   <a-select
                     v-model:value="formData.partyAId"
                     placeholder="请选择甲方（合作方-甲方类型）"
@@ -549,7 +565,7 @@ function genTermKey(): string {
                 </a-form-item>
               </a-col>
               <a-col :span="12">
-                <a-form-item label="乙方">
+                <a-form-item label="乙方" name="partyBId">
                   <a-select
                     v-model:value="formData.partyBId"
                     placeholder="请选择乙方（合作方-乙方类型）"
@@ -653,7 +669,7 @@ function genTermKey(): string {
               formData.contractName || '-'
             }}</a-descriptions-item>
             <a-descriptions-item label="合同类型">
-              {{ formData.contractType ? TYPE_LABEL[formData.contractType] : '-' }}
+              {{ contractTypeLabel(formData.contractType) }}
             </a-descriptions-item>
             <a-descriptions-item label="所属项目">{{ projectName }}</a-descriptions-item>
             <a-descriptions-item label="甲方">{{ partyAName }}</a-descriptions-item>

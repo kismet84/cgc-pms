@@ -24,6 +24,7 @@ import {
 import type { PartnerVO } from '@/types/partner'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { normalizeArray } from '@/utils/normalizeArray'
 
 const filter = reactive({
   partnerCode: '',
@@ -71,14 +72,6 @@ const fallbackPartnerTypeOptions = [
   { dictLabel: '乙方', dictValue: 'PARTY_B' },
   { dictLabel: '其他', dictValue: 'OTHER' },
 ]
-function normalizeArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (value && typeof value === 'object') {
-    const records = (value as { records?: unknown }).records
-    if (Array.isArray(records)) return records as T[]
-  }
-  return []
-}
 const partnerTypeLabel = (val: string) => {
   const options = Array.isArray(partnerTypeOptions.value) ? partnerTypeOptions.value : []
   const fromDict = options.find((o) => o.dictValue === val)
@@ -138,14 +131,12 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('partner_list_cols_v2', gridColumns)
-
-if (!localStorage.getItem('partner_list_cols_v2')) {
-  colVisible.partnerType = false
-  colVisible.qualificationLevel = false
-  colVisible.blacklistFlag = false
-  colVisible.riskLevel = false
-}
+} = useColumnSettings('partner_list_cols_v2', gridColumns, {
+  partnerType: false,
+  qualificationLevel: false,
+  blacklistFlag: false,
+  riskLevel: false,
+})
 
 const partnerStats = computed(() => ({
   total: total.value,

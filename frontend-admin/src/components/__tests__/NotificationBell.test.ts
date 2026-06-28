@@ -125,22 +125,35 @@ describe('NotificationBell', () => {
     vi.mocked(createNotificationStream).mockReturnValue(mockEventSource as unknown as EventSource)
   })
 
-  it('fetches unread count on mount', async () => {
+  it('does not fetch unread count on mount', async () => {
     vi.mocked(getUnreadCount).mockResolvedValue({ count: 5 })
 
     const wrapper = mount(NotificationBell, { global: { stubs } })
     await flushPromises()
 
-    expect(getUnreadCount).toHaveBeenCalledTimes(1)
+    expect(getUnreadCount).not.toHaveBeenCalled()
     const badge = wrapper.find('.badge-count')
-    expect(badge.exists()).toBe(true)
-    expect(badge.text()).toBe('5')
+    expect(badge.exists()).toBe(false)
   })
 
-  it('connects SSE on mount', async () => {
+  it('connects SSE when popover opens', async () => {
     vi.mocked(getUnreadCount).mockResolvedValue({ count: 0 })
+    vi.mocked(getNotifications).mockResolvedValue({
+      records: [],
+      total: 0,
+      pageNo: 1,
+      pageSize: 20,
+    })
 
     mount(NotificationBell, { global: { stubs } })
+    await flushPromises()
+
+    expect(createNotificationStream).not.toHaveBeenCalled()
+
+    const wrapper = mount(NotificationBell, { global: { stubs } })
+    await flushPromises()
+
+    emitPopoverOpen(wrapper, true)
     await flushPromises()
 
     expect(createNotificationStream).toHaveBeenCalledTimes(1)
@@ -177,9 +190,6 @@ describe('NotificationBell', () => {
 
     const wrapper = mount(NotificationBell, { global: { stubs } })
     await flushPromises()
-
-    // Clear call from onMounted if any
-    vi.mocked(getNotifications).mockClear()
 
     emitPopoverOpen(wrapper, true)
     await flushPromises()

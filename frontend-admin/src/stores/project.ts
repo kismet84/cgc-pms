@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { message } from 'ant-design-vue'
 import type { ProjectVO, MemberVO, MemberFormParams } from '@/types/project'
+import { normalizeArray } from '@/utils/normalizeArray'
 import {
   getProjectDetail,
   getMemberList,
@@ -9,15 +10,6 @@ import {
   updateMember as updateMemberApi,
   removeMember as removeMemberApi,
 } from '@/api/modules/project'
-
-function normalizeArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (value && typeof value === 'object') {
-    const records = (value as { records?: unknown }).records
-    if (Array.isArray(records)) return records as T[]
-  }
-  return []
-}
 
 export const useProjectStore = defineStore('project', () => {
   const currentProject = ref<ProjectVO | null>(null)

@@ -5,8 +5,10 @@ import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostSummary;
+import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
 import com.cgcpms.dashboard.vo.*;
@@ -66,6 +68,7 @@ class DashboardServiceTest {
     @Autowired private AlertLogMapper alertLogMapper;
     @Autowired private CostSummaryMapper costSummaryMapper;
     @Autowired private CostSubjectMapper costSubjectMapper;
+    @Autowired private CostItemMapper costItemMapper;
 
     /**
      * Helper that seeds a full test project and returns its ID.
@@ -124,8 +127,9 @@ class DashboardServiceTest {
         task.setBusinessType("CONTRACT");
         task.setBusinessId(contractId);
         task.setApproverId(USER_ADMIN);
+        task.setApproverName("成本经理");
         task.setTaskStatus(WorkflowConstants.TASK_PENDING);
-        task.setReceivedAt(LocalDateTime.now().minusHours(2));
+        task.setReceivedAt(LocalDateTime.now().minusDays(9));
         wfTaskMapper.insert(task);
 
         // VarOrder
@@ -166,6 +170,16 @@ class DashboardServiceTest {
         payRecord.setPayStatus("SUCCESS");
         payRecordMapper.insert(payRecord);
 
+        PayRecord pendingPayRecord = new PayRecord();
+        pendingPayRecord.setTenantId(TENANT_ID);
+        pendingPayRecord.setPayApplicationId(2L);
+        pendingPayRecord.setContractId(contractId);
+        pendingPayRecord.setProjectId(projectId);
+        pendingPayRecord.setPayAmount(new BigDecimal("230000.00"));
+        pendingPayRecord.setPayDate(LocalDate.now().minusDays(1));
+        pendingPayRecord.setPayStatus("PENDING_APPROVAL");
+        payRecordMapper.insert(pendingPayRecord);
+
         // CostSummary (project-level)
         CostSummary summary = new CostSummary();
         summary.setTenantId(TENANT_ID);
@@ -181,6 +195,21 @@ class DashboardServiceTest {
         summary.setExpectedProfit(new BigDecimal("1800000.00"));
         summary.setCostDeviation(new BigDecimal("200000.00"));
         costSummaryMapper.insert(summary);
+
+        CostSummary lastMonthSummary = new CostSummary();
+        lastMonthSummary.setTenantId(TENANT_ID);
+        lastMonthSummary.setProjectId(projectId);
+        lastMonthSummary.setSummaryDate(LocalDate.now().minusMonths(1).withDayOfMonth(1));
+        lastMonthSummary.setTargetCost(new BigDecimal("7600000.00"));
+        lastMonthSummary.setContractLockedCost(new BigDecimal("2800000.00"));
+        lastMonthSummary.setActualCost(new BigDecimal("3500000.00"));
+        lastMonthSummary.setPaidAmount(new BigDecimal("1800000.00"));
+        lastMonthSummary.setEstimatedRemainingCost(new BigDecimal("3900000.00"));
+        lastMonthSummary.setDynamicCost(new BigDecimal("7600000.00"));
+        lastMonthSummary.setContractIncome(new BigDecimal("10000000.00"));
+        lastMonthSummary.setExpectedProfit(new BigDecimal("2400000.00"));
+        lastMonthSummary.setCostDeviation(BigDecimal.ZERO);
+        costSummaryMapper.insert(lastMonthSummary);
 
         // CostSubject
         CostSubject subject = new CostSubject();
@@ -203,6 +232,23 @@ class DashboardServiceTest {
         subjectSummary.setDynamicCost(new BigDecimal("3100000.00"));
         subjectSummary.setCostDeviation(new BigDecimal("100000.00"));
         costSummaryMapper.insert(subjectSummary);
+
+        CostItem costItem = new CostItem();
+        costItem.setTenantId(TENANT_ID);
+        costItem.setProjectId(projectId);
+        costItem.setContractId(contractId);
+        costItem.setCostSubjectId(subjectId);
+        costItem.setCostType("CT_LABOR");
+        costItem.setAmount(new BigDecimal("1500000.00"));
+        costItem.setTaxAmount(BigDecimal.ZERO);
+        costItem.setAmountWithoutTax(new BigDecimal("1500000.00"));
+        costItem.setSourceType("CT_CONTRACT");
+        costItem.setSourceId(contractId);
+        costItem.setSourceItemId(1L);
+        costItem.setCostDate(LocalDate.now());
+        costItem.setCostStatus("CONFIRMED");
+        costItem.setGeneratedFlag(1);
+        costItemMapper.insert(costItem);
 
         // AlertLog
         AlertLog alert = new AlertLog();
@@ -327,6 +373,91 @@ class DashboardServiceTest {
         assertNotNull(vo.getActualCost());
         assertNotNull(vo.getExpectedProfit());
         assertTrue(vo.getOverBudgetAlerts().size() >= 1);
+        assertEquals(sr.projectName, vo.getOverBudgetAlerts().get(0).getProjectName());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.1b Cost view: returns dashboard contract lists from real project data")
+    void testCostView_ReturnsDashboardContractLists() {
+        SeedResult sr = seed("COST_FULL");
+        CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId);
+
+        assertNotNull(vo);
+        assertEquals(sr.projectId.toString(), vo.getProjectId());
+        assertEquals("8000000.00", vo.getTargetCost());
+        assertEquals("8200000.00", vo.getDynamicCost());
+
+        assertNotNull(vo.getTrendPoints());
+        assertEquals(2, vo.getTrendPoints().size(), "monthly trend should come from cost_summary dates");
+        assertTrue(vo.getTrendPoints().get(0).getMonth().compareTo(vo.getTrendPoints().get(1).getMonth()) <= 0);
+        assertEquals("7600000.00", vo.getTrendPoints().get(0).getDynamicCost());
+        assertEquals("8200000.00", vo.getTrendPoints().get(1).getDynamicCost());
+
+        assertNotNull(vo.getSubjectRankings());
+        assertEquals(1, vo.getSubjectRankings().size());
+        assertEquals("人工费", vo.getSubjectRankings().get(0).getCostSubjectName());
+        assertEquals("1500000.00", vo.getSubjectRankings().get(0).getActualCost());
+
+        assertNotNull(vo.getOverdueItems());
+        assertEquals(1, vo.getOverdueItems().size());
+        assertEquals("审批-COST_FULL", vo.getOverdueItems().get(0).getTitle());
+        assertTrue(vo.getOverdueItems().get(0).getOverdueDays() >= 2);
+        assertEquals("成本经理", vo.getOverdueItems().get(0).getOwnerName());
+
+        assertNotNull(vo.getPendingPayments());
+        assertEquals(1, vo.getPendingPayments().size());
+        assertEquals("230000.00", vo.getPendingPayments().get(0).getPayAmount());
+        assertEquals("PENDING_APPROVAL", vo.getPendingPayments().get(0).getPayStatus());
+        assertEquals("Contract COST_FULL", vo.getPendingPayments().get(0).getContractName());
+
+        assertNotNull(vo.getLedgerRows());
+        CostManagerDashboardVO.LedgerRow costRow = vo.getLedgerRows().stream()
+                .filter(row -> "cost".equals(row.getRowType()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("人工费", costRow.getCostSubjectName());
+        assertEquals("CT-COST_FULL", costRow.getContractCode());
+        assertEquals("Contract COST_FULL", costRow.getContractName());
+        assertEquals("正常", costRow.getStatus());
+        assertEquals((long) vo.getLedgerRows().size(), vo.getLedgerTotal());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.1c Cost view: selected month uses cost snapshot up to that month")
+    void testCostView_SelectedMonthUsesMonthlySnapshot() {
+        SeedResult sr = seed("COST_MONTH");
+        String lastMonth = LocalDate.now().minusMonths(1).withDayOfMonth(1).toString().substring(0, 7);
+
+        CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId, lastMonth);
+
+        assertNotNull(vo);
+        assertEquals("7600000.00", vo.getTargetCost());
+        assertEquals("7600000.00", vo.getDynamicCost());
+        assertEquals("3500000.00", vo.getActualCost());
+        assertEquals(1, vo.getTrendPoints().size());
+        assertEquals(lastMonth, vo.getTrendPoints().get(0).getMonth());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.1d Cost view: selected month keeps latest subject snapshot")
+    void testCostView_SelectedMonthKeepsLatestSubjectSnapshot() {
+        SeedResult sr = seed("COST_SUBJECT_MONTH");
+        LocalDate lastMonthDate = LocalDate.now().minusMonths(1).withDayOfMonth(1);
+        for (CostSummary summary : costSummaryMapper.selectList(null)) {
+            if (sr.projectId.equals(summary.getProjectId()) && summary.getCostSubjectId() != null) {
+                summary.setSummaryDate(lastMonthDate);
+                costSummaryMapper.updateById(summary);
+            }
+        }
+
+        CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId, LocalDate.now().toString().substring(0, 7));
+
+        assertEquals(1, vo.getSubjectRankings().size());
+        assertEquals("人工费", vo.getSubjectRankings().get(0).getCostSubjectName());
+        assertTrue(vo.getLedgerRows().stream().anyMatch(row -> "人工费".equals(row.getCostSubjectName())));
     }
 
     @Test
@@ -341,6 +472,12 @@ class DashboardServiceTest {
         assertEquals("全部项目", vo.getProjectName());
         assertNotNull(vo.getTargetCost());
         assertNotNull(vo.getDynamicCost());
+        assertNotNull(vo.getTrendPoints());
+        assertNotNull(vo.getSubjectRankings());
+        assertNotNull(vo.getOverdueItems());
+        assertNotNull(vo.getPendingPayments());
+        assertNotNull(vo.getLedgerRows());
+        assertTrue(vo.getLedgerTotal() >= 1L);
     }
 
     // ========================================================================

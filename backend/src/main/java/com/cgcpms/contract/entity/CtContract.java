@@ -42,8 +42,10 @@ public class CtContract extends BaseEntity {
     @NotBlank
     private String contractType;
 
+    @NotNull(message = "合同甲方不能为空")
     private Long partyAId;
 
+    @NotNull(message = "合同乙方不能为空")
     private Long partyBId;
 
     @NotNull

@@ -38,7 +38,7 @@ const compactBar = (name: string, data: number[], color = '#3b82f6'): CompactSer
 
 interface ChartOption {
   tooltip: { trigger: 'axis' | 'item' }
-  grid?: { left: number; right: number; top: number; bottom: number }
+  grid?: { left: number; right: number; top: number; bottom: number; containLabel?: boolean }
   legend?: {
     bottom: number
     itemWidth: number
@@ -61,7 +61,7 @@ interface ChartOption {
 function axisOption(categories: string[], series: CompactSeries[]): ChartOption {
   return {
     tooltip: { trigger: 'axis' as const },
-    grid: { left: 28, right: 18, top: 24, bottom: 28 },
+    grid: { left: 48, right: 18, top: 24, bottom: 28, containLabel: true },
     xAxis: { type: 'category' as const, data: categories, axisLabel: { fontSize: 11 } },
     yAxis: { type: 'value' as const, axisLabel: { fontSize: 11 } },
     series,

@@ -130,12 +130,10 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('subcontract_measure_cols_v2', gridColumns)
-
-if (!localStorage.getItem('subcontract_measure_cols_v2')) {
-  colVisible.measureDate = false
-  colVisible.approvalStatus = false
-}
+} = useColumnSettings('subcontract_measure_cols_v2', gridColumns, {
+  measureDate: false,
+  approvalStatus: false,
+})
 
 async function fetchData() {
   loading.value = true

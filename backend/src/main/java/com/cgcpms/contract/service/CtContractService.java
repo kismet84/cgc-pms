@@ -157,6 +157,7 @@ public class CtContractService {
 
     @Transactional
     public Long create(CtContract contract) {
+        validateContractParties(contract);
         String code = codeGenerationService.nextCode(
                 ctContractMapper,
                 CtContract::getContractCode,
@@ -182,6 +183,8 @@ public class CtContractService {
         // 编辑守卫：只允许 DRAFT 状态编辑
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
             throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
+
+        validateContractParties(contract);
 
         // 使用字段白名单更新，禁止通过 update 接口覆盖受保护字段
         ctContractMapper.update(null,
@@ -272,6 +275,7 @@ public class CtContractService {
     @Transactional
     public Long compositeSave(ContractSaveRequest request) {
         CtContract contract = request.getContract();
+        validateContractParties(contract);
 
         if (contract.getId() == null) {
             // ── 新建 ──
@@ -356,6 +360,12 @@ public class CtContractService {
             vo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().format(DateTimeUtils.DTF) : null);
             return vo;
         }).toList();
+    }
+
+    private void validateContractParties(CtContract contract) {
+        if (contract == null || contract.getPartyAId() == null || contract.getPartyBId() == null) {
+            throw new BusinessException("CONTRACT_PARTY_REQUIRED", "合同甲方和乙方不能为空");
+        }
     }
 
     private CtContractVO toVO(CtContract c) {

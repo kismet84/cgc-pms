@@ -27,25 +27,11 @@ export const useUserStore = defineStore('user', () => {
     clearUserInfo()
   }
 
-  // Backward-compat stubs — tokens are now HttpOnly cookies, JS never sees them.
-  // These are kept so existing code calling setToken/setRefreshToken doesn't break.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function setToken(_value: string) {
-    // no-op: tokens are set via Set-Cookie by the backend
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function setRefreshToken(_value: string) {
-    // no-op: tokens are set via Set-Cookie by the backend
-  }
-
   return {
     userInfo,
     roles,
     permissions,
     isLogin,
-    setToken,
-    setRefreshToken,
     setUserInfo,
     hasPermission,
     logout,

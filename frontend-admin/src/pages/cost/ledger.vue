@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { message } from 'ant-design-vue'
 import {
@@ -28,6 +29,7 @@ import { ColumnSettingsButton } from '@/components/list-page'
 
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
+const route = useRoute()
 function onResize() {
   isMobile.value = window.innerWidth < MOBILE_BP
 }
@@ -215,6 +217,13 @@ function handleShowSizeChange(_current: number, size: number) {
   fetchData()
 }
 
+function applyRouteQuery() {
+  const projectId = route.query.projectId
+  const costSubjectId = route.query.costSubjectId
+  filter.projectId = typeof projectId === 'string' ? projectId : undefined
+  filter.costSubjectId = typeof costSubjectId === 'string' ? costSubjectId : undefined
+}
+
 async function showDetail(record: CostLedgerVO) {
   detailVisible.value = true
   try {
@@ -345,6 +354,7 @@ const {
 // ---- Init ----
 onMounted(() => {
   window.addEventListener('resize', onResize)
+  applyRouteQuery()
   referenceStore.fetchProjects()
   referenceStore.fetchPartners()
   fetchSubjectTree()

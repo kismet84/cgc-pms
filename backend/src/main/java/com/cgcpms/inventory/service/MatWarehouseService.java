@@ -11,6 +11,8 @@ import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatStockMapper;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ public class MatWarehouseService {
     private final MatWarehouseMapper matWarehouseMapper;
 
     private final MatStockMapper matStockMapper;
+
+    private final PmProjectMapper pmProjectMapper;
 
     public PageResult<MatWarehouseVO> getPage(long pageNo, long pageSize, Long projectId, String warehouseCode, String warehouseName, String status) {
         LambdaQueryWrapper<MatWarehouse> wrapper = new LambdaQueryWrapper<>();
@@ -113,6 +117,10 @@ public class MatWarehouseService {
         vo.setId(w.getId() != null ? w.getId().toString() : null);
         vo.setTenantId(w.getTenantId() != null ? w.getTenantId().toString() : null);
         vo.setProjectId(w.getProjectId() != null ? w.getProjectId().toString() : null);
+        if (w.getProjectId() != null) {
+            PmProject project = pmProjectMapper.selectById(w.getProjectId());
+            vo.setProjectName(project != null ? project.getProjectName() : null);
+        }
         vo.setWarehouseCode(w.getWarehouseCode());
         vo.setWarehouseName(w.getWarehouseName());
         vo.setStatus(w.getStatus());

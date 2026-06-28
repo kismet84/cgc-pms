@@ -6,15 +6,7 @@ import type { OrgPositionVO } from '@/types/org'
 import type { PageResult } from '@/types/api'
 import { flattenDeptTree } from '../utils'
 import type { OrgDepartmentTreeNodeVO } from '@/types/org'
-
-function normalizeArray<T>(value: unknown): T[] {
-  if (Array.isArray(value)) return value as T[]
-  if (value && typeof value === 'object') {
-    const records = (value as { records?: unknown }).records
-    if (Array.isArray(records)) return records as T[]
-  }
-  return []
-}
+import { normalizeArray } from '@/utils/normalizeArray'
 
 export function usePosition(deptTreeData: Ref<OrgDepartmentTreeNodeVO[]>) {
   const loading = ref(false)

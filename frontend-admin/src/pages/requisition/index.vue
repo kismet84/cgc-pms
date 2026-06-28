@@ -45,12 +45,10 @@ const {
   columnSettings,
   colVisible,
   toggleCol,
-} = useColumnSettings('requisition_list_cols_v2', gridColumns)
-
-if (!localStorage.getItem('requisition_list_cols_v2')) {
-  colVisible.requisitionDate = false
-  colVisible.approvalStatus = false
-}
+} = useColumnSettings('requisition_list_cols_v2', gridColumns, {
+  requisitionDate: false,
+  approvalStatus: false,
+})
 
 const {
   modalVisible,
