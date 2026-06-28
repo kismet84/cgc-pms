@@ -12,13 +12,33 @@ describe('VariationOrderPage save chain integrity', () => {
       // createVarOrder returns Promise<string>, so res is a string.
       // The fix: const id = await createVarOrder(formData) then saveVarOrderItems(id, ...)
       expect(orderSource).toMatch(/const\s+id\s+=\s+await\s+createVarOrder\(formData\)/)
-      expect(orderSource).toMatch(/await\s+saveVarOrderItems\(id,\s*itemList\.value\)/)
+      expect(orderSource).toMatch(/await\s+saveVarOrderItems\(id,\s*effectiveItems\)/)
     })
 
     it('does NOT reference res.id for createVarOrder result', () => {
       // The old buggy pattern was "const res = await createVarOrder(...); saveVarOrderItems(res.id, ...)"
       // This must not appear in the source
       expect(orderSource).not.toMatch(/saveVarOrderItems\(res\.id/)
+    })
+  })
+
+  describe('new variation defaults from contract items', () => {
+    it('loads contract items and cost subjects for variation detail rows', () => {
+      expect(orderSource).toMatch(/getContractItems/)
+      expect(orderSource).toMatch(/getCostSubjectTree/)
+      expect(orderSource).toMatch(/loadContractItems\(contractId\)/)
+    })
+
+    it('renders a cost subject selector in detail rows', () => {
+      expect(orderSource).toMatch(/title="成本科目"/)
+      expect(orderSource).toMatch(/v-model:value="item\.costSubjectId"/)
+      expect(orderSource).toMatch(/:options="costSubjectOptions"/)
+      expect(orderSource).toMatch(/popup-match-select-width="false"/)
+    })
+
+    it('saves only detail rows with quantity greater than zero', () => {
+      expect(orderSource).toMatch(/effectiveItems\s*=\s*itemList\.value[\s\S]*?quantity[\s\S]*?>\s*0/)
+      expect(orderSource).toMatch(/saveVarOrderItems\(id,\s*effectiveItems\)/)
     })
   })
 

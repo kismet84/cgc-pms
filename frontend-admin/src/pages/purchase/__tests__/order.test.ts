@@ -30,4 +30,9 @@ describe('PurchaseOrderPage submit-approval button', () => {
   it('wires 提交审批 button to handleSubmitApproval handler', () => {
     expect(source).toMatch(/handleSubmitApproval\(row\)/)
   })
+
+  it('maps contract purchase order type to Chinese display text', () => {
+    expect(source).toMatch(/CONTRACT:\s*'合同采购'/)
+    expect(source).toMatch(/ORDER_TYPE_LABEL\[row\.orderType\]\s*\?\?\s*row\.orderType/)
+  })
 })

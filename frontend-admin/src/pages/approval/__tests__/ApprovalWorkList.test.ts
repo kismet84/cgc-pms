@@ -14,4 +14,9 @@ describe('approval work list route titles', () => {
     )
     expect(source).toMatch(/<p[^>]*>\s*\{\{ pageHeaderSubtitle\(\) \}\}[\s\S]*?<\/p>/)
   })
+
+  it('maps payment application business type to Chinese display text', () => {
+    expect(source).toMatch(/PAY_APPLICATION:\s*'付款申请'/)
+    expect(source).toMatch(/businessTypeMap\[row\.businessType as string\]/)
+  })
 })

@@ -16,17 +16,23 @@ export const PAY_TYPE_COLOR: Record<PayType, string> = {
 }
 
 /** Payment status display mapping */
-export type PayStatus = 'UNPAID' | 'PARTIAL' | 'PAID'
+export type PayStatus = 'PENDING' | 'APPROVED' | 'UNPAID' | 'PARTIAL' | 'PARTIALLY_PAID' | 'PAID'
 
 export const PAY_STATUS_LABEL: Record<PayStatus, string> = {
+  PENDING: '待付款',
+  APPROVED: '已批未付',
   UNPAID: '未支付',
   PARTIAL: '部分支付',
+  PARTIALLY_PAID: '部分支付',
   PAID: '已支付',
 }
 
 export const PAY_STATUS_COLOR: Record<PayStatus, string> = {
+  PENDING: 'default',
+  APPROVED: 'warning',
   UNPAID: 'default',
   PARTIAL: 'warning',
+  PARTIALLY_PAID: 'warning',
   PAID: 'success',
 }
 

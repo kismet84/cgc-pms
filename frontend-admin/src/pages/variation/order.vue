@@ -21,8 +21,12 @@ import {
   saveVarOrderItems,
   submitVarOrderForApproval,
 } from '@/api/modules/variation'
+import { getContractItems } from '@/api/modules/contract'
+import { getCostSubjectTree } from '@/api/modules/costSubject'
 import { useReferenceStore } from '@/stores/reference'
 import type { VarOrderVO, VarOrderItemVO } from '@/types/variation'
+import type { ContractItem } from '@/types/contract'
+import type { CostSubjectTreeNode } from '@/types/costSubject'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
@@ -62,19 +66,32 @@ const formData = reactive<Partial<VarOrderVO>>({
 const formPartnerName = computed(
   () => contractList.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
 )
-function onContractChange(contractId: string) {
+async function onContractChange(contractId: string) {
   const c = contractList.value?.find((ct) => ct.id === contractId)
   formData.partnerId = c?.partyBId
+  await ensureCostSubjects()
+  await loadContractItems(contractId)
+}
+function onFormProjectChange(projectId: string) {
+  formData.contractId = undefined
+  formData.partnerId = undefined
+  itemList.value = []
+  referenceStore.fetchContracts({ projectId })
 }
 watch(
   () => formData.contractId,
   (val) => {
-    if (!val) formData.partnerId = undefined
+    if (!val) {
+      formData.partnerId = undefined
+      itemList.value = []
+    }
   },
 )
 
 const itemList = ref<(Partial<VarOrderItemVO> & { key: number })[]>([])
 let itemKeyCounter = 0
+const contractItemsLoading = ref(false)
+const costSubjectOptions = ref<{ value: string; label: string }[]>([])
 
 const VAR_TYPE_OPTIONS = [
   { label: '设计变更', value: '设计变更' },
@@ -229,7 +246,7 @@ function handlePageSizeChange(_cur: number, size: number) {
   fetchData()
 }
 
-function handleAdd() {
+async function handleAdd() {
   modalTitle.value = '新建变更签证'
   editingId.value = null
   modalReadonly.value = false
@@ -246,6 +263,7 @@ function handleAdd() {
   })
   itemList.value = []
   itemKeyCounter = 0
+  await ensureCostSubjects()
   modalVisible.value = true
 }
 
@@ -264,6 +282,7 @@ async function openVarOrderModal(record: VarOrderVO, readonly: boolean) {
     ownerConfirmFlag: record.ownerConfirmFlag ?? 0,
     remark: record.remark ?? '',
   })
+  await ensureCostSubjects()
   try {
     const detail = await getVarOrderDetail(record.id)
     itemList.value = (detail.items ?? []).map((it, idx) => ({ ...it, key: idx }))
@@ -310,20 +329,72 @@ async function handleDelete(record: VarOrderVO) {
 async function handleSubmit() {
   if (modalReadonly.value) return
   const id = editingId.value
+  const effectiveItems = itemList.value.filter((item) => toNumber(item.quantity) > 0)
   try {
     if (id) {
       await updateVarOrder(id, formData)
-      await saveVarOrderItems(id, itemList.value)
+      await saveVarOrderItems(id, effectiveItems)
       message.success('更新成功')
     } else {
       const id = await createVarOrder(formData)
-      await saveVarOrderItems(id, itemList.value)
+      await saveVarOrderItems(id, effectiveItems)
       message.success('创建成功')
     }
     modalVisible.value = false
     fetchData()
   } catch (e: unknown) {
     console.error(e)
+  }
+}
+
+function toNumber(value: unknown): number {
+  const n = Number(value ?? 0)
+  return Number.isFinite(n) ? n : 0
+}
+
+function flattenCostSubjects(
+  nodes: CostSubjectTreeNode[] = [],
+  depth = 0,
+): { value: string; label: string }[] {
+  return nodes.flatMap((node) => [
+    { value: node.id, label: `${'　'.repeat(depth)}${node.subjectName}` },
+    ...flattenCostSubjects(node.children ?? [], depth + 1),
+  ])
+}
+
+async function ensureCostSubjects() {
+  if (costSubjectOptions.value.length) return
+  try {
+    costSubjectOptions.value = flattenCostSubjects(await getCostSubjectTree('COST'))
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载成本科目失败')
+  }
+}
+
+async function loadContractItems(contractId?: string) {
+  if (!contractId) {
+    itemList.value = []
+    return
+  }
+  contractItemsLoading.value = true
+  try {
+    const rows = await getContractItems(contractId)
+    itemKeyCounter = 0
+    itemList.value = rows.map((row: ContractItem) => ({
+      key: itemKeyCounter++,
+      itemName: row.itemName,
+      unit: row.unit,
+      quantity: 0,
+      unitPrice: toNumber(row.unitPrice),
+      amount: 0,
+    }))
+  } catch (e: unknown) {
+    console.error(e)
+    itemList.value = []
+    message.error('加载合同清单失败')
+  } finally {
+    contractItemsLoading.value = false
   }
 }
 
@@ -342,14 +413,18 @@ function handleRemoveItem(idx: number) {
 }
 function handleItemQtyChange(idx: number) {
   const item = itemList.value[idx]
-  item.amount = (item.quantity ?? 0) * (item.unitPrice ?? 0)
+  item.amount = toNumber(item.quantity) * toNumber(item.unitPrice)
 }
 function handleItemPriceChange(idx: number) {
   const item = itemList.value[idx]
-  item.amount = (item.quantity ?? 0) * (item.unitPrice ?? 0)
+  item.amount = toNumber(item.quantity) * toNumber(item.unitPrice)
 }
 
-const itemsTotalAmount = computed(() => itemList.value.reduce((sum, i) => sum + (i.amount ?? 0), 0))
+const itemsTotalAmount = computed(() =>
+  itemList.value
+    .filter((item) => toNumber(item.quantity) > 0)
+    .reduce((sum, i) => sum + toNumber(i.amount), 0),
+)
 
 const variationStats = computed(() => ({
   total: total.value,
@@ -668,9 +743,7 @@ onMounted(() => {
                 :options="(projectList ?? []).map((p) => ({ value: p.id, label: p.projectName }))"
                 @change="
                   (v: string) => {
-                    formData.contractId = undefined
-                    formData.partnerId = undefined
-                    referenceStore.fetchContracts({ projectId: v })
+                    onFormProjectChange(v)
                   }
                 " /></a-form-item
           ></a-col>
@@ -759,10 +832,11 @@ onMounted(() => {
         </div>
         <a-table
           :data-source="itemList"
+          :loading="contractItemsLoading"
           :pagination="false"
           row-key="key"
           size="small"
-          :scroll="{ y: 250 }"
+          :scroll="{ x: 900, y: 250 }"
         >
           <a-table-column title="清单项名称" width="160"
             ><template #default="{ record: item }"
@@ -777,6 +851,19 @@ onMounted(() => {
               ><a-input
                 v-model:value="item.unit"
                 placeholder="单位"
+                :disabled="modalReadonly"
+                style="width: 100%" /></template
+          ></a-table-column>
+          <a-table-column title="成本科目" width="180"
+            ><template #default="{ record: item }"
+              ><a-select
+                v-model:value="item.costSubjectId"
+                placeholder="选择成本科目"
+                :options="costSubjectOptions"
+                show-search
+                option-filter-prop="label"
+                popup-match-select-width="false"
+                :dropdown-style="{ minWidth: '280px' }"
                 :disabled="modalReadonly"
                 style="width: 100%" /></template
           ></a-table-column>

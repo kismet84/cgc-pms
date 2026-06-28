@@ -13,6 +13,12 @@ describe('ProjectNav — navigation handlers', () => {
     expect(source).toMatch(/@click="router\.push\(`\/project\/[^`]*overview`\)"/)
   })
 
+  it('maps ACTIVE project status to Chinese display text', () => {
+    const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
+    expect(source).toMatch(/ACTIVE:\s*'在建'/)
+    expect(source).toMatch(/\['ACTIVE',\s*'ONGOING'\]\.includes\(item\.status\)/)
+  })
+
   // ── TEST 2: Partner name is NOT a clickable link (no partner detail route) ──
   it('renders partner name as plain text, not a fake link', () => {
     const source = readFileSync(resolve(currentDir, '../../partner/index.vue'), 'utf-8')

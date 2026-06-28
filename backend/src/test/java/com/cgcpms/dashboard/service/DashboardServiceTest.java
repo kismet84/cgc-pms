@@ -462,6 +462,49 @@ class DashboardServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("3.1e Cost view: fallback rankings include variation cost items")
+    void testCostView_FallbackRankingsIncludeVariationCostItems() {
+        SeedResult sr = seed("COST_VAR_ITEM");
+        costSummaryMapper.physicalDeleteByTenantAndProject(TENANT_ID, sr.projectId);
+
+        CostSubject subject = costSubjectMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostSubject>()
+                        .eq(CostSubject::getTenantId, TENANT_ID)
+                        .eq(CostSubject::getSubjectCode, "SUBJ-COST_VAR_ITEM"))
+                .stream()
+                .findFirst()
+                .orElseThrow();
+
+        CostItem variationCost = new CostItem();
+        variationCost.setTenantId(TENANT_ID);
+        variationCost.setProjectId(sr.projectId);
+        variationCost.setCostSubjectId(subject.getId());
+        variationCost.setCostType("VARIATION");
+        variationCost.setAmount(new BigDecimal("30000.00"));
+        variationCost.setTaxAmount(BigDecimal.ZERO);
+        variationCost.setAmountWithoutTax(new BigDecimal("30000.00"));
+        variationCost.setSourceType("VAR_ORDER");
+        variationCost.setSourceId(1L);
+        variationCost.setSourceItemId(1L);
+        variationCost.setCostDate(LocalDate.now());
+        variationCost.setCostStatus("CONFIRMED");
+        variationCost.setGeneratedFlag(1);
+        costItemMapper.insert(variationCost);
+
+        CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId);
+
+        CostManagerDashboardVO.SubjectRanking ranking = vo.getSubjectRankings().stream()
+                .filter(item -> subject.getId().toString().equals(item.getCostSubjectId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("人工费", ranking.getCostSubjectName());
+        assertEquals("30000.00", ranking.getActualCost());
+        assertTrue(vo.getLedgerRows().stream()
+                .anyMatch(row -> subject.getId().toString().equals(row.getCostSubjectId())
+                        && "30000.00".equals(row.getActualAmount())));
+    }
+
+    @Test
+    @Transactional
     @DisplayName("3.2 Cost view: null projectId returns tenant-wide cost")
     void testCostView_AllProjects() {
         seed("COST2");

@@ -37,6 +37,20 @@ describe('reference store cache isolation', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.useRealTimers()
+    localStorage.clear()
+  })
+
+  it('hydrates cached reference data from localStorage', async () => {
+    localStorage.setItem(
+      'cgc_pms_reference_cache:projects',
+      JSON.stringify({ savedAt: Date.now(), items: [{ id: 'p1', projectName: '项目A' }] }),
+    )
+
+    vi.resetModules()
+    const { useReferenceStore: freshUseReferenceStore } = await import('@/stores/reference')
+    setActivePinia(createPinia())
+    store = freshUseReferenceStore()
+    expect(store.projects).toEqual([{ id: 'p1', projectName: '项目A' }])
   })
 
   describe('fetchContracts', () => {

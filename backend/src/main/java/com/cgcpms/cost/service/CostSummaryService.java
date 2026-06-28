@@ -172,11 +172,7 @@ public class CostSummaryService {
 
             // Aggregate actualCost: include all cost source types plus bid_cost and overhead
             BigDecimal actualCost = subjectItems.stream()
-                    .filter(item -> "MAT_RECEIPT".equals(item.getSourceType())
-                            || "SUB_MEASURE".equals(item.getSourceType())
-                            || "BID_COST".equals(item.getSourceType())
-                            || "BID_COST_TRANSFERRED".equals(item.getSourceType())
-                            || "OVERHEAD_ALLOCATION".equals(item.getSourceType()))
+                    .filter(this::isActualCostSource)
                     .map(CostItem::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -215,6 +211,20 @@ public class CostSummaryService {
 
         log.info("Cost summary refreshed for projectId={}: {} subject(s) updated", projectId, summaries.size());
         return getProjectSummary(tenantId, projectId);
+    }
+
+    private boolean isActualCostSource(CostItem item) {
+        if (item == null) {
+            return false;
+        }
+        String sourceType = item.getSourceType();
+        return "MAT_RECEIPT".equals(sourceType)
+                || "SUB_MEASURE".equals(sourceType)
+                || "VAR_ORDER".equals(sourceType)
+                || "CT_CHANGE".equals(sourceType)
+                || "BID_COST".equals(sourceType)
+                || "BID_COST_TRANSFERRED".equals(sourceType)
+                || "OVERHEAD_ALLOCATION".equals(sourceType);
     }
 
     public List<CostSummaryVO> getSummary(Long projectId) {

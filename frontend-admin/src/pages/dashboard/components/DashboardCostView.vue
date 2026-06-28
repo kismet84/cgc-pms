@@ -289,14 +289,14 @@ const costTrendOption = computed(() => ({
     textStyle: { color: '#1f2937' },
   },
   legend: {
-    top: 4,
+    top: 8,
     left: 'center',
     itemWidth: 16,
     itemHeight: 6,
     textStyle: { color: '#536176', fontSize: 11 },
     data: [`目标成本（${trendLabel.value}）`, `动态成本（${trendLabel.value}）`, `成本偏差（${trendLabel.value}）`],
   },
-  grid: { left: 50, right: 54, top: 42, bottom: 34, containLabel: true },
+  grid: { left: 50, right: 54, top: 64, bottom: 34, containLabel: true },
   xAxis: {
     type: 'category',
     boundaryGap: false,
@@ -497,11 +497,11 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
             <thead>
               <tr>
                 <th>序号</th>
-                <th>项目名称</th>
-                <th>预警类型</th>
-                <th>预警说明</th>
-                <th>风险等级</th>
-                <th>预警时间</th>
+                <th style="text-align: left">项目名称</th>
+                <th style="text-align: left">预警类型</th>
+                <th style="text-align: left">预警说明</th>
+                <th style="text-align: left">风险等级</th>
+                <th style="text-align: left">预警时间</th>
               </tr>
             </thead>
             <tbody>
@@ -526,11 +526,11 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
             <thead>
               <tr>
                 <th>序号</th>
-                <th>事项类型</th>
-                <th>事项名称</th>
-                <th>逾期天数</th>
-                <th>责任人</th>
-                <th>计划完成时间</th>
+                <th style="text-align: left">事项类型</th>
+                <th style="text-align: left">事项名称</th>
+                <th style="text-align: left">逾期天数</th>
+                <th style="text-align: left">责任人</th>
+                <th style="text-align: left">计划完成时间</th>
               </tr>
             </thead>
             <tbody>
@@ -550,11 +550,11 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
             <thead>
               <tr>
                 <th>序号</th>
-                <th>申请单号</th>
-                <th>合同名称</th>
-                <th>金额（万元）</th>
-                <th>申请付款时间</th>
-                <th>审批节点</th>
+                <th style="text-align: left">申请单号</th>
+                <th style="text-align: left">合同名称</th>
+                <th style="text-align: left">金额（万元）</th>
+                <th style="text-align: left">申请付款时间</th>
+                <th style="text-align: left">审批节点</th>
               </tr>
             </thead>
             <tbody>
@@ -944,10 +944,19 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
   font-weight: 700;
 }
 
+.cost-mini-table thead th + th,
+.cost-mini-table tbody td + td,
+.cost-ledger-table th,
+.cost-ledger-table td {
+  text-align: left;
+}
+
 .cost-mini-table td:first-child,
 .cost-mini-table th:first-child,
 .cost-ledger-table td:first-child,
-.cost-ledger-table th:first-child {
+.cost-ledger-table th:first-child,
+.cost-ledger-table th:last-child,
+.cost-ledger-table .cost-ledger-actions {
   text-align: center;
 }
 
@@ -1049,7 +1058,12 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
 .cost-ledger-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
+}
+
+.cost-ledger-table td.cost-ledger-actions {
+  text-align: center;
 }
 
 .cost-ledger-actions a {

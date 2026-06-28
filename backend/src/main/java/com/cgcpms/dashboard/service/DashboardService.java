@@ -1302,6 +1302,8 @@ public class DashboardService {
         }
         return "MAT_RECEIPT".equals(item.getSourceType())
                 || "SUB_MEASURE".equals(item.getSourceType())
+                || "VAR_ORDER".equals(item.getSourceType())
+                || "CT_CHANGE".equals(item.getSourceType())
                 || "BID_COST".equals(item.getSourceType())
                 || "BID_COST_TRANSFERRED".equals(item.getSourceType())
                 || "OVERHEAD_ALLOCATION".equals(item.getSourceType());

@@ -1,12 +1,40 @@
 /** Source type display mapping */
-export type SourceType = 'CT_CONTRACT' | 'MAT_RECEIPT' | 'SUB_MEASURE' | 'VAR_ORDER'
+export type SourceType =
+  | 'CT_CONTRACT'
+  | 'CT_REVENUE'
+  | 'CT_DIRECT'
+  | 'CT_INDIRECT'
+  | 'CT_MATERIAL'
+  | 'CT_MACHINE'
+  | 'CT_SUBCONTRACT'
+  | 'CT_LABOR'
+  | 'CT_OTHER'
+  | 'MATERIAL_RECEIPT'
+  | 'MAT_RECEIPT'
+  | 'SUB_MEASURE'
+  | 'VAR_ORDER'
+  | 'VARIATION'
+  | 'CT_CHANGE'
+  | 'BID_COST'
+  | 'BID_COST_TRANSFERRED'
+  | 'OVERHEAD_ALLOCATION'
 
 export const SOURCE_TYPE_LABEL: Record<SourceType, string> = {
   CT_CONTRACT: '合同锁定成本',
+  CT_REVENUE: '业主收入确认',
+  CT_DIRECT: '直接成本',
+  CT_INDIRECT: '间接成本',
+  CT_MATERIAL: '材料成本',
+  CT_MACHINE: '机械使用成本',
+  CT_SUBCONTRACT: '分包成本',
+  CT_LABOR: '人工成本',
+  CT_OTHER: '其他成本',
+  MATERIAL_RECEIPT: '材料验收成本',
   MAT_RECEIPT: '材料验收成本',
   SUB_MEASURE: '分包计量成本',
   VAR_ORDER: '签证变更成本',
-  CT_REVENUE: '业主收入确认',
+  VARIATION: '签证变更成本',
+  CT_CHANGE: '合同变更成本',
   BID_COST: '投标前期费用',
   BID_COST_TRANSFERRED: '投标前期费用(已结转)',
   OVERHEAD_ALLOCATION: '间接费用分摊',
@@ -14,10 +42,20 @@ export const SOURCE_TYPE_LABEL: Record<SourceType, string> = {
 
 export const SOURCE_TYPE_COLOR: Record<SourceType, string> = {
   CT_CONTRACT: 'blue',
+  CT_REVENUE: 'cyan',
+  CT_DIRECT: 'geekblue',
+  CT_INDIRECT: 'magenta',
+  CT_MATERIAL: 'green',
+  CT_MACHINE: 'gold',
+  CT_SUBCONTRACT: 'orange',
+  CT_LABOR: 'lime',
+  CT_OTHER: 'default',
+  MATERIAL_RECEIPT: 'green',
   MAT_RECEIPT: 'green',
   SUB_MEASURE: 'orange',
   VAR_ORDER: 'purple',
-  CT_REVENUE: 'cyan',
+  VARIATION: 'purple',
+  CT_CHANGE: 'purple',
   BID_COST: 'geekblue',
   BID_COST_TRANSFERRED: 'lime',
   OVERHEAD_ALLOCATION: 'magenta',

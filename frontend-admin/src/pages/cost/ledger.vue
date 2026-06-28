@@ -260,9 +260,16 @@ const COST_TYPE_LABEL: Record<string, string> = {
   CT_DIRECT: '直接成本',
   CT_INDIRECT: '间接成本',
   CT_MATERIAL: '材料成本',
+  CT_MACHINE: '机械使用成本',
   CT_SUBCONTRACT: '分包成本',
   CT_LABOR: '人工成本',
   CT_OTHER: '其他成本',
+  MATERIAL_RECEIPT: '材料验收成本',
+  MAT_RECEIPT: '材料验收成本',
+  SUB_MEASURE: '分包计量成本',
+  VAR_ORDER: '签证变更成本',
+  VARIATION: '签证变更成本',
+  CT_CHANGE: '合同变更成本',
 }
 
 // ---- Computed KPI ----

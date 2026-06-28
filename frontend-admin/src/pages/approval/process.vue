@@ -69,6 +69,7 @@ const nodeForm = reactive<WorkflowTemplateNodeParams>({
 
 const businessTypeMap: Record<string, string> = {
   CONTRACT_APPROVAL: '合同审批',
+  PAY_APPLICATION: '付款申请',
   PURCHASE_ORDER: '采购订单',
   PURCHASE_REQUEST: '采购申请',
   MATERIAL_RECEIPT: '材料验收',

@@ -93,8 +93,11 @@ class CostSummaryServiceTest {
         // 清理 TC18 种子数据
         costItemMapper.deleteById(80001L);
         costItemMapper.deleteById(80002L);
+        costItemMapper.deleteById(80003L);
+        costItemMapper.deleteById(80004L);
         costSubjectMapper.deleteById(80001L);
         costSubjectMapper.deleteById(80002L);
+        costSubjectMapper.deleteById(80003L);
         payRecordMapper.deleteById(80001L);
         payRecordMapper.deleteById(80002L);
         payApplicationMapper.deleteById(80001L);
@@ -443,5 +446,53 @@ class CostSummaryServiceTest {
             assertEquals(0, new BigDecimal("25000.00").compareTo(subjectPaid),
                     "每个科目行的 paidAmount 都应为项目级 25000, 实际: " + subjectPaid.toPlainString());
         }
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TC19: refreshSummary 计入签证和合同变更成本")
+    void testRefreshSummaryIncludesVariationAndContractChangeCosts() {
+        CostSubject subject = new CostSubject();
+        subject.setId(80003L);
+        subject.setSubjectName("人工费");
+        subject.setSubjectCode("RG-VAR");
+        subject.setTenantId(TENANT_ID);
+        if (costSubjectMapper.selectById(80003L) == null) costSubjectMapper.insert(subject);
+
+        CostItem varOrderCost = new CostItem();
+        varOrderCost.setId(80003L);
+        varOrderCost.setTenantId(TENANT_ID);
+        varOrderCost.setProjectId(testProjectId);
+        varOrderCost.setCostSubjectId(80003L);
+        varOrderCost.setSourceType("VAR_ORDER");
+        varOrderCost.setSourceId(80003L);
+        varOrderCost.setSourceItemId(80003L);
+        varOrderCost.setCostType("VARIATION");
+        varOrderCost.setCostStatus("CONFIRMED");
+        varOrderCost.setCostDate(java.time.LocalDate.now());
+        varOrderCost.setAmount(new BigDecimal("30000.00"));
+        if (costItemMapper.selectById(80003L) == null) costItemMapper.insert(varOrderCost);
+
+        CostItem contractChangeCost = new CostItem();
+        contractChangeCost.setId(80004L);
+        contractChangeCost.setTenantId(TENANT_ID);
+        contractChangeCost.setProjectId(testProjectId);
+        contractChangeCost.setCostSubjectId(80003L);
+        contractChangeCost.setSourceType("CT_CHANGE");
+        contractChangeCost.setSourceId(80004L);
+        contractChangeCost.setCostType("CHANGE");
+        contractChangeCost.setCostStatus("CONFIRMED");
+        contractChangeCost.setCostDate(java.time.LocalDate.now());
+        contractChangeCost.setAmount(new BigDecimal("40000.00"));
+        if (costItemMapper.selectById(80004L) == null) costItemMapper.insert(contractChangeCost);
+
+        CostProjectSummaryVO result = costSummaryService.refreshSummary(TENANT_ID, testProjectId);
+
+        assertEquals(0, new BigDecimal("70000.00").compareTo(new BigDecimal(result.getActualCost())));
+        CostSummaryVO subjectSummary = result.getSubjects().stream()
+                .filter(s -> "人工费".equals(s.getCostSubjectName()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, new BigDecimal("70000.00").compareTo(new BigDecimal(subjectSummary.getActualCost())));
     }
 }

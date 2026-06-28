@@ -25,9 +25,52 @@ export interface FetchMaterialsParams {
 /** Cache TTL in milliseconds (5 minutes) */
 const CACHE_TTL = 5 * 60 * 1000
 
+const STORAGE_PREFIX = 'cgc_pms_reference_cache'
+
+type CacheKey = 'projects' | 'contracts' | 'partners' | 'materials'
+
+interface CachePayload<T> {
+  savedAt: number
+  items: T[]
+}
+
 function isExpired(ts: number | null): boolean {
   if (ts == null) return true
   return Date.now() - ts > CACHE_TTL
+}
+
+function storageKey(key: CacheKey) {
+  return `${STORAGE_PREFIX}:${key}`
+}
+
+function loadCache<T>(key: CacheKey): CachePayload<T> | null {
+  try {
+    const raw = localStorage.getItem(storageKey(key))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<CachePayload<T>>
+    if (!Array.isArray(parsed.items) || typeof parsed.savedAt !== 'number') return null
+    if (Date.now() - parsed.savedAt > CACHE_TTL) return null
+    return { savedAt: parsed.savedAt, items: parsed.items }
+  } catch {
+    return null
+  }
+}
+
+function persistCache<T>(key: CacheKey, items: T[], savedAt = Date.now()) {
+  try {
+    const payload: CachePayload<T> = { savedAt, items }
+    localStorage.setItem(storageKey(key), JSON.stringify(payload))
+  } catch {
+    // ignore storage failures — in-memory refs still work
+  }
+}
+
+function clearCache(key: CacheKey) {
+  try {
+    localStorage.removeItem(storageKey(key))
+  } catch {
+    // ignore
+  }
 }
 
 /**
@@ -40,7 +83,7 @@ async function fetchAllPages<T>(
     pageNo: number,
     pageSize: number,
   ) => Promise<{ total?: number | string; records?: T[]; data?: T[] }>,
-  pageSize = 200,
+  pageSize = 1000,
 ): Promise<T[]> {
   const first = await fetcher(1, pageSize)
   const records: T[] = (first.records ?? first.data ?? []) as T[]
@@ -58,10 +101,15 @@ async function fetchAllPages<T>(
 
 export const useReferenceStore = defineStore('reference', () => {
   // ── Data refs ──
-  const projects = ref<ProjectVO[] | null>(null)
-  const contracts = ref<ContractVO[] | null>(null)
-  const partners = ref<PartnerVO[] | null>(null)
-  const materials = ref<MaterialVO[] | null>(null)
+  const projectsCache = loadCache<ProjectVO>('projects')
+  const contractsCache = loadCache<ContractVO>('contracts')
+  const partnersCache = loadCache<PartnerVO>('partners')
+  const materialsCache = loadCache<MaterialVO>('materials')
+
+  const projects = ref<ProjectVO[] | null>(projectsCache?.items ?? null)
+  const contracts = ref<ContractVO[] | null>(contractsCache?.items ?? null)
+  const partners = ref<PartnerVO[] | null>(partnersCache?.items ?? null)
+  const materials = ref<MaterialVO[] | null>(materialsCache?.items ?? null)
 
   // ── Timestamps for TTL ──
   let projectsFetchedAt: number | null = null
@@ -84,6 +132,7 @@ export const useReferenceStore = defineStore('reference', () => {
       .then((all) => {
         projects.value = all
         projectsFetchedAt = Date.now()
+        persistCache('projects', all, projectsFetchedAt)
         projectsPromise = null
         return all
       })
@@ -107,6 +156,7 @@ export const useReferenceStore = defineStore('reference', () => {
       .then((all) => {
         contracts.value = all
         contractsFetchedAt = Date.now()
+        persistCache('contracts', all, contractsFetchedAt)
         contractsPromise = null
         return contracts.value
       })
@@ -131,6 +181,7 @@ export const useReferenceStore = defineStore('reference', () => {
       .then((all) => {
         partners.value = all
         partnersFetchedAt = Date.now()
+        persistCache('partners', all, partnersFetchedAt)
         partnersPromise = null
         return partners.value
       })
@@ -155,6 +206,7 @@ export const useReferenceStore = defineStore('reference', () => {
       .then((all) => {
         materials.value = all
         materialsFetchedAt = Date.now()
+        persistCache('materials', all, materialsFetchedAt)
         materialsPromise = null
         return materials.value
       })
@@ -170,21 +222,25 @@ export const useReferenceStore = defineStore('reference', () => {
   function invalidateProjects() {
     projects.value = null
     projectsFetchedAt = null
+    clearCache('projects')
   }
 
   function invalidateContracts() {
     contracts.value = null
     contractsFetchedAt = null
+    clearCache('contracts')
   }
 
   function invalidatePartners() {
     partners.value = null
     partnersFetchedAt = null
+    clearCache('partners')
   }
 
   function invalidateMaterials() {
     materials.value = null
     materialsFetchedAt = null
+    clearCache('materials')
   }
 
   return {

@@ -43,9 +43,17 @@ const showRejectModal = ref(false)
 
 const businessTypeMap: Record<string, string> = {
   CONTRACT_APPROVAL: '合同审批',
+  PAY_APPLICATION: '付款申请',
   PAY_REQUEST: '付款申请',
+  PURCHASE_ORDER: '采购订单',
+  PURCHASE_REQUEST: '采购申请',
+  MATERIAL_RECEIPT: '材料验收',
   VAR_ORDER: '签证变更',
+  CT_CHANGE: '合同变更',
   MAT_RECEIPT: '材料验收',
+  SUB_MEASURE: '分包计量',
+  SETTLEMENT: '结算审批',
+  COST_TARGET: '目标成本',
 }
 
 const statusMap: Record<string, { text: string; color: string }> = {

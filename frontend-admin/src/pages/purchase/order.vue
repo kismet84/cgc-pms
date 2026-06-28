@@ -79,12 +79,14 @@ const itemList = ref<(Partial<MatPurchaseOrderItemVO> & { key: number })[]>([])
 let itemKeyCounter = 0
 
 const ORDER_TYPE_LABEL: Record<string, string> = {
+  CONTRACT: '合同采购',
   MATERIAL: '材料采购',
   EQUIPMENT: '设备采购',
   SERVICE: '服务采购',
   OTHER: '其他',
 }
 const ORDER_TYPE_COLOR: Record<string, string> = {
+  CONTRACT: 'blue',
   MATERIAL: 'blue',
   EQUIPMENT: 'cyan',
   SERVICE: 'purple',

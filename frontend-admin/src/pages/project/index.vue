@@ -258,6 +258,7 @@ function fmtAmount(val: string): string {
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: '前期',
+  ACTIVE: '在建',
   ONGOING: '在建',
   COMPLETED: '已竣工',
   SUSPENDED: '已暂停',
@@ -265,6 +266,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'processing',
+  ACTIVE: 'success',
   ONGOING: 'success',
   COMPLETED: 'green',
   SUSPENDED: 'warning',
@@ -306,7 +308,7 @@ const projectStats = computed(() => {
   const rows = tableData.value
   return {
     total: total.value || rows.length,
-    ongoing: rows.filter((item) => item.status === 'ONGOING').length,
+    ongoing: rows.filter((item) => ['ACTIVE', 'ONGOING'].includes(item.status)).length,
     completed: rows.filter((item) => item.status === 'COMPLETED').length,
     draft: rows.filter((item) => item.status === 'DRAFT').length,
     risk: rows.filter((item) => ['SUSPENDED', 'CLOSED'].includes(item.status)).length,

@@ -86,6 +86,19 @@ const writebackForm = reactive({
   voucherNo: '',
 })
 
+const APPROVAL_STATUS_LABEL: Record<string, string> = {
+  DRAFT: '草稿',
+  APPROVING: '审批中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+}
+const APPROVAL_STATUS_COLOR: Record<string, string> = {
+  DRAFT: 'default',
+  APPROVING: 'processing',
+  APPROVED: 'success',
+  REJECTED: 'error',
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -318,12 +331,6 @@ const approvalBreakdown = computed(() => {
     m[r.approvalStatus || 'DRAFT'] = (m[r.approvalStatus || 'DRAFT'] || 0) + 1
   })
   const max = Math.max(total.value, tableData.value.length, 1)
-  const labels: Record<string, string> = {
-    DRAFT: '草稿',
-    APPROVING: '审批中',
-    APPROVED: '已通过',
-    REJECTED: '已驳回',
-  }
   const colors: Record<string, string> = {
     DRAFT: '#94a3b8',
     APPROVING: '#2563eb',
@@ -332,7 +339,7 @@ const approvalBreakdown = computed(() => {
   }
   return Object.entries(m).map(([k, v]) => ({
     key: k,
-    label: labels[k] ?? k,
+    label: APPROVAL_STATUS_LABEL[k] ?? k,
     count: v,
     percent: kpiPct(v, max),
     color: colors[k] ?? '#94a3b8',
@@ -597,17 +604,9 @@ onMounted(() => {
               </template>
               <template #approvalStatus="{ row }">
                 <a-tag
-                  :color="
-                    row.approvalStatus === 'APPROVED'
-                      ? 'success'
-                      : row.approvalStatus === 'REJECTED'
-                        ? 'error'
-                        : row.approvalStatus === 'APPROVING'
-                          ? 'processing'
-                          : 'default'
-                  "
+                  :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'"
                   size="small"
-                  >{{ row.approvalStatus }}</a-tag
+                  >{{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}</a-tag
                 >
               </template>
               <template #action="{ row }">

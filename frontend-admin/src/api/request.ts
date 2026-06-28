@@ -15,7 +15,7 @@ const REFRESH_QUEUE_TIMEOUT = 15_000
 
 /** Axios instance for normal API calls — carries the 401 interceptor. */
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
   timeout: 15000,
   withCredentials: true, // send HttpOnly cookies automatically
 })
@@ -25,7 +25,7 @@ const service: AxiosInstance = axios.create({
  * Has NO 401 interceptor, preventing self-waiting deadlocks.
  */
 export const refreshClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
   timeout: 10_000,
   withCredentials: true,
 })
