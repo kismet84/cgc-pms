@@ -35,7 +35,8 @@ public class SecurityConfig {
     };
 
     public static final String[] HEALTH_WHITELIST_PATHS = {
-            "/actuator/health/**"
+            "/actuator/health/**",
+            "/actuator/prometheus"
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
