@@ -24,6 +24,18 @@ describe('Dashboard data loading behavior', () => {
     expect(composableSource).toMatch(/case\s+'cost':[\s\S]*?getCostManagerView\b/)
   })
 
+  it('calls getPurchaseManagerView for purchase role', () => {
+    expect(composableSource).toMatch(/case\s+'purchase':[\s\S]*?getPurchaseManagerView\b/)
+  })
+
+  it('calls getProductionManagerView for production role', () => {
+    expect(composableSource).toMatch(/case\s+'production':[\s\S]*?getProductionManagerView\b/)
+  })
+
+  it('calls getChiefEngineerView for chiefEngineer role', () => {
+    expect(composableSource).toMatch(/case\s+'chiefEngineer':[\s\S]*?getChiefEngineerView\b/)
+  })
+
   it('calls getFinanceView for finance role', () => {
     expect(composableSource).toMatch(/case\s+'finance':[\s\S]*?getFinanceView\b/)
   })
@@ -43,11 +55,20 @@ describe('Dashboard data loading behavior', () => {
   })
 
   it('passes selectedProjectId to getCostManagerView', () => {
-    expect(composableSource).toMatch(/getCostManagerView\(pid\)/)
+    expect(composableSource).toMatch(/getCostManagerView\(pid,\s*month\)/)
   })
 
   it('passes selectedProjectId to getFinanceView', () => {
     expect(composableSource).toMatch(/getFinanceView\(pid\)/)
+  })
+
+  it('passes selectedProjectId to phase-two manager views', () => {
+    expect(composableSource).toMatch(/getPurchaseManagerView\(pid\)/)
+    expect(composableSource).toMatch(/getProductionManagerView\(pid\)/)
+  })
+
+  it('passes selectedProjectId to getChiefEngineerView', () => {
+    expect(composableSource).toMatch(/getChiefEngineerView\(pid\)/)
   })
 
   it('calls getManagementView without pid (tenant-wide)', () => {
@@ -66,14 +87,16 @@ describe('Dashboard data loading behavior', () => {
 
   // ── watch triggers fetchViewData ──
   it('watches activeRole and selectedProjectId to call fetchViewData', () => {
-    expect(composableSource).toMatch(/watch\s*\(\s*\[\s*activeRole\s*,\s*selectedProjectId\s*\]/)
+    expect(composableSource).toMatch(
+      /watch\s*\(\s*\[\s*activeRole\s*,\s*selectedProjectId\s*,\s*selectedMonth\s*\]/,
+    )
     expect(composableSource).toMatch(/fetchViewData\s*\(\s*\)/)
   })
 
   // ── onMounted fetches project list and initializes first-screen data ──
   it('loads projects and initializes dashboard data on mounted', () => {
     expect(composableSource).toMatch(
-      /onMounted\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*await\s+fetchProjects\s*\(\s*\)/,
+      /onMounted\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*Promise\.allSettled\(\[\s*fetchProjects\(\),\s*fetchViewData\(\)\s*\]\)/,
     )
     expect(composableSource).toMatch(/selectedProjectId\.value\s*=\s*projectList\.value\[0\]\.id/)
     expect(composableSource).toMatch(/await\s+fetchViewData\s*\(\s*\)/)
@@ -93,6 +116,11 @@ describe('Dashboard data loading behavior', () => {
   it('returns true for non-mgmt roles in needsProject', () => {
     // needsProject returns role !== 'mgmt'
     expect(composableSource).toMatch(/role\s*!==\s*'mgmt'/)
+  })
+
+  it('treats SUPER_ADMIN as full-access role', () => {
+    expect(composableSource).toMatch(/role\s*===\s*'ADMIN'\s*\|\|\s*role\s*===\s*'SUPER_ADMIN'/)
+    expect(composableSource).toContain("'chiefEngineer'")
   })
 
   // ── Management view has no project selector ──

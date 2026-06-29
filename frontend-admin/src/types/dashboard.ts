@@ -9,6 +9,10 @@ export interface DashboardTaskItemVO {
   receivedAt: string
   projectId: string
   projectName: string
+  itemSummary?: string
+  ownerName?: string
+  amount?: string
+  pendingDays?: number
 }
 
 /** Dashboard - Project summary card */
@@ -99,6 +103,67 @@ export interface DashboardAlertItemVO {
   projectId: string
   projectName: string
   triggeredAt: string
+}
+
+export interface DashboardBusinessItemVO {
+  sourceType: string
+  sourceId: string
+  code: string
+  title: string
+  itemSummary?: string
+  status: string
+  amount: string
+  date: string
+  projectId: string
+  projectName: string
+  partnerName?: string
+  ownerName?: string
+  overdueDays?: number
+  pendingDays?: number
+}
+
+/** ── Purchase Manager View ── */
+export interface PurchaseManagerDashboardVO {
+  projectId: string
+  projectName: string
+  pendingRequestCount: number
+  activeOrderCount: number
+  overdueDeliveryCount: number
+  pendingReceiptCount: number
+  lowStockItemCount: number
+  totalOrderAmount: string
+  recentRequests: DashboardBusinessItemVO[]
+  overdueOrders: DashboardBusinessItemVO[]
+  pendingReceipts: DashboardBusinessItemVO[]
+}
+
+/** ── Production Manager View (MVP) ── */
+export interface ProductionManagerDashboardVO {
+  projectId: string
+  projectName: string
+  receiptCount: number
+  requisitionCount: number
+  pendingStockOutCount: number
+  subMeasureCount: number
+  lowStockItemCount: number
+  confirmedMeasureAmount: string
+  recentReceipts: DashboardBusinessItemVO[]
+  recentRequisitions: DashboardBusinessItemVO[]
+  recentSubMeasures: DashboardBusinessItemVO[]
+}
+
+/** ── Chief Engineer View ── */
+export interface ChiefEngineerDashboardVO {
+  projectId: string
+  projectName: string
+  pendingReviewCount: number
+  pendingCoordinationCount: number
+  openIssueCount: number
+  overdueCount: number
+  pendingReviews: DashboardBusinessItemVO[]
+  pendingCoordinations: DashboardBusinessItemVO[]
+  openIssues: DashboardBusinessItemVO[]
+  overdueItems: DashboardBusinessItemVO[]
 }
 
 /** ── Cost Manager View ── */
@@ -229,7 +294,15 @@ export interface SubjectBreakdown {
 }
 
 /** Dashboard role tabs */
-export type DashboardRole = 'pm' | 'bm' | 'cost' | 'finance' | 'mgmt'
+export type DashboardRole =
+  | 'pm'
+  | 'bm'
+  | 'cost'
+  | 'purchase'
+  | 'production'
+  | 'chiefEngineer'
+  | 'finance'
+  | 'mgmt'
 
 /** Time range options for display */
 export const TIME_RANGE_OPTIONS: { value: DashboardTimeRange; label: string }[] = [

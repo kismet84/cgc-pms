@@ -18,17 +18,45 @@ import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.cost.vo.CostProjectSummaryVO;
 import com.cgcpms.cost.vo.CostSummaryVO;
 import com.cgcpms.dashboard.vo.*;
+import com.cgcpms.inventory.entity.MatStock;
+import com.cgcpms.inventory.entity.MatWarehouse;
+import com.cgcpms.inventory.mapper.MatStockMapper;
+import com.cgcpms.inventory.mapper.MatWarehouseMapper;
+import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.partner.entity.MdPartner;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.entity.MatPurchaseRequest;
+import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
+import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.entity.MatReceiptItem;
+import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.requisition.entity.MatRequisition;
+import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.tech.entity.TechItem;
+import com.cgcpms.tech.mapper.TechItemMapper;
+import com.cgcpms.tech.vo.ChiefEngineerDashboardVO;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfTask;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
@@ -37,6 +65,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -67,6 +96,19 @@ public class DashboardService {
     private final VarOrderMapper varOrderMapper;
     private final SubMeasureMapper subMeasureMapper;
     private final AlertLogMapper alertLogMapper;
+    private final MatPurchaseRequestMapper purchaseRequestMapper;
+    private final MatPurchaseRequestItemMapper purchaseRequestItemMapper;
+    private final MatPurchaseOrderMapper purchaseOrderMapper;
+    private final MatPurchaseOrderItemMapper purchaseOrderItemMapper;
+    private final MatReceiptMapper receiptMapper;
+    private final MatReceiptItemMapper receiptItemMapper;
+    private final MatRequisitionMapper requisitionMapper;
+    private final MatWarehouseMapper warehouseMapper;
+    private final MatStockMapper stockMapper;
+    private final TechItemMapper techItemMapper;
+    private final MdPartnerMapper partnerMapper;
+    private final MdMaterialMapper materialMapper;
+    private final SysUserMapper userMapper;
 
     // ========================================================================
     // 1. Project Manager Dashboard
@@ -95,22 +137,12 @@ public class DashboardService {
 
         // Enrich with instance info (batch to avoid N+1)
         Map<Long, WfInstance> instanceMap = batchLoadInstances(pendingTasks);
-
-        List<DashboardTaskItemVO> taskItems = pendingTasks.stream().map(t -> {
-            DashboardTaskItemVO item = new DashboardTaskItemVO();
-            item.setTaskId(String.valueOf(t.getId()));
-            item.setInstanceId(String.valueOf(t.getInstanceId()));
-            item.setBusinessType(t.getBusinessType());
-            item.setBusinessId(String.valueOf(t.getBusinessId()));
-            item.setTaskStatus(t.getTaskStatus());
-            if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
-            WfInstance inst = instanceMap.get(t.getInstanceId());
-            if (inst != null) {
-                item.setTitle(inst.getTitle());
-                item.setProjectId(inst.getProjectId() != null ? String.valueOf(inst.getProjectId()) : null);
-            }
-            return item;
-        }).collect(Collectors.toList());
+        Map<Long, String> projectNameMap = Map.of(projectId, project.getProjectName());
+        List<DashboardTaskItemVO> taskItems = pendingTasks.stream()
+                .filter(t -> isProjectManagerWorkflowTask(t, instanceMap.get(t.getInstanceId()))
+                        && isWorkflowInstanceInProject(instanceMap.get(t.getInstanceId()), projectId))
+                .map(t -> toTaskItem(t, instanceMap.get(t.getInstanceId()), projectNameMap))
+                .collect(Collectors.toList());
 
         vo.setPendingTasks(taskItems);
         vo.setPendingTaskCount((long) taskItems.size());
@@ -143,21 +175,15 @@ public class DashboardService {
                             .in(WfTask::getInstanceId, instanceIds)
                             .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
                             .orderByDesc(WfTask::getReceivedAt));
-            pendingApprovalCount = projectPendingTasks.size();
-            pendingApprovals = projectPendingTasks.stream().limit(10).map(t -> {
-                DashboardTaskItemVO item = new DashboardTaskItemVO();
-                item.setTaskId(String.valueOf(t.getId()));
-                item.setInstanceId(String.valueOf(t.getInstanceId()));
-                item.setBusinessType(t.getBusinessType());
-                item.setTaskStatus(t.getTaskStatus());
-                if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
-                WfInstance inst = instanceMap.get(t.getInstanceId());
-                if (inst != null) {
-                    item.setTitle(inst.getTitle());
-                    item.setProjectId(inst.getProjectId() != null ? String.valueOf(inst.getProjectId()) : null);
-                }
-                return item;
-            }).collect(Collectors.toList());
+            Map<Long, WfInstance> approvalInstanceMap = batchLoadInstances(projectPendingTasks);
+            List<WfTask> projectManagerPendingTasks = projectPendingTasks.stream()
+                    .filter(t -> isProjectManagerWorkflowTask(t, approvalInstanceMap.get(t.getInstanceId())))
+                    .collect(Collectors.toList());
+            pendingApprovals = projectManagerPendingTasks.stream()
+                    .limit(10)
+                    .map(t -> toTaskItem(t, approvalInstanceMap.get(t.getInstanceId()), projectNameMap))
+                    .collect(Collectors.toList());
+            pendingApprovalCount = projectManagerPendingTasks.size();
         }
         vo.setPendingApprovals(pendingApprovals);
         vo.setPendingApprovalCount(pendingApprovalCount);
@@ -317,7 +343,191 @@ public class DashboardService {
     }
 
     // ========================================================================
-    // 4. Finance Dashboard
+    // 4. Purchase Manager Dashboard
+    // ========================================================================
+    public PurchaseManagerDashboardVO getPurchaseManagerView(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
+        List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
+        Map<Long, String> projectNameMap = projectNameMap(projects);
+
+        PurchaseManagerDashboardVO vo = new PurchaseManagerDashboardVO();
+        vo.setProjectId(projectId != null ? projectId.toString() : null);
+        vo.setProjectName(projectId != null ? projects.get(0).getProjectName() : "全部项目");
+        if (projectIds.isEmpty()) {
+            applyEmptyPurchaseManager(vo);
+            return vo;
+        }
+
+        List<MatPurchaseRequest> requests = purchaseRequestMapper.selectList(new LambdaQueryWrapper<MatPurchaseRequest>()
+                .eq(MatPurchaseRequest::getTenantId, tenantId)
+                .in(MatPurchaseRequest::getProjectId, projectIds)
+                .orderByDesc(MatPurchaseRequest::getCreatedTime));
+        List<MatPurchaseOrder> orders = purchaseOrderMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrder>()
+                .eq(MatPurchaseOrder::getTenantId, tenantId)
+                .in(MatPurchaseOrder::getProjectId, projectIds));
+        List<MatReceipt> receipts = receiptMapper.selectList(new LambdaQueryWrapper<MatReceipt>()
+                .eq(MatReceipt::getTenantId, tenantId)
+                .in(MatReceipt::getProjectId, projectIds)
+                .orderByDesc(MatReceipt::getReceiptDate));
+
+        List<MatPurchaseOrder> overdueOrders = orders.stream()
+                .filter(o -> o.getDeliveryDate() != null && o.getDeliveryDate().isBefore(LocalDate.now()))
+                .filter(o -> !"COMPLETED".equals(o.getOrderStatus()) && !"CANCELLED".equals(o.getOrderStatus()))
+                .collect(Collectors.toList());
+        List<MatReceipt> pendingReceipts = receipts.stream()
+                .filter(r -> !"APPROVED".equals(r.getApprovalStatus()))
+                .collect(Collectors.toList());
+        Map<Long, String> partnerNameMap = partnerNameMap(tenantId, orders, receipts);
+        Map<Long, String> ownerNameMap = ownerNameMap(tenantId, requests);
+        Map<Long, String> requestSummaryMap = requestSummaryMap(tenantId, requests);
+        Map<Long, String> orderSummaryMap = orderSummaryMap(tenantId, orders);
+        Map<Long, String> receiptSummaryMap = receiptSummaryMap(tenantId, receipts, orderSummaryMap);
+
+        vo.setPendingRequestCount(requests.stream().filter(r -> !"APPROVED".equals(r.getApprovalStatus())).count());
+        vo.setActiveOrderCount(orders.stream().filter(o -> !"COMPLETED".equals(o.getOrderStatus()) && !"CANCELLED".equals(o.getOrderStatus())).count());
+        vo.setOverdueDeliveryCount((long) overdueOrders.size());
+        vo.setPendingReceiptCount((long) pendingReceipts.size());
+        vo.setLowStockItemCount(countLowStockItems(tenantId, projectIds));
+        vo.setTotalOrderAmount(orders.stream()
+                .map(o -> o.getTotalAmount() != null ? o.getTotalAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .toPlainString());
+        vo.setRecentRequests(requests.stream()
+                .limit(5)
+                .map(r -> toBusinessItem("PURCHASE_REQUEST", r, projectNameMap, ownerNameMap, requestSummaryMap))
+                .collect(Collectors.toList()));
+        vo.setOverdueOrders(overdueOrders.stream()
+                .sorted(Comparator
+                        .comparingLong((MatPurchaseOrder o) -> overdueDays(o.getDeliveryDate())).reversed()
+                        .thenComparing(o -> amountOrZero(o.getTotalAmount()), Comparator.reverseOrder()))
+                .limit(5)
+                .map(o -> toBusinessItem("PURCHASE_ORDER", o, projectNameMap, partnerNameMap, orderSummaryMap))
+                .collect(Collectors.toList()));
+        vo.setPendingReceipts(pendingReceipts.stream()
+                .sorted(Comparator
+                        .comparingLong((MatReceipt r) -> pendingDays(r.getReceiptDate())).reversed()
+                        .thenComparing(r -> amountOrZero(r.getTotalAmount()), Comparator.reverseOrder()))
+                .limit(5)
+                .map(r -> toBusinessItem("MATERIAL_RECEIPT", r, projectNameMap, partnerNameMap, receiptSummaryMap))
+                .collect(Collectors.toList()));
+        return vo;
+    }
+
+    // ========================================================================
+    // 5. Production Manager Dashboard (MVP)
+    // ========================================================================
+    public ProductionManagerDashboardVO getProductionManagerView(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
+        List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
+        Map<Long, String> projectNameMap = projectNameMap(projects);
+
+        ProductionManagerDashboardVO vo = new ProductionManagerDashboardVO();
+        vo.setProjectId(projectId != null ? projectId.toString() : null);
+        vo.setProjectName(projectId != null ? projects.get(0).getProjectName() : "全部项目");
+        if (projectIds.isEmpty()) {
+            applyEmptyProductionManager(vo);
+            return vo;
+        }
+
+        List<MatReceipt> receipts = receiptMapper.selectList(new LambdaQueryWrapper<MatReceipt>()
+                .eq(MatReceipt::getTenantId, tenantId)
+                .in(MatReceipt::getProjectId, projectIds)
+                .orderByDesc(MatReceipt::getReceiptDate));
+        List<MatRequisition> requisitions = requisitionMapper.selectList(new LambdaQueryWrapper<MatRequisition>()
+                .eq(MatRequisition::getTenantId, tenantId)
+                .in(MatRequisition::getProjectId, projectIds)
+                .orderByDesc(MatRequisition::getRequisitionDate));
+        List<SubMeasure> measures = subMeasureMapper.selectList(new LambdaQueryWrapper<SubMeasure>()
+                .eq(SubMeasure::getTenantId, tenantId)
+                .in(SubMeasure::getProjectId, projectIds)
+                .orderByDesc(SubMeasure::getMeasureDate));
+        Map<Long, String> partnerNameMap = partnerNameMap(tenantId, businessPartnerIds(receipts, requisitions, measures));
+        Map<Long, String> ownerNameMap = userNameMap(tenantId, businessUserIds(receipts, requisitions));
+        Map<Long, String> receiptSummaryMap = receiptSummaryMap(tenantId, receipts, Collections.emptyMap());
+
+        vo.setReceiptCount((long) receipts.size());
+        vo.setRequisitionCount((long) requisitions.size());
+        vo.setPendingStockOutCount(requisitions.stream().filter(r -> r.getStockOutFlag() == null || r.getStockOutFlag() == 0).count());
+        vo.setSubMeasureCount((long) measures.size());
+        vo.setLowStockItemCount(countLowStockItems(tenantId, projectIds));
+        vo.setConfirmedMeasureAmount(measures.stream()
+                .filter(m -> "APPROVED".equals(m.getApprovalStatus()) || "CONFIRMED".equals(m.getStatus()))
+                .map(m -> m.getApprovedAmount() != null ? m.getApprovedAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .toPlainString());
+        vo.setRecentReceipts(receipts.stream().limit(5).map(r -> toBusinessItem("MATERIAL_RECEIPT", r, projectNameMap, partnerNameMap, ownerNameMap, receiptSummaryMap)).collect(Collectors.toList()));
+        vo.setRecentRequisitions(requisitions.stream().limit(5).map(r -> toBusinessItem("MATERIAL_REQUISITION", r, projectNameMap, partnerNameMap, ownerNameMap)).collect(Collectors.toList()));
+        vo.setRecentSubMeasures(measures.stream().limit(5).map(m -> toBusinessItem("SUB_MEASURE", m, projectNameMap, partnerNameMap)).collect(Collectors.toList()));
+        return vo;
+    }
+
+    // ========================================================================
+    // 6. Chief Engineer Dashboard
+    // ========================================================================
+    public ChiefEngineerDashboardVO getChiefEngineerView(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
+        List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
+        Map<Long, String> projectNameMap = projectNameMap(projects);
+
+        ChiefEngineerDashboardVO vo = new ChiefEngineerDashboardVO();
+        vo.setProjectId(projectId != null ? projectId.toString() : null);
+        vo.setProjectName(projectId != null ? projects.get(0).getProjectName() : "全部项目");
+        if (projectIds.isEmpty()) {
+            vo.setPendingReviewCount(0L);
+            vo.setPendingCoordinationCount(0L);
+            vo.setOpenIssueCount(0L);
+            vo.setOverdueCount(0L);
+            vo.setPendingReviews(Collections.emptyList());
+            vo.setPendingCoordinations(Collections.emptyList());
+            vo.setOpenIssues(Collections.emptyList());
+            vo.setOverdueItems(Collections.emptyList());
+            return vo;
+        }
+
+        List<TechItem> items = techItemMapper.selectList(new LambdaQueryWrapper<TechItem>()
+                .eq(TechItem::getTenantId, tenantId)
+                .in(TechItem::getProjectId, projectIds)
+                .orderByDesc(TechItem::getDiscoveredAt));
+        Map<Long, String> ownerNameMap = userNameMap(tenantId, items.stream()
+                .map(TechItem::getResponsibleUserId)
+                .collect(Collectors.toSet()));
+
+        vo.setPendingReviewCount(items.stream().filter(i -> "TECH_REVIEW".equals(i.getItemType())
+                && !"CLOSED".equals(i.getItemStatus())).count());
+        vo.setPendingCoordinationCount(items.stream().filter(i -> "DESIGN_COORDINATION".equals(i.getItemType())
+                && !"CLOSED".equals(i.getItemStatus())).count());
+        vo.setOpenIssueCount(items.stream().filter(i -> "TECH_ISSUE".equals(i.getItemType())
+                && !"CLOSED".equals(i.getItemStatus())).count());
+        vo.setOverdueCount(items.stream().filter(this::isChiefEngineerOverdueItem).count());
+
+        vo.setPendingReviews(items.stream()
+                .filter(i -> "TECH_REVIEW".equals(i.getItemType()) && !"CLOSED".equals(i.getItemStatus()))
+                .limit(5)
+                .map(i -> toTechBusinessItem("TECH_REVIEW", i, projectNameMap, ownerNameMap))
+                .collect(Collectors.toList()));
+        vo.setPendingCoordinations(items.stream()
+                .filter(i -> "DESIGN_COORDINATION".equals(i.getItemType()) && !"CLOSED".equals(i.getItemStatus()))
+                .limit(5)
+                .map(i -> toTechBusinessItem("DESIGN_COORDINATION", i, projectNameMap, ownerNameMap))
+                .collect(Collectors.toList()));
+        vo.setOpenIssues(items.stream()
+                .filter(i -> "TECH_ISSUE".equals(i.getItemType()) && !"CLOSED".equals(i.getItemStatus()))
+                .limit(5)
+                .map(i -> toTechBusinessItem("TECH_ISSUE", i, projectNameMap, ownerNameMap))
+                .collect(Collectors.toList()));
+        vo.setOverdueItems(items.stream()
+                .filter(this::isChiefEngineerOverdueItem)
+                .limit(5)
+                .map(i -> toTechBusinessItem(i.getItemType(), i, projectNameMap, ownerNameMap))
+                .collect(Collectors.toList()));
+        return vo;
+    }
+
+    // ========================================================================
+    // 6. Finance Dashboard
     // ========================================================================
     public FinanceDashboardVO getFinanceView(Long projectId) {
         Long tenantId = UserContext.getCurrentTenantId();
@@ -613,22 +823,11 @@ public class DashboardService {
                         .orderByDesc(WfTask::getReceivedAt));
 
         Map<Long, WfInstance> instanceMap = batchLoadInstances(pendingTasks);
-
-        List<DashboardTaskItemVO> taskItems = pendingTasks.stream().map(t -> {
-            DashboardTaskItemVO item = new DashboardTaskItemVO();
-            item.setTaskId(String.valueOf(t.getId()));
-            item.setInstanceId(String.valueOf(t.getInstanceId()));
-            item.setBusinessType(t.getBusinessType());
-            item.setBusinessId(String.valueOf(t.getBusinessId()));
-            item.setTaskStatus(t.getTaskStatus());
-            if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
-            WfInstance inst = instanceMap.get(t.getInstanceId());
-            if (inst != null) {
-                item.setTitle(inst.getTitle());
-                item.setProjectId(inst.getProjectId() != null ? String.valueOf(inst.getProjectId()) : null);
-            }
-            return item;
-        }).collect(Collectors.toList());
+        Map<Long, String> activeProjectNameMap = projectNameMap(activeProjects);
+        List<DashboardTaskItemVO> taskItems = pendingTasks.stream()
+                .filter(t -> isProjectManagerWorkflowTask(t, instanceMap.get(t.getInstanceId())))
+                .map(t -> toTaskItem(t, instanceMap.get(t.getInstanceId()), activeProjectNameMap))
+                .collect(Collectors.toList());
         vo.setPendingTasks(taskItems);
         vo.setPendingTaskCount((long) taskItems.size());
 
@@ -646,23 +845,16 @@ public class DashboardService {
                         .eq(WfTask::getTenantId, tenantId)
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
                         .orderByDesc(WfTask::getReceivedAt));
-        long pendingApprovalCount = allPendingApprovals.size();
-        List<DashboardTaskItemVO> pendingApprovals = allPendingApprovals.stream().limit(10).map(t -> {
-            DashboardTaskItemVO item = new DashboardTaskItemVO();
-            item.setTaskId(String.valueOf(t.getId()));
-            item.setInstanceId(String.valueOf(t.getInstanceId()));
-            item.setBusinessType(t.getBusinessType());
-            item.setTaskStatus(t.getTaskStatus());
-            if (t.getReceivedAt() != null) item.setReceivedAt(DateTimeUtils.DTF.format(t.getReceivedAt()));
-            WfInstance inst = instanceMap.get(t.getInstanceId());
-            if (inst != null) {
-                item.setTitle(inst.getTitle());
-                item.setProjectId(inst.getProjectId() != null ? String.valueOf(inst.getProjectId()) : null);
-            }
-            return item;
-        }).collect(Collectors.toList());
+        Map<Long, WfInstance> approvalInstanceMap = batchLoadInstances(allPendingApprovals);
+        List<WfTask> projectManagerPendingApprovals = allPendingApprovals.stream()
+                .filter(t -> isProjectManagerWorkflowTask(t, approvalInstanceMap.get(t.getInstanceId())))
+                .collect(Collectors.toList());
+        List<DashboardTaskItemVO> pendingApprovals = projectManagerPendingApprovals.stream()
+                .limit(10)
+                .map(t -> toTaskItem(t, approvalInstanceMap.get(t.getInstanceId()), activeProjectNameMap))
+                .collect(Collectors.toList());
         vo.setPendingApprovals(pendingApprovals);
-        vo.setPendingApprovalCount(pendingApprovalCount);
+        vo.setPendingApprovalCount((long) projectManagerPendingApprovals.size());
 
         // Expiring contracts: tenant-wide within 30 days
         LocalDate cutoff = LocalDate.now().plusDays(30);
@@ -1510,6 +1702,408 @@ public class DashboardService {
             dynamicCost = dynamicCost.add(summary.getDynamicCost() != null ? summary.getDynamicCost() : BigDecimal.ZERO);
             costDeviation = costDeviation.add(summary.getCostDeviation() != null ? summary.getCostDeviation() : BigDecimal.ZERO);
         }
+    }
+
+    private void applyEmptyPurchaseManager(PurchaseManagerDashboardVO vo) {
+        vo.setPendingRequestCount(0L);
+        vo.setActiveOrderCount(0L);
+        vo.setOverdueDeliveryCount(0L);
+        vo.setPendingReceiptCount(0L);
+        vo.setLowStockItemCount(0L);
+        vo.setTotalOrderAmount("0");
+        vo.setRecentRequests(Collections.emptyList());
+        vo.setOverdueOrders(Collections.emptyList());
+        vo.setPendingReceipts(Collections.emptyList());
+    }
+
+    private void applyEmptyProductionManager(ProductionManagerDashboardVO vo) {
+        vo.setReceiptCount(0L);
+        vo.setRequisitionCount(0L);
+        vo.setPendingStockOutCount(0L);
+        vo.setSubMeasureCount(0L);
+        vo.setLowStockItemCount(0L);
+        vo.setConfirmedMeasureAmount("0");
+        vo.setRecentReceipts(Collections.emptyList());
+        vo.setRecentRequisitions(Collections.emptyList());
+        vo.setRecentSubMeasures(Collections.emptyList());
+    }
+
+    private List<PmProject> resolveDashboardProjects(Long tenantId, Long projectId) {
+        if (projectId != null) {
+            return List.of(requireProject(tenantId, projectId));
+        }
+        return projectMapper.selectList(new LambdaQueryWrapper<PmProject>()
+                .eq(PmProject::getTenantId, tenantId)
+                .eq(PmProject::getStatus, "ACTIVE"));
+    }
+
+    private Map<Long, String> projectNameMap(List<PmProject> projects) {
+        return projects.stream().collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
+    }
+
+    private DashboardTaskItemVO toTaskItem(WfTask task, WfInstance instance, Map<Long, String> projectNameMap) {
+        DashboardTaskItemVO item = new DashboardTaskItemVO();
+        item.setTaskId(String.valueOf(task.getId()));
+        item.setInstanceId(String.valueOf(task.getInstanceId()));
+        item.setBusinessType(task.getBusinessType());
+        item.setBusinessId(task.getBusinessId() != null ? String.valueOf(task.getBusinessId()) : null);
+        item.setTaskStatus(task.getTaskStatus());
+        item.setOwnerName(task.getApproverName());
+        if (task.getReceivedAt() != null) {
+            item.setReceivedAt(DateTimeUtils.DTF.format(task.getReceivedAt()));
+            item.setPendingDays(pendingDays(task.getReceivedAt()));
+        }
+        if (instance != null) {
+            item.setTitle(instance.getTitle());
+            item.setItemSummary(instance.getBusinessSummary());
+            item.setAmount(instance.getAmount() != null ? instance.getAmount().toPlainString() : null);
+            item.setProjectId(instance.getProjectId() != null ? String.valueOf(instance.getProjectId()) : null);
+            item.setProjectName(projectNameMap.get(instance.getProjectId()));
+        }
+        return item;
+    }
+
+    private boolean isProjectManagerWorkflowTask(WfTask task, WfInstance instance) {
+        return !isPaymentWorkflowType(task.getBusinessType())
+                && (instance == null || !isPaymentWorkflowType(instance.getBusinessType()));
+    }
+
+    private boolean isWorkflowInstanceInProject(WfInstance instance, Long projectId) {
+        return instance != null && Objects.equals(instance.getProjectId(), projectId);
+    }
+
+    private boolean isPaymentWorkflowType(String businessType) {
+        return WorkflowBusinessTypes.PAY_REQUEST.equals(businessType)
+                || "PAY_APPLICATION".equals(businessType);
+    }
+
+    private boolean isChiefEngineerOverdueItem(TechItem item) {
+        if ("CLOSED".equals(item.getItemStatus())) return false;
+        return overdueDays(item.getDueDate()) > 0;
+    }
+
+    private Map<Long, String> partnerNameMap(Long tenantId, List<MatPurchaseOrder> orders, List<MatReceipt> receipts) {
+        Set<Long> partnerIds = new HashSet<>();
+        orders.stream().map(MatPurchaseOrder::getPartnerId).filter(Objects::nonNull).forEach(partnerIds::add);
+        receipts.stream().map(MatReceipt::getPartnerId).filter(Objects::nonNull).forEach(partnerIds::add);
+        return partnerNameMap(tenantId, partnerIds);
+    }
+
+    private Map<Long, String> partnerNameMap(Long tenantId, Set<Long> partnerIds) {
+        partnerIds.remove(null);
+        if (partnerIds.isEmpty()) return Collections.emptyMap();
+        return partnerMapper.selectList(new LambdaQueryWrapper<MdPartner>()
+                        .eq(MdPartner::getTenantId, tenantId)
+                        .in(MdPartner::getId, partnerIds))
+                .stream()
+                .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
+    }
+
+    private Map<Long, String> ownerNameMap(Long tenantId, List<MatPurchaseRequest> requests) {
+        Set<Long> userIds = requests.stream()
+                .map(MatPurchaseRequest::getCreatedBy)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return userNameMap(tenantId, userIds);
+    }
+
+    private Map<Long, String> userNameMap(Long tenantId, Set<Long> userIds) {
+        userIds.remove(null);
+        if (userIds.isEmpty()) return Collections.emptyMap();
+        return userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getTenantId, tenantId)
+                        .in(SysUser::getId, userIds))
+                .stream()
+                .collect(Collectors.toMap(SysUser::getId,
+                        u -> StringUtils.hasText(u.getRealName()) ? u.getRealName() : u.getUsername(),
+                        (a, b) -> a));
+    }
+
+    private Set<Long> businessPartnerIds(List<MatReceipt> receipts, List<MatRequisition> requisitions, List<SubMeasure> measures) {
+        Set<Long> partnerIds = new HashSet<>();
+        receipts.stream().map(MatReceipt::getPartnerId).filter(Objects::nonNull).forEach(partnerIds::add);
+        requisitions.stream().map(MatRequisition::getPartnerId).filter(Objects::nonNull).forEach(partnerIds::add);
+        measures.stream().map(SubMeasure::getPartnerId).filter(Objects::nonNull).forEach(partnerIds::add);
+        return partnerIds;
+    }
+
+    private Set<Long> businessUserIds(List<MatReceipt> receipts, List<MatRequisition> requisitions) {
+        Set<Long> userIds = new HashSet<>();
+        receipts.stream().map(MatReceipt::getReceiverId).filter(Objects::nonNull).forEach(userIds::add);
+        requisitions.stream().map(MatRequisition::getRequisitionerId).filter(Objects::nonNull).forEach(userIds::add);
+        return userIds;
+    }
+
+    private Map<Long, String> requestSummaryMap(Long tenantId, List<MatPurchaseRequest> requests) {
+        List<Long> requestIds = requests.stream().map(MatPurchaseRequest::getId).filter(Objects::nonNull).toList();
+        if (requestIds.isEmpty()) return Collections.emptyMap();
+        List<MatPurchaseRequestItem> items = purchaseRequestItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseRequestItem>()
+                .eq(MatPurchaseRequestItem::getTenantId, tenantId)
+                .in(MatPurchaseRequestItem::getRequestId, requestIds));
+        Map<Long, String> materialNames = materialNameMap(items.stream().map(MatPurchaseRequestItem::getMaterialId).collect(Collectors.toSet()));
+        return items.stream().collect(Collectors.groupingBy(MatPurchaseRequestItem::getRequestId,
+                Collectors.collectingAndThen(Collectors.toList(), list -> summarizeNames(list.stream()
+                        .map(i -> materialNames.get(i.getMaterialId()))
+                        .filter(StringUtils::hasText)
+                        .toList()))));
+    }
+
+    private Map<Long, String> orderSummaryMap(Long tenantId, List<MatPurchaseOrder> orders) {
+        List<Long> orderIds = orders.stream().map(MatPurchaseOrder::getId).filter(Objects::nonNull).toList();
+        if (orderIds.isEmpty()) return Collections.emptyMap();
+        List<MatPurchaseOrderItem> items = purchaseOrderItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                .eq(MatPurchaseOrderItem::getTenantId, tenantId)
+                .in(MatPurchaseOrderItem::getOrderId, orderIds));
+        Map<Long, String> materialNames = materialNameMap(items.stream().map(MatPurchaseOrderItem::getMaterialId).collect(Collectors.toSet()));
+        return items.stream().collect(Collectors.groupingBy(MatPurchaseOrderItem::getOrderId,
+                Collectors.collectingAndThen(Collectors.toList(), list -> summarizeNames(list.stream()
+                        .map(i -> StringUtils.hasText(i.getMaterialName()) ? i.getMaterialName() : materialNames.get(i.getMaterialId()))
+                        .filter(StringUtils::hasText)
+                        .toList()))));
+    }
+
+    private Map<Long, String> receiptSummaryMap(Long tenantId, List<MatReceipt> receipts, Map<Long, String> orderSummaryMap) {
+        List<Long> receiptIds = receipts.stream().map(MatReceipt::getId).filter(Objects::nonNull).toList();
+        if (receiptIds.isEmpty()) return Collections.emptyMap();
+        Map<Long, String> summaries = receipts.stream()
+                .filter(r -> StringUtils.hasText(orderSummaryMap.get(r.getOrderId())))
+                .collect(Collectors.toMap(MatReceipt::getId, r -> orderSummaryMap.get(r.getOrderId()), (a, b) -> a));
+        List<MatReceiptItem> items = receiptItemMapper.selectList(new LambdaQueryWrapper<MatReceiptItem>()
+                .eq(MatReceiptItem::getTenantId, tenantId)
+                .in(MatReceiptItem::getReceiptId, receiptIds));
+        Map<Long, String> materialNames = materialNameMap(items.stream().map(MatReceiptItem::getMaterialId).collect(Collectors.toSet()));
+        summaries.putAll(items.stream().collect(Collectors.groupingBy(MatReceiptItem::getReceiptId,
+                Collectors.collectingAndThen(Collectors.toList(), list -> summarizeNames(list.stream()
+                        .map(i -> materialNames.get(i.getMaterialId()))
+                        .filter(StringUtils::hasText)
+                        .toList())))));
+        return summaries;
+    }
+
+    private Map<Long, String> materialNameMap(Set<Long> materialIds) {
+        materialIds.remove(null);
+        if (materialIds.isEmpty()) return Collections.emptyMap();
+        return materialMapper.selectList(new LambdaQueryWrapper<MdMaterial>()
+                        .in(MdMaterial::getId, materialIds))
+                .stream()
+                .collect(Collectors.toMap(MdMaterial::getId, MdMaterial::getMaterialName, (a, b) -> a));
+    }
+
+    private String summarizeNames(List<String> names) {
+        List<String> distinct = names.stream().filter(StringUtils::hasText).distinct().limit(3).toList();
+        if (distinct.isEmpty()) return null;
+        String summary = String.join("、", distinct);
+        long extra = names.stream().filter(StringUtils::hasText).distinct().count() - distinct.size();
+        return extra > 0 ? summary + " 等" + (distinct.size() + extra) + "项" : summary;
+    }
+
+    private long overdueDays(LocalDate deliveryDate) {
+        return deliveryDate == null ? 0L : Math.max(0L, ChronoUnit.DAYS.between(deliveryDate, LocalDate.now()));
+    }
+
+    private long pendingDays(LocalDate receiptDate) {
+        return receiptDate == null ? 0L : Math.max(0L, ChronoUnit.DAYS.between(receiptDate, LocalDate.now()));
+    }
+
+    private long pendingDays(LocalDateTime receivedAt) {
+        return receivedAt == null ? 0L : Math.max(0L, ChronoUnit.DAYS.between(receivedAt, LocalDateTime.now()));
+    }
+
+    private long overdueDays(LocalDateTime dueDate) {
+        return dueDate == null ? 0L : Math.max(0L, ChronoUnit.DAYS.between(dueDate.toLocalDate(), LocalDate.now()));
+    }
+
+    private BigDecimal amountOrZero(BigDecimal amount) {
+        return amount != null ? amount : BigDecimal.ZERO;
+    }
+
+    private Long countLowStockItems(Long tenantId, List<Long> projectIds) {
+        if (projectIds.isEmpty()) {
+            return 0L;
+        }
+        List<MatWarehouse> warehouses = warehouseMapper.selectList(new LambdaQueryWrapper<MatWarehouse>()
+                .eq(MatWarehouse::getTenantId, tenantId)
+                .in(MatWarehouse::getProjectId, projectIds));
+        List<Long> warehouseIds = warehouses.stream().map(MatWarehouse::getId).collect(Collectors.toList());
+        if (warehouseIds.isEmpty()) {
+            return 0L;
+        }
+        return stockMapper.selectCount(new LambdaQueryWrapper<MatStock>()
+                .eq(MatStock::getTenantId, tenantId)
+                .in(MatStock::getWarehouseId, warehouseIds)
+                .le(MatStock::getAvailableQty, BigDecimal.ZERO));
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatPurchaseRequest request, Map<Long, String> projectNameMap) {
+        return toBusinessItem(sourceType, request, projectNameMap, Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatPurchaseRequest request,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> ownerNameMap) {
+        return toBusinessItem(sourceType, request, projectNameMap, ownerNameMap, Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatPurchaseRequest request,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> ownerNameMap,
+                                                   Map<Long, String> summaryMap) {
+        DashboardBusinessItemVO item = new DashboardBusinessItemVO();
+        String summary = summaryMap.get(request.getId());
+        item.setSourceType(sourceType);
+        item.setSourceId(String.valueOf(request.getId()));
+        item.setCode(request.getRequestCode());
+        item.setTitle(StringUtils.hasText(summary) ? summary : request.getRequestCode());
+        item.setItemSummary(summary);
+        item.setStatus(request.getApprovalStatus());
+        item.setAmount(null);
+        item.setDate(request.getCreatedTime() != null ? DateTimeUtils.DTF.format(request.getCreatedTime()) : null);
+        item.setProjectId(request.getProjectId() != null ? String.valueOf(request.getProjectId()) : null);
+        item.setProjectName(projectNameMap.get(request.getProjectId()));
+        item.setOwnerName(ownerNameMap.get(request.getCreatedBy()));
+        return item;
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatPurchaseOrder order, Map<Long, String> projectNameMap) {
+        return toBusinessItem(sourceType, order, projectNameMap, Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatPurchaseOrder order,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> partnerNameMap) {
+        return toBusinessItem(sourceType, order, projectNameMap, partnerNameMap, Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatPurchaseOrder order,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> partnerNameMap,
+                                                   Map<Long, String> summaryMap) {
+        DashboardBusinessItemVO item = new DashboardBusinessItemVO();
+        String summary = summaryMap.get(order.getId());
+        item.setSourceType(sourceType);
+        item.setSourceId(String.valueOf(order.getId()));
+        item.setCode(order.getOrderCode());
+        item.setTitle(StringUtils.hasText(summary) ? summary : order.getOrderCode());
+        item.setItemSummary(summary);
+        item.setStatus(order.getOrderStatus());
+        item.setAmount(order.getTotalAmount() != null ? order.getTotalAmount().toPlainString() : "0");
+        item.setDate(order.getDeliveryDate() != null ? order.getDeliveryDate().toString() : null);
+        item.setProjectId(order.getProjectId() != null ? String.valueOf(order.getProjectId()) : null);
+        item.setProjectName(projectNameMap.get(order.getProjectId()));
+        item.setPartnerName(partnerNameMap.get(order.getPartnerId()));
+        item.setOverdueDays(overdueDays(order.getDeliveryDate()));
+        return item;
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatReceipt receipt, Map<Long, String> projectNameMap) {
+        return toBusinessItem(sourceType, receipt, projectNameMap, Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatReceipt receipt,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> partnerNameMap) {
+        return toBusinessItem(sourceType, receipt, projectNameMap, partnerNameMap, Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatReceipt receipt,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> partnerNameMap,
+                                                   Map<Long, String> summaryMap) {
+        return toBusinessItem(sourceType, receipt, projectNameMap, partnerNameMap, Collections.emptyMap(), summaryMap);
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatReceipt receipt,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> partnerNameMap,
+                                                   Map<Long, String> ownerNameMap,
+                                                   Map<Long, String> summaryMap) {
+        DashboardBusinessItemVO item = new DashboardBusinessItemVO();
+        String summary = summaryMap.get(receipt.getId());
+        item.setSourceType(sourceType);
+        item.setSourceId(String.valueOf(receipt.getId()));
+        item.setCode(receipt.getReceiptCode());
+        item.setTitle(summary);
+        item.setItemSummary(summary);
+        item.setStatus(receipt.getApprovalStatus());
+        item.setAmount(receipt.getTotalAmount() != null ? receipt.getTotalAmount().toPlainString() : "0");
+        item.setDate(receipt.getReceiptDate() != null ? receipt.getReceiptDate().toString() : null);
+        item.setProjectId(receipt.getProjectId() != null ? String.valueOf(receipt.getProjectId()) : null);
+        item.setProjectName(projectNameMap.get(receipt.getProjectId()));
+        item.setPartnerName(partnerNameMap.get(receipt.getPartnerId()));
+        item.setOwnerName(ownerNameMap.get(receipt.getReceiverId()));
+        item.setPendingDays(pendingDays(receipt.getReceiptDate()));
+        return item;
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatRequisition requisition, Map<Long, String> projectNameMap) {
+        return toBusinessItem(sourceType, requisition, projectNameMap, Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, MatRequisition requisition,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> partnerNameMap,
+                                                   Map<Long, String> ownerNameMap) {
+        DashboardBusinessItemVO item = new DashboardBusinessItemVO();
+        item.setSourceType(sourceType);
+        item.setSourceId(String.valueOf(requisition.getId()));
+        item.setCode(requisition.getRequisitionCode());
+        item.setTitle(null);
+        item.setItemSummary(null);
+        item.setStatus(requisition.getApprovalStatus());
+        item.setAmount(requisition.getTotalAmount() != null ? requisition.getTotalAmount().toPlainString() : "0");
+        item.setDate(requisition.getRequisitionDate() != null ? requisition.getRequisitionDate().toString() : null);
+        item.setProjectId(requisition.getProjectId() != null ? String.valueOf(requisition.getProjectId()) : null);
+        item.setProjectName(projectNameMap.get(requisition.getProjectId()));
+        item.setPartnerName(partnerNameMap.get(requisition.getPartnerId()));
+        item.setOwnerName(ownerNameMap.get(requisition.getRequisitionerId()));
+        return item;
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, SubMeasure measure, Map<Long, String> projectNameMap) {
+        return toBusinessItem(sourceType, measure, projectNameMap, Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toBusinessItem(String sourceType, SubMeasure measure,
+                                                   Map<Long, String> projectNameMap,
+                                                   Map<Long, String> partnerNameMap) {
+        DashboardBusinessItemVO item = new DashboardBusinessItemVO();
+        item.setSourceType(sourceType);
+        item.setSourceId(String.valueOf(measure.getId()));
+        item.setCode(measure.getMeasureCode());
+        item.setTitle(null);
+        item.setItemSummary(null);
+        item.setStatus(measure.getStatus() != null ? measure.getStatus() : measure.getApprovalStatus());
+        item.setAmount(measure.getApprovedAmount() != null ? measure.getApprovedAmount().toPlainString() : "0");
+        item.setDate(measure.getMeasureDate() != null ? measure.getMeasureDate().toString() : null);
+        item.setProjectId(measure.getProjectId() != null ? String.valueOf(measure.getProjectId()) : null);
+        item.setProjectName(projectNameMap.get(measure.getProjectId()));
+        item.setPartnerName(partnerNameMap.get(measure.getPartnerId()));
+        return item;
+    }
+
+    private DashboardBusinessItemVO toTechBusinessItem(String sourceType, TechItem item, Map<Long, String> projectNameMap) {
+        return toTechBusinessItem(sourceType, item, projectNameMap, Collections.emptyMap());
+    }
+
+    private DashboardBusinessItemVO toTechBusinessItem(String sourceType, TechItem item,
+                                                       Map<Long, String> projectNameMap,
+                                                       Map<Long, String> ownerNameMap) {
+        DashboardBusinessItemVO vo = new DashboardBusinessItemVO();
+        vo.setSourceType(sourceType);
+        vo.setSourceId(String.valueOf(item.getId()));
+        vo.setCode(item.getItemCode());
+        vo.setTitle(item.getItemTitle());
+        vo.setStatus(item.getItemStatus());
+        vo.setAmount(item.getItemLevel());
+        vo.setDate(item.getDueDate() != null ? DateTimeUtils.DTF.format(item.getDueDate()) : null);
+        vo.setProjectId(item.getProjectId() != null ? String.valueOf(item.getProjectId()) : null);
+        vo.setProjectName(projectNameMap.get(item.getProjectId()));
+        vo.setOwnerName(ownerNameMap.get(item.getResponsibleUserId()));
+        long overdueDays = overdueDays(item.getDueDate());
+        if (overdueDays > 0) {
+            vo.setOverdueDays(overdueDays);
+        }
+        return vo;
     }
 
     // ========================================================================

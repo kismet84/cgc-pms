@@ -7,6 +7,9 @@ import type {
   FinanceDashboardVO,
   ManagementDashboardVO,
   CostBreakdownVO,
+  PurchaseManagerDashboardVO,
+  ProductionManagerDashboardVO,
+  ChiefEngineerDashboardVO,
 } from '@/types/dashboard'
 import type { ContractVO } from '@/types/contract'
 
@@ -41,6 +44,33 @@ export function getCostManagerView(projectId?: string, month?: string) {
     url: '/dashboard/cost-manager',
     method: 'get',
     params: dashboardParams(projectId, month),
+  })
+}
+
+/** Purchase Manager dashboard view */
+export function getPurchaseManagerView(projectId?: string) {
+  return request<PurchaseManagerDashboardVO>({
+    url: '/dashboard/purchase-manager',
+    method: 'get',
+    params: projectId ? { projectId } : undefined,
+  })
+}
+
+/** Production Manager dashboard view */
+export function getProductionManagerView(projectId?: string) {
+  return request<ProductionManagerDashboardVO>({
+    url: '/dashboard/production-manager',
+    method: 'get',
+    params: projectId ? { projectId } : undefined,
+  })
+}
+
+/** Chief Engineer dashboard view */
+export function getChiefEngineerView(projectId?: string) {
+  return request<ChiefEngineerDashboardVO>({
+    url: '/dashboard/chief-engineer',
+    method: 'get',
+    params: projectId ? { projectId } : undefined,
   })
 }
 

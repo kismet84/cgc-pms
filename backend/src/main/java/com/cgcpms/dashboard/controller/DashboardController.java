@@ -5,6 +5,7 @@ import com.cgcpms.common.annotation.RateLimitKey;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.dashboard.service.DashboardService;
 import com.cgcpms.dashboard.vo.*;
+import com.cgcpms.tech.vo.ChiefEngineerDashboardVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -46,6 +47,36 @@ public class DashboardController {
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) String month) {
         return ApiResponse.success(dashboardService.getCostManagerView(projectId, month));
+    }
+
+    /**
+     * Purchase Manager View: purchase requests, orders, delivery, receipts, and stock pressure.
+     */
+    @GetMapping("/purchase-manager")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:purchase-manager:view')")
+    public ApiResponse<PurchaseManagerDashboardVO> getPurchaseManagerView(
+            @RequestParam(required = false) Long projectId) {
+        return ApiResponse.success(dashboardService.getPurchaseManagerView(projectId));
+    }
+
+    /**
+     * Production Manager MVP View: receipts, requisitions, subcontract measures, and inventory pressure.
+     */
+    @GetMapping("/production-manager")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:production-manager:view')")
+    public ApiResponse<ProductionManagerDashboardVO> getProductionManagerView(
+            @RequestParam(required = false) Long projectId) {
+        return ApiResponse.success(dashboardService.getProductionManagerView(projectId));
+    }
+
+    /**
+     * Chief Engineer View: technical reviews, design coordination, major technical issues.
+     */
+    @GetMapping("/chief-engineer")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:chief-engineer:view')")
+    public ApiResponse<ChiefEngineerDashboardVO> getChiefEngineerView(
+            @RequestParam(required = false) Long projectId) {
+        return ApiResponse.success(dashboardService.getChiefEngineerView(projectId));
     }
 
     /**

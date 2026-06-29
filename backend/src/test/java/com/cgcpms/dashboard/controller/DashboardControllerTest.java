@@ -70,6 +70,20 @@ class DashboardControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/dashboard/purchase-manager without JWT → 401")
+    void testPurchaseView_Unauthenticated() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/purchase-manager"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/production-manager without JWT → 401")
+    void testProductionView_Unauthenticated() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/production-manager"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("GET /api/dashboard/finance without JWT → 401")
     void testFinanceView_Unauthenticated() throws Exception {
         mockMvc.perform(getWithContext("/dashboard/finance"))
@@ -126,6 +140,24 @@ class DashboardControllerTest {
     @DisplayName("GET /api/dashboard/cost-manager → 200 (no param)")
     void testCostView_NoProjectId() throws Exception {
         mockMvc.perform(getWithContext("/dashboard/cost-manager")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/purchase-manager → 200 (no param)")
+    void testPurchaseView_NoProjectId() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/purchase-manager")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/production-manager → 200 (no param)")
+    void testProductionView_NoProjectId() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/production-manager")
                         .cookie(adminCookie()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));

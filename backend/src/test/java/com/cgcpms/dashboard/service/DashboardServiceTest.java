@@ -11,18 +11,46 @@ import com.cgcpms.cost.entity.CostSummary;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
+import com.cgcpms.inventory.entity.MatStock;
+import com.cgcpms.inventory.entity.MatWarehouse;
+import com.cgcpms.inventory.mapper.MatStockMapper;
+import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.dashboard.vo.*;
+import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.partner.entity.MdPartner;
+import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.entity.MatPurchaseRequest;
+import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
+import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.entity.MatReceiptItem;
+import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.requisition.entity.MatRequisition;
+import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
+import com.cgcpms.tech.entity.TechItem;
+import com.cgcpms.tech.mapper.TechItemMapper;
+import com.cgcpms.tech.vo.ChiefEngineerDashboardVO;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfTask;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
@@ -69,17 +97,34 @@ class DashboardServiceTest {
     @Autowired private CostSummaryMapper costSummaryMapper;
     @Autowired private CostSubjectMapper costSubjectMapper;
     @Autowired private CostItemMapper costItemMapper;
+    @Autowired private MatPurchaseRequestMapper purchaseRequestMapper;
+    @Autowired private MatPurchaseRequestItemMapper purchaseRequestItemMapper;
+    @Autowired private MatPurchaseOrderMapper purchaseOrderMapper;
+    @Autowired private MatPurchaseOrderItemMapper purchaseOrderItemMapper;
+    @Autowired private MatReceiptMapper receiptMapper;
+    @Autowired private MatReceiptItemMapper receiptItemMapper;
+    @Autowired private MatRequisitionMapper requisitionMapper;
+    @Autowired private MatWarehouseMapper warehouseMapper;
+    @Autowired private MatStockMapper stockMapper;
+    @Autowired private MdPartnerMapper partnerMapper;
+    @Autowired private MdMaterialMapper materialMapper;
+    @Autowired private SysUserMapper userMapper;
+    @Autowired private TechItemMapper techItemMapper;
+
+    private void setAdminContext() {
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", TENANT_ID)
+                .build());
+    }
 
     /**
      * Helper that seeds a full test project and returns its ID.
      * Each call produces unique codes via a suffix so tests don't clash on UK constraints.
      */
     private SeedResult seed(String suffix) {
-        UserContext.set(Jwts.claims()
-                .add("userId", USER_ADMIN)
-                .add("username", "admin")
-                .add("tenantId", TENANT_ID)
-                .build());
+        setAdminContext();
 
         // Project
         PmProject project = new PmProject();
@@ -108,6 +153,33 @@ class DashboardServiceTest {
         ctContractMapper.insert(contract);
         Long contractId = contract.getId();
 
+        MdPartner partner = new MdPartner();
+        partner.setTenantId(TENANT_ID);
+        partner.setPartnerCode("PT-" + suffix);
+        partner.setPartnerName("供应商-" + suffix);
+        partner.setPartnerType("SUPPLIER");
+        partner.setStatus("ENABLE");
+        partnerMapper.insert(partner);
+        Long partnerId = partner.getId();
+
+        MdMaterial material = new MdMaterial();
+        material.setTenantId(TENANT_ID);
+        material.setMaterialCode("MAT-" + suffix);
+        material.setMaterialName("钢筋-" + suffix);
+        material.setUnit("吨");
+        material.setStatus("ENABLE");
+        materialMapper.insert(material);
+        Long materialId = material.getId();
+
+        SysUser signalUser = new SysUser();
+        signalUser.setTenantId(TENANT_ID);
+        signalUser.setUsername("dashboard-user-" + suffix);
+        signalUser.setPassword("{noop}dashboard-test");
+        signalUser.setRealName("驾驶舱用户-" + suffix);
+        signalUser.setStatus("ENABLE");
+        userMapper.insert(signalUser);
+        Long signalUserId = signalUser.getId();
+
         // WfInstance + WfTask
         WfInstance instance = new WfInstance();
         instance.setTenantId(TENANT_ID);
@@ -116,6 +188,8 @@ class DashboardServiceTest {
         instance.setBusinessId(contractId);
         instance.setProjectId(projectId);
         instance.setTitle("审批-" + suffix);
+        instance.setAmount(new BigDecimal("5000000.00"));
+        instance.setBusinessSummary("合同审批摘要-" + suffix);
         instance.setInstanceStatus("RUNNING");
         instance.setInitiatorId(USER_ADMIN);
         wfInstanceMapper.insert(instance);
@@ -146,10 +220,115 @@ class DashboardServiceTest {
         SubMeasure subMeasure = new SubMeasure();
         subMeasure.setTenantId(TENANT_ID);
         subMeasure.setProjectId(projectId);
+        subMeasure.setPartnerId(partnerId);
         subMeasure.setMeasureCode("SM-" + suffix);
+        subMeasure.setMeasurePeriod("2026-06");
+        subMeasure.setReportedAmount(new BigDecimal("90000.00"));
         subMeasure.setApprovedAmount(new BigDecimal("80000.00"));
         subMeasure.setApprovalStatus("APPROVED");
+        subMeasure.setStatus("CONFIRMED");
         subMeasureMapper.insert(subMeasure);
+
+        // Purchase / receipt / requisition / inventory signals for role dashboards
+        MatPurchaseRequest purchaseRequest = new MatPurchaseRequest();
+        purchaseRequest.setTenantId(TENANT_ID);
+        purchaseRequest.setProjectId(projectId);
+        purchaseRequest.setContractId(contractId);
+        purchaseRequest.setRequestCode("PR-" + suffix);
+        purchaseRequest.setApprovalStatus("APPROVING");
+        purchaseRequest.setStatus("DRAFT");
+        purchaseRequest.setCreatedBy(999L);
+        purchaseRequestMapper.insert(purchaseRequest);
+
+        MatPurchaseRequestItem requestItem = new MatPurchaseRequestItem();
+        requestItem.setTenantId(TENANT_ID);
+        requestItem.setRequestId(purchaseRequest.getId());
+        requestItem.setMaterialId(materialId);
+        requestItem.setQuantity(new BigDecimal("10.0000"));
+        requestItem.setUnit("吨");
+        requestItem.setPlannedDate(LocalDate.now().plusDays(7));
+        purchaseRequestItemMapper.insert(requestItem);
+
+        MatPurchaseOrder purchaseOrder = new MatPurchaseOrder();
+        purchaseOrder.setTenantId(TENANT_ID);
+        purchaseOrder.setProjectId(projectId);
+        purchaseOrder.setRequestId(purchaseRequest.getId());
+        purchaseOrder.setContractId(contractId);
+        purchaseOrder.setPartnerId(partnerId);
+        purchaseOrder.setOrderCode("PO-" + suffix);
+        purchaseOrder.setOrderDate(LocalDate.now().minusDays(10));
+        purchaseOrder.setDeliveryDate(LocalDate.now().minusDays(1));
+        purchaseOrder.setTotalAmount(new BigDecimal("120000.00"));
+        purchaseOrder.setApprovalStatus("APPROVED");
+        purchaseOrder.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(purchaseOrder);
+
+        MatPurchaseOrderItem purchaseOrderItem = new MatPurchaseOrderItem();
+        purchaseOrderItem.setTenantId(TENANT_ID);
+        purchaseOrderItem.setProjectId(projectId);
+        purchaseOrderItem.setOrderId(purchaseOrder.getId());
+        purchaseOrderItem.setMaterialId(materialId);
+        purchaseOrderItem.setMaterialName("钢筋-" + suffix);
+        purchaseOrderItem.setQuantity(new BigDecimal("10.0000"));
+        purchaseOrderItem.setUnit("吨");
+        purchaseOrderItem.setUnitPrice(new BigDecimal("12000.0000"));
+        purchaseOrderItem.setAmount(new BigDecimal("120000.00"));
+        purchaseOrderItemMapper.insert(purchaseOrderItem);
+
+        MatWarehouse warehouse = new MatWarehouse();
+        warehouse.setTenantId(TENANT_ID);
+        warehouse.setProjectId(projectId);
+        warehouse.setWarehouseCode("WH-" + suffix);
+        warehouse.setWarehouseName("Warehouse " + suffix);
+        warehouse.setStatus("ENABLE");
+        warehouseMapper.insert(warehouse);
+
+        MatReceipt receipt = new MatReceipt();
+        receipt.setTenantId(TENANT_ID);
+        receipt.setProjectId(projectId);
+        receipt.setOrderId(purchaseOrder.getId());
+        receipt.setContractId(contractId);
+        receipt.setPartnerId(partnerId);
+        receipt.setReceiptCode("RC-" + suffix);
+        receipt.setReceiptDate(LocalDate.now());
+        receipt.setWarehouseId(warehouse.getId());
+        receipt.setReceiverId(signalUserId);
+        receipt.setQualityStatus("PENDING");
+        receipt.setTotalAmount(new BigDecimal("80000.00"));
+        receipt.setApprovalStatus("APPROVING");
+        receiptMapper.insert(receipt);
+
+        MatReceiptItem receiptItem = new MatReceiptItem();
+        receiptItem.setTenantId(TENANT_ID);
+        receiptItem.setReceiptId(receipt.getId());
+        receiptItem.setOrderItemId(purchaseOrderItem.getId());
+        receiptItem.setMaterialId(materialId);
+        receiptItem.setActualQuantity(new BigDecimal("6.0000"));
+        receiptItem.setQualifiedQuantity(new BigDecimal("6.0000"));
+        receiptItem.setUnitPrice(new BigDecimal("12000.0000"));
+        receiptItem.setAmount(new BigDecimal("72000.00"));
+        receiptItemMapper.insert(receiptItem);
+
+        MatRequisition requisition = new MatRequisition();
+        requisition.setTenantId(TENANT_ID);
+        requisition.setProjectId(projectId);
+        requisition.setContractId(contractId);
+        requisition.setRequisitionCode("RQ-" + suffix);
+        requisition.setRequisitionDate(LocalDate.now());
+        requisition.setWarehouseId(warehouse.getId());
+        requisition.setRequisitionerId(signalUserId);
+        requisition.setPartnerId(partnerId);
+        requisition.setApprovalStatus("APPROVED");
+        requisition.setTotalAmount(new BigDecimal("50000.00"));
+        requisition.setStockOutFlag(0);
+        requisitionMapper.insert(requisition);
+
+        MatStock stock = new MatStock();
+        stock.setTenantId(TENANT_ID);
+        stock.setWarehouseId(warehouse.getId());
+        stock.setMaterialId(1L);
+        stock.setAvailableQty(BigDecimal.ZERO);
+        stockMapper.insert(stock);
 
         // Settlement
         StlSettlement settlement = new StlSettlement();
@@ -262,15 +441,23 @@ class DashboardServiceTest {
         alertLogMapper.insert(alert);
         // Do NOT clear UserContext here — test methods need it
 
-        return new SeedResult(projectId, project.getProjectName());
+        return new SeedResult(projectId, project.getProjectName(), partnerId, warehouse.getId(), materialId, signalUserId);
     }
 
     static class SeedResult {
         final Long projectId;
         final String projectName;
-        SeedResult(Long projectId, String projectName) {
+        final Long partnerId;
+        final Long warehouseId;
+        final Long materialId;
+        final Long signalUserId;
+        SeedResult(Long projectId, String projectName, Long partnerId, Long warehouseId, Long materialId, Long signalUserId) {
             this.projectId = projectId;
             this.projectName = projectName;
+            this.partnerId = partnerId;
+            this.warehouseId = warehouseId;
+            this.materialId = materialId;
+            this.signalUserId = signalUserId;
         }
     }
 
@@ -293,6 +480,118 @@ class DashboardServiceTest {
         assertTrue(vo.getLaggingProjectCount() >= 1, "At least 1 lagging project");
         assertTrue(vo.getExpiringContractCount() >= 1, "At least 1 expiring contract");
         assertNotNull(vo.getPendingApprovals(), "pendingApprovals should not be null");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("1.1a PM view: pending approvals load instance details outside current user tasks")
+    void testPMView_PendingApprovalsLoadOwnInstanceDetails() {
+        SeedResult sr = seed("PM_APPROVAL_SUMMARY");
+
+        WfInstance externalInstance = new WfInstance();
+        externalInstance.setTenantId(TENANT_ID);
+        externalInstance.setTemplateId(1L);
+        externalInstance.setBusinessType("CONTRACT");
+        externalInstance.setBusinessId(970000000000L);
+        externalInstance.setProjectId(sr.projectId);
+        externalInstance.setTitle("非当前用户审批-PM_APPROVAL_SUMMARY");
+        externalInstance.setBusinessSummary("非当前用户审批摘要-PM_APPROVAL_SUMMARY");
+        externalInstance.setAmount(new BigDecimal("123456.00"));
+        externalInstance.setInstanceStatus("RUNNING");
+        externalInstance.setInitiatorId(USER_ADMIN);
+        wfInstanceMapper.insert(externalInstance);
+
+        WfTask externalTask = new WfTask();
+        externalTask.setTenantId(TENANT_ID);
+        externalTask.setInstanceId(externalInstance.getId());
+        externalTask.setNodeInstanceId(2L);
+        externalTask.setBusinessType("CONTRACT");
+        externalTask.setBusinessId(970000000000L);
+        externalTask.setApproverId(2L);
+        externalTask.setApproverName("项目总监");
+        externalTask.setTaskStatus(WorkflowConstants.TASK_PENDING);
+        externalTask.setReceivedAt(LocalDateTime.now().minusDays(4));
+        wfTaskMapper.insert(externalTask);
+
+        ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(sr.projectId);
+
+        DashboardTaskItemVO item = vo.getPendingApprovals().stream()
+                .filter(i -> externalTask.getId().toString().equals(i.getTaskId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("非当前用户审批-PM_APPROVAL_SUMMARY", item.getTitle());
+        assertEquals("非当前用户审批摘要-PM_APPROVAL_SUMMARY", item.getItemSummary());
+        assertEquals("项目总监", item.getOwnerName());
+        assertEquals("123456.00", item.getAmount());
+        assertEquals(4L, item.getPendingDays());
+        assertEquals(sr.projectId.toString(), item.getProjectId());
+        assertEquals(sr.projectName, item.getProjectName());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("1.1b PM view: payment approvals are not PM dashboard main-axis tasks")
+    void testPMView_ExcludesPaymentApprovalTasks() {
+        SeedResult sr = seed("PM_NO_PAYMENT");
+
+        WfInstance payInstance = new WfInstance();
+        payInstance.setTenantId(TENANT_ID);
+        payInstance.setTemplateId(50005L);
+        payInstance.setBusinessType("PAY_APPLICATION");
+        payInstance.setBusinessId(970000000001L);
+        payInstance.setProjectId(sr.projectId);
+        payInstance.setTitle("待审批付款-PM_NO_PAYMENT");
+        payInstance.setBusinessSummary("付款审批摘要-PM_NO_PAYMENT");
+        payInstance.setAmount(new BigDecimal("98765.00"));
+        payInstance.setInstanceStatus("RUNNING");
+        payInstance.setInitiatorId(USER_ADMIN);
+        wfInstanceMapper.insert(payInstance);
+
+        WfTask payTask = new WfTask();
+        payTask.setTenantId(TENANT_ID);
+        payTask.setInstanceId(payInstance.getId());
+        payTask.setNodeInstanceId(3L);
+        payTask.setBusinessType("CONTRACT");
+        payTask.setBusinessId(970000000001L);
+        payTask.setApproverId(USER_ADMIN);
+        payTask.setApproverName("项目经理");
+        payTask.setTaskStatus(WorkflowConstants.TASK_PENDING);
+        payTask.setReceivedAt(LocalDateTime.now().minusDays(1));
+        wfTaskMapper.insert(payTask);
+
+        ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(sr.projectId);
+
+        assertTrue(vo.getPendingTasks().stream().noneMatch(i -> WorkflowBusinessTypes.PAY_REQUEST.equals(i.getBusinessType())));
+        assertTrue(vo.getPendingTasks().stream().noneMatch(i -> "PAY_APPLICATION".equals(i.getBusinessType())));
+        assertTrue(vo.getPendingApprovals().stream().noneMatch(i -> WorkflowBusinessTypes.PAY_REQUEST.equals(i.getBusinessType())));
+        assertTrue(vo.getPendingApprovals().stream().noneMatch(i -> "PAY_APPLICATION".equals(i.getBusinessType())));
+        assertTrue(vo.getPendingTasks().stream().noneMatch(i -> "待审批付款-PM_NO_PAYMENT".equals(i.getTitle())));
+        assertTrue(vo.getPendingApprovals().stream().noneMatch(i -> "待审批付款-PM_NO_PAYMENT".equals(i.getTitle())));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("1.1c PM view: single project pending tasks stay scoped and carry readable fields")
+    void testPMView_SingleProjectPendingTasksStayScopedAndCarryReadableFields() {
+        SeedResult selected = seed("PM_SCOPE_A");
+        SeedResult other = seed("PM_SCOPE_B");
+
+        ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(selected.projectId);
+
+        assertTrue(vo.getPendingTasks().stream()
+                .noneMatch(i -> other.projectId.toString().equals(i.getProjectId())),
+                "single-project PM view must not include pending tasks from another project");
+
+        DashboardTaskItemVO item = vo.getPendingTasks().stream()
+                .filter(i -> selected.projectId.toString().equals(i.getProjectId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("审批-PM_SCOPE_A", item.getTitle());
+        assertEquals("合同审批摘要-PM_SCOPE_A", item.getItemSummary());
+        assertEquals("成本经理", item.getOwnerName());
+        assertEquals("5000000.00", item.getAmount());
+        assertEquals(9L, item.getPendingDays());
+        assertEquals(selected.projectName, item.getProjectName());
     }
 
     @Test
@@ -458,6 +757,363 @@ class DashboardServiceTest {
         assertEquals(1, vo.getSubjectRankings().size());
         assertEquals("人工费", vo.getSubjectRankings().get(0).getCostSubjectName());
         assertTrue(vo.getLedgerRows().stream().anyMatch(row -> "人工费".equals(row.getCostSubjectName())));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.2 Purchase manager view: aggregates existing purchase and receipt signals")
+    void testPurchaseManagerView_MvpSignals() {
+        SeedResult sr = seed("PUR_DASH");
+
+        MatPurchaseOrder olderLowerAmountOrder = new MatPurchaseOrder();
+        olderLowerAmountOrder.setTenantId(TENANT_ID);
+        olderLowerAmountOrder.setProjectId(sr.projectId);
+        olderLowerAmountOrder.setPartnerId(sr.partnerId);
+        olderLowerAmountOrder.setOrderCode("PO-PUR_DASH-OLD-LOW");
+        olderLowerAmountOrder.setOrderDate(LocalDate.now().minusDays(8));
+        olderLowerAmountOrder.setDeliveryDate(LocalDate.now().minusDays(5));
+        olderLowerAmountOrder.setTotalAmount(new BigDecimal("110000.00"));
+        olderLowerAmountOrder.setApprovalStatus("APPROVED");
+        olderLowerAmountOrder.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(olderLowerAmountOrder);
+
+        MatPurchaseOrder olderHigherAmountOrder = new MatPurchaseOrder();
+        olderHigherAmountOrder.setTenantId(TENANT_ID);
+        olderHigherAmountOrder.setProjectId(sr.projectId);
+        olderHigherAmountOrder.setPartnerId(sr.partnerId);
+        olderHigherAmountOrder.setOrderCode("PO-PUR_DASH-OLD-HIGH");
+        olderHigherAmountOrder.setOrderDate(LocalDate.now().minusDays(8));
+        olderHigherAmountOrder.setDeliveryDate(LocalDate.now().minusDays(5));
+        olderHigherAmountOrder.setTotalAmount(new BigDecimal("130000.00"));
+        olderHigherAmountOrder.setApprovalStatus("APPROVED");
+        olderHigherAmountOrder.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(olderHigherAmountOrder);
+
+        MatPurchaseOrderItem olderHigherAmountOrderItem = new MatPurchaseOrderItem();
+        olderHigherAmountOrderItem.setTenantId(TENANT_ID);
+        olderHigherAmountOrderItem.setProjectId(sr.projectId);
+        olderHigherAmountOrderItem.setOrderId(olderHigherAmountOrder.getId());
+        olderHigherAmountOrderItem.setMaterialId(sr.materialId);
+        olderHigherAmountOrderItem.setMaterialName("高强螺栓-PUR_DASH");
+        olderHigherAmountOrderItem.setQuantity(new BigDecimal("20.0000"));
+        olderHigherAmountOrderItem.setUnit("套");
+        olderHigherAmountOrderItem.setUnitPrice(new BigDecimal("6500.0000"));
+        olderHigherAmountOrderItem.setAmount(new BigDecimal("130000.00"));
+        purchaseOrderItemMapper.insert(olderHigherAmountOrderItem);
+
+        MatReceipt olderLowerAmountReceipt = new MatReceipt();
+        olderLowerAmountReceipt.setTenantId(TENANT_ID);
+        olderLowerAmountReceipt.setProjectId(sr.projectId);
+        olderLowerAmountReceipt.setPartnerId(sr.partnerId);
+        olderLowerAmountReceipt.setReceiptCode("RC-PUR_DASH-OLD-LOW");
+        olderLowerAmountReceipt.setReceiptDate(LocalDate.now().minusDays(3));
+        olderLowerAmountReceipt.setWarehouseId(sr.warehouseId);
+        olderLowerAmountReceipt.setTotalAmount(new BigDecimal("50000.00"));
+        olderLowerAmountReceipt.setApprovalStatus("APPROVING");
+        receiptMapper.insert(olderLowerAmountReceipt);
+
+        MatReceipt olderHigherAmountReceipt = new MatReceipt();
+        olderHigherAmountReceipt.setTenantId(TENANT_ID);
+        olderHigherAmountReceipt.setProjectId(sr.projectId);
+        olderHigherAmountReceipt.setPartnerId(sr.partnerId);
+        olderHigherAmountReceipt.setReceiptCode("RC-PUR_DASH-OLD-HIGH");
+        olderHigherAmountReceipt.setReceiptDate(LocalDate.now().minusDays(3));
+        olderHigherAmountReceipt.setWarehouseId(sr.warehouseId);
+        olderHigherAmountReceipt.setTotalAmount(new BigDecimal("90000.00"));
+        olderHigherAmountReceipt.setApprovalStatus("APPROVING");
+        receiptMapper.insert(olderHigherAmountReceipt);
+
+        MatReceiptItem olderHigherAmountReceiptItem = new MatReceiptItem();
+        olderHigherAmountReceiptItem.setTenantId(TENANT_ID);
+        olderHigherAmountReceiptItem.setReceiptId(olderHigherAmountReceipt.getId());
+        olderHigherAmountReceiptItem.setMaterialId(sr.materialId);
+        olderHigherAmountReceiptItem.setActualQuantity(new BigDecimal("8.0000"));
+        olderHigherAmountReceiptItem.setQualifiedQuantity(new BigDecimal("8.0000"));
+        olderHigherAmountReceiptItem.setUnitPrice(new BigDecimal("11250.0000"));
+        olderHigherAmountReceiptItem.setAmount(new BigDecimal("90000.00"));
+        receiptItemMapper.insert(olderHigherAmountReceiptItem);
+
+        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(sr.projectId);
+
+        assertNotNull(vo);
+        assertEquals(sr.projectId.toString(), vo.getProjectId());
+        assertEquals(1L, vo.getPendingRequestCount());
+        assertEquals(3L, vo.getActiveOrderCount());
+        assertEquals(3L, vo.getOverdueDeliveryCount());
+        assertEquals(3L, vo.getPendingReceiptCount());
+        assertEquals(1L, vo.getLowStockItemCount());
+        assertEquals("360000.00", vo.getTotalOrderAmount());
+
+        DashboardBusinessItemVO request = vo.getRecentRequests().get(0);
+        assertEquals("PR-PUR_DASH", request.getCode());
+        assertEquals("钢筋-PUR_DASH", request.getTitle());
+        assertEquals("钢筋-PUR_DASH", request.getItemSummary());
+        assertEquals(sr.projectName, request.getProjectName());
+        assertEquals("抄送用户1", request.getOwnerName());
+        assertNull(request.getAmount(), "采购申请无真实金额字段时不返回假金额");
+
+        DashboardBusinessItemVO overdueOrder = vo.getOverdueOrders().get(0);
+        assertEquals("PO-PUR_DASH-OLD-HIGH", overdueOrder.getCode());
+        assertEquals("高强螺栓-PUR_DASH", overdueOrder.getTitle());
+        assertEquals("高强螺栓-PUR_DASH", overdueOrder.getItemSummary());
+        assertEquals("供应商-PUR_DASH", overdueOrder.getPartnerName());
+        assertEquals(5L, overdueOrder.getOverdueDays());
+        assertEquals("130000.00", overdueOrder.getAmount());
+
+        DashboardBusinessItemVO pendingReceipt = vo.getPendingReceipts().get(0);
+        assertEquals("RC-PUR_DASH-OLD-HIGH", pendingReceipt.getCode());
+        assertEquals("钢筋-PUR_DASH", pendingReceipt.getTitle());
+        assertEquals("钢筋-PUR_DASH", pendingReceipt.getItemSummary());
+        assertEquals("供应商-PUR_DASH", pendingReceipt.getPartnerName());
+        assertEquals(3L, pendingReceipt.getPendingDays());
+        assertEquals("90000.00", pendingReceipt.getAmount());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.3 Production manager MVP view: uses receipt, requisition, sub-measure and stock signals")
+    void testProductionManagerView_MvpSignals() {
+        SeedResult sr = seed("PROD_DASH");
+
+        MatReceipt noSummaryReceipt = new MatReceipt();
+        noSummaryReceipt.setTenantId(TENANT_ID);
+        noSummaryReceipt.setProjectId(sr.projectId);
+        noSummaryReceipt.setPartnerId(sr.partnerId);
+        noSummaryReceipt.setReceiptCode("RC-PROD_DASH-NO-SUMMARY");
+        noSummaryReceipt.setReceiptDate(LocalDate.now());
+        noSummaryReceipt.setWarehouseId(sr.warehouseId);
+        noSummaryReceipt.setReceiverId(sr.signalUserId);
+        noSummaryReceipt.setQualityStatus("PENDING");
+        noSummaryReceipt.setTotalAmount(new BigDecimal("1000.00"));
+        noSummaryReceipt.setApprovalStatus("APPROVING");
+        receiptMapper.insert(noSummaryReceipt);
+
+        ProductionManagerDashboardVO vo = dashboardService.getProductionManagerView(sr.projectId);
+
+        assertNotNull(vo);
+        assertEquals(sr.projectId.toString(), vo.getProjectId());
+        assertEquals(2L, vo.getReceiptCount());
+        assertEquals(1L, vo.getRequisitionCount());
+        assertEquals(1L, vo.getPendingStockOutCount());
+        assertEquals(1L, vo.getSubMeasureCount());
+        assertEquals(1L, vo.getLowStockItemCount());
+        assertEquals("80000.00", vo.getConfirmedMeasureAmount());
+
+        DashboardBusinessItemVO receipt = vo.getRecentReceipts().stream()
+                .filter(i -> "RC-PROD_DASH".equals(i.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("RC-PROD_DASH", receipt.getCode());
+        assertNotEquals("RC-PROD_DASH", receipt.getTitle());
+        assertEquals("钢筋-PROD_DASH", receipt.getItemSummary());
+        assertEquals("供应商-PROD_DASH", receipt.getPartnerName());
+        assertNotNull(receipt.getOwnerName());
+        assertEquals(0L, receipt.getPendingDays());
+
+        DashboardBusinessItemVO receiptWithoutSummary = vo.getRecentReceipts().stream()
+                .filter(i -> "RC-PROD_DASH-NO-SUMMARY".equals(i.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertNull(receiptWithoutSummary.getTitle());
+        assertNull(receiptWithoutSummary.getItemSummary());
+
+        DashboardBusinessItemVO requisition = vo.getRecentRequisitions().get(0);
+        assertEquals("RQ-PROD_DASH", requisition.getCode());
+        assertEquals("供应商-PROD_DASH", requisition.getPartnerName());
+        assertNotNull(requisition.getOwnerName());
+        assertEquals(0, new BigDecimal("50000.00").compareTo(new BigDecimal(requisition.getAmount())));
+        assertNull(requisition.getItemSummary());
+
+        DashboardBusinessItemVO subMeasure = vo.getRecentSubMeasures().get(0);
+        assertEquals("SM-PROD_DASH", subMeasure.getCode());
+        assertNull(subMeasure.getItemSummary());
+        assertEquals("供应商-PROD_DASH", subMeasure.getPartnerName());
+        assertEquals("80000.00", subMeasure.getAmount());
+
+        assertTrue(vo.getRecentRequisitions().stream()
+                .noneMatch(i -> "PENDING_STOCK_OUT".equals(i.getItemSummary()) || "STOCKED_OUT".equals(i.getItemSummary())));
+        assertTrue(vo.getRecentSubMeasures().stream()
+                .noneMatch(i -> "2026-06".equals(i.getItemSummary())));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.5 Chief engineer view: maps owner and overdue days from tech item")
+    void testChiefEngineerView_TechItemOwnerAndOverdueDays() {
+        SeedResult sr = seed("CHIEF_DASH");
+
+        TechItem item = new TechItem();
+        item.setTenantId(TENANT_ID);
+        item.setProjectId(sr.projectId);
+        item.setItemType("TECH_ISSUE");
+        item.setItemCode("TECH-CHIEF_DASH");
+        item.setItemTitle("重大技术问题-CHIEF_DASH");
+        item.setItemLevel("MAJOR");
+        item.setItemStatus("OPEN");
+        item.setDiscoveredAt(LocalDateTime.now().minusDays(5));
+        item.setDueDate(LocalDateTime.now().minusDays(2));
+        item.setResponsibleUserId(sr.signalUserId);
+        techItemMapper.insert(item);
+
+        ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(sr.projectId);
+
+        DashboardBusinessItemVO issue = vo.getOpenIssues().stream()
+                .filter(i -> "TECH-CHIEF_DASH".equals(i.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("重大技术问题-CHIEF_DASH", issue.getTitle());
+        assertEquals("MAJOR", issue.getAmount());
+        assertNotNull(issue.getOwnerName());
+        assertEquals(2L, issue.getOverdueDays());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.5a Chief engineer view: future due date does not emit overdueDays 0")
+    void testChiefEngineerView_FutureDueDateHasNoOverdueDays() {
+        SeedResult sr = seed("CHIEF_FUTURE");
+
+        TechItem item = new TechItem();
+        item.setTenantId(TENANT_ID);
+        item.setProjectId(sr.projectId);
+        item.setItemType("TECH_ISSUE");
+        item.setItemCode("TECH-CHIEF_FUTURE");
+        item.setItemTitle("未来到期技术问题-CHIEF_FUTURE");
+        item.setItemLevel("MAJOR");
+        item.setItemStatus("OPEN");
+        item.setDiscoveredAt(LocalDateTime.now().minusDays(1));
+        item.setDueDate(LocalDateTime.now().plusDays(2));
+        item.setResponsibleUserId(sr.signalUserId);
+        techItemMapper.insert(item);
+
+        ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(sr.projectId);
+
+        DashboardBusinessItemVO issue = vo.getOpenIssues().stream()
+                .filter(i -> "TECH-CHIEF_FUTURE".equals(i.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertNull(issue.getOverdueDays());
+        assertTrue(vo.getOverdueItems().stream().noneMatch(i -> "TECH-CHIEF_FUTURE".equals(i.getCode())));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.5b Chief engineer view: yesterday due item is overdue by calendar day")
+    void testChiefEngineerView_YesterdayDueDateHasPositiveOverdueDays() {
+        SeedResult sr = seed("CHIEF_YESTERDAY");
+
+        TechItem item = new TechItem();
+        item.setTenantId(TENANT_ID);
+        item.setProjectId(sr.projectId);
+        item.setItemType("TECH_ISSUE");
+        item.setItemCode("TECH-CHIEF_YESTERDAY");
+        item.setItemTitle("昨日到期技术问题-CHIEF_YESTERDAY");
+        item.setItemLevel("MAJOR");
+        item.setItemStatus("OPEN");
+        item.setDiscoveredAt(LocalDateTime.now().minusDays(2));
+        item.setDueDate(LocalDate.now().minusDays(1).atTime(23, 59));
+        item.setResponsibleUserId(sr.signalUserId);
+        techItemMapper.insert(item);
+
+        ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(sr.projectId);
+
+        DashboardBusinessItemVO overdue = vo.getOverdueItems().stream()
+                .filter(i -> "TECH-CHIEF_YESTERDAY".equals(i.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(overdue.getOverdueDays() > 0L);
+        assertEquals(1L, overdue.getOverdueDays());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.5c Chief engineer view: today due item is open but not overdue")
+    void testChiefEngineerView_TodayDueDateIsNotOverdue() {
+        SeedResult sr = seed("CHIEF_TODAY");
+
+        TechItem item = new TechItem();
+        item.setTenantId(TENANT_ID);
+        item.setProjectId(sr.projectId);
+        item.setItemType("TECH_ISSUE");
+        item.setItemCode("TECH-CHIEF_TODAY");
+        item.setItemTitle("今日到期技术问题-CHIEF_TODAY");
+        item.setItemLevel("MAJOR");
+        item.setItemStatus("OPEN");
+        item.setDiscoveredAt(LocalDateTime.now().minusDays(1));
+        item.setDueDate(LocalDate.now().atTime(0, 1));
+        item.setResponsibleUserId(sr.signalUserId);
+        techItemMapper.insert(item);
+
+        ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(sr.projectId);
+
+        DashboardBusinessItemVO issue = vo.getOpenIssues().stream()
+                .filter(i -> "TECH-CHIEF_TODAY".equals(i.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertNull(issue.getOverdueDays());
+        assertTrue(vo.getOverdueItems().stream().noneMatch(i -> "TECH-CHIEF_TODAY".equals(i.getCode())));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.4 Default demo project: purchase and production dashboards are not blank")
+    void testDefaultDemoProject_PurchaseAndProductionDashboardsNotBlank() {
+        setAdminContext();
+
+        PurchaseManagerDashboardVO purchase = dashboardService.getPurchaseManagerView(null);
+        ProductionManagerDashboardVO production = dashboardService.getProductionManagerView(null);
+
+        assertNotNull(purchase);
+        assertEquals("全部项目", purchase.getProjectName());
+        assertTrue(purchase.getPendingRequestCount() > 0L);
+        assertTrue(purchase.getActiveOrderCount() > 0L);
+        assertFalse(purchase.getRecentRequests().isEmpty());
+        assertFalse(purchase.getOverdueOrders().isEmpty());
+        assertFalse(purchase.getPendingReceipts().isEmpty());
+
+        assertNotNull(production);
+        assertEquals("全部项目", production.getProjectName());
+        assertTrue(production.getReceiptCount() > 0L);
+        assertTrue(production.getRequisitionCount() > 0L);
+        assertTrue(production.getPendingStockOutCount() > 0L);
+        assertTrue(production.getSubMeasureCount() > 0L);
+        assertFalse(production.getRecentReceipts().isEmpty());
+        assertFalse(production.getRecentRequisitions().isEmpty());
+        assertFalse(production.getRecentSubMeasures().isEmpty());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.5 Default demo project: project manager dashboard is not blank and excludes payment workflows")
+    void testDefaultDemoProject_ProjectManagerDashboardNotBlank() {
+        setAdminContext();
+
+        PmProject defaultProject = projectMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PmProject>()
+                                .eq(PmProject::getTenantId, TENANT_ID)
+                                .eq(PmProject::getStatus, "ACTIVE")
+                                .eq(PmProject::getDeletedFlag, 0)
+                                .orderByDesc(PmProject::getCreatedAt)
+                                .orderByDesc(PmProject::getId))
+                .stream()
+                .findFirst()
+                .orElseThrow();
+
+        ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(defaultProject.getId());
+
+        assertNotNull(vo);
+        assertEquals(defaultProject.getId().toString(), vo.getProjectId());
+        assertTrue(vo.getPendingTaskCount() > 0L);
+        assertTrue(vo.getPendingApprovalCount() > 0L);
+        assertTrue(vo.getExpiringContractCount() > 0L);
+        assertTrue(vo.getLaggingProjectCount() > 0L);
+        assertFalse(vo.getPendingTasks().isEmpty());
+        assertFalse(vo.getPendingApprovals().isEmpty());
+        assertFalse(vo.getExpiringContracts().isEmpty());
+        assertTrue(vo.getPendingTasks().stream().noneMatch(i -> WorkflowBusinessTypes.PAY_REQUEST.equals(i.getBusinessType())));
+        assertTrue(vo.getPendingTasks().stream().noneMatch(i -> "PAY_APPLICATION".equals(i.getBusinessType())));
+        assertTrue(vo.getPendingApprovals().stream().noneMatch(i -> WorkflowBusinessTypes.PAY_REQUEST.equals(i.getBusinessType())));
+        assertTrue(vo.getPendingApprovals().stream().noneMatch(i -> "PAY_APPLICATION".equals(i.getBusinessType())));
     }
 
     @Test

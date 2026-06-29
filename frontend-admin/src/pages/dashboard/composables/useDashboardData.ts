@@ -6,6 +6,9 @@ import {
   getProjectManagerView,
   getBusinessManagerView,
   getCostManagerView,
+  getPurchaseManagerView,
+  getProductionManagerView,
+  getChiefEngineerView,
   getFinanceView,
   getManagementView,
   getCostBreakdown,
@@ -13,12 +16,15 @@ import {
 import type { ProjectVO } from '@/types/project'
 import type {
   BusinessManagerDashboardVO,
+  ChiefEngineerDashboardVO,
   CostBreakdownVO,
   CostManagerDashboardVO,
   DashboardRole,
   FinanceDashboardVO,
   ManagementDashboardVO,
   ProjectManagerDashboardVO,
+  PurchaseManagerDashboardVO,
+  ProductionManagerDashboardVO,
   SubjectBreakdown,
 } from '@/types/dashboard'
 
@@ -34,24 +40,34 @@ export function useDashboardData() {
   const availableRoles = computed<DashboardRole[]>(() => {
     const perms = userStore.permissions
     const roles: DashboardRole[] = []
-    if (userStore.roles.includes('ADMIN')) return ['pm', 'bm', 'cost', 'finance', 'mgmt']
+    if (userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')) {
+      return ['pm', 'bm', 'cost', 'purchase', 'production', 'chiefEngineer', 'finance', 'mgmt']
+    }
     if (perms.includes('dashboard:project-manager:view')) roles.push('pm')
     if (perms.includes('dashboard:business-manager:view')) roles.push('bm')
     if (perms.includes('dashboard:cost-manager:view')) roles.push('cost')
+    if (perms.includes('dashboard:purchase-manager:view')) roles.push('purchase')
+    if (perms.includes('dashboard:production-manager:view')) roles.push('production')
+    if (perms.includes('dashboard:chief-engineer:view')) roles.push('chiefEngineer')
     if (perms.includes('dashboard:finance:view')) roles.push('finance')
     if (perms.includes('dashboard:management:view')) roles.push('mgmt')
-    return roles.length > 0 ? roles : ['pm', 'bm', 'cost', 'finance', 'mgmt']
+    return roles.length > 0
+      ? roles
+      : ['pm', 'bm', 'cost', 'purchase', 'production', 'chiefEngineer', 'finance', 'mgmt']
   })
 
   const initialRole: DashboardRole = availableRoles.value.includes('cost')
     ? 'cost'
-    : availableRoles.value[0] ?? 'pm'
+    : (availableRoles.value[0] ?? 'pm')
   const activeRole = ref<DashboardRole>(initialRole)
 
   const roleLabel: Record<DashboardRole, string> = {
-    pm: '项目总',
+    pm: '项目经理',
     bm: '商务经理',
-    cost: '成本经理',
+    cost: '商务经理',
+    purchase: '采购经理',
+    production: '生产经理',
+    chiefEngineer: '总工程师',
     finance: '财务',
     mgmt: '管理层',
   }
@@ -69,6 +85,9 @@ export function useDashboardData() {
   const pmData = ref<ProjectManagerDashboardVO | null>(null)
   const bmData = ref<BusinessManagerDashboardVO | null>(null)
   const costData = ref<CostManagerDashboardVO | null>(null)
+  const purchaseData = ref<PurchaseManagerDashboardVO | null>(null)
+  const productionData = ref<ProductionManagerDashboardVO | null>(null)
+  const chiefEngineerData = ref<ChiefEngineerDashboardVO | null>(null)
   const financeData = ref<FinanceDashboardVO | null>(null)
   const mgmtData = ref<ManagementDashboardVO | null>(null)
   const costBreakdown = ref<CostBreakdownVO | null>(null)
@@ -112,6 +131,15 @@ export function useDashboardData() {
             costBreakdown.value = null
           }
           break
+        case 'purchase':
+          purchaseData.value = await getPurchaseManagerView(pid)
+          break
+        case 'production':
+          productionData.value = await getProductionManagerView(pid)
+          break
+        case 'chiefEngineer':
+          chiefEngineerData.value = await getChiefEngineerView(pid)
+          break
         case 'finance':
           financeData.value = await getFinanceView(pid)
           break
@@ -153,11 +181,7 @@ export function useDashboardData() {
   onMounted(async () => {
     const roleAtBoot = activeRole.value
     await Promise.allSettled([fetchProjects(), fetchViewData()])
-    if (
-      needsProject(roleAtBoot) &&
-      !selectedProjectId.value &&
-      projectList.value.length > 0
-    ) {
+    if (needsProject(roleAtBoot) && !selectedProjectId.value && projectList.value.length > 0) {
       selectedProjectId.value = projectList.value[0].id
       await fetchViewData()
     }
@@ -175,6 +199,9 @@ export function useDashboardData() {
     pmData,
     bmData,
     costData,
+    purchaseData,
+    productionData,
+    chiefEngineerData,
     financeData,
     mgmtData,
     costBreakdown,

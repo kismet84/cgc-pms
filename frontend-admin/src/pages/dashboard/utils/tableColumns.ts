@@ -32,6 +32,18 @@ export const financePayCols = [
   { title: '金额', dataIndex: 'payAmount', width: 128, align: 'right' as const },
 ]
 
+export const businessItemCols = [
+  { title: '事项', dataIndex: 'title', ellipsis: true },
+  { title: '状态', dataIndex: 'status', width: 100 },
+  { title: '日期', dataIndex: 'date', width: 112 },
+]
+
+export const businessItemAmountCols = [
+  { title: '事项', dataIndex: 'title', ellipsis: true },
+  { title: '金额', dataIndex: 'amount', width: 120, align: 'right' as const },
+  { title: '状态', dataIndex: 'status', width: 100 },
+]
+
 export const alertCols = [
   { title: '严重程度', dataIndex: 'severity', width: 90 },
   { title: '预警信息', dataIndex: 'message', ellipsis: true },

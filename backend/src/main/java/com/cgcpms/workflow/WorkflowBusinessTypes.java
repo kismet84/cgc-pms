@@ -21,4 +21,6 @@ public final class WorkflowBusinessTypes {
     public static final String CONTRACT_REVENUE = "CONTRACT_REVENUE";
     /** 领料申请 */
     public static final String MATERIAL_REQUISITION = "MATERIAL_REQUISITION";
+    /** 总工程师技术事项 */
+    public static final String TECH_ITEM = "TECH_ITEM";
 }

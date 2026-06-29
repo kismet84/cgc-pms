@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
-  BankOutlined,
   DollarOutlined,
   FullscreenOutlined,
+  InboxOutlined,
   ProjectOutlined,
   ReloadOutlined,
-  SafetyCertificateOutlined,
-  ScheduleOutlined,
+  ShoppingCartOutlined,
+  ToolOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue'
 import { useDashboardData } from './composables/useDashboardData'
@@ -17,6 +17,9 @@ import type { DashboardRole } from '@/types/dashboard'
 import DashboardPmView from './components/DashboardPmView.vue'
 import DashboardBmView from './components/DashboardBmView.vue'
 import DashboardCostView from './components/DashboardCostView.vue'
+import DashboardPurchaseView from './components/DashboardPurchaseView.vue'
+import DashboardProductionView from './components/DashboardProductionView.vue'
+import DashboardChiefEngineerView from './components/DashboardChiefEngineerView.vue'
 import DashboardFinanceView from './components/DashboardFinanceView.vue'
 import DashboardMgmtView from './components/DashboardMgmtView.vue'
 
@@ -30,6 +33,9 @@ const {
   pmData,
   bmData,
   costData,
+  purchaseData,
+  productionData,
+  chiefEngineerData,
   financeData,
   mgmtData,
   costBreakdown,
@@ -43,20 +49,26 @@ const {
   fetchViewData,
 } = useDashboardData()
 
-const roleTabOrder: DashboardRole[] = ['cost', 'pm', 'finance', 'mgmt', 'bm']
+const roleTabOrder: DashboardRole[] = ['cost', 'pm', 'purchase', 'production', 'chiefEngineer']
 const roleDisplayLabel: Record<DashboardRole, string> = {
-  cost: '成本经理',
+  cost: '商务经理',
   pm: '项目经理',
-  finance: '生产经理',
-  mgmt: '安全经理',
+  purchase: '采购经理',
+  production: '生产经理',
+  chiefEngineer: '总工程师',
+  finance: '财务',
+  mgmt: '管理层',
   bm: '商务经理',
 }
 const roleIcon: Record<DashboardRole, unknown> = {
   cost: DollarOutlined,
   pm: UserOutlined,
-  finance: ScheduleOutlined,
-  mgmt: SafetyCertificateOutlined,
-  bm: BankOutlined,
+  purchase: ShoppingCartOutlined,
+  production: InboxOutlined,
+  chiefEngineer: ToolOutlined,
+  finance: DollarOutlined,
+  mgmt: ProjectOutlined,
+  bm: DollarOutlined,
 }
 
 if (availableRoles.value.includes('cost')) {
@@ -136,6 +148,18 @@ function toggleFullscreen() {
         :loading="loading"
         @bar-click="handleBarClick"
       />
+    </template>
+
+    <template v-if="activeRole === 'purchase' && purchaseData">
+      <DashboardPurchaseView :data="purchaseData" :loading="loading" />
+    </template>
+
+    <template v-if="activeRole === 'production' && productionData">
+      <DashboardProductionView :data="productionData" :loading="loading" />
+    </template>
+
+    <template v-if="activeRole === 'chiefEngineer' && chiefEngineerData">
+      <DashboardChiefEngineerView :data="chiefEngineerData" :loading="loading" />
     </template>
 
     <template v-if="activeRole === 'finance' && financeData">
@@ -701,6 +725,270 @@ function toggleFullscreen() {
   padding-bottom: 10px;
 }
 
+.dashboard .role-reference-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard .role-reference-kpis {
+  display: grid;
+  background: #fff;
+  border: 1px solid #e4eaf3;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dashboard .role-reference-kpis--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dashboard .role-reference-kpi {
+  position: relative;
+  min-height: 104px;
+  padding: 17px 18px 14px;
+  border-right: 1px solid #edf1f7;
+  background: linear-gradient(180deg, #fff, #fbfdff);
+}
+
+.dashboard .role-reference-kpi:last-child {
+  border-right: 0;
+}
+
+.dashboard .role-reference-kpi::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 4px;
+  background: var(--kpi-accent);
+  border-radius: 0 999px 999px 0;
+  content: '';
+}
+
+.dashboard .role-reference-kpi-title {
+  color: #263246;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.dashboard .role-reference-kpi-value {
+  margin-top: 12px;
+  color: #111827;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 28px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dashboard .role-reference-kpi-value.is-cyan {
+  color: #13a8ba;
+}
+
+.dashboard .role-reference-kpi-value.is-danger {
+  color: #b42318;
+}
+
+.dashboard .role-reference-kpi-value.is-warning {
+  color: #ea7500;
+}
+
+.dashboard .role-reference-kpi-value small {
+  margin-left: 4px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dashboard .role-reference-kpi-meta {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+  color: #5d6b82;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.dashboard .role-reference-kpi-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dashboard .role-reference-main-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.72fr) minmax(720px, 1.28fr);
+  gap: 10px;
+}
+
+.dashboard .role-reference-side-stack {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard .role-reference-panel {
+  min-width: 0;
+  background: #fff;
+  border: 1px solid #e4eaf3;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+  overflow: hidden;
+}
+
+.dashboard .role-reference-panel-head {
+  min-height: 42px;
+  padding: 0 16px;
+  border-bottom: 1px solid #edf1f7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #172033;
+  font-size: 14px;
+}
+
+.dashboard .role-reference-panel-head strong {
+  font-weight: 800;
+}
+
+.dashboard .role-reference-panel-head span {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.dashboard .role-reference-panel-head.mini {
+  min-height: 36px;
+  font-size: 13px;
+}
+
+.dashboard .role-reference-panel-head.mini b {
+  color: #ef4444;
+}
+
+.dashboard .role-reference-analysis {
+  display: grid;
+}
+
+.dashboard .role-reference-chart {
+  width: 100%;
+  height: 286px;
+}
+
+.dashboard .role-reference-mini-chart {
+  width: 100%;
+  height: 240px;
+}
+
+.dashboard .role-reference-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 18px 18px;
+}
+
+.dashboard .role-reference-summary-grid--2 {
+  padding-top: 0;
+}
+
+.dashboard .role-reference-summary-grid--hero {
+  padding-bottom: 0;
+}
+
+.dashboard .role-reference-summary-item {
+  padding: 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.dashboard .role-reference-summary-item span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.dashboard .role-reference-summary-item b {
+  color: var(--text);
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard .role-reference-focus-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.dashboard .role-reference-focus-list > div {
+  padding: 12px;
+  background: #fbfdff;
+  border: 1px solid #edf1f7;
+  border-radius: var(--radius-sm);
+}
+
+.dashboard .role-reference-focus-list strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #172033;
+  font-size: 13px;
+}
+
+.dashboard .role-reference-focus-list span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.dashboard .role-mini-panel.is-red {
+  border-top: 2px solid #ef4444;
+}
+
+.dashboard .role-mini-panel.is-orange {
+  border-top: 2px solid #f97316;
+}
+
+.dashboard .role-mini-panel.is-blue {
+  border-top: 2px solid #2f7cf6;
+}
+
+.dashboard .role-reference-table :deep(.ant-table) {
+  font-size: 12px;
+}
+
+.dashboard .role-reference-table :deep(.ant-table-thead > tr > th) {
+  color: #536176;
+  background: #fbfcff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dashboard .role-reference-table :deep(.ant-table-tbody > tr > td) {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  vertical-align: top;
+}
+
+.dashboard .role-reference-chart-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard .role-reference-chart-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard .role-reference-chart-block + .role-reference-chart-block {
+  border-left: 1px solid #edf1f7;
+}
+
+.dashboard .role-reference-bottom-panel {
+  display: grid;
+}
+
 .dashboard .empty-page {
   padding: 80px 20px;
   text-align: center;
@@ -726,8 +1014,20 @@ function toggleFullscreen() {
   .dashboard .pm-bottom-grid,
   .dashboard .role-analysis-grid,
   .dashboard .role-table-grid,
-  .dashboard .cost-lens-grid {
+  .dashboard .cost-lens-grid,
+  .dashboard .role-reference-main-grid,
+  .dashboard .role-reference-chart-grid--2,
+  .dashboard .role-reference-kpis--4 {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard .role-reference-chart-block + .role-reference-chart-block {
+    border-left: 0;
+    border-top: 1px solid #edf1f7;
+  }
+
+  .dashboard .role-reference-side-stack {
+    grid-template-rows: none;
   }
 }
 
