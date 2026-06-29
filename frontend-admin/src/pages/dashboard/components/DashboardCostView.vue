@@ -127,7 +127,7 @@ const kpiCards = computed(() => [
     unit: '万元',
     accent: '#1677ff',
     tone: 'default',
-    metas: ['项目级成本汇总'],
+    metas: ['商务成本控制'],
   },
   {
     title: '动态成本（含税）',
@@ -179,7 +179,9 @@ const subjectRows = computed<SubjectRankRow[]>(() => {
     .map((item, index) => toSubjectRankRow(item, index))
 })
 
-const maxSubjectAmount = computed(() => Math.max(...subjectRows.value.map((item) => item.amount), 1))
+const maxSubjectAmount = computed(() =>
+  Math.max(...subjectRows.value.map((item) => item.amount), 1),
+)
 
 const budgetAlertRows = computed(() =>
   overBudgetAlerts.value.map((item, index) => [
@@ -294,7 +296,11 @@ const costTrendOption = computed(() => ({
     itemWidth: 16,
     itemHeight: 6,
     textStyle: { color: '#536176', fontSize: 11 },
-    data: [`目标成本（${trendLabel.value}）`, `动态成本（${trendLabel.value}）`, `成本偏差（${trendLabel.value}）`],
+    data: [
+      `目标成本（${trendLabel.value}）`,
+      `动态成本（${trendLabel.value}）`,
+      `成本偏差（${trendLabel.value}）`,
+    ],
   },
   grid: { left: 50, right: 54, top: 64, bottom: 34, containLabel: true },
   xAxis: {
@@ -456,7 +462,7 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
       <div class="cost-reference-panel cost-reference-analysis">
         <div class="cost-reference-panel-head">
           <div>
-            <strong>成本执行情况</strong>
+            <strong>商务成本执行情况</strong>
             <span>（含税）</span>
           </div>
           <a-segmented v-model:value="trendMode" :options="['累计', '当月']" size="small" />
@@ -490,7 +496,9 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
       <aside class="cost-reference-side-stack">
         <div class="cost-reference-panel cost-mini-panel is-red">
           <div class="cost-reference-panel-head mini">
-            <strong>超预算预警 <b>（{{ overBudgetAlerts.length }}）</b></strong>
+            <strong
+              >超预算预警 <b>（{{ overBudgetAlerts.length }}）</b></strong
+            >
             <a>全部</a>
           </div>
           <table class="cost-mini-table">
@@ -506,7 +514,11 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
             </thead>
             <tbody>
               <tr v-for="row in budgetAlertRows" :key="row[0]">
-                <td v-for="(cell, index) in row.slice(0, 6)" :key="index" :class="{ danger: index === 3 }">
+                <td
+                  v-for="(cell, index) in row.slice(0, 6)"
+                  :key="index"
+                  :class="{ danger: index === 3 }"
+                >
                   <a-tooltip v-if="index === 3" :title="row[6]">
                     <span>{{ cell }}</span>
                   </a-tooltip>
@@ -519,7 +531,9 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
 
         <div class="cost-reference-panel cost-mini-panel is-orange">
           <div class="cost-reference-panel-head mini">
-            <strong>逾期事项 <b>（{{ overdueRecords.length }}）</b></strong>
+            <strong
+              >逾期事项 <b>（{{ overdueRecords.length }}）</b></strong
+            >
             <a>全部</a>
           </div>
           <table class="cost-mini-table">
@@ -535,7 +549,9 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
             </thead>
             <tbody>
               <tr v-for="row in overdueRows" :key="row[0]">
-                <td v-for="(cell, index) in row" :key="index" :class="{ danger: index === 3 }">{{ cell }}</td>
+                <td v-for="(cell, index) in row" :key="index" :class="{ danger: index === 3 }">
+                  {{ cell }}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -543,7 +559,9 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
 
         <div class="cost-reference-panel cost-mini-panel is-blue">
           <div class="cost-reference-panel-head mini">
-            <strong>待审批付款 <b>（{{ pendingPaymentRecords.length }}）</b></strong>
+            <strong
+              >待审批付款 <b>（{{ pendingPaymentRecords.length }}）</b></strong
+            >
             <a>全部</a>
           </div>
           <table class="cost-mini-table">
@@ -569,9 +587,15 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
 
     <section class="cost-reference-panel cost-ledger-reference">
       <div class="cost-ledger-tabs">
-        <a :class="{ active: activeLedgerTab === 'cost' }" @click="activeLedgerTab = 'cost'">成本台账</a>
-        <a :class="{ active: activeLedgerTab === 'contract' }" @click="activeLedgerTab = 'contract'">合同执行</a>
-        <a :class="{ active: activeLedgerTab === 'fund' }" @click="activeLedgerTab = 'fund'">资金流水</a>
+        <a :class="{ active: activeLedgerTab === 'cost' }" @click="activeLedgerTab = 'cost'"
+          >成本台账</a
+        >
+        <a :class="{ active: activeLedgerTab === 'contract' }" @click="activeLedgerTab = 'contract'"
+          >合同执行</a
+        >
+        <a :class="{ active: activeLedgerTab === 'fund' }" @click="activeLedgerTab = 'fund'"
+          >资金流水</a
+        >
       </div>
       <div class="cost-ledger-tools">
         <a-select v-model:value="subjectFilter" size="small" style="width: 96px">
@@ -832,7 +856,10 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
   border: 0;
   background: transparent;
   display: grid;
-  grid-template-columns: max-content minmax(max-content, 1fr) minmax(80px, 1.5fr) max-content max-content;
+  grid-template-columns: max-content minmax(max-content, 1fr) minmax(
+      80px,
+      1.5fr
+    ) max-content max-content;
   align-items: center;
   gap: 10px;
   color: #273449;

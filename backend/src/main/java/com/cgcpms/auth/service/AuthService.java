@@ -143,6 +143,18 @@ public class AuthService {
         List<Long> roleIds = userRoles.stream()
                 .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
                 .toList();
+        List<String> roleCodes = sysRoleMapper.selectBatchIds(roleIds).stream()
+                .map(SysRole::getRoleCode)
+                .toList();
+        if (roleCodes.contains("SUPER_ADMIN") || roleCodes.contains("ADMIN")) {
+            return sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenu>()
+                            .isNotNull(SysMenu::getPerms)
+                            .ne(SysMenu::getPerms, ""))
+                    .stream()
+                    .map(SysMenu::getPerms)
+                    .distinct()
+                    .collect(Collectors.toList());
+        }
 
         var roleMenus = sysRoleMenuMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysRoleMenu>()
                 .in(com.cgcpms.system.entity.SysRoleMenu::getRoleId, roleIds));

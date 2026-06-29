@@ -13,9 +13,15 @@ const SUCCESS_CODE = '0'
 /** Queue timeout in ms — draining forever-queued requests */
 const REFRESH_QUEUE_TIMEOUT = 15_000
 
+const runtimeApiBaseUrl =
+  new URLSearchParams(window.location.search).get('apiBaseUrl') ??
+  (window as unknown as { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }).__APP_RUNTIME_CONFIG__?.apiBaseUrl
+
+const API_BASE_URL = runtimeApiBaseUrl || import.meta.env.VITE_API_BASE_URL || '/api'
+
 /** Axios instance for normal API calls — carries the 401 interceptor. */
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
+  baseURL: API_BASE_URL,
   timeout: 15000,
   withCredentials: true, // send HttpOnly cookies automatically
 })
@@ -25,7 +31,7 @@ const service: AxiosInstance = axios.create({
  * Has NO 401 interceptor, preventing self-waiting deadlocks.
  */
 export const refreshClient: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api',
+  baseURL: API_BASE_URL,
   timeout: 10_000,
   withCredentials: true,
 })
