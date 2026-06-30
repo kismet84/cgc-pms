@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.util.DateTimeUtils;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
@@ -29,6 +30,7 @@ public class WorkflowQueryService {
     private final WfCcMapper wfCcMapper;
     private final WorkflowEngine workflowEngine;
     private final WorkflowVOAssembler voAssembler;
+    private final ProjectAccessChecker projectAccessChecker;
 
     // ── 我的待办 ──
 
@@ -56,10 +58,18 @@ public class WorkflowQueryService {
     // ── 我发起的实例 ──
 
     public IPage<WfMyInstanceVO> getMyStarted(Long tenantId, Long userId, long pageNo, long pageSize) {
+        return getMyStarted(tenantId, userId, null, pageNo, pageSize);
+    }
+
+    public IPage<WfMyInstanceVO> getMyStarted(Long tenantId, Long userId, String instanceStatus,
+                                              long pageNo, long pageSize) {
         LambdaQueryWrapper<WfInstance> wrapper = new LambdaQueryWrapper<WfInstance>()
                 .eq(WfInstance::getTenantId, tenantId)
-                .eq(WfInstance::getInitiatorId, userId)
-                .orderByDesc(WfInstance::getUpdatedAt)
+                .eq(WfInstance::getInitiatorId, userId);
+        if (instanceStatus != null && !instanceStatus.isBlank()) {
+            wrapper.eq(WfInstance::getInstanceStatus, instanceStatus.trim());
+        }
+        wrapper.orderByDesc(WfInstance::getUpdatedAt)
                 .orderByDesc(WfInstance::getCreatedAt);
 
         Page<WfInstance> page = wfInstanceMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -113,6 +123,7 @@ public class WorkflowQueryService {
         if (instance == null) return null;
 
         if (!isAuthorized(instance, tenantId, instanceId, currentUserId)) return null;
+        requireProjectAccess(instance);
 
         WfInstanceVO vo = voAssembler.toInstanceVO(instance);
         WfTemplate template = wfTemplateMapper.selectById(instance.getTemplateId());
@@ -172,10 +183,21 @@ public class WorkflowQueryService {
                 .eq(WfTask::getInstanceId, instanceId)
                 .eq(WfTask::getApproverId, currentUserId));
         if (count > 0) return true;
+        Long ccCount = wfCcMapper.selectCount(new LambdaQueryWrapper<WfCc>()
+                .eq(WfCc::getTenantId, tenantId)
+                .eq(WfCc::getInstanceId, instanceId)
+                .eq(WfCc::getCcUserId, currentUserId));
+        if (ccCount > 0) return true;
         // ADMIN/SUPER_ADMIN may view instances in the current tenant. The instance was already loaded
         // with the caller's tenantId; this fallback only exempts the participant check for admins within
         // their own tenant, not across tenants.
         return UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN");
+    }
+
+    private void requireProjectAccess(WfInstance instance) {
+        if (instance.getProjectId() != null) {
+            projectAccessChecker.checkAccess(instance.getProjectId(), "查看审批详情");
+        }
     }
 
     private <T> Map<Long, WfInstance> batchLoadInstances(List<T> records,

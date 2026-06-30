@@ -124,10 +124,11 @@ public class WorkflowController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<PageResult<WfMyInstanceVO>> myStarted(
             @RequestParam(defaultValue = "1") long pageNo,
-            @RequestParam(defaultValue = "20") long pageSize) {
+            @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) String instanceStatus) {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();
-        IPage<WfMyInstanceVO> page = workflowQueryService.getMyStarted(tenantId, userId, pageNo, pageSize);
+        IPage<WfMyInstanceVO> page = workflowQueryService.getMyStarted(tenantId, userId, instanceStatus, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
     }
 

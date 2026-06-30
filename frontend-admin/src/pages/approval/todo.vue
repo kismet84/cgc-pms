@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { MoreOutlined } from '@ant-design/icons-vue'
 import {
   approveTask,
@@ -11,6 +11,7 @@ import {
   getMyCc,
   getMyInitiatedInstances,
   rejectTask,
+  resubmitInstance,
   withdrawInstance,
   type WfTaskVO,
   type WfRecordVO,
@@ -31,6 +32,8 @@ const loading = ref(false)
 const pageNo = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const tabTotals = ref<Record<string, number>>({ todo: 0, done: 0, cc: 0, mine: 0 })
+const mineStatus = ref('')
 
 const todoData = ref<WfTaskVO[]>([])
 const doneData = ref<WfRecordVO[]>([])
@@ -92,27 +95,44 @@ const taskStatusMap: Record<string, { text: string; color: string }> = {
   TRANSFERRED: { text: '已转办', color: 'warning' },
 }
 
+const mineStatusOptions = [
+  { label: '全部', value: '' },
+  { label: '审批中', value: 'RUNNING' },
+  { label: '已通过', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+  { label: '已撤回', value: 'WITHDRAWN' },
+]
+
+function syncActiveTotal(value: unknown) {
+  const nextTotal = Number(value ?? 0)
+  total.value = Number.isFinite(nextTotal) ? nextTotal : 0
+  tabTotals.value[activeTab.value] = total.value
+}
+
 async function fetchData() {
   loading.value = true
   try {
-    const params = { pageNum: pageNo.value, pageSize: pageSize.value }
+    const params = { pageNo: pageNo.value, pageNum: pageNo.value, pageSize: pageSize.value }
+    if (activeTab.value === 'mine' && mineStatus.value) {
+      Object.assign(params, { instanceStatus: mineStatus.value })
+    }
 
     if (activeTab.value === 'todo') {
       const res: PageResult<WfTaskVO> = await getMyTodos(params)
       todoData.value = res.records
-      total.value = Number(res.total ?? 0)
+      syncActiveTotal(res.total)
     } else if (activeTab.value === 'done') {
       const res: PageResult<WfRecordVO> = await getMyDone(params)
       doneData.value = res.records
-      total.value = Number(res.total ?? 0)
+      syncActiveTotal(res.total)
     } else if (activeTab.value === 'cc') {
       const res: PageResult<WfCcVO> = await getMyCc(params)
       ccData.value = res.records
-      total.value = Number(res.total ?? 0)
+      syncActiveTotal(res.total)
     } else if (activeTab.value === 'mine') {
       const res: PageResult<WfMineInstanceVO> = await getMyInitiatedInstances(params)
       mineData.value = res.records
-      total.value = Number(res.total ?? 0)
+      syncActiveTotal(res.total)
     }
   } catch (e: unknown) {
     console.error(e)
@@ -120,7 +140,7 @@ async function fetchData() {
     else if (activeTab.value === 'done') doneData.value = []
     else if (activeTab.value === 'cc') ccData.value = []
     else if (activeTab.value === 'mine') mineData.value = []
-    total.value = 0
+    syncActiveTotal(0)
     message.error('加载列表失败，请稍后重试')
   } finally {
     loading.value = false
@@ -136,6 +156,12 @@ function handleTabChange(key: string) {
 function handlePageChange(pno: number, psize: number) {
   pageNo.value = pno
   pageSize.value = psize
+  fetchData()
+}
+
+function handleMineStatusChange(value: string | number) {
+  mineStatus.value = String(value)
+  pageNo.value = 1
   fetchData()
 }
 
@@ -194,10 +220,10 @@ const tableData = computed<Record<string, unknown>[]>(() => {
   return ccData.value as unknown as Record<string, unknown>[]
 })
 const approvalSummary = computed(() => [
-  { label: '我的待办', count: todoData.value.length, color: '#1890ff' },
-  { label: '我的已办', count: doneData.value.length, color: '#52c41a' },
-  { label: '抄送我的', count: ccData.value.length, color: '#faad14' },
-  { label: '我发起', count: mineData.value.length, color: '#722ed1' },
+  { label: '待办任务', count: tabTotals.value.todo, color: '#1890ff' },
+  { label: '已处理记录', count: tabTotals.value.done, color: '#52c41a' },
+  { label: '抄送记录', count: tabTotals.value.cc, color: '#faad14' },
+  { label: '发起实例', count: tabTotals.value.mine, color: '#722ed1' },
 ])
 const recentApprovals = computed(() => tableData.value.slice(0, 4))
 const detailNodes = computed(() => (Array.isArray(detail.value?.nodes) ? detail.value.nodes : []))
@@ -301,6 +327,30 @@ async function handleWithdraw() {
   }
 }
 
+async function handleResubmit() {
+  if (!detail.value?.id) return
+  const instanceId = detail.value.id
+  Modal.confirm({
+    title: '确认重新提交',
+    content: '确定重新提交该审批吗？',
+    okText: '确认',
+    cancelText: '取消',
+    onOk: async () => {
+      actionLoading.value = true
+      try {
+        await resubmitInstance(instanceId)
+        message.success('已重新提交')
+        await refreshDetail()
+      } catch (e: unknown) {
+        console.error(e)
+        message.error('重新提交失败')
+      } finally {
+        actionLoading.value = false
+      }
+    },
+  })
+}
+
 function getTimeCol(record: Record<string, unknown>): string {
   if (activeTab.value === 'todo') return (record.receivedAt as string) ?? ''
   if (activeTab.value === 'done') return (record.createdAt as string) ?? ''
@@ -310,6 +360,11 @@ function getTimeCol(record: Record<string, unknown>): string {
 function displayText(value: unknown): string {
   if (value === null || value === undefined || value === '') return '-'
   return String(value)
+}
+
+function getInstanceStatusMeta(status: unknown) {
+  const key = String(status ?? '')
+  return statusMap[key] ?? { text: displayText(status), color: 'default' }
 }
 
 function getActionLabel(): string {
@@ -326,6 +381,17 @@ function pageHeaderSubtitle(): string {
   if (activeTab.value === 'done') return '查看您已处理的审批记录'
   if (activeTab.value === 'mine') return '追踪您发起的审批实例'
   return '查看抄送给您的业务单据'
+}
+
+function tableEmptyText(): string {
+  if (activeTab.value === 'todo') return '暂无待办任务'
+  if (activeTab.value === 'done') return '暂无已处理记录'
+  if (activeTab.value === 'mine') return '暂无发起记录'
+  return '暂无抄送记录'
+}
+
+function shouldShowTableEmpty(): boolean {
+  return total.value === 0 && tableData.value.length === 0
 }
 
 onMounted(() => {
@@ -362,6 +428,12 @@ watch(
           <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
             <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label" />
           </a-tabs>
+          <a-segmented
+            v-if="activeTab === 'mine'"
+            v-model:value="mineStatus"
+            :options="mineStatusOptions"
+            @change="handleMineStatusChange"
+          />
           <ColumnSettingsButton
             :columns="columnSettings"
             :visible="colVisible"
@@ -402,10 +474,9 @@ watch(
               {{ displayText(row.currentNodeName) }}
             </template>
             <template #instanceStatus="{ row }">
-              <a-tag v-if="row.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>
-              <a-tag v-else-if="row.instanceStatus === 'APPROVED'" color="success">已通过</a-tag>
-              <a-tag v-else-if="row.instanceStatus === 'REJECTED'" color="error">已驳回</a-tag>
-              <a-tag v-else>{{ row.instanceStatus }}</a-tag>
+              <a-tag :color="getInstanceStatusMeta(row.instanceStatus).color">
+                {{ getInstanceStatusMeta(row.instanceStatus).text }}
+              </a-tag>
             </template>
             <template #action="{ row }">
               <a-dropdown :trigger="['click']">
@@ -420,6 +491,9 @@ watch(
                   </a-menu>
                 </template>
               </a-dropdown>
+            </template>
+            <template #empty>
+              <div v-if="shouldShowTableEmpty()" class="lg-empty-text">{{ tableEmptyText() }}</div>
             </template>
           </vxe-grid>
         </div>
@@ -524,6 +598,14 @@ watch(
               @click="handleWithdraw"
             >
               撤回
+            </a-button>
+          </div>
+          <div
+            v-if="availableActions.includes('resubmit') && !isDetailRunning"
+            class="approval-actions"
+          >
+            <a-button type="primary" :loading="actionLoading" @click="handleResubmit">
+              重新提交
             </a-button>
           </div>
 

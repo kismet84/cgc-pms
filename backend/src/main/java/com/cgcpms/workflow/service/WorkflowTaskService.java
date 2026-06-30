@@ -30,6 +30,7 @@ public class WorkflowTaskService {
     private final WorkflowCoreService core;
     private final WfInstanceMapper wfInstanceMapper;
     private final WfNodeInstanceMapper wfNodeInstanceMapper;
+    private final WfTemplateNodeMapper wfTemplateNodeMapper;
     private final WfTaskMapper wfTaskMapper;
 
     @Transactional
@@ -56,6 +57,7 @@ public class WorkflowTaskService {
         if (instance == null) {
             throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
         }
+        requireTemplateNodeActionAllowed(task.getNodeInstanceId(), true);
 
         // Validate target user belongs to the same tenant as the instance
         SysUser targetUser = core.sysUserMapper.selectById(targetUserId);
@@ -154,6 +156,7 @@ public class WorkflowTaskService {
         if (node == null || !WorkflowConstants.NODE_ACTIVE.equals(node.getNodeStatus())) {
             throw new BusinessException("NODE_NOT_ACTIVE", "只能对当前活动节点加签");
         }
+        requireTemplateNodeActionAllowed(node.getId(), false);
         // Batch-fetch user names for all signees and validate tenant membership
         Map<Long, SysUser> signUserMap = Collections.emptyMap();
         if (!additionalUserIds.isEmpty()) {
@@ -211,5 +214,24 @@ public class WorkflowTaskService {
                 task.getInstanceId(), task.getNodeInstanceId(), taskId, task.getRoundNo(),
                 null, null, WorkflowConstants.ACTION_ADD_SIGN, "加签",
                 userId, username, comment);
+    }
+
+    private void requireTemplateNodeActionAllowed(Long nodeInstanceId, boolean transfer) {
+        WfNodeInstance node = wfNodeInstanceMapper.selectById(nodeInstanceId);
+        if (node == null || node.getTemplateNodeId() == null) {
+            throw new BusinessException("WORKFLOW_TEMPLATE_NODE_NOT_FOUND", "审批模板节点不存在");
+        }
+        WfTemplateNode templateNode = wfTemplateNodeMapper.selectById(node.getTemplateNodeId());
+        if (templateNode == null) {
+            throw new BusinessException("WORKFLOW_TEMPLATE_NODE_NOT_FOUND", "审批模板节点不存在");
+        }
+        boolean allowed = transfer
+                ? Integer.valueOf(1).equals(templateNode.getAllowTransfer())
+                : Integer.valueOf(1).equals(templateNode.getAllowAddSign());
+        if (!allowed) {
+            throw new BusinessException(
+                    transfer ? "WORKFLOW_TRANSFER_NOT_ALLOWED" : "WORKFLOW_ADD_SIGN_NOT_ALLOWED",
+                    transfer ? "当前审批节点不允许转办" : "当前审批节点不允许加签");
+        }
     }
 }

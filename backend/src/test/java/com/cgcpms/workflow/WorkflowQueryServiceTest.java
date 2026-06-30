@@ -3,6 +3,9 @@ package com.cgcpms.workflow;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -51,6 +54,7 @@ class WorkflowQueryServiceTest {
 
     private static final long TEMPLATE_ID = 230200000000000001L;
     private static final long NODE_1_ID = 230200000000000101L;
+    private static final long PROJECT_ID = 230200000000000201L;
     private static final String BUSINESS_TYPE = "WQ_TEST_APPROVAL";
 
     @Autowired
@@ -81,6 +85,9 @@ class WorkflowQueryServiceTest {
     private WfCcMapper ccMapper;
 
     @Autowired
+    private PmProjectMapper projectMapper;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private Long submittedInstanceId;
@@ -96,6 +103,7 @@ class WorkflowQueryServiceTest {
                 .add("roleCodes", List.of("ADMIN"))
                 .build());
         cleanup();
+        seedProject(USER_ADMIN);
         seedTemplateAndSubmit();
     }
 
@@ -374,6 +382,71 @@ class WorkflowQueryServiceTest {
     }
 
     @Test
+    @DisplayName("getMyStarted 按实例状态筛选并保持分页total一致")
+    void getMyStartedFiltersByInstanceStatus() {
+        LocalDateTime now = LocalDateTime.of(2099, 7, 1, 10, 0, 0);
+        insertStartedInstance(33333020L, "CONTRACT_APPROVAL", USER_ADMIN,
+                WorkflowConstants.INSTANCE_RUNNING, "合同审批", "合同审批节点", now.minusDays(3), now.minusHours(3));
+        insertStartedInstance(33333021L, "PURCHASE_REQUEST", USER_ADMIN,
+                WorkflowConstants.INSTANCE_APPROVED, "采购申请审批", null, now.minusDays(2), now.minusHours(2));
+        insertStartedInstance(33333022L, "SUB_MEASURE", USER_ADMIN,
+                WorkflowConstants.INSTANCE_REJECTED, "分包计量审批", null, now.minusDays(1), now.minusHours(1));
+        insertStartedInstance(33333023L, "CONTRACT_APPROVAL", USER_OTHER,
+                WorkflowConstants.INSTANCE_WITHDRAWN, "他人发起合同审批", null, now.minusDays(1), now);
+        insertStartedInstance(33333024L, "CONTRACT_APPROVAL", USER_ADMIN,
+                WorkflowConstants.INSTANCE_WITHDRAWN, "已撤回合同审批", null, now.minusDays(4), now.minusHours(4));
+
+        IPage<WfMyInstanceVO> allMine = queryService.getMyStarted(TENANT_0, USER_ADMIN, null, 1, 100);
+
+        assertTrue(allMine.getTotal() >= 4);
+        assertTrue(allMine.getRecords().stream().noneMatch(r -> "33333023".equals(r.getBusinessId())));
+        assertTrue(allMine.getRecords().stream().anyMatch(r -> WorkflowConstants.INSTANCE_RUNNING.equals(r.getInstanceStatus())));
+        assertTrue(allMine.getRecords().stream().anyMatch(r -> WorkflowConstants.INSTANCE_APPROVED.equals(r.getInstanceStatus())));
+        assertTrue(allMine.getRecords().stream().anyMatch(r -> WorkflowConstants.INSTANCE_REJECTED.equals(r.getInstanceStatus())));
+        assertTrue(allMine.getRecords().stream().anyMatch(r -> WorkflowConstants.INSTANCE_WITHDRAWN.equals(r.getInstanceStatus())));
+
+        assertOnlyStatus(WorkflowConstants.INSTANCE_RUNNING, "33333020");
+        assertOnlyStatus(WorkflowConstants.INSTANCE_APPROVED, "33333021");
+        assertOnlyStatus(WorkflowConstants.INSTANCE_REJECTED, "33333022");
+
+        IPage<WfMyInstanceVO> withdrawnAll = queryService.getMyStarted(TENANT_0, USER_ADMIN,
+                WorkflowConstants.INSTANCE_WITHDRAWN, 1, 100);
+        assertTrue(withdrawnAll.getTotal() >= 1);
+        assertTrue(withdrawnAll.getRecords().stream()
+                .allMatch(r -> WorkflowConstants.INSTANCE_WITHDRAWN.equals(r.getInstanceStatus())));
+        assertTrue(withdrawnAll.getRecords().stream().anyMatch(r -> "33333024".equals(r.getBusinessId())));
+        assertTrue(withdrawnAll.getRecords().stream().noneMatch(r -> "33333023".equals(r.getBusinessId())));
+
+        IPage<WfMyInstanceVO> withdrawnFirstPage = queryService.getMyStarted(TENANT_0, USER_ADMIN,
+                WorkflowConstants.INSTANCE_WITHDRAWN, 1, 1);
+        assertEquals(withdrawnAll.getTotal(), withdrawnFirstPage.getTotal());
+        assertEquals(1, withdrawnFirstPage.getRecords().size());
+        assertEquals(WorkflowConstants.INSTANCE_WITHDRAWN, withdrawnFirstPage.getRecords().get(0).getInstanceStatus());
+
+        IPage<WfMyInstanceVO> withdrawnSecondPage = queryService.getMyStarted(TENANT_0, USER_ADMIN,
+                WorkflowConstants.INSTANCE_WITHDRAWN, 2, 1);
+        assertEquals(withdrawnAll.getTotal(), withdrawnSecondPage.getTotal());
+        assertEquals(withdrawnAll.getTotal() > 1 ? 1 : 0, withdrawnSecondPage.getRecords().size());
+        if (!withdrawnSecondPage.getRecords().isEmpty()) {
+            assertNotEquals(withdrawnFirstPage.getRecords().get(0).getInstanceId(),
+                    withdrawnSecondPage.getRecords().get(0).getInstanceId());
+        }
+    }
+
+    private void assertOnlyStatus(String instanceStatus, String expectedBusinessId) {
+        IPage<WfMyInstanceVO> page = queryService.getMyStarted(TENANT_0, USER_ADMIN, instanceStatus, 1, 100);
+
+        assertTrue(page.getTotal() >= 1);
+        assertFalse(page.getRecords().isEmpty());
+        assertTrue(page.getRecords().stream()
+                .allMatch(r -> instanceStatus.equals(r.getInstanceStatus())));
+        assertTrue(page.getRecords().stream()
+                .anyMatch(r -> expectedBusinessId.equals(r.getBusinessId())));
+        assertTrue(page.getRecords().stream()
+                .noneMatch(r -> "33333023".equals(r.getBusinessId())));
+    }
+
+    @Test
     @DisplayName("getMyDone 分页第二页无数据返回空列表")
     void getMyDoneSecondPageEmpty() {
         // Use large page size so our own records are on page 1.
@@ -488,6 +561,107 @@ class WorkflowQueryServiceTest {
         // USER_ADMIN has ADMIN role set in setUp
         WfInstanceVO detail = queryService.getInstanceDetail(TENANT_0, submittedInstanceId, USER_ADMIN);
         assertNotNull(detail, "ADMIN角色应能查看任何同租户实例");
+    }
+
+    @Test
+    @DisplayName("getInstanceDetail 抄送人可查看无项目实例详情")
+    void getInstanceDetailCcUserCanViewNoProjectInstance() {
+        WfInstance instance = workflowEngine.submit(
+                USER_ADMIN, "admin", TENANT_0,
+                BUSINESS_TYPE, 33333025L,
+                "抄送详情测试", new BigDecimal("500.00"),
+                null, null, "{}", "{}", List.of(USER_SECOND_APPROVER));
+        assertNotNull(instance);
+
+        UserContext.clear();
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", USER_SECOND_APPROVER)
+                .add("username", "workflow-second-approver")
+                .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of())
+                .build());
+        try {
+            WfInstanceVO detail = queryService.getInstanceDetail(TENANT_0, instance.getId(), USER_SECOND_APPROVER);
+            assertNotNull(detail, "抄送人应能查看无项目实例详情");
+        } finally {
+            cleanupInstance(instance.getId(), 33333025L);
+            UserContext.clear();
+            UserContext.set(io.jsonwebtoken.Jwts.claims()
+                    .add("userId", USER_ADMIN)
+                    .add("username", "admin")
+                    .add("tenantId", TENANT_0)
+                    .add("roleCodes", List.of("ADMIN"))
+                    .build());
+        }
+    }
+
+    @Test
+    @DisplayName("getInstanceDetail 参与人无项目访问权限时拒绝")
+    void getInstanceDetailParticipantWithoutProjectAccessDenied() {
+        insertParticipantTask(USER_SECOND_APPROVER);
+        UserContext.clear();
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", USER_SECOND_APPROVER)
+                .add("username", "workflow-second-approver")
+                .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of())
+                .build());
+        try {
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> queryService.getInstanceDetail(TENANT_0, submittedInstanceId, USER_SECOND_APPROVER));
+            assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+        } finally {
+            UserContext.clear();
+            UserContext.set(io.jsonwebtoken.Jwts.claims()
+                    .add("userId", USER_ADMIN)
+                    .add("username", "admin")
+                    .add("tenantId", TENANT_0)
+                    .add("roleCodes", List.of("ADMIN"))
+                    .build());
+        }
+    }
+
+    @Test
+    @DisplayName("getInstanceDetail 有项目访问权限的参与人不被误伤")
+    void getInstanceDetailParticipantWithProjectAccessCanView() {
+        jdbcTemplate.update("UPDATE pm_project SET created_by = ? WHERE id = ?", USER_SECOND_APPROVER, PROJECT_ID);
+        insertParticipantTask(USER_SECOND_APPROVER);
+        UserContext.clear();
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", USER_SECOND_APPROVER)
+                .add("username", "workflow-second-approver")
+                .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of())
+                .build());
+        try {
+            WfInstanceVO detail = queryService.getInstanceDetail(TENANT_0, submittedInstanceId, USER_SECOND_APPROVER);
+            assertNotNull(detail, "有项目访问权限的参与人应能查看详情");
+        } finally {
+            UserContext.clear();
+            UserContext.set(io.jsonwebtoken.Jwts.claims()
+                    .add("userId", USER_ADMIN)
+                    .add("username", "admin")
+                    .add("tenantId", TENANT_0)
+                    .add("roleCodes", List.of("ADMIN"))
+                    .build());
+        }
+    }
+
+    @Test
+    @DisplayName("getInstanceDetail 模板禁用转办加签时可用动作不包含对应动作")
+    void getInstanceDetailAvailableActionsRespectTemplateSwitches() {
+        WfTemplateNode node = templateNodeMapper.selectById(NODE_1_ID);
+        node.setAllowTransfer(0);
+        node.setAllowAddSign(0);
+        templateNodeMapper.updateById(node);
+
+        WfInstanceVO detail = queryService.getInstanceDetail(TENANT_0, submittedInstanceId, USER_ADMIN);
+
+        assertNotNull(detail);
+        assertTrue(detail.getAvailableActions().contains(WorkflowConstants.UI_APPROVE));
+        assertTrue(detail.getAvailableActions().contains(WorkflowConstants.UI_REJECT));
+        assertFalse(detail.getAvailableActions().contains(WorkflowConstants.UI_TRANSFER));
+        assertFalse(detail.getAvailableActions().contains(WorkflowConstants.UI_ADD_SIGN));
     }
 
     @Test
@@ -630,7 +804,7 @@ class WorkflowQueryServiceTest {
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 33333001L,
                 "测试待办标题", new BigDecimal("500.00"),
-                100L, 100L, "测试业务摘要", "{}", null);
+                PROJECT_ID, 100L, "测试业务摘要", "{}", null);
         assertNotNull(instance, "提交应在测试数据准备阶段成功");
         submittedInstanceId = instance.getId();
 
@@ -647,19 +821,20 @@ class WorkflowQueryServiceTest {
         // Keep cleanup scoped to this class. Broad tenant-level deletes remove Flyway
         // workflow seed data used by later tests in the same H2 application context.
         jdbcTemplate.update("DELETE FROM wf_cc WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?)",
-                BUSINESS_TYPE, 33333001L, 33333024L);
+                BUSINESS_TYPE, 33333001L, 33333025L);
         jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key IN (?, ?, ?, ?)",
                 "done-test-key-001", "reject-test-key-001", "detail-approve-key-001", "running-done-test-key-001");
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333024L);
+                BUSINESS_TYPE, 33333001L, 33333025L);
         jdbcTemplate.update("DELETE FROM wf_task WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333024L);
+                BUSINESS_TYPE, 33333001L, 33333025L);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?)",
-                BUSINESS_TYPE, 33333001L, 33333024L);
+                BUSINESS_TYPE, 33333001L, 33333025L);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333024L);
+                BUSINESS_TYPE, 33333001L, 33333025L);
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
         jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
+        jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", PROJECT_ID);
     }
 
     private void cleanupInstance(Long instanceId, Long businessId) {
@@ -669,6 +844,33 @@ class WorkflowQueryServiceTest {
         jdbcTemplate.update("DELETE FROM wf_task WHERE instance_id = ?", instanceId);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id = ?", instanceId);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE id = ?", instanceId);
+    }
+
+    private void seedProject(Long createdBy) {
+        PmProject project = new PmProject();
+        project.setId(PROJECT_ID);
+        project.setTenantId(TENANT_0);
+        project.setProjectCode("WF-Q-PROJECT");
+        project.setProjectName("审批查询测试项目");
+        project.setStatus("ACTIVE");
+        project.setCreatedBy(createdBy);
+        projectMapper.insert(project);
+    }
+
+    private void insertParticipantTask(Long approverId) {
+        WfTask task = new WfTask();
+        task.setTenantId(TENANT_0);
+        task.setInstanceId(submittedInstanceId);
+        task.setNodeInstanceId(nodeInstanceMapper.selectOne(new LambdaQueryWrapper<WfNodeInstance>()
+                .eq(WfNodeInstance::getInstanceId, submittedInstanceId)).getId());
+        task.setBusinessType(BUSINESS_TYPE);
+        task.setBusinessId(33333001L);
+        task.setApproverId(approverId);
+        task.setApproverName("other");
+        task.setTaskStatus(WorkflowConstants.TASK_PENDING);
+        task.setRoundNo(1);
+        task.setTaskVersion(0);
+        taskMapper.insert(task);
     }
 
     private void insertStartedInstance(Long businessId, String businessType, Long initiatorId,

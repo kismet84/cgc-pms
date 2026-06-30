@@ -8,9 +8,11 @@ import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfNodeInstance;
 import com.cgcpms.workflow.entity.WfTask;
+import com.cgcpms.workflow.entity.WfTemplateNode;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfNodeInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
+import com.cgcpms.workflow.mapper.WfTemplateNodeMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,6 +44,7 @@ class WorkflowTaskServiceTest {
     private static final long TASK_ID = 880000000000001L;
     private static final long INSTANCE_ID = 880000000000002L;
     private static final long NODE_INSTANCE_ID = 880000000000003L;
+    private static final long TEMPLATE_NODE_ID = 880000000000004L;
 
     @Autowired
     private WorkflowTaskService workflowTaskService;
@@ -54,6 +57,9 @@ class WorkflowTaskServiceTest {
 
     @Autowired
     private WfNodeInstanceMapper wfNodeInstanceMapper;
+
+    @Autowired
+    private WfTemplateNodeMapper wfTemplateNodeMapper;
 
     @Autowired
     private SysUserMapper sysUserMapper;
@@ -170,6 +176,20 @@ class WorkflowTaskServiceTest {
         } finally {
             sysUserMapper.deleteById(88888002L);
         }
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("transfer: 模板节点禁止转办时拒绝")
+    void transferDisallowedByTemplateNode() {
+        seedTransferFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING);
+        WfTemplateNode node = wfTemplateNodeMapper.selectById(TEMPLATE_NODE_ID);
+        node.setAllowTransfer(0);
+        wfTemplateNodeMapper.updateById(node);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> workflowTaskService.transfer(TASK_ID, USER_OTHER, USER_ADMIN, "admin", "备注"));
+        assertEquals("WORKFLOW_TRANSFER_NOT_ALLOWED", ex.getCode());
     }
 
     @Test
@@ -468,6 +488,22 @@ class WorkflowTaskServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("addSign: 模板节点禁止加签时拒绝")
+    void addSignDisallowedByTemplateNode() {
+        seedAddSignFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING,
+                WorkflowConstants.NODE_ACTIVE);
+        WfTemplateNode node = wfTemplateNodeMapper.selectById(TEMPLATE_NODE_ID);
+        node.setAllowAddSign(0);
+        wfTemplateNodeMapper.updateById(node);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> workflowTaskService.addSign(TASK_ID, List.of(USER_OTHER),
+                        USER_ADMIN, "admin", "备注"));
+        assertEquals("WORKFLOW_ADD_SIGN_NOT_ALLOWED", ex.getCode());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("addSign: 空加签用户列表不抛出异常")
     void addSignEmptyUserList() {
         seedAddSignFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING,
@@ -511,6 +547,8 @@ class WorkflowTaskServiceTest {
      * Seed task + instance (no node) for transfer tests.
      */
     private void seedTransferFixture(String taskStatus, String instanceStatus) {
+        seedTemplateNode(1, 1);
+
         WfInstance instance = new WfInstance();
         instance.setId(INSTANCE_ID);
         instance.setTenantId(TENANT_0);
@@ -537,12 +575,27 @@ class WorkflowTaskServiceTest {
         task.setRoundNo(1);
         task.setTaskVersion(0);
         wfTaskMapper.insert(task);
+
+        WfNodeInstance node = new WfNodeInstance();
+        node.setId(NODE_INSTANCE_ID);
+        node.setTenantId(TENANT_0);
+        node.setInstanceId(INSTANCE_ID);
+        node.setTemplateNodeId(TEMPLATE_NODE_ID);
+        node.setNodeCode("N1");
+        node.setNodeName("转办节点");
+        node.setNodeOrder(1);
+        node.setApproveMode(WorkflowConstants.MODE_SEQUENTIAL);
+        node.setNodeStatus(WorkflowConstants.NODE_ACTIVE);
+        node.setRoundNo(1);
+        wfNodeInstanceMapper.insert(node);
     }
 
     /**
      * Seed task + instance + node for addSign tests.
      */
     private void seedAddSignFixture(String taskStatus, String instanceStatus, String nodeStatus) {
+        seedTemplateNode(1, 1);
+
         WfInstance instance = new WfInstance();
         instance.setId(INSTANCE_ID);
         instance.setTenantId(TENANT_0);
@@ -560,6 +613,7 @@ class WorkflowTaskServiceTest {
         node.setId(NODE_INSTANCE_ID);
         node.setTenantId(TENANT_0);
         node.setInstanceId(INSTANCE_ID);
+        node.setTemplateNodeId(TEMPLATE_NODE_ID);
         node.setNodeCode("N1");
         node.setNodeName("加签节点");
         node.setNodeOrder(1);
@@ -583,6 +637,22 @@ class WorkflowTaskServiceTest {
         wfTaskMapper.insert(task);
     }
 
+    private void seedTemplateNode(int allowTransfer, int allowAddSign) {
+        WfTemplateNode node = new WfTemplateNode();
+        node.setId(TEMPLATE_NODE_ID);
+        node.setTenantId(TENANT_0);
+        node.setTemplateId(1L);
+        node.setNodeCode("N1");
+        node.setNodeName("测试节点");
+        node.setNodeOrder(1);
+        node.setNodeType("APPROVAL");
+        node.setApproveMode(WorkflowConstants.MODE_SEQUENTIAL);
+        node.setApproverConfig("{\"type\":\"USER\",\"userId\":" + USER_ADMIN + "}");
+        node.setAllowTransfer(allowTransfer);
+        node.setAllowAddSign(allowAddSign);
+        wfTemplateNodeMapper.insert(node);
+    }
+
     private void cleanupTestData() {
         // Clean up in reverse FK order
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_id = ?", 88000001L);
@@ -591,6 +661,7 @@ class WorkflowTaskServiceTest {
         jdbcTemplate.update("DELETE FROM wf_task WHERE id = ?", TASK_ID);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE id = ?", NODE_INSTANCE_ID);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id = ?", INSTANCE_ID);
+        jdbcTemplate.update("DELETE FROM wf_template_node WHERE id = ?", TEMPLATE_NODE_ID);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE id = ?", INSTANCE_ID);
         jdbcTemplate.update("DELETE FROM sys_user WHERE id = ?", USER_OTHER);
     }

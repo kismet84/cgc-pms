@@ -5,9 +5,13 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.entity.WfNodeInstance;
 import com.cgcpms.workflow.entity.WfTask;
+import com.cgcpms.workflow.entity.WfTemplateNode;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
+import com.cgcpms.workflow.mapper.WfNodeInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
+import com.cgcpms.workflow.mapper.WfTemplateNodeMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -34,6 +38,8 @@ public class WorkflowEngine {
     private final WorkflowWithdrawService withdrawService;
     private final WfInstanceMapper wfInstanceMapper;
     private final WfTaskMapper wfTaskMapper;
+    private final WfNodeInstanceMapper wfNodeInstanceMapper;
+    private final WfTemplateNodeMapper wfTemplateNodeMapper;
 
     // ───────────────────── PERMISSION ─────────────────────
 
@@ -159,12 +165,17 @@ public class WorkflowEngine {
             if (tenantId != null) {
                 pendingWrapper.eq(WfTask::getTenantId, tenantId);
             }
-            long pendingCount = wfTaskMapper.selectCount(pendingWrapper);
-            if (pendingCount > 0) {
+            List<WfTask> pendingTasks = wfTaskMapper.selectList(pendingWrapper);
+            if (!pendingTasks.isEmpty()) {
                 actions.add(WorkflowConstants.UI_APPROVE);
                 actions.add(WorkflowConstants.UI_REJECT);
-                actions.add(WorkflowConstants.UI_TRANSFER);
-                actions.add(WorkflowConstants.UI_ADD_SIGN);
+                WfTemplateNode templateNode = findTemplateNode(pendingTasks.get(0));
+                if (templateNode != null && Integer.valueOf(1).equals(templateNode.getAllowTransfer())) {
+                    actions.add(WorkflowConstants.UI_TRANSFER);
+                }
+                if (templateNode != null && Integer.valueOf(1).equals(templateNode.getAllowAddSign())) {
+                    actions.add(WorkflowConstants.UI_ADD_SIGN);
+                }
             }
         }
 
@@ -179,5 +190,11 @@ public class WorkflowEngine {
         }
 
         return actions;
+    }
+
+    private WfTemplateNode findTemplateNode(WfTask task) {
+        WfNodeInstance node = wfNodeInstanceMapper.selectById(task.getNodeInstanceId());
+        if (node == null || node.getTemplateNodeId() == null) return null;
+        return wfTemplateNodeMapper.selectById(node.getTemplateNodeId());
     }
 }

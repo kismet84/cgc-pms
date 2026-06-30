@@ -113,6 +113,37 @@ class MigrationIntegrityTest {
         }
     }
 
+    @Test
+    void workflowMineEnhancementDemoSeedStaysOnPrimaryApprovalTypes() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V108__seed_workflow_mine_enhancement_demo_data.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V108__seed_workflow_mine_enhancement_demo_data.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("'CONTRACT_APPROVAL'"));
+            assertTrue(sql.contains("'PURCHASE_REQUEST'"));
+            assertTrue(sql.contains("'SUB_MEASURE'"));
+            assertTrue(sql.contains("'RUNNING'"));
+            assertTrue(sql.contains("'APPROVED'"));
+            assertTrue(sql.contains("'REJECTED'"));
+            assertTrue(sql.contains("'WITHDRAWN'"));
+            assertTrue(sql.contains("'WITHDRAW'"));
+            assertTrue(sql.contains("wf_instance"));
+            assertTrue(sql.contains("wf_record"));
+            assertTrue(sql.contains("wf_node_instance"));
+            assertTrue(sql.contains("wf_task"));
+            assertFalse(sql.contains("'CONTRACT'"),
+                    "V108 must not use legacy CONTRACT as the primary sample type");
+            assertFalse(sql.contains("'PAY_REQUEST'"));
+            assertFalse(sql.contains("'PAY_APPLICATION'"));
+            assertFalse(sql.contains("'VAR_ORDER'"));
+            assertFalse(sql.contains("'CT_CHANGE'"));
+            assertFalse(sql.contains("'TECH_ITEM'"));
+        }
+    }
+
     /**
      * Java-based migrations (V51/V58/V75) are executed by Flyway at startup
      * from {@code common/migration/} and do not require SQL-level coverage here —
