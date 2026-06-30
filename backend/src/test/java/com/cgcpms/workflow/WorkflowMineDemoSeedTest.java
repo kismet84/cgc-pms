@@ -2,6 +2,7 @@ package com.cgcpms.workflow;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.workflow.service.WorkflowQueryService;
+import com.cgcpms.workflow.vo.WfCcVO;
 import com.cgcpms.workflow.vo.WfMyInstanceVO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
@@ -91,6 +93,34 @@ class WorkflowMineDemoSeedTest {
         assertEquals(totalMine, page1.getTotal());
         assertEquals(20, page1.getRecords().size());
         assertTrue(page2.getRecords().size() >= 1, "必须形成真实第二页");
+    }
+
+    @Test
+    @DisplayName("V109 admin 抄送样本支持抄送页非空")
+    void v109CcSeedMakesAdminCcListNonEmpty() {
+        long v109Total = count("""
+                SELECT COUNT(*)
+                FROM wf_cc
+                WHERE tenant_id = 0
+                  AND cc_user_id = 1
+                  AND id IN (979000000000000901, 979000000000000902)
+                """);
+        assertEquals(2L, v109Total);
+
+        IPage<WfCcVO> page = workflowQueryService.getMyCc(ADMIN_USER_ID, TENANT_ID, 1, 20);
+
+        assertTrue(page.getTotal() >= v109Total, "admin 抄送列表至少应包含 V109 demo 样本");
+        assertFalse(page.getRecords().isEmpty(), "admin 抄送列表不应为空");
+        assertEquals(2L, page.getRecords().stream()
+                .filter(cc -> "979000000000000901".equals(cc.getId())
+                        || "979000000000000902".equals(cc.getId()))
+                .count());
+        assertTrue(page.getRecords().stream()
+                .anyMatch(cc -> "979000000000000901".equals(cc.getId())
+                        && "RUNNING".equals(cc.getInstanceStatus())));
+        assertTrue(page.getRecords().stream()
+                .anyMatch(cc -> "979000000000000902".equals(cc.getId())
+                        && "APPROVED".equals(cc.getInstanceStatus())));
     }
 
     private long count(String sql) {

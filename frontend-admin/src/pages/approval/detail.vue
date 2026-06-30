@@ -75,6 +75,31 @@ const completedNodeCount = computed(
   () => nodes.value.filter((node) => node.nodeStatus === 'COMPLETED').length,
 )
 
+function displayText(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-'
+  return String(value)
+}
+
+function getInstanceStatusMeta(status: unknown) {
+  const key = String(status ?? '')
+  return statusMap[key] ?? { text: '未知状态', color: 'default' }
+}
+
+function getNodeStatusMeta(status: unknown) {
+  const key = String(status ?? '')
+  return nodeStatusMap[key] ?? { text: '未知节点状态', color: 'default' }
+}
+
+function getTaskStatusMeta(status: unknown) {
+  const key = String(status ?? '')
+  return taskStatusMap[key] ?? { text: '未知任务状态', color: 'default' }
+}
+
+function getRecordActionName(record: { actionType?: string; actionName?: string }) {
+  const key = String(record.actionType ?? '')
+  return actionNameMap[key] ?? displayText(record.actionName)
+}
+
 async function fetchDetail() {
   loading.value = true
   try {
@@ -287,8 +312,8 @@ onMounted(() => {
         ><a-breadcrumb-item>审批详情</a-breadcrumb-item></a-breadcrumb
       >
       <div class="pt-head-actions">
-        <a-tag v-if="detail" :color="statusMap[detail.instanceStatus]?.color">
-          {{ statusMap[detail.instanceStatus]?.text || detail.instanceStatus }}
+        <a-tag v-if="detail" :color="getInstanceStatusMeta(detail.instanceStatus).color">
+          {{ getInstanceStatusMeta(detail.instanceStatus).text }}
         </a-tag>
       </div>
     </div>
@@ -359,8 +384,8 @@ onMounted(() => {
             <a-step v-for="node in nodes" :key="node.id">
               <template #title>
                 {{ node.nodeName }}
-                <a-tag :color="nodeStatusMap[node.nodeStatus]?.color" class="wf-inline-tag">
-                  {{ nodeStatusMap[node.nodeStatus]?.text || node.nodeStatus }}
+                <a-tag :color="getNodeStatusMeta(node.nodeStatus).color" class="wf-inline-tag">
+                  {{ getNodeStatusMeta(node.nodeStatus).text }}
                 </a-tag>
               </template>
               <template #description>
@@ -370,8 +395,8 @@ onMounted(() => {
                 >
                   <div v-for="task in node.tasks" :key="task.id" class="wf-node-task-item">
                     <span>{{ task.approverName }}</span>
-                    <a-tag :color="taskStatusMap[task.taskStatus]?.color" size="small">
-                      {{ taskStatusMap[task.taskStatus]?.text || task.taskStatus }}
+                    <a-tag :color="getTaskStatusMeta(task.taskStatus).color" size="small">
+                      {{ getTaskStatusMeta(task.taskStatus).text }}
                     </a-tag>
                     <span v-if="task.comment" class="wf-task-comment">{{ task.comment }}</span>
                   </div>
@@ -388,9 +413,7 @@ onMounted(() => {
             <a-timeline-item v-for="record in records" :key="record.id">
               <div>
                 <strong>{{ record.operatorName }}</strong>
-                <a-tag class="wf-inline-tag">{{
-                  actionNameMap[record.actionType] || record.actionName
-                }}</a-tag>
+                <a-tag class="wf-inline-tag">{{ getRecordActionName(record) }}</a-tag>
               </div>
               <div v-if="record.comment" class="wf-record-comment">
                 {{ record.comment }}

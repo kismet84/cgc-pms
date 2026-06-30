@@ -144,6 +144,28 @@ class MigrationIntegrityTest {
         }
     }
 
+    @Test
+    void workflowCcDemoSeedOnlyTouchesCcRows() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V109__seed_workflow_cc_demo_data.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V109__seed_workflow_cc_demo_data.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("INSERT INTO wf_cc"));
+            assertTrue(sql.contains("JOIN wf_instance"));
+            assertTrue(sql.contains("979000000000000901"));
+            assertTrue(sql.contains("979000000000000902"));
+            assertTrue(sql.contains("978000000000001001"));
+            assertTrue(sql.contains("978000000000001002"));
+            assertFalse(sql.contains("INSERT INTO wf_instance"));
+            assertFalse(sql.contains("INSERT INTO wf_task"));
+            assertFalse(sql.contains("INSERT INTO wf_record"));
+            assertFalse(sql.contains("INSERT INTO wf_node_instance"));
+        }
+    }
+
     /**
      * Java-based migrations (V51/V58/V75) are executed by Flyway at startup
      * from {@code common/migration/} and do not require SQL-level coverage here —

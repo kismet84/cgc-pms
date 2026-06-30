@@ -237,6 +237,9 @@ const availableActions = computed(() =>
   Array.isArray(detail.value?.availableActions) ? detail.value.availableActions : [],
 )
 const isDetailRunning = computed(() => detail.value?.instanceStatus === 'RUNNING')
+const fullDetailOnlyActions = computed(() =>
+  availableActions.value.filter((action) => action === 'transfer' || action === 'addSign'),
+)
 
 function findMyPendingTask() {
   const activeNode = detailNodes.value.find((node) => node.nodeStatus === 'ACTIVE')
@@ -364,7 +367,17 @@ function displayText(value: unknown): string {
 
 function getInstanceStatusMeta(status: unknown) {
   const key = String(status ?? '')
-  return statusMap[key] ?? { text: displayText(status), color: 'default' }
+  return statusMap[key] ?? { text: '未知状态', color: 'default' }
+}
+
+function getRecordActionName(record: WfRecordVO): string {
+  const key = String(record.actionType ?? '')
+  return actionNameMap[key] ?? displayText(record.actionName)
+}
+
+function openFullDetail() {
+  if (!detail.value?.id) return
+  router.push(`/approval/${detail.value.id}`)
 }
 
 function getActionLabel(): string {
@@ -554,8 +567,8 @@ watch(
               <strong>{{ detail.title }}</strong>
               <span>{{ businessTypeMap[detail.businessType] || detail.businessType }}</span>
             </div>
-            <a-tag :color="statusMap[detail.instanceStatus]?.color">
-              {{ statusMap[detail.instanceStatus]?.text || detail.instanceStatus }}
+            <a-tag :color="getInstanceStatusMeta(detail.instanceStatus).color">
+              {{ getInstanceStatusMeta(detail.instanceStatus).text }}
             </a-tag>
           </div>
 
@@ -600,6 +613,17 @@ watch(
               撤回
             </a-button>
           </div>
+          <a-alert
+            v-if="fullDetailOnlyActions.length > 0"
+            class="approval-action-hint"
+            type="info"
+            show-icon
+          >
+            <template #message>
+              转办、加签等完整处理入口请进入独立详情页
+              <a-button type="link" size="small" @click="openFullDetail">打开详情</a-button>
+            </template>
+          </a-alert>
           <div
             v-if="availableActions.includes('resubmit') && !isDetailRunning"
             class="approval-actions"
@@ -638,7 +662,7 @@ watch(
             <a-timeline>
               <a-timeline-item v-for="record in detailRecords" :key="record.id">
                 <strong>{{ record.operatorName }}</strong>
-                <a-tag>{{ actionNameMap[record.actionType] || record.actionName }}</a-tag>
+                <a-tag>{{ getRecordActionName(record) }}</a-tag>
                 <p v-if="record.comment">{{ record.comment }}</p>
                 <small>{{ record.createdAt }}</small>
               </a-timeline-item>
@@ -706,6 +730,10 @@ watch(
   display: flex;
   gap: 8px;
   padding: 10px 0 2px;
+}
+
+.approval-action-hint {
+  margin-top: 4px;
 }
 
 .approval-detail-section h3 {

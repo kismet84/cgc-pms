@@ -683,9 +683,9 @@ class WorkflowQueryServiceTest {
     // ── getMyCc ──
 
     @Test
-    @DisplayName("getMyCc 无抄送时返回空分页")
+    @DisplayName("getMyCc 未被抄送用户返回空分页")
     void getMyCcReturnsEmptyWhenNoCc() {
-        IPage<WfCcVO> page = queryService.getMyCc(USER_ADMIN, TENANT_0, 1, 20);
+        IPage<WfCcVO> page = queryService.getMyCc(USER_NO_TASKS, TENANT_0, 1, 20);
 
         assertNotNull(page);
         assertEquals(0, page.getTotal());
