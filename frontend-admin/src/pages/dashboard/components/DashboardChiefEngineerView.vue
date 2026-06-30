@@ -19,7 +19,7 @@ const techItemCols = [
   { title: '责任人', dataIndex: 'ownerName', width: 80, ellipsis: true },
   { title: '状态', dataIndex: 'status', width: 74 },
   { title: '日期', dataIndex: 'date', width: 100 },
-  { title: '逾期', key: 'overdueDays', width: 70 },
+  { title: '时效', key: 'overdueDays', width: 78 },
 ]
 
 const TECH_STATUS_LABEL: Record<string, string> = {
@@ -56,10 +56,22 @@ function techStatusLabel(value?: string | number) {
   return key === '-' ? '-' : (TECH_STATUS_LABEL[key] ?? '-')
 }
 
-function overdueText(value?: number) {
-  if (value === undefined || value === null) return '-'
-  if (value === 0) return '今日'
-  return `逾期${Math.max(Math.round(value), 0)}天`
+function daysUntil(value?: string | number) {
+  const text = formatDate(value)
+  if (text === '-') return null
+  const target = new Date(`${text}T00:00:00`)
+  if (Number.isNaN(target.getTime())) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - today.getTime()) / 86400000)
+}
+
+function timelinessText(record: DashboardBusinessItemVO) {
+  const days = daysUntil(record.date)
+  if (days === null) return '-'
+  if (days > 0) return `剩余${days}天`
+  if (days === 0) return '今日到期'
+  return `逾期${Math.abs(days)}天`
 }
 </script>
 
@@ -173,7 +185,7 @@ function overdueText(value?: number) {
                 {{ techStatusLabel(text) }}
               </span>
               <span v-else-if="column.key === 'overdueDays'" class="chief-days">
-                {{ overdueText((record as DashboardBusinessItemVO).overdueDays) }}
+                {{ timelinessText(record as DashboardBusinessItemVO) }}
               </span>
               <span v-else-if="column.dataIndex === 'date'" class="chief-date">
                 {{ formatDate(text) }}
@@ -208,7 +220,7 @@ function overdueText(value?: number) {
                 {{ techStatusLabel(text) }}
               </span>
               <span v-else-if="column.key === 'overdueDays'" class="chief-days">
-                {{ overdueText((record as DashboardBusinessItemVO).overdueDays) }}
+                {{ timelinessText(record as DashboardBusinessItemVO) }}
               </span>
               <span v-else-if="column.dataIndex === 'date'" class="chief-date">
                 {{ formatDate(text) }}
@@ -247,7 +259,7 @@ function overdueText(value?: number) {
               {{ techStatusLabel(text) }}
             </span>
             <span v-else-if="column.key === 'overdueDays'" class="chief-days">
-              {{ overdueText((record as DashboardBusinessItemVO).overdueDays) }}
+              {{ timelinessText(record as DashboardBusinessItemVO) }}
             </span>
             <span v-else-if="column.dataIndex === 'date'" class="chief-date">
               {{ formatDate(text) }}
@@ -283,7 +295,7 @@ function overdueText(value?: number) {
               {{ techStatusLabel(text) }}
             </span>
             <span v-else-if="column.key === 'overdueDays'" class="chief-days">
-              {{ overdueText((record as DashboardBusinessItemVO).overdueDays) }}
+              {{ timelinessText(record as DashboardBusinessItemVO) }}
             </span>
             <span v-else-if="column.dataIndex === 'date'" class="chief-date">
               {{ formatDate(text) }}

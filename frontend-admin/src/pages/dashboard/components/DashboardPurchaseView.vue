@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import {
   AuditOutlined,
   ClockCircleOutlined,
@@ -25,11 +25,12 @@ const STATUS_LABEL: Record<string, string> = {
   COMPLETED: '已完成',
   PARTIAL_RECEIVED: '部分入库',
   RECEIVED: '已入库',
+  IN_TRANSIT: '运输中',
 }
 
 const overdueOrderCols = [
   { title: '单号', dataIndex: 'code', width: 156 },
-  { title: '事项摘要', dataIndex: 'title', width: 188, ellipsis: true },
+  { title: '事项摘要', dataIndex: 'itemSummary', width: 188, ellipsis: true },
   { title: '供应商', dataIndex: 'partnerName', width: 104, ellipsis: true },
   { title: '状态', dataIndex: 'status', width: 84 },
   { title: '应交日期', dataIndex: 'date', width: 112 },
@@ -38,7 +39,7 @@ const overdueOrderCols = [
 
 const pendingReceiptCols = [
   { title: '单号', dataIndex: 'code', width: 156 },
-  { title: '事项摘要', dataIndex: 'title', width: 188, ellipsis: true },
+  { title: '事项摘要', dataIndex: 'itemSummary', width: 188, ellipsis: true },
   { title: '供应商', dataIndex: 'partnerName', width: 104, ellipsis: true },
   { title: '状态', dataIndex: 'status', width: 84 },
   { title: '应验日期', dataIndex: 'date', width: 112 },
@@ -47,22 +48,30 @@ const pendingReceiptCols = [
 
 const purchaseRequestCols = [
   { title: '申请单号', dataIndex: 'code', width: 164 },
-  { title: '申请事项/物资', dataIndex: 'title', width: 240, ellipsis: true },
+  { title: '申请事项/物资', dataIndex: 'itemSummary', width: 240, ellipsis: true },
   { title: '申请部门/项目', dataIndex: 'projectName', width: 132, ellipsis: true },
   { title: '申请人', dataIndex: 'ownerName', width: 92, ellipsis: true },
-  { title: '金额', dataIndex: 'amount', width: 112, align: 'right' as const },
+  { title: '金额（万元）', dataIndex: 'amount', width: 112, align: 'right' as const },
   { title: '申请日期', dataIndex: 'date', width: 136 },
   { title: '当前状态', dataIndex: 'status', width: 92 },
   { title: '紧急程度', key: 'urgency', width: 88 },
 ]
 
+type PurchaseBottomTab = 'requests' | 'orders'
+
+const activeBottomTab = ref<PurchaseBottomTab>('requests')
+const purchaseBottomTabs: { key: PurchaseBottomTab; label: string }[] = [
+  { key: 'requests', label: '采购申请' },
+  { key: 'orders', label: '采购订单' },
+]
+
 function statusLabel(status?: string) {
-  return status ? (STATUS_LABEL[status] ?? status) : '-'
+  return status ? (STATUS_LABEL[status] ?? '-') : '-'
 }
 
 function statusTone(status?: string) {
   if (status === 'APPROVED' || status === 'COMPLETED' || status === 'RECEIVED') return 'success'
-  if (status === 'APPROVING' || status === 'PENDING' || status === 'PARTIAL_RECEIVED') {
+  if (status === 'APPROVING' || status === 'PENDING' || status === 'PARTIAL_RECEIVED' || status === 'IN_TRANSIT') {
     return 'warning'
   }
   if (status === 'REJECTED' || status === 'CANCELLED') return 'danger'
@@ -71,6 +80,34 @@ function statusTone(status?: string) {
 
 function displayText(value?: string | number) {
   return value === undefined || value === null || value === '' ? '-' : String(value)
+}
+
+function amountText(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : fmtWan(text)
+}
+
+function formatDate(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : text.slice(0, 10)
+}
+
+function formatDateTime(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : text.slice(0, 16).replace('T', ' ')
+}
+
+function isInvalidSummary(value?: string | number) {
+  const text = displayText(value).trim()
+  if (text === '-') return true
+  if (/^\d{4}[-/]\d{1,2}([-/]\d{1,2})?$/.test(text)) return true
+  if (/^[A-Z_]{2,}$/.test(text)) return true
+  return /^[A-Za-z0-9_-]+$/.test(text) && /\d/.test(text)
+}
+
+function purchaseSummary(record: DashboardBusinessItemVO) {
+  if (!isInvalidSummary(record.itemSummary)) return displayText(record.itemSummary)
+  return isInvalidSummary(record.title) ? '-' : displayText(record.title)
 }
 
 const summaryOverflow = reactive<Record<string, boolean>>({})
@@ -146,6 +183,12 @@ const recentRequests = computed(() =>
       sortDate(a.date, true) - sortDate(b.date, true) ||
       sortCode(a.code).localeCompare(sortCode(b.code), 'zh-CN'),
   ),
+)
+
+const purchaseOrders = computed(() => props.data.purchaseOrders ?? [])
+
+const purchaseBottomRows = computed(() =>
+  activeBottomTab.value === 'requests' ? recentRequests.value : purchaseOrders.value,
 )
 
 function overdueInfo(record: DashboardBusinessItemVO) {
@@ -275,17 +318,22 @@ function pendingInfo(record: DashboardBusinessItemVO) {
                 </a-tooltip>
               </span>
               <span v-else-if="column.dataIndex === 'date'" class="purchase-muted">
-                {{ displayText(text) }}
+                {{ formatDate(text) }}
               </span>
               <a-tooltip
-                v-else-if="column.dataIndex === 'title'"
-                :title="summaryTooltipTitle(summaryKey('overdue', record as DashboardBusinessItemVO), text)"
+                v-else-if="column.dataIndex === 'itemSummary'"
+                :title="
+                  summaryTooltipTitle(
+                    summaryKey('overdue', record as DashboardBusinessItemVO),
+                    purchaseSummary(record as DashboardBusinessItemVO),
+                  )
+                "
               >
                 <span
                   class="purchase-ellipsis"
                   v-summary-overflow="summaryKey('overdue', record as DashboardBusinessItemVO)"
                 >
-                  {{ displayText(text) }}
+                  {{ purchaseSummary(record as DashboardBusinessItemVO) }}
                 </span>
               </a-tooltip>
               <span v-else-if="column.key === 'overdueInfo'" class="purchase-days danger">
@@ -323,17 +371,22 @@ function pendingInfo(record: DashboardBusinessItemVO) {
                 </a-tooltip>
               </span>
               <span v-else-if="column.dataIndex === 'date'" class="purchase-muted">
-                {{ displayText(text) }}
+                {{ formatDate(text) }}
               </span>
               <a-tooltip
-                v-else-if="column.dataIndex === 'title'"
-                :title="summaryTooltipTitle(summaryKey('receipt', record as DashboardBusinessItemVO), text)"
+                v-else-if="column.dataIndex === 'itemSummary'"
+                :title="
+                  summaryTooltipTitle(
+                    summaryKey('receipt', record as DashboardBusinessItemVO),
+                    purchaseSummary(record as DashboardBusinessItemVO),
+                  )
+                "
               >
                 <span
                   class="purchase-ellipsis"
                   v-summary-overflow="summaryKey('receipt', record as DashboardBusinessItemVO)"
                 >
-                  {{ displayText(text) }}
+                  {{ purchaseSummary(record as DashboardBusinessItemVO) }}
                 </span>
               </a-tooltip>
               <span v-else-if="column.key === 'pendingInfo'" class="purchase-days warning">
@@ -346,14 +399,22 @@ function pendingInfo(record: DashboardBusinessItemVO) {
     </section>
 
     <section class="role-reference-panel role-reference-bottom-panel">
-      <div class="role-reference-panel-head">
-        <div>
-          <strong>近期采购申请</strong>
-        </div>
+      <div class="purchase-bottom-tabs" role="tablist" aria-label="采购底部表格">
+        <button
+          v-for="tab in purchaseBottomTabs"
+          :key="tab.key"
+          type="button"
+          role="tab"
+          :aria-selected="activeBottomTab === tab.key"
+          :class="['purchase-bottom-tab', { active: activeBottomTab === tab.key }]"
+          @click="activeBottomTab = tab.key"
+        >
+          {{ tab.label }}
+        </button>
       </div>
       <a-table
         :columns="purchaseRequestCols"
-        :data-source="recentRequests"
+        :data-source="purchaseBottomRows"
         :loading="loading"
         :pagination="false"
         :scroll="{ x: 1136, y: 248 }"
@@ -377,20 +438,25 @@ function pendingInfo(record: DashboardBusinessItemVO) {
             </a-tooltip>
           </span>
           <span v-else-if="column.dataIndex === 'amount'" class="purchase-amount">
-            {{ displayText(text) }}
+            {{ amountText(text) }}
           </span>
-          <a-tooltip v-else-if="column.dataIndex === 'date'" :title="displayText(text)">
-            <span class="purchase-date-cell">{{ displayText(text) }}</span>
+          <a-tooltip v-else-if="column.dataIndex === 'date'" :title="formatDateTime(text)">
+            <span class="purchase-date-cell">{{ formatDateTime(text) }}</span>
           </a-tooltip>
           <a-tooltip
-            v-else-if="column.dataIndex === 'title'"
-            :title="summaryTooltipTitle(summaryKey('request', record as DashboardBusinessItemVO), text)"
+            v-else-if="column.dataIndex === 'itemSummary'"
+            :title="
+              summaryTooltipTitle(
+                summaryKey(activeBottomTab, record as DashboardBusinessItemVO),
+                purchaseSummary(record as DashboardBusinessItemVO),
+              )
+            "
           >
             <span
               class="purchase-ellipsis"
-              v-summary-overflow="summaryKey('request', record as DashboardBusinessItemVO)"
+              v-summary-overflow="summaryKey(activeBottomTab, record as DashboardBusinessItemVO)"
             >
-              {{ displayText(text) }}
+              {{ purchaseSummary(record as DashboardBusinessItemVO) }}
             </span>
           </a-tooltip>
           <span v-else-if="column.key === 'urgency'" class="purchase-muted">-</span>
@@ -461,6 +527,39 @@ function pendingInfo(record: DashboardBusinessItemVO) {
 
 .purchase-muted {
   color: #64748b;
+}
+
+.purchase-bottom-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.purchase-bottom-tab {
+  position: relative;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.purchase-bottom-tab.active {
+  color: #1d4ed8;
+}
+
+.purchase-bottom-tab.active::after {
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+  height: 2px;
+  background: #2563eb;
+  content: '';
 }
 
 .purchase-amount,

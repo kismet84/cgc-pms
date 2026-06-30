@@ -133,6 +133,7 @@ export interface PurchaseManagerDashboardVO {
   lowStockItemCount: number
   totalOrderAmount: string
   recentRequests: DashboardBusinessItemVO[]
+  purchaseOrders: DashboardBusinessItemVO[]
   overdueOrders: DashboardBusinessItemVO[]
   pendingReceipts: DashboardBusinessItemVO[]
 }

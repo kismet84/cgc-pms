@@ -21,11 +21,11 @@ function dashboardParams(projectId?: string, month?: string) {
 }
 
 /** Project Manager dashboard view */
-export function getProjectManagerView(projectId?: string) {
+export function getProjectManagerView(projectId?: string, month?: string) {
   return request<ProjectManagerDashboardVO>({
     url: '/dashboard/project-manager',
     method: 'get',
-    params: projectId ? { projectId } : undefined,
+    params: dashboardParams(projectId, month),
   })
 }
 
@@ -48,29 +48,29 @@ export function getCostManagerView(projectId?: string, month?: string) {
 }
 
 /** Purchase Manager dashboard view */
-export function getPurchaseManagerView(projectId?: string) {
+export function getPurchaseManagerView(projectId?: string, month?: string) {
   return request<PurchaseManagerDashboardVO>({
     url: '/dashboard/purchase-manager',
     method: 'get',
-    params: projectId ? { projectId } : undefined,
+    params: dashboardParams(projectId, month),
   })
 }
 
 /** Production Manager dashboard view */
-export function getProductionManagerView(projectId?: string) {
+export function getProductionManagerView(projectId?: string, month?: string) {
   return request<ProductionManagerDashboardVO>({
     url: '/dashboard/production-manager',
     method: 'get',
-    params: projectId ? { projectId } : undefined,
+    params: dashboardParams(projectId, month),
   })
 }
 
 /** Chief Engineer dashboard view */
-export function getChiefEngineerView(projectId?: string) {
+export function getChiefEngineerView(projectId?: string, month?: string) {
   return request<ChiefEngineerDashboardVO>({
     url: '/dashboard/chief-engineer',
     method: 'get',
-    params: projectId ? { projectId } : undefined,
+    params: dashboardParams(projectId, month),
   })
 }
 

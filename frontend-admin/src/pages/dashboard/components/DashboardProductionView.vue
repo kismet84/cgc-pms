@@ -29,7 +29,7 @@ const productionAmountCols = [
   { title: '事项摘要', dataIndex: 'itemSummary', width: 260, ellipsis: true },
   { title: '协作方', dataIndex: 'partnerName', width: 120, ellipsis: true },
   { title: '责任人', dataIndex: 'ownerName', width: 92, ellipsis: true },
-  { title: '金额', dataIndex: 'amount', width: 120, align: 'right' as const },
+  { title: '金额（万元）', dataIndex: 'amount', width: 120, align: 'right' as const },
   { title: '状态', dataIndex: 'status', width: 92 },
   { title: '日期', dataIndex: 'date', width: 112 },
 ]
@@ -54,6 +54,16 @@ const STATUS_LABEL: Record<string, string> = {
 
 function displayText(value?: string | number) {
   return value === undefined || value === null || value === '' ? '-' : String(value)
+}
+
+function amountText(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : fmtWan(text)
+}
+
+function formatDate(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : text.slice(0, 10)
 }
 
 function itemSummary(record: DashboardBusinessItemVO) {
@@ -185,7 +195,7 @@ function pendingText(value?: number) {
                 {{ statusLabel(text) }}
               </span>
               <span v-else-if="column.dataIndex === 'date'" class="production-date">
-                {{ displayText(text) }}
+                {{ formatDate(text) }}
               </span>
               <span v-else-if="column.key === 'pendingDays'" class="production-days">
                 {{ pendingText((record as DashboardBusinessItemVO).pendingDays) }}
@@ -223,7 +233,7 @@ function pendingText(value?: number) {
                 {{ statusLabel(text) }}
               </span>
               <span v-else-if="column.dataIndex === 'date'" class="production-date">
-                {{ displayText(text) }}
+                {{ formatDate(text) }}
               </span>
               <span v-else-if="column.key === 'pendingDays'" class="production-days">
                 {{ pendingText((record as DashboardBusinessItemVO).pendingDays) }}
@@ -261,13 +271,13 @@ function pendingText(value?: number) {
             {{ displayText(text) }}
           </span>
           <span v-else-if="column.dataIndex === 'amount'" class="production-number">
-            {{ displayText(text) }}
+            {{ amountText(text) }}
           </span>
           <span v-else-if="column.dataIndex === 'status'" class="production-status">
             {{ statusLabel(text) }}
           </span>
           <span v-else-if="column.dataIndex === 'date'" class="production-date">
-            {{ displayText(text) }}
+            {{ formatDate(text) }}
           </span>
         </template>
       </a-table>

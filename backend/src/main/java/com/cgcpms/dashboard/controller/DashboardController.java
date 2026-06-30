@@ -23,8 +23,9 @@ public class DashboardController {
     @GetMapping("/project-manager")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:project-manager:view')")
     public ApiResponse<ProjectManagerDashboardVO> getProjectManagerView(
-            @RequestParam(required = false) Long projectId) {
-        return ApiResponse.success(dashboardService.getProjectManagerView(projectId));
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getProjectManagerView(projectId, month));
     }
 
     /**
@@ -55,8 +56,9 @@ public class DashboardController {
     @GetMapping("/purchase-manager")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:purchase-manager:view')")
     public ApiResponse<PurchaseManagerDashboardVO> getPurchaseManagerView(
-            @RequestParam(required = false) Long projectId) {
-        return ApiResponse.success(dashboardService.getPurchaseManagerView(projectId));
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getPurchaseManagerView(projectId, month));
     }
 
     /**
@@ -65,8 +67,9 @@ public class DashboardController {
     @GetMapping("/production-manager")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:production-manager:view')")
     public ApiResponse<ProductionManagerDashboardVO> getProductionManagerView(
-            @RequestParam(required = false) Long projectId) {
-        return ApiResponse.success(dashboardService.getProductionManagerView(projectId));
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getProductionManagerView(projectId, month));
     }
 
     /**
@@ -75,8 +78,9 @@ public class DashboardController {
     @GetMapping("/chief-engineer")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:chief-engineer:view')")
     public ApiResponse<ChiefEngineerDashboardVO> getChiefEngineerView(
-            @RequestParam(required = false) Long projectId) {
-        return ApiResponse.success(dashboardService.getChiefEngineerView(projectId));
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getChiefEngineerView(projectId, month));
     }
 
     /**

@@ -15,6 +15,7 @@ public class PurchaseManagerDashboardVO {
     private Long lowStockItemCount;
     private String totalOrderAmount;
     private List<DashboardBusinessItemVO> recentRequests;
+    private List<DashboardBusinessItemVO> purchaseOrders;
     private List<DashboardBusinessItemVO> overdueOrders;
     private List<DashboardBusinessItemVO> pendingReceipts;
 }

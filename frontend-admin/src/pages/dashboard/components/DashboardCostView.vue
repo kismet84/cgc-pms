@@ -73,6 +73,20 @@ function amountText(value: string | undefined) {
   return displayAmount(toNum(value))
 }
 
+function displayText(value?: string | number) {
+  return value === undefined || value === null || value === '' ? '-' : String(value)
+}
+
+function formatDate(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : text.slice(0, 10)
+}
+
+function formatDateTime(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : text.slice(0, 16).replace('T', ' ')
+}
+
 function percentText(numerator: string | undefined, denominator: string | undefined) {
   const base = toNum(denominator)
   if (!base) return '0.00%'
@@ -190,7 +204,7 @@ const budgetAlertRows = computed(() =>
     labelOf(ALERT_TYPE_LABEL, item.alertType),
     alertDeviationText(item.message),
     labelOf(SEVERITY_LABEL, item.severity),
-    item.triggeredAt || '-',
+    formatDateTime(item.triggeredAt),
     item.message || '-',
   ]),
 )
@@ -202,7 +216,7 @@ const overdueRows = computed(() =>
     item.title || '-',
     String(item.overdueDays ?? 0),
     item.ownerName || '-',
-    item.plannedAt || '-',
+    formatDateTime(item.plannedAt),
   ]),
 )
 
@@ -212,7 +226,7 @@ const pendingPaymentRows = computed(() =>
     item.payRecordId || '-',
     item.partnerName || item.contractName || '-',
     amountText(item.payAmount),
-    item.payDate || '-',
+    formatDate(item.payDate),
     ledgerStatusLabel(item.payStatus),
   ]),
 )
@@ -520,7 +534,7 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
                   :class="{ danger: index === 3 }"
                 >
                   <a-tooltip v-if="index === 3" :title="row[6]">
-                    <span>{{ cell }}</span>
+                    <span class="cost-alert-summary">{{ cell }}</span>
                   </a-tooltip>
                   <template v-else>{{ cell }}</template>
                 </td>
@@ -959,9 +973,6 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
   padding-top: 5px;
   padding-bottom: 5px;
   line-height: 16px;
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
 }
 
 .cost-mini-table th,
@@ -990,6 +1001,13 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
 .cost-mini-table .danger {
   color: #ef4444;
   font-weight: 700;
+}
+
+.cost-alert-summary {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cost-ledger-reference {

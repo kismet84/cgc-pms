@@ -11,7 +11,7 @@ import type {
   DashboardTaskItemVO,
   ProjectManagerDashboardVO,
 } from '@/types/dashboard'
-import { fmtNum } from '../utils/formatUtils'
+import { fmtNum, fmtWan } from '../utils/formatUtils'
 
 const props = defineProps<{
   data: ProjectManagerDashboardVO
@@ -22,7 +22,7 @@ const pmTaskCols = [
   { title: '任务摘要', dataIndex: 'itemSummary', width: 220, ellipsis: true },
   { title: '业务类型', dataIndex: 'businessType', width: 96 },
   { title: '责任人', dataIndex: 'ownerName', width: 92, ellipsis: true },
-  { title: '金额', dataIndex: 'amount', width: 100, align: 'right' as const },
+  { title: '金额（万元）', dataIndex: 'amount', width: 100, align: 'right' as const },
   { title: '待处理', key: 'pendingDays', width: 84 },
   { title: '接收时间', dataIndex: 'receivedAt', width: 136 },
 ]
@@ -36,7 +36,7 @@ const pmProjectCols = [
 const pmContractCols = [
   { title: '合同名称', dataIndex: 'contractName', width: 240, ellipsis: true },
   { title: '到期日', dataIndex: 'endDate', width: 120 },
-  { title: '金额(万元)', dataIndex: 'contractAmount', width: 120, align: 'right' as const },
+  { title: '金额（万元）', dataIndex: 'contractAmount', width: 120, align: 'right' as const },
 ]
 
 const BUSINESS_TYPE_LABEL: Record<string, string> = {
@@ -60,6 +60,21 @@ const PROJECT_STATUS_LABEL: Record<string, string> = {
 
 function displayText(value?: string | number) {
   return value === undefined || value === null || value === '' ? '-' : String(value)
+}
+
+function amountText(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : fmtWan(text)
+}
+
+function formatDate(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : text.slice(0, 10)
+}
+
+function formatDateTime(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : text.slice(0, 16).replace('T', ' ')
 }
 
 function taskSummary(record: DashboardTaskItemVO) {
@@ -193,13 +208,13 @@ function pendingText(value?: number) {
                 {{ displayText(text) }}
               </span>
               <span v-else-if="column.dataIndex === 'amount'" class="pm-number">
-                {{ displayText(text) }}
+                {{ amountText(text) }}
               </span>
               <span v-else-if="column.key === 'pendingDays'" class="pm-number">
                 {{ pendingText((record as DashboardTaskItemVO).pendingDays) }}
               </span>
               <span v-else-if="column.dataIndex === 'receivedAt'" class="pm-date">
-                {{ displayText(text) }}
+                {{ formatDateTime(text) }}
               </span>
             </template>
           </a-table>
@@ -231,13 +246,13 @@ function pendingText(value?: number) {
                 {{ displayText(text) }}
               </span>
               <span v-else-if="column.dataIndex === 'amount'" class="pm-number">
-                {{ displayText(text) }}
+                {{ amountText(text) }}
               </span>
               <span v-else-if="column.key === 'pendingDays'" class="pm-number">
                 {{ pendingText((record as DashboardTaskItemVO).pendingDays) }}
               </span>
               <span v-else-if="column.dataIndex === 'receivedAt'" class="pm-date">
-                {{ displayText(text) }}
+                {{ formatDateTime(text) }}
               </span>
             </template>
           </a-table>
@@ -293,10 +308,10 @@ function pendingText(value?: number) {
               <span class="pm-ellipsis">{{ displayText(text) }}</span>
             </a-tooltip>
             <span v-else-if="column.dataIndex === 'endDate'" class="pm-date">
-              {{ displayText(text) }}
+              {{ formatDate(text) }}
             </span>
             <span v-else-if="column.dataIndex === 'contractAmount'" class="pm-number">
-              {{ displayText(text) }}
+              {{ amountText(text) }}
             </span>
           </template>
         </a-table>

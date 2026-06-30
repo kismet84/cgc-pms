@@ -189,4 +189,98 @@ class DashboardControllerTest {
                         .cookie(adminCookie()))
                 .andExpect(status().is4xxClientError());
     }
+
+    // ========================================================================
+    // Month parameter acceptance tests
+    // ========================================================================
+
+    @Test
+    @DisplayName("GET /api/dashboard/project-manager?month=2026-06 → 200 (month accepted)")
+    void testPMView_WithMonth() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/project-manager")
+                        .cookie(adminCookie())
+                        .param("month", "2026-06"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/project-manager?month=invalid → 200 (safe ignore)")
+    void testPMView_InvalidMonthDoesNot500() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/project-manager")
+                        .cookie(adminCookie())
+                        .param("month", "not-a-month"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/purchase-manager?month=2026-06 → 200 (month accepted)")
+    void testPurchaseView_WithMonth() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/purchase-manager")
+                        .cookie(adminCookie())
+                        .param("month", "2026-06"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/purchase-manager?month=invalid → 200 (safe ignore)")
+    void testPurchaseView_InvalidMonthDoesNot500() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/purchase-manager")
+                        .cookie(adminCookie())
+                        .param("month", "bad"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/production-manager?month=2026-06 → 200 (month accepted)")
+    void testProductionView_WithMonth() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/production-manager")
+                        .cookie(adminCookie())
+                        .param("month", "2026-06"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/production-manager?month=invalid → 200 (safe ignore)")
+    void testProductionView_InvalidMonthDoesNot500() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/production-manager")
+                        .cookie(adminCookie())
+                        .param("month", "xyz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/chief-engineer?month=2026-06 → 200 (month accepted)")
+    void testChiefEngineerView_WithMonth() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/chief-engineer")
+                        .cookie(adminCookie())
+                        .param("month", "2026-06"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/chief-engineer?month=invalid → 200 (safe ignore)")
+    void testChiefEngineerView_InvalidMonthDoesNot500() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/chief-engineer")
+                        .cookie(adminCookie())
+                        .param("month", "not-valid"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("GET /api/dashboard/cost-manager?month=invalid → 200 (safe ignore, no 500)")
+    void testCostView_InvalidMonthDoesNot500() throws Exception {
+        mockMvc.perform(getWithContext("/dashboard/cost-manager")
+                        .cookie(adminCookie())
+                        .param("month", "bad-month-format"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
 }

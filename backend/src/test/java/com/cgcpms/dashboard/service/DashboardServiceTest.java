@@ -765,6 +765,30 @@ class DashboardServiceTest {
     void testPurchaseManagerView_MvpSignals() {
         SeedResult sr = seed("PUR_DASH");
 
+        MatPurchaseOrder newestOrder = new MatPurchaseOrder();
+        newestOrder.setTenantId(TENANT_ID);
+        newestOrder.setProjectId(sr.projectId);
+        newestOrder.setPartnerId(sr.partnerId);
+        newestOrder.setOrderCode("PO-PUR_DASH-NEWEST");
+        newestOrder.setOrderDate(LocalDate.now().minusDays(1));
+        newestOrder.setDeliveryDate(LocalDate.now().plusDays(7));
+        newestOrder.setTotalAmount(new BigDecimal("140000.00"));
+        newestOrder.setApprovalStatus("APPROVED");
+        newestOrder.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(newestOrder);
+
+        MatPurchaseOrderItem newestOrderItem = new MatPurchaseOrderItem();
+        newestOrderItem.setTenantId(TENANT_ID);
+        newestOrderItem.setProjectId(sr.projectId);
+        newestOrderItem.setOrderId(newestOrder.getId());
+        newestOrderItem.setMaterialId(sr.materialId);
+        newestOrderItem.setMaterialName("止水钢板-PUR_DASH");
+        newestOrderItem.setQuantity(new BigDecimal("10.0000"));
+        newestOrderItem.setUnit("吨");
+        newestOrderItem.setUnitPrice(new BigDecimal("14000.0000"));
+        newestOrderItem.setAmount(new BigDecimal("140000.00"));
+        purchaseOrderItemMapper.insert(newestOrderItem);
+
         MatPurchaseOrder olderLowerAmountOrder = new MatPurchaseOrder();
         olderLowerAmountOrder.setTenantId(TENANT_ID);
         olderLowerAmountOrder.setProjectId(sr.projectId);
@@ -838,11 +862,19 @@ class DashboardServiceTest {
         assertNotNull(vo);
         assertEquals(sr.projectId.toString(), vo.getProjectId());
         assertEquals(1L, vo.getPendingRequestCount());
-        assertEquals(3L, vo.getActiveOrderCount());
+        assertEquals(4L, vo.getActiveOrderCount());
         assertEquals(3L, vo.getOverdueDeliveryCount());
         assertEquals(3L, vo.getPendingReceiptCount());
         assertEquals(1L, vo.getLowStockItemCount());
-        assertEquals("360000.00", vo.getTotalOrderAmount());
+        assertEquals("500000.00", vo.getTotalOrderAmount());
+
+        assertNotNull(vo.getPurchaseOrders());
+        assertFalse(vo.getPurchaseOrders().isEmpty());
+        assertEquals("PO-PUR_DASH-NEWEST", vo.getPurchaseOrders().get(0).getCode());
+        assertTrue(vo.getPurchaseOrders().stream()
+                .allMatch(item -> "PURCHASE_ORDER".equals(item.getSourceType())));
+        assertTrue(vo.getPurchaseOrders().stream()
+                .noneMatch(item -> item.getCode() != null && item.getCode().startsWith("RC-")));
 
         DashboardBusinessItemVO request = vo.getRecentRequests().get(0);
         assertEquals("PR-PUR_DASH", request.getCode());
@@ -867,6 +899,98 @@ class DashboardServiceTest {
         assertEquals("供应商-PUR_DASH", pendingReceipt.getPartnerName());
         assertEquals(3L, pendingReceipt.getPendingDays());
         assertEquals("90000.00", pendingReceipt.getAmount());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.2a Default demo project: purchase orders are limited, sorted, and include long summary")
+    void testDefaultDemoProject_PurchaseOrdersOverflowDemoData() {
+        setAdminContext();
+
+        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(10001L);
+        List<DashboardBusinessItemVO> purchaseOrders = vo.getPurchaseOrders();
+        Long candidateCount = purchaseOrderMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrder>()
+                        .eq(MatPurchaseOrder::getTenantId, TENANT_ID)
+                        .eq(MatPurchaseOrder::getProjectId, 10001L)
+                        .eq(MatPurchaseOrder::getDeletedFlag, 0));
+
+        assertEquals(5, purchaseOrders.size());
+        assertTrue(candidateCount > 5L);
+        assertIterableEquals(List.of(
+                "PO-DEMO-PUR-OVERFLOW-001",
+                "PO-DEMO-PUR-OVERFLOW-002",
+                "PO-DEMO-PUR-OVERFLOW-003",
+                "PO-DEMO-PUR-OVERFLOW-004",
+                "PO-DEMO-PUR-OVERFLOW-005"
+        ), purchaseOrders.stream().map(DashboardBusinessItemVO::getCode).toList());
+        assertTrue(purchaseOrders.stream().allMatch(i -> "PURCHASE_ORDER".equals(i.getSourceType())));
+        assertTrue(purchaseOrders.stream().allMatch(i -> i.getCode() != null && i.getCode().startsWith("PO-")));
+        assertTrue(purchaseOrders.stream().noneMatch(i -> i.getCode().startsWith("RC-")));
+        assertTrue(purchaseOrders.stream().anyMatch(i -> i.getItemSummary() != null
+                && i.getItemSummary().contains("超长摘要")
+                && i.getItemSummary().length() > 50));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.2b Default demo project: V105 realistic purchase and production seed is readable")
+    void testDefaultDemoProject_DashboardRealisticDemoDistribution() {
+        setAdminContext();
+
+        PurchaseManagerDashboardVO purchase = dashboardService.getPurchaseManagerView(10001L);
+        ProductionManagerDashboardVO production = dashboardService.getProductionManagerView(10001L);
+
+        assertEquals(5, purchase.getRecentRequests().size());
+        assertEquals(5, purchase.getOverdueOrders().size());
+        assertEquals(5, purchase.getPendingReceipts().size());
+        assertTrue(purchase.getRecentRequests().stream().anyMatch(i -> i.getItemSummary() != null
+                && i.getItemSummary().contains("超长摘要")
+                && i.getItemSummary().length() > 30));
+
+        List<MatPurchaseRequest> requests = purchaseRequestMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseRequest>()
+                        .eq(MatPurchaseRequest::getTenantId, TENANT_ID)
+                        .likeRight(MatPurchaseRequest::getRequestCode, "PR-DEMO-REAL-")
+                        .eq(MatPurchaseRequest::getDeletedFlag, 0));
+        assertEquals(6, requests.size());
+        assertTrue(requests.stream().map(MatPurchaseRequest::getApprovalStatus).distinct().count() >= 3);
+
+        Long overdueOrderCount = purchaseOrderMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrder>()
+                        .eq(MatPurchaseOrder::getTenantId, TENANT_ID)
+                        .likeRight(MatPurchaseOrder::getOrderCode, "PO-DEMO-REAL-OVD-")
+                        .eq(MatPurchaseOrder::getDeletedFlag, 0));
+        Long receiptCount = receiptMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatReceipt>()
+                        .eq(MatReceipt::getTenantId, TENANT_ID)
+                        .likeRight(MatReceipt::getReceiptCode, "RC-DEMO-REAL-")
+                        .eq(MatReceipt::getDeletedFlag, 0));
+        assertEquals(5L, overdueOrderCount);
+        assertEquals(6L, receiptCount);
+
+        assertEquals(5, production.getRecentReceipts().size());
+        assertEquals(5, production.getRecentRequisitions().size());
+        assertEquals(5, production.getRecentSubMeasures().size());
+        assertTrue(production.getLowStockItemCount() >= 5L);
+        assertTrue(production.getRecentReceipts().stream().anyMatch(i -> i.getItemSummary() != null
+                && i.getItemSummary().contains("施工部位")
+                && i.getItemSummary().length() > 30));
+
+        List<MatRequisition> requisitions = requisitionMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatRequisition>()
+                        .eq(MatRequisition::getTenantId, TENANT_ID)
+                        .likeRight(MatRequisition::getRequisitionCode, "REQ-DEMO-REAL-")
+                        .eq(MatRequisition::getDeletedFlag, 0));
+        List<SubMeasure> measures = subMeasureMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SubMeasure>()
+                        .eq(SubMeasure::getTenantId, TENANT_ID)
+                        .likeRight(SubMeasure::getMeasureCode, "SM-DEMO-REAL-")
+                        .eq(SubMeasure::getDeletedFlag, 0));
+        assertEquals(5, requisitions.size());
+        assertEquals(5, measures.size());
+        assertTrue(requisitions.stream().map(MatRequisition::getApprovalStatus).distinct().count() >= 3);
+        assertTrue(measures.stream().map(SubMeasure::getStatus).distinct().count() >= 3);
     }
 
     @Test
@@ -1068,6 +1192,11 @@ class DashboardServiceTest {
         assertTrue(purchase.getPendingRequestCount() > 0L);
         assertTrue(purchase.getActiveOrderCount() > 0L);
         assertFalse(purchase.getRecentRequests().isEmpty());
+        assertFalse(purchase.getPurchaseOrders().isEmpty());
+        assertTrue(purchase.getPurchaseOrders().stream()
+                .allMatch(item -> "PURCHASE_ORDER".equals(item.getSourceType())));
+        assertTrue(purchase.getPurchaseOrders().stream()
+                .noneMatch(item -> item.getCode() != null && item.getCode().startsWith("RC-")));
         assertFalse(purchase.getOverdueOrders().isEmpty());
         assertFalse(purchase.getPendingReceipts().isEmpty());
 
@@ -1114,6 +1243,48 @@ class DashboardServiceTest {
         assertTrue(vo.getPendingTasks().stream().noneMatch(i -> "PAY_APPLICATION".equals(i.getBusinessType())));
         assertTrue(vo.getPendingApprovals().stream().noneMatch(i -> WorkflowBusinessTypes.PAY_REQUEST.equals(i.getBusinessType())));
         assertTrue(vo.getPendingApprovals().stream().noneMatch(i -> "PAY_APPLICATION".equals(i.getBusinessType())));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.6 Default demo project: chief engineer dashboard has a today-due item")
+    void testDefaultDemoProject_ChiefEngineerDashboardHasTodayDueItem() {
+        setAdminContext();
+
+        PmProject defaultProject = projectMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PmProject>()
+                                .eq(PmProject::getTenantId, TENANT_ID)
+                                .eq(PmProject::getDeletedFlag, 0)
+                                .in(PmProject::getId, java.util.List.of(2071032241708793858L, 10001L)))
+                .stream()
+                .sorted(java.util.Comparator
+                        .comparing((PmProject p) -> p.getId().equals(2071032241708793858L) ? 0 : 1)
+                        .thenComparing(PmProject::getId))
+                .findFirst()
+                .orElseGet(() -> projectMapper.selectList(
+                                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PmProject>()
+                                        .eq(PmProject::getTenantId, TENANT_ID)
+                                        .eq(PmProject::getStatus, "ACTIVE")
+                                        .eq(PmProject::getDeletedFlag, 0)
+                                        .orderByAsc(PmProject::getId))
+                        .stream()
+                        .findFirst()
+                        .orElseThrow());
+
+        ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(defaultProject.getId());
+
+        DashboardBusinessItemVO todayDueItem = vo.getOpenIssues().stream()
+                .filter(i -> "TECH-DEMO-105".equals(i.getCode()))
+                .findFirst()
+                .orElseThrow();
+
+        assertNotNull(vo);
+        assertEquals(defaultProject.getId().toString(), vo.getProjectId());
+        assertTrue(vo.getOpenIssueCount() > 0L);
+        assertEquals("TECH-DEMO-105", todayDueItem.getCode());
+        assertTrue(todayDueItem.getDate().startsWith(LocalDate.now().toString()));
+        assertNull(todayDueItem.getOverdueDays());
+        assertTrue(vo.getOverdueItems().stream().noneMatch(i -> "TECH-DEMO-105".equals(i.getCode())));
     }
 
     @Test
@@ -1343,5 +1514,197 @@ class DashboardServiceTest {
         boolean found = vo.getLaggingProjects().stream()
                 .anyMatch(p -> sr.projectId.toString().equals(p.getProjectId()));
         assertTrue(found, "Seeded project should appear in lagging list");
+    }
+
+    // ========================================================================
+    // 8. Month parameter tests
+    // ========================================================================
+
+    @Test
+    @Transactional
+    @DisplayName("8.1 PM view: accepts month parameter and filters by WfTask.receivedAt / CtContract.endDate")
+    void testPMView_WithMonthParameter() {
+        SeedResult sr = seed("PM_MONTH");
+        String currentMonth = LocalDate.now().toString().substring(0, 7); // yyyy-MM
+
+        ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(sr.projectId, currentMonth);
+
+        assertNotNull(vo);
+        assertTrue(vo.getPendingTaskCount() >= 1, "Should have tasks in current month");
+        assertTrue(vo.getLaggingProjectCount() >= 1, "Lagging projects should NOT be filtered by month");
+
+        // Test with month in the future — should filter out all date-scoped items
+        String futureMonth = LocalDate.now().plusMonths(12).toString().substring(0, 7);
+        ProjectManagerDashboardVO futureVo = dashboardService.getProjectManagerView(sr.projectId, futureMonth);
+        assertEquals(0L, futureVo.getPendingTaskCount(), "Future month should have 0 pending tasks");
+        assertEquals(0L, futureVo.getExpiringContractCount(), "Future month should have 0 expiring contracts");
+        // Lagging projects are NOT month-filtered
+        assertTrue(futureVo.getLaggingProjectCount() >= 1, "Lagging projects still visible even with month filter");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.1a PM view: invalid month returns data without 500")
+    void testPMView_InvalidMonthDoesNotThrow() {
+        SeedResult sr = seed("PM_BAD_MONTH");
+        ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(sr.projectId, "not-a-month");
+        assertNotNull(vo);
+        assertTrue(vo.getPendingTaskCount() >= 1, "Invalid month should be ignored, return full data");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.2 Purchase view: accepts month parameter and filters requests/orders/receipts")
+    void testPurchaseView_WithMonthParameter() {
+        SeedResult sr = seed("PUR_MONTH");
+        String currentMonth = LocalDate.now().toString().substring(0, 7);
+
+        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(sr.projectId, currentMonth);
+
+        assertNotNull(vo);
+        assertTrue(vo.getPendingRequestCount() >= 1, "Should have requests in current month");
+
+        // Test future month filters all
+        String futureMonth = LocalDate.now().plusMonths(12).toString().substring(0, 7);
+        PurchaseManagerDashboardVO futureVo = dashboardService.getPurchaseManagerView(sr.projectId, futureMonth);
+        assertEquals(0L, futureVo.getPendingRequestCount(), "Future month should have 0 purchase requests");
+        assertEquals(0L, futureVo.getActiveOrderCount(), "Future month should have 0 active orders");
+        assertEquals("0", futureVo.getTotalOrderAmount(), "Future month should have 0 order amount");
+        // lowStock is NOT month-filtered (current inventory state)
+        assertEquals(vo.getLowStockItemCount(), futureVo.getLowStockItemCount(), "LowStock should not be month-filtered");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.2a Purchase view: invalid month returns data without 500")
+    void testPurchaseView_InvalidMonthDoesNotThrow() {
+        SeedResult sr = seed("PUR_BAD_MONTH");
+        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(sr.projectId, "garbage");
+        assertNotNull(vo);
+        assertTrue(vo.getActiveOrderCount() >= 1, "Invalid month should be ignored");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.2b Purchase view: overdueOrders uses deliveryDate scope NOT orderDate pre-filter")
+    void testPurchaseView_OverdueUsesDeliveryDateScope() {
+        SeedResult sr = seed("PUR_OVERDUE_DLV");
+        String currentMonth = LocalDate.now().toString().substring(0, 7);
+        String lastMonth = LocalDate.now().minusMonths(1).toString().substring(0, 7);
+
+        // Order with orderDate=lastMonth, deliveryDate=currentMonth (overdue)
+        MatPurchaseOrder crossOrder = new MatPurchaseOrder();
+        crossOrder.setTenantId(TENANT_ID);
+        crossOrder.setProjectId(sr.projectId);
+        crossOrder.setPartnerId(sr.partnerId);
+        crossOrder.setOrderCode("PO-CROSS-DLV");
+        crossOrder.setOrderDate(LocalDate.now().minusMonths(1));         // last month
+        crossOrder.setDeliveryDate(LocalDate.now().minusDays(1));        // current month, overdue
+        crossOrder.setTotalAmount(new BigDecimal("50000.00"));
+        crossOrder.setApprovalStatus("APPROVED");
+        crossOrder.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(crossOrder);
+
+        MatPurchaseOrderItem crossOrderItem = new MatPurchaseOrderItem();
+        crossOrderItem.setTenantId(TENANT_ID);
+        crossOrderItem.setProjectId(sr.projectId);
+        crossOrderItem.setOrderId(crossOrder.getId());
+        crossOrderItem.setMaterialId(sr.materialId);
+        crossOrderItem.setMaterialName("钢筋-CROSS-DLV");
+        crossOrderItem.setQuantity(new BigDecimal("5.0000"));
+        crossOrderItem.setUnit("吨");
+        crossOrderItem.setUnitPrice(new BigDecimal("10000.0000"));
+        crossOrderItem.setAmount(new BigDecimal("50000.00"));
+        purchaseOrderItemMapper.insert(crossOrderItem);
+
+        // Query by lastMonth: only cross-order matches by orderDate
+        PurchaseManagerDashboardVO lastMonthVo = dashboardService.getPurchaseManagerView(sr.projectId, lastMonth);
+        assertTrue(lastMonthVo.getActiveOrderCount() >= 1, "Last month should include cross order by orderDate");
+        assertTrue(lastMonthVo.getPurchaseOrders().stream()
+                .anyMatch(o -> "PO-CROSS-DLV".equals(o.getCode())),
+                "Cross order should appear in purchaseOrders when filtered by lastMonth");
+
+        // Query by currentMonth: orderDate does NOT match → NOT in purchaseOrders
+        PurchaseManagerDashboardVO currentMonthVo = dashboardService.getPurchaseManagerView(sr.projectId, currentMonth);
+        assertTrue(currentMonthVo.getPurchaseOrders().stream()
+                .noneMatch(o -> "PO-CROSS-DLV".equals(o.getCode())),
+                "Cross order should NOT appear in purchaseOrders (orderDate not in current month)");
+
+        // CRITICAL: deliveryDate IS in current month → MUST appear in overdueOrders
+        assertTrue(currentMonthVo.getOverdueOrders().stream()
+                .anyMatch(o -> "PO-CROSS-DLV".equals(o.getCode())),
+                "Cross order MUST appear in overdueOrders because deliveryDate is in current month");
+        assertTrue(currentMonthVo.getOverdueDeliveryCount() >= 1,
+                "overdueDeliveryCount should count orders with deliveryDate in selected month");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.3 Production view: accepts month parameter and filters receipts/requisitions/measures")
+    void testProductionView_WithMonthParameter() {
+        SeedResult sr = seed("PROD_MONTH");
+        String currentMonth = LocalDate.now().toString().substring(0, 7);
+
+        ProductionManagerDashboardVO vo = dashboardService.getProductionManagerView(sr.projectId, currentMonth);
+
+        assertNotNull(vo);
+        assertTrue(vo.getReceiptCount() >= 1, "Should have receipts in current month");
+
+        String futureMonth = LocalDate.now().plusMonths(12).toString().substring(0, 7);
+        ProductionManagerDashboardVO futureVo = dashboardService.getProductionManagerView(sr.projectId, futureMonth);
+        assertEquals(0L, futureVo.getReceiptCount(), "Future month should have 0 receipts");
+        assertEquals(0L, futureVo.getRequisitionCount(), "Future month should have 0 requisitions");
+        assertEquals(0L, futureVo.getSubMeasureCount(), "Future month should have 0 measures");
+        assertEquals("0", futureVo.getConfirmedMeasureAmount(), "Future month should have 0 confirmed amount");
+        // lowStock is NOT month-filtered
+        assertEquals(vo.getLowStockItemCount(), futureVo.getLowStockItemCount(), "LowStock should not be month-filtered");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.3a Production view: invalid month returns data without 500")
+    void testProductionView_InvalidMonthDoesNotThrow() {
+        SeedResult sr = seed("PROD_BAD_MONTH");
+        ProductionManagerDashboardVO vo = dashboardService.getProductionManagerView(sr.projectId, "invalid-month");
+        assertNotNull(vo);
+        assertTrue(vo.getReceiptCount() >= 1, "Invalid month should be ignored");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.4 Chief engineer view: accepts month parameter and filters by dueDate/discoveredAt")
+    void testChiefEngineerView_WithMonthParameter() {
+        SeedResult sr = seed("CHIEF_MONTH");
+        String currentMonth = LocalDate.now().toString().substring(0, 7);
+
+        ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(sr.projectId, currentMonth);
+
+        assertNotNull(vo);
+
+        String futureMonth = LocalDate.now().plusMonths(12).toString().substring(0, 7);
+        ChiefEngineerDashboardVO futureVo = dashboardService.getChiefEngineerView(sr.projectId, futureMonth);
+        // Future month should have 0 items (no tech items seeded with future dates)
+        assertEquals(0L, futureVo.getOpenIssueCount(), "Future month should have 0 tech items");
+        assertEquals(0L, futureVo.getPendingReviewCount(), "Future month should have 0 reviews");
+        assertEquals(0L, futureVo.getOverdueCount(), "Future month should have 0 overdue items");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.4a Chief engineer view: invalid month returns data without 500")
+    void testChiefEngineerView_InvalidMonthDoesNotThrow() {
+        SeedResult sr = seed("CHIEF_BAD_MONTH");
+        ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(sr.projectId, "not-valid");
+        assertNotNull(vo);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.5 Cost view: invalid month returns data without 500")
+    void testCostView_InvalidMonthDoesNotThrow() {
+        SeedResult sr = seed("COST_BAD_MONTH");
+        CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId, "bad-month");
+        assertNotNull(vo);
+        assertEquals(sr.projectId.toString(), vo.getProjectId());
     }
 }

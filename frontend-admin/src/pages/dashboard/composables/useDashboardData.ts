@@ -118,7 +118,7 @@ export function useDashboardData() {
     try {
       switch (activeRole.value) {
         case 'pm':
-          pmData.value = await getProjectManagerView(pid)
+          pmData.value = await getProjectManagerView(pid, month)
           break
         case 'bm':
           bmData.value = await getBusinessManagerView(pid)
@@ -132,13 +132,13 @@ export function useDashboardData() {
           }
           break
         case 'purchase':
-          purchaseData.value = await getPurchaseManagerView(pid)
+          purchaseData.value = await getPurchaseManagerView(pid, month)
           break
         case 'production':
-          productionData.value = await getProductionManagerView(pid)
+          productionData.value = await getProductionManagerView(pid, month)
           break
         case 'chiefEngineer':
-          chiefEngineerData.value = await getChiefEngineerView(pid)
+          chiefEngineerData.value = await getChiefEngineerView(pid, month)
           break
         case 'finance':
           financeData.value = await getFinanceView(pid)
@@ -210,6 +210,7 @@ export function useDashboardData() {
     drillVisible,
     drillChildren,
     fetchProjects,
+    fetchViewData,
     needsProject,
     handleBarClick,
     closeDrill,

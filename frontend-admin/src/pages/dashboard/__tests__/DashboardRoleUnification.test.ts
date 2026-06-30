@@ -69,6 +69,9 @@ describe('Dashboard role UI unification', () => {
     expect(pmViewSource).toContain('pm-reference-table')
     expect(purchaseViewSource).toContain("APPROVED: '已审批'")
     expect(purchaseViewSource).toContain("APPROVING: '审批中'")
+    expect(purchaseViewSource).toContain("IN_TRANSIT: '运输中'")
+    expect(purchaseViewSource).toContain('STATUS_LABEL[status] ?? \'-\'')
+    expect(purchaseViewSource).not.toContain('STATUS_LABEL[status] ?? status')
     expect(purchaseViewSource).toContain('purchase-status')
     expect(purchaseViewSource).toContain('purchase-code')
     expect(purchaseViewSource).toContain('overdueOrderCols')
@@ -152,6 +155,19 @@ describe('Dashboard role UI unification', () => {
   it('removes purchase manager table title helper copy', () => {
     expect(purchaseViewSource).not.toContain('订单、交货、入库与库存关注')
     expect(purchaseViewSource).not.toContain('只展示后端采购经理接口返回事项')
+    expect(purchaseViewSource).not.toContain('近期采购申请')
+  })
+
+  it('keeps purchase manager bottom tables as simple tabs with shared columns', () => {
+    expect(purchaseViewSource).toContain("label: '采购申请'")
+    expect(purchaseViewSource).toContain("label: '采购订单'")
+    expect(purchaseViewSource).toContain('activeBottomTab')
+    expect(purchaseViewSource).toContain('purchaseBottomRows')
+    expect(purchaseViewSource).toContain(':columns="purchaseRequestCols"')
+    expect(purchaseViewSource).toContain('const purchaseOrders = computed(() => props.data.purchaseOrders ?? [])')
+    expect(purchaseViewSource).not.toContain('const purchaseOrders = computed(() => overdueOrders.value)')
+    expect(purchaseViewSource).not.toContain('...pendingReceipts.value')
+    expect(purchaseViewSource).not.toContain('uniqueBusinessRows')
   })
 
   it('uses truncation-driven tooltips for purchase manager summary cells', () => {
@@ -164,6 +180,66 @@ describe('Dashboard role UI unification', () => {
     expect(purchaseViewSource).not.toContain('el.title =')
     expect(purchaseViewSource).not.toContain(':ellipsis="{ tooltip: displayText(text) }"')
     expect(purchaseViewSource).not.toContain('<a-tooltip v-else-if="column.dataIndex === \'title\'"')
+  })
+
+  it('keeps dashboard summary columns aligned with the local summary rules', () => {
+    expect(costViewSource).toContain('cost-alert-summary')
+    expect(costViewSource).not.toContain('overflow: visible;\n  text-overflow: clip;\n  white-space: normal;')
+
+    expect(purchaseViewSource).toContain("dataIndex: 'itemSummary'")
+    expect(purchaseViewSource).toContain('function purchaseSummary')
+    expect(purchaseViewSource).toContain('isInvalidSummary')
+    expect(purchaseViewSource).not.toContain("dataIndex: 'title'")
+
+    expect(chiefViewSource).toContain("title: '时效'")
+    expect(chiefViewSource).toContain('function timelinessText')
+    expect(chiefViewSource).toContain('return `剩余${days}天`')
+    expect(chiefViewSource).toContain("return '今日到期'")
+    expect(chiefViewSource).not.toContain("title: '逾期'")
+  })
+
+  it('keeps dashboard date and date-time display rules aligned with product policy', () => {
+    expect(costViewSource).toContain('function formatDateTime')
+    expect(costViewSource).toContain('formatDateTime(item.triggeredAt)')
+    expect(costViewSource).toContain('formatDateTime(item.plannedAt)')
+    expect(costViewSource).toContain('formatDate(item.payDate)')
+
+    expect(pmViewSource).toContain('function formatDateTime')
+    expect(pmViewSource).toContain('formatDateTime(text)')
+    expect(pmViewSource).toContain('formatDate(text)')
+
+    expect(purchaseViewSource).toContain('function formatDateTime')
+    expect(purchaseViewSource).toContain('formatDateTime(text)')
+    expect(purchaseViewSource).toContain('formatDate(text)')
+
+    expect(productionViewSource).toContain('function formatDate')
+    expect(productionViewSource).toContain('formatDate(text)')
+
+    expect(chiefViewSource).toContain('function formatDate')
+    expect(chiefViewSource).toContain('formatDate(text)')
+    expect(chiefViewSource).toContain("return '今日到期'")
+  })
+
+  it('formats first-screen dashboard amount columns as ten-thousand yuan text', () => {
+    expect(pmViewSource).toContain("{ title: '金额（万元）', dataIndex: 'amount'")
+    expect(pmViewSource).toContain("{ title: '金额（万元）', dataIndex: 'contractAmount'")
+    expect(pmViewSource).toContain('function amountText')
+    expect(pmViewSource).toContain('amountText(text)')
+    expect(pmViewSource).not.toContain("column.dataIndex === 'amount'\" class=\"pm-number\">\n                {{ displayText(text) }}")
+    expect(pmViewSource).not.toContain("column.dataIndex === 'contractAmount'\" class=\"pm-number\">\n              {{ displayText(text) }}")
+
+    expect(purchaseViewSource).toContain("{ title: '金额（万元）', dataIndex: 'amount'")
+    expect(purchaseViewSource).toContain('function amountText')
+    expect(purchaseViewSource).toContain('amountText(text)')
+    expect(purchaseViewSource).not.toContain("column.dataIndex === 'amount'\" class=\"purchase-amount\">\n            {{ displayText(text) }}")
+
+    expect(productionViewSource).toContain("{ title: '金额（万元）', dataIndex: 'amount'")
+    expect(productionViewSource).toContain('function amountText')
+    expect(productionViewSource).toContain('amountText(text)')
+    expect(productionViewSource).not.toContain("column.dataIndex === 'amount'\" class=\"production-number\">\n            {{ displayText(text) }}")
+
+    expect(costViewSource).toContain('amountText(item.payAmount)')
+    expect(chiefViewSource).not.toContain('fmtWan')
   })
 
   it('localizes visible dashboard type and status values without leaking unknown English codes', () => {

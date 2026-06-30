@@ -1,15 +1,39 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+const { mockRequest } = vi.hoisted(() => ({
+  mockRequest: vi.fn(() => Promise.resolve({})),
+}))
+
+vi.mock('@/api/request', () => ({
+  request: mockRequest,
+}))
+
+import {
+  getChiefEngineerView,
+  getCostManagerView,
+  getProductionManagerView,
+  getProjectManagerView,
+  getPurchaseManagerView,
+} from '@/api/modules/dashboard'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const composableSource = readFileSync(
   resolve(currentDir, '../composables/useDashboardData.ts'),
   'utf-8',
 )
+const dashboardApiSource = readFileSync(
+  resolve(currentDir, '../../../api/modules/dashboard.ts'),
+  'utf-8',
+)
 
 describe('Dashboard data loading behavior', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   // ── fetchViewData: dispatch by activeRole ──
   it('calls getProjectManagerView for pm role', () => {
     // The switch-case dispatch lives in useDashboardData.ts
@@ -45,16 +69,15 @@ describe('Dashboard data loading behavior', () => {
   })
 
   // ── fetchViewData: passes projectId ──
-  it('passes selectedProjectId to getProjectManagerView (none or value)', () => {
-    // fetchViewData passes `pid` which is selectedProjectId or undefined
-    expect(composableSource).toMatch(/getProjectManagerView\(pid\)/)
+  it('passes selectedProjectId and selectedMonth to getProjectManagerView', () => {
+    expect(composableSource).toMatch(/getProjectManagerView\(pid,\s*month\)/)
   })
 
   it('passes selectedProjectId to getBusinessManagerView', () => {
     expect(composableSource).toMatch(/getBusinessManagerView\(pid\)/)
   })
 
-  it('passes selectedProjectId to getCostManagerView', () => {
+  it('passes selectedProjectId and selectedMonth to getCostManagerView', () => {
     expect(composableSource).toMatch(/getCostManagerView\(pid,\s*month\)/)
   })
 
@@ -62,13 +85,10 @@ describe('Dashboard data loading behavior', () => {
     expect(composableSource).toMatch(/getFinanceView\(pid\)/)
   })
 
-  it('passes selectedProjectId to phase-two manager views', () => {
-    expect(composableSource).toMatch(/getPurchaseManagerView\(pid\)/)
-    expect(composableSource).toMatch(/getProductionManagerView\(pid\)/)
-  })
-
-  it('passes selectedProjectId to getChiefEngineerView', () => {
-    expect(composableSource).toMatch(/getChiefEngineerView\(pid\)/)
+  it('passes selectedProjectId and selectedMonth to purchase/production/chiefEngineer views', () => {
+    expect(composableSource).toMatch(/getPurchaseManagerView\(pid,\s*month\)/)
+    expect(composableSource).toMatch(/getProductionManagerView\(pid,\s*month\)/)
+    expect(composableSource).toMatch(/getChiefEngineerView\(pid,\s*month\)/)
   })
 
   it('calls getManagementView without pid (tenant-wide)', () => {
@@ -134,5 +154,65 @@ describe('Dashboard data loading behavior', () => {
     const indexSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
     expect(indexSource).toContain('empty-page')
     expect(indexSource).toContain('暂无项目数据')
+  })
+
+  // ── API module: month param contract for the five visible tabs ──
+  it('dashboard API functions for cost/pm/purchase/production/chiefEngineer accept month via dashboardParams', () => {
+    const funcs = [
+      'getProjectManagerView',
+      'getCostManagerView',
+      'getPurchaseManagerView',
+      'getProductionManagerView',
+      'getChiefEngineerView',
+    ]
+    for (const name of funcs) {
+      // Each function declares optional month param
+      expect(dashboardApiSource).toMatch(
+        new RegExp(
+          `export function ${name}\\(projectId\\?: string,\\s*month\\?: string\\)`,
+        ),
+      )
+      // Each function body delegates to dashboardParams(projectId, month)
+      expect(dashboardApiSource).toMatch(
+        new RegExp(`${name}[\\s\\S]*?dashboardParams\\(projectId,\\s*month\\)`),
+      )
+    }
+  })
+
+  it('builds real request params with month for the five visible dashboard tabs', () => {
+    const projectId = 'project-001'
+    const month = '2026-05'
+
+    getCostManagerView(projectId, month)
+    getProjectManagerView(projectId, month)
+    getPurchaseManagerView(projectId, month)
+    getProductionManagerView(projectId, month)
+    getChiefEngineerView(projectId, month)
+
+    expect(mockRequest).toHaveBeenNthCalledWith(1, {
+      url: '/dashboard/cost-manager',
+      method: 'get',
+      params: { projectId, month },
+    })
+    expect(mockRequest).toHaveBeenNthCalledWith(2, {
+      url: '/dashboard/project-manager',
+      method: 'get',
+      params: { projectId, month },
+    })
+    expect(mockRequest).toHaveBeenNthCalledWith(3, {
+      url: '/dashboard/purchase-manager',
+      method: 'get',
+      params: { projectId, month },
+    })
+    expect(mockRequest).toHaveBeenNthCalledWith(4, {
+      url: '/dashboard/production-manager',
+      method: 'get',
+      params: { projectId, month },
+    })
+    expect(mockRequest).toHaveBeenNthCalledWith(5, {
+      url: '/dashboard/chief-engineer',
+      method: 'get',
+      params: { projectId, month },
+    })
   })
 })

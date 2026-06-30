@@ -77,6 +77,7 @@ import java.time.temporal.ChronoUnit;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -114,10 +115,15 @@ public class DashboardService {
     // 1. Project Manager Dashboard
     // ========================================================================
     public ProjectManagerDashboardVO getProjectManagerView(Long projectId) {
+        return getProjectManagerView(projectId, (String) null);
+    }
+
+    public ProjectManagerDashboardVO getProjectManagerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
+        YearMonth selectedMonth = parseDashboardMonth(month);
 
         if (projectId == null) {
-            return getProjectManagerViewAllProjects(tenantId);
+            return getProjectManagerViewAllProjects(tenantId, selectedMonth);
         }
 
         PmProject project = requireProject(tenantId, projectId);
@@ -134,6 +140,13 @@ public class DashboardService {
                         .eq(WfTask::getApproverId, currentUserId)
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
                         .orderByDesc(WfTask::getReceivedAt));
+        if (selectedMonth != null) {
+            pendingTasks = pendingTasks.stream()
+                    .filter(t -> t.getReceivedAt() != null
+                            && !t.getReceivedAt().toLocalDate().isBefore(selectedMonth.atDay(1))
+                            && !t.getReceivedAt().toLocalDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
 
         // Enrich with instance info (batch to avoid N+1)
         Map<Long, WfInstance> instanceMap = batchLoadInstances(pendingTasks);
@@ -148,6 +161,7 @@ public class DashboardService {
         vo.setPendingTaskCount((long) taskItems.size());
 
         // Lagging projects: planned end date in the past, not completed
+        // NOT filtered by month — current-state indicator
         List<PmProject> tenantProjects = projectMapper.selectList(
                 new LambdaQueryWrapper<PmProject>()
                         .eq(PmProject::getTenantId, tenantId)
@@ -175,6 +189,13 @@ public class DashboardService {
                             .in(WfTask::getInstanceId, instanceIds)
                             .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
                             .orderByDesc(WfTask::getReceivedAt));
+            if (selectedMonth != null) {
+                projectPendingTasks = projectPendingTasks.stream()
+                        .filter(t -> t.getReceivedAt() != null
+                                && !t.getReceivedAt().toLocalDate().isBefore(selectedMonth.atDay(1))
+                                && !t.getReceivedAt().toLocalDate().isAfter(selectedMonth.atEndOfMonth()))
+                        .collect(Collectors.toList());
+            }
             Map<Long, WfInstance> approvalInstanceMap = batchLoadInstances(projectPendingTasks);
             List<WfTask> projectManagerPendingTasks = projectPendingTasks.stream()
                     .filter(t -> isProjectManagerWorkflowTask(t, approvalInstanceMap.get(t.getInstanceId())))
@@ -197,6 +218,13 @@ public class DashboardService {
                         .le(CtContract::getEndDate, cutoff)
                         .ge(CtContract::getEndDate, LocalDate.now())
                         .eq(CtContract::getContractStatus, "PERFORMING"));
+        if (selectedMonth != null) {
+            expiringContracts = expiringContracts.stream()
+                    .filter(c -> c.getEndDate() != null
+                            && !c.getEndDate().isBefore(selectedMonth.atDay(1))
+                            && !c.getEndDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
         vo.setExpiringContracts(expiringContracts.stream().map(this::toContractItem).collect(Collectors.toList()));
         vo.setExpiringContractCount((long) expiringContracts.size());
 
@@ -346,7 +374,12 @@ public class DashboardService {
     // 4. Purchase Manager Dashboard
     // ========================================================================
     public PurchaseManagerDashboardVO getPurchaseManagerView(Long projectId) {
+        return getPurchaseManagerView(projectId, (String) null);
+    }
+
+    public PurchaseManagerDashboardVO getPurchaseManagerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
+        YearMonth selectedMonth = parseDashboardMonth(month);
         List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
         List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
         Map<Long, String> projectNameMap = projectNameMap(projects);
@@ -363,25 +396,67 @@ public class DashboardService {
                 .eq(MatPurchaseRequest::getTenantId, tenantId)
                 .in(MatPurchaseRequest::getProjectId, projectIds)
                 .orderByDesc(MatPurchaseRequest::getCreatedTime));
-        List<MatPurchaseOrder> orders = purchaseOrderMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrder>()
+        if (selectedMonth != null) {
+            requests = requests.stream()
+                    .filter(r -> r.getCreatedTime() != null
+                            && !r.getCreatedTime().toLocalDate().isBefore(selectedMonth.atDay(1))
+                            && !r.getCreatedTime().toLocalDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
+
+        // Load all orders; split into orderDate-scoped (purchase tabs/amount)
+        // and deliveryDate-scoped (overdue delivery) when month is selected.
+        List<MatPurchaseOrder> allOrders = purchaseOrderMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrder>()
                 .eq(MatPurchaseOrder::getTenantId, tenantId)
                 .in(MatPurchaseOrder::getProjectId, projectIds));
+
+        List<MatPurchaseOrder> orders;
+        List<MatPurchaseOrder> overdueOrders;
+        if (selectedMonth != null) {
+            orders = allOrders.stream()
+                    .filter(o -> o.getOrderDate() != null
+                            && !o.getOrderDate().isBefore(selectedMonth.atDay(1))
+                            && !o.getOrderDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+            overdueOrders = allOrders.stream()
+                    .filter(o -> o.getDeliveryDate() != null
+                            && !o.getDeliveryDate().isBefore(selectedMonth.atDay(1))
+                            && !o.getDeliveryDate().isAfter(selectedMonth.atEndOfMonth())
+                            && o.getDeliveryDate().isBefore(LocalDate.now()))
+                    .filter(o -> !"COMPLETED".equals(o.getOrderStatus()) && !"CANCELLED".equals(o.getOrderStatus()))
+                    .collect(Collectors.toList());
+        } else {
+            orders = allOrders;
+            overdueOrders = allOrders.stream()
+                    .filter(o -> o.getDeliveryDate() != null && o.getDeliveryDate().isBefore(LocalDate.now()))
+                    .filter(o -> !"COMPLETED".equals(o.getOrderStatus()) && !"CANCELLED".equals(o.getOrderStatus()))
+                    .collect(Collectors.toList());
+        }
+
         List<MatReceipt> receipts = receiptMapper.selectList(new LambdaQueryWrapper<MatReceipt>()
                 .eq(MatReceipt::getTenantId, tenantId)
                 .in(MatReceipt::getProjectId, projectIds)
                 .orderByDesc(MatReceipt::getReceiptDate));
+        if (selectedMonth != null) {
+            receipts = receipts.stream()
+                    .filter(r -> r.getReceiptDate() != null
+                            && !r.getReceiptDate().isBefore(selectedMonth.atDay(1))
+                            && !r.getReceiptDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
 
-        List<MatPurchaseOrder> overdueOrders = orders.stream()
-                .filter(o -> o.getDeliveryDate() != null && o.getDeliveryDate().isBefore(LocalDate.now()))
-                .filter(o -> !"COMPLETED".equals(o.getOrderStatus()) && !"CANCELLED".equals(o.getOrderStatus()))
-                .collect(Collectors.toList());
         List<MatReceipt> pendingReceipts = receipts.stream()
                 .filter(r -> !"APPROVED".equals(r.getApprovalStatus()))
                 .collect(Collectors.toList());
-        Map<Long, String> partnerNameMap = partnerNameMap(tenantId, orders, receipts);
+
+        // Merge order scopes so partner/order summary maps cover both purchaseOrders and overdueOrders
+        List<MatPurchaseOrder> mapOrders = selectedMonth != null
+                ? Stream.concat(orders.stream(), overdueOrders.stream()).distinct().collect(Collectors.toList())
+                : orders;
+        Map<Long, String> partnerNameMap = partnerNameMap(tenantId, mapOrders, receipts);
         Map<Long, String> ownerNameMap = ownerNameMap(tenantId, requests);
         Map<Long, String> requestSummaryMap = requestSummaryMap(tenantId, requests);
-        Map<Long, String> orderSummaryMap = orderSummaryMap(tenantId, orders);
+        Map<Long, String> orderSummaryMap = orderSummaryMap(tenantId, mapOrders);
         Map<Long, String> receiptSummaryMap = receiptSummaryMap(tenantId, receipts, orderSummaryMap);
 
         vo.setPendingRequestCount(requests.stream().filter(r -> !"APPROVED".equals(r.getApprovalStatus())).count());
@@ -396,6 +471,18 @@ public class DashboardService {
         vo.setRecentRequests(requests.stream()
                 .limit(5)
                 .map(r -> toBusinessItem("PURCHASE_REQUEST", r, projectNameMap, ownerNameMap, requestSummaryMap))
+                .collect(Collectors.toList()));
+        vo.setPurchaseOrders(orders.stream()
+                .sorted(Comparator
+                        .comparing((MatPurchaseOrder o) -> o.getOrderDate() != null ? o.getOrderDate() : LocalDate.MIN)
+                        .reversed()
+                        .thenComparing(o -> amountOrZero(o.getTotalAmount()), Comparator.reverseOrder()))
+                .limit(5)
+                .map(o -> {
+                    DashboardBusinessItemVO item = toBusinessItem("PURCHASE_ORDER", o, projectNameMap, partnerNameMap, orderSummaryMap);
+                    item.setDate(o.getOrderDate() != null ? o.getOrderDate().toString() : null);
+                    return item;
+                })
                 .collect(Collectors.toList()));
         vo.setOverdueOrders(overdueOrders.stream()
                 .sorted(Comparator
@@ -418,7 +505,12 @@ public class DashboardService {
     // 5. Production Manager Dashboard (MVP)
     // ========================================================================
     public ProductionManagerDashboardVO getProductionManagerView(Long projectId) {
+        return getProductionManagerView(projectId, (String) null);
+    }
+
+    public ProductionManagerDashboardVO getProductionManagerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
+        YearMonth selectedMonth = parseDashboardMonth(month);
         List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
         List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
         Map<Long, String> projectNameMap = projectNameMap(projects);
@@ -435,14 +527,38 @@ public class DashboardService {
                 .eq(MatReceipt::getTenantId, tenantId)
                 .in(MatReceipt::getProjectId, projectIds)
                 .orderByDesc(MatReceipt::getReceiptDate));
+        if (selectedMonth != null) {
+            receipts = receipts.stream()
+                    .filter(r -> r.getReceiptDate() != null
+                            && !r.getReceiptDate().isBefore(selectedMonth.atDay(1))
+                            && !r.getReceiptDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
+
         List<MatRequisition> requisitions = requisitionMapper.selectList(new LambdaQueryWrapper<MatRequisition>()
                 .eq(MatRequisition::getTenantId, tenantId)
                 .in(MatRequisition::getProjectId, projectIds)
                 .orderByDesc(MatRequisition::getRequisitionDate));
+        if (selectedMonth != null) {
+            requisitions = requisitions.stream()
+                    .filter(r -> r.getRequisitionDate() != null
+                            && !r.getRequisitionDate().isBefore(selectedMonth.atDay(1))
+                            && !r.getRequisitionDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
+
         List<SubMeasure> measures = subMeasureMapper.selectList(new LambdaQueryWrapper<SubMeasure>()
                 .eq(SubMeasure::getTenantId, tenantId)
                 .in(SubMeasure::getProjectId, projectIds)
                 .orderByDesc(SubMeasure::getMeasureDate));
+        if (selectedMonth != null) {
+            measures = measures.stream()
+                    .filter(m -> m.getMeasureDate() != null
+                            && !m.getMeasureDate().isBefore(selectedMonth.atDay(1))
+                            && !m.getMeasureDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
+
         Map<Long, String> partnerNameMap = partnerNameMap(tenantId, businessPartnerIds(receipts, requisitions, measures));
         Map<Long, String> ownerNameMap = userNameMap(tenantId, businessUserIds(receipts, requisitions));
         Map<Long, String> receiptSummaryMap = receiptSummaryMap(tenantId, receipts, Collections.emptyMap());
@@ -467,7 +583,12 @@ public class DashboardService {
     // 6. Chief Engineer Dashboard
     // ========================================================================
     public ChiefEngineerDashboardVO getChiefEngineerView(Long projectId) {
+        return getChiefEngineerView(projectId, (String) null);
+    }
+
+    public ChiefEngineerDashboardVO getChiefEngineerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
+        YearMonth selectedMonth = parseDashboardMonth(month);
         List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
         List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
         Map<Long, String> projectNameMap = projectNameMap(projects);
@@ -491,6 +612,12 @@ public class DashboardService {
                 .eq(TechItem::getTenantId, tenantId)
                 .in(TechItem::getProjectId, projectIds)
                 .orderByDesc(TechItem::getDiscoveredAt));
+        if (selectedMonth != null) {
+            items = items.stream()
+                    .filter(i -> isTechItemInMonth(i, selectedMonth))
+                    .collect(Collectors.toList());
+        }
+
         Map<Long, String> ownerNameMap = userNameMap(tenantId, items.stream()
                 .map(TechItem::getResponsibleUserId)
                 .collect(Collectors.toSet()));
@@ -803,7 +930,7 @@ public class DashboardService {
     // All-projects aggregated views (projectId == null)
     // ========================================================================
 
-    private ProjectManagerDashboardVO getProjectManagerViewAllProjects(Long tenantId) {
+    private ProjectManagerDashboardVO getProjectManagerViewAllProjects(Long tenantId, YearMonth selectedMonth) {
         ProjectManagerDashboardVO vo = new ProjectManagerDashboardVO();
         vo.setProjectId(null);
         vo.setProjectName("全部项目");
@@ -821,6 +948,13 @@ public class DashboardService {
                         .eq(WfTask::getApproverId, currentUserId)
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
                         .orderByDesc(WfTask::getReceivedAt));
+        if (selectedMonth != null) {
+            pendingTasks = pendingTasks.stream()
+                    .filter(t -> t.getReceivedAt() != null
+                            && !t.getReceivedAt().toLocalDate().isBefore(selectedMonth.atDay(1))
+                            && !t.getReceivedAt().toLocalDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
 
         Map<Long, WfInstance> instanceMap = batchLoadInstances(pendingTasks);
         Map<Long, String> activeProjectNameMap = projectNameMap(activeProjects);
@@ -832,6 +966,7 @@ public class DashboardService {
         vo.setPendingTaskCount((long) taskItems.size());
 
         // Lagging projects: all active projects with planned end date in the past
+        // NOT filtered by month — current-state indicator
         List<DashboardProjectSummaryVO> lagging = activeProjects.stream()
                 .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(LocalDate.now()))
                 .map(this::toProjectSummary)
@@ -845,6 +980,13 @@ public class DashboardService {
                         .eq(WfTask::getTenantId, tenantId)
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
                         .orderByDesc(WfTask::getReceivedAt));
+        if (selectedMonth != null) {
+            allPendingApprovals = allPendingApprovals.stream()
+                    .filter(t -> t.getReceivedAt() != null
+                            && !t.getReceivedAt().toLocalDate().isBefore(selectedMonth.atDay(1))
+                            && !t.getReceivedAt().toLocalDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
         Map<Long, WfInstance> approvalInstanceMap = batchLoadInstances(allPendingApprovals);
         List<WfTask> projectManagerPendingApprovals = allPendingApprovals.stream()
                 .filter(t -> isProjectManagerWorkflowTask(t, approvalInstanceMap.get(t.getInstanceId())))
@@ -864,6 +1006,13 @@ public class DashboardService {
                         .le(CtContract::getEndDate, cutoff)
                         .ge(CtContract::getEndDate, LocalDate.now())
                         .eq(CtContract::getContractStatus, "PERFORMING"));
+        if (selectedMonth != null) {
+            expiringContracts = expiringContracts.stream()
+                    .filter(c -> c.getEndDate() != null
+                            && !c.getEndDate().isBefore(selectedMonth.atDay(1))
+                            && !c.getEndDate().isAfter(selectedMonth.atEndOfMonth()))
+                    .collect(Collectors.toList());
+        }
         vo.setExpiringContracts(expiringContracts.stream().map(this::toContractItem).collect(Collectors.toList()));
         vo.setExpiringContractCount((long) expiringContracts.size());
 
@@ -1321,7 +1470,8 @@ public class DashboardService {
         try {
             return YearMonth.parse(month);
         } catch (DateTimeParseException e) {
-            throw new BusinessException("INVALID_DASHBOARD_MONTH", "月份格式必须为 yyyy-MM", e);
+            log.warn("Invalid dashboard month format '{}', ignoring. Expected yyyy-MM.", month);
+            return null;
         }
     }
 
@@ -1712,6 +1862,7 @@ public class DashboardService {
         vo.setLowStockItemCount(0L);
         vo.setTotalOrderAmount("0");
         vo.setRecentRequests(Collections.emptyList());
+        vo.setPurchaseOrders(Collections.emptyList());
         vo.setOverdueOrders(Collections.emptyList());
         vo.setPendingReceipts(Collections.emptyList());
     }
@@ -1780,6 +1931,13 @@ public class DashboardService {
     private boolean isChiefEngineerOverdueItem(TechItem item) {
         if ("CLOSED".equals(item.getItemStatus())) return false;
         return overdueDays(item.getDueDate()) > 0;
+    }
+
+    private boolean isTechItemInMonth(TechItem item, YearMonth month) {
+        LocalDateTime effectiveDate = item.getDueDate() != null ? item.getDueDate() : item.getDiscoveredAt();
+        if (effectiveDate == null) return false;
+        LocalDate date = effectiveDate.toLocalDate();
+        return !date.isBefore(month.atDay(1)) && !date.isAfter(month.atEndOfMonth());
     }
 
     private Map<Long, String> partnerNameMap(Long tenantId, List<MatPurchaseOrder> orders, List<MatReceipt> receipts) {
