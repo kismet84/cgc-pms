@@ -67,6 +67,16 @@ export interface WfCcVO {
   instanceStatus?: string
 }
 
+export interface WfMineInstanceVO {
+  instanceId: string
+  businessType: string
+  title: string
+  instanceStatus: string
+  createdAt: string
+  updatedAt?: string
+  currentNodeName?: string
+}
+
 export interface WfInstanceVO {
   id: string
   templateId: string
@@ -260,6 +270,15 @@ export function getMyDone(params: PageParams) {
 export function getMyCc(params: PageParams) {
   return request<PageResult<WfCcVO>>({
     url: '/workflow/tasks/cc',
+    method: 'get',
+    params,
+  })
+}
+
+/** 我发起的实例列表 */
+export function getMyInitiatedInstances(params: PageParams) {
+  return request<PageResult<WfMineInstanceVO>>({
+    url: '/workflow/instances/mine',
     method: 'get',
     params,
   })

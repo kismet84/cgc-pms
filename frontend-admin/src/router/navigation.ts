@@ -80,11 +80,12 @@ export const navigationItems: NavigationItem[] = [
     key: '/approval-center',
     label: '审批中心',
     icon: 'AuditOutlined',
-    matchPrefixes: ['/approval/todo', '/approval/done', '/approval/cc'],
+    matchPrefixes: ['/approval/todo', '/approval/done', '/approval/cc', '/approval/mine'],
     children: [
       { key: '/approval/todo', label: '我的待办' },
       { key: '/approval/done', label: '我的已办' },
       { key: '/approval/cc', label: '抄送我的' },
+      { key: '/approval/mine', label: '我发起' },
     ],
   },
   {

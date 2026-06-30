@@ -9,6 +9,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.service.WorkflowQueryService;
 import com.cgcpms.workflow.vo.WfCcVO;
 import com.cgcpms.workflow.vo.WfInstanceVO;
+import com.cgcpms.workflow.vo.WfMyInstanceVO;
 import com.cgcpms.workflow.vo.WfRecordVO;
 import com.cgcpms.workflow.vo.WfTaskVO;
 import org.junit.jupiter.api.AfterEach;
@@ -21,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -44,6 +46,8 @@ class WorkflowQueryServiceTest {
     private static final long TENANT_0 = 0L;
     private static final long USER_ADMIN = 1L;
     private static final long USER_OTHER = 2L;
+    private static final long USER_SECOND_APPROVER = 230200000000000002L;
+    private static final long USER_NO_TASKS = 230200000000000099L;
 
     private static final long TEMPLATE_ID = 230200000000000001L;
     private static final long NODE_1_ID = 230200000000000101L;
@@ -128,9 +132,40 @@ class WorkflowQueryServiceTest {
     }
 
     @Test
+    @DisplayName("getMyTodos 包含V107驳回闭环演示待办")
+    void getMyTodosIncludesV107RejectDemoSeeds() {
+        Long rejectPurchaseRequestId = jdbcTemplate.queryForObject(
+                "SELECT id FROM mat_purchase_request WHERE tenant_id = 0 AND request_code = 'PR-DEMO-WF-REJECT-001' AND deleted_flag = 0",
+                Long.class);
+        Long rejectContractId = jdbcTemplate.queryForObject(
+                "SELECT id FROM ct_contract WHERE tenant_id = 0 AND contract_code = 'CT-DEMO-WF-REJECT-001' AND deleted_flag = 0",
+                Long.class);
+
+        assertNotNull(rejectPurchaseRequestId, "V107 应存在采购申请驳回演示单据");
+        assertNotNull(rejectContractId, "V107 应存在合同驳回演示单据");
+
+        IPage<WfTaskVO> page = queryService.getMyTodos(TENANT_0, USER_ADMIN, 1, 100);
+
+        assertTrue(page.getRecords().stream().anyMatch(task ->
+                        "PURCHASE_REQUEST".equals(task.getBusinessType())
+                                && String.valueOf(rejectPurchaseRequestId).equals(task.getBusinessId())
+                                && WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())
+                                && WorkflowConstants.INSTANCE_RUNNING.equals(task.getInstanceStatus())
+                                && "审批中心采购申请驳回演示".equals(task.getTitle())),
+                "待办列表应包含 V107 采购申请驳回样本");
+        assertTrue(page.getRecords().stream().anyMatch(task ->
+                        "CONTRACT_APPROVAL".equals(task.getBusinessType())
+                                && String.valueOf(rejectContractId).equals(task.getBusinessId())
+                                && WorkflowConstants.TASK_PENDING.equals(task.getTaskStatus())
+                                && WorkflowConstants.INSTANCE_RUNNING.equals(task.getInstanceStatus())
+                                && "审批中心合同驳回演示".equals(task.getTitle())),
+                "待办列表应包含 V107 合同驳回样本");
+    }
+
+    @Test
     @DisplayName("getMyTodos 其他用户无待办时返回空分页")
     void getMyTodosReturnsEmptyForUserWithoutTasks() {
-        IPage<WfTaskVO> page = queryService.getMyTodos(TENANT_0, USER_OTHER, 1, 20);
+        IPage<WfTaskVO> page = queryService.getMyTodos(TENANT_0, USER_NO_TASKS, 1, 20);
 
         assertNotNull(page);
         assertEquals(0, page.getTotal());
@@ -201,18 +236,15 @@ class WorkflowQueryServiceTest {
     // ── getMyDone ──
 
     @Test
-    @DisplayName("getMyDone 发起人提交后已有1条SUBMIT记录")
-    void getMyDoneReturnsSubmitRecordForInitiator() {
-        // The initiator (USER_ADMIN) is the operator on the SUBMIT record,
-        // so getMyDone for USER_ADMIN includes the submit action.
+    @DisplayName("getMyDone 不返回发起人的SUBMIT记录")
+    void getMyDoneExcludesSubmitRecordForInitiator() {
         IPage<WfRecordVO> page = queryService.getMyDone(USER_ADMIN, TENANT_0, 1, 20);
 
         assertNotNull(page);
-        // SUBMIT creates a record with the initiator as operator
-        assertTrue(page.getTotal() >= 1, "发起人提交后应有 SUBMIT 已办记录");
         boolean hasSubmit = page.getRecords().stream()
-                .anyMatch(r -> WorkflowConstants.ACTION_SUBMIT.equals(r.getActionType()));
-        assertTrue(hasSubmit, "应包含 SUBMIT 操作记录");
+                .anyMatch(r -> String.valueOf(submittedInstanceId).equals(r.getInstanceId())
+                        && WorkflowConstants.ACTION_SUBMIT.equals(r.getActionType()));
+        assertFalse(hasSubmit, "我的已办不应包含自己发起审批的 SUBMIT 记录");
     }
 
     @Test
@@ -223,9 +255,14 @@ class WorkflowQueryServiceTest {
         IPage<WfRecordVO> page = queryService.getMyDone(USER_ADMIN, TENANT_0, 1, 20);
 
         assertTrue(page.getTotal() >= 1, "审批后应至少有1条已办记录");
-        WfRecordVO done = page.getRecords().get(0);
+        WfRecordVO done = page.getRecords().stream()
+                .filter(r -> String.valueOf(submittedInstanceId).equals(r.getInstanceId())
+                        && WorkflowConstants.ACTION_APPROVE.equals(r.getActionType()))
+                .findFirst()
+                .orElseThrow();
         assertEquals("admin", done.getOperatorName());
         assertEquals(String.valueOf(submittedInstanceId), done.getInstanceId());
+        assertEquals(WorkflowConstants.ACTION_APPROVE, done.getActionType());
         assertNotNull(done.getTitle());
     }
 
@@ -237,8 +274,103 @@ class WorkflowQueryServiceTest {
         IPage<WfRecordVO> page = queryService.getMyDone(USER_ADMIN, TENANT_0, 1, 20);
 
         assertTrue(page.getTotal() >= 1, "驳回后应至少有1条已办记录");
-        WfRecordVO done = page.getRecords().get(0);
+        WfRecordVO done = page.getRecords().stream()
+                .filter(r -> String.valueOf(submittedInstanceId).equals(r.getInstanceId())
+                        && WorkflowConstants.ACTION_REJECT.equals(r.getActionType()))
+                .findFirst()
+                .orElseThrow();
         assertEquals("admin", done.getOperatorName());
+        assertEquals(WorkflowConstants.ACTION_REJECT, done.getActionType());
+    }
+
+    @Test
+    @DisplayName("getMyDone 保留仍在流转实例中的已审批记录")
+    void getMyDoneKeepsApprovedRecordForRunningInstance() {
+        WfTemplateNode secondNode = new WfTemplateNode();
+        secondNode.setId(NODE_1_ID + 1);
+        secondNode.setTenantId(TENANT_0);
+        secondNode.setTemplateId(TEMPLATE_ID);
+        secondNode.setNodeCode("N2");
+        secondNode.setNodeName("查询服务二级审批节点");
+        secondNode.setNodeOrder(2);
+        secondNode.setNodeType("APPROVAL");
+        secondNode.setApproveMode("SEQUENTIAL");
+        secondNode.setApproverConfig("{\"type\":\"USER\",\"userId\":" + USER_SECOND_APPROVER + "}");
+        secondNode.setAllowTransfer(1);
+        secondNode.setAllowAddSign(1);
+        templateNodeMapper.insert(secondNode);
+
+        WfInstance instance = workflowEngine.submit(
+                USER_ADMIN, "admin", TENANT_0,
+                BUSINESS_TYPE, 33333012L,
+                "二级审批仍运行", new BigDecimal("500.00"),
+                100L, 100L, "测试业务摘要", "{}", null);
+        WfTask firstTask = taskMapper.selectOne(new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getInstanceId, instance.getId())
+                .eq(WfTask::getApproverId, USER_ADMIN)
+                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+
+        try {
+            workflowEngine.approve(firstTask.getId(), USER_ADMIN, "admin", "同意", "running-done-test-key-001");
+
+            IPage<WfRecordVO> page = queryService.getMyDone(USER_ADMIN, TENANT_0, 1, 20);
+
+            WfRecordVO done = page.getRecords().stream()
+                    .filter(r -> String.valueOf(instance.getId()).equals(r.getInstanceId())
+                            && WorkflowConstants.ACTION_APPROVE.equals(r.getActionType()))
+                    .findFirst()
+                    .orElseThrow();
+            assertEquals(WorkflowConstants.INSTANCE_RUNNING, done.getInstanceStatus());
+        } finally {
+            cleanupInstance(instance.getId(), 33333012L);
+        }
+    }
+
+    // ── getMyStarted ──
+
+    @Test
+    @DisplayName("getMyStarted 只返回当前用户发起实例并带当前节点和更新时间")
+    void getMyStartedReturnsOnlyCurrentUserInstances() {
+        LocalDateTime now = LocalDateTime.of(2099, 6, 30, 10, 0, 0);
+        insertStartedInstance(33333020L, "CONTRACT_APPROVAL", USER_ADMIN,
+                WorkflowConstants.INSTANCE_RUNNING, "合同审批", "合同审批节点", now.minusDays(3), now.minusHours(3));
+        insertStartedInstance(33333021L, "PURCHASE_REQUEST", USER_ADMIN,
+                WorkflowConstants.INSTANCE_APPROVED, "采购申请审批", null, now.minusDays(2), now.minusHours(2));
+        insertStartedInstance(33333022L, "SUB_MEASURE", USER_ADMIN,
+                WorkflowConstants.INSTANCE_REJECTED, "分包计量审批", null, now.minusDays(1), now.minusHours(1));
+        insertStartedInstance(33333023L, "CONTRACT_APPROVAL", USER_OTHER,
+                WorkflowConstants.INSTANCE_WITHDRAWN, "他人发起合同审批", null, now.minusDays(1), now);
+        insertStartedInstance(33333024L, "CONTRACT_APPROVAL", USER_ADMIN,
+                WorkflowConstants.INSTANCE_WITHDRAWN, "已撤回合同审批", null, now.minusDays(4), now.minusHours(4));
+
+        IPage<WfMyInstanceVO> page = queryService.getMyStarted(TENANT_0, USER_ADMIN, 1, 2);
+
+        assertTrue(page.getTotal() >= 4);
+        assertEquals(2, page.getRecords().size());
+        assertEquals("33333022", page.getRecords().get(0).getBusinessId());
+        assertEquals("2099-06-30 09:00:00", page.getRecords().get(0).getUpdatedAt());
+        assertEquals("SUB_MEASURE", page.getRecords().get(0).getBusinessType());
+
+        IPage<WfMyInstanceVO> secondPage = queryService.getMyStarted(TENANT_0, USER_ADMIN, 2, 2);
+
+        assertTrue(secondPage.getTotal() >= 4);
+        assertFalse(secondPage.getRecords().isEmpty());
+        List<String> businessTypes = page.getRecords().stream()
+                .map(WfMyInstanceVO::getBusinessType)
+                .toList();
+        List<String> secondPageTypes = secondPage.getRecords().stream()
+                .map(WfMyInstanceVO::getBusinessType)
+                .toList();
+        assertTrue(businessTypes.contains("PURCHASE_REQUEST"));
+        assertTrue(businessTypes.contains("SUB_MEASURE"));
+        assertTrue(secondPageTypes.contains("CONTRACT_APPROVAL"));
+        IPage<WfMyInstanceVO> allMine = queryService.getMyStarted(TENANT_0, USER_ADMIN, 1, 100);
+        assertTrue(allMine.getRecords().stream()
+                .noneMatch(r -> "33333023".equals(r.getBusinessId())));
+        assertTrue(allMine.getRecords().stream()
+                .anyMatch(r -> "33333024".equals(r.getBusinessId())
+                        && WorkflowConstants.INSTANCE_WITHDRAWN.equals(r.getInstanceStatus())));
+        assertEquals("合同审批节点", secondPage.getRecords().get(0).getCurrentNodeName());
     }
 
     @Test
@@ -248,13 +380,11 @@ class WorkflowQueryServiceTest {
         // Then verify our records are NOT on page 2.
         IPage<WfRecordVO> page1 = queryService.getMyDone(USER_ADMIN, TENANT_0, 1, 100);
         assertNotNull(page1);
-        assertTrue(page1.getTotal() >= 1, "第一页应至少有本测试创建记录");
-
-        // Verify our SUBMIT record is on page 1
+        // Verify our SUBMIT record is not in done records.
         boolean foundSubmit = page1.getRecords().stream()
                 .anyMatch(r -> String.valueOf(submittedInstanceId).equals(r.getInstanceId())
                         && WorkflowConstants.ACTION_SUBMIT.equals(r.getActionType()));
-        assertTrue(foundSubmit, "自己的 SUBMIT 记录应在第一页");
+        assertFalse(foundSubmit, "自己的 SUBMIT 记录不应出现在已办列表");
 
         IPage<WfRecordVO> page2 = queryService.getMyDone(USER_ADMIN, TENANT_0, 2, 100);
         assertNotNull(page2);
@@ -426,8 +556,8 @@ class WorkflowQueryServiceTest {
         assertNotNull(instance);
 
         try {
-            // USER_OTHER has no cc
-            IPage<WfCcVO> page = queryService.getMyCc(USER_OTHER, TENANT_0, 1, 20);
+            // USER_NO_TASKS has no cc
+            IPage<WfCcVO> page = queryService.getMyCc(USER_NO_TASKS, TENANT_0, 1, 20);
 
             assertEquals(0, page.getTotal());
             assertTrue(page.getRecords().isEmpty());
@@ -449,6 +579,17 @@ class WorkflowQueryServiceTest {
                     "$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2",
                     "系统管理员", "13800000000", "admin@cgc-pms.com",
                     "ENABLE", 1, USER_ADMIN, "测试种子数据");
+        }
+        Integer secondApproverCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, USER_SECOND_APPROVER);
+        if (secondApproverCount != null && secondApproverCount == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    USER_SECOND_APPROVER, TENANT_0, "workflow-second-approver",
+                    "$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2",
+                    "二级审批人", "13800000002", "workflow-second-approver@cgc-pms.com",
+                    "ENABLE", 0, USER_ADMIN, "测试种子数据");
         }
     }
 
@@ -506,17 +647,17 @@ class WorkflowQueryServiceTest {
         // Keep cleanup scoped to this class. Broad tenant-level deletes remove Flyway
         // workflow seed data used by later tests in the same H2 application context.
         jdbcTemplate.update("DELETE FROM wf_cc WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?)",
-                BUSINESS_TYPE, 33333001L, 33333011L);
-        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key IN (?, ?, ?)",
-                "done-test-key-001", "reject-test-key-001", "detail-approve-key-001");
+                BUSINESS_TYPE, 33333001L, 33333024L);
+        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key IN (?, ?, ?, ?)",
+                "done-test-key-001", "reject-test-key-001", "detail-approve-key-001", "running-done-test-key-001");
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333011L);
+                BUSINESS_TYPE, 33333001L, 33333024L);
         jdbcTemplate.update("DELETE FROM wf_task WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333011L);
+                BUSINESS_TYPE, 33333001L, 33333024L);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?)",
-                BUSINESS_TYPE, 33333001L, 33333011L);
+                BUSINESS_TYPE, 33333001L, 33333024L);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333011L);
+                BUSINESS_TYPE, 33333001L, 33333024L);
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
         jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
     }
@@ -528,5 +669,45 @@ class WorkflowQueryServiceTest {
         jdbcTemplate.update("DELETE FROM wf_task WHERE instance_id = ?", instanceId);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id = ?", instanceId);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE id = ?", instanceId);
+    }
+
+    private void insertStartedInstance(Long businessId, String businessType, Long initiatorId,
+                                       String status, String title, String currentNodeName,
+                                       LocalDateTime createdAt, LocalDateTime updatedAt) {
+        WfInstance instance = new WfInstance();
+        instance.setTenantId(TENANT_0);
+        instance.setTemplateId(TEMPLATE_ID);
+        instance.setBusinessType(businessType);
+        instance.setBusinessId(businessId);
+        instance.setProjectId(100L);
+        instance.setContractId(100L);
+        instance.setTitle(title);
+        instance.setAmount(new BigDecimal("100.00"));
+        instance.setInstanceStatus(status);
+        instance.setCurrentRound(1);
+        instance.setResubmitCount(0);
+        instance.setBusinessRevision(1);
+        instance.setInitiatorId(initiatorId);
+        instance.setBusinessSummary(title);
+        instance.setVariables("{}");
+        instance.setStartedAt(createdAt);
+        instance.setCreatedAt(createdAt);
+        instance.setUpdatedAt(updatedAt);
+        instanceMapper.insert(instance);
+
+        if (currentNodeName != null) {
+            WfNodeInstance node = new WfNodeInstance();
+            node.setTenantId(TENANT_0);
+            node.setInstanceId(instance.getId());
+            node.setTemplateNodeId(NODE_1_ID);
+            node.setNodeCode("N1");
+            node.setNodeName(currentNodeName);
+            node.setNodeOrder(1);
+            node.setApproveMode(WorkflowConstants.MODE_SEQUENTIAL);
+            node.setNodeStatus(WorkflowConstants.NODE_ACTIVE);
+            node.setRoundNo(1);
+            node.setStartedAt(createdAt);
+            nodeInstanceMapper.insert(node);
+        }
     }
 }

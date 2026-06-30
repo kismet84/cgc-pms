@@ -77,11 +77,12 @@ describe('router lazy loading', () => {
     expect(approvalRoute?.meta?.title).toBe('审批中心')
   })
 
-  it('registers dedicated approval done and cc routes', () => {
+  it('registers dedicated approval done, cc and mine routes', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')
     const doneRoute = approvalRoute?.children?.find((c) => c.path === 'done')
     const ccRoute = approvalRoute?.children?.find((c) => c.path === 'cc')
+    const mineRoute = approvalRoute?.children?.find((c) => c.path === 'mine')
 
     expect(doneRoute?.name).toBe('ApprovalDone')
     expect(doneRoute?.meta?.title).toBe('我的已办')
@@ -91,6 +92,10 @@ describe('router lazy loading', () => {
     expect(ccRoute?.meta?.title).toBe('抄送我的')
     expect(ccRoute?.meta?.approvalTab).toBe('cc')
     expect(typeof ccRoute?.component).toBe('function')
+    expect(mineRoute?.name).toBe('ApprovalMine')
+    expect(mineRoute?.meta?.title).toBe('我发起')
+    expect(mineRoute?.meta?.approvalTab).toBe('mine')
+    expect(typeof mineRoute?.component).toBe('function')
   })
 
   it('matches approval process route before approval detail route', async () => {

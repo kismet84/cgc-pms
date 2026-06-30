@@ -324,6 +324,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '抄送我的', approvalTab: 'cc' },
           },
           {
+            path: 'mine',
+            name: 'ApprovalMine',
+            component: () => import('@/pages/approval/todo.vue'),
+            meta: { title: '我发起', approvalTab: 'mine' },
+          },
+          {
             path: 'process',
             name: 'ApprovalProcess',
             component: () => import('@/pages/approval/process.vue'),

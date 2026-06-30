@@ -3,6 +3,7 @@ package com.cgcpms.workflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.system.entity.SysUser;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -43,6 +45,12 @@ class WorkflowCoreService {
     final WorkflowBusinessHandlerRegistry handlerRegistry;
     final NotificationService notificationService;
     final ApproverResolver approverResolver;
+
+    void requireCurrentTenant(Long targetTenantId) {
+        if (!Objects.equals(targetTenantId, UserContext.getCurrentTenantId())) {
+            throw new BusinessException("RESOURCE_NOT_FOUND", "资源不存在");
+        }
+    }
 
     // ── Template lookup ──
     WfTemplate findTemplate(String businessType, Long tenantId, java.math.BigDecimal amount) {

@@ -13,6 +13,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.service.WorkflowQueryService;
 import com.cgcpms.workflow.vo.WfCcVO;
 import com.cgcpms.workflow.vo.WfInstanceVO;
+import com.cgcpms.workflow.vo.WfMyInstanceVO;
 import com.cgcpms.workflow.vo.WfRecordVO;
 import com.cgcpms.workflow.vo.WfTaskVO;
 import jakarta.validation.Valid;
@@ -116,6 +117,17 @@ public class WorkflowController {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();
         IPage<WfTaskVO> page = workflowQueryService.getMyTodos(tenantId, userId, pageNo, pageSize);
+        return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/instances/mine")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<PageResult<WfMyInstanceVO>> myStarted(
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize) {
+        Long userId = UserContext.getCurrentUserId();
+        Long tenantId = UserContext.getCurrentTenantId();
+        IPage<WfMyInstanceVO> page = workflowQueryService.getMyStarted(tenantId, userId, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
     }
 

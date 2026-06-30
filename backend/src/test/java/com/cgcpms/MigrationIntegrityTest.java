@@ -84,6 +84,35 @@ class MigrationIntegrityTest {
         assertTrue(h2Sql.contains("ALTER TABLE accounting_entry_line ADD COLUMN IF NOT EXISTS deleted_flag"));
     }
 
+    @Test
+    void approvalWorkflowClosureDemoSeedUsesOnlyFirstRoundBusinessTypes() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V106__seed_approval_workflow_closure_demo_data.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V106__seed_approval_workflow_closure_demo_data.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("'CONTRACT_APPROVAL'"));
+            assertTrue(sql.contains("'PURCHASE_REQUEST'"));
+            assertTrue(sql.contains("'SUB_MEASURE'"));
+            assertTrue(sql.contains("'RUNNING'"));
+            assertTrue(sql.contains("'ACTIVE'"));
+            assertTrue(sql.contains("'PENDING'"));
+            assertTrue(sql.contains("'SUBMIT'"));
+            assertTrue(sql.contains("wf_node_instance"));
+            assertTrue(sql.contains("wf_task"));
+            assertTrue(sql.contains("wf_record"));
+            assertFalse(sql.contains("'CONTRACT'"),
+                    "V106 must not use legacy CONTRACT as a replacement for CONTRACT_APPROVAL");
+            assertFalse(sql.contains("'PAY_REQUEST'"));
+            assertFalse(sql.contains("'PAY_APPLICATION'"));
+            assertFalse(sql.contains("'VAR_ORDER'"));
+            assertFalse(sql.contains("'CT_CHANGE'"));
+            assertFalse(sql.contains("'TECH_ITEM'"));
+        }
+    }
+
     /**
      * Java-based migrations (V51/V58/V75) are executed by Flyway at startup
      * from {@code common/migration/} and do not require SQL-level coverage here —

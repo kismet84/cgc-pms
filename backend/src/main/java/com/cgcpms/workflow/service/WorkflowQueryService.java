@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
@@ -52,12 +53,43 @@ public class WorkflowQueryService {
         });
     }
 
+    // ── 我发起的实例 ──
+
+    public IPage<WfMyInstanceVO> getMyStarted(Long tenantId, Long userId, long pageNo, long pageSize) {
+        LambdaQueryWrapper<WfInstance> wrapper = new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getTenantId, tenantId)
+                .eq(WfInstance::getInitiatorId, userId)
+                .orderByDesc(WfInstance::getUpdatedAt)
+                .orderByDesc(WfInstance::getCreatedAt);
+
+        Page<WfInstance> page = wfInstanceMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+        Map<Long, String> currentNodeNames = batchLoadCurrentNodeNames(tenantId, page.getRecords());
+
+        return page.convert(instance -> {
+            WfMyInstanceVO vo = new WfMyInstanceVO();
+            vo.setInstanceId(String.valueOf(instance.getId()));
+            vo.setBusinessType(instance.getBusinessType());
+            if (instance.getBusinessId() != null) vo.setBusinessId(String.valueOf(instance.getBusinessId()));
+            vo.setTitle(instance.getTitle());
+            vo.setInstanceStatus(instance.getInstanceStatus());
+            if (instance.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(instance.getCreatedAt()));
+            if (instance.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(instance.getUpdatedAt()));
+            vo.setCurrentNodeName(currentNodeNames.get(instance.getId()));
+            return vo;
+        });
+    }
+
     // ── 我的已办 ──
 
     public IPage<WfRecordVO> getMyDone(Long userId, Long tenantId, long pageNo, long pageSize) {
         LambdaQueryWrapper<WfRecord> wrapper = new LambdaQueryWrapper<WfRecord>()
                 .eq(WfRecord::getTenantId, tenantId)
                 .eq(WfRecord::getOperatorId, userId)
+                .in(WfRecord::getActionType,
+                        WorkflowConstants.ACTION_APPROVE,
+                        WorkflowConstants.ACTION_REJECT,
+                        WorkflowConstants.ACTION_TRANSFER,
+                        WorkflowConstants.ACTION_ADD_SIGN)
                 .orderByDesc(WfRecord::getCreatedAt);
 
         Page<WfRecord> page = wfRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -165,6 +197,20 @@ public class WorkflowQueryService {
                         .eq(WfTask::getTenantId, tenantId)
                         .in(WfTask::getNodeInstanceId, nodeIds));
         return allTasks.stream().collect(Collectors.groupingBy(WfTask::getNodeInstanceId));
+    }
+
+    private Map<Long, String> batchLoadCurrentNodeNames(Long tenantId, List<WfInstance> instances) {
+        List<Long> instanceIds = instances.stream().map(WfInstance::getId).toList();
+        if (instanceIds.isEmpty()) return Collections.emptyMap();
+        return wfNodeInstanceMapper.selectList(new LambdaQueryWrapper<WfNodeInstance>()
+                        .eq(WfNodeInstance::getTenantId, tenantId)
+                        .in(WfNodeInstance::getInstanceId, instanceIds)
+                        .eq(WfNodeInstance::getNodeStatus, WorkflowConstants.NODE_ACTIVE)
+                        .orderByAsc(WfNodeInstance::getNodeOrder))
+                .stream()
+                .collect(Collectors.toMap(WfNodeInstance::getInstanceId,
+                        WfNodeInstance::getNodeName,
+                        (first, ignored) -> first));
     }
 
     private List<WfNodeVO> buildNodeVOs(List<WfNodeInstance> nodes,

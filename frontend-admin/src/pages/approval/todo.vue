@@ -9,11 +9,13 @@ import {
   getMyTodos,
   getMyDone,
   getMyCc,
+  getMyInitiatedInstances,
   rejectTask,
   withdrawInstance,
   type WfTaskVO,
   type WfRecordVO,
   type WfCcVO,
+  type WfMineInstanceVO,
   type WfInstanceVO,
 } from '@/api/modules/workflow'
 import type { PageResult } from '@/types/api'
@@ -33,6 +35,7 @@ const total = ref(0)
 const todoData = ref<WfTaskVO[]>([])
 const doneData = ref<WfRecordVO[]>([])
 const ccData = ref<WfCcVO[]>([])
+const mineData = ref<WfMineInstanceVO[]>([])
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref<WfInstanceVO | null>(null)
@@ -102,16 +105,21 @@ async function fetchData() {
       const res: PageResult<WfRecordVO> = await getMyDone(params)
       doneData.value = res.records
       total.value = Number(res.total ?? 0)
-    } else {
+    } else if (activeTab.value === 'cc') {
       const res: PageResult<WfCcVO> = await getMyCc(params)
       ccData.value = res.records
+      total.value = Number(res.total ?? 0)
+    } else if (activeTab.value === 'mine') {
+      const res: PageResult<WfMineInstanceVO> = await getMyInitiatedInstances(params)
+      mineData.value = res.records
       total.value = Number(res.total ?? 0)
     }
   } catch (e: unknown) {
     console.error(e)
     if (activeTab.value === 'todo') todoData.value = []
     else if (activeTab.value === 'done') doneData.value = []
-    else ccData.value = []
+    else if (activeTab.value === 'cc') ccData.value = []
+    else if (activeTab.value === 'mine') mineData.value = []
     total.value = 0
     message.error('加载列表失败，请稍后重试')
   } finally {
@@ -144,13 +152,26 @@ async function handleDetail(record: { instanceId: string }) {
   }
 }
 
-const gridColumns = computed(() => [
-  { field: 'title', title: '审批标题', ellipsis: true, slots: { default: 'title' } },
-  { field: 'businessType', title: '业务类型', width: 120, slots: { default: 'businessType' } },
-  { field: 'timeCol', title: '时间', width: 160, slots: { default: 'timeCol' } },
-  { field: 'instanceStatus', title: '状态', width: 100, slots: { default: 'instanceStatus' } },
-  { title: '操作', width: 76, slots: { default: 'action' } },
-])
+const gridColumns = computed(() => {
+  if (activeTab.value === 'mine') {
+    return [
+      { field: 'businessType', title: '业务类型', width: 120, slots: { default: 'businessType' } },
+      { field: 'title', title: '审批标题', ellipsis: true, slots: { default: 'title' } },
+      { field: 'instanceStatus', title: '当前状态', width: 100, slots: { default: 'instanceStatus' } },
+      { field: 'createdAt', title: '发起时间', width: 160, slots: { default: 'createdAt' } },
+      { field: 'updatedAt', title: '最近更新时间', width: 160, slots: { default: 'updatedAt' } },
+      { field: 'currentNodeName', title: '当前节点', width: 140, slots: { default: 'currentNodeName' } },
+      { title: '操作', width: 76, slots: { default: 'action' } },
+    ]
+  }
+  return [
+    { field: 'title', title: '审批标题', ellipsis: true, slots: { default: 'title' } },
+    { field: 'businessType', title: '业务类型', width: 120, slots: { default: 'businessType' } },
+    { field: 'timeCol', title: '时间', width: 160, slots: { default: 'timeCol' } },
+    { field: 'instanceStatus', title: '状态', width: 100, slots: { default: 'instanceStatus' } },
+    { title: '操作', width: 76, slots: { default: 'action' } },
+  ]
+})
 
 const {
   visibleColumns: visibleGridColumns,
@@ -163,17 +184,20 @@ const tabs = [
   { key: 'todo', label: '我的待办' },
   { key: 'done', label: '我的已办' },
   { key: 'cc', label: '抄送我的' },
+  { key: 'mine', label: '我发起' },
 ]
 
 const tableData = computed<Record<string, unknown>[]>(() => {
   if (activeTab.value === 'todo') return todoData.value as unknown as Record<string, unknown>[]
   if (activeTab.value === 'done') return doneData.value as unknown as Record<string, unknown>[]
+  if (activeTab.value === 'mine') return mineData.value as unknown as Record<string, unknown>[]
   return ccData.value as unknown as Record<string, unknown>[]
 })
 const approvalSummary = computed(() => [
   { label: '我的待办', count: todoData.value.length, color: '#1890ff' },
   { label: '我的已办', count: doneData.value.length, color: '#52c41a' },
   { label: '抄送我的', count: ccData.value.length, color: '#faad14' },
+  { label: '我发起', count: mineData.value.length, color: '#722ed1' },
 ])
 const recentApprovals = computed(() => tableData.value.slice(0, 4))
 const detailNodes = computed(() => (Array.isArray(detail.value?.nodes) ? detail.value.nodes : []))
@@ -283,6 +307,11 @@ function getTimeCol(record: Record<string, unknown>): string {
   return (record.createdTime as string) ?? ''
 }
 
+function displayText(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-'
+  return String(value)
+}
+
 function getActionLabel(): string {
   return activeTab.value === 'todo' ? '处理' : '查看'
 }
@@ -295,6 +324,7 @@ function pageHeaderTitle(): string {
 function pageHeaderSubtitle(): string {
   if (activeTab.value === 'todo') return '处理需要您审批的业务单据'
   if (activeTab.value === 'done') return '查看您已处理的审批记录'
+  if (activeTab.value === 'mine') return '追踪您发起的审批实例'
   return '查看抄送给您的业务单据'
 }
 
@@ -361,6 +391,15 @@ watch(
             </template>
             <template #timeCol="{ row }">
               {{ getTimeCol(row) }}
+            </template>
+            <template #createdAt="{ row }">
+              {{ displayText(row.createdAt) }}
+            </template>
+            <template #updatedAt="{ row }">
+              {{ displayText(row.updatedAt) }}
+            </template>
+            <template #currentNodeName="{ row }">
+              {{ displayText(row.currentNodeName) }}
             </template>
             <template #instanceStatus="{ row }">
               <a-tag v-if="row.instanceStatus === 'RUNNING'" color="processing">审批中</a-tag>

@@ -133,6 +133,21 @@ class WorkflowTaskServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("transfer: 当前租户与任务租户不一致时拒绝")
+    void transferCurrentTenantMismatch() {
+        seedTransferFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING);
+        TestUserContext.setAdmin(999L, USER_ADMIN);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> workflowTaskService.transfer(TASK_ID, USER_OTHER, USER_ADMIN, "admin", "备注"));
+        assertEquals("RESOURCE_NOT_FOUND", ex.getCode());
+
+        WfTask task = wfTaskMapper.selectByIdIgnoringTenant(TASK_ID);
+        assertEquals(WorkflowConstants.TASK_PENDING, task.getTaskStatus(), "跨租户拒绝不应变更任务状态");
+    }
+
+    @Test
+    @Transactional
     @DisplayName("transfer: 目标用户不在当前租户抛出WORKFLOW_TARGET_USER_INVALID")
     void transferTargetUserWrongTenant() {
         seedTransferFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING);
@@ -351,6 +366,27 @@ class WorkflowTaskServiceTest {
                 () -> workflowTaskService.addSign(TASK_ID, List.of(USER_OTHER),
                         USER_OTHER, "other", "备注"));
         assertEquals("NOT_TASK_OWNER", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("addSign: 当前租户与任务租户不一致时拒绝")
+    void addSignCurrentTenantMismatch() {
+        seedAddSignFixture(WorkflowConstants.TASK_PENDING, WorkflowConstants.INSTANCE_RUNNING,
+                WorkflowConstants.NODE_ACTIVE);
+        TestUserContext.setAdmin(999L, USER_ADMIN);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> workflowTaskService.addSign(TASK_ID, List.of(USER_OTHER),
+                        USER_ADMIN, "admin", "备注"));
+        assertEquals("RESOURCE_NOT_FOUND", ex.getCode());
+
+        TestUserContext.setAdmin(TENANT_0, USER_ADMIN);
+        long pendingCount = wfTaskMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, INSTANCE_ID)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+        assertEquals(1, pendingCount, "跨租户拒绝不应新增加签任务");
     }
 
     @Test

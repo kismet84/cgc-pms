@@ -1,15 +1,21 @@
 package com.cgcpms.workflow.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.cgcpms.workflow.entity.WfTask;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDateTime;
 
 @Mapper
 public interface WfTaskMapper extends BaseMapper<WfTask> {
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT * FROM wf_task WHERE id = #{id} AND deleted_flag = 0")
+    WfTask selectByIdIgnoringTenant(@Param("id") Long id);
 
     /**
      * CAS update: atomically transition task status from expectedStatus to newStatus,

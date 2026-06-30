@@ -41,10 +41,10 @@ class WorkflowEngineIntegrationTest {
     private static final long USER_COST = 5L;
 
     private static final long RUN_ID = System.currentTimeMillis();
-    /** Business ID range allocated to this test run: RUN_ID+1 through RUN_ID+21.
+    /** Business ID range allocated to this test run: RUN_ID+1 through RUN_ID+25.
      *  See the business ID allocation comment at the top of cleanupTestData(). */
     private static final long BID_FIRST = RUN_ID + 1;
-    private static final long BID_LAST  = RUN_ID + 21;
+    private static final long BID_LAST  = RUN_ID + 25;
 
     @Autowired private WorkflowEngine workflowEngine;
     @Autowired private WorkflowQueryService queryService;
@@ -417,6 +417,7 @@ class WorkflowEngineIntegrationTest {
             final int idx = i;
             executor.submit(() -> {
                 try {
+                    setAdminContext(0L);
                     workflowEngine.approve(task.getId(), USER_ADMIN, "admin",
                             "并发测试-" + idx, "test08-" + UUID.randomUUID() + "-" + idx);
                     successCount.incrementAndGet();
@@ -424,6 +425,7 @@ class WorkflowEngineIntegrationTest {
                     failCount.incrementAndGet();
                     System.out.println("  线程" + idx + " 失败: " + e.getMessage());
                 } finally {
+                    UserContext.clear();
                     latch.countDown();
                 }
             });
@@ -700,9 +702,9 @@ class WorkflowEngineIntegrationTest {
         workflowEngine.approve(taskB.getId(), taskB.getApproverId(), "admin",
                 "同意", "test14-tenantB-" + UUID.randomUUID());
 
-        // 查询租户B中 USER_MANAGER 的已办记录 → 应有
-        pageB = queryService.getMyDone(USER_MANAGER, tenantB, 1, 20);
-        assertTrue(pageB.getTotal() >= 1, "租户B中USER_MANAGER应有已办记录");
+        // 查询租户B中实际处理人 USER_ADMIN 的已办记录 → 应有
+        pageB = queryService.getMyDone(USER_ADMIN, tenantB, 1, 20);
+        assertTrue(pageB.getTotal() >= 1, "租户B中USER_ADMIN应有已办记录");
 
         // 验证 instance 信息已富化加载
         WfRecordVO firstRecord = pageA.getRecords().get(0);
@@ -714,7 +716,7 @@ class WorkflowEngineIntegrationTest {
         System.out.println("✅ 场景14 通过: getMyDone 租户隔离验证通过，"
                 + "租户A(USER_ADMIN)=" + pageA.getTotal()
                 + ", 租户A(USER_MANAGER)=" + pageA2.getTotal()
-                + ", 租户B(USER_MANAGER)=" + pageB.getTotal());
+                + ", 租户B(USER_ADMIN)=" + pageB.getTotal());
         } finally {
             restoreUsersToTenant0();
         }
@@ -959,6 +961,89 @@ class WorkflowEngineIntegrationTest {
         }
     }
 
+    @Test
+    @Order(17)
+    @DisplayName("场景17: 审批动作显式拒绝当前租户与目标租户不一致")
+    void test17_crossTenantActionsRejected() {
+        long tenantId = 889L;
+        long wrongTenantId = 890L;
+        moveUsersToTenant(tenantId);
+        try {
+            setAdminContext(tenantId);
+            WfInstance approveInstance = submitTenantContract(tenantId, RUN_ID + 22, "跨租户拒绝-同意");
+            WfTask approveTask = firstPendingTask(approveInstance.getId());
+            setAdminContext(wrongTenantId);
+            BusinessException approveEx = assertThrows(BusinessException.class,
+                    () -> workflowEngine.approve(approveTask.getId(), USER_ADMIN, "admin",
+                            "跨租户同意", "test17-approve-" + UUID.randomUUID()));
+            assertEquals("RESOURCE_NOT_FOUND", approveEx.getCode());
+            assertEquals(WorkflowConstants.TASK_PENDING,
+                    taskMapper.selectByIdIgnoringTenant(approveTask.getId()).getTaskStatus(),
+                    "跨租户同意不应变更任务状态");
+
+            setAdminContext(tenantId);
+            WfInstance rejectInstance = submitTenantContract(tenantId, RUN_ID + 23, "跨租户拒绝-驳回");
+            WfTask rejectTask = firstPendingTask(rejectInstance.getId());
+            setAdminContext(wrongTenantId);
+            BusinessException rejectEx = assertThrows(BusinessException.class,
+                    () -> workflowEngine.reject(rejectTask.getId(), USER_ADMIN, "admin",
+                            "跨租户驳回", "test17-reject-" + UUID.randomUUID()));
+            assertEquals("RESOURCE_NOT_FOUND", rejectEx.getCode());
+            assertEquals(WorkflowConstants.TASK_PENDING,
+                    taskMapper.selectByIdIgnoringTenant(rejectTask.getId()).getTaskStatus(),
+                    "跨租户驳回不应变更任务状态");
+
+            setAdminContext(tenantId);
+            WfInstance withdrawInstance = submitTenantContract(tenantId, RUN_ID + 24, "跨租户拒绝-撤回");
+            setAdminContext(wrongTenantId);
+            BusinessException withdrawEx = assertThrows(BusinessException.class,
+                    () -> workflowEngine.withdraw(withdrawInstance.getId(), USER_ADMIN, "admin"));
+            assertEquals("RESOURCE_NOT_FOUND", withdrawEx.getCode());
+            assertEquals(WorkflowConstants.INSTANCE_RUNNING,
+                    instanceMapper.selectByIdIgnoringTenant(withdrawInstance.getId()).getInstanceStatus(),
+                    "跨租户撤回不应变更实例状态");
+
+            setAdminContext(tenantId);
+            WfInstance resubmitInstance = submitTenantContract(tenantId, RUN_ID + 25, "跨租户拒绝-重提");
+            WfTask resubmitTask = firstPendingTask(resubmitInstance.getId());
+            workflowEngine.reject(resubmitTask.getId(), USER_ADMIN, "admin",
+                    "准备重提", "test17-resubmit-reject-" + UUID.randomUUID());
+            setAdminContext(wrongTenantId);
+            BusinessException resubmitEx = assertThrows(BusinessException.class,
+                    () -> workflowEngine.resubmit(resubmitInstance.getId(), USER_ADMIN, "admin"));
+            assertEquals("RESOURCE_NOT_FOUND", resubmitEx.getCode());
+            assertEquals(WorkflowConstants.INSTANCE_REJECTED,
+                    instanceMapper.selectByIdIgnoringTenant(resubmitInstance.getId()).getInstanceStatus(),
+                    "跨租户重提不应变更实例状态");
+        } finally {
+            restoreUsersToTenant0();
+        }
+    }
+
+    private void setAdminContext(long tenantId) {
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", tenantId)
+                .add("roleCodes", java.util.List.of("ADMIN"))
+                .build());
+    }
+
+    private WfInstance submitTenantContract(long tenantId, long businessId, String title) {
+        return workflowEngine.submit(
+                USER_ADMIN, "admin", tenantId,
+                "CONTRACT_APPROVAL", businessId,
+                title, new BigDecimal("220000.00"),
+                100L, 100L, "{}", "{}", null);
+    }
+
+    private WfTask firstPendingTask(Long instanceId) {
+        return taskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getInstanceId, instanceId)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)).get(0);
+    }
+
     /**
      * Cleanup all workflow test data generated by this integration test.
      *
@@ -982,7 +1067,8 @@ class WorkflowEngineIntegrationTest {
      *   RUN_ID+19   test15e (addSign notification)
      *   RUN_ID+20   test16a (submit with CC)
      *   RUN_ID+21   test16b (submit without CC)
-     *   TOTAL: 21 business IDs.
+     *   RUN_ID+22-25 test17 (cross-tenant action guard)
+     *   TOTAL: 25 business IDs.
      *
      * Deletion order: child tables first, parent table (wf_instance) last.
      * No FK constraints exist, but this order ensures logical consistency.
@@ -999,7 +1085,7 @@ class WorkflowEngineIntegrationTest {
         jdbcTemplate.update("DELETE FROM sys_notification WHERE biz_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)", BID_FIRST, BID_LAST);
 
         // 4. wf_idempotency — records created with specific key patterns (business_id is NOT set during creation)
-        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key LIKE 'tenant-idem-%' OR idempotency_key LIKE 'test13-%' OR idempotency_key LIKE 'test14-%' OR idempotency_key LIKE 'test15-%'");
+        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key LIKE 'tenant-idem-%' OR idempotency_key LIKE 'test13-%' OR idempotency_key LIKE 'test14-%' OR idempotency_key LIKE 'test15-%' OR idempotency_key LIKE 'test17-%'");
 
         // 5. wf_idempotency — fallback by business_id range (for records where business_id IS set)
         jdbcTemplate.update("DELETE FROM wf_idempotency WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);

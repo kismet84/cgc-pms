@@ -29,6 +29,11 @@ public class WorkflowWithdrawService {
     @Transactional
     public void withdraw(Long instanceId, Long userId, String username) {
 
+        WfInstance tenantProbe = wfInstanceMapper.selectByIdIgnoringTenant(instanceId);
+        if (tenantProbe == null) {
+            throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
+        }
+        core.requireCurrentTenant(tenantProbe.getTenantId());
         WfInstance instance = wfInstanceMapper.selectById(instanceId);
         if (instance == null) {
             throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");

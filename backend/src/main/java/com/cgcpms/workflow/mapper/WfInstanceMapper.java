@@ -1,5 +1,6 @@
 package com.cgcpms.workflow.mapper;
 
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import org.apache.ibatis.annotations.Delete;
@@ -12,6 +13,10 @@ import java.util.List;
 
 @Mapper
 public interface WfInstanceMapper extends BaseMapper<WfInstance> {
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("SELECT * FROM wf_instance WHERE id = #{id} AND deleted_flag = 0")
+    WfInstance selectByIdIgnoringTenant(@Param("id") Long id);
 
     /**
      * Query all rows (including logically-deleted) for the given business key.

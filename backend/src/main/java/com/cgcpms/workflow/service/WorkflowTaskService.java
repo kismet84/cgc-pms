@@ -36,6 +36,11 @@ public class WorkflowTaskService {
     public void transfer(Long taskId, Long targetUserId, Long userId,
                          String username, String comment) {
 
+        WfTask tenantProbe = wfTaskMapper.selectByIdIgnoringTenant(taskId);
+        if (tenantProbe == null) {
+            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
+        }
+        core.requireCurrentTenant(tenantProbe.getTenantId());
         WfTask task = wfTaskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
@@ -122,6 +127,11 @@ public class WorkflowTaskService {
     public void addSign(Long taskId, List<Long> additionalUserIds, Long userId,
                         String username, String comment) {
 
+        WfTask tenantProbe = wfTaskMapper.selectByIdIgnoringTenant(taskId);
+        if (tenantProbe == null) {
+            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
+        }
+        core.requireCurrentTenant(tenantProbe.getTenantId());
         WfTask task = wfTaskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");

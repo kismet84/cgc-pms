@@ -156,6 +156,11 @@ public class WorkflowApprovalService {
      */
     private WfTask validateAndCasUpdateTask(Long taskId, Long userId, String idempotencyKey,
                                              String actionType, String targetStatus, String comment) {
+        WfTask tenantProbe = wfTaskMapper.selectByIdIgnoringTenant(taskId);
+        if (tenantProbe == null) {
+            throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
+        }
+        core.requireCurrentTenant(tenantProbe.getTenantId());
         WfTask task = wfTaskMapper.selectById(taskId);
         if (task == null) {
             throw new BusinessException("TASK_NOT_FOUND", "审批任务不存在");
