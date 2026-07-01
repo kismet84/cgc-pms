@@ -1,0 +1,127 @@
+export interface WorkflowBusinessEntryRegistryItem {
+  businessType: string
+  displayName: string
+  permissionCode: string
+  targetRoute: (businessId: string) => string
+  openMode: 'route'
+  forbiddenPolicy: 'disabled-with-tooltip'
+}
+
+export const workflowBusinessEntryRegistry: WorkflowBusinessEntryRegistryItem[] = [
+  {
+    businessType: 'CONTRACT',
+    displayName: '合同审批',
+    permissionCode: 'contract:query',
+    targetRoute: (businessId: string) => `/contract/${businessId}`,
+    openMode: 'route',
+    forbiddenPolicy: 'disabled-with-tooltip',
+  },
+  {
+    businessType: 'CONTRACT_APPROVAL',
+    displayName: '合同审批',
+    permissionCode: 'contract:query',
+    targetRoute: (businessId: string) => `/contract/${businessId}`,
+    openMode: 'route',
+    forbiddenPolicy: 'disabled-with-tooltip',
+  },
+  {
+    businessType: 'PURCHASE_REQUEST',
+    displayName: '采购申请',
+    permissionCode: 'purchase:request:list',
+    targetRoute: (businessId: string) => `/inventory/purchase-request?businessId=${businessId}`,
+    openMode: 'route',
+    forbiddenPolicy: 'disabled-with-tooltip',
+  },
+  {
+    businessType: 'SUB_MEASURE',
+    displayName: '分包计量',
+    permissionCode: 'subcontract:measure:query',
+    targetRoute: (businessId: string) => `/subcontract/measure?businessId=${businessId}`,
+    openMode: 'route',
+    forbiddenPolicy: 'disabled-with-tooltip',
+  },
+]
+
+const workflowBusinessEntryMap = new Map(
+  workflowBusinessEntryRegistry.map((entry) => [entry.businessType, entry]),
+)
+
+export const workflowBusinessTypeLabels: Record<string, string> = {
+  ...Object.fromEntries(
+    workflowBusinessEntryRegistry.map((entry) => [entry.businessType, entry.displayName]),
+  ),
+  PAY_APPLICATION: '付款申请',
+  PAY_REQUEST: '付款申请',
+  PURCHASE_ORDER: '采购订单',
+  MATERIAL_RECEIPT: '材料验收',
+  MAT_RECEIPT: '材料验收',
+  MATERIAL_REQUISITION: '材料领用',
+  VAR_ORDER: '签证变更',
+  CT_CHANGE: '合同变更',
+  SETTLEMENT: '结算审批',
+  COST_TARGET: '目标成本',
+  CONTRACT_REVENUE: '合同收入',
+  TECH_ITEM: '技术事项',
+}
+
+export const coreBusinessTypeOptions = workflowBusinessEntryRegistry
+  .filter((entry) => entry.businessType !== 'CONTRACT')
+  .map((entry) => ({ label: entry.displayName, value: entry.businessType }))
+
+export const instanceStatusOptions = [
+  { label: '审批中', value: 'RUNNING' },
+  { label: '已通过', value: 'APPROVED' },
+  { label: '已驳回', value: 'REJECTED' },
+  { label: '已撤回', value: 'WITHDRAWN' },
+]
+
+const instanceStatusMap: Record<string, { text: string; color: string }> = {
+  RUNNING: { text: '审批中', color: 'processing' },
+  APPROVED: { text: '已通过', color: 'success' },
+  REJECTED: { text: '已驳回', color: 'error' },
+  WITHDRAWN: { text: '已撤回', color: 'default' },
+  VOIDED: { text: '已作废', color: 'default' },
+}
+
+export function getWorkflowBusinessTypeLabel(value: unknown): string {
+  const key = String(value ?? '').trim()
+  if (!key) return '未知业务类型'
+  return workflowBusinessTypeLabels[key] ?? '未知业务类型'
+}
+
+export function getWorkflowInstanceStatusMeta(status: unknown) {
+  const key = String(status ?? '').trim()
+  return instanceStatusMap[key] ?? { text: '未知状态', color: 'default' }
+}
+
+export function getWorkflowBusinessEntryPath(record: {
+  businessId?: unknown
+  businessType?: unknown
+} | null) {
+  const businessId = String(record?.businessId ?? '').trim()
+  if (!businessId) return ''
+  return getWorkflowBusinessEntry(record)?.targetRoute(businessId) ?? ''
+}
+
+export function getWorkflowBusinessEntry(record: {
+  businessType?: unknown
+} | null) {
+  const key = String(record?.businessType ?? '').trim()
+  return workflowBusinessEntryMap.get(key) ?? null
+}
+
+export function getWorkflowBusinessEntryPermission(record: {
+  businessType?: unknown
+} | null) {
+  return getWorkflowBusinessEntry(record)?.permissionCode ?? ''
+}
+
+export function canAccessWorkflowBusinessEntry(
+  record: { businessType?: unknown } | null,
+  hasPermission: (code: string) => boolean,
+  roles: string[] = [],
+) {
+  const permission = getWorkflowBusinessEntryPermission(record)
+  if (!permission) return false
+  return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN') || hasPermission(permission)
+}
