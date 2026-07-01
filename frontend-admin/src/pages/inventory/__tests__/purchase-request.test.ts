@@ -21,4 +21,18 @@ describe('purchase request modal filters', () => {
     expect(source).toMatch(/await loadContractsByProject\(record\.projectId\)/)
     expect(source).not.toMatch(/fetchContracts\(\)/)
   })
+
+  it('opens businessId deeplink through detail API and clears query', () => {
+    expect(source).toContain("import { useRoute, useRouter } from 'vue-router'")
+    expect(source).toContain('getPurchaseRequestDetail')
+    expect(source).toContain('const route = useRoute()')
+    expect(source).toContain('const router = useRouter()')
+    expect(source).toContain('async function openBusinessIdFromQuery()')
+    expect(source).toContain('route.query.businessId')
+    expect(source).toContain('await getPurchaseRequestDetail(String(businessId))')
+    expect(source).toContain('await handleView(record)')
+    expect(source).toContain('delete nextQuery.businessId')
+    expect(source).toContain('await router.replace({ path: route.path, query: nextQuery })')
+    expect(source).toMatch(/onMounted\([\s\S]*?openBusinessIdFromQuery\(\)/)
+  })
 })

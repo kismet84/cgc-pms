@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { MoreOutlined } from '@ant-design/icons-vue'
+import type { Dayjs } from 'dayjs'
 import {
   approveTask,
   getInstanceDetail,
@@ -19,12 +20,22 @@ import {
   type WfMineInstanceVO,
   type WfInstanceVO,
 } from '@/api/modules/workflow'
-import type { PageResult } from '@/types/api'
+import type { PageParams, PageResult } from '@/types/api'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { useUserStore } from '@/stores/user'
+import {
+  canAccessWorkflowBusinessEntry,
+  coreBusinessTypeOptions,
+  getWorkflowBusinessEntryPath,
+  getWorkflowBusinessTypeLabel,
+  getWorkflowInstanceStatusMeta,
+  instanceStatusOptions,
+} from './workflowDisplay'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 
 const activeTab = ref(String(route.meta.approvalTab ?? 'todo'))
 
@@ -33,7 +44,10 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const tabTotals = ref<Record<string, number>>({ todo: 0, done: 0, cc: 0, mine: 0 })
-const mineStatus = ref('')
+const filterKeyword = ref('')
+const filterBusinessType = ref('')
+const filterInstanceStatus = ref('')
+const filterTimeRange = ref<[Dayjs, Dayjs] | null>(null)
 
 const todoData = ref<WfTaskVO[]>([])
 const doneData = ref<WfRecordVO[]>([])
@@ -46,28 +60,6 @@ const actionLoading = ref(false)
 const approvalComment = ref('')
 const showApproveModal = ref(false)
 const showRejectModal = ref(false)
-
-const businessTypeMap: Record<string, string> = {
-  CONTRACT_APPROVAL: '合同审批',
-  PAY_APPLICATION: '付款申请',
-  PAY_REQUEST: '付款申请',
-  PURCHASE_ORDER: '采购订单',
-  PURCHASE_REQUEST: '采购申请',
-  MATERIAL_RECEIPT: '材料验收',
-  VAR_ORDER: '签证变更',
-  CT_CHANGE: '合同变更',
-  MAT_RECEIPT: '材料验收',
-  SUB_MEASURE: '分包计量',
-  SETTLEMENT: '结算审批',
-  COST_TARGET: '目标成本',
-}
-
-const statusMap: Record<string, { text: string; color: string }> = {
-  RUNNING: { text: '审批中', color: 'processing' },
-  APPROVED: { text: '已通过', color: 'success' },
-  REJECTED: { text: '已驳回', color: 'error' },
-  WITHDRAWN: { text: '已撤回', color: 'default' },
-}
 
 const actionNameMap: Record<string, string> = {
   SUBMIT: '提交审批',
@@ -95,13 +87,12 @@ const taskStatusMap: Record<string, { text: string; color: string }> = {
   TRANSFERRED: { text: '已转办', color: 'warning' },
 }
 
-const mineStatusOptions = [
+const statusFilterOptions = [
   { label: '全部', value: '' },
-  { label: '审批中', value: 'RUNNING' },
-  { label: '已通过', value: 'APPROVED' },
-  { label: '已驳回', value: 'REJECTED' },
-  { label: '已撤回', value: 'WITHDRAWN' },
+  ...instanceStatusOptions,
 ]
+
+const businessTypeFilterOptions = [{ label: '全部业务', value: '' }, ...coreBusinessTypeOptions]
 
 function syncActiveTotal(value: unknown) {
   const nextTotal = Number(value ?? 0)
@@ -109,13 +100,27 @@ function syncActiveTotal(value: unknown) {
   tabTotals.value[activeTab.value] = total.value
 }
 
+function buildQueryParams(): PageParams {
+  const params: PageParams = {
+    pageNo: pageNo.value,
+    pageNum: pageNo.value,
+    pageSize: pageSize.value,
+  }
+  const keyword = filterKeyword.value.trim()
+  if (keyword) params.keyword = keyword
+  if (filterBusinessType.value) params.businessType = filterBusinessType.value
+  if (filterInstanceStatus.value) params.instanceStatus = filterInstanceStatus.value
+  if (filterTimeRange.value?.[0] && filterTimeRange.value?.[1]) {
+    params.startTime = filterTimeRange.value[0].startOf('day').format('YYYY-MM-DD HH:mm:ss')
+    params.endTime = filterTimeRange.value[1].endOf('day').format('YYYY-MM-DD HH:mm:ss')
+  }
+  return params
+}
+
 async function fetchData() {
   loading.value = true
   try {
-    const params = { pageNo: pageNo.value, pageNum: pageNo.value, pageSize: pageSize.value }
-    if (activeTab.value === 'mine' && mineStatus.value) {
-      Object.assign(params, { instanceStatus: mineStatus.value })
-    }
+    const params = buildQueryParams()
 
     if (activeTab.value === 'todo') {
       const res: PageResult<WfTaskVO> = await getMyTodos(params)
@@ -159,10 +164,17 @@ function handlePageChange(pno: number, psize: number) {
   fetchData()
 }
 
-function handleMineStatusChange(value: string | number) {
-  mineStatus.value = String(value)
+function handleFilterSearch() {
   pageNo.value = 1
   fetchData()
+}
+
+function handleFilterReset() {
+  filterKeyword.value = ''
+  filterBusinessType.value = ''
+  filterInstanceStatus.value = ''
+  filterTimeRange.value = null
+  handleFilterSearch()
 }
 
 async function handleDetail(record: { instanceId: string }) {
@@ -240,6 +252,14 @@ const isDetailRunning = computed(() => detail.value?.instanceStatus === 'RUNNING
 const fullDetailOnlyActions = computed(() =>
   availableActions.value.filter((action) => action === 'transfer' || action === 'addSign'),
 )
+
+function canShowApprovalActions() {
+  return activeTab.value === 'todo' && isDetailRunning.value
+}
+
+function canShowInitiatorActions() {
+  return activeTab.value === 'mine'
+}
 
 function findMyPendingTask() {
   const activeNode = detailNodes.value.find((node) => node.nodeStatus === 'ACTIVE')
@@ -365,14 +385,31 @@ function displayText(value: unknown): string {
   return String(value)
 }
 
+function businessTypeLabel(value: unknown) {
+  return getWorkflowBusinessTypeLabel(value)
+}
+
 function getInstanceStatusMeta(status: unknown) {
-  const key = String(status ?? '')
-  return statusMap[key] ?? { text: '未知状态', color: 'default' }
+  return getWorkflowInstanceStatusMeta(status)
 }
 
 function getRecordActionName(record: WfRecordVO): string {
   const key = String(record.actionType ?? '')
   return actionNameMap[key] ?? displayText(record.actionName)
+}
+
+function businessEntryPath(record: WfInstanceVO | null) {
+  return getWorkflowBusinessEntryPath(record)
+}
+
+function canOpenBusinessEntry(record: WfInstanceVO | null) {
+  return canAccessWorkflowBusinessEntry(record, userStore.hasPermission, userStore.roles)
+}
+
+function openBusinessEntry(record: WfInstanceVO) {
+  if (!canOpenBusinessEntry(record)) return
+  const path = businessEntryPath(record)
+  if (path) router.push(path)
 }
 
 function openFullDetail() {
@@ -441,17 +478,38 @@ watch(
           <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
             <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label" />
           </a-tabs>
-          <a-segmented
-            v-if="activeTab === 'mine'"
-            v-model:value="mineStatus"
-            :options="mineStatusOptions"
-            @change="handleMineStatusChange"
-          />
           <ColumnSettingsButton
             :columns="columnSettings"
             :visible="colVisible"
             @toggle="toggleCol"
           />
+        </div>
+
+        <div class="lg-search-bar approval-filter-bar">
+          <a-input
+            v-model:value="filterKeyword"
+            allow-clear
+            placeholder="搜索标题/摘要"
+            class="approval-filter-keyword"
+            @press-enter="handleFilterSearch"
+          />
+          <a-select
+            v-model:value="filterBusinessType"
+            :options="businessTypeFilterOptions"
+            placeholder="全部业务"
+            style="width: 150px"
+          />
+          <a-select
+            v-model:value="filterInstanceStatus"
+            :options="statusFilterOptions"
+            placeholder="全部状态"
+            style="width: 140px"
+          />
+          <a-range-picker v-model:value="filterTimeRange" />
+          <div class="lg-search-actions">
+            <a-button type="primary" @click="handleFilterSearch">查询</a-button>
+            <a-button @click="handleFilterReset">重置</a-button>
+          </div>
         </div>
 
         <div class="lg-table-wrap">
@@ -470,9 +528,7 @@ watch(
               }}</a>
             </template>
             <template #businessType="{ row }">
-              <a-tag>{{
-                businessTypeMap[row.businessType as string] || (row.businessType as string) || '—'
-              }}</a-tag>
+              <a-tag>{{ businessTypeLabel(row.businessType) }}</a-tag>
             </template>
             <template #timeCol="{ row }">
               {{ getTimeCol(row) }}
@@ -565,7 +621,7 @@ watch(
           <div class="approval-detail-head">
             <div>
               <strong>{{ detail.title }}</strong>
-              <span>{{ businessTypeMap[detail.businessType] || detail.businessType }}</span>
+              <span>{{ businessTypeLabel(detail.businessType) }}</span>
             </div>
             <a-tag :color="getInstanceStatusMeta(detail.instanceStatus).color">
               {{ getInstanceStatusMeta(detail.instanceStatus).text }}
@@ -587,8 +643,22 @@ watch(
               {{ detail.businessSummary }}
             </a-descriptions-item>
           </a-descriptions>
+          <div v-if="businessEntryPath(detail)" class="approval-actions">
+            <a-tooltip :title="canOpenBusinessEntry(detail) ? '' : '无权访问该业务单据'">
+              <span>
+                <a-button
+                  type="link"
+                  size="small"
+                  :disabled="!canOpenBusinessEntry(detail)"
+                  @click="openBusinessEntry(detail)"
+                >
+                  查看业务单据
+                </a-button>
+              </span>
+            </a-tooltip>
+          </div>
 
-          <div v-if="availableActions.length > 0 && isDetailRunning" class="approval-actions">
+          <div v-if="availableActions.length > 0 && canShowApprovalActions()" class="approval-actions">
             <a-button
               v-if="availableActions.includes('approve')"
               type="primary"
@@ -605,8 +675,12 @@ watch(
             >
               驳回
             </a-button>
+          </div>
+          <div
+            v-if="availableActions.includes('withdraw') && canShowInitiatorActions()"
+            class="approval-actions"
+          >
             <a-button
-              v-if="availableActions.includes('withdraw')"
               :loading="actionLoading"
               @click="handleWithdraw"
             >
@@ -614,7 +688,7 @@ watch(
             </a-button>
           </div>
           <a-alert
-            v-if="fullDetailOnlyActions.length > 0"
+            v-if="fullDetailOnlyActions.length > 0 && canShowApprovalActions()"
             class="approval-action-hint"
             type="info"
             show-icon
@@ -625,7 +699,7 @@ watch(
             </template>
           </a-alert>
           <div
-            v-if="availableActions.includes('resubmit') && !isDetailRunning"
+            v-if="availableActions.includes('resubmit') && canShowInitiatorActions() && !isDetailRunning"
             class="approval-actions"
           >
             <a-button type="primary" :loading="actionLoading" @click="handleResubmit">
@@ -734,6 +808,15 @@ watch(
 
 .approval-action-hint {
   margin-top: 4px;
+}
+
+.approval-filter-bar {
+  padding: 12px 0;
+}
+
+.approval-filter-keyword {
+  flex: 1;
+  min-width: 220px;
 }
 
 .approval-detail-section h3 {

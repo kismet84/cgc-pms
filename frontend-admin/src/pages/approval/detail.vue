@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   getInstanceDetail,
   approveTask,
@@ -12,8 +12,17 @@ import {
   type WfInstanceVO,
 } from '@/api/modules/workflow'
 import { message, Modal } from 'ant-design-vue'
+import { useUserStore } from '@/stores/user'
+import {
+  canAccessWorkflowBusinessEntry,
+  getWorkflowBusinessEntryPath,
+  getWorkflowBusinessTypeLabel,
+  getWorkflowInstanceStatusMeta,
+} from './workflowDisplay'
 
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
 const instanceId = route.params.instanceId as string
 
 const loading = ref(false)
@@ -31,13 +40,6 @@ const transferComment = ref('')
 const showAddSignModal = ref(false)
 const addSignUserIds = ref<string[]>([])
 const addSignComment = ref('')
-
-const statusMap: Record<string, { text: string; color: string }> = {
-  RUNNING: { text: '审批中', color: 'processing' },
-  APPROVED: { text: '已通过', color: 'success' },
-  REJECTED: { text: '已驳回', color: 'error' },
-  WITHDRAWN: { text: '已撤回', color: 'default' },
-}
 
 const actionNameMap: Record<string, string> = {
   SUBMIT: '提交审批',
@@ -81,8 +83,7 @@ function displayText(value: unknown): string {
 }
 
 function getInstanceStatusMeta(status: unknown) {
-  const key = String(status ?? '')
-  return statusMap[key] ?? { text: '未知状态', color: 'default' }
+  return getWorkflowInstanceStatusMeta(status)
 }
 
 function getNodeStatusMeta(status: unknown) {
@@ -98,6 +99,20 @@ function getTaskStatusMeta(status: unknown) {
 function getRecordActionName(record: { actionType?: string; actionName?: string }) {
   const key = String(record.actionType ?? '')
   return actionNameMap[key] ?? displayText(record.actionName)
+}
+
+function businessEntryPath(record: WfInstanceVO | null) {
+  return getWorkflowBusinessEntryPath(record)
+}
+
+function canOpenBusinessEntry(record: WfInstanceVO | null) {
+  return canAccessWorkflowBusinessEntry(record, userStore.hasPermission, userStore.roles)
+}
+
+function openBusinessEntry(record: WfInstanceVO) {
+  if (!canOpenBusinessEntry(record)) return
+  const path = businessEntryPath(record)
+  if (path) router.push(path)
 }
 
 async function fetchDetail() {
@@ -324,6 +339,9 @@ onMounted(() => {
         <div class="pt-panel">
           <a-descriptions title="基本信息" :column="2" size="small" bordered>
             <a-descriptions-item label="审批标题">{{ detail.title }}</a-descriptions-item>
+            <a-descriptions-item label="业务类型">
+              {{ getWorkflowBusinessTypeLabel(detail.businessType) }}
+            </a-descriptions-item>
             <a-descriptions-item label="模板名称">{{ detail.templateName }}</a-descriptions-item>
             <a-descriptions-item label="发起人">{{ detail.initiatorName }}</a-descriptions-item>
             <a-descriptions-item label="发起时间">{{ detail.startedAt }}</a-descriptions-item>
@@ -337,6 +355,20 @@ onMounted(() => {
               detail.endedAt
             }}</a-descriptions-item>
           </a-descriptions>
+          <div v-if="businessEntryPath(detail)" class="wf-actions">
+            <a-tooltip :title="canOpenBusinessEntry(detail) ? '' : '无权访问该业务单据'">
+              <span>
+                <a-button
+                  type="link"
+                  size="small"
+                  :disabled="!canOpenBusinessEntry(detail)"
+                  @click="openBusinessEntry(detail)"
+                >
+                  查看业务单据
+                </a-button>
+              </span>
+            </a-tooltip>
+          </div>
         </div>
 
         <!-- Action Bar -->

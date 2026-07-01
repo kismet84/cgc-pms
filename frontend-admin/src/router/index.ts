@@ -373,6 +373,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/system/roles/index.vue'),
             meta: { title: '角色管理' },
           },
+          {
+            path: 'permissions',
+            name: 'SystemPermissions',
+            component: () => import('@/pages/system/permissions/index.vue'),
+            meta: { title: '权限清单' },
+          },
         ],
       },
       {

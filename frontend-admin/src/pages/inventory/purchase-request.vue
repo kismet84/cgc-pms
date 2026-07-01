@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
   CheckCircleOutlined,
@@ -14,6 +15,7 @@ import {
 } from '@ant-design/icons-vue'
 import {
   getPurchaseRequestList,
+  getPurchaseRequestDetail,
   createPurchaseRequest,
   updatePurchaseRequest,
   deletePurchaseRequest,
@@ -28,6 +30,9 @@ import type { ContractVO } from '@/types/contract'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+
+const route = useRoute()
+const router = useRouter()
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -210,6 +215,24 @@ async function handleEdit(record: PurchaseRequestVO) {
 async function handleView(record: PurchaseRequestVO) {
   await handleEdit(record)
   modalTitle.value = '查看采购申请'
+}
+
+async function openBusinessIdFromQuery() {
+  const value = route.query.businessId
+  const businessId = Array.isArray(value) ? value[0] : value
+  if (!businessId) return
+
+  try {
+    const record = await getPurchaseRequestDetail(String(businessId))
+    await handleView(record)
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('业务单据加载失败，请稍后重试')
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.businessId
+    await router.replace({ path: route.path, query: nextQuery })
+  }
 }
 
 async function loadContractsByProject(projectId?: string) {
@@ -473,6 +496,7 @@ onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchMaterials()
   fetchData()
+  openBusinessIdFromQuery()
 })
 </script>
 

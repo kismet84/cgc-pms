@@ -30,4 +30,18 @@ describe('SubcontractMeasurePage submit-approval button', () => {
   it('wires 提交审批 button to handleSubmitApproval handler', () => {
     expect(source).toMatch(/handleSubmitApproval\(row\)/)
   })
+
+  it('opens businessId deeplink through detail API and clears query', () => {
+    expect(source).toContain("import { useRoute, useRouter } from 'vue-router'")
+    expect(source).toContain('getMeasureDetail')
+    expect(source).toContain('const route = useRoute()')
+    expect(source).toContain('const router = useRouter()')
+    expect(source).toContain('async function openBusinessIdFromQuery()')
+    expect(source).toContain('route.query.businessId')
+    expect(source).toContain('await getMeasureDetail(String(businessId))')
+    expect(source).toContain('await handleView(record)')
+    expect(source).toContain('delete nextQuery.businessId')
+    expect(source).toContain('await router.replace({ path: route.path, query: nextQuery })')
+    expect(source).toMatch(/onMounted\([\s\S]*?openBusinessIdFromQuery\(\)/)
+  })
 })

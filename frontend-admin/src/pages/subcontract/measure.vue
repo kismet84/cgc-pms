@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -15,6 +16,7 @@ import {
 } from '@ant-design/icons-vue'
 import {
   getMeasureList,
+  getMeasureDetail,
   createMeasure,
   updateMeasure,
   deleteMeasure,
@@ -30,6 +32,9 @@ import type { SelectOption } from '@/types/ui'
 import type { ContractItem } from '@/types/contract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+
+const route = useRoute()
+const router = useRouter()
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -274,6 +279,24 @@ async function handleView(record: SubMeasureVO) {
   modalTitle.value = '查看分包计量'
 }
 
+async function openBusinessIdFromQuery() {
+  const value = route.query.businessId
+  const businessId = Array.isArray(value) ? value[0] : value
+  if (!businessId) return
+
+  try {
+    const record = await getMeasureDetail(String(businessId))
+    await handleView(record)
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('业务单据加载失败，请稍后重试')
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.businessId
+    await router.replace({ path: route.path, query: nextQuery })
+  }
+}
+
 function handleDelete(record: SubMeasureVO) {
   Modal.confirm({
     title: '确认删除',
@@ -479,6 +502,7 @@ onMounted(() => {
   referenceStore.fetchContracts({ contractType: 'SUB' })
   referenceStore.fetchPartners({ partnerType: 'SUB' })
   fetchData()
+  openBusinessIdFromQuery()
 })
 </script>
 

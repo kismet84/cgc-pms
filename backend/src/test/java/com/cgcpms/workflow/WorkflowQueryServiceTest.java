@@ -241,6 +241,31 @@ class WorkflowQueryServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("getMyTodos 支持统一筛选并保持身份边界")
+    void getMyTodosSupportsUnifiedFilters() {
+        LocalDateTime base = LocalDateTime.of(2099, 7, 1, 10, 0, 0);
+        Long targetInstanceId = insertStartedInstance(33333020L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_OTHER,
+                WorkflowConstants.INSTANCE_RUNNING, "统一筛选合同待办", "合同审批节点", base.minusDays(2), base.minusDays(2));
+        Long otherInstanceId = insertStartedInstance(33333021L, WorkflowBusinessTypes.PURCHASE_REQUEST, USER_OTHER,
+                WorkflowConstants.INSTANCE_RUNNING, "统一筛选采购待办", "采购审批节点", base.minusDays(1), base.minusDays(1));
+        insertTask(targetInstanceId, 33333020L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_ADMIN, base.minusHours(2));
+        insertTask(otherInstanceId, 33333021L, WorkflowBusinessTypes.PURCHASE_REQUEST, USER_OTHER, base.minusHours(1));
+
+        IPage<WfTaskVO> page = queryService.getMyTodos(TENANT_0, USER_ADMIN,
+                "合同待办", WorkflowBusinessTypes.CONTRACT_APPROVAL, WorkflowConstants.INSTANCE_RUNNING,
+                base.minusDays(1), base, 1, 10);
+
+        assertEquals(1, page.getTotal());
+        assertEquals("33333020", page.getRecords().get(0).getBusinessId());
+        assertEquals(WorkflowBusinessTypes.CONTRACT_APPROVAL, page.getRecords().get(0).getBusinessType());
+
+        IPage<WfTaskVO> noHit = queryService.getMyTodos(TENANT_0, USER_ADMIN,
+                "合同待办", WorkflowBusinessTypes.CONTRACT_APPROVAL, WorkflowConstants.INSTANCE_RUNNING,
+                base.minusMinutes(30), base, 1, 10);
+        assertEquals(0, noHit.getTotal());
+    }
+
     // ── getMyDone ──
 
     @Test
@@ -433,6 +458,32 @@ class WorkflowQueryServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("getMyStarted 支持关键词业务类型状态时间筛选")
+    void getMyStartedSupportsUnifiedFilters() {
+        LocalDateTime base = LocalDateTime.of(2099, 7, 1, 10, 0, 0);
+        insertStartedInstance(33333020L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_ADMIN,
+                WorkflowConstants.INSTANCE_APPROVED, "我发起合同筛选", null, base.minusDays(3), base.minusHours(3));
+        insertStartedInstance(33333021L, WorkflowBusinessTypes.PURCHASE_REQUEST, USER_ADMIN,
+                WorkflowConstants.INSTANCE_RUNNING, "我发起采购筛选", null, base.minusDays(2), base.minusHours(2));
+        insertStartedInstance(33333022L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_OTHER,
+                WorkflowConstants.INSTANCE_APPROVED, "他人合同筛选", null, base.minusDays(2), base.minusHours(1));
+
+        IPage<WfMyInstanceVO> page = queryService.getMyStarted(TENANT_0, USER_ADMIN,
+                "合同筛选", WorkflowBusinessTypes.CONTRACT_APPROVAL, WorkflowConstants.INSTANCE_APPROVED,
+                base.minusDays(4), base.minusDays(2), 1, 1);
+
+        assertEquals(1, page.getTotal());
+        assertEquals(1, page.getRecords().size());
+        assertEquals("33333020", page.getRecords().get(0).getBusinessId());
+        assertEquals(WorkflowConstants.INSTANCE_APPROVED, page.getRecords().get(0).getInstanceStatus());
+
+        IPage<WfMyInstanceVO> noHit = queryService.getMyStarted(TENANT_0, USER_ADMIN,
+                "合同筛选", WorkflowBusinessTypes.CONTRACT_APPROVAL, WorkflowConstants.INSTANCE_RUNNING,
+                base.minusDays(4), base, 1, 10);
+        assertEquals(0, noHit.getTotal());
+    }
+
     private void assertOnlyStatus(String instanceStatus, String expectedBusinessId) {
         IPage<WfMyInstanceVO> page = queryService.getMyStarted(TENANT_0, USER_ADMIN, instanceStatus, 1, 100);
 
@@ -464,6 +515,33 @@ class WorkflowQueryServiceTest {
         boolean foundSubmitInPage2 = page2.getRecords().stream()
                 .anyMatch(r -> String.valueOf(submittedInstanceId).equals(r.getInstanceId()));
         assertFalse(foundSubmitInPage2, "自己的记录不应出现在第二页");
+    }
+
+    @Test
+    @DisplayName("getMyDone 支持统一筛选并保留已处理动作语义")
+    void getMyDoneSupportsUnifiedFilters() {
+        LocalDateTime base = LocalDateTime.of(2099, 7, 1, 10, 0, 0);
+        Long approvedInstanceId = insertStartedInstance(33333020L, WorkflowBusinessTypes.PURCHASE_REQUEST, USER_OTHER,
+                WorkflowConstants.INSTANCE_APPROVED, "已办采购筛选", null, base.minusDays(2), base.minusHours(2));
+        Long runningInstanceId = insertStartedInstance(33333021L, WorkflowBusinessTypes.PURCHASE_REQUEST, USER_OTHER,
+                WorkflowConstants.INSTANCE_RUNNING, "运行采购筛选", null, base.minusDays(1), base.minusHours(1));
+        insertRecord(approvedInstanceId, 33333020L, WorkflowBusinessTypes.PURCHASE_REQUEST,
+                WorkflowConstants.ACTION_APPROVE, USER_ADMIN, base.minusHours(4));
+        insertRecord(runningInstanceId, 33333021L, WorkflowBusinessTypes.PURCHASE_REQUEST,
+                WorkflowConstants.ACTION_APPROVE, USER_OTHER, base.minusHours(3));
+
+        IPage<WfRecordVO> page = queryService.getMyDone(USER_ADMIN, TENANT_0,
+                "已办采购", WorkflowBusinessTypes.PURCHASE_REQUEST, WorkflowConstants.INSTANCE_APPROVED,
+                base.minusDays(1), base, 1, 10);
+
+        assertEquals(1, page.getTotal());
+        assertEquals(String.valueOf(approvedInstanceId), page.getRecords().get(0).getInstanceId());
+        assertEquals(WorkflowConstants.ACTION_APPROVE, page.getRecords().get(0).getActionType());
+
+        IPage<WfRecordVO> noHit = queryService.getMyDone(USER_ADMIN, TENANT_0,
+                "已办采购", WorkflowBusinessTypes.PURCHASE_REQUEST, WorkflowConstants.INSTANCE_RUNNING,
+                base.minusDays(1), base, 1, 10);
+        assertEquals(0, noHit.getTotal());
     }
 
     // ── getInstanceDetail ──
@@ -740,6 +818,33 @@ class WorkflowQueryServiceTest {
         }
     }
 
+    @Test
+    @DisplayName("getMyCc 支持统一筛选并保持抄送人边界")
+    void getMyCcSupportsUnifiedFilters() {
+        LocalDateTime base = LocalDateTime.of(2099, 7, 1, 10, 0, 0);
+        Long targetInstanceId = insertStartedInstance(33333020L, WorkflowBusinessTypes.SUB_MEASURE, USER_OTHER,
+                WorkflowConstants.INSTANCE_RUNNING, "抄送分包筛选", null, base.minusDays(2), base.minusHours(2));
+        Long otherInstanceId = insertStartedInstance(33333021L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_OTHER,
+                WorkflowConstants.INSTANCE_RUNNING, "抄送合同筛选", null, base.minusDays(1), base.minusHours(1));
+        insertCc(targetInstanceId, 33333020L, WorkflowBusinessTypes.SUB_MEASURE,
+                USER_ADMIN, "抄送分包筛选", base.minusHours(5));
+        insertCc(otherInstanceId, 33333021L, WorkflowBusinessTypes.CONTRACT_APPROVAL,
+                USER_OTHER, "抄送合同筛选", base.minusHours(4));
+
+        IPage<WfCcVO> page = queryService.getMyCc(USER_ADMIN, TENANT_0,
+                "分包筛选", WorkflowBusinessTypes.SUB_MEASURE, WorkflowConstants.INSTANCE_RUNNING,
+                base.minusDays(1), base, 1, 10);
+
+        assertEquals(1, page.getTotal());
+        assertEquals("33333020", page.getRecords().get(0).getBusinessId());
+        assertEquals(WorkflowBusinessTypes.SUB_MEASURE, page.getRecords().get(0).getBusinessType());
+
+        IPage<WfCcVO> noHit = queryService.getMyCc(USER_ADMIN, TENANT_0,
+                "分包筛选", WorkflowBusinessTypes.SUB_MEASURE, WorkflowConstants.INSTANCE_APPROVED,
+                base.minusDays(1), base, 1, 10);
+        assertEquals(0, noHit.getTotal());
+    }
+
     // ── Seed data ──
 
     private void seedAdminUser() {
@@ -873,7 +978,7 @@ class WorkflowQueryServiceTest {
         taskMapper.insert(task);
     }
 
-    private void insertStartedInstance(Long businessId, String businessType, Long initiatorId,
+    private Long insertStartedInstance(Long businessId, String businessType, Long initiatorId,
                                        String status, String title, String currentNodeName,
                                        LocalDateTime createdAt, LocalDateTime updatedAt) {
         WfInstance instance = new WfInstance();
@@ -911,5 +1016,59 @@ class WorkflowQueryServiceTest {
             node.setStartedAt(createdAt);
             nodeInstanceMapper.insert(node);
         }
+        return instance.getId();
+    }
+
+    private void insertTask(Long instanceId, Long businessId, String businessType,
+                            Long approverId, LocalDateTime receivedAt) {
+        WfNodeInstance node = nodeInstanceMapper.selectOne(new LambdaQueryWrapper<WfNodeInstance>()
+                .eq(WfNodeInstance::getInstanceId, instanceId));
+        WfTask task = new WfTask();
+        task.setTenantId(TENANT_0);
+        task.setInstanceId(instanceId);
+        task.setNodeInstanceId(node == null ? null : node.getId());
+        task.setBusinessType(businessType);
+        task.setBusinessId(businessId);
+        task.setApproverId(approverId);
+        task.setApproverName("filter-user");
+        task.setTaskStatus(WorkflowConstants.TASK_PENDING);
+        task.setRoundNo(1);
+        task.setTaskVersion(0);
+        task.setReceivedAt(receivedAt);
+        taskMapper.insert(task);
+    }
+
+    private void insertRecord(Long instanceId, Long businessId, String businessType,
+                              String actionType, Long operatorId, LocalDateTime createdAt) {
+        WfRecord record = new WfRecord();
+        record.setTenantId(TENANT_0);
+        record.setInstanceId(instanceId);
+        record.setRoundNo(1);
+        record.setBusinessType(businessType);
+        record.setBusinessId(businessId);
+        record.setNodeCode("N1");
+        record.setNodeName("筛选审批节点");
+        record.setActionType(actionType);
+        record.setActionName(actionType);
+        record.setOperatorId(operatorId);
+        record.setOperatorName("filter-user");
+        record.setRecordStatus(WorkflowConstants.RECORD_EFFECTIVE);
+        record.setCreatedAt(createdAt);
+        recordMapper.insert(record);
+    }
+
+    private void insertCc(Long instanceId, Long businessId, String businessType,
+                          Long ccUserId, String title, LocalDateTime createdTime) {
+        WfCc cc = new WfCc();
+        cc.setTenantId(TENANT_0);
+        cc.setInstanceId(instanceId);
+        cc.setCcUserId(ccUserId);
+        cc.setCcUserName("filter-user");
+        cc.setBusinessType(businessType);
+        cc.setBusinessId(businessId);
+        cc.setTitle(title);
+        cc.setIsRead(0);
+        cc.setCreatedTime(createdTime);
+        ccMapper.insert(cc);
     }
 }

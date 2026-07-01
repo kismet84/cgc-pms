@@ -80,6 +80,25 @@ function pendingText(value?: number) {
   if (value === 0) return '今日'
   return `${Math.max(Math.round(value), 0)}天`
 }
+
+function daysFromToday(value?: string | number) {
+  const text = formatDate(value)
+  if (text === '-') return null
+  const [year, month, day] = text.split('-').map(Number)
+  if (!year || !month || !day) return null
+  const now = new Date()
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  const target = Date.UTC(year, month - 1, day)
+  return Math.round((target - today) / 86_400_000)
+}
+
+function receiptTimingText(record: DashboardBusinessItemVO) {
+  const days = daysFromToday(record.date)
+  if (days === null) return '-'
+  if (days > 0) return `剩余${days}天`
+  if (days === 0) return '今日'
+  return `已过${Math.abs(days)}天`
+}
 </script>
 
 <template>
@@ -198,7 +217,7 @@ function pendingText(value?: number) {
                 {{ formatDate(text) }}
               </span>
               <span v-else-if="column.key === 'pendingDays'" class="production-days">
-                {{ pendingText((record as DashboardBusinessItemVO).pendingDays) }}
+                {{ receiptTimingText(record as DashboardBusinessItemVO) }}
               </span>
             </template>
           </a-table>

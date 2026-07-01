@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../todo.vue'), 'utf-8')
+const helperSource = readFileSync(resolve(currentDir, '../workflowDisplay.ts'), 'utf-8')
 const workflowApiSource = readFileSync(resolve(currentDir, '../../../api/modules/workflow.ts'), 'utf-8')
 const navigationSource = readFileSync(resolve(currentDir, '../../../router/navigation.ts'), 'utf-8')
 
@@ -18,8 +19,15 @@ describe('approval work list route titles', () => {
   })
 
   it('maps payment application business type to Chinese display text', () => {
-    expect(source).toMatch(/PAY_APPLICATION:\s*'付款申请'/)
-    expect(source).toMatch(/businessTypeMap\[row\.businessType as string\]/)
+    expect(helperSource).toMatch(/PAY_APPLICATION:\s*'付款申请'/)
+    expect(helperSource).toContain("businessType: 'CONTRACT_APPROVAL'")
+    expect(helperSource).toContain("displayName: '合同审批'")
+    expect(helperSource).toContain('getWorkflowBusinessTypeLabel')
+    expect(helperSource).toContain("return workflowBusinessTypeLabels[key] ?? '未知业务类型'")
+    expect(source).toContain('function businessTypeLabel')
+    expect(source).toContain('return getWorkflowBusinessTypeLabel(value)')
+    expect(source).toContain('businessTypeLabel(row.businessType)')
+    expect(source).not.toMatch(/businessTypeMap\[row\.businessType as string\][\s\S]*row\.businessType as string/)
   })
 
   it('wires my initiated tab to the mine instance API and tracking columns', () => {
@@ -41,7 +49,7 @@ describe('approval work list route titles', () => {
     expect(source).toContain("{ key: 'done', label: '我的已办' }")
     expect(source).toContain("{ key: 'cc', label: '抄送我的' }")
     expect(source).toContain(
-      'const params = { pageNo: pageNo.value, pageNum: pageNo.value, pageSize: pageSize.value }',
+      'const params: PageParams = {',
     )
     expect(source).toContain('getMyTodos(params)')
     expect(source).toContain('getMyDone(params)')
@@ -86,30 +94,109 @@ describe('approval work list route titles', () => {
     expect(source).toContain("handleDetail(row as { instanceId: string })")
   })
 
-  it('filters my initiated instances by server-side instance status', () => {
-    expect(source).toContain("const mineStatus = ref('')")
-    expect(source).toContain("const mineStatusOptions = [")
+  it('filters approval tabs with server-side query params', () => {
+    expect(source).toContain("const filterKeyword = ref('')")
+    expect(source).toContain("const filterBusinessType = ref('')")
+    expect(source).toContain("const filterInstanceStatus = ref('')")
+    expect(source).toContain('const filterTimeRange = ref')
+    expect(source).toContain('function buildQueryParams()')
+    expect(source).toContain('if (keyword) params.keyword = keyword')
+    expect(source).toContain('if (filterBusinessType.value) params.businessType = filterBusinessType.value')
+    expect(source).toContain('if (filterInstanceStatus.value) params.instanceStatus = filterInstanceStatus.value')
+    expect(source).toContain("params.startTime = filterTimeRange.value[0].startOf('day').format('YYYY-MM-DD HH:mm:ss')")
+    expect(source).toContain("params.endTime = filterTimeRange.value[1].endOf('day').format('YYYY-MM-DD HH:mm:ss')")
+    expect(source).toContain('const params = buildQueryParams()')
+    expect(source).toContain('getMyTodos(params)')
+    expect(source).toContain('getMyDone(params)')
+    expect(source).toContain('getMyCc(params)')
+    expect(source).toContain('getMyInitiatedInstances(params)')
+    expect(source).toContain('function handleFilterSearch')
+    expect(source).toMatch(/function handleFilterSearch[\s\S]*?pageNo\.value = 1[\s\S]*?fetchData\(\)/)
+    expect(source).toContain('function handleFilterReset')
+    expect(source).toContain('<a-input')
+    expect(source).toContain('<a-range-picker v-model:value="filterTimeRange"')
+    expect(source).not.toContain('tableData.value.filter')
+  })
+
+  it('limits approval filter options to the three core workflow business types', () => {
+    expect(helperSource).toContain('export const coreBusinessTypeOptions = workflowBusinessEntryRegistry')
+    expect(helperSource).toContain(".filter((entry) => entry.businessType !== 'CONTRACT')")
+    expect(helperSource).toContain('.map((entry) => ({ label: entry.displayName, value: entry.businessType }))')
+    expect(source).toContain('const businessTypeFilterOptions = [{ label: \'全部业务\', value: \'\' }, ...coreBusinessTypeOptions]')
+    expect(source).toContain('const statusFilterOptions = [')
     expect(source).toContain("{ label: '全部', value: '' }")
-    expect(source).toContain("{ label: '审批中', value: 'RUNNING' }")
-    expect(source).toContain("{ label: '已通过', value: 'APPROVED' }")
-    expect(source).toContain("{ label: '已驳回', value: 'REJECTED' }")
-    expect(source).toContain("{ label: '已撤回', value: 'WITHDRAWN' }")
-    expect(source).toContain("Object.assign(params, { instanceStatus: mineStatus.value })")
-    expect(source).toContain('function handleMineStatusChange')
-    expect(source).toMatch(/function handleMineStatusChange[\s\S]*?pageNo\.value = 1[\s\S]*?fetchData\(\)/)
-    expect(source).toContain('<a-segmented')
-    expect(source).toContain('v-if="activeTab === \'mine\'"')
+    expect(helperSource).toContain("{ label: '审批中', value: 'RUNNING' }")
+    expect(helperSource).toContain("{ label: '已通过', value: 'APPROVED' }")
+    expect(helperSource).toContain("{ label: '已驳回', value: 'REJECTED' }")
+    expect(helperSource).toContain("{ label: '已撤回', value: 'WITHDRAWN' }")
+    expect(source).not.toContain('mineStatus')
+    expect(source).not.toContain('<a-segmented')
   })
 
   it('localizes withdrawn status and exposes resubmit in embedded detail', () => {
     expect(source).toContain('resubmitInstance')
-    expect(source).toContain("WITHDRAWN: { text: '已撤回', color: 'default' }")
+    expect(helperSource).toContain("WITHDRAWN: { text: '已撤回', color: 'default' }")
     expect(source).toContain('function getInstanceStatusMeta')
+    expect(source).toContain('return getWorkflowInstanceStatusMeta(status)')
     expect(source).toContain('getInstanceStatusMeta(row.instanceStatus)')
     expect(source).not.toContain('{{ row.instanceStatus }}</a-tag>')
     expect(source).toContain('async function handleResubmit()')
     expect(source).toMatch(/handleResubmit[\s\S]*?resubmitInstance\(instanceId\)[\s\S]*?await refreshDetail\(\)/)
-    expect(source).toContain("availableActions.includes('resubmit') && !isDetailRunning")
+    expect(source).toContain(
+      "availableActions.includes('resubmit') && canShowInitiatorActions() && !isDetailRunning",
+    )
     expect(source).toContain('重新提交')
+  })
+
+  it('keeps embedded detail actions read-only for done and cc tabs', () => {
+    expect(source).toContain('function canShowApprovalActions()')
+    expect(source).toContain("return activeTab.value === 'todo' && isDetailRunning.value")
+    expect(source).toContain('function canShowInitiatorActions()')
+    expect(source).toContain("return activeTab.value === 'mine'")
+    expect(source).toContain('v-if="availableActions.length > 0 && canShowApprovalActions()"')
+    expect(source).toContain("v-if=\"availableActions.includes('withdraw') && canShowInitiatorActions()\"")
+    expect(source).toContain("v-if=\"availableActions.includes('resubmit') && canShowInitiatorActions() && !isDetailRunning\"")
+  })
+
+  it('shows embedded business document entry only for supported workflow business types', () => {
+    expect(helperSource).toContain('export const workflowBusinessEntryRegistry')
+    expect(helperSource).toContain("businessType: 'CONTRACT_APPROVAL'")
+    expect(helperSource).toContain("displayName: '合同审批'")
+    expect(helperSource).toContain("permissionCode: 'contract:query'")
+    expect(helperSource).toContain("businessType: 'PURCHASE_REQUEST'")
+    expect(helperSource).toContain("displayName: '采购申请'")
+    expect(helperSource).toContain("permissionCode: 'purchase:request:list'")
+    expect(helperSource).toContain("businessType: 'SUB_MEASURE'")
+    expect(helperSource).toContain("displayName: '分包计量'")
+    expect(helperSource).toContain("permissionCode: 'subcontract:measure:query'")
+    expect(helperSource).toContain("openMode: 'route'")
+    expect(helperSource).toContain("forbiddenPolicy: 'disabled-with-tooltip'")
+    expect(helperSource).toContain('targetRoute:')
+    expect(helperSource).toContain('export function getWorkflowBusinessEntry')
+    expect(source).toContain('function businessEntryPath')
+    expect(source).toContain('return getWorkflowBusinessEntryPath(record)')
+    expect(source).toContain('useUserStore')
+    expect(source).toContain('const userStore = useUserStore()')
+    expect(source).toContain('function canOpenBusinessEntry')
+    expect(source).toContain(
+      'return canAccessWorkflowBusinessEntry(record, userStore.hasPermission, userStore.roles)',
+    )
+    expect(helperSource).toContain('targetRoute: (businessId: string) => `/contract/${businessId}`')
+    expect(helperSource).toContain(
+      'targetRoute: (businessId: string) => `/inventory/purchase-request?businessId=${businessId}`',
+    )
+    expect(helperSource).toContain(
+      'targetRoute: (businessId: string) => `/subcontract/measure?businessId=${businessId}`',
+    )
+    expect(helperSource).toContain('export function getWorkflowBusinessEntryPermission')
+    expect(helperSource).toContain('export function canAccessWorkflowBusinessEntry')
+    expect(helperSource).toContain("roles.includes('ADMIN') || roles.includes('SUPER_ADMIN')")
+    expect(source).toContain('function openBusinessEntry')
+    expect(source).toMatch(/function openBusinessEntry[\s\S]*?if \(!canOpenBusinessEntry\(record\)\) return/)
+    expect(source).toContain('router.push(path)')
+    expect(source).toContain("v-if=\"businessEntryPath(detail)\"")
+    expect(source).toContain('无权访问该业务单据')
+    expect(source).toContain(':disabled="!canOpenBusinessEntry(detail)"')
+    expect(source).toContain('查看业务单据')
   })
 })

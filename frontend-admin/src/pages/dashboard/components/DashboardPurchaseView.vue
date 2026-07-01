@@ -142,6 +142,17 @@ function durationDays(value?: number | string) {
   return Number.isFinite(days) ? Math.max(Math.round(days), 0) : null
 }
 
+function daysFromToday(value?: string | number) {
+  const text = formatDate(value)
+  if (text === '-') return null
+  const [year, month, day] = text.split('-').map(Number)
+  if (!year || !month || !day) return null
+  const now = new Date()
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+  const target = Date.UTC(year, month - 1, day)
+  return Math.round((target - today) / 86_400_000)
+}
+
 function sortNumber(value?: number | string, desc = false) {
   const days = durationDays(value)
   if (days === null) return desc ? -1 : Number.MAX_SAFE_INTEGER
@@ -198,11 +209,12 @@ function overdueInfo(record: DashboardBusinessItemVO) {
   return `逾期${days}天`
 }
 
-function pendingInfo(record: DashboardBusinessItemVO) {
-  const days = durationDays(record.pendingDays)
+function receiptTimeliness(record: DashboardBusinessItemVO) {
+  const days = daysFromToday(record.date)
   if (days === null) return '-'
+  if (days > 0) return `剩余${days}天`
   if (days === 0) return '今日'
-  return `剩余${days}天`
+  return `逾期${Math.abs(days)}天`
 }
 </script>
 
@@ -390,7 +402,7 @@ function pendingInfo(record: DashboardBusinessItemVO) {
                 </span>
               </a-tooltip>
               <span v-else-if="column.key === 'pendingInfo'" class="purchase-days warning">
-                {{ pendingInfo(record) }}
+                {{ receiptTimeliness(record) }}
               </span>
             </template>
           </a-table>

@@ -15,6 +15,7 @@ import {
   type WorkflowTemplateNodeParams,
 } from '@/api/modules/workflow'
 import type { PageResult } from '@/types/api'
+import { getWorkflowBusinessTypeLabel, workflowBusinessTypeLabels } from './workflowDisplay'
 
 interface TemplateFilter {
   businessType: string
@@ -67,21 +68,7 @@ const nodeForm = reactive<WorkflowTemplateNodeParams>({
   remark: '',
 })
 
-const businessTypeMap: Record<string, string> = {
-  CONTRACT_APPROVAL: '合同审批',
-  PAY_APPLICATION: '付款申请',
-  PURCHASE_ORDER: '采购订单',
-  PURCHASE_REQUEST: '采购申请',
-  MATERIAL_RECEIPT: '材料验收',
-  SUB_MEASURE: '分包计量',
-  PAY_REQUEST: '付款申请',
-  VAR_ORDER: '变更签证',
-  CT_CHANGE: '合同变更',
-  SETTLEMENT: '结算审批',
-  COST_TARGET: '目标成本',
-}
-
-const businessTypeOptions = Object.entries(businessTypeMap).map(([value, label]) => ({
+const businessTypeOptions = Object.entries(workflowBusinessTypeLabels).map(([value, label]) => ({
   value,
   label,
 }))
@@ -372,7 +359,7 @@ function handleTableChange(pagination: { current?: number; pageSize?: number }) 
 }
 
 function businessTypeLabel(type: string) {
-  return businessTypeMap[type] ?? type
+  return getWorkflowBusinessTypeLabel(type)
 }
 
 function approveModeLabel(mode: string) {

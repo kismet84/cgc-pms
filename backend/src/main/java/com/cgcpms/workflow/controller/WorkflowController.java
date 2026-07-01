@@ -20,7 +20,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 
 @Slf4j
 @RestController
@@ -113,10 +116,16 @@ public class WorkflowController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<PageResult<WfTaskVO>> myTodos(
             @RequestParam(defaultValue = "1") long pageNo,
-            @RequestParam(defaultValue = "20") long pageSize) {
+            @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String businessType,
+            @RequestParam(required = false) String instanceStatus,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();
-        IPage<WfTaskVO> page = workflowQueryService.getMyTodos(tenantId, userId, pageNo, pageSize);
+        IPage<WfTaskVO> page = workflowQueryService.getMyTodos(tenantId, userId,
+                keyword, businessType, instanceStatus, startTime, endTime, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -125,10 +134,15 @@ public class WorkflowController {
     public ApiResponse<PageResult<WfMyInstanceVO>> myStarted(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
-            @RequestParam(required = false) String instanceStatus) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String businessType,
+            @RequestParam(required = false) String instanceStatus,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();
-        IPage<WfMyInstanceVO> page = workflowQueryService.getMyStarted(tenantId, userId, instanceStatus, pageNo, pageSize);
+        IPage<WfMyInstanceVO> page = workflowQueryService.getMyStarted(tenantId, userId,
+                keyword, businessType, instanceStatus, startTime, endTime, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -136,10 +150,16 @@ public class WorkflowController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<PageResult<WfRecordVO>> myDone(
             @RequestParam(defaultValue = "1") long pageNo,
-            @RequestParam(defaultValue = "20") long pageSize) {
+            @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String businessType,
+            @RequestParam(required = false) String instanceStatus,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();
-        IPage<WfRecordVO> page = workflowQueryService.getMyDone(userId, tenantId, pageNo, pageSize);
+        IPage<WfRecordVO> page = workflowQueryService.getMyDone(userId, tenantId,
+                keyword, businessType, instanceStatus, startTime, endTime, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -147,10 +167,16 @@ public class WorkflowController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<PageResult<WfCcVO>> myCc(
             @RequestParam(defaultValue = "1") long pageNo,
-            @RequestParam(defaultValue = "20") long pageSize) {
+            @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String businessType,
+            @RequestParam(required = false) String instanceStatus,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         Long userId = UserContext.getCurrentUserId();
         Long tenantId = UserContext.getCurrentTenantId();
-        IPage<WfCcVO> page = workflowQueryService.getMyCc(userId, tenantId, pageNo, pageSize);
+        IPage<WfCcVO> page = workflowQueryService.getMyCc(userId, tenantId,
+                keyword, businessType, instanceStatus, startTime, endTime, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
     }
 

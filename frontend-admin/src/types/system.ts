@@ -28,6 +28,7 @@ export interface SysMenuVO {
   menuType: string
   path: string
   component: string
+  perms?: string
   icon: string
   sort: number
   status: string

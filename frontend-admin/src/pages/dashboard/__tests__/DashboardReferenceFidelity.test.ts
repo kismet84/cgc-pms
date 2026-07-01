@@ -93,9 +93,9 @@ describe('Dashboard reference fidelity', () => {
     expect(purchaseViewSource).toContain("key: 'overdueInfo'")
     expect(purchaseViewSource).toContain("key: 'pendingInfo'")
     expect(purchaseViewSource).toContain('overdueInfo(record)')
-    expect(purchaseViewSource).toContain('pendingInfo(record)')
+    expect(purchaseViewSource).toContain('receiptTimeliness(record)')
     expect(purchaseViewSource).toContain('durationDays(record.overdueDays)')
-    expect(purchaseViewSource).toContain('durationDays(record.pendingDays)')
+    expect(purchaseViewSource).toContain('receiptTimeliness(record)')
     expect(purchaseViewSource).toContain("return `逾期${days}天`")
     expect(purchaseViewSource).toContain("return `剩余${days}天`")
     expect(purchaseViewSource).toContain('purchase-ellipsis')
@@ -182,6 +182,28 @@ describe('Dashboard reference fidelity', () => {
       expect(typesSource).toContain(field)
       expect(purchaseViewSource).toContain(field)
     }
+  })
+
+  it('uses receipt date instead of pendingDays zero to label future pending receipts', () => {
+    expect(purchaseViewSource).toContain('function receiptTimeliness')
+    expect(purchaseViewSource).toContain('Date.UTC')
+    expect(purchaseViewSource).toContain("return `剩余${days}天`")
+    expect(purchaseViewSource).toContain("return '今日'")
+    expect(purchaseViewSource).toContain("return `逾期${Math.abs(days)}天`")
+    expect(purchaseViewSource).toContain('receiptTimeliness(record)')
+    expect(purchaseViewSource).not.toContain('if (days === 0) return \'今日\'\n  return `剩余${days}天`')
+  })
+
+  it('uses receipt date for production recent receipt timing without touching requisitions', () => {
+    expect(productionViewSource).toContain('function receiptTimingText')
+    expect(productionViewSource).toContain('Date.UTC')
+    expect(productionViewSource).toContain("return `剩余${days}天`")
+    expect(productionViewSource).toContain("return '今日'")
+    expect(productionViewSource).toContain("return `已过${Math.abs(days)}天`")
+    expect(productionViewSource).toContain('receiptTimingText(record as DashboardBusinessItemVO)')
+    expect(productionViewSource).toContain(
+      'pendingText((record as DashboardBusinessItemVO).pendingDays)',
+    )
   })
 
   it('wires role-specific summary fields without changing legacy dashboard pages', () => {

@@ -166,6 +166,86 @@ class MigrationIntegrityTest {
         }
     }
 
+    @Test
+    void approvalPermissionMatrixDemoSeedStaysWithinSeedBoundary() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V110__seed_approval_permission_matrix_demo_accounts.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V110__seed_approval_permission_matrix_demo_accounts.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("demo_workflow_only"));
+            assertTrue(sql.contains("demo_cc_readonly"));
+            assertTrue(sql.contains("demo_non_participant"));
+            assertTrue(sql.contains("WORKFLOW_ONLY_DEMO"));
+            assertTrue(sql.contains("CC_READONLY_DEMO"));
+            assertTrue(sql.contains("NON_PARTICIPANT_DEMO"));
+            assertTrue(sql.contains("'ALL'"));
+            assertTrue(sql.contains("INSERT INTO sys_user"));
+            assertTrue(sql.contains("INSERT INTO sys_role"));
+            assertTrue(sql.contains("INSERT INTO sys_user_role"));
+            assertTrue(sql.contains("INSERT INTO sys_role_menu"));
+            assertTrue(sql.contains("INSERT INTO wf_instance"));
+            assertTrue(sql.contains("INSERT INTO wf_cc"));
+            assertTrue(sql.contains("908"));
+            assertTrue(sql.contains("946"));
+            assertTrue(sql.contains("947"));
+            assertTrue(sql.contains("948"));
+            assertTrue(sql.contains("949"));
+            assertFalse(sql.contains("INSERT INTO sys_menu"));
+            assertFalse(sql.contains("ALTER TABLE"));
+            assertFalse(sql.contains("CREATE INDEX"));
+            assertFalse(sql.contains("workflow:approve"));
+            assertFalse(sql.contains("workflow:reject"));
+            assertFalse(sql.contains("workflow:transfer"));
+            assertFalse(sql.contains("workflow:add-sign"));
+            assertFalse(sql.contains("workflow:withdraw"));
+            assertFalse(sql.contains("workflow:resubmit"));
+            assertFalse(sql.contains("contract:query"));
+            assertFalse(sql.contains("purchase:request:list"));
+            assertFalse(sql.contains("subcontract:measure:query"));
+        }
+    }
+
+    @Test
+    void approvalPermissionMatrixWorkflowOnlyRepairStaysWithinSeedBoundary() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V111__repair_approval_permission_matrix_workflow_only_samples.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V111__repair_approval_permission_matrix_workflow_only_samples.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("demo_workflow_only"));
+            assertTrue(sql.contains("2071032241708793858"));
+            assertTrue(sql.contains("970000000000005001"));
+            assertTrue(sql.contains("CT-DEMO-WF-PERM-ONLY-001"));
+            assertTrue(sql.contains("PR-DEMO-WF-PERM-ONLY-001"));
+            assertTrue(sql.contains("SM-DEMO-WF-PERM-ONLY-001"));
+            assertTrue(sql.contains("PR-DEMO-REAL-001"));
+            assertTrue(sql.contains("SM-DEMO-REAL-001"));
+            assertTrue(sql.contains("INSERT INTO ct_contract"));
+            assertTrue(sql.contains("INSERT INTO mat_purchase_request"));
+            assertTrue(sql.contains("INSERT INTO sub_measure"));
+            assertTrue(sql.contains("INSERT INTO wf_instance"));
+            assertTrue(sql.contains("INSERT INTO wf_node_instance"));
+            assertTrue(sql.contains("INSERT INTO wf_task"));
+            assertTrue(sql.contains("INSERT INTO wf_record"));
+            assertFalse(sql.contains("INSERT INTO sys_user"));
+            assertFalse(sql.contains("INSERT INTO sys_role"));
+            assertFalse(sql.contains("INSERT INTO sys_user_role"));
+            assertFalse(sql.contains("INSERT INTO sys_role_menu"));
+            assertFalse(sql.contains("INSERT INTO sys_menu"));
+            assertFalse(sql.contains("INSERT INTO wf_cc"));
+            assertFalse(sql.contains("ALTER TABLE"));
+            assertFalse(sql.contains("CREATE INDEX"));
+            assertFalse(sql.contains("contract:query"));
+            assertFalse(sql.contains("purchase:request:list"));
+            assertFalse(sql.contains("subcontract:measure:query"));
+        }
+    }
+
     /**
      * Java-based migrations (V51/V58/V75) are executed by Flyway at startup
      * from {@code common/migration/} and do not require SQL-level coverage here —

@@ -110,6 +110,7 @@ export const navigationItems: NavigationItem[] = [
     children: [
       { key: '/system/users', label: '用户管理' },
       { key: '/system/roles', label: '角色管理' },
+      { key: '/system/permissions', label: '权限清单' },
       { key: '/system/dict', label: '字典管理' },
       { key: '/system/data', label: '数据管理' },
     ],

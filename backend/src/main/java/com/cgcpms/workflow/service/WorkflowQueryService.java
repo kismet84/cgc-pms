@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -32,14 +34,66 @@ public class WorkflowQueryService {
     private final WorkflowVOAssembler voAssembler;
     private final ProjectAccessChecker projectAccessChecker;
 
+    private static final Set<String> SUPPORTED_BUSINESS_TYPES = Set.of(
+            WorkflowBusinessTypes.CONTRACT_APPROVAL,
+            WorkflowBusinessTypes.PURCHASE_ORDER,
+            WorkflowBusinessTypes.MATERIAL_RECEIPT,
+            WorkflowBusinessTypes.SUB_MEASURE,
+            WorkflowBusinessTypes.PAY_REQUEST,
+            WorkflowBusinessTypes.VAR_ORDER,
+            WorkflowBusinessTypes.PURCHASE_REQUEST,
+            WorkflowBusinessTypes.CT_CHANGE,
+            WorkflowBusinessTypes.SETTLEMENT,
+            WorkflowBusinessTypes.COST_TARGET,
+            WorkflowBusinessTypes.CONTRACT_REVENUE,
+            WorkflowBusinessTypes.MATERIAL_REQUISITION,
+            WorkflowBusinessTypes.TECH_ITEM
+    );
+
+    private static final Set<String> SUPPORTED_INSTANCE_STATUSES = Set.of(
+            WorkflowConstants.INSTANCE_RUNNING,
+            WorkflowConstants.INSTANCE_APPROVED,
+            WorkflowConstants.INSTANCE_REJECTED,
+            WorkflowConstants.INSTANCE_WITHDRAWN,
+            WorkflowConstants.INSTANCE_VOIDED
+    );
+
     // ── 我的待办 ──
 
     public IPage<WfTaskVO> getMyTodos(Long tenantId, Long userId, long pageNo, long pageSize) {
+        return getMyTodos(tenantId, userId, null, null, null, null, null, pageNo, pageSize);
+    }
+
+    public IPage<WfTaskVO> getMyTodos(Long tenantId, Long userId,
+                                      String keyword, String businessType, String instanceStatus,
+                                      LocalDateTime startTime, LocalDateTime endTime,
+                                      long pageNo, long pageSize) {
+        if (isUnsupportedBusinessType(businessType) || isUnsupportedInstanceStatus(instanceStatus)) {
+            return emptyPage(pageNo, pageSize);
+        }
+        String normalizedBusinessType = trimToNull(businessType);
+        Set<Long> instanceIds = resolveInstanceIds(tenantId, keyword, normalizedBusinessType, instanceStatus);
+        if (instanceIds != null && instanceIds.isEmpty()) {
+            return emptyPage(pageNo, pageSize);
+        }
+
         LambdaQueryWrapper<WfTask> wrapper = new LambdaQueryWrapper<WfTask>()
                 .eq(WfTask::getTenantId, tenantId)
                 .eq(WfTask::getApproverId, userId)
-                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
-                .orderByDesc(WfTask::getReceivedAt);
+                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING);
+        if (normalizedBusinessType != null) {
+            wrapper.eq(WfTask::getBusinessType, normalizedBusinessType);
+        }
+        if (instanceIds != null) {
+            wrapper.in(WfTask::getInstanceId, instanceIds);
+        }
+        if (startTime != null) {
+            wrapper.ge(WfTask::getReceivedAt, startTime);
+        }
+        if (endTime != null) {
+            wrapper.le(WfTask::getReceivedAt, endTime);
+        }
+        wrapper.orderByDesc(WfTask::getReceivedAt);
 
         Page<WfTask> page = wfTaskMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
 
@@ -63,11 +117,39 @@ public class WorkflowQueryService {
 
     public IPage<WfMyInstanceVO> getMyStarted(Long tenantId, Long userId, String instanceStatus,
                                               long pageNo, long pageSize) {
+        return getMyStarted(tenantId, userId, null, null, instanceStatus, null, null, pageNo, pageSize);
+    }
+
+    public IPage<WfMyInstanceVO> getMyStarted(Long tenantId, Long userId,
+                                              String keyword, String businessType, String instanceStatus,
+                                              LocalDateTime startTime, LocalDateTime endTime,
+                                              long pageNo, long pageSize) {
+        if (isUnsupportedBusinessType(businessType) || isUnsupportedInstanceStatus(instanceStatus)) {
+            return emptyPage(pageNo, pageSize);
+        }
+        String normalizedKeyword = trimToNull(keyword);
+        String normalizedBusinessType = trimToNull(businessType);
+        String normalizedStatus = trimToNull(instanceStatus);
+
         LambdaQueryWrapper<WfInstance> wrapper = new LambdaQueryWrapper<WfInstance>()
                 .eq(WfInstance::getTenantId, tenantId)
                 .eq(WfInstance::getInitiatorId, userId);
-        if (instanceStatus != null && !instanceStatus.isBlank()) {
-            wrapper.eq(WfInstance::getInstanceStatus, instanceStatus.trim());
+        if (normalizedKeyword != null) {
+            wrapper.and(w -> w.like(WfInstance::getTitle, normalizedKeyword)
+                    .or()
+                    .like(WfInstance::getBusinessSummary, normalizedKeyword));
+        }
+        if (normalizedBusinessType != null) {
+            wrapper.eq(WfInstance::getBusinessType, normalizedBusinessType);
+        }
+        if (normalizedStatus != null) {
+            wrapper.eq(WfInstance::getInstanceStatus, normalizedStatus);
+        }
+        if (startTime != null) {
+            wrapper.ge(WfInstance::getCreatedAt, startTime);
+        }
+        if (endTime != null) {
+            wrapper.le(WfInstance::getCreatedAt, endTime);
         }
         wrapper.orderByDesc(WfInstance::getUpdatedAt)
                 .orderByDesc(WfInstance::getCreatedAt);
@@ -92,6 +174,22 @@ public class WorkflowQueryService {
     // ── 我的已办 ──
 
     public IPage<WfRecordVO> getMyDone(Long userId, Long tenantId, long pageNo, long pageSize) {
+        return getMyDone(userId, tenantId, null, null, null, null, null, pageNo, pageSize);
+    }
+
+    public IPage<WfRecordVO> getMyDone(Long userId, Long tenantId,
+                                       String keyword, String businessType, String instanceStatus,
+                                       LocalDateTime startTime, LocalDateTime endTime,
+                                       long pageNo, long pageSize) {
+        if (isUnsupportedBusinessType(businessType) || isUnsupportedInstanceStatus(instanceStatus)) {
+            return emptyPage(pageNo, pageSize);
+        }
+        String normalizedBusinessType = trimToNull(businessType);
+        Set<Long> instanceIds = resolveInstanceIds(tenantId, keyword, normalizedBusinessType, instanceStatus);
+        if (instanceIds != null && instanceIds.isEmpty()) {
+            return emptyPage(pageNo, pageSize);
+        }
+
         LambdaQueryWrapper<WfRecord> wrapper = new LambdaQueryWrapper<WfRecord>()
                 .eq(WfRecord::getTenantId, tenantId)
                 .eq(WfRecord::getOperatorId, userId)
@@ -99,8 +197,20 @@ public class WorkflowQueryService {
                         WorkflowConstants.ACTION_APPROVE,
                         WorkflowConstants.ACTION_REJECT,
                         WorkflowConstants.ACTION_TRANSFER,
-                        WorkflowConstants.ACTION_ADD_SIGN)
-                .orderByDesc(WfRecord::getCreatedAt);
+                        WorkflowConstants.ACTION_ADD_SIGN);
+        if (normalizedBusinessType != null) {
+            wrapper.eq(WfRecord::getBusinessType, normalizedBusinessType);
+        }
+        if (instanceIds != null) {
+            wrapper.in(WfRecord::getInstanceId, instanceIds);
+        }
+        if (startTime != null) {
+            wrapper.ge(WfRecord::getCreatedAt, startTime);
+        }
+        if (endTime != null) {
+            wrapper.le(WfRecord::getCreatedAt, endTime);
+        }
+        wrapper.orderByDesc(WfRecord::getCreatedAt);
 
         Page<WfRecord> page = wfRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
 
@@ -156,10 +266,38 @@ public class WorkflowQueryService {
     // ── 我的抄送 ──
 
     public IPage<WfCcVO> getMyCc(Long userId, Long tenantId, long pageNo, long pageSize) {
+        return getMyCc(userId, tenantId, null, null, null, null, null, pageNo, pageSize);
+    }
+
+    public IPage<WfCcVO> getMyCc(Long userId, Long tenantId,
+                                 String keyword, String businessType, String instanceStatus,
+                                 LocalDateTime startTime, LocalDateTime endTime,
+                                 long pageNo, long pageSize) {
+        if (isUnsupportedBusinessType(businessType) || isUnsupportedInstanceStatus(instanceStatus)) {
+            return emptyPage(pageNo, pageSize);
+        }
+        String normalizedBusinessType = trimToNull(businessType);
+        Set<Long> instanceIds = resolveInstanceIds(tenantId, keyword, normalizedBusinessType, instanceStatus);
+        if (instanceIds != null && instanceIds.isEmpty()) {
+            return emptyPage(pageNo, pageSize);
+        }
+
         LambdaQueryWrapper<WfCc> wrapper = new LambdaQueryWrapper<WfCc>()
                 .eq(WfCc::getTenantId, tenantId)
-                .eq(WfCc::getCcUserId, userId)
-                .orderByDesc(WfCc::getCreatedTime);
+                .eq(WfCc::getCcUserId, userId);
+        if (normalizedBusinessType != null) {
+            wrapper.eq(WfCc::getBusinessType, normalizedBusinessType);
+        }
+        if (instanceIds != null) {
+            wrapper.in(WfCc::getInstanceId, instanceIds);
+        }
+        if (startTime != null) {
+            wrapper.ge(WfCc::getCreatedTime, startTime);
+        }
+        if (endTime != null) {
+            wrapper.le(WfCc::getCreatedTime, endTime);
+        }
+        wrapper.orderByDesc(WfCc::getCreatedTime);
 
         Page<WfCc> page = wfCcMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
 
@@ -175,6 +313,54 @@ public class WorkflowQueryService {
     }
 
     // ── 内部辅助方法 ──
+
+    private Set<Long> resolveInstanceIds(Long tenantId, String keyword, String businessType, String instanceStatus) {
+        String normalizedKeyword = trimToNull(keyword);
+        String normalizedStatus = trimToNull(instanceStatus);
+        String normalizedBusinessType = trimToNull(businessType);
+        if (normalizedKeyword == null && normalizedStatus == null) {
+            return null;
+        }
+        LambdaQueryWrapper<WfInstance> wrapper = new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getTenantId, tenantId);
+        if (normalizedKeyword != null) {
+            wrapper.and(w -> w.like(WfInstance::getTitle, normalizedKeyword)
+                    .or()
+                    .like(WfInstance::getBusinessSummary, normalizedKeyword));
+        }
+        if (normalizedBusinessType != null) {
+            wrapper.eq(WfInstance::getBusinessType, normalizedBusinessType);
+        }
+        if (normalizedStatus != null) {
+            wrapper.eq(WfInstance::getInstanceStatus, normalizedStatus);
+        }
+        return wfInstanceMapper.selectList(wrapper).stream()
+                .map(WfInstance::getId)
+                .collect(Collectors.toSet());
+    }
+
+    private boolean isUnsupportedBusinessType(String businessType) {
+        String normalized = trimToNull(businessType);
+        return normalized != null && !SUPPORTED_BUSINESS_TYPES.contains(normalized);
+    }
+
+    private boolean isUnsupportedInstanceStatus(String instanceStatus) {
+        String normalized = trimToNull(instanceStatus);
+        return normalized != null && !SUPPORTED_INSTANCE_STATUSES.contains(normalized);
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private <T> IPage<T> emptyPage(long pageNo, long pageSize) {
+        Page<T> page = new Page<>(pageNo, pageSize);
+        page.setRecords(Collections.emptyList());
+        page.setTotal(0);
+        return page;
+    }
 
     private boolean isAuthorized(WfInstance instance, Long tenantId, Long instanceId, Long currentUserId) {
         if (instance.getInitiatorId().equals(currentUserId)) return true;
