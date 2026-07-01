@@ -246,6 +246,29 @@ class MigrationIntegrityTest {
         }
     }
 
+    @Test
+    void roleMenuAuditSnapshotMigrationStaysMinimalAndDedicated() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V112__create_role_menu_audit_snapshot.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V112__create_role_menu_audit_snapshot.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("CREATE TABLE sys_role_menu_audit_snapshot"));
+            assertTrue(sql.contains("operator_id"));
+            assertTrue(sql.contains("role_id"));
+            assertTrue(sql.contains("before_menu_ids"));
+            assertTrue(sql.contains("after_menu_ids"));
+            assertTrue(sql.contains("success_flag"));
+            assertTrue(sql.contains("error_summary"));
+            assertFalse(sql.contains("CREATE TABLE sys_menu"));
+            assertFalse(sql.contains("CREATE TABLE sys_role_menu ("));
+            assertFalse(sql.contains("permission_registry"));
+            assertFalse(sql.contains("entry_registry"));
+        }
+    }
+
     /**
      * Java-based migrations (V51/V58/V75) are executed by Flyway at startup
      * from {@code common/migration/} and do not require SQL-level coverage here —

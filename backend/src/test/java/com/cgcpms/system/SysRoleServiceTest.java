@@ -3,10 +3,16 @@ package com.cgcpms.system;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.system.entity.SysMenu;
 import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.entity.SysRoleMenuAuditSnapshot;
 import com.cgcpms.system.entity.SysRoleMenu;
+import com.cgcpms.system.entity.SysUserRole;
+import com.cgcpms.system.mapper.SysMenuMapper;
+import com.cgcpms.system.mapper.SysRoleMenuAuditSnapshotMapper;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysRoleMenuMapper;
+import com.cgcpms.system.mapper.SysUserRoleMapper;
 import com.cgcpms.system.service.SysRoleService;
 import com.cgcpms.system.vo.SysRoleVO;
 import io.jsonwebtoken.Jwts;
@@ -42,6 +48,15 @@ class SysRoleServiceTest {
 
     @Autowired
     private SysRoleMenuMapper roleMenuMapper;
+
+    @Autowired
+    private SysMenuMapper menuMapper;
+
+    @Autowired
+    private SysUserRoleMapper userRoleMapper;
+
+    @Autowired
+    private SysRoleMenuAuditSnapshotMapper auditSnapshotMapper;
 
     @BeforeEach
     void setupContext() {
@@ -465,5 +480,94 @@ class SysRoleServiceTest {
         assertEquals("ROLE_NOT_FOUND", ex.getCode());
 
         System.out.println("testAssignMenus_CrossTenantIsolation 通过: code=" + ex.getCode());
+    }
+
+    @Test
+    @Order(20)
+    @Transactional
+    @DisplayName("分配菜单 — 禁止编辑SUPER_ADMIN角色")
+    void testAssignMenus_SuperAdminRejected() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> roleService.assignMenus(1L, List.of(201L)));
+        assertEquals("ROLE_MENU_SUPER_ADMIN_PROTECTED", ex.getCode());
+    }
+
+    @Test
+    @Order(21)
+    @Transactional
+    @DisplayName("分配菜单 — 禁止编辑当前用户持有的角色")
+    void testAssignMenus_SelfRoleRejected() {
+        SysRole role = new SysRole();
+        role.setRoleCode("SELF_MENU_ROLE");
+        role.setRoleName("当前用户持有角色");
+        Long roleId = roleService.create(role);
+
+        SysUserRole userRole = new SysUserRole();
+        userRole.setUserId(USER_ADMIN);
+        userRole.setRoleId(roleId);
+        userRoleMapper.insert(userRole);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> roleService.assignMenus(roleId, List.of(201L)));
+        assertEquals("ROLE_MENU_SELF_EDIT_FORBIDDEN", ex.getCode());
+    }
+
+    @Test
+    @Order(22)
+    @Transactional
+    @DisplayName("分配菜单 — 高危系统权限diff被拒绝")
+    void testAssignMenus_HighRiskSystemPermissionRejected() {
+        Long highRiskMenuId = 991001L;
+        seedMenu(highRiskMenuId, "10C高危用户权限", "system:user:query");
+
+        SysRole role = new SysRole();
+        role.setRoleCode("HIGH_RISK_MENU_ROLE");
+        role.setRoleName("高危权限测试角色");
+        Long roleId = roleService.create(role);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> roleService.assignMenus(roleId, List.of(highRiskMenuId)));
+        assertEquals("ROLE_MENU_HIGH_RISK_FORBIDDEN", ex.getCode());
+    }
+
+    @Test
+    @Order(23)
+    @Transactional
+    @DisplayName("分配菜单 — 普通角色菜单绑定成功并写入审计快照")
+    void testAssignMenus_AuditSnapshotCreated() {
+        SysRole role = new SysRole();
+        role.setRoleCode("AUDIT_MENU_ROLE");
+        role.setRoleName("审计快照测试角色");
+        Long roleId = roleService.create(role);
+
+        roleService.assignMenus(roleId, List.of(201L, 301L));
+
+        SysRoleVO vo = roleService.getById(roleId);
+        assertEquals(2, vo.getMenuIds().size());
+
+        List<SysRoleMenuAuditSnapshot> snapshots = auditSnapshotMapper.selectList(
+                new LambdaQueryWrapper<SysRoleMenuAuditSnapshot>()
+                        .eq(SysRoleMenuAuditSnapshot::getRoleId, roleId));
+        assertEquals(1, snapshots.size());
+        SysRoleMenuAuditSnapshot snapshot = snapshots.get(0);
+        assertEquals(USER_ADMIN, snapshot.getOperatorId());
+        assertEquals("[201,301]", snapshot.getAfterMenuIds());
+        assertEquals(1, snapshot.getSuccessFlag());
+        assertNull(snapshot.getErrorSummary());
+    }
+
+    private void seedMenu(Long id, String name, String perms) {
+        if (menuMapper.selectById(id) != null) return;
+        SysMenu menu = new SysMenu();
+        menu.setId(id);
+        menu.setTenantId(TENANT_0);
+        menu.setParentId(0L);
+        menu.setMenuName(name);
+        menu.setMenuType("BUTTON");
+        menu.setPerms(perms);
+        menu.setOrderNum(999);
+        menu.setStatus("ENABLE");
+        menu.setVisible(0);
+        menuMapper.insert(menu);
     }
 }

@@ -53,6 +53,8 @@ class CtContractServiceTest {
 
     private static final long TENANT_ID = 0L;
     private static final long USER_ADMIN = 1L;
+    private static final long USER_PROJECT_OWNER = 2L;
+    private static final long USER_NO_PROJECT_ACCESS = 3L;
     private static final long PROJECT_ID = 10001L;
     private static final long PARTY_A_ID = 20001L;
     private static final long PARTY_B_ID = 20002L;
@@ -409,6 +411,45 @@ class CtContractServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> contractService.getById(SEED_CONTRACT_30001));
         assertEquals("CONTRACT_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("按ID查询 — SELF 数据范围: 项目创建人可查看合同详情")
+    void testGetByIdSelfProjectOwnerAllowed() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        project.setCreatedBy(USER_PROJECT_OWNER);
+        projectMapper.updateById(project);
+
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_PROJECT_OWNER)
+                .add("username", "project-owner")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of())
+                .build());
+
+        CtContractVO vo = contractService.getById(SEED_CONTRACT_30001);
+        assertEquals("CT-2026-001", vo.getContractCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("按ID查询 — SELF 数据范围: 非项目创建人被拒绝")
+    void testGetByIdSelfNonOwnerDenied() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        project.setCreatedBy(USER_PROJECT_OWNER);
+        projectMapper.updateById(project);
+
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_NO_PROJECT_ACCESS)
+                .add("username", "no-project-access")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of())
+                .build());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> contractService.getById(SEED_CONTRACT_30001));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════════

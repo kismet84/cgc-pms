@@ -16,6 +16,7 @@ import com.cgcpms.contract.vo.ContractApprovalRecordVO;
 import com.cgcpms.contract.vo.CtContractVO;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -52,6 +53,7 @@ public class CtContractService {
     private final WfInstanceMapper wfInstanceMapper;
     private final WfRecordMapper wfRecordMapper;
     private final CodeGenerationService codeGenerationService;
+    private final ProjectAccessChecker projectAccessChecker;
 
     public IPage<CtContractVO> getPage(long pageNo, long pageSize, String keyword,
                                        String contractCode, String contractName,
@@ -152,6 +154,9 @@ public class CtContractService {
         CtContract c = ctContractMapper.selectById(id);
         if (c == null || !c.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        if (c.getProjectId() != null) {
+            projectAccessChecker.checkAccess(c.getProjectId(), "查看合同详情");
+        }
         return toVO(c);
     }
 
