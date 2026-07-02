@@ -1,12 +1,12 @@
 package com.cgcpms.settlement.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
 import com.cgcpms.settlement.vo.SettlementAttachmentVO;
 import com.cgcpms.settlement.vo.SettlementCostItemVO;
+import com.cgcpms.settlement.vo.SettlementPaymentItemVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
 import com.cgcpms.variation.vo.VarOrderVO;
@@ -60,7 +60,7 @@ public class StlSettlementService {
         return queryService.getVariations(settlementId);
     }
 
-    public List<PayRecord> getPayments(Long settlementId) {
+    public List<SettlementPaymentItemVO> getPayments(Long settlementId) {
         return queryService.getPayments(settlementId);
     }
 

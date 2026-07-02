@@ -16,7 +16,9 @@ import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -28,6 +30,7 @@ import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
 import com.cgcpms.settlement.vo.SettlementAttachmentVO;
 import com.cgcpms.settlement.vo.SettlementCostItemVO;
+import com.cgcpms.settlement.vo.SettlementPaymentItemVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
@@ -76,6 +79,7 @@ public class StlSettlementQueryService {
     private final MdPartnerMapper mdPartnerMapper;
     private final VarOrderMapper varOrderMapper;
     private final SubMeasureMapper subMeasureMapper;
+    private final PayApplicationMapper payApplicationMapper;
     private final PayRecordMapper payRecordMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectMapper costSubjectMapper;
@@ -295,12 +299,28 @@ public class StlSettlementQueryService {
         return varOrderService.toVOList(variations);
     }
 
-    public List<PayRecord> getPayments(Long settlementId) {
+    public List<SettlementPaymentItemVO> getPayments(Long settlementId) {
         StlSettlement settlement = validateAndGetSettlement(settlementId);
         Long tenantId = UserContext.getCurrentTenantId();
-        return payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+        List<PayRecord> payRecords = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
                 .eq(PayRecord::getTenantId, tenantId)
                 .eq(PayRecord::getContractId, settlement.getContractId()));
+        if (payRecords.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, PayApplication> applicationsById = payApplicationMapper.selectBatchIds(
+                        payRecords.stream()
+                                .map(PayRecord::getPayApplicationId)
+                                .filter(Objects::nonNull)
+                                .collect(Collectors.toSet()))
+                .stream()
+                .filter(application -> Objects.equals(application.getTenantId(), tenantId))
+                .collect(Collectors.toMap(PayApplication::getId, application -> application));
+
+        return payRecords.stream()
+                .map(record -> toSettlementPaymentItemVO(record, applicationsById.get(record.getPayApplicationId())))
+                .toList();
     }
 
     public List<SettlementCostItemVO> getCosts(Long settlementId) {
@@ -467,5 +487,35 @@ public class StlSettlementQueryService {
         vo.setUploadedBy(file.getCreatedBy() != null ? file.getCreatedBy().toString() : null);
         vo.setUploadedAt(file.getCreatedAt() != null ? file.getCreatedAt().format(DateTimeUtils.DTF) : null);
         return vo;
+    }
+
+    private SettlementPaymentItemVO toSettlementPaymentItemVO(PayRecord record, PayApplication application) {
+        SettlementPaymentItemVO vo = new SettlementPaymentItemVO();
+        vo.setId(record.getId() != null ? record.getId().toString() : null);
+        vo.setApplicationId(record.getPayApplicationId() != null ? record.getPayApplicationId().toString() : null);
+        vo.setApplyCode(application != null ? application.getApplyCode() : null);
+        vo.setPayType(application != null ? application.getPayType() : null);
+        vo.setApplyAmount(application != null && application.getApplyAmount() != null
+                ? application.getApplyAmount().toPlainString() : null);
+        vo.setApprovedAmount(application != null && application.getApprovedAmount() != null
+                ? application.getApprovedAmount().toPlainString() : null);
+        vo.setActualPayAmount(record.getPayAmount() != null ? record.getPayAmount().toPlainString() : null);
+        vo.setPayStatus(normalizeSettlementPayStatus(application != null ? application.getPayStatus() : null));
+        vo.setPayDate(record.getPayDate() != null ? record.getPayDate().toString() : null);
+        vo.setVoucherNo(record.getVoucherNo());
+        vo.setCreatedAt(record.getCreatedAt() != null ? record.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        return vo;
+    }
+
+    private String normalizeSettlementPayStatus(String payStatus) {
+        if (payStatus == null) {
+            return null;
+        }
+        return switch (payStatus) {
+            case "PAID" -> "PAID";
+            case "PARTIALLY_PAID" -> "PARTIAL";
+            case "APPROVED" -> "UNPAID";
+            default -> payStatus;
+        };
     }
 }

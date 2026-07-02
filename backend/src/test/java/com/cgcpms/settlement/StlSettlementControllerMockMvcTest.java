@@ -9,6 +9,10 @@ import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.StlSettlementWriteService;
@@ -65,6 +69,10 @@ class StlSettlementControllerMockMvcTest {
     private CostSubjectMapper costSubjectMapper;
     @Autowired
     private SysFileMapper sysFileMapper;
+    @Autowired
+    private PayApplicationMapper payApplicationMapper;
+    @Autowired
+    private PayRecordMapper payRecordMapper;
 
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
@@ -111,6 +119,7 @@ class StlSettlementControllerMockMvcTest {
             seedVariation();
             seedCost();
             seedAttachment();
+            seedPayments();
         } finally {
             clearUserContext();
         }
@@ -130,6 +139,12 @@ class StlSettlementControllerMockMvcTest {
             varOrderMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<VarOrder>()
                     .eq(VarOrder::getContractId, CONTRACT_ID)
                     .eq(VarOrder::getVarName, "settlement-controller-test-variation"));
+            payRecordMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PayRecord>()
+                    .eq(PayRecord::getContractId, CONTRACT_ID)
+                    .eq(PayRecord::getTenantId, TENANT_ID));
+            payApplicationMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PayApplication>()
+                    .eq(PayApplication::getContractId, CONTRACT_ID)
+                    .eq(PayApplication::getTenantId, TENANT_ID));
             costSubjectMapper.deleteById(COST_SUBJECT_ID);
             settlementMapper.deleteById(settlementId);
         } finally {
@@ -196,11 +211,43 @@ class StlSettlementControllerMockMvcTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 4. POST /settlements/{id}/submit
+    // 4. GET /settlements/{id}/payments
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Order(4)
+    @DisplayName("GET /settlements/{id}/payments -> 200 returns settlement payment items only")
+    void testGetPayments() throws Exception {
+        mockMvc.perform(getWithApi("/settlements/" + settlementId + "/payments")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].applicationId").exists())
+                .andExpect(jsonPath("$.data[0].applyCode").exists())
+                .andExpect(jsonPath("$.data[0].payType").exists())
+                .andExpect(jsonPath("$.data[0].applyAmount").exists())
+                .andExpect(jsonPath("$.data[0].approvedAmount").exists())
+                .andExpect(jsonPath("$.data[0].actualPayAmount").exists())
+                .andExpect(jsonPath("$.data[0].payStatus").exists())
+                .andExpect(jsonPath("$.data[0].payDate").exists())
+                .andExpect(jsonPath("$.data[0].voucherNo").value("VCH-SETTLEMENT-CONTROLLER-001"))
+                .andExpect(jsonPath("$.data[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].deletedFlag").doesNotExist())
+                .andExpect(jsonPath("$.data[0].externalTxnNo").doesNotExist())
+                .andExpect(jsonPath("$.data[0].payMethod").doesNotExist())
+                .andExpect(jsonPath("$.data[0].projectId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].contractId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].partnerId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].remark").doesNotExist());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 5. POST /settlements/{id}/submit
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Order(5)
     @DisplayName("POST /settlements/{id}/submit -> 200 submits for approval")
     void testSubmitForApproval() throws Exception {
         mockMvc.perform(postWithApi("/settlements/" + settlementId + "/submit")
@@ -297,5 +344,37 @@ class StlSettlementControllerMockMvcTest {
         file.setBucketName("test-bucket");
         file.setCreatedBy(ADMIN_ID);
         sysFileMapper.insert(file);
+    }
+
+    private void seedPayments() {
+        PayApplication application = new PayApplication();
+        application.setTenantId(TENANT_ID);
+        application.setProjectId(PROJECT_ID);
+        application.setContractId(CONTRACT_ID);
+        application.setPartnerId(20001L);
+        application.setApplyCode("PAY-SETTLEMENT-CONTROLLER-001");
+        application.setApplyAmount(new BigDecimal("1500.00"));
+        application.setApprovedAmount(new BigDecimal("1400.00"));
+        application.setActualPayAmount(new BigDecimal("1000.00"));
+        application.setPayType("BANK");
+        application.setPayStatus("PAID");
+        application.setApprovalStatus("APPROVED");
+        application.setApplyReason("controller test");
+        payApplicationMapper.insert(application);
+
+        PayRecord record = new PayRecord();
+        record.setTenantId(TENANT_ID);
+        record.setProjectId(PROJECT_ID);
+        record.setPayApplicationId(application.getId());
+        record.setContractId(CONTRACT_ID);
+        record.setPartnerId(20001L);
+        record.setPayAmount(new BigDecimal("1000.00"));
+        record.setPayDate(LocalDate.of(2026, 7, 2));
+        record.setPayMethod("BANK_TRANSFER");
+        record.setVoucherNo("VCH-SETTLEMENT-CONTROLLER-001");
+        record.setPayStatus("SUCCESS");
+        record.setExternalTxnNo("EXT-VCH-SETTLEMENT-CONTROLLER-001");
+        record.setRemark("should not leak");
+        payRecordMapper.insert(record);
     }
 }

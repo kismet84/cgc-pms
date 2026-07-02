@@ -9,13 +9,20 @@ import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.StlSettlementQueryService;
 import com.cgcpms.settlement.vo.SettlementAttachmentVO;
 import com.cgcpms.settlement.vo.SettlementCostItemVO;
+import com.cgcpms.settlement.vo.SettlementPaymentItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.variation.vo.VarOrderVO;
@@ -28,6 +35,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -55,6 +63,9 @@ class StlSettlementQueryServiceTest {
     @Autowired private CostItemMapper costItemMapper;
     @Autowired private CostSubjectMapper costSubjectMapper;
     @Autowired private SysFileMapper sysFileMapper;
+    @Autowired private PayApplicationMapper payApplicationMapper;
+    @Autowired private PayRecordMapper payRecordMapper;
+    @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private Long settlementId;
@@ -87,6 +98,7 @@ class StlSettlementQueryServiceTest {
         seedVariation();
         seedCost();
         seedAttachment();
+        seedPayments();
     }
 
     @AfterEach
@@ -94,6 +106,8 @@ class StlSettlementQueryServiceTest {
         jdbcTemplate.update("DELETE FROM sys_file WHERE business_type = 'SETTLEMENT' AND business_id = ?", settlementId);
         jdbcTemplate.update("DELETE FROM cost_item WHERE contract_id = ? AND source_type = 'SETTLEMENT_QUERY_TEST_COST'", CONTRACT_ID);
         jdbcTemplate.update("DELETE FROM var_order WHERE contract_id = ? AND var_name = 'settlement-query-test-variation'", CONTRACT_ID);
+        jdbcTemplate.update("DELETE FROM pay_record WHERE contract_id = ? AND tenant_id = ?", CONTRACT_ID, TENANT_ID);
+        jdbcTemplate.update("DELETE FROM pay_application WHERE contract_id = ? AND tenant_id = ?", CONTRACT_ID, TENANT_ID);
         jdbcTemplate.update("DELETE FROM cost_subject WHERE id = ?", COST_SUBJECT_ID);
         jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
         UserContext.clear();
@@ -263,8 +277,45 @@ class StlSettlementQueryServiceTest {
         assertEquals("VO-SETTLEMENT-QUERY-001", variation.getVarCode());
     }
 
-    @Test @DisplayName("getPayments — 返回空列表")
-    void testGetPayments() { assertNotNull(queryService.getPayments(settlementId)); }
+    @Test @DisplayName("getPayments — 返回结算页付款 VO 并归一化状态")
+    void testGetPayments() throws Exception {
+        List<SettlementPaymentItemVO> payments = queryService.getPayments(settlementId);
+        assertEquals(3, payments.size());
+
+        SettlementPaymentItemVO paid = payments.stream()
+                .filter(item -> "PAY-SETTLEMENT-QUERY-PAID".equals(item.getApplyCode()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("PAID", paid.getPayStatus());
+        assertEquals("1000.00", paid.getActualPayAmount());
+        assertEquals("1200.00", paid.getApplyAmount());
+        assertEquals("1100.00", paid.getApprovedAmount());
+        assertEquals("2026-07-02", paid.getPayDate());
+        assertEquals("VCH-SETTLEMENT-QUERY-001", paid.getVoucherNo());
+        assertNotNull(paid.getCreatedAt());
+
+        SettlementPaymentItemVO partial = payments.stream()
+                .filter(item -> "PAY-SETTLEMENT-QUERY-PARTIAL".equals(item.getApplyCode()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("PARTIAL", partial.getPayStatus());
+
+        SettlementPaymentItemVO unpaid = payments.stream()
+                .filter(item -> "PAY-SETTLEMENT-QUERY-UNPAID".equals(item.getApplyCode()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("UNPAID", unpaid.getPayStatus());
+
+        JsonNode json = objectMapper.valueToTree(paid);
+        assertFalse(json.has("tenantId"));
+        assertFalse(json.has("deletedFlag"));
+        assertFalse(json.has("externalTxnNo"));
+        assertFalse(json.has("payMethod"));
+        assertFalse(json.has("projectId"));
+        assertFalse(json.has("contractId"));
+        assertFalse(json.has("partnerId"));
+        assertFalse(json.has("remark"));
+    }
 
     @Test @DisplayName("getCosts — 返回脱敏后的成本项")
     void testGetCosts() {
@@ -389,5 +440,53 @@ class StlSettlementQueryServiceTest {
         file.setBucketName("test-bucket");
         file.setCreatedBy(USER_ID);
         sysFileMapper.insert(file);
+    }
+
+    private void seedPayments() {
+        PayApplication paidApplication = insertPayApplication("PAY-SETTLEMENT-QUERY-PAID", "BANK", "1200.00", "1100.00", "PAID");
+        insertPayRecord(paidApplication.getId(), "1000.00", LocalDate.of(2026, 7, 2), "VCH-SETTLEMENT-QUERY-001", "SUCCESS");
+
+        PayApplication partialApplication = insertPayApplication("PAY-SETTLEMENT-QUERY-PARTIAL", "CASH", "900.00", "800.00", "PARTIALLY_PAID");
+        insertPayRecord(partialApplication.getId(), "500.00", LocalDate.of(2026, 7, 3), "VCH-SETTLEMENT-QUERY-002", "SUCCESS");
+
+        PayApplication unpaidApplication = insertPayApplication("PAY-SETTLEMENT-QUERY-UNPAID", "TRANSFER", "700.00", "650.00", "APPROVED");
+        insertPayRecord(unpaidApplication.getId(), "0.00", LocalDate.of(2026, 7, 4), "VCH-SETTLEMENT-QUERY-003", "PENDING");
+    }
+
+    private PayApplication insertPayApplication(String applyCode, String payType, String applyAmount,
+                                                String approvedAmount, String payStatus) {
+        PayApplication application = new PayApplication();
+        application.setTenantId(TENANT_ID);
+        application.setProjectId(PROJECT_ID);
+        application.setContractId(CONTRACT_ID);
+        application.setPartnerId(20001L);
+        application.setApplyCode(applyCode);
+        application.setApplyAmount(new BigDecimal(applyAmount));
+        application.setApprovedAmount(new BigDecimal(approvedAmount));
+        application.setActualPayAmount(BigDecimal.ZERO);
+        application.setPayType(payType);
+        application.setPayStatus(payStatus);
+        application.setApprovalStatus("APPROVED");
+        application.setApplyReason("settlement query test");
+        payApplicationMapper.insert(application);
+        return application;
+    }
+
+    private void insertPayRecord(Long payApplicationId, String payAmount, LocalDate payDate,
+                                 String voucherNo, String payStatus) {
+        PayRecord record = new PayRecord();
+        record.setTenantId(TENANT_ID);
+        record.setProjectId(PROJECT_ID);
+        record.setPayApplicationId(payApplicationId);
+        record.setContractId(CONTRACT_ID);
+        record.setPartnerId(20001L);
+        record.setPayAmount(new BigDecimal(payAmount));
+        record.setPayDate(payDate);
+        record.setPayMethod("BANK_TRANSFER");
+        record.setVoucherNo(voucherNo);
+        record.setPayStatus(payStatus);
+        record.setExternalTxnNo("EXT-" + voucherNo);
+        record.setRemark("should not leak");
+        payRecordMapper.insert(record);
     }
 }

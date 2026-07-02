@@ -4,7 +4,6 @@ import com.cgcpms.audit.annotation.AuditedOperation;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
-import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.service.StlSettlementQueryService;
@@ -12,6 +11,7 @@ import com.cgcpms.settlement.service.StlSettlementWriteService;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
 import com.cgcpms.settlement.vo.SettlementAttachmentVO;
 import com.cgcpms.settlement.vo.SettlementCostItemVO;
+import com.cgcpms.settlement.vo.SettlementPaymentItemVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
@@ -128,10 +128,9 @@ public class StlSettlementController {
         return ApiResponse.success(queryService.getVariations(id));
     }
 
-    // TODO: 返回 PayRecordVO 而非直接暴露 Entity（前端已定义 SettlementPaymentItemVO）
     @GetMapping("/{id}/payments")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
-    public ApiResponse<List<PayRecord>> getPayments(@PathVariable Long id) {
+    public ApiResponse<List<SettlementPaymentItemVO>> getPayments(@PathVariable Long id) {
         return ApiResponse.success(queryService.getPayments(id));
     }
 
