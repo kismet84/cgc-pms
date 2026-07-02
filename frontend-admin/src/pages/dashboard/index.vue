@@ -105,8 +105,12 @@ function toggleFullscreen() {
           </a-select>
         </div>
         <a-select v-model:value="selectedMonth" style="width: 112px">
-          <a-select-option v-for="month in monthOptions" :key="month" :value="month">
-            {{ month }}
+          <a-select-option
+            v-for="monthOption in monthOptions"
+            :key="monthOption.value || 'all'"
+            :value="monthOption.value"
+          >
+            {{ monthOption.label }}
           </a-select-option>
         </a-select>
         <a-button type="text" :loading="loading" @click="fetchViewData">

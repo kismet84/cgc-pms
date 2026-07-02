@@ -14,10 +14,12 @@ import type { PageResult } from '@/types/api'
 
 interface Props {
   label?: string
+  placement?: string
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   label: '',
+  placement: 'bottomRight',
 })
 
 // ── State ──
@@ -195,7 +197,7 @@ onUnmounted(() => {
 <template>
   <a-popover
     trigger="click"
-    placement="bottomRight"
+    :placement="props.placement"
     :arrow-point-at-center="true"
     overlay-class-name="nb-popover"
     @open-change="handlePopoverChange"

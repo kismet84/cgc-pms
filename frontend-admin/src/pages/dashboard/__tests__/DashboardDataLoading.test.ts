@@ -215,4 +215,16 @@ describe('Dashboard data loading behavior', () => {
       params: { projectId, month },
     })
   })
+
+  it('omits month from request params when all data is selected', () => {
+    const projectId = 'project-001'
+
+    getCostManagerView(projectId, '')
+
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/dashboard/cost-manager',
+      method: 'get',
+      params: { projectId },
+    })
+  })
 })

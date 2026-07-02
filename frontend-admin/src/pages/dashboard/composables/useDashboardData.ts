@@ -34,6 +34,19 @@ export function formatDashboardMonth(date: Date) {
   return `${year}-${month}`
 }
 
+export const ALL_DASHBOARD_MONTH = ''
+
+export function buildDashboardMonthOptions(now: Date = new Date()) {
+  return [
+    { value: ALL_DASHBOARD_MONTH, label: '全部' },
+    ...Array.from({ length: 12 }, (_, index) => {
+      const month = new Date(now.getFullYear(), now.getMonth() - index, 1)
+      const value = formatDashboardMonth(month)
+      return { value, label: value }
+    }),
+  ]
+}
+
 export function useDashboardData() {
   const userStore = useUserStore()
 
@@ -74,14 +87,8 @@ export function useDashboardData() {
 
   const projectList = ref<ProjectVO[]>([])
   const selectedProjectId = ref<string | undefined>(undefined)
-  const selectedMonth = ref(formatDashboardMonth(new Date()))
-  const monthOptions = computed(() => {
-    const now = new Date()
-    return Array.from({ length: 12 }, (_, index) => {
-      const month = new Date(now.getFullYear(), now.getMonth() - index, 1)
-      return formatDashboardMonth(month)
-    })
-  })
+  const selectedMonth = ref(ALL_DASHBOARD_MONTH)
+  const monthOptions = computed(() => buildDashboardMonthOptions())
   const pmData = ref<ProjectManagerDashboardVO | null>(null)
   const bmData = ref<BusinessManagerDashboardVO | null>(null)
   const costData = ref<CostManagerDashboardVO | null>(null)

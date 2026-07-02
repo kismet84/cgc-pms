@@ -87,7 +87,11 @@ onBeforeUnmount(() => {
             <span v-if="!collapsed">折叠菜单</span>
           </button>
           <span class="sidebar-tool-button sidebar-bell" :aria-label="bellReady ? '通知' : undefined">
-            <NotificationBell v-if="bellReady" :label="collapsed ? '' : '通知中心'" />
+            <NotificationBell
+              v-if="bellReady"
+              :label="collapsed ? '' : '通知中心'"
+              placement="topRight"
+            />
             <span v-if="bellReady && !collapsed" class="sidebar-bell-label sidebar-bell-label--sr"
               >通知中心</span
             >

@@ -136,6 +136,17 @@ describe('NotificationBell', () => {
     expect(badge.exists()).toBe(false)
   })
 
+  it('uses bottomRight by default and allows overriding placement', () => {
+    const defaultWrapper = mount(NotificationBell, { global: { stubs } })
+    expect(defaultWrapper.findComponent(APopoverStub).props('placement')).toBe('bottomRight')
+
+    const customWrapper = mount(NotificationBell, {
+      props: { placement: 'topRight' },
+      global: { stubs },
+    })
+    expect(customWrapper.findComponent(APopoverStub).props('placement')).toBe('topRight')
+  })
+
   it('connects SSE when popover opens', async () => {
     vi.mocked(getUnreadCount).mockResolvedValue({ count: 0 })
     vi.mocked(getNotifications).mockResolvedValue({
