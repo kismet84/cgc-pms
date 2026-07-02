@@ -33,7 +33,7 @@ jobs:
       CI_MYSQL_DATABASE: cgc_pms_test
       CI_MYSQL_USER: cgc_test
       CI_MYSQL_PASSWORD: cgc_test_pw_2026
-      CI_MYSQL_ROOT_PASSWORD: ci_root_local_only_2026
+      CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
     services:
       mysql:
         image: mysql:8.0
@@ -151,7 +151,7 @@ jobs:
       CI_MYSQL_DATABASE: cgc_pms_test
       CI_MYSQL_USER: cgc_test
       CI_MYSQL_PASSWORD: cgc_test_pw_2026
-      CI_MYSQL_ROOT_PASSWORD: ci_root_local_only_2026
+      CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
     services:
       mysql:
         image: mysql:8.0

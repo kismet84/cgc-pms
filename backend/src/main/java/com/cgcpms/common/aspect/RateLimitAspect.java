@@ -4,10 +4,9 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.annotation.RateLimit;
 import com.cgcpms.common.annotation.RateLimitKey;
 import com.cgcpms.common.exception.RateLimitExceededException;
+import com.cgcpms.common.ratelimit.LoginLockoutStore;
 import com.cgcpms.common.ratelimit.RateLimitCounterStore;
 import com.cgcpms.common.result.ApiResponse;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -17,8 +16,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * Enforces {@link RateLimit} constraints on annotated controller methods,
@@ -52,10 +49,6 @@ public class RateLimitAspect {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitAspect.class);
 
-    /** Max time an idle entry stays in cache before eviction (prevents memory leaks). */
-    private static final int MAX_IDLE_SECONDS = 300;
-    private static final int MAX_CACHE_SIZE = 10_000;
-
     // ---- Account-lockout constants (R-27) ----
     /** Number of failed attempts before lockout triggers. */
     private static final int LOCKOUT_THRESHOLD = 5;
@@ -64,32 +57,19 @@ public class RateLimitAspect {
     /** Lockout duration in minutes. */
     private static final long LOCKOUT_DURATION_MINUTES = 30;
 
-    // Lockout entry array indices
-    private static final int LX_LOCKOUT_UNTIL = 0;
-    private static final int LX_FIRST_FAILURE = 1;
-    private static final int LX_FAILURE_COUNT = 2;
-
     /**
      * Pluggable counter store — injected via Spring (Redis or fallback).
      */
     private final RateLimitCounterStore counterStore;
 
     /**
-     * IP → [lockoutUntilMs, firstFailureMs, failureCount] — R-27 account lockout.
-     * <ul>
-     *   <li>{@code lockoutUntilMs}: epoch-millis until lockout ends, or 0 when not locked.</li>
-     *   <li>{@code firstFailureMs}: epoch-millis of the first failure in the current window.</li>
-     *   <li>{@code failureCount}: number of failures in the current window.</li>
-     * </ul>
-     * Entries expire 5 minutes after the last access to prevent memory leaks.
+     * Shared login lockout state store — Redis when available, in-memory fallback otherwise.
      */
-    private final Cache<String, long[]> lockoutCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(MAX_IDLE_SECONDS, TimeUnit.SECONDS)
-            .maximumSize(MAX_CACHE_SIZE)
-            .build();
+    private final LoginLockoutStore lockoutStore;
 
-    public RateLimitAspect(RateLimitCounterStore counterStore) {
+    public RateLimitAspect(RateLimitCounterStore counterStore, LoginLockoutStore lockoutStore) {
         this.counterStore = counterStore;
+        this.lockoutStore = lockoutStore;
     }
 
     /* =========================================================================
@@ -173,23 +153,13 @@ public class RateLimitAspect {
      * @throws RateLimitExceededException with a lockout-specific message
      */
     private void checkLockout(String ip) {
-        long[] lockEntry = lockoutCache.getIfPresent(ip);
-        if (lockEntry == null) {
-            return;
-        }
-        long lockoutUntil = lockEntry[LX_LOCKOUT_UNTIL];
-        if (lockoutUntil == 0) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (now < lockoutUntil) {
-            long remainingMinutes = (lockoutUntil - now) / 60_000 + 1;
+        long remainingMillis = lockoutStore.getRemainingLockoutMillis(ip);
+        if (remainingMillis > 0L) {
+            long remainingMinutes = remainingMillis / 60_000 + 1;
             log.warn("Account locked out: ipDigest={}, remaining={}min", safeIpDigest(ip), remainingMinutes);
             throw new RateLimitExceededException(
                     String.format("登录失败次数过多，账号已锁定，请在 %d 分钟后重试", remainingMinutes));
         }
-        // Lockout has expired – clear the entry
-        lockoutCache.invalidate(ip);
     }
 
     /**
@@ -200,20 +170,7 @@ public class RateLimitAspect {
      * {@link #LOCKOUT_DURATION_MINUTES} minutes and the failure counter is reset.
      */
     private void recordFailedAttempt(String ip) {
-        long now = System.currentTimeMillis();
-        lockoutCache.asMap().compute(ip, (key, old) -> {
-            if (old == null || (now - old[LX_FIRST_FAILURE]) > TimeUnit.MINUTES.toMillis(FAILURE_WINDOW_MINUTES)) {
-                // Fresh failure window
-                return new long[]{0L, now, 1L};
-            }
-            old[LX_FAILURE_COUNT]++;
-            if (old[LX_FAILURE_COUNT] >= LOCKOUT_THRESHOLD) {
-                long lockoutUntil = now + TimeUnit.MINUTES.toMillis(LOCKOUT_DURATION_MINUTES);
-                // Lock the IP and clear the failure counter for the locked entry
-                return new long[]{lockoutUntil, 0L, 0L};
-            }
-            return old;
-        });
+        lockoutStore.recordFailure(ip, LOCKOUT_THRESHOLD, FAILURE_WINDOW_MINUTES, LOCKOUT_DURATION_MINUTES);
     }
 
     /**
@@ -222,7 +179,7 @@ public class RateLimitAspect {
      * are not penalised.
      */
     private void clearFailureCounter(String ip) {
-        lockoutCache.invalidate(ip);
+        lockoutStore.clear(ip);
     }
 
     /* =========================================================================
