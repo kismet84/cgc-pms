@@ -2,6 +2,7 @@ package com.cgcpms;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -28,12 +29,13 @@ import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.receipt.service.MatReceiptService;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfTask;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
-import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -85,16 +87,14 @@ class Phase2FullChainIntegrationTest {
     @Autowired private PayRecordMapper payRecordMapper;
     @Autowired private CostItemMapper costItemMapper;
     @Autowired private CtContractMapper contractMapper;
+    @Autowired private SysUserMapper sysUserMapper;
     @Autowired private WfInstanceMapper wfInstanceMapper;
     @Autowired private WfTaskMapper wfTaskMapper;
 
     @BeforeEach
     void setupContext() {
-        UserContext.set(Jwts.claims()
-                .add("userId", USER_ADMIN)
-                .add("username", "admin")
-                .add("tenantId", 0L)
-                .build());
+        seedAdminUser();
+        TestUserContext.setAdmin(TestUserContext.TENANT_0, USER_ADMIN);
     }
 
     @AfterEach
@@ -599,6 +599,7 @@ class Phase2FullChainIntegrationTest {
         input1.setPayDate(LocalDate.now());
         input1.setPayMethod("BANK_TRANSFER");
         input1.setVoucherNo("VCH-" + System.currentTimeMillis() + "-01");
+        input1.setExternalTxnNo("EXT-TXN-" + System.currentTimeMillis() + "-01");
 
         payRecordService.writeback(input1);
 
@@ -633,6 +634,7 @@ class Phase2FullChainIntegrationTest {
         input2.setPayDate(LocalDate.now());
         input2.setPayMethod("BANK_TRANSFER");
         input2.setVoucherNo("VCH-" + System.currentTimeMillis() + "-02");
+        input2.setExternalTxnNo("EXT-TXN-" + System.currentTimeMillis() + "-02");
 
         payRecordService.writeback(input2);
 
@@ -661,6 +663,7 @@ class Phase2FullChainIntegrationTest {
         overpay.setPayDate(LocalDate.now());
         overpay.setPayMethod("BANK_TRANSFER");
         overpay.setVoucherNo("VCH-OVERPAY");
+        overpay.setExternalTxnNo("EXT-TXN-OVERPAY");
 
         BusinessException overEx = assertThrows(BusinessException.class, () -> {
             payRecordService.writeback(overpay);
@@ -779,6 +782,21 @@ class Phase2FullChainIntegrationTest {
                 workflowEngine.approve(task.getId(), USER_ADMIN, "admin",
                         "集成测试审批通过", "phase2-" + UUID.randomUUID() + "-" + task.getId());
             }
+        }
+    }
+
+    /** V85 会删掉默认 admin；材料验收审批模板仍使用 userId=1。 */
+    private void seedAdminUser() {
+        if (sysUserMapper.selectById(USER_ADMIN) == null) {
+            SysUser admin = new SysUser();
+            admin.setId(USER_ADMIN);
+            admin.setTenantId(0L);
+            admin.setUsername("admin");
+            admin.setPassword("seeded");
+            admin.setRealName("系统管理员");
+            admin.setStatus("ENABLE");
+            admin.setIsAdmin(1);
+            sysUserMapper.insert(admin);
         }
     }
 }

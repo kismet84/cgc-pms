@@ -125,6 +125,7 @@ class DashboardServiceTest {
      */
     private SeedResult seed(String suffix) {
         setAdminContext();
+        LocalDate currentMonthDate = LocalDate.now().withDayOfMonth(1).plusDays(1);
 
         // Project
         PmProject project = new PmProject();
@@ -149,7 +150,7 @@ class DashboardServiceTest {
         contract.setCurrentAmount(new BigDecimal("5500000.00"));
         contract.setPaidAmount(new BigDecimal("2000000.00"));
         contract.setContractStatus("PERFORMING");
-        contract.setEndDate(LocalDate.now().plusDays(15));
+        contract.setEndDate(currentMonthDate.plusDays(10));
         ctContractMapper.insert(contract);
         Long contractId = contract.getId();
 
@@ -203,7 +204,7 @@ class DashboardServiceTest {
         task.setApproverId(USER_ADMIN);
         task.setApproverName("成本经理");
         task.setTaskStatus(WorkflowConstants.TASK_PENDING);
-        task.setReceivedAt(LocalDateTime.now().minusDays(9));
+        task.setReceivedAt(currentMonthDate.atTime(10, 0));
         wfTaskMapper.insert(task);
 
         // VarOrder
@@ -246,7 +247,7 @@ class DashboardServiceTest {
         requestItem.setMaterialId(materialId);
         requestItem.setQuantity(new BigDecimal("10.0000"));
         requestItem.setUnit("吨");
-        requestItem.setPlannedDate(LocalDate.now().plusDays(7));
+        requestItem.setPlannedDate(currentMonthDate.plusDays(7));
         purchaseRequestItemMapper.insert(requestItem);
 
         MatPurchaseOrder purchaseOrder = new MatPurchaseOrder();
@@ -256,8 +257,8 @@ class DashboardServiceTest {
         purchaseOrder.setContractId(contractId);
         purchaseOrder.setPartnerId(partnerId);
         purchaseOrder.setOrderCode("PO-" + suffix);
-        purchaseOrder.setOrderDate(LocalDate.now().minusDays(10));
-        purchaseOrder.setDeliveryDate(LocalDate.now().minusDays(1));
+        purchaseOrder.setOrderDate(currentMonthDate);
+        purchaseOrder.setDeliveryDate(currentMonthDate.minusDays(1));
         purchaseOrder.setTotalAmount(new BigDecimal("120000.00"));
         purchaseOrder.setApprovalStatus("APPROVED");
         purchaseOrder.setOrderStatus("APPROVED");
@@ -290,7 +291,7 @@ class DashboardServiceTest {
         receipt.setContractId(contractId);
         receipt.setPartnerId(partnerId);
         receipt.setReceiptCode("RC-" + suffix);
-        receipt.setReceiptDate(LocalDate.now());
+        receipt.setReceiptDate(currentMonthDate);
         receipt.setWarehouseId(warehouse.getId());
         receipt.setReceiverId(signalUserId);
         receipt.setQualityStatus("PENDING");
@@ -314,7 +315,7 @@ class DashboardServiceTest {
         requisition.setProjectId(projectId);
         requisition.setContractId(contractId);
         requisition.setRequisitionCode("RQ-" + suffix);
-        requisition.setRequisitionDate(LocalDate.now());
+        requisition.setRequisitionDate(currentMonthDate);
         requisition.setWarehouseId(warehouse.getId());
         requisition.setRequisitionerId(signalUserId);
         requisition.setPartnerId(partnerId);
@@ -345,7 +346,7 @@ class DashboardServiceTest {
         payRecord.setContractId(contractId);
         payRecord.setProjectId(projectId);
         payRecord.setPayAmount(new BigDecimal("100000.00"));
-        payRecord.setPayDate(LocalDate.now());
+        payRecord.setPayDate(currentMonthDate);
         payRecord.setPayStatus("SUCCESS");
         payRecordMapper.insert(payRecord);
 
@@ -355,7 +356,7 @@ class DashboardServiceTest {
         pendingPayRecord.setContractId(contractId);
         pendingPayRecord.setProjectId(projectId);
         pendingPayRecord.setPayAmount(new BigDecimal("230000.00"));
-        pendingPayRecord.setPayDate(LocalDate.now().minusDays(1));
+        pendingPayRecord.setPayDate(currentMonthDate.minusDays(1));
         pendingPayRecord.setPayStatus("PENDING_APPROVAL");
         payRecordMapper.insert(pendingPayRecord);
 
@@ -363,7 +364,7 @@ class DashboardServiceTest {
         CostSummary summary = new CostSummary();
         summary.setTenantId(TENANT_ID);
         summary.setProjectId(projectId);
-        summary.setSummaryDate(LocalDate.now());
+        summary.setSummaryDate(currentMonthDate);
         summary.setTargetCost(new BigDecimal("8000000.00"));
         summary.setContractLockedCost(new BigDecimal("3000000.00"));
         summary.setActualCost(new BigDecimal("4000000.00"));
@@ -378,7 +379,7 @@ class DashboardServiceTest {
         CostSummary lastMonthSummary = new CostSummary();
         lastMonthSummary.setTenantId(TENANT_ID);
         lastMonthSummary.setProjectId(projectId);
-        lastMonthSummary.setSummaryDate(LocalDate.now().minusMonths(1).withDayOfMonth(1));
+        lastMonthSummary.setSummaryDate(currentMonthDate.minusMonths(1).withDayOfMonth(1));
         lastMonthSummary.setTargetCost(new BigDecimal("7600000.00"));
         lastMonthSummary.setContractLockedCost(new BigDecimal("2800000.00"));
         lastMonthSummary.setActualCost(new BigDecimal("3500000.00"));
@@ -403,7 +404,7 @@ class DashboardServiceTest {
         CostSummary subjectSummary = new CostSummary();
         subjectSummary.setTenantId(TENANT_ID);
         subjectSummary.setProjectId(projectId);
-        subjectSummary.setSummaryDate(LocalDate.now());
+        subjectSummary.setSummaryDate(currentMonthDate);
         subjectSummary.setCostSubjectId(subjectId);
         subjectSummary.setTargetCost(new BigDecimal("3000000.00"));
         subjectSummary.setContractLockedCost(new BigDecimal("1000000.00"));
@@ -424,7 +425,7 @@ class DashboardServiceTest {
         costItem.setSourceType("CT_CONTRACT");
         costItem.setSourceId(contractId);
         costItem.setSourceItemId(1L);
-        costItem.setCostDate(LocalDate.now());
+        costItem.setCostDate(currentMonthDate);
         costItem.setCostStatus("CONFIRMED");
         costItem.setGeneratedFlag(1);
         costItemMapper.insert(costItem);
@@ -576,6 +577,19 @@ class DashboardServiceTest {
         SeedResult selected = seed("PM_SCOPE_A");
         SeedResult other = seed("PM_SCOPE_B");
 
+        wfTaskMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getTenantId, TENANT_ID)
+                        .eq(WfTask::getApproverId, USER_ADMIN))
+                .stream()
+                .filter(task -> {
+                    WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
+                    return instance != null && selected.projectId.equals(instance.getProjectId());
+                })
+                .forEach(task -> {
+                    task.setReceivedAt(LocalDateTime.now().minusDays(9));
+                    wfTaskMapper.updateById(task);
+                });
+
         ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(selected.projectId);
 
         assertTrue(vo.getPendingTasks().stream()
@@ -680,6 +694,18 @@ class DashboardServiceTest {
     @DisplayName("3.1b Cost view: returns dashboard contract lists from real project data")
     void testCostView_ReturnsDashboardContractLists() {
         SeedResult sr = seed("COST_FULL");
+        wfTaskMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getTenantId, TENANT_ID)
+                        .eq(WfTask::getApproverId, USER_ADMIN))
+                .stream()
+                .filter(task -> {
+                    WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
+                    return instance != null && sr.projectId.equals(instance.getProjectId());
+                })
+                .forEach(task -> {
+                    task.setReceivedAt(LocalDateTime.now().minusDays(9));
+                    wfTaskMapper.updateById(task);
+                });
         CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId);
 
         assertNotNull(vo);
@@ -770,7 +796,7 @@ class DashboardServiceTest {
         newestOrder.setProjectId(sr.projectId);
         newestOrder.setPartnerId(sr.partnerId);
         newestOrder.setOrderCode("PO-PUR_DASH-NEWEST");
-        newestOrder.setOrderDate(LocalDate.now().minusDays(1));
+        newestOrder.setOrderDate(LocalDate.now());
         newestOrder.setDeliveryDate(LocalDate.now().plusDays(7));
         newestOrder.setTotalAmount(new BigDecimal("140000.00"));
         newestOrder.setApprovalStatus("APPROVED");
@@ -938,13 +964,41 @@ class DashboardServiceTest {
     void testDefaultDemoProject_DashboardRealisticDemoDistribution() {
         setAdminContext();
 
+        MdMaterial longSummaryMaterial = new MdMaterial();
+        longSummaryMaterial.setTenantId(TENANT_ID);
+        longSummaryMaterial.setMaterialCode("MAT-DEMO-LONG-SUMMARY");
+        longSummaryMaterial.setMaterialName("超长摘要-驾驶舱测试补充采购申请摘要用于验证最近请求展示以及额外字符超过三十个");
+        longSummaryMaterial.setUnit("批");
+        longSummaryMaterial.setStatus("ENABLE");
+        materialMapper.insert(longSummaryMaterial);
+
+        MatPurchaseRequest longSummaryRequest = new MatPurchaseRequest();
+        longSummaryRequest.setTenantId(TENANT_ID);
+        longSummaryRequest.setProjectId(10001L);
+        longSummaryRequest.setContractId(30001L);
+        longSummaryRequest.setRequestCode("PR-DEMO-LONG-SUMMARY");
+        longSummaryRequest.setApprovalStatus("APPROVING");
+        longSummaryRequest.setStatus("DRAFT");
+        longSummaryRequest.setCreatedBy(1L);
+        purchaseRequestMapper.insert(longSummaryRequest);
+
+        MatPurchaseRequestItem longSummaryItem = new MatPurchaseRequestItem();
+        longSummaryItem.setTenantId(TENANT_ID);
+        longSummaryItem.setRequestId(longSummaryRequest.getId());
+        longSummaryItem.setMaterialId(longSummaryMaterial.getId());
+        longSummaryItem.setQuantity(new BigDecimal("1.0000"));
+        longSummaryItem.setUnit("批");
+        longSummaryItem.setPlannedDate(LocalDate.now().plusDays(3));
+        purchaseRequestItemMapper.insert(longSummaryItem);
+
         PurchaseManagerDashboardVO purchase = dashboardService.getPurchaseManagerView(10001L);
         ProductionManagerDashboardVO production = dashboardService.getProductionManagerView(10001L);
 
         assertEquals(5, purchase.getRecentRequests().size());
         assertEquals(5, purchase.getOverdueOrders().size());
         assertEquals(5, purchase.getPendingReceipts().size());
-        assertTrue(purchase.getRecentRequests().stream().anyMatch(i -> i.getItemSummary() != null
+        assertTrue(purchase.getRecentRequests().stream().anyMatch(i -> "PR-DEMO-LONG-SUMMARY".equals(i.getCode())
+                && i.getItemSummary() != null
                 && i.getItemSummary().contains("超长摘要")
                 && i.getItemSummary().length() > 30));
 
@@ -1217,16 +1271,19 @@ class DashboardServiceTest {
     void testDefaultDemoProject_ProjectManagerDashboardNotBlank() {
         setAdminContext();
 
-        PmProject defaultProject = projectMapper.selectList(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PmProject>()
-                                .eq(PmProject::getTenantId, TENANT_ID)
-                                .eq(PmProject::getStatus, "ACTIVE")
-                                .eq(PmProject::getDeletedFlag, 0)
-                                .orderByDesc(PmProject::getCreatedAt)
-                                .orderByDesc(PmProject::getId))
-                .stream()
-                .findFirst()
-                .orElseThrow();
+        PmProject defaultProject = projectMapper.selectById(10001L);
+        if (defaultProject == null) {
+            defaultProject = projectMapper.selectList(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PmProject>()
+                                    .eq(PmProject::getTenantId, TENANT_ID)
+                                    .eq(PmProject::getStatus, "ACTIVE")
+                                    .eq(PmProject::getDeletedFlag, 0)
+                                    .orderByDesc(PmProject::getCreatedAt)
+                                    .orderByDesc(PmProject::getId))
+                    .stream()
+                    .findFirst()
+                    .orElseThrow();
+        }
 
         ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(defaultProject.getId());
 

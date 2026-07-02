@@ -677,6 +677,13 @@ class Phase3IntegrationTest {
         jdbcTemplate.update("INSERT INTO pm_project_member (id, tenant_id, project_id, user_id, role_code, status, created_at, updated_at, created_by, updated_by, deleted_flag) "
                 + "SELECT 40001, 0, 10001, 1, 'PM', 'ACTIVE', NOW(), NOW(), 1, 1, 0 "
                 + "WHERE NOT EXISTS (SELECT 1 FROM pm_project_member WHERE project_id = 10001 AND user_id = 1 AND deleted_flag = 0)");
+        jdbcTemplate.update(
+                "DELETE FROM sys_notification WHERE tenant_id = ? AND biz_type = 'ALERT' " +
+                        "AND biz_id IN (SELECT id FROM alert_log WHERE tenant_id = ? AND project_id = ? AND rule_type = 'CONTRACT_EXPIRING')",
+                0L, 0L, PROJECT_ID);
+        jdbcTemplate.update(
+                "DELETE FROM alert_log WHERE tenant_id = ? AND project_id = ? AND rule_type = 'CONTRACT_EXPIRING'",
+                0L, PROJECT_ID);
 
         // 2. 设置触发条件：将合同结束日期改为15天后（触发 CONTRACT_EXPIRING 预警）
         CtContract contract = contractMapper.selectById(CONTRACT_ID);

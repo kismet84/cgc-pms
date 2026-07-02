@@ -106,7 +106,9 @@ class WfCcServiceTest {
         assertDoesNotThrow(() ->
                 wfCcService.createCc(99999999L, List.of(USER_OTHER), TENANT_0));
 
-        long count = wfCcMapper.selectCount(null);
+        long count = wfCcMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfCc>()
+                        .eq(WfCc::getInstanceId, INSTANCE_ID));
         assertEquals(0, count);
     }
 

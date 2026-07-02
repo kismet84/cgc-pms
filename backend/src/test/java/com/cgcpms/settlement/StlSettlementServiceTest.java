@@ -71,6 +71,8 @@ class StlSettlementServiceTest {
         // Clear stl_settlement data left by other test classes
         // (e.g. Phase3IntegrationTest) to prevent pollution.
         jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("UPDATE sub_measure SET approval_status = 'APPROVED', status = 'CONFIRMED' " +
+                "WHERE tenant_id = ? AND contract_id = ?", TENANT_ID, CONTRACT_ID_30001);
 
         // Pre-load JSQLParser via a trivial MyBatis query.
         // JaCoCo 0.8.13 throws IllegalClassFormatException when instrumenting

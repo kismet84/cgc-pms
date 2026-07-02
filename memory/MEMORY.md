@@ -1,3 +1,4 @@
+- [InvoiceRecognitionTest 需要损坏结构的 PDF fixture](invoice-recognition-test-malformed-pdf-fixture-2026-07-02.md) — 发票识别失败用例应使用带 PDF 魔术字节但结构损坏的 fixture，单独保留 FILE_TYPE_NOT_ALLOWED 覆盖
 - [系统环境修复 2026-06-21](system-environment-fix-2026-06-21.md) — JAVA_HOME、Python版本、psmux、OMC版本漂移 4 个问题修复记录
 - [Hook 注入风暴 v2 深度分析](hook-injection-storm-v2-analysis.md) — 三层 hook 注入叠加机制、任务循环根因、7 个优化方案
 - [重复注入源全量审计](duplicate-injection-sources-audit.md) — 6 个重复注入配置源审计，含字节级量化

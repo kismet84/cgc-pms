@@ -249,12 +249,12 @@ class PaymentFinancialConsistencyTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // T-FC-4: Writeback without external_txn_no (backward compat)
+    // T-FC-4: Writeback without external_txn_no must fail under the new safety rule
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Transactional
-    @DisplayName("T-FC-4: 无 external_txn_no 的写回仍然可用")
+    @DisplayName("T-FC-4: 无 external_txn_no 的写回应明确失败")
     void testWritebackWithoutExternalTxnNo() {
         PayRecord input = new PayRecord();
         input.setPayApplicationId(testPayAppId);
@@ -262,9 +262,10 @@ class PaymentFinancialConsistencyTest {
         input.setPayDate(LocalDate.now());
         input.setPayMethod("银行转账");
 
-        PayRecordVO vo = payRecordService.writeback(input);
-        assertNotNull(vo.getId());
-        assertEquals("SUCCESS", vo.getPayStatus());
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> payRecordService.writeback(input),
+                "缺少外部交易流水号应直接失败");
+        assertEquals("EXTERNAL_TXN_NO_REQUIRED", ex.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════════

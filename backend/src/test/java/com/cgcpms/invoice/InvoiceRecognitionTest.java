@@ -29,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -282,8 +283,9 @@ class InvoiceRecognitionTest {
     @Order(8)
     @DisplayName("Should return fixed message when PDF recognition fails")
     void shouldReturnFixedMessageWhenPdfRecognitionFails() {
+        byte[] brokenPdfBytes = createMalformedPdfBytes();
         MultipartFile file = createMockMultipartFile(
-                "application/pdf", 5, false, "nope}".getBytes());
+                "application/pdf", brokenPdfBytes.length, false, brokenPdfBytes);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> invoiceService.recognize(file));
@@ -297,6 +299,16 @@ class InvoiceRecognitionTest {
     private MultipartFile createMockMultipartFile(String contentType, long size,
                                                    boolean empty, byte[] content) {
         return new MockMultipartFile("file", "test.pdf", contentType, content);
+    }
+
+    /** Create a PDF-like byte stream with a valid magic header but broken structure. */
+    private static byte[] createMalformedPdfBytes() {
+        return """
+                %PDF-1.4
+                1 0 obj
+                << /Type /Catalog /Pages 2 0 R >>
+                endobj
+                """.getBytes(StandardCharsets.US_ASCII);
     }
 
     /**

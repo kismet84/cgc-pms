@@ -751,6 +751,9 @@ class CtContractServiceTest {
         CtContract editContract = new CtContract();
         editContract.setId(contract.getId());
         editContract.setContractName("尝试修改");
+        editContract.setProjectId(PROJECT_ID);
+        editContract.setPartyAId(PARTY_A_ID);
+        editContract.setPartyBId(PARTY_B_ID);
 
         ContractSaveRequest request = new ContractSaveRequest();
         request.setContract(editContract);

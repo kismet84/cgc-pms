@@ -114,6 +114,7 @@ class WorkflowConcurrencyTest {
 
         // Thread 0: approve
         executor.submit(() -> {
+            TestUserContext.setAdmin(TestUserContext.TENANT_0, USER_ADMIN);
             try {
                 workflowEngine.approve(taskId, USER_ADMIN, "admin",
                         "并发审批", "cas1-approve-" + UUID.randomUUID());
@@ -130,12 +131,14 @@ class WorkflowConcurrencyTest {
                 conflictCount.incrementAndGet();
                 System.out.println("  [approve] deadlock/error: " + e.getMessage());
             } finally {
+                TestUserContext.clear();
                 latch.countDown();
             }
         });
 
         // Thread 1: withdraw
         executor.submit(() -> {
+            TestUserContext.setAdmin(TestUserContext.TENANT_0, USER_ADMIN);
             try {
                 workflowEngine.withdraw(instanceId, USER_ADMIN, "admin");
                 successCount.incrementAndGet();
@@ -151,6 +154,7 @@ class WorkflowConcurrencyTest {
                 conflictCount.incrementAndGet();
                 System.out.println("  [withdraw] deadlock/error: " + e.getMessage());
             } finally {
+                TestUserContext.clear();
                 latch.countDown();
             }
         });
@@ -198,6 +202,7 @@ class WorkflowConcurrencyTest {
 
         // Thread 0: transfer
         executor.submit(() -> {
+            TestUserContext.setAdmin(TestUserContext.TENANT_0, USER_ADMIN);
             try {
                 workflowEngine.transfer(taskId, USER_MANAGER,
                         USER_ADMIN, "admin", "转办给项目经理");
@@ -213,12 +218,14 @@ class WorkflowConcurrencyTest {
                 conflictCount.incrementAndGet();
                 System.out.println("  [transfer] deadlock/error: " + e.getMessage());
             } finally {
+                TestUserContext.clear();
                 latch.countDown();
             }
         });
 
         // Thread 1: approve
         executor.submit(() -> {
+            TestUserContext.setAdmin(TestUserContext.TENANT_0, USER_ADMIN);
             try {
                 workflowEngine.approve(taskId, USER_ADMIN, "admin",
                         "并发审批", "cas2-approve-" + UUID.randomUUID());
@@ -234,6 +241,7 @@ class WorkflowConcurrencyTest {
                 conflictCount.incrementAndGet();
                 System.out.println("  [approve] deadlock/error: " + e.getMessage());
             } finally {
+                TestUserContext.clear();
                 latch.countDown();
             }
         });
