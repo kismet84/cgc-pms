@@ -34,7 +34,28 @@ class SysMenuControllerTest {
     @Test @Order(2) @DisplayName("GET /system/menus -> 200 with menu list")
     void testList() throws Exception {
         mockMvc.perform(g("/system/menus").cookie(adminCookie()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isArray());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].id").exists())
+                .andExpect(jsonPath("$.data[0].parentId").exists())
+                .andExpect(jsonPath("$.data[0].menuName").exists())
+                .andExpect(jsonPath("$.data[0].menuType").exists())
+                .andExpect(jsonPath("$.data[0].path").hasJsonPath())
+                .andExpect(jsonPath("$.data[0].component").hasJsonPath())
+                .andExpect(jsonPath("$.data[0].perms").hasJsonPath())
+                .andExpect(jsonPath("$.data[0].icon").hasJsonPath())
+                .andExpect(jsonPath("$.data[0].orderNum").exists())
+                .andExpect(jsonPath("$.data[0].status").exists())
+                .andExpect(jsonPath("$.data[0].visible").exists())
+                .andExpect(jsonPath("$.data[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].deletedFlag").doesNotExist())
+                .andExpect(jsonPath("$.data[0].createdBy").doesNotExist())
+                .andExpect(jsonPath("$.data[0].updatedBy").doesNotExist())
+                .andExpect(jsonPath("$.data[0].createdAt").doesNotExist())
+                .andExpect(jsonPath("$.data[0].updatedAt").doesNotExist())
+                .andExpect(jsonPath("$.data[0].remark").doesNotExist())
+                .andExpect(jsonPath("$.data[0].children").doesNotExist());
     }
 
     @Test @Order(3) @DisplayName("GET /system/menus/tree -> 200 with tree data")
@@ -46,7 +67,27 @@ class SysMenuControllerTest {
     @Test @Order(4) @DisplayName("GET /system/menus/{id} -> 200")
     void testGetById() throws Exception {
         mockMvc.perform(g("/system/menus/1").cookie(adminCookie()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.parentId").exists())
+                .andExpect(jsonPath("$.data.menuName").exists())
+                .andExpect(jsonPath("$.data.menuType").exists())
+                .andExpect(jsonPath("$.data.path").hasJsonPath())
+                .andExpect(jsonPath("$.data.component").hasJsonPath())
+                .andExpect(jsonPath("$.data.perms").hasJsonPath())
+                .andExpect(jsonPath("$.data.icon").hasJsonPath())
+                .andExpect(jsonPath("$.data.orderNum").exists())
+                .andExpect(jsonPath("$.data.status").exists())
+                .andExpect(jsonPath("$.data.visible").exists())
+                .andExpect(jsonPath("$.data.tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data.deletedFlag").doesNotExist())
+                .andExpect(jsonPath("$.data.createdBy").doesNotExist())
+                .andExpect(jsonPath("$.data.updatedBy").doesNotExist())
+                .andExpect(jsonPath("$.data.createdAt").doesNotExist())
+                .andExpect(jsonPath("$.data.updatedAt").doesNotExist())
+                .andExpect(jsonPath("$.data.remark").doesNotExist())
+                .andExpect(jsonPath("$.data.children").doesNotExist());
     }
 
     @Test @Order(5) @DisplayName("POST /system/menus missing required -> 400")

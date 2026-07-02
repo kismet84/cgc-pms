@@ -257,11 +257,14 @@ class Phase3IntegrationTest {
     @Transactional
     @DisplayName("场景2: 结算全链路 → 创建分包计量并审批→创建结算→提交审批→锁定→验证无成本生成")
     void test02_settlementFullChain() {
+        final long settlementContractId = 30003L;
+        final long settlementPartnerId = 20002L;
+
         // 1. 创建分包计量并提交审批
         SubMeasure measure = new SubMeasure();
         measure.setProjectId(PROJECT_ID);
-        measure.setContractId(CONTRACT_ID);
-        measure.setPartnerId(PARTNER_ID);
+        measure.setContractId(settlementContractId);
+        measure.setPartnerId(settlementPartnerId);
         measure.setMeasurePeriod("2026-Q2");
         measure.setMeasureDate(LocalDate.now());
         measure.setReportedAmount(new BigDecimal("100000.00"));
@@ -302,14 +305,14 @@ class Phase3IntegrationTest {
         // 2. 创建结算单
         StlSettlement settlement = new StlSettlement();
         settlement.setProjectId(PROJECT_ID);
-        settlement.setContractId(CONTRACT_ID);
-        settlement.setPartnerId(PARTNER_ID);
+        settlement.setContractId(settlementContractId);
+        settlement.setPartnerId(settlementPartnerId);
         settlement.setSettlementType("FINAL");
-        settlement.setContractAmount(new BigDecimal("45000000.00"));
+        settlement.setContractAmount(new BigDecimal("10000000.00"));
         settlement.setMeasuredAmount(new BigDecimal("95000.00"));
         settlement.setDeductionAmount(new BigDecimal("5000.00"));
         settlement.setPaidAmount(BigDecimal.ZERO);
-        settlement.setFinalAmount(new BigDecimal("45090000.00"));
+        settlement.setFinalAmount(new BigDecimal("10090000.00"));
 
         Long settlementId = settlementWriteService.create(settlement);
         assertNotNull(settlementId, "结算单ID不应为空");
@@ -325,7 +328,7 @@ class Phase3IntegrationTest {
                 WorkflowBusinessTypes.SETTLEMENT, settlementId,
                 "结算审批-" + saved.getSettlementCode(),
                 settlement.getFinalAmount(),
-                PROJECT_ID, CONTRACT_ID,
+                PROJECT_ID, settlementContractId,
                 "Phase3集成测试-结算审批", null, null),
                 "提交结算审批不应抛异常");
 
@@ -344,7 +347,7 @@ class Phase3IntegrationTest {
         assertEquals("APPROVED", afterApproval.getApprovalStatus());
 
         // 6. 验证合同settlementAmount已回写
-        CtContract contractAfter = contractMapper.selectById(CONTRACT_ID);
+        CtContract contractAfter = contractMapper.selectById(settlementContractId);
         assertNotNull(contractAfter.getSettlementAmount(),
                 "合同settlementAmount应已回写");
 

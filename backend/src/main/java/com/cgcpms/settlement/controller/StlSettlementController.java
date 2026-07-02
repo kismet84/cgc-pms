@@ -4,18 +4,18 @@ import com.cgcpms.audit.annotation.AuditedOperation;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
-import com.cgcpms.cost.entity.CostItem;
-import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.service.StlSettlementQueryService;
 import com.cgcpms.settlement.service.StlSettlementWriteService;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
+import com.cgcpms.settlement.vo.SettlementAttachmentVO;
+import com.cgcpms.settlement.vo.SettlementCostItemVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
-import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.vo.VarOrderVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -122,10 +122,9 @@ public class StlSettlementController {
 
     // ---- Related data queries (read-only) ----
 
-    // TODO: 返回 VarOrderVO 而非直接暴露 Entity（前端已定义 SettlementVariationItemVO）
     @GetMapping("/{id}/variations")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
-    public ApiResponse<List<VarOrder>> getVariations(@PathVariable Long id) {
+    public ApiResponse<List<VarOrderVO>> getVariations(@PathVariable Long id) {
         return ApiResponse.success(queryService.getVariations(id));
     }
 
@@ -136,16 +135,15 @@ public class StlSettlementController {
         return ApiResponse.success(queryService.getPayments(id));
     }
 
-    // TODO: 返回 CostItemVO 而非直接暴露 Entity（前端已定义 SettlementCostItemVO）
     @GetMapping("/{id}/costs")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
-    public ApiResponse<List<CostItem>> getCosts(@PathVariable Long id) {
+    public ApiResponse<List<SettlementCostItemVO>> getCosts(@PathVariable Long id) {
         return ApiResponse.success(queryService.getCosts(id));
     }
 
     @GetMapping("/{id}/attachments")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
-    public ApiResponse<List<SysFile>> getAttachments(@PathVariable Long id) {
+    public ApiResponse<List<SettlementAttachmentVO>> getAttachments(@PathVariable Long id) {
         return ApiResponse.success(queryService.getAttachments(id));
     }
 

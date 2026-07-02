@@ -1,15 +1,15 @@
 package com.cgcpms.settlement.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.cgcpms.cost.entity.CostItem;
-import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
+import com.cgcpms.settlement.vo.SettlementAttachmentVO;
+import com.cgcpms.settlement.vo.SettlementCostItemVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
-import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.vo.VarOrderVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -56,7 +56,7 @@ public class StlSettlementService {
         return queryService.getSources(settlementId);
     }
 
-    public List<VarOrder> getVariations(Long settlementId) {
+    public List<VarOrderVO> getVariations(Long settlementId) {
         return queryService.getVariations(settlementId);
     }
 
@@ -64,11 +64,11 @@ public class StlSettlementService {
         return queryService.getPayments(settlementId);
     }
 
-    public List<CostItem> getCosts(Long settlementId) {
+    public List<SettlementCostItemVO> getCosts(Long settlementId) {
         return queryService.getCosts(settlementId);
     }
 
-    public List<SysFile> getAttachments(Long settlementId) {
+    public List<SettlementAttachmentVO> getAttachments(Long settlementId) {
         return queryService.getAttachments(settlementId);
     }
 

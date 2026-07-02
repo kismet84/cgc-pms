@@ -8,7 +8,9 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
@@ -24,6 +26,8 @@ import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
+import com.cgcpms.settlement.vo.SettlementAttachmentVO;
+import com.cgcpms.settlement.vo.SettlementCostItemVO;
 import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
@@ -31,6 +35,8 @@ import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
+import com.cgcpms.variation.service.VarOrderService;
+import com.cgcpms.variation.vo.VarOrderVO;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfRecord;
@@ -72,10 +78,12 @@ public class StlSettlementQueryService {
     private final SubMeasureMapper subMeasureMapper;
     private final PayRecordMapper payRecordMapper;
     private final CostItemMapper costItemMapper;
+    private final CostSubjectMapper costSubjectMapper;
     private final SysFileMapper sysFileMapper;
     private final WfInstanceMapper wfInstanceMapper;
     private final WfRecordMapper wfRecordMapper;
     private final StlSettlementAssembler assembler;
+    private final VarOrderService varOrderService;
 
     // ================================================================
     // Page / KPI / Detail
@@ -278,12 +286,13 @@ public class StlSettlementQueryService {
     // Related data queries (read-only)
     // ================================================================
 
-    public List<VarOrder> getVariations(Long settlementId) {
+    public List<VarOrderVO> getVariations(Long settlementId) {
         StlSettlement settlement = validateAndGetSettlement(settlementId);
         Long tenantId = UserContext.getCurrentTenantId();
-        return varOrderMapper.selectList(new LambdaQueryWrapper<VarOrder>()
+        List<VarOrder> variations = varOrderMapper.selectList(new LambdaQueryWrapper<VarOrder>()
                 .eq(VarOrder::getTenantId, tenantId)
                 .eq(VarOrder::getContractId, settlement.getContractId()));
+        return varOrderService.toVOList(variations);
     }
 
     public List<PayRecord> getPayments(Long settlementId) {
@@ -294,21 +303,28 @@ public class StlSettlementQueryService {
                 .eq(PayRecord::getContractId, settlement.getContractId()));
     }
 
-    public List<CostItem> getCosts(Long settlementId) {
+    public List<SettlementCostItemVO> getCosts(Long settlementId) {
         StlSettlement settlement = validateAndGetSettlement(settlementId);
         Long tenantId = UserContext.getCurrentTenantId();
-        return costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
+        List<CostItem> costItems = costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
                 .eq(CostItem::getTenantId, tenantId)
                 .eq(CostItem::getContractId, settlement.getContractId()));
+        Map<Long, String> subjectNames = resolveCostSubjectNames(costItems);
+        return costItems.stream()
+                .map(item -> toSettlementCostItemVO(item, subjectNames))
+                .toList();
     }
 
-    public List<SysFile> getAttachments(Long settlementId) {
+    public List<SettlementAttachmentVO> getAttachments(Long settlementId) {
         validateAndGetSettlement(settlementId);
         Long tenantId = UserContext.getCurrentTenantId();
         return sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getTenantId, tenantId)
                 .eq(SysFile::getBusinessType, "SETTLEMENT")
-                .eq(SysFile::getBusinessId, settlementId));
+                .eq(SysFile::getBusinessId, settlementId))
+                .stream()
+                .map(this::toSettlementAttachmentVO)
+                .toList();
     }
 
     public List<SettlementApprovalRecordVO> getApprovalRecords(Long settlementId) {
@@ -411,5 +427,45 @@ public class StlSettlementQueryService {
                 .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
 
         return new StlSettlementAssembler.NameMaps(projectNames, contractNames, partnerNames);
+    }
+
+    private Map<Long, String> resolveCostSubjectNames(List<CostItem> items) {
+        Set<Long> subjectIds = items.stream()
+                .map(CostItem::getCostSubjectId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (subjectIds.isEmpty()) {
+            return Map.of();
+        }
+        return costSubjectMapper.selectBatchIds(subjectIds).stream()
+                .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
+    }
+
+    private SettlementCostItemVO toSettlementCostItemVO(CostItem item, Map<Long, String> subjectNames) {
+        SettlementCostItemVO vo = new SettlementCostItemVO();
+        vo.setId(item.getId() != null ? item.getId().toString() : null);
+        vo.setCostSubjectId(item.getCostSubjectId() != null ? item.getCostSubjectId().toString() : null);
+        vo.setCostSubjectName(item.getCostSubjectId() == null ? null : subjectNames.get(item.getCostSubjectId()));
+        vo.setCostType(item.getCostType());
+        vo.setSourceType(item.getSourceType());
+        vo.setSourceId(item.getSourceId() != null ? item.getSourceId().toString() : null);
+        vo.setSourceItemId(item.getSourceItemId() != null ? item.getSourceItemId().toString() : null);
+        vo.setAmount(item.getAmount() != null ? item.getAmount().toPlainString() : null);
+        vo.setTaxAmount(item.getTaxAmount() != null ? item.getTaxAmount().toPlainString() : null);
+        vo.setAmountWithoutTax(item.getAmountWithoutTax() != null ? item.getAmountWithoutTax().toPlainString() : null);
+        vo.setCostDate(item.getCostDate() != null ? DateTimeUtils.DATE_FMT.format(item.getCostDate()) : null);
+        vo.setCostStatus(item.getCostStatus());
+        return vo;
+    }
+
+    private SettlementAttachmentVO toSettlementAttachmentVO(SysFile file) {
+        SettlementAttachmentVO vo = new SettlementAttachmentVO();
+        vo.setId(file.getId() != null ? file.getId().toString() : null);
+        vo.setOriginalName(file.getOriginalName());
+        vo.setFileSize(file.getFileSize());
+        vo.setFileType(file.getContentType());
+        vo.setUploadedBy(file.getCreatedBy() != null ? file.getCreatedBy().toString() : null);
+        vo.setUploadedAt(file.getCreatedAt() != null ? file.getCreatedAt().format(DateTimeUtils.DTF) : null);
+        return vo;
     }
 }

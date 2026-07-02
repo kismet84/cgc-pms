@@ -313,6 +313,11 @@ public class MatStockService {
         return kpi;
     }
 
+    public MatStockVO toStockVO(MatStock entity) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        return toStockVO(entity, getWarehouseNameMap(tenantId), getMaterialMap(tenantId));
+    }
+
     // ── 内部工具方法 ──
 
     /**

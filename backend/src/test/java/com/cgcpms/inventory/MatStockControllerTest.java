@@ -63,15 +63,22 @@ class MatStockControllerTest {
 
     @Test
     @Order(1)
-    @DisplayName("RED-1: POST /inventory/stock/in with JSON body → expects 200 but gets error (binding mismatch)")
-    void testStockInWithJsonBodyFails() throws Exception {
+    @DisplayName("POST /inventory/stock/in with JSON body → 200 and hides internal fields")
+    void testStockInWithJsonBodySucceedsAndHidesInternalFields() throws Exception {
         mockMvc.perform(postWithApi("/inventory/stock/in")
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"warehouseId":100,"materialId":1001,"quantity":"100.0000"}"""))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"));
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").exists())
+                .andExpect(jsonPath("$.data.warehouseId").value(WAREHOUSE_ID))
+                .andExpect(jsonPath("$.data.materialId").value(MATERIAL_ID))
+                .andExpect(jsonPath("$.data.availableQty").exists())
+                .andExpect(jsonPath("$.data.tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data.version").doesNotExist())
+                .andExpect(jsonPath("$.data.deletedFlag").doesNotExist());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -82,15 +89,22 @@ class MatStockControllerTest {
 
     @Test
     @Order(2)
-    @DisplayName("RED-2: POST /inventory/stock/out with JSON body → expects 200 but gets error (binding mismatch)")
-    void testStockOutWithJsonBodyFails() throws Exception {
+    @DisplayName("POST /inventory/stock/out with JSON body → 200 and hides internal fields")
+    void testStockOutWithJsonBodySucceedsAndHidesInternalFields() throws Exception {
         mockMvc.perform(postWithApi("/inventory/stock/out")
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"warehouseId":100,"materialId":1001,"quantity":"50.0000"}"""))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"));
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").exists())
+                .andExpect(jsonPath("$.data.warehouseId").value(WAREHOUSE_ID))
+                .andExpect(jsonPath("$.data.materialId").value(MATERIAL_ID))
+                .andExpect(jsonPath("$.data.availableQty").exists())
+                .andExpect(jsonPath("$.data.tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data.version").doesNotExist())
+                .andExpect(jsonPath("$.data.deletedFlag").doesNotExist());
     }
 
     // ═══════════════════════════════════════════════════════════════

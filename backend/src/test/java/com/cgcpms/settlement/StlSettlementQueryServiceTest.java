@@ -3,11 +3,22 @@ package com.cgcpms.settlement;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.StlSettlementQueryService;
+import com.cgcpms.settlement.vo.SettlementAttachmentVO;
+import com.cgcpms.settlement.vo.SettlementCostItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
+import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.mapper.VarOrderMapper;
+import com.cgcpms.variation.vo.VarOrderVO;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,9 +47,14 @@ class StlSettlementQueryServiceTest {
     private static final long USER_ID = 1L;
     private static final long PROJECT_ID = 10001L;
     private static final long CONTRACT_ID = 30001L;
+    private static final long COST_SUBJECT_ID = 910001L;
 
     @Autowired private StlSettlementQueryService queryService;
     @Autowired private StlSettlementMapper settlementMapper;
+    @Autowired private VarOrderMapper varOrderMapper;
+    @Autowired private CostItemMapper costItemMapper;
+    @Autowired private CostSubjectMapper costSubjectMapper;
+    @Autowired private SysFileMapper sysFileMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private Long settlementId;
@@ -66,10 +83,18 @@ class StlSettlementQueryServiceTest {
         s.setSettlementStatus(SettlementStatusConstants.SETTLEMENT_DRAFT);
         settlementMapper.insert(s);
         settlementId = s.getId();
+
+        seedVariation();
+        seedCost();
+        seedAttachment();
     }
 
     @AfterEach
     void tearDown() {
+        jdbcTemplate.update("DELETE FROM sys_file WHERE business_type = 'SETTLEMENT' AND business_id = ?", settlementId);
+        jdbcTemplate.update("DELETE FROM cost_item WHERE contract_id = ? AND source_type = 'SETTLEMENT_QUERY_TEST_COST'", CONTRACT_ID);
+        jdbcTemplate.update("DELETE FROM var_order WHERE contract_id = ? AND var_name = 'settlement-query-test-variation'", CONTRACT_ID);
+        jdbcTemplate.update("DELETE FROM cost_subject WHERE id = ?", COST_SUBJECT_ID);
         jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
         UserContext.clear();
     }
@@ -230,16 +255,38 @@ class StlSettlementQueryServiceTest {
     // ================================================================
 
     @Test @DisplayName("getVariations — 返回空列表")
-    void testGetVariations() { assertNotNull(queryService.getVariations(settlementId)); }
+    void testGetVariations() {
+        var variations = queryService.getVariations(settlementId);
+        assertEquals(1, variations.size());
+        VarOrderVO variation = variations.get(0);
+        assertEquals("settlement-query-test-variation", variation.getVarName());
+        assertEquals("VO-SETTLEMENT-QUERY-001", variation.getVarCode());
+    }
 
     @Test @DisplayName("getPayments — 返回空列表")
     void testGetPayments() { assertNotNull(queryService.getPayments(settlementId)); }
 
-    @Test @DisplayName("getCosts — 返回空列表")
-    void testGetCosts() { assertNotNull(queryService.getCosts(settlementId)); }
+    @Test @DisplayName("getCosts — 返回脱敏后的成本项")
+    void testGetCosts() {
+        var costs = queryService.getCosts(settlementId);
+        assertEquals(1, costs.size());
+        SettlementCostItemVO cost = costs.get(0);
+        assertEquals(String.valueOf(COST_SUBJECT_ID), cost.getCostSubjectId());
+        assertEquals("单测成本科目", cost.getCostSubjectName());
+        assertEquals("1234.56", cost.getAmount());
+        assertEquals("2026-07-02", cost.getCostDate());
+    }
 
-    @Test @DisplayName("getAttachments — 返回空列表")
-    void testGetAttachments() { assertNotNull(queryService.getAttachments(settlementId)); }
+    @Test @DisplayName("getAttachments — 返回脱敏后的附件")
+    void testGetAttachments() {
+        var attachments = queryService.getAttachments(settlementId);
+        assertEquals(1, attachments.size());
+        SettlementAttachmentVO attachment = attachments.get(0);
+        assertEquals("settlement-query-test.pdf", attachment.getOriginalName());
+        assertEquals("application/pdf", attachment.getFileType());
+        assertEquals(String.valueOf(USER_ID), attachment.getUploadedBy());
+        assertNotNull(attachment.getUploadedAt());
+    }
 
     @Test @DisplayName("getApprovalRecords — 返回空列表")
     void testGetApprovalRecords() { assertNotNull(queryService.getApprovalRecords(settlementId)); }
@@ -271,5 +318,76 @@ class StlSettlementQueryServiceTest {
     @Test @DisplayName("getApprovalRecords — 不存在抛异常")
     void testGetApprovalRecords_NotFound() {
         assertThrows(BusinessException.class, () -> queryService.getApprovalRecords(99999999L));
+    }
+
+    private void seedVariation() {
+        VarOrder order = new VarOrder();
+        order.setTenantId(TENANT_ID);
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setVarCode("VO-SETTLEMENT-QUERY-001");
+        order.setVarName("settlement-query-test-variation");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        order.setReportedAmount(new BigDecimal("1000.00"));
+        order.setApprovedAmount(new BigDecimal("900.00"));
+        order.setConfirmedAmount(new BigDecimal("800.00"));
+        order.setOwnerConfirmFlag(1);
+        order.setImpactDays(3);
+        order.setApprovalStatus("APPROVED");
+        order.setCostGeneratedFlag(0);
+        order.setCreatedBy(USER_ID);
+        varOrderMapper.insert(order);
+    }
+
+    private void seedCost() {
+        if (costSubjectMapper.selectById(COST_SUBJECT_ID) == null) {
+            CostSubject subject = new CostSubject();
+            subject.setId(COST_SUBJECT_ID);
+            subject.setTenantId(TENANT_ID);
+            subject.setParentId(0L);
+            subject.setSubjectCode("CS-SETTLEMENT-QUERY-001");
+            subject.setSubjectName("单测成本科目");
+            subject.setSubjectType("DETAIL");
+            subject.setAccountCategory("COST");
+            subject.setLevel(1);
+            subject.setSortOrder(1);
+            subject.setStatus("ENABLE");
+            costSubjectMapper.insert(subject);
+        }
+
+        CostItem item = new CostItem();
+        item.setTenantId(TENANT_ID);
+        item.setProjectId(PROJECT_ID);
+        item.setContractId(CONTRACT_ID);
+        item.setPartnerId(20001L);
+        item.setCostSubjectId(COST_SUBJECT_ID);
+        item.setCostType("MATERIAL");
+        item.setAmount(new BigDecimal("1234.56"));
+        item.setTaxAmount(new BigDecimal("34.56"));
+        item.setAmountWithoutTax(new BigDecimal("1200.00"));
+        item.setSourceType("SETTLEMENT_QUERY_TEST_COST");
+        item.setSourceId(settlementId);
+        item.setSourceItemId(880001L);
+        item.setCostDate(LocalDate.of(2026, 7, 2));
+        item.setCostStatus("CONFIRMED");
+        item.setGeneratedFlag(1);
+        item.setCreatedBy(USER_ID);
+        costItemMapper.insert(item);
+    }
+
+    private void seedAttachment() {
+        SysFile file = new SysFile();
+        file.setTenantId(TENANT_ID);
+        file.setBusinessType("SETTLEMENT");
+        file.setBusinessId(settlementId);
+        file.setFileName("settlement-query-test.pdf");
+        file.setOriginalName("settlement-query-test.pdf");
+        file.setFileSize(2048L);
+        file.setContentType("application/pdf");
+        file.setStoragePath("SETTLEMENT/" + settlementId + "/settlement-query-test.pdf");
+        file.setBucketName("test-bucket");
+        file.setCreatedBy(USER_ID);
+        sysFileMapper.insert(file);
     }
 }

@@ -6,6 +6,8 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.cost.entity.CostTarget;
 import com.cgcpms.cost.entity.CostTargetItem;
 import com.cgcpms.cost.service.CostTargetService;
+import com.cgcpms.cost.vo.CostTargetItemVO;
+import com.cgcpms.cost.vo.CostTargetVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -24,7 +27,7 @@ public class CostTargetController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:query')")
-    public ApiResponse<PageResult<CostTarget>> list(
+    public ApiResponse<PageResult<CostTargetVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
             @RequestParam(required = false) Long projectId,
@@ -33,13 +36,18 @@ public class CostTargetController {
             @RequestParam(required = false) Integer isActive) {
         IPage<CostTarget> page = costTargetService.getPage(pageNo, pageSize,
                 projectId, versionNo, approvalStatus, isActive);
-        return ApiResponse.success(PageResult.of(page));
+        PageResult<CostTargetVO> result = new PageResult<>(
+                page.getCurrent(),
+                page.getSize(),
+                page.getTotal(),
+                page.getRecords().stream().map(this::toVO).collect(Collectors.toList()));
+        return ApiResponse.success(result);
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:query')")
-    public ApiResponse<CostTarget> getById(@PathVariable Long id) {
-        return ApiResponse.success(costTargetService.getById(id));
+    public ApiResponse<CostTargetVO> getById(@PathVariable Long id) {
+        return ApiResponse.success(toVO(costTargetService.getById(id)));
     }
 
     @PostMapping
@@ -74,9 +82,11 @@ public class CostTargetController {
 
     @GetMapping("/{targetId}/items")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:query')")
-    public ApiResponse<List<CostTargetItem>> getItems(@PathVariable Long targetId) {
+    public ApiResponse<List<CostTargetItemVO>> getItems(@PathVariable Long targetId) {
         log.info("GET /cost-targets/{}/items", targetId);
-        return ApiResponse.success(costTargetService.getItems(targetId));
+        return ApiResponse.success(costTargetService.getItems(targetId).stream()
+                .map(this::toItemVO)
+                .collect(Collectors.toList()));
     }
 
     @PostMapping("/{targetId}/items")
@@ -96,5 +106,34 @@ public class CostTargetController {
         log.info("POST /cost-targets/{}/submit", id);
         costTargetService.submitForApproval(id);
         return ApiResponse.success();
+    }
+
+    private CostTargetVO toVO(CostTarget target) {
+        CostTargetVO vo = new CostTargetVO();
+        vo.setId(target.getId());
+        vo.setProjectId(target.getProjectId());
+        vo.setVersionNo(target.getVersionNo());
+        vo.setVersionName(target.getVersionName());
+        vo.setTotalTargetAmount(target.getTotalTargetAmount());
+        vo.setIsActive(target.getIsActive());
+        vo.setApprovalStatus(target.getApprovalStatus());
+        vo.setEffectiveDate(target.getEffectiveDate());
+        vo.setStatus(target.getStatus());
+        vo.setRemark(target.getRemark());
+        vo.setCreatedBy(target.getCreatedBy());
+        vo.setCreatedTime(target.getCreatedTime());
+        vo.setUpdatedTime(target.getUpdatedTime());
+        return vo;
+    }
+
+    private CostTargetItemVO toItemVO(CostTargetItem item) {
+        CostTargetItemVO vo = new CostTargetItemVO();
+        vo.setId(item.getId());
+        vo.setTargetId(item.getTargetId());
+        vo.setProjectId(item.getProjectId());
+        vo.setCostSubjectId(item.getCostSubjectId());
+        vo.setTargetAmount(item.getTargetAmount());
+        vo.setRemark(item.getRemark());
+        return vo;
     }
 }

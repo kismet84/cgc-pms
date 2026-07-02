@@ -2,9 +2,9 @@ package com.cgcpms.inventory.controller;
 
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.inventory.dto.StockTransactionDTO;
-import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.inventory.vo.MatStockLedgerVO;
+import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,18 +20,18 @@ public class MatStockController {
 
     @PostMapping("/in")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
-    public ApiResponse<MatStock> stockIn(@Valid @RequestBody StockTransactionDTO dto) {
-        return ApiResponse.success(matStockService.stockIn(
+    public ApiResponse<MatStockVO> stockIn(@Valid @RequestBody StockTransactionDTO dto) {
+        return ApiResponse.success(matStockService.toStockVO(matStockService.stockIn(
                 dto.getWarehouseId(), dto.getMaterialId(), dto.getQuantity(),
-                dto.getSourceType(), dto.getSourceId()));
+                dto.getSourceType(), dto.getSourceId())));
     }
 
     @PostMapping("/out")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
-    public ApiResponse<MatStock> stockOut(@Valid @RequestBody StockTransactionDTO dto) {
-        return ApiResponse.success(matStockService.stockOut(
+    public ApiResponse<MatStockVO> stockOut(@Valid @RequestBody StockTransactionDTO dto) {
+        return ApiResponse.success(matStockService.toStockVO(matStockService.stockOut(
                 dto.getWarehouseId(), dto.getMaterialId(), dto.getQuantity(),
-                dto.getSourceType(), dto.getSourceId()));
+                dto.getSourceType(), dto.getSourceId())));
     }
 
     @GetMapping("/ledger")

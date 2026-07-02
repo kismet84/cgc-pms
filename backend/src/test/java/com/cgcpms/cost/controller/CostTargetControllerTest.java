@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -35,6 +36,9 @@ class CostTargetControllerTest {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
@@ -50,6 +54,14 @@ class CostTargetControllerTest {
                 List.of("ADMIN"),
                 List.of());
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    @BeforeEach
+    void seedAdminUser() {
+        jdbcTemplate.update(
+                "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
+                "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -121,7 +133,7 @@ class CostTargetControllerTest {
     @Test
     @Order(3)
     @DisplayName("T2b: GET /cost-targets returns target id as string")
-    void testListCostTargets_IdSerializedAsString() throws Exception {
+    void testListCostTargets_UsesVoAndHidesInternalFields() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
         mockMvc.perform(getWithApiContext("/cost-targets")
                         .cookie(adminCookie())
@@ -132,7 +144,32 @@ class CostTargetControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.records[0].id").isString())
-                .andExpect(jsonPath("$.data.records[0].id").value(String.valueOf(testTargetId)));
+                .andExpect(jsonPath("$.data.records[0].id").value(String.valueOf(testTargetId)))
+                .andExpect(jsonPath("$.data.records[0].projectId").value(String.valueOf(PROJECT_ID)))
+                .andExpect(jsonPath("$.data.records[0].versionNo").value("V1.0-TEST"))
+                .andExpect(jsonPath("$.data.records[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data.records[0].deletedFlag").doesNotExist());
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("T2c: GET /cost-targets/{id} hides internal fields and keeps frontend fields")
+    void testGetById_HidesInternalFields() throws Exception {
+        Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
+        mockMvc.perform(getWithApiContext("/cost-targets/" + testTargetId)
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").value(String.valueOf(testTargetId)))
+                .andExpect(jsonPath("$.data.projectId").value(String.valueOf(PROJECT_ID)))
+                .andExpect(jsonPath("$.data.versionNo").value("V1.0-TEST"))
+                .andExpect(jsonPath("$.data.versionName").value("测试版本"))
+                .andExpect(jsonPath("$.data.totalTargetAmount").value(500000.00))
+                .andExpect(jsonPath("$.data.isActive").value(0))
+                .andExpect(jsonPath("$.data.approvalStatus").value("DRAFT"))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andExpect(jsonPath("$.data.tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data.deletedFlag").doesNotExist());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -140,7 +177,7 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(3)
+    @Order(5)
     @DisplayName("T3: GET /cost-targets/{id}/items → 200 with empty list")
     void testGetItems_Empty() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
@@ -157,7 +194,7 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(4)
+    @Order(6)
     @DisplayName("T4: POST /cost-targets/{id}/items → 200 batch save")
     void testBatchSaveItems() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
@@ -181,7 +218,7 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(5)
+    @Order(7)
     @DisplayName("T5: GET /cost-targets/{id}/items → 200 with saved items")
     void testGetItems_WithData() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
@@ -191,9 +228,13 @@ class CostTargetControllerTest {
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data.length()").value(3))
-                .andExpect(jsonPath("$.data[0].costSubjectId").value(101))
+                .andExpect(jsonPath("$.data[0].id").exists())
+                .andExpect(jsonPath("$.data[0].costSubjectId").value("101"))
                 .andExpect(jsonPath("$.data[0].targetAmount").value(100000.00))
-                .andExpect(jsonPath("$.data[0].targetId").value(testTargetId));
+                .andExpect(jsonPath("$.data[0].targetId").value(String.valueOf(testTargetId)))
+                .andExpect(jsonPath("$.data[0].projectId").value(String.valueOf(PROJECT_ID)))
+                .andExpect(jsonPath("$.data[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].deletedFlag").doesNotExist());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -201,7 +242,7 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(6)
+    @Order(8)
     @DisplayName("T6: POST /cost-targets/{id}/items → replace with 2 items")
     void testBatchSaveItems_Replace() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
@@ -231,10 +272,10 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(7)
+    @Order(9)
     @DisplayName("T7: POST /cost-targets/{id}/submit → 200 submit for approval")
     void testSubmitForApproval() throws Exception {
-        Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
+        ensureDraftTargetExists();
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/submit")
                         .cookie(adminCookie()))
                 .andExpect(status().isOk())
@@ -246,10 +287,10 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(8)
+    @Order(10)
     @DisplayName("T8: POST /cost-targets/{id}/submit again → 400 (already submitted)")
     void testSubmitForApproval_Duplicate() throws Exception {
-        Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
+        ensureSubmittedTargetExists();
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/submit")
                         .cookie(adminCookie()))
                 .andExpect(status().isBadRequest())
@@ -261,7 +302,7 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(9)
+    @Order(11)
     @DisplayName("T9: GET /cost-targets/999999/items → 400 (not found)")
     void testGetItems_NotFound() throws Exception {
         mockMvc.perform(getWithApiContext("/cost-targets/999999/items")
@@ -271,7 +312,7 @@ class CostTargetControllerTest {
     }
 
     @Test
-    @Order(10)
+    @Order(12)
     @DisplayName("T10: DELETE /cost-targets/{id} succeeds with id returned from list")
     void testDeleteCostTarget_UsesStringIdFromList() throws Exception {
         String versionNo = "V1.0-DELETE-" + System.nanoTime();
@@ -331,5 +372,61 @@ class CostTargetControllerTest {
 
     private MockHttpServletRequestBuilder deleteWithApiContext(String pathWithinContext) {
         return delete("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private void ensureDraftTargetExists() throws Exception {
+        if (testTargetId != null) {
+            return;
+        }
+
+        String versionNo = "V1.0-SUBMIT-" + System.nanoTime();
+        String body = """
+                {
+                    "projectId": %d,
+                    "versionNo": "%s",
+                    "versionName": "提交测试版本",
+                    "totalTargetAmount": 500000.00,
+                    "isActive": 0,
+                    "approvalStatus": "DRAFT",
+                    "status": "DRAFT"
+                }
+                """.formatted(PROJECT_ID, versionNo);
+
+        String response = mockMvc.perform(postWithApiContext("/cost-targets")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+
+        testTargetId = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+
+        String items = """
+                [
+                    {"costSubjectId":101,"targetAmount":"300000.00"},
+                    {"costSubjectId":102,"targetAmount":"200000.00"}
+                ]
+                """;
+        mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(items))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    private void ensureSubmittedTargetExists() throws Exception {
+        ensureDraftTargetExists();
+        String approvalStatus = jdbcTemplate.queryForObject(
+                "SELECT approval_status FROM cost_target WHERE id = ? AND deleted_flag = 0",
+                String.class,
+                testTargetId);
+        if ("DRAFT".equals(approvalStatus)) {
+            mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/submit")
+                            .cookie(adminCookie()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"));
+        }
     }
 }

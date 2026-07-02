@@ -104,6 +104,16 @@ public class VarOrderService {
         return vo;
     }
 
+    public List<VarOrderVO> toVOList(List<VarOrder> records) {
+        if (records == null || records.isEmpty()) {
+            return List.of();
+        }
+        NameMaps nameMaps = resolveNameMaps(records);
+        return records.stream()
+                .map(record -> toVO(record, nameMaps.projectNames(), nameMaps.contractNames(), nameMaps.partnerNames()))
+                .toList();
+    }
+
     @Transactional
     public Long create(VarOrder order) {
         // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
@@ -265,6 +275,32 @@ public class VarOrderService {
         return names.get(id);
     }
 
+    private NameMaps resolveNameMaps(List<VarOrder> records) {
+        Set<Long> projectIds = records.stream()
+                .map(VarOrder::getProjectId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> contractIds = records.stream()
+                .map(VarOrder::getContractId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> partnerIds = records.stream()
+                .map(VarOrder::getPartnerId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
+                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
+        Map<Long, String> contractNames = contractIds.isEmpty() ? Map.of()
+                : ctContractMapper.selectBatchIds(contractIds).stream()
+                .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
+        Map<Long, String> partnerNames = partnerIds.isEmpty() ? Map.of()
+                : mdPartnerMapper.selectBatchIds(partnerIds).stream()
+                .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
+        return new NameMaps(projectNames, contractNames, partnerNames);
+    }
+
     private VarOrderVO toVO(VarOrder m, Map<Long, String> projectNames,
                               Map<Long, String> contractNames, Map<Long, String> partnerNames) {
         VarOrderVO vo = buildBaseVO(m);
@@ -315,5 +351,11 @@ public class VarOrderService {
         vo.setUpdatedAt(item.getUpdatedAt() != null ? item.getUpdatedAt().format(DateTimeUtils.DTF) : null);
         vo.setRemark(item.getRemark());
         return vo;
+    }
+
+    private record NameMaps(
+            Map<Long, String> projectNames,
+            Map<Long, String> contractNames,
+            Map<Long, String> partnerNames) {
     }
 }
