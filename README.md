@@ -86,9 +86,13 @@ cgc-pms/
 
 ```bash
 cd backend
-.\mvnw.cmd test "-Djasypt.encryptor.password=dev-jasypt-key"
-.\mvnw.cmd verify "-Djasypt.encryptor.password=dev-jasypt-key"
+$env:TEST_JWT_SECRET="<运行前临时生成的测试密钥>"
+.\mvnw.cmd test
+.\mvnw.cmd verify
 ```
+
+`backend/src/main/resources/application-dev.yml` 与 `backend/src/test/resources/application-test.yml`
+中的数据库、MinIO、JWT 配置不再提供可用默认凭据；本地运行或测试前请通过环境变量注入。
 
 前端：
 

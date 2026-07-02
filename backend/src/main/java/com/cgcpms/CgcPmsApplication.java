@@ -1,6 +1,7 @@
 package com.cgcpms;
 
 import com.cgcpms.auth.config.JwtProperties;
+import com.cgcpms.common.ratelimit.GlobalWriteRateLimitProperties;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -15,7 +16,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @SpringBootApplication
 @MapperScan("com.cgcpms.**.mapper")
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, GlobalWriteRateLimitProperties.class})
 @EnableScheduling
 @EnableAsync
 @EnableAspectJAutoProxy(exposeProxy = true)

@@ -84,8 +84,7 @@ public class InvoiceService {
                     "关联的付款记录(" + invoice.getPayRecordId() + ")不存在或不属于当前租户");
         }
         checkAndThrowDuplicate(invoice.getInvoiceNo(), () -> payInvoiceMapper.insert(invoice));
-        log.info("Invoice created: id={}, invoiceNo={}, payRecordId={}",
-                invoice.getId(), invoice.getInvoiceNo(), invoice.getPayRecordId());
+        log.debug("Invoice created successfully");
         return invoice.getId();
     }
 
@@ -208,7 +207,7 @@ public class InvoiceService {
             throw new BusinessException("PDF_ENCRYPTED", "PDF文件已加密，无法识别");
         } catch (Exception e) {
             log.error("PDF recognize failed for invoice file", e);
-            throw new BusinessException("PDF_RECOGNIZE_FAILED", "PDF识别失败: " + e.getMessage(), e);
+            throw new BusinessException("PDF_RECOGNIZE_FAILED", "PDF识别失败", e);
         } finally {
             if (document != null) {
                 try {
@@ -238,13 +237,7 @@ public class InvoiceService {
         result.setSellerTaxNo(extractSellerTaxNo(text));
         result.setRemark(null);
 
-        log.info("PDF recognition result: invoiceNo={}, amount={}, taxRate={}, taxAmount={}, seller={}, buyer={}, sellerTaxNo={}",
-                result.getInvoiceNo(), result.getInvoiceAmount(),
-                result.getTaxRate(), result.getTaxAmount(),
-                result.getSellerName(), result.getBuyerName(),
-                result.getSellerTaxNo());
-        log.info("Extracted PDF text (first 500 chars):\n{}",
-                text.length() > 500 ? text.substring(0, 500) + "..." : text);
+        log.debug("Invoice PDF recognition completed");
 
         return result;
     }

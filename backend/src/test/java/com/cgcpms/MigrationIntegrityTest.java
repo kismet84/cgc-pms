@@ -326,6 +326,23 @@ class MigrationIntegrityTest {
         }
     }
 
+    @Test
+    void payRecordExternalTxnNoUniqueConstraintRemainsTenantScopedForMysqlAndH2() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V76__fix_pay_record_external_txn_no_unique.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V76__fix_pay_record_external_txn_no_unique.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        String mysqlSql = readString(mysqlMigration);
+        assertTrue(mysqlSql.contains("DROP INDEX uk_external_txn_no"));
+        assertTrue(mysqlSql.contains("UNIQUE KEY uk_external_txn_no (tenant_id, external_txn_no, deleted_flag)"));
+
+        String h2Sql = readString(h2Migration);
+        assertTrue(h2Sql.contains("DROP INDEX uk_external_txn_no"));
+        assertTrue(h2Sql.contains("UNIQUE KEY uk_external_txn_no (tenant_id, external_txn_no, deleted_flag)"));
+    }
+
     /**
      * Java-based migrations (V51/V58/V75) are executed by Flyway at startup
      * from {@code common/migration/} and do not require SQL-level coverage here —

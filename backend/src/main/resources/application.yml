@@ -36,3 +36,9 @@ logging:
   level:
     root: INFO
     com.cgcpms: DEBUG
+
+rate-limit:
+  global-write:
+    enabled: true
+    max-requests: 120
+    window-seconds: 60

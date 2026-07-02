@@ -101,6 +101,7 @@ class InvoiceControllerTest {
             record.setPayAmount(new BigDecimal("3000.00"));
             record.setPayDate(LocalDate.now());
             record.setPayMethod("BANK_TRANSFER");
+            record.setExternalTxnNo("INV-TEST-TXN-" + System.nanoTime());
             var vo = payRecordService.writeback(record);
             payRecordId = Long.parseLong(vo.getId());
         } finally {
@@ -207,8 +208,21 @@ class InvoiceControllerTest {
         mockMvc.perform(postWithApi("/invoices")
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                .content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("POST /invoices malformed JSON -> 400 with fixed validation message")
+    void testCreate_MalformedJson_UsesFixedMessage() throws Exception {
+        mockMvc.perform(postWithApi("/invoices")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"invoiceNo\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.message").value("请求数据格式错误"));
     }
 
     // ═══════════════════════════════════════════════════════════════

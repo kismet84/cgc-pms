@@ -4,20 +4,36 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SpringBootTest(properties = {
-        "jwt.expiration=900000",
-        "jwt.secret=test-secret-key-minimum-256-bit-length-for-hs256-algorithm",
-})
+import java.security.SecureRandom;
+import java.util.Base64;
+
+@SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("JWT 属性配置测试")
 class JwtPropertiesTest {
 
+    private static final String JWT_SECRET = generateJwtSecret();
+
     @Autowired
     private JwtProperties jwtProperties;
+
+    @DynamicPropertySource
+    static void registerProperties(DynamicPropertyRegistry registry) {
+        registry.add("jwt.expiration", () -> 900000);
+        registry.add("jwt.secret", () -> JWT_SECRET);
+    }
+
+    private static String generateJwtSecret() {
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getEncoder().encodeToString(bytes);
+    }
 
     @Test
     @DisplayName("access token TTL 应为 15 分钟 (900000ms)")

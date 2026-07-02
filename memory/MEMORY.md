@@ -1,0 +1,54 @@
+- [系统环境修复 2026-06-21](system-environment-fix-2026-06-21.md) — JAVA_HOME、Python版本、psmux、OMC版本漂移 4 个问题修复记录
+- [Hook 注入风暴 v2 深度分析](hook-injection-storm-v2-analysis.md) — 三层 hook 注入叠加机制、任务循环根因、7 个优化方案
+- [重复注入源全量审计](duplicate-injection-sources-audit.md) — 6 个重复注入配置源审计，含字节级量化
+- [状态栏配置固定修复](statusline-config-fix-2026-06-21.md) — 项目级状态栏从 claude-hud/claude-hub 固定改回 ccstatusline
+- [claude-mem hook 阻断修复](claude-mem-hook-block-fix-2026-06-22.md) — claude-mem worker 不可达导致 UserPromptSubmit 被拦截，已先禁用插件止血
+- [后端重建 Jasypt 环境修复](backend-rebuild-jasypt-env-fix-2026-06-22.md) — Windows 下 mvnw.cmd 启动方式与 docker compose 必需环境变量修复
+- [PowerShell 不支持 Bash 花括号路径展开](powershell-no-bash-brace-expansion.md) — 跨目录检索改用 PowerShell 枚举，避免 `{a,b}` 解析失败
+- [H2 Workflow 测试数据污染修复 2026-06-23](h2-workflow-test-data-pollution-fix-2026-06-23.md) — 收紧 WorkflowQueryServiceTest 清理范围并加固 WorkflowEngineIntegrationTest 用户种子，避免 H2 全量套件跨类污染
+- [重建脚本 Maven Wrapper Windows 路径修复 2026-06-23](rebuild-script-maven-wrapper-windows-path-fix-2026-06-23.md) — scripts/rebuild.py 使用 Maven Wrapper 绝对路径，避免 mvnw.cmd not recognized
+- [首页驾驶舱首屏空白修复 2026-06-23](dashboard-initial-load-blank-fix-2026-06-23.md) — onMounted 初始化默认项目并加载驾驶舱数据，避免默认页签空白
+- [H2 测试污染与表锁修复 2026-06-23](h2-test-isolation-pagination-table-lock-fix-2026-06-23.md) — WorkflowQueryServiceTest 分页断言污染 + CtContractPaymentTermServiceTest Db.saveBatch 表锁超时
+- [lg-* 设计系统视觉基准收敛 2026-06-24](lg-design-token-alignment-2026-06-24.md) — 保留 lg-* 布局类名体系，将全局 Token、KPI、表格、搜索栏收敛到项目列表页企业级 UI 基准
+- [ContractRevenueService 收入科目兜底多结果修复 2026-06-24](contract-revenue-subject-selectone-too-many-results-2026-06-24.md) — 将收入科目兜底查询从 selectOne 改为排序后取首项，避免 H2 多个 REVENUE 科目触发 TooManyResultsException
+- [JDT LS + Lombok 安装修复 2026-06-24](jdtls-lombok-javaagent-install-2026-06-24.md) — Windows 安装 Eclipse JDT LS 后加 Lombok javaagent 并重启旧 LSP 进程，消除 getter/setter 误报
+- [H2 V78 缺失收入子科目种子修复 2026-06-24](h2-v78-missing-contract-revenue-subject-seed-2026-06-24.md) — H2 的 V78 少了 6001.01~6001.04，新增 V92 回填后才能稳定覆盖 ContractRevenueService 精确分支
+- [cost_item 测试前置数据必须补 project_id 2026-06-24](cost-item-h2-project-id-required-in-service-tests-2026-06-24.md) — 手工插入 cost_item 做服务测试前置时，H2 要求 project_id 非空，否则会触发 DataIntegrityViolationException
+- [结算提交审批测试需要 workflow 用户种子 2026-06-24](settlement-submit-workflow-user-seed-required-2026-06-24.md) — StlSettlementWriteService 的 submitForApproval 测试若不补 sys_user 1~3，会在 ApproverResolver 报审批人不属于当前租户
+- [ChatGPT Desktop AppContainer 初始化失败 2026-06-25](chatgpt-desktop-appcontainer-init-failure-2026-06-25.md) — Win11 25H2 预览版上 ChatGPT Desktop 包状态正常但 AppsFolder / 直接 exe 启动都失败，按 AppX 兼容性问题处理
+- [Codex CLI PATH hash 目录陈旧修复 2026-06-27](codex-cli-path-hash-stale-after-update-2026-06-27.md) — Codex 桌面端更新后 PATH 指向已删除的旧 hash bin 目录，清理旧项并加入当前有效 CLI 目录
+- [Docker 前端与 Playwright UI 验收 2026-06-27](frontend-docker-playwright-ui-acceptance-2026-06-27.md) — Docker 前端改动后需重启等待，Playwright 脚本复用 @playwright/test，并避免登录按钮文案和 networkidle 陷阱
+- [PowerShell Start-Process 同一日志重定向失败 2026-06-27](powershell-start-process-same-redirect-failure-2026-06-27.md) — 启动 Vite 时 stdout/stderr 不能重定向到同一个文件；本仓库最终 UI 验收仍以 Docker 5173 为准
+- [通知中心 Popover 触发区修复 2026-06-27](notification-center-popover-trigger-2026-06-27.md) — 侧边栏通知中心文字必须放进同一个 Popover 触发器，Playwright 验收需避开隐藏辅助文本的 strict mode 冲突
+- [Playwright Vite 代理登录超时 2026-06-28](playwright-vite-proxy-login-timeout-2026-06-28.md) — Docker 前端 UI 验收登录 token 优先直连 8080，避免 5173 Vite 代理 request 超时
+- [批量插入 import 不能插入多行 import 块 2026-06-28](bulk-import-insertion-multiline-import-2026-06-28.md) — 批量替换后需检查多行 import，`pnpm build` 能兜住 vue-tsc 未暴露的 transform 语法错误
+- [项目创建带 LocalDate 被脱敏切面拦截 2026-06-28](project-create-localdate-masking-aspect-2026-06-28.md) — `POST /api/projects` 带日期字段会触发 Java 21 反射模块限制；演示造数先不传日期，根修应让脱敏切面跳过 `java.time`
+- [Playwright require 包名修复 2026-06-28](playwright-require-package-name-2026-06-28.md) — 本仓库前端只装 `@playwright/test`，Node stdin 验收脚本应 `require('@playwright/test')` 而不是 `require('playwright')`
+- [前端 localhost IPv6 Docker 端口冲突 2026-06-28](frontend-localhost-ipv6-docker-port-conflict-2026-06-28.md) — Docker/WSL 与本机 Vite 同占 5173 时 `localhost` 可能命中挂起的 IPv6 转发，UI 验收需用 `127.0.0.1` 或先停 Docker 前端
+- [Playwright 合同台账下拉验证路径修复 2026-06-28](playwright-contract-ledger-dropdown-validation-2026-06-28.md) — API baseURL 避免 leading slash 覆盖路径，Ant Dropdown 菜单项可用 boundingBox + mouse.click 稳定触发
+- [脱敏切面 LocalDate 反射根修 2026-06-28](localdate-masking-aspect-root-fix-2026-06-28.md) — `SensitiveDataMaskingAspect` 将 `java.time` 视为简单类型，避免 Java 21 反射模块限制；PowerShell Maven `-D` 参数需加引号
+- [Playwright 驾驶舱标题严格模式定位 2026-06-28](playwright-dashboard-heading-strict-mode-2026-06-28.md) — 首页驾驶舱同时有菜单和 H1，验收页面身份用 heading 角色定位，避免 `text=驾驶舱` strict mode 冲突
+- [PowerShell Maven -D 属性参数必须加引号 2026-06-28](powershell-maven-d-property-quote-2026-06-28.md) — Windows PowerShell 下运行 mvnw.cmd 时，带点号的 `-D` 属性用引号包裹，避免 Maven 误报 Unknown lifecycle phase
+- [前端 Docker 快速重启入口脚本 2026-06-28](frontend-docker-fast-restart-entrypoint-2026-06-28.md) — 前端 Docker 不要把 `pnpm install` 放进每次启动命令；用 lockfile 哈希判断 + pnpm store/Corepack 持久卷，把重启压到秒级
+- [前端 Docker 可达但页面报错 2026-06-28](frontend-docker-reachable-but-app-errors-2026-06-28.md) — `127.0.0.1:5173` 与 backend health 都通时，所谓“无法连接”多半是页面级 API/鉴权/SSE 错误，不是 Docker 端口没起来
+- [驾驶舱月份筛选科目快照口径修复 2026-06-28](dashboard-month-subject-snapshot-2026-06-28.md) — 成本经理驾驶舱选月份时，科目排名也取截至月份最新科目快照，避免 KPI 有数据但科目和成本台账为空
+- [驾驶舱月份选项 UTC 回退修复 2026-06-28](dashboard-month-option-timezone-rollover-2026-06-28.md) — 前端 `YYYY-MM` 月份选项使用本地年月格式化，避免 `toISOString` 在北京时间月初回退到上月
+- [驾驶舱成本台账演示数据与小表高度修复 2026-06-28](dashboard-cost-ledger-demo-data-and-mini-panel-height-2026-06-28.md) — 成本台账默认 tab 依赖科目级 `cost_summary`，右侧小表需保证至少显示两行，避免标题数量与可见行数不一致
+- [驾驶舱成本台账操作列静态链接修复 2026-06-28](dashboard-ledger-actions-static-links-2026-06-28.md) — 成本经理驾驶舱底部 `查看/下钻` 不能留静态 `<a>`，需绑定跳转、过滤或下钻等可见行为
+- [驾驶舱汇总与成本台账明细数据口径 2026-06-28](dashboard-cost-summary-vs-item-ledger-demo-data-2026-06-28.md) — 驾驶舱汇总来自科目快照，完整成本台账来自 `cost_item`，演示造数需同时补汇总和明细
+- [驾驶舱成本台账合同显示与月份口径 2026-06-28](dashboard-cost-ledger-contract-display-month-snapshot-2026-06-28.md) — 科目汇总行合同信息从 `cost_item.contract_id` 反查，月份过滤按截至月末而非仅当月发生
+- [成本驾驶舱真实业务流演示数据补齐 2026-06-28](demo-real-business-flow-seed-2026-06-28.md) — 演示成本记录需挂回采购订单/验收/库存、分包任务/计量和合同清单；注意 `sub_measure_item.cumulative_quantity` 字段名与库存台账筛选前置条件
+- [仓库所属项目列为空修复 2026-06-28](warehouse-project-name-vo-and-dev-jar-2026-06-28.md) — 仓库页读 `projectName`，后端 `MatWarehouseVO` 必须返回；Docker 后端 dev 跑 target jar，改后需 package 再 restart
+- [变更签证成本汇总来源类型修复 2026-06-28](variation-cost-summary-source-types-2026-06-28.md) — `VAR_ORDER`/`CT_CHANGE` 需计入实际成本汇总和驾驶舱实时兜底，签证明细必须关联具体成本科目
+- [变更签证弹窗 Docker 旧 bundle 验收陷阱 2026-06-28](variation-modal-docker-stale-bundle-2026-06-28.md) — 前端改动和构建通过后 5173 仍可能显示旧弹窗，重启 `cgc-pms-frontend-dev` 再用 `localhost:5173` 复验
+- [变更签证成本科目下拉宽度 2026-06-28](variation-cost-subject-select-width-2026-06-28.md) — 表格单元格内 Select 弹层默认跟随窄列宽，局部设置 `popup-match-select-width=false` 和最小宽度即可
+- [AGENTS override 缺失文件处理 2026-06-28](agents-override-missing-file-2026-06-28.md) — 用户指定 AGENTS.override.md 但文件不存在时，先确认根目录规则文件，再创建最小覆盖规则，避免复制整份 AGENTS.md 造成漂移
+- [Superpowers 技能根路径读取修复 2026-06-28](superpowers-skill-root-path-2026-06-28.md) — 读取 Superpowers 技能时按本会话 skill roots 展开路径，不要假设位于 `.codex/skills/.system`
+- [Browser 超时后 Playwright API 登录兜底 2026-06-28](browser-timeout-playwright-api-login-2026-06-28.md) — Browser 插件连接本地驾驶舱超时时，用 @playwright/test 请求 `/api/auth/login` 建立 Cookie 和 userInfo 后再验收页面
+- [前端枚举码中文映射别名补齐 2026-06-28](frontend-enum-label-aliases-2026-06-28.md) — 后端返回 ACTIVE、CONTRACT、PAY_APPLICATION、CT_MACHINE、VARIATION 等码值时，前端 table/analysis rail/审批映射需补中文别名，不能直接回显英文码
+- [后端 Flyway 迁移需先重打 JAR 再重启 2026-06-29](backend-flyway-migration-needs-jar-repackage-2026-06-29.md) — Docker dev 后端跑 `target/cgc-pms-backend.jar`，新增 migration SQL 先 package 再 restart，Flyway 才会执行
+- [PowerShell 不支持 Bash export 前缀 2026-06-30](powershell-no-bash-export-prefix-2026-06-30.md) — Windows PowerShell 下不要在命令前拼 Bash `export`，需要环境变量时改用 `$env:`
+- [Dashboard seed 候选分布与可见列表断言 2026-06-30](dashboard-seed-candidate-vs-visible-list-2026-06-30.md) — demo seed 测试需分开验证源表候选分布和 dashboard 前 5 可见列表，避免排序/limit 被既有数据影响
+- [Vue LSP 缺失时的前端验证兜底 2026-07-01](vue-lsp-missing-fallback-typecheck-build-2026-07-01.md) — vue-language-server 未安装导致 LSP 诊断不可用时，改用 pnpm type-check 与 pnpm build 覆盖 Vue 模板和构建验证
+- [PowerShell SSH 远程脚本美元符号展开陷阱 2026-07-01](powershell-ssh-remote-dollar-expansion-2026-07-01.md) — Windows PowerShell 调 Linux 远程 Bash 时外层双引号会提前展开 `$`，ssh 远程脚本应优先用单引号包裹
+- [全局写接口限流修复 VUL-006 2026-07-02](global-write-rate-limit-filter-vul-006-2026-07-02.md) — 全局写限流应挂在 JWT 后过滤器层并复用 RateLimitCounterStore，避免给各 Controller 批量补注解

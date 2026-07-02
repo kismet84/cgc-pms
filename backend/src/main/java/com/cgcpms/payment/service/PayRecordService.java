@@ -65,23 +65,22 @@ public class PayRecordService {
         Long payApplicationId = input.getPayApplicationId();
         if (payApplicationId == null)
             throw new BusinessException("MISSING_APP_ID", "付款申请ID不能为空");
+        if (input.getExternalTxnNo() == null || input.getExternalTxnNo().isBlank())
+            throw new BusinessException("EXTERNAL_TXN_NO_REQUIRED", "外部交易流水号不能为空");
 
         // Lookup and lock the pay application to prevent concurrent writeback TOCTOU
         PayApplication app = payApplicationMapper.selectByIdForUpdate(payApplicationId, UserContext.getCurrentTenantId());
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
 
-        // Idempotency: if external_txn_no provided, check for existing record
-        if (input.getExternalTxnNo() != null && !input.getExternalTxnNo().isBlank()) {
-            List<PayRecord> existing = payRecordMapper.selectList(
-                new LambdaQueryWrapper<PayRecord>()
-                    .eq(PayRecord::getTenantId, UserContext.getCurrentTenantId())
-                    .eq(PayRecord::getExternalTxnNo, input.getExternalTxnNo()));
-            if (!existing.isEmpty()) {
-                log.info("Idempotent writeback: external_txn_no={} already exists, returning existing record id={}",
-                    input.getExternalTxnNo(), existing.get(0).getId());
-                return toVO(existing.get(0));
-            }
+        List<PayRecord> existing = payRecordMapper.selectList(
+            new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getTenantId, UserContext.getCurrentTenantId())
+                .eq(PayRecord::getExternalTxnNo, input.getExternalTxnNo()));
+        if (!existing.isEmpty()) {
+            log.info("Idempotent writeback hit: duplicate external transaction detected, returning existing record id={}",
+                existing.get(0).getId());
+            return toVO(existing.get(0));
         }
 
         // Check contract balance before payment — include pendingAmount to prevent concurrent overpay
@@ -117,8 +116,8 @@ public class PayRecordService {
         record.setPayStatus("SUCCESS");
 
         payRecordMapper.insert(record);
-        log.info("Authoritative writeback: pay_record created, id={}, amount={}, externalTxnNo={}",
-            record.getId(), record.getPayAmount(), record.getExternalTxnNo());
+        log.info("Authoritative writeback: pay_record created, id={}, amount={}",
+            record.getId(), record.getPayAmount());
 
         // D4 linkage: cascade updates
         updateContractPaidAmount(app.getContractId());

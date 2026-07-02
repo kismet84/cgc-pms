@@ -1,6 +1,7 @@
 package com.cgcpms.auth.config;
 
 import com.cgcpms.auth.filter.JwtAuthenticationFilter;
+import com.cgcpms.common.filter.GlobalWriteRateLimitFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -39,9 +40,12 @@ public class SecurityConfig {
     };
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final GlobalWriteRateLimitFilter globalWriteRateLimitFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          GlobalWriteRateLimitFilter globalWriteRateLimitFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.globalWriteRateLimitFilter = globalWriteRateLimitFilter;
     }
 
     @Bean
@@ -57,7 +61,8 @@ public class SecurityConfig {
                         .requestMatchers(AUTH_WHITELIST_PATHS).permitAll()
                         .requestMatchers(HttpMethod.GET, HEALTH_WHITELIST_PATHS).permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(globalWriteRateLimitFilter, JwtAuthenticationFilter.class);
         return http.build();
     }
 

@@ -1,5 +1,9 @@
 package com.cgcpms.invoice;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
@@ -14,6 +18,8 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
@@ -25,7 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -41,8 +47,8 @@ class InvoiceRecognitionTest {
     /** Reusable bytes for the valid Chinese invoice PDF, populated in @BeforeAll. */
     private static byte[] sampleInvoiceBytes;
 
-    /** Path to the sample-invoice.pdf file on disk. */
-    private static final Path SAMPLE_PDF_DISK = Paths.get("src/test/resources/sample-invoice.pdf");
+    @TempDir
+    static Path tempDir;
 
     /** Lines of Chinese invoice text to embed in the sample PDF. */
     private static final String[] INVOICE_TEXT_LINES = {
@@ -77,10 +83,9 @@ class InvoiceRecognitionTest {
                     new String[] { "Invoice No: 12345678", "VAT Special Invoice", "Amount: 150000.00" });
         }
 
-        // Persist to disk as a static test resource
-        Files.createDirectories(SAMPLE_PDF_DISK.getParent());
-        Files.write(SAMPLE_PDF_DISK, sampleInvoiceBytes);
-        System.out.println("Sample invoice PDF written to: " + SAMPLE_PDF_DISK.toAbsolutePath());
+        Path samplePdf = tempDir.resolve("sample-invoice.pdf");
+        Files.write(samplePdf, sampleInvoiceBytes);
+        System.out.println("Sample invoice PDF written to temp file: " + samplePdf.toAbsolutePath());
     }
 
     // ── Test 1: Valid Chinese invoice PDF ──
@@ -233,6 +238,57 @@ class InvoiceRecognitionTest {
                 "Should use first-match invoice type (page 1)");
         // Amount from page 1
         assertNotNull(result.getInvoiceAmount(), "Should extract amount from first page");
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("Should not write sensitive invoice recognition details to info logs")
+    void shouldNotLogSensitiveRecognitionDetailsAtInfo() {
+        Logger logger = (Logger) LoggerFactory.getLogger(InvoiceService.class);
+        Level previousLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.INFO);
+        try {
+            MultipartFile file = createMockMultipartFile(
+                    "application/pdf", sampleInvoiceBytes.length, false, sampleInvoiceBytes);
+
+            invoiceService.recognize(file);
+
+            List<String> infoMessages = appender.list.stream()
+                    .filter(event -> event.getLevel() == Level.INFO)
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .toList();
+            assertTrue(infoMessages.stream().noneMatch(message -> message.contains("PDF recognition result")),
+                    "不应输出识别结果明细");
+            assertTrue(infoMessages.stream().noneMatch(message -> message.contains("Extracted PDF text")),
+                    "不应输出PDF文本内容");
+            assertTrue(infoMessages.stream().noneMatch(message -> message.contains("12345678")),
+                    "不应输出发票号码");
+            assertTrue(infoMessages.stream().noneMatch(message -> message.contains("150000.00")),
+                    "不应输出金额");
+            assertTrue(infoMessages.stream().noneMatch(message -> message.contains("测试供应商")),
+                    "不应输出销售方名称");
+            assertTrue(infoMessages.stream().noneMatch(message -> message.contains("91110000ABCDEFGH")),
+                    "不应输出税号");
+        } finally {
+            logger.detachAppender(appender);
+            logger.setLevel(previousLevel);
+        }
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("Should return fixed message when PDF recognition fails")
+    void shouldReturnFixedMessageWhenPdfRecognitionFails() {
+        MultipartFile file = createMockMultipartFile(
+                "application/pdf", 5, false, "nope}".getBytes());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> invoiceService.recognize(file));
+        assertEquals("PDF_RECOGNIZE_FAILED", ex.getCode());
+        assertEquals("PDF识别失败", ex.getMessage());
     }
 
     // ── Helper methods ──

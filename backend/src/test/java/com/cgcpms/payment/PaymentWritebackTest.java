@@ -19,6 +19,9 @@ import com.cgcpms.payment.vo.PayRecordVO;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -317,6 +320,7 @@ class PaymentWritebackTest {
         input.setPayApplicationId(999999L);
         input.setPayAmount(new BigDecimal("10000.00"));
         input.setPayDate(LocalDate.now());
+        input.setExternalTxnNo("TXN-MISSING-APP-001");
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> payRecordService.writeback(input),
@@ -341,19 +345,27 @@ class PaymentWritebackTest {
                 "payAmount 为 null 时 writeback 应直接抛 NullPointerException");
     }
 
-    @Test
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", "   "})
     @Transactional
-    @DisplayName("T-WB-11: writeback — 无 external_txn_no 仍可正常写回")
-    void testWriteback_WithoutExternalTxnNo() {
+    @DisplayName("T-WB-11: writeback — external_txn_no 为空白时拒绝且不落库")
+    void testWriteback_BlankExternalTxnNo_Rejected(String externalTxnNo) {
         PayRecord input = new PayRecord();
         input.setPayApplicationId(testPayAppId);
         input.setPayAmount(new BigDecimal("50000.00"));
         input.setPayDate(LocalDate.now());
         input.setPayMethod("银行转账");
+        input.setExternalTxnNo(externalTxnNo);
 
-        PayRecordVO vo = payRecordService.writeback(input);
-        assertNotNull(vo.getId());
-        assertEquals("SUCCESS", vo.getPayStatus());
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> payRecordService.writeback(input),
+                "externalTxnNo 为空白时应拒绝");
+        assertEquals("EXTERNAL_TXN_NO_REQUIRED", ex.getCode());
+
+        long count = payRecordMapper.selectCount(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getPayApplicationId, testPayAppId));
+        assertEquals(0, count, "externalTxnNo 为空白时不应创建支付记录");
     }
 
     @Test

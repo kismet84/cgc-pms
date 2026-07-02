@@ -1,5 +1,9 @@
 package com.cgcpms.invoice;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -12,6 +16,7 @@ import com.cgcpms.payment.mapper.PayRecordMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -19,6 +24,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -101,6 +107,39 @@ class InvoiceServiceTest {
         assertEquals("1300.00", vo.getTaxAmount());
         assertEquals("2026-06-12", vo.getInvoiceDate());
         assertEquals("PENDING", vo.getVerifyStatus());
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("CREATE: info log should not expose invoiceNo or payRecordId")
+    void shouldNotLogSensitiveIdentifiersAtInfoOnCreate() {
+        Logger logger = (Logger) LoggerFactory.getLogger(InvoiceService.class);
+        Level previousLevel = logger.getLevel();
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        logger.setLevel(Level.INFO);
+        try {
+            PayInvoice invoice = new PayInvoice();
+            invoice.setInvoiceNo("INV-LOG-014");
+            invoice.setInvoiceType("VAT_SPECIAL");
+            invoice.setInvoiceAmount(new BigDecimal("1200.00"));
+            invoice.setPayRecordId(SEED_PAY_RECORD_ID);
+
+            invoiceService.create(invoice);
+
+            List<String> infoMessages = appender.list.stream()
+                    .filter(event -> event.getLevel() == Level.INFO)
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .toList();
+            assertTrue(infoMessages.stream().noneMatch(message -> message.contains("INV-LOG-014")),
+                    "INFO 日志不应输出 invoiceNo");
+            assertTrue(infoMessages.stream().noneMatch(message -> message.contains(String.valueOf(SEED_PAY_RECORD_ID))),
+                    "INFO 日志不应输出 payRecordId");
+        } finally {
+            logger.detachAppender(appender);
+            logger.setLevel(previousLevel);
+        }
     }
 
     // ── RED 2: duplicate invoice_no per tenant → BusinessException ──

@@ -87,11 +87,7 @@ public class GlobalExceptionHandler {
             traceId = UUID.randomUUID().toString().replace("-", "");
         }
         log.error("JSON parse error, traceId={}", traceId, e);
-        String detail = e.getMostSpecificCause().getMessage();
-        if (detail != null && detail.length() > 200) {
-            detail = detail.substring(0, 200) + "...";
-        }
-        return ApiResponse.fail(VALIDATION_ERROR_CODE, "请求数据格式错误: " + (detail != null ? detail : "无法解析"));
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "请求数据格式错误");
     }
 
     @ExceptionHandler(Exception.class)

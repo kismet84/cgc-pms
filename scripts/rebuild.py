@@ -14,6 +14,7 @@ CGC-PMS 开发环境重建脚本
 """
 
 import argparse
+import secrets
 import subprocess
 import sys
 import os
@@ -29,16 +30,11 @@ COMPOSE_FILE = "docker-compose.dev.yml"
 # JDK 21 path — required for Maven builds on Windows
 JAVA_HOME = os.environ.get("JAVA_HOME", r"D:\projects-test\jdk-21\jdk-21.0.11+10")
 
-# Jasypt 密钥 — required for running tests
-JASYPT_PASSWORD = os.environ.get("JASYPT_PASSWORD", "dev-jasypt-key")
-
-
 def run(cmd: list[str], *, cwd: Path | None = None, check: bool = True,
         capture: bool = False, timeout: int | None = None, env: dict | None = None) -> subprocess.CompletedProcess:
     """Run a command, print output in real time, return result."""
     full_env = os.environ.copy()
     full_env["JAVA_HOME"] = JAVA_HOME
-    full_env.setdefault("JASYPT_ENCRYPTOR_PASSWORD", JASYPT_PASSWORD)
     if env:
         full_env.update(env)
 
@@ -98,6 +94,13 @@ def run_maven(cmd: list[str], *, cwd: Path, timeout: int) -> None:
         run(fallback_cmd, cwd=cwd, timeout=timeout)
 
 
+def build_backend_test_env() -> dict[str, str]:
+    """Inject test-only env vars only for backend test execution."""
+    return {
+        "TEST_JWT_SECRET": os.environ.get("TEST_JWT_SECRET", secrets.token_urlsafe(48))
+    }
+
+
 def check_docker() -> bool:
     """Check if Docker is running."""
     try:
@@ -136,9 +139,9 @@ def build_backend(test: bool = False) -> bool:
     # Step 3: Run tests if requested
     if test:
         print(f"\n[测试] 运行后端测试...")
-        test_args = [*mvnw, "test", f"-Djasypt.encryptor.password={JASYPT_PASSWORD}"]
+        test_args = [*mvnw, "test"]
         try:
-            run(test_args, cwd=BACKEND_DIR, timeout=600)
+            run(test_args, cwd=BACKEND_DIR, timeout=600, env=build_backend_test_env())
             print("  \033[32m[OK] 后端测试通过\033[0m")
         except subprocess.CalledProcessError:
             print("  \033[31m[ERROR] 后端测试失败\033[0m")

@@ -45,9 +45,8 @@ minio:
 
 # JWT
 jwt:
-  # Plaintext secret for local H2 development — no Jasypt dependency needed.
-  # Override via TEST_JWT_SECRET env var in CI if needed.
-  secret: ${TEST_JWT_SECRET:local-dev-only-cgc-pms-jwt-secret-key-256bit-minimum-length}
+  # Must be provided explicitly for local/CI test runs.
+  secret: ${TEST_JWT_SECRET}
   # 1 h — developer convenience for local debugging
   expiration: 3600000
   refresh-expiration: 604800000
