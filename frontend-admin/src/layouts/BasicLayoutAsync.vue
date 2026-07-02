@@ -90,7 +90,7 @@ onBeforeUnmount(() => {
             <NotificationBell
               v-if="bellReady"
               :label="collapsed ? '' : '通知中心'"
-              placement="topRight"
+              placement="topLeft"
             />
             <span v-if="bellReady && !collapsed" class="sidebar-bell-label sidebar-bell-label--sr"
               >通知中心</span

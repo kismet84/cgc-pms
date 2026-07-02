@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 // ── Helpers ──
 function flushPromises() {
@@ -50,6 +52,7 @@ const APopoverStub = defineComponent({
   props: {
     trigger: String,
     placement: String,
+    transitionName: String,
     overlayClassName: String,
     arrowPointAtCenter: Boolean,
   },
@@ -141,10 +144,31 @@ describe('NotificationBell', () => {
     expect(defaultWrapper.findComponent(APopoverStub).props('placement')).toBe('bottomRight')
 
     const customWrapper = mount(NotificationBell, {
-      props: { placement: 'topRight' },
+      props: { placement: 'topLeft' },
       global: { stubs },
     })
-    expect(customWrapper.findComponent(APopoverStub).props('placement')).toBe('topRight')
+    expect(customWrapper.findComponent(APopoverStub).props('placement')).toBe('topLeft')
+  })
+
+  it('passes stable overlay class', () => {
+    const defaultWrapper = mount(NotificationBell, { global: { stubs } })
+    const defaultPopover = defaultWrapper.findComponent(APopoverStub)
+    expect(defaultPopover.props('overlayClassName')).toBe('nb-popover')
+    expect(defaultPopover.props('transitionName')).toBe('')
+
+    const sidebarWrapper = mount(NotificationBell, {
+      props: { placement: 'topLeft' },
+      global: { stubs },
+    })
+    const sidebarPopover = sidebarWrapper.findComponent(APopoverStub)
+    expect(sidebarPopover.props('overlayClassName')).toBe('nb-popover')
+    expect(sidebarPopover.props('placement')).toBe('topLeft')
+  })
+
+  it('contains zoom animation override CSS for nb-popover', () => {
+    const source = readFileSync(resolve(__dirname, '../NotificationBell.vue'), 'utf-8')
+    expect(source).toContain('.nb-popover.ant-popover.ant-zoom-big-enter')
+    expect(source).toContain('transform: none !important;')
   })
 
   it('connects SSE when popover opens', async () => {

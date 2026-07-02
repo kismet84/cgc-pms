@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { BellOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import {
@@ -21,6 +21,8 @@ const props = withDefaults(defineProps<Props>(), {
   label: '',
   placement: 'bottomRight',
 })
+
+const popoverOverlayClassName = computed(() => 'nb-popover')
 
 // ── State ──
 const unreadCount = ref(0)
@@ -185,10 +187,6 @@ function handlePopoverChange(visible: boolean) {
   }
 }
 
-// ── Lifecycle ──
-onMounted(() => {
-})
-
 onUnmounted(() => {
   eventSource?.close()
 })
@@ -198,8 +196,9 @@ onUnmounted(() => {
   <a-popover
     trigger="click"
     :placement="props.placement"
+    :transitionName="''"
     :arrow-point-at-center="true"
-    overlay-class-name="nb-popover"
+    :overlay-class-name="popoverOverlayClassName"
     @open-change="handlePopoverChange"
   >
     <span class="nb-trigger" :class="{ 'nb-trigger--with-label': label }" aria-label="通知">
@@ -292,7 +291,8 @@ onUnmounted(() => {
 /* ── Panel ── */
 .nb-panel {
   width: 360px;
-  max-height: 480px;
+  min-height: 420px;
+  max-height: 420px;
   display: flex;
   flex-direction: column;
 }
@@ -315,8 +315,8 @@ onUnmounted(() => {
 .nb-list {
   flex: 1;
   overflow-y: auto;
-  min-height: 60px;
-  max-height: 400px;
+  min-height: 0;
+  max-height: 340px;
 }
 
 .nb-list.nb-empty {
@@ -407,6 +407,16 @@ onUnmounted(() => {
 }
 
 /* ── Override popover padding ── */
+:global(.nb-popover.ant-popover.ant-zoom-big-enter),
+:global(.nb-popover.ant-popover.ant-zoom-big-enter-active),
+:global(.nb-popover.ant-popover.ant-zoom-big-leave),
+:global(.nb-popover.ant-popover.ant-zoom-big-leave-active) {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
 :deep(.nb-popover .ant-popover-inner-content) {
   padding: 0;
 }
@@ -414,4 +424,5 @@ onUnmounted(() => {
 :deep(.nb-popover .ant-popover-arrow) {
   display: none;
 }
+
 </style>
