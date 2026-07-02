@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
 import { MenuFoldOutlined, ProjectOutlined } from '@ant-design/icons-vue'
+import { getUserInfo } from '@/api/modules/auth'
 import SidebarMenu from './components/SidebarMenu.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 
@@ -27,10 +28,25 @@ function handleLogout() {
   router.push('/login')
 }
 
+async function refreshUserInfoIfNeeded() {
+  if (!userInfo.value?.userId) {
+    return
+  }
+  if (userInfo.value.realName && userInfo.value.phone !== undefined && userInfo.value.email !== undefined) {
+    return
+  }
+  try {
+    userStore.setUserInfo(await getUserInfo())
+  } catch {
+    // ignore and keep auth-only state; request interceptor will handle expired sessions
+  }
+}
+
 onMounted(() => {
   mobileQuery = window.matchMedia('(max-width: 768px)')
   syncMobileState(mobileQuery)
   mobileQuery.addEventListener('change', syncMobileState)
+  refreshUserInfoIfNeeded()
   setTimeout(() => {
     bellReady.value = true
   }, 500)

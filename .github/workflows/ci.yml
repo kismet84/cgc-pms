@@ -29,15 +29,26 @@ jobs:
 
   backend-test-mysql:
     runs-on: ubuntu-latest
+    env:
+      CI_MYSQL_DATABASE: cgc_pms_test
+      CI_MYSQL_USER: cgc_test
+      CI_MYSQL_PASSWORD: cgc_test_pw_2026
+      CI_MYSQL_ROOT_PASSWORD: ci_root_local_only_2026
     services:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: cgc_pms_test
+          MYSQL_ROOT_PASSWORD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ env.CI_MYSQL_DATABASE }}
+          MYSQL_USER: ${{ env.CI_MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u${{ env.CI_MYSQL_USER }} -p${{ env.CI_MYSQL_PASSWORD }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
       redis:
         image: redis:7-alpine
         ports:
@@ -53,9 +64,9 @@ jobs:
         run: cd backend && ./mvnw test -Dspring.profiles.active=test
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET }}
-          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/cgc_pms_test
-          SPRING_DATASOURCE_USERNAME: root
-          SPRING_DATASOURCE_PASSWORD: root
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}
+          SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
+          SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
 
   type-check:
     runs-on: ubuntu-latest
@@ -136,15 +147,26 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: [backend-test-mysql, frontend-build]
+    env:
+      CI_MYSQL_DATABASE: cgc_pms_test
+      CI_MYSQL_USER: cgc_test
+      CI_MYSQL_PASSWORD: cgc_test_pw_2026
+      CI_MYSQL_ROOT_PASSWORD: ci_root_local_only_2026
     services:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: cgc_pms_test
+          MYSQL_ROOT_PASSWORD: ${{ env.CI_MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ env.CI_MYSQL_DATABASE }}
+          MYSQL_USER: ${{ env.CI_MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u${{ env.CI_MYSQL_USER }} -p${{ env.CI_MYSQL_PASSWORD }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
       redis:
         image: redis:7-alpine
         ports:
@@ -173,7 +195,7 @@ jobs:
         run: |
           cd backend
           nohup ./mvnw spring-boot:run -Dspring-boot.run.profiles=test \
-            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/cgc_pms_test --spring.datasource.username=root --spring.datasource.password=root --spring.redis.host=localhost --spring.redis.port=6379" \
+            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }} --spring.datasource.username=${{ env.CI_MYSQL_USER }} --spring.datasource.password=${{ env.CI_MYSQL_PASSWORD }} --spring.redis.host=localhost --spring.redis.port=6379" \
             > ../backend.log 2>&1 &
           sleep 30
           cd ..

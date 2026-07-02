@@ -186,4 +186,28 @@ describe('Profile page', () => {
     )
     expect(pwdCalls.length).toBe(0)
   })
+
+  it('shows warning when new password does not meet minimum strength', async () => {
+    const wrapper = mountProfile()
+
+    const passwordInputs = wrapper.findAll('.stub-input-password')
+    expect(passwordInputs.length).toBeGreaterThanOrEqual(3)
+
+    await passwordInputs.at(0)!.setValue('old123456')
+    await passwordInputs.at(1)!.setValue('abcdefgh')
+    await passwordInputs.at(2)!.setValue('abcdefgh')
+    await nextTick()
+
+    const forms = wrapper.findAll('.stub-form')
+    const passwordForm = forms.at(1)
+    expect(passwordForm).toBeTruthy()
+    await passwordForm!.trigger('submit')
+    await nextTick()
+
+    expect(mockMessage.warning).toHaveBeenCalled()
+    const pwdCalls = mockRequest.mock.calls.filter(
+      (call: unknown[]) => (call[0] as Record<string, unknown>)?.url === '/profile/password',
+    )
+    expect(pwdCalls.length).toBe(0)
+  })
 })

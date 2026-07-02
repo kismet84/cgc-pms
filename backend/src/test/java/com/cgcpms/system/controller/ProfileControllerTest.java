@@ -199,13 +199,37 @@ class ProfileControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("RED-6: PUT /api/profile/password with newPassword < 6 chars → 400")
+    @DisplayName("RED-6: PUT /api/profile/password with newPassword < 8 chars → 400")
     void testChangePassword_ShortNewPassword() throws Exception {
         mockMvc.perform(putWithApiContext("/profile/password")
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"oldPassword":"admin123","newPassword":"1234"}"""))
+                                {"oldPassword":"admin123","newPassword":"1234567"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("RED-7: PUT /api/profile/password with letters-only password → 400")
+    void testChangePassword_PasswordWithoutDigit() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile/password")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"oldPassword":"admin123","newPassword":"abcdefgh"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("RED-8: PUT /api/profile/password with digits-only password → 400")
+    void testChangePassword_PasswordWithoutLetter() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile/password")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"oldPassword":"admin123","newPassword":"12345678"}"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }

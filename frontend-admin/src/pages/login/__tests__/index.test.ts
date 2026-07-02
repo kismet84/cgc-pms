@@ -64,10 +64,17 @@ describe('login/index.vue', () => {
     expect(wrapper.find('form').exists()).toBe(true)
   })
 
+  it('用户名默认值为空，不再预填 admin', () => {
+    const wrapper = mount(LoginPage)
+
+    expect(wrapper.vm.formState.username).toBe('')
+  })
+
   it('登录成功后允许跳转站内 redirect 路径', async () => {
     mockRoute.query = { redirect: '/contract/list?status=pending' }
     const wrapper = mount(LoginPage)
 
+    wrapper.vm.formState.username = 'admin'
     wrapper.vm.formState.password = 'secret'
     await wrapper.vm.handleSubmit()
 
@@ -78,6 +85,7 @@ describe('login/index.vue', () => {
     mockRoute.query = { redirect: 'https://evil.example/phishing' }
     const wrapper = mount(LoginPage)
 
+    wrapper.vm.formState.username = 'admin'
     wrapper.vm.formState.password = 'secret'
     await wrapper.vm.handleSubmit()
 
@@ -88,6 +96,7 @@ describe('login/index.vue', () => {
     mockRoute.query = { redirect: '//evil.example/phishing' }
     const wrapper = mount(LoginPage)
 
+    wrapper.vm.formState.username = 'admin'
     wrapper.vm.formState.password = 'secret'
     await wrapper.vm.handleSubmit()
 
@@ -98,6 +107,7 @@ describe('login/index.vue', () => {
     mockRoute.query = { redirect: ['/invoice', 'https://evil.example'] }
     const wrapper = mount(LoginPage)
 
+    wrapper.vm.formState.username = 'admin'
     wrapper.vm.formState.password = 'secret'
     await wrapper.vm.handleSubmit()
 
@@ -118,6 +128,7 @@ describe('login/index.vue', () => {
   it('登录成功且无 redirect 时回到首页', async () => {
     const wrapper = mount(LoginPage)
 
+    wrapper.vm.formState.username = 'admin'
     wrapper.vm.formState.password = 'secret'
     await wrapper.vm.handleSubmit()
 
@@ -128,6 +139,7 @@ describe('login/index.vue', () => {
     vi.mocked(login).mockRejectedValueOnce(new Error('bad credentials'))
     const wrapper = mount(LoginPage)
 
+    wrapper.vm.formState.username = 'admin'
     wrapper.vm.formState.password = 'wrong'
     await wrapper.vm.handleSubmit()
 

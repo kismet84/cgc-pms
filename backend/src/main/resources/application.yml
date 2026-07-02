@@ -37,6 +37,13 @@ logging:
     root: INFO
     com.cgcpms: DEBUG
 
+app:
+  async:
+    core-pool-size: 4
+    max-pool-size: 8
+    queue-capacity: 200
+    thread-name-prefix: cgc-pms-async-
+
 rate-limit:
   global-write:
     enabled: true

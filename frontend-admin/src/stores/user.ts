@@ -4,6 +4,7 @@ import type { UserInfo } from '@/types/user'
 import { logout as authLogout } from '@/api/modules/auth'
 
 const USER_INFO_KEY = 'cgc_pms_userinfo'
+type PersistedUserInfo = Pick<UserInfo, 'userId' | 'username' | 'roles' | 'permissions' | 'roleName'>
 
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(loadUserInfo())
@@ -53,12 +54,22 @@ function loadUserInfo(): UserInfo | null {
 
 function persistUserInfo(info: UserInfo) {
   try {
-    localStorage.setItem(USER_INFO_KEY, JSON.stringify(info))
+    localStorage.setItem(USER_INFO_KEY, JSON.stringify(toPersistedUserInfo(info)))
   } catch {
     if (import.meta.env.DEV) {
       console.warn('localStorage operation failed:', 'persistUserInfo')
     }
     // localStorage full or unavailable — userInfo lives only in memory
+  }
+}
+
+function toPersistedUserInfo(info: UserInfo): PersistedUserInfo {
+  return {
+    userId: info.userId,
+    username: info.username,
+    roles: info.roles,
+    permissions: info.permissions,
+    roleName: info.roleName,
   }
 }
 

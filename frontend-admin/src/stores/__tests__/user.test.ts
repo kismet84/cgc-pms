@@ -19,9 +19,9 @@ function seedLocalStorage() {
     JSON.stringify({
       userId: '1',
       username: 'admin',
-      realName: 'Admin',
       roles: ['ADMIN'],
       permissions: ['*'],
+      roleName: '系统管理员',
     }),
   )
 }
@@ -95,6 +95,55 @@ describe('userStore — logout', () => {
     expect(mockAuthLogout).toHaveBeenCalledOnce()
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
     expect(store.userInfo).toBeNull()
+  })
+
+  it('should persist auth-only fields without PII', () => {
+    const store = useUserStore()
+
+    store.setUserInfo({
+      userId: '1',
+      username: 'admin',
+      realName: '管理员',
+      phone: '13800138000',
+      email: 'admin@example.com',
+      avatar: 'https://example.com/avatar.png',
+      roles: ['ADMIN'],
+      permissions: ['dashboard:view'],
+      roleName: '系统管理员',
+    })
+
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') as Record<string, unknown>
+    expect(saved).toEqual({
+      userId: '1',
+      username: 'admin',
+      roles: ['ADMIN'],
+      permissions: ['dashboard:view'],
+      roleName: '系统管理员',
+    })
+    expect(saved.realName).toBeUndefined()
+    expect(saved.phone).toBeUndefined()
+    expect(saved.email).toBeUndefined()
+    expect(saved.avatar).toBeUndefined()
+  })
+
+  it('should keep permission checks working after reload from auth-only cache', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        userId: '1',
+        username: 'admin',
+        roles: ['ADMIN'],
+        permissions: ['system:user:view'],
+        roleName: '系统管理员',
+      }),
+    )
+
+    const store = useUserStore()
+
+    expect(store.isLogin).toBe(true)
+    expect(store.roles).toEqual(['ADMIN'])
+    expect(store.permissions).toEqual(['system:user:view'])
+    expect(store.hasPermission('system:user:view')).toBe(true)
   })
 
   it('should NOT await the API call — clears state synchronously before promise settles', () => {

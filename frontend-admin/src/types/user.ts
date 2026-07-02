@@ -16,7 +16,7 @@ export interface LoginResult {
 export interface UserInfo {
   userId: string
   username: string
-  realName: string
+  realName?: string
   avatar?: string
   phone?: string
   email?: string

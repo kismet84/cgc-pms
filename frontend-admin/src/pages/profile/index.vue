@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import { updateProfile, changePassword } from '@/api/modules/auth'
@@ -21,6 +21,19 @@ const passwordForm = reactive({
 
 const profileLoading = ref(false)
 const passwordLoading = ref(false)
+const PASSWORD_RULE_TEXT = '新密码至少 8 位，且同时包含字母和数字'
+const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
+
+watch(
+  () => userStore.userInfo,
+  (info) => {
+    profileForm.realName = info?.realName ?? ''
+    profileForm.phone = info?.phone ?? ''
+    profileForm.email = info?.email ?? ''
+    profileForm.avatar = info?.avatar ?? ''
+  },
+  { immediate: true },
+)
 
 async function handleProfileSave() {
   if (!profileForm.realName.trim()) {
@@ -52,6 +65,10 @@ async function handlePasswordChange() {
   }
   if (!passwordForm.newPassword) {
     message.warning('请输入新密码')
+    return
+  }
+  if (!PASSWORD_PATTERN.test(passwordForm.newPassword)) {
+    message.warning(PASSWORD_RULE_TEXT)
     return
   }
   if (passwordForm.newPassword !== passwordForm.confirmPassword) {

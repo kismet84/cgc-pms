@@ -24,7 +24,7 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const formState = reactive<LoginParams>({
-  username: 'admin',
+  username: '',
   password: '',
   remember: true,
 })
