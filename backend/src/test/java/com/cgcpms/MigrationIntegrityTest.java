@@ -269,6 +269,63 @@ class MigrationIntegrityTest {
         }
     }
 
+    @Test
+    void notificationListLegacyPermCleanupStaysPointedAndDoesNotRetargetAuthorization() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V113__clear_notification_list_legacy_perm.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V113__clear_notification_list_legacy_perm.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("UPDATE sys_menu"));
+            assertTrue(sql.contains("id = 761"));
+            assertTrue(sql.contains("perms = NULL"));
+            assertTrue(sql.contains("perms = 'notification:list'"));
+            assertFalse(sql.contains("notification:view"));
+            assertFalse(sql.contains("UPDATE sys_role_menu"));
+            assertFalse(sql.contains("INSERT INTO sys_role_menu"));
+        }
+    }
+
+    @Test
+    void partnerListLegacyPermCleanupStaysPointedAndDoesNotRetargetAuthorization() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V114__clear_partner_list_legacy_perm.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V114__clear_partner_list_legacy_perm.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("UPDATE sys_menu"));
+            assertTrue(sql.contains("id = 401"));
+            assertTrue(sql.contains("perms = NULL"));
+            assertTrue(sql.contains("perms = 'partner:list'"));
+            assertFalse(sql.contains("partner:query"));
+            assertFalse(sql.contains("UPDATE sys_role_menu"));
+            assertFalse(sql.contains("INSERT INTO sys_role_menu"));
+        }
+    }
+
+    @Test
+    void contractListLegacyPermCleanupStaysPointedAndDoesNotRetargetAuthorization() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V115__clear_contract_list_legacy_perm.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V115__clear_contract_list_legacy_perm.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertTrue(sql.contains("UPDATE sys_menu"));
+            assertTrue(sql.contains("id = 301"));
+            assertTrue(sql.contains("perms = NULL"));
+            assertTrue(sql.contains("perms = 'contract:list'"));
+            assertFalse(sql.contains("contract:query"));
+            assertFalse(sql.contains("UPDATE sys_role_menu"));
+            assertFalse(sql.contains("INSERT INTO sys_role_menu"));
+        }
+    }
+
     /**
      * Java-based migrations (V51/V58/V75) are executed by Flyway at startup
      * from {@code common/migration/} and do not require SQL-level coverage here —
