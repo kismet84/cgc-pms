@@ -13,11 +13,11 @@ const SUCCESS_CODE = '0'
 /** Queue timeout in ms — draining forever-queued requests */
 const REFRESH_QUEUE_TIMEOUT = 15_000
 
-const runtimeApiBaseUrl =
-  new URLSearchParams(window.location.search).get('apiBaseUrl') ??
-  (window as unknown as { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }).__APP_RUNTIME_CONFIG__?.apiBaseUrl
+const runtimeApiBaseUrl = (window as unknown as { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } })
+  .__APP_RUNTIME_CONFIG__?.apiBaseUrl
+const devQueryApiBaseUrl = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('apiBaseUrl') : null
 
-const API_BASE_URL = runtimeApiBaseUrl || import.meta.env.VITE_API_BASE_URL || '/api'
+const API_BASE_URL = devQueryApiBaseUrl || runtimeApiBaseUrl || import.meta.env.VITE_API_BASE_URL || '/api'
 
 /** Axios instance for normal API calls — carries the 401 interceptor. */
 const service: AxiosInstance = axios.create({

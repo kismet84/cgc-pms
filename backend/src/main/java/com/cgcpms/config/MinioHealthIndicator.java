@@ -1,5 +1,6 @@
 package com.cgcpms.config;
 
+import io.minio.BucketExistsArgs;
 import io.minio.MinioClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Component;
 /**
  * Spring Boot Actuator HealthIndicator for MinIO object storage.
  *
- * Checks MinIO connectivity by listing buckets.
+ * Checks MinIO connectivity by verifying the configured bucket exists.
  * Returns {@link Health#up()} when MinIO is reachable,
  * {@link Health#down()} when the connection fails or the client is unavailable.
  *
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Component;
 public class MinioHealthIndicator implements HealthIndicator {
 
     private final ObjectProvider<MinioClient> minioClientProvider;
+    private final MinioConfig minioConfig;
 
     @Override
     public Health health() {
@@ -37,9 +39,16 @@ public class MinioHealthIndicator implements HealthIndicator {
         }
 
         try {
-            client.listBuckets();
+            String bucket = minioConfig.getBucket();
+            boolean exists = client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+            if (!exists) {
+                return Health.down()
+                        .withDetail("bucket", bucket)
+                        .withDetail("reason", "Configured bucket does not exist")
+                        .build();
+            }
             return Health.up()
-                    .withDetail("endpoint", "reachable")
+                    .withDetail("bucket", bucket)
                     .build();
         } catch (Exception e) {
             log.warn("MinIO health check failed: {}", e.getMessage());

@@ -1,5 +1,6 @@
 package com.cgcpms.payment;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
@@ -19,10 +20,13 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -102,6 +106,7 @@ class PayRecordControllerTest {
             record.setPayAmount(new BigDecimal("5000.00"));
             record.setPayDate(LocalDate.now());
             record.setPayMethod("BANK_TRANSFER");
+            record.setExternalTxnNo("INIT-" + System.nanoTime());
             var vo = payRecordService.writeback(record);
             payRecordId = Long.parseLong(vo.getId());
         } finally {
@@ -225,6 +230,19 @@ class PayRecordControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"payAmount\":1000}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("writeback 带审计注解")
+    void testWritebackAuditedOperationPresent() throws Exception {
+        Method method = com.cgcpms.payment.controller.PayRecordController.class
+                .getMethod("writeback", PayRecord.class);
+        AuditedOperation audited = method.getAnnotation(AuditedOperation.class);
+        assertNotNull(audited);
+        assertEquals("CREATE", audited.type());
+        assertEquals("PAYMENT", audited.businessType());
+        assertEquals("#input.payApplicationId", audited.businessIdExpression());
     }
 
     // ── helpers ──

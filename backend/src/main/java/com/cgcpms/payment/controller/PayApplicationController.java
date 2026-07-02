@@ -1,6 +1,7 @@
 package com.cgcpms.payment.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.payment.entity.PayApplication;
@@ -45,12 +46,14 @@ public class PayApplicationController {
     }
 
     @PostMapping
+    @AuditedOperation(type = "CREATE", businessType = "PAYMENT", businessIdExpression = "#app.id")
     @PreAuthorize("hasAuthority('payment:app:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> create(@Valid @RequestBody PayApplication app) {
         return ApiResponse.success(payApplicationService.create(app));
     }
 
     @PutMapping("/{id}")
+    @AuditedOperation(type = "UPDATE", businessType = "PAYMENT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('payment:app:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PayApplication app) {
         app.setId(id);
@@ -79,6 +82,7 @@ public class PayApplicationController {
     }
 
     @PostMapping("/{id}/submit")
+    @AuditedOperation(type = "SUBMIT", businessType = "PAYMENT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('payment:app:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         payApplicationService.submitForApproval(id);

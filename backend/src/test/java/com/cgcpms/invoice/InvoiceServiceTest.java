@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -140,6 +141,20 @@ class InvoiceServiceTest {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);
         }
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("RECOGNIZE: fake PDF magic bytes rejected before PDFBox parsing")
+    void shouldRejectRecognizeForFakePdfMagic() {
+        MockMultipartFile fakePdf = new MockMultipartFile(
+                "file",
+                "fake.pdf",
+                "application/pdf",
+                "not-a-real-pdf".getBytes());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> invoiceService.recognize(fakePdf));
+        assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
     }
 
     // ── RED 2: duplicate invoice_no per tenant → BusinessException ──

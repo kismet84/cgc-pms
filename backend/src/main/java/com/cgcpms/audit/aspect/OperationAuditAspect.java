@@ -5,6 +5,7 @@ import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.result.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
  * 操作审计切面 — 在 @AuditedOperation 标注的方法中提取审计信息，finally 块中发布事件。
  */
 @Aspect
+@Slf4j
 @Component
 public class OperationAuditAspect {
 
@@ -87,7 +89,8 @@ public class OperationAuditAspect {
 
             publisher.publishEvent(event);
         } catch (Exception e) {
-            // 审计事件发布失败不影响业务
+            log.warn("Operation audit publish failed: type={}, businessType={}, errorCode={}",
+                    annotation.type(), annotation.businessType(), errorCode, e);
         }
     }
 

@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.file.service.FileTypeValidator;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
@@ -38,6 +39,7 @@ public class InvoiceService {
 
     private final PayInvoiceMapper payInvoiceMapper;
     private final PayRecordMapper payRecordMapper;
+    private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     // ── Query ──
 
@@ -178,19 +180,19 @@ public class InvoiceService {
      * Best-effort: returns null for fields that cannot be extracted.
      */
     public InvoiceRecognizeResultVO recognize(MultipartFile file) {
-        // Validation
-        if (file.isEmpty()) {
-            throw new BusinessException("FILE_EMPTY", "上传文件不能为空");
-        }
         if (!"application/pdf".equals(file.getContentType())) {
             throw new BusinessException("FILE_TYPE_NOT_ALLOWED", "仅支持PDF格式");
         }
-        if (file.getSize() > 50 * 1024 * 1024) {
-            throw new BusinessException("FILE_TOO_LARGE", "文件大小不能超过50MB");
+        byte[] content;
+        try {
+            content = file.getBytes();
+        } catch (IOException e) {
+            throw new BusinessException("FILE_EMPTY", "无法读取文件内容");
         }
-        if (file.getSize() > 10 * 1024 * 1024) {
+        fileTypeValidator.validate("invoice.pdf", file.getContentType(), content);
+        if (content.length > 10 * 1024 * 1024) {
             log.warn("Invoice PDF is large ({} MB), this may increase memory pressure",
-                    file.getSize() / 1024 / 1024);
+                    content.length / 1024 / 1024);
         }
 
         // PDF text extraction.
@@ -199,7 +201,7 @@ public class InvoiceService {
         PDDocument document = null;
         String text;
         try {
-            document = Loader.loadPDF(file.getBytes());
+            document = Loader.loadPDF(content);
             PDFTextStripper stripper = new PDFTextStripper();
             stripper.setSortByPosition(true);
             text = stripper.getText(document);
