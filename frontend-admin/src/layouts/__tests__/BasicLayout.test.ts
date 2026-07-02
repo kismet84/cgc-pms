@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 
 // ── Mock window.matchMedia (not available in jsdom) ──
 beforeAll(() => {
@@ -31,7 +31,13 @@ vi.mock('vue-router', () => ({
 vi.mock('@/stores/user', () => ({
   useUserStore: () => ({
     logout: vi.fn(),
-    userInfo: { realName: '张三', roleName: '项目经理' },
+    userInfo: ref({ userId: '1', realName: '张三', roleName: '项目经理' }),
+  }),
+}))
+
+vi.mock('pinia', () => ({
+  storeToRefs: (store: { userInfo: ReturnType<typeof ref> }) => ({
+    userInfo: store.userInfo,
   }),
 }))
 

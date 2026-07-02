@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { ref } from 'vue'
 import BasicLayout from '@/layouts/BasicLayoutAsync.vue'
 
 // ── Mock window.matchMedia (not available in jsdom) ──
@@ -28,7 +29,13 @@ vi.mock('vue-router', () => ({
 vi.mock('@/stores/user', () => ({
   useUserStore: () => ({
     logout: vi.fn(),
-    userInfo: { realName: '张三', roleName: '项目经理' },
+    userInfo: ref({ userId: '1', realName: '张三', roleName: '项目经理' }),
+  }),
+}))
+
+vi.mock('pinia', () => ({
+  storeToRefs: (store: { userInfo: ReturnType<typeof ref> }) => ({
+    userInfo: store.userInfo,
   }),
 }))
 
