@@ -80,7 +80,11 @@ public class WorkflowQueryService {
         LambdaQueryWrapper<WfTask> wrapper = new LambdaQueryWrapper<WfTask>()
                 .eq(WfTask::getTenantId, tenantId)
                 .eq(WfTask::getApproverId, userId)
-                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING);
+                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                .inSql(WfTask::getInstanceId,
+                        "SELECT id FROM wf_instance WHERE deleted_flag = 0"
+                                + " AND tenant_id = " + tenantId
+                                + " AND instance_status = '" + WorkflowConstants.INSTANCE_RUNNING + "'");
         if (normalizedBusinessType != null) {
             wrapper.eq(WfTask::getBusinessType, normalizedBusinessType);
         }

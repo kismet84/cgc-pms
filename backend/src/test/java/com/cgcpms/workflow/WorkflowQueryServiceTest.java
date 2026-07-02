@@ -266,6 +266,21 @@ class WorkflowQueryServiceTest {
         assertEquals(0, noHit.getTotal());
     }
 
+    @Test
+    @DisplayName("getMyTodos 不返回实例非RUNNING的脏待办")
+    void getMyTodosExcludesPendingTasksOfNonRunningInstances() {
+        LocalDateTime base = LocalDateTime.of(2099, 7, 1, 10, 0, 0);
+        Long dirtyInstanceId = insertStartedInstance(33333022L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_OTHER,
+                WorkflowConstants.INSTANCE_APPROVED, "脏数据合同待办", "脏数据节点", base.minusDays(1), base.minusHours(1));
+        insertTask(dirtyInstanceId, 33333022L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_ADMIN, base.minusMinutes(30));
+
+        IPage<WfTaskVO> page = queryService.getMyTodos(TENANT_0, USER_ADMIN, 1, 100);
+
+        assertTrue(page.getRecords().stream()
+                        .noneMatch(task -> "33333022".equals(task.getBusinessId())),
+                "实例非 RUNNING 的 PENDING task 不应出现在待办列表");
+    }
+
     // ── getMyDone ──
 
     @Test
