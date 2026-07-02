@@ -1,10 +1,14 @@
 package com.cgcpms.file;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.service.FileService;
 import io.minio.MinioClient;
+import io.minio.PutObjectArgs;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,6 +17,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 /**
  * 文件上传安全边界验证。
@@ -35,6 +41,9 @@ class FileServiceTest {
 
     @Autowired
     private FileService fileService;
+
+    @Autowired
+    private SysFileMapper sysFileMapper;
 
     /** Mock MinIO client 避免真实网络连接 */
     @MockBean
@@ -209,5 +218,50 @@ class FileServiceTest {
         assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
         assertTrue(ex.getMessage().contains("无法识别") || ex.getMessage().contains("不匹配"),
                 "应提示文件格式无法识别或类型不匹配: " + ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("upload retries putObject once then succeeds and inserts one record")
+    void testUploadRetriesPutObjectThenSucceeds() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "retry.pdf", "application/pdf", "%PDF-1.4 retry".getBytes());
+        String businessType = "RETRY_OK";
+        long businessId = Math.abs(System.nanoTime());
+        LambdaQueryWrapper<SysFile> query = new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getBusinessType, businessType)
+                .eq(SysFile::getBusinessId, businessId);
+        assertEquals(0L, sysFileMapper.selectCount(query));
+
+        when(minioClient.putObject(any(PutObjectArgs.class)))
+                .thenThrow(new RuntimeException("transient minio error"))
+                .thenReturn(null);
+
+        assertDoesNotThrow(() -> fileService.upload(file, businessType, businessId));
+        assertEquals(1L, sysFileMapper.selectCount(query));
+        verify(minioClient, times(2)).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("upload fails after max putObject retries and does not insert record")
+    void testUploadFailsAfterMaxPutObjectRetries() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "retry-fail.pdf", "application/pdf", "%PDF-1.4 retry fail".getBytes());
+        String businessType = "RETRY_FAIL";
+        long businessId = Math.abs(System.nanoTime());
+        LambdaQueryWrapper<SysFile> query = new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getBusinessType, businessType)
+                .eq(SysFile::getBusinessId, businessId);
+        assertEquals(0L, sysFileMapper.selectCount(query));
+
+        when(minioClient.putObject(any(PutObjectArgs.class)))
+                .thenThrow(new RuntimeException("minio error 1"))
+                .thenThrow(new RuntimeException("minio error 2"))
+                .thenThrow(new RuntimeException("minio error 3"));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.upload(file, businessType, businessId));
+        assertEquals("FILE_UPLOAD_FAILED", ex.getCode());
+        assertEquals(0L, sysFileMapper.selectCount(query));
+        verify(minioClient, times(3)).putObject(any(PutObjectArgs.class));
     }
 }

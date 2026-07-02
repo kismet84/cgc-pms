@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 public class FileService {
 
     private static final int PRESIGNED_URL_EXPIRE_MINUTES = 5;
+    private static final int PUT_OBJECT_MAX_ATTEMPTS = 3;
+    private static final long PUT_OBJECT_RETRY_BACKOFF_MS = 50L;
 
     private final SysFileMapper sysFileMapper;
     private final MinioClient minioClient;
@@ -100,16 +102,7 @@ public class FileService {
             String bucketName = minioConfig.getBucket();
             String contentType = vr.detectedMime();
 
-            // Re-build InputStream since getBytes() consumed it
-            java.io.InputStream inputStream = new java.io.ByteArrayInputStream(content);
-
-            // Upload to MinIO — use detectedMime, not client-provided contentType
-            minioClient.putObject(PutObjectArgs.builder()
-                    .bucket(bucketName)
-                    .object(storagePath)
-                    .stream(inputStream, content.length, -1)
-                    .contentType(contentType)
-                    .build());
+            putObjectWithRetry(bucketName, storagePath, contentType, content);
 
             // Persist file record
             SysFile sysFile = new SysFile();
@@ -222,6 +215,38 @@ public class FileService {
     }
 
     // ---- private helpers ----
+
+    private void putObjectWithRetry(String bucketName, String storagePath, String contentType, byte[] content)
+            throws Exception {
+        Exception lastException = null;
+        for (int attempt = 1; attempt <= PUT_OBJECT_MAX_ATTEMPTS; attempt++) {
+            try {
+                minioClient.putObject(PutObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(storagePath)
+                        .stream(new java.io.ByteArrayInputStream(content), content.length, -1)
+                        .contentType(contentType)
+                        .build());
+                return;
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt == PUT_OBJECT_MAX_ATTEMPTS) {
+                    throw e;
+                }
+                try {
+                    sleepBeforePutObjectRetry();
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw interruptedException;
+                }
+            }
+        }
+        throw lastException;
+    }
+
+    void sleepBeforePutObjectRetry() throws InterruptedException {
+        Thread.sleep(PUT_OBJECT_RETRY_BACKOFF_MS);
+    }
 
     private String genPresignedUrl(String bucket, String object) {
         try {
