@@ -53,3 +53,5 @@
 - [Vue LSP 缺失时的前端验证兜底 2026-07-01](vue-lsp-missing-fallback-typecheck-build-2026-07-01.md) — vue-language-server 未安装导致 LSP 诊断不可用时，改用 pnpm type-check 与 pnpm build 覆盖 Vue 模板和构建验证
 - [PowerShell SSH 远程脚本美元符号展开陷阱 2026-07-01](powershell-ssh-remote-dollar-expansion-2026-07-01.md) — Windows PowerShell 调 Linux 远程 Bash 时外层双引号会提前展开 `$`，ssh 远程脚本应优先用单引号包裹
 - [全局写接口限流修复 VUL-006 2026-07-02](global-write-rate-limit-filter-vul-006-2026-07-02.md) — 全局写限流应挂在 JWT 后过滤器层并复用 RateLimitCounterStore，避免给各 Controller 批量补注解
+- [Playwright auth state 空文件误判 2026-07-03](playwright-auth-state-empty-if-dashboard-has-login-shell-2026-07-03.md) — 登录页内嵌态势预览壳会让 `/dashboard` URL 判定失真，global auth 应等待 `.basic-layout`
+- [后端 verify 因 Maven Wrapper 缺失被阻塞 2026-07-03](backend-verify-blocked-when-mvn-wrapper-missing-2026-07-03.md) — 当前 checkout 缺 `.mvn/wrapper` 且系统无 `mvn` 时，`backend/mvnw.cmd verify` 属于环境阻塞

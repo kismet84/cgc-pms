@@ -1,0 +1,35 @@
+{
+  "cookies": [
+    {
+      "name": "refresh_token",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwidXNlcklkIjoxLCJ0b2tlblR5cGUiOiJyZWZyZXNoIiwiaWF0IjoxNzgzMDM2OTg0LCJleHAiOjE3ODM2NDE3ODR9.v9NqKP_m-uPu9ULYSOke0NFLlZw6_d62TRIr37aDF9I",
+      "domain": "localhost",
+      "path": "/api/auth/refresh",
+      "expires": 1783641784.976085,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "access_token",
+      "value": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsInVzZXJJZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsInRlbmFudElkIjowLCJyb2xlQ29kZXMiOlsiU1VQRVJfQURNSU4iXSwicGVybWlzc2lvbnMiOlsiZGFzaGJvYXJkOnZpZXciLCJwcm9qZWN0Omxpc3QiLCJwcm9qZWN0OmFkZCIsInByb2plY3Q6ZWRpdCIsInByb2plY3Q6ZGVsZXRlIiwiY29udHJhY3Q6YWRkIiwiY29udHJhY3Q6ZWRpdCIsImNvbnRyYWN0OmRlbGV0ZSIsImNvbnRyYWN0OnN1Ym1pdCIsInBhcnRuZXI6YWRkIiwicGFydG5lcjplZGl0IiwicGFydG5lcjpkZWxldGUiLCJzeXN0ZW06dXNlcjpsaXN0Iiwic3lzdGVtOnJvbGU6bGlzdCIsInN5c3RlbTptZW51Omxpc3QiLCJzeXN0ZW06ZGljdDpsaXN0IiwicHVyY2hhc2U6b3JkZXI6c3VibWl0IiwicmVjZWlwdDpzdWJtaXQiLCJzdWJjb250cmFjdDptZWFzdXJlOnN1Ym1pdCIsInBheW1lbnQ6YXBwOnN1Ym1pdCIsInZhcmlhdGlvbjpvcmRlcjpzdWJtaXQiLCJjb250cmFjdDpjaGFuZ2U6c3VibWl0Iiwic2V0dGxlbWVudDpzdWJtaXQiLCJjb3N0OnRhcmdldDpzdWJtaXQiLCJ3b3JrZmxvdzphcHByb3ZlIiwid29ya2Zsb3c6cmVqZWN0Iiwid29ya2Zsb3c6dHJhbnNmZXIiLCJ3b3JrZmxvdzphZGQtc2lnbiIsIndvcmtmbG93OndpdGhkcmF3Iiwid29ya2Zsb3c6cmVzdWJtaXQiLCJvcmc6bGlzdCIsIm9yZzphZGQiLCJvcmc6ZWRpdCIsIm9yZzpkZWxldGUiLCJwcm9qZWN0Om1lbWJlcjpsaXN0IiwicHJvamVjdDptZW1iZXI6YWRkIiwicHJvamVjdDptZW1iZXI6ZWRpdCIsInByb2plY3Q6bWVtYmVyOmRlbGV0ZSIsInN5c3RlbTpkaWN0OmFkZCIsInN5c3RlbTpkaWN0OmVkaXQiLCJzeXN0ZW06ZGljdDpkZWxldGUiLCJpbnZlbnRvcnk6d2FyZWhvdXNlOmxpc3QiLCJpbnZlbnRvcnk6c3RvY2s6bGlzdCIsImludmVudG9yeTp0cmFuc2FjdGlvbjpsaXN0IiwicHVyY2hhc2U6cmVxdWVzdDpsaXN0IiwiaW52ZW50b3J5OndhcmVob3VzZTphZGQiLCJpbnZlbnRvcnk6d2FyZWhvdXNlOmVkaXQiLCJpbnZlbnRvcnk6d2FyZWhvdXNlOmRlbGV0ZSIsImludmVudG9yeTp0cmFuc2FjdGlvbjphZGQiLCJwdXJjaGFzZTpyZXF1ZXN0OmFkZCIsInB1cmNoYXNlOnJlcXVlc3Q6c3VibWl0IiwiaW52b2ljZTpsaXN0IiwiaW52b2ljZTphZGQiLCJpbnZvaWNlOmVkaXQiLCJpbnZvaWNlOmRlbGV0ZSIsImludm9pY2U6dmVyaWZ5IiwiaW52b2ljZTpxdWVyeSIsIm5vdGlmaWNhdGlvbjp2aWV3Iiwibm90aWZpY2F0aW9uOmVkaXQiLCJhbGVydDp2aWV3IiwiYWxlcnQ6ZWRpdCIsInN5c3RlbTp1c2VyOnF1ZXJ5Iiwic3lzdGVtOnJvbGU6cXVlcnkiLCJzeXN0ZW06bWVudTpxdWVyeSIsInByb2plY3Q6cXVlcnkiLCJjb250cmFjdDpxdWVyeSIsInBhcnRuZXI6cXVlcnkiLCJvcmc6cXVlcnkiLCJkYXNoYm9hcmQ6cHJvamVjdC1tYW5hZ2VyOnZpZXciLCJkYXNoYm9hcmQ6YnVzaW5lc3MtbWFuYWdlcjp2aWV3IiwiZGFzaGJvYXJkOmNvc3QtbWFuYWdlcjp2aWV3IiwiZGFzaGJvYXJkOmZpbmFuY2U6dmlldyIsImRhc2hib2FyZDptYW5hZ2VtZW50OnZpZXciLCJkYXNoYm9hcmQ6Y29zdC1icmVha2Rvd246dmlldyIsImRhc2hib2FyZDpwdXJjaGFzZS1tYW5hZ2VyOnZpZXciLCJkYXNoYm9hcmQ6cHJvZHVjdGlvbi1tYW5hZ2VyOnZpZXciLCJkYXNoYm9hcmQ6Y2hpZWYtZW5naW5lZXI6dmlldyIsIm1hdGVyaWFsOmRpY3Q6bGlzdCIsInZhcmlhdGlvbjpvcmRlcjpxdWVyeSIsImNvc3Q6cXVlcnkiLCJjb3N0OmxlZGdlcjpxdWVyeSIsImNvc3Q6c3VtbWFyeTp2aWV3IiwiY29zdDp0YXJnZXQ6cXVlcnkiLCJwdXJjaGFzZTpvcmRlcjpxdWVyeSIsInJlY2VpcHQ6cXVlcnkiLCJzdWJ0YXNrOnF1ZXJ5Iiwic3ViY29udHJhY3Q6bWVhc3VyZTpxdWVyeSIsInBheW1lbnQ6YXBwOnF1ZXJ5Iiwic2V0dGxlbWVudDpxdWVyeSJdLCJ0b2tlblR5cGUiOiJhY2Nlc3MiLCJpYXQiOjE3ODMwMzY5ODQsImV4cCI6MTc4MzAzNzg4NH0.rJJt1XnthjgUluYBEQK4wSQDNYj9rA5YcxQPOiexr3o",
+      "domain": "localhost",
+      "path": "/api",
+      "expires": 1783037884.974928,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Strict"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "cgc_pms_userinfo",
+          "value": "{\"userId\":\"1\",\"username\":\"admin\",\"roles\":[\"SUPER_ADMIN\"],\"permissions\":[\"dashboard:view\",\"project:list\",\"project:add\",\"project:edit\",\"project:delete\",\"contract:add\",\"contract:edit\",\"contract:delete\",\"contract:submit\",\"partner:add\",\"partner:edit\",\"partner:delete\",\"system:user:list\",\"system:role:list\",\"system:menu:list\",\"system:dict:list\",\"purchase:order:submit\",\"receipt:submit\",\"subcontract:measure:submit\",\"payment:app:submit\",\"variation:order:submit\",\"contract:change:submit\",\"settlement:submit\",\"cost:target:submit\",\"workflow:approve\",\"workflow:reject\",\"workflow:transfer\",\"workflow:add-sign\",\"workflow:withdraw\",\"workflow:resubmit\",\"org:list\",\"org:add\",\"org:edit\",\"org:delete\",\"project:member:list\",\"project:member:add\",\"project:member:edit\",\"project:member:delete\",\"system:dict:add\",\"system:dict:edit\",\"system:dict:delete\",\"inventory:warehouse:list\",\"inventory:stock:list\",\"inventory:transaction:list\",\"purchase:request:list\",\"inventory:warehouse:add\",\"inventory:warehouse:edit\",\"inventory:warehouse:delete\",\"inventory:transaction:add\",\"purchase:request:add\",\"purchase:request:submit\",\"invoice:list\",\"invoice:add\",\"invoice:edit\",\"invoice:delete\",\"invoice:verify\",\"invoice:query\",\"notification:view\",\"notification:edit\",\"alert:view\",\"alert:edit\",\"system:user:query\",\"system:role:query\",\"system:menu:query\",\"project:query\",\"contract:query\",\"partner:query\",\"org:query\",\"dashboard:project-manager:view\",\"dashboard:business-manager:view\",\"dashboard:cost-manager:view\",\"dashboard:finance:view\",\"dashboard:management:view\",\"dashboard:cost-breakdown:view\",\"dashboard:purchase-manager:view\",\"dashboard:production-manager:view\",\"dashboard:chief-engineer:view\",\"material:dict:list\",\"variation:order:query\",\"cost:query\",\"cost:ledger:query\",\"cost:summary:view\",\"cost:target:query\",\"purchase:order:query\",\"receipt:query\",\"subtask:query\",\"subcontract:measure:query\",\"payment:app:query\",\"settlement:query\"],\"roleName\":\"SUPER_ADMIN\"}"
+        }
+      ]
+    }
+  ]
+}
