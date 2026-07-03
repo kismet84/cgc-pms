@@ -60,3 +60,8 @@ logging:
   level:
     com.cgcpms: DEBUG
     org.springframework.security: DEBUG
+
+auth:
+  dev-login:
+    enabled: true
+    default-username: demo_dev_super_admin

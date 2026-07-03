@@ -1,6 +1,35 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { routes } from '@/router'
+import { getUserInfo } from '@/api/modules/auth'
+import { routes, handleAuthGuard } from '@/router'
+import { useUserStore } from '@/stores/user'
+import type { UserInfo } from '@/types/user'
+
+vi.mock('@/api/modules/auth', async () => {
+  const actual = await vi.importActual<typeof import('@/api/modules/auth')>('@/api/modules/auth')
+  return {
+    ...actual,
+    getUserInfo: vi.fn(),
+  }
+})
+
+const mockGetUserInfo = vi.mocked(getUserInfo)
+
+const sessionUserInfo: UserInfo = {
+  userId: '1',
+  username: 'dev-admin',
+  realName: '开发管理员',
+  roles: ['ADMIN'],
+  permissions: ['*'],
+  roleName: '管理员',
+}
+
+beforeEach(() => {
+  sessionStorage.clear()
+  mockGetUserInfo.mockReset()
+  setActivePinia(createPinia())
+})
 
 describe('router lazy loading', () => {
   it('login route is lazily loaded', () => {
@@ -108,5 +137,36 @@ describe('router lazy loading', () => {
     await router.isReady()
 
     expect(router.currentRoute.value.name).toBe('ApprovalProcess')
+  })
+
+  it('hydrates user info from backend session before allowing protected route', async () => {
+    mockGetUserInfo.mockResolvedValue(sessionUserInfo)
+    const userStore = useUserStore()
+
+    const result = await handleAuthGuard({
+      path: '/alert',
+      fullPath: '/alert',
+      meta: {},
+    } as never)
+
+    expect(mockGetUserInfo).toHaveBeenCalledTimes(1)
+    expect(userStore.userInfo).toEqual(sessionUserInfo)
+    expect(result).toBe(true)
+  })
+
+  it('redirects to login when backend session recovery fails', async () => {
+    mockGetUserInfo.mockRejectedValue(new Error('401'))
+
+    const result = await handleAuthGuard({
+      path: '/alert',
+      fullPath: '/alert',
+      meta: {},
+    } as never)
+
+    expect(mockGetUserInfo).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({
+      path: '/login',
+      query: { redirect: '/alert' },
+    })
   })
 })

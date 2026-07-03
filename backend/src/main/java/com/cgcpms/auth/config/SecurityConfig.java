@@ -25,7 +25,8 @@ public class SecurityConfig {
 
     public static final String[] AUTH_WHITELIST_PATHS = {
             "/auth/login",
-            "/auth/refresh"
+            "/auth/refresh",
+            "/auth/dev-login"
     };
 
     public static final String[] DOC_WHITELIST_PATHS = {

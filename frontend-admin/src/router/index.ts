@@ -1,4 +1,5 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
+import { getUserInfo } from '@/api/modules/auth'
 import { useUserStore } from '@/stores/user'
 
 export const routes: RouteRecordRaw[] = [
@@ -481,12 +482,33 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
 
 applyRoutePermissions(routes)
 
-router.beforeEach((to) => {
+let pendingUserInfoRequest: Promise<boolean> | null = null
+
+async function restoreUserSession() {
+  const userStore = useUserStore()
+  if (userStore.isLogin) {
+    return true
+  }
+  if (!pendingUserInfoRequest) {
+    pendingUserInfoRequest = getUserInfo()
+      .then((userInfo) => {
+        userStore.setUserInfo(userInfo)
+        return true
+      })
+      .catch(() => false)
+      .finally(() => {
+        pendingUserInfoRequest = null
+      })
+  }
+  return pendingUserInfoRequest
+}
+
+export async function handleAuthGuard(to: RouteLocationNormalized) {
   const userStore = useUserStore()
   if (to.meta?.public || WHITE_LIST.includes(to.path)) {
     return true
   }
-  if (!userStore.isLogin) {
+  if (!(await restoreUserSession())) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
   if (to.meta?.adminOnly && !isAdminRole(userStore.roles)) {
@@ -496,7 +518,9 @@ router.beforeEach((to) => {
     return { path: '/dashboard' }
   }
   return true
-})
+}
+
+router.beforeEach(handleAuthGuard)
 
 function isAdminRole(roles: string[]) {
   return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN')
