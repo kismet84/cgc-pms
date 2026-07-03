@@ -92,7 +92,7 @@ public class SysUserService {
         return vo;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(SysUser user) {
         if (sysUserMapper.selectCount(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getUsername, user.getUsername())) > 0) {
@@ -109,7 +109,7 @@ public class SysUserService {
         return user.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(SysUser user) {
         SysUser existing = sysUserMapper.selectById(user.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -122,7 +122,7 @@ public class SysUserService {
         sysUserMapper.updateById(user);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, String status) {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -131,7 +131,7 @@ public class SysUserService {
         sysUserMapper.updateById(user);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -167,7 +167,7 @@ public class SysUserService {
         sysUserMapper.deleteById(id);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void assignRoles(Long userId, List<Long> roleIds) {
         // Tenant isolation: verify user belongs to current tenant
         SysUser user = sysUserMapper.selectById(userId);

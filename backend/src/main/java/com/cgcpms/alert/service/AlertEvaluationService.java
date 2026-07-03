@@ -119,7 +119,7 @@ public class AlertEvaluationService {
     // Public API — manual trigger
     // ──────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public int batchEvaluate(Long tenantId) {
         log.info("Manual alert evaluation triggered for tenantId={}", tenantId);
         List<PmProject> activeProjects = projectMapper.selectList(
@@ -138,7 +138,7 @@ public class AlertEvaluationService {
     // Core evaluation
     // ──────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public int evaluateProject(Long tenantId, Long projectId) {
         List<AlertLog> alerts = new ArrayList<>();
 

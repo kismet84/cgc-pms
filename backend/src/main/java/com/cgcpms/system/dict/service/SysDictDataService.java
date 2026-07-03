@@ -47,7 +47,7 @@ public class SysDictDataService {
         return toVO(entity);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(SysDictData entity) {
         if (sysDictDataMapper.selectCount(new LambdaQueryWrapper<SysDictData>()
                 .eq(SysDictData::getDictTypeId, entity.getDictTypeId())
@@ -63,7 +63,7 @@ public class SysDictDataService {
         return entity.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(SysDictData entity) {
         SysDictData existing = sysDictDataMapper.selectById(entity.getId());
         if (existing == null) throw new BusinessException("DICT_DATA_NOT_FOUND", "字典数据不存在");
@@ -73,7 +73,7 @@ public class SysDictDataService {
         sysDictDataMapper.updateById(entity);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         SysDictData existing = sysDictDataMapper.selectById(id);
         if (existing == null) throw new BusinessException("DICT_DATA_NOT_FOUND", "字典数据不存在");

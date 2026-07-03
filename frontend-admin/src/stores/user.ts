@@ -19,7 +19,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function hasPermission(code: string): boolean {
-    return permissions.value.includes(code)
+    return permissions.value.includes('*') || permissions.value.includes(code)
   }
 
   async function logout() {
@@ -41,12 +41,12 @@ export const useUserStore = defineStore('user', () => {
 
 function loadUserInfo(): UserInfo | null {
   try {
-    const raw = localStorage.getItem(USER_INFO_KEY)
+    const raw = sessionStorage.getItem(USER_INFO_KEY)
     if (!raw) return null
     return JSON.parse(raw) as UserInfo
   } catch {
     if (import.meta.env.DEV) {
-      console.warn('localStorage operation failed:', 'loadUserInfo')
+      console.warn('sessionStorage operation failed:', 'loadUserInfo')
     }
     return null
   }
@@ -54,12 +54,12 @@ function loadUserInfo(): UserInfo | null {
 
 function persistUserInfo(info: UserInfo) {
   try {
-    localStorage.setItem(USER_INFO_KEY, JSON.stringify(toPersistedUserInfo(info)))
+    sessionStorage.setItem(USER_INFO_KEY, JSON.stringify(toPersistedUserInfo(info)))
   } catch {
     if (import.meta.env.DEV) {
-      console.warn('localStorage operation failed:', 'persistUserInfo')
+      console.warn('sessionStorage operation failed:', 'persistUserInfo')
     }
-    // localStorage full or unavailable — userInfo lives only in memory
+    // sessionStorage full or unavailable — userInfo lives only in memory
   }
 }
 
@@ -75,10 +75,10 @@ function toPersistedUserInfo(info: UserInfo): PersistedUserInfo {
 
 function clearUserInfo() {
   try {
-    localStorage.removeItem(USER_INFO_KEY)
+    sessionStorage.removeItem(USER_INFO_KEY)
   } catch {
     if (import.meta.env.DEV) {
-      console.warn('localStorage operation failed:', 'clearUserInfo')
+      console.warn('sessionStorage operation failed:', 'clearUserInfo')
     }
     // ignore
   }

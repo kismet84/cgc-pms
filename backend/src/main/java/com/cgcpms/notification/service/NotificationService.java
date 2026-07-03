@@ -51,7 +51,7 @@ public class NotificationService {
      * Create a notification. ALL params EXPLICIT (no UserContext read).
      * After persisting, pushes the notification to the target user's SSE emitter if connected.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public SysNotification create(Long tenantId, Long userId, String title, String content,
                                    String bizType, Long bizId) {
         SysNotification notification = new SysNotification();
@@ -113,7 +113,7 @@ public class NotificationService {
     /**
      * Mark a single notification as read. Validates tenant ownership.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void markAsRead(Long id, Long userId, Long tenantId) {
         SysNotification notification = notificationMapper.selectById(id);
         if (notification == null) {
@@ -136,7 +136,7 @@ public class NotificationService {
     /**
      * Mark all unread notifications as read for a specific user in a tenant.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void markAllAsRead(Long userId, Long tenantId) {
         SysNotification update = new SysNotification();
         update.setIsRead(1);

@@ -33,7 +33,7 @@ public class WorkflowTaskService {
     private final WfTemplateNodeMapper wfTemplateNodeMapper;
     private final WfTaskMapper wfTaskMapper;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void transfer(Long taskId, Long targetUserId, Long userId,
                          String username, String comment) {
 
@@ -125,7 +125,7 @@ public class WorkflowTaskService {
                 userId, username, comment);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void addSign(Long taskId, List<Long> additionalUserIds, Long userId,
                         String username, String comment) {
 

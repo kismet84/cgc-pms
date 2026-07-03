@@ -59,7 +59,7 @@ public class CostTargetService {
 
     // ── Create ──
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(CostTarget target) {
         target.setTenantId(UserContext.getCurrentTenantId());
         target.setApprovalStatus(target.getApprovalStatus() != null ? target.getApprovalStatus() : "DRAFT");
@@ -73,7 +73,7 @@ public class CostTargetService {
 
     // ── Update ──
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(CostTarget target) {
         CostTarget existing = costTargetMapper.selectById(target.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
@@ -93,7 +93,7 @@ public class CostTargetService {
 
     // ── Delete ──
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         CostTarget existing = costTargetMapper.selectById(id);
         if (existing == null) {
@@ -134,7 +134,7 @@ public class CostTargetService {
      * <b>H2 兼容性注意</b>：FOR UPDATE 在 MySQL 中锁定返回行，在 H2 中行为等价但锁粒度可能不同。
      * 该方法有 @Transactional 保护，在单事务内保证原子性，H2 环境测试通过。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void activate(Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
 
@@ -182,7 +182,7 @@ public class CostTargetService {
     /**
      * 批量保存目标成本明细项（先删后插）。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void batchSaveItems(Long targetId, List<CostTargetItem> items) {
         // 验证目标成本存在且属于当前租户
         CostTarget target = costTargetMapper.selectById(targetId);
@@ -219,7 +219,7 @@ public class CostTargetService {
     /**
      * 提交目标成本审批。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long targetId) {
         Long tenantId = UserContext.getCurrentTenantId();
 

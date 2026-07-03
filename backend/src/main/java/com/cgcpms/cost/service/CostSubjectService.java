@@ -12,16 +12,20 @@ import com.cgcpms.cost.mapper.CostTargetItemMapper;
 import com.cgcpms.cost.vo.CostSubjectTreeNodeVO;
 import com.cgcpms.cost.vo.CostSubjectVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CostSubjectService {
@@ -47,13 +51,26 @@ public class CostSubjectService {
         // Build tree starting from root nodes (parentId = 0)
         List<CostSubject> roots = parentMap.getOrDefault(0L, new ArrayList<>());
         return roots.stream()
-                .map(root -> buildTreeNode(root, parentMap))
+                .map(root -> buildTreeNode(root, parentMap, new HashSet<>()))
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
-    private CostSubjectTreeNodeVO buildTreeNode(CostSubject subject, Map<Long, List<CostSubject>> parentMap) {
+    private CostSubjectTreeNodeVO buildTreeNode(CostSubject subject, Map<Long, List<CostSubject>> parentMap,
+                                                Set<Long> visitedPath) {
+        Long subjectId = subject.getId();
+        if (subjectId == null) {
+            log.warn("Skip cost subject with null id while building tree: code={}", subject.getSubjectCode());
+            return null;
+        }
+        if (!visitedPath.add(subjectId)) {
+            log.warn("Detected circular cost subject reference, skip branch: subjectId={}, parentId={}, path={}",
+                    subjectId, subject.getParentId(), visitedPath);
+            return null;
+        }
+
         CostSubjectTreeNodeVO node = new CostSubjectTreeNodeVO();
-        node.setId(subject.getId() != null ? subject.getId().toString() : null);
+        node.setId(subjectId.toString());
         node.setSubjectCode(subject.getSubjectCode());
         node.setSubjectName(subject.getSubjectName());
         node.setSubjectType(subject.getSubjectType());
@@ -64,9 +81,10 @@ public class CostSubjectService {
         node.setParentId(subject.getParentId() != null ? subject.getParentId().toString() : "0");
 
         // Recursively build children
-        List<CostSubject> children = parentMap.getOrDefault(subject.getId(), new ArrayList<>());
+        List<CostSubject> children = parentMap.getOrDefault(subjectId, new ArrayList<>());
         node.setChildren(children.stream()
-                .map(child -> buildTreeNode(child, parentMap))
+                .map(child -> buildTreeNode(child, parentMap, new HashSet<>(visitedPath)))
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList()));
 
         return node;
@@ -95,8 +113,9 @@ public class CostSubjectService {
         return toVO(subject);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(CostSubject subject) {
+        validateParentForSave(subject, null);
         // Validate parent exists if not root
         if (subject.getParentId() != null && subject.getParentId() != 0L) {
             CostSubject parent = costSubjectMapper.selectById(subject.getParentId());
@@ -129,7 +148,7 @@ public class CostSubjectService {
         return subject.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(CostSubject subject) {
         CostSubject existing = costSubjectMapper.selectById(subject.getId());
         if (existing == null) {
@@ -138,6 +157,8 @@ public class CostSubjectService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
         }
+
+        validateParentForSave(subject, existing.getId());
 
         // Validate unique subject_code within tenant among active rows only.
         Long count = costSubjectMapper.countByTenantAndCode(
@@ -150,7 +171,7 @@ public class CostSubjectService {
         costSubjectMapper.updateById(subject);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void toggleStatus(Long id) {
         CostSubject existing = costSubjectMapper.selectById(id);
         if (existing == null) {
@@ -166,7 +187,7 @@ public class CostSubjectService {
         costSubjectMapper.updateById(existing);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         CostSubject existing = costSubjectMapper.selectById(id);
         if (existing == null) {
@@ -217,6 +238,40 @@ public class CostSubjectService {
             costSubjectMapper.updateById(existing);
         }
         costSubjectMapper.deleteById(id);
+    }
+
+    private void validateParentForSave(CostSubject subject, Long currentId) {
+        Long parentId = subject.getParentId();
+        if (parentId == null || parentId == 0L) {
+            return;
+        }
+        if (parentId < 0L) {
+            throw new BusinessException("PARENT_INVALID", "父科目非法");
+        }
+        if (currentId != null && parentId.equals(currentId)) {
+            throw new BusinessException("PARENT_INVALID", "父科目不能指向自身");
+        }
+        if (currentId != null) {
+            assertParentDoesNotCreateCycle(parentId, currentId);
+        }
+    }
+
+    private void assertParentDoesNotCreateCycle(Long parentId, Long currentId) {
+        Set<Long> visited = new HashSet<>();
+        Long cursor = parentId;
+        while (cursor != null && cursor != 0L) {
+            if (!visited.add(cursor)) {
+                throw new BusinessException("PARENT_INVALID", "父科目层级存在循环引用");
+            }
+            if (cursor.equals(currentId)) {
+                throw new BusinessException("PARENT_INVALID", "父科目不能指向当前科目的子孙节点");
+            }
+            CostSubject parent = costSubjectMapper.selectById(cursor);
+            if (parent == null) {
+                return;
+            }
+            cursor = parent.getParentId();
+        }
     }
 
     private CostSubjectVO toVO(CostSubject subject) {

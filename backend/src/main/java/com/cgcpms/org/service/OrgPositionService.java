@@ -48,7 +48,7 @@ public class OrgPositionService {
         return toVO(position);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(OrgPosition position) {
         if (position.getCompanyId() == null) {
             throw new BusinessException("ORG_POSITION_COMPANY_REQUIRED", "所属公司不能为空");
@@ -87,7 +87,7 @@ public class OrgPositionService {
         return position.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(OrgPosition position) {
         OrgPosition existing = orgPositionMapper.selectById(position.getId());
         if (existing == null)
@@ -120,7 +120,7 @@ public class OrgPositionService {
         orgPositionMapper.updateById(position);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         OrgPosition existing = orgPositionMapper.selectById(id);
         if (existing == null)

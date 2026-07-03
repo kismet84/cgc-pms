@@ -86,7 +86,7 @@ public class SubTaskService {
         return toVO(task);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(SubTask task) {
         // Force tenantId from authenticated context, ignore client-supplied value
         task.setTenantId(UserContext.getCurrentTenantId());
@@ -120,7 +120,7 @@ public class SubTaskService {
         return task.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(SubTask task) {
         SubTask existing = subTaskMapper.selectById(task.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -129,7 +129,7 @@ public class SubTaskService {
         subTaskMapper.updateById(task);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         SubTask existing = subTaskMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))

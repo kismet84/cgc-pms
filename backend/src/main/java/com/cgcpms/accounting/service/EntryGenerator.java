@@ -49,7 +49,7 @@ public class EntryGenerator {
      * 根据来源类型自动生成会计分录。
      * 幂等：同一来源已存在 DRAFT 或 POSTED 凭证时跳过。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AccountingEntry generateEntry(String sourceType, Long sourceId, String entryType) {
         EntryGenerationStrategy strategy = strategyMap.get(sourceType);
         if (strategy == null) {

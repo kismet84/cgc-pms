@@ -55,7 +55,7 @@ public class OverheadAllocationService {
         return ruleMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(OverheadAllocationRule rule) {
         rule.setTenantId(UserContext.getCurrentTenantId());
         rule.setStatus("ENABLE");
@@ -63,7 +63,7 @@ public class OverheadAllocationService {
         return rule.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(OverheadAllocationRule rule) {
         Long tenantId = UserContext.getCurrentTenantId();
         OverheadAllocationRule existing = ruleMapper.selectById(rule.getId());
@@ -74,7 +74,7 @@ public class OverheadAllocationService {
         ruleMapper.updateById(rule);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         OverheadAllocationRule existing = ruleMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -127,7 +127,7 @@ public class OverheadAllocationService {
     /**
      * 手动触发分摊。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void executeAllocation(Long tenantId, LocalDate period) {
         List<OverheadAllocationRule> rules = ruleMapper.selectList(
                 new LambdaQueryWrapper<OverheadAllocationRule>()

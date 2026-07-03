@@ -3,6 +3,7 @@ package com.cgcpms.purchase.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
@@ -47,4 +48,7 @@ public class MatPurchaseOrderItem extends BaseEntity {
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal receivedQuantity;
+
+    @Version
+    private Integer version;
 }

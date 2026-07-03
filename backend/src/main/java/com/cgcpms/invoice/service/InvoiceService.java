@@ -66,7 +66,7 @@ public class InvoiceService {
 
     // ── CRUD ──
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(PayInvoice invoice) {
         invoice.setTenantId(UserContext.getCurrentTenantId());
         if (invoice.getInvoiceType() == null || invoice.getInvoiceType().isBlank()) {
@@ -90,7 +90,7 @@ public class InvoiceService {
         return invoice.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(PayInvoice invoice) {
         PayInvoice existing = payInvoiceMapper.selectById(invoice.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -104,7 +104,7 @@ public class InvoiceService {
         checkAndThrowDuplicate(invoice.getInvoiceNo(), () -> payInvoiceMapper.updateById(invoice));
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         PayInvoice existing = payInvoiceMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -114,7 +114,7 @@ public class InvoiceService {
 
     // ── Verify: status toggle ──
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void verify(Long id, String targetStatus) {
         if (!"VERIFIED".equals(targetStatus) && !"ABNORMAL".equals(targetStatus)) {
             throw new BusinessException("INVALID_VERIFY_STATUS",
@@ -137,7 +137,7 @@ public class InvoiceService {
 
     // ── Register: link to PayRecord ──
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long register(PayInvoice invoice) {
         // Register is same as create but additionally validates payRecord linkage
         // create() already enforces payRecordId non-null + referential integrity

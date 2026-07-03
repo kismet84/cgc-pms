@@ -3,6 +3,7 @@ package com.cgcpms.payment.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -178,7 +179,7 @@ public class PayApplicationService {
 
     // ---- CRUD ----
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(PayApplication app) {
         // Auto-generate apply code: PAY-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -214,7 +215,7 @@ public class PayApplicationService {
         return app.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(PayApplication app) {
         PayApplication existing = payApplicationMapper.selectById(app.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -228,7 +229,7 @@ public class PayApplicationService {
         payApplicationMapper.updateById(app);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         PayApplication existing = payApplicationMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -283,7 +284,7 @@ public class PayApplicationService {
 
     // ---- Pay status update (called by PayRecordService) ----
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updatePayStatus(Long applicationId) {
         List<PayRecord> records = payRecordMapper.selectList(
                 new LambdaQueryWrapper<PayRecord>()
@@ -313,7 +314,7 @@ public class PayApplicationService {
 
     // ---- Basis batch save ----
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveBasis(Long applicationId, List<PayApplicationBasis> basisList) {
         PayApplication app = payApplicationMapper.selectById(applicationId);
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -347,13 +348,17 @@ public class PayApplicationService {
                 .eq(PayApplicationBasis::getPayApplicationId, applicationId));
 
         // Batch insert new basis
-        if (basisList != null) {
+        if (basisList != null && !basisList.isEmpty()) {
+            Long tenantId = UserContext.getCurrentTenantId();
+            Long userId = UserContext.getCurrentUserId();
             for (PayApplicationBasis basis : basisList) {
+                basis.setId(IdWorker.getId());
                 basis.setPayApplicationId(applicationId);
-                basis.setTenantId(UserContext.getCurrentTenantId());
-                basis.setId(null);
-                payApplicationBasisMapper.insert(basis);
+                basis.setTenantId(tenantId);
+                basis.setCreatedBy(userId);
+                basis.setUpdatedBy(userId);
             }
+            payApplicationBasisMapper.insertBatch(basisList);
         }
     }
 
@@ -493,6 +498,7 @@ public class PayApplicationService {
     private BigDecimal getApprovedSumForContract(Long contractId, Long excludePayAppId) {
         LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayApplication::getContractId, contractId)
+                .eq(PayApplication::getTenantId, UserContext.getCurrentTenantId())
                 .eq(PayApplication::getApprovalStatus, "APPROVED");
         if (excludePayAppId != null) {
             wrapper.ne(PayApplication::getId, excludePayAppId);

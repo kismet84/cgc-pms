@@ -112,7 +112,7 @@ public class SubMeasureService {
         return vo;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(SubMeasure measure) {
         // Validate subTaskId belongs to same project/contract/partner
         validateSubTaskBelongsToSameContext(measure);
@@ -151,7 +151,7 @@ public class SubMeasureService {
         return measure.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(SubMeasure measure) {
         SubMeasure existing = subMeasureMapper.selectById(measure.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -195,7 +195,7 @@ public class SubMeasureService {
             throw new BusinessException("SUB_TASK_PARTNER_MISMATCH", "关联的分包任务不属于当前合作方");
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveItems(Long measureId, List<SubMeasureItem> items) {
         // Verify measure exists and belongs to tenant
         SubMeasure measure = subMeasureMapper.selectById(measureId);
@@ -228,7 +228,7 @@ public class SubMeasureService {
         subMeasureMapper.updateById(measure);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         SubMeasure existing = subMeasureMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -242,7 +242,7 @@ public class SubMeasureService {
         subMeasureMapper.deleteById(id);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long measureId) {
         SubMeasure measure = subMeasureMapper.selectById(measureId);
         if (measure == null || !measure.getTenantId().equals(UserContext.getCurrentTenantId()))

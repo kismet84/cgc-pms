@@ -33,7 +33,7 @@ public class ProfileService {
      * Whitelist: only {@code realName}, {@code phone}, {@code email}, {@code avatar} are updated.
      * All other fields (username, roles, status, isAdmin, tenantId, orgId) are ignored.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public UserInfo updateProfile(Long userId, UpdateProfileRequest request) {
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
@@ -72,7 +72,7 @@ public class ProfileService {
      * Verifies old password first, then encodes and persists the new one.
      * Uses direct field update — NOT the general {@code SysUserService.update()} method.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void changePassword(Long userId, ChangePasswordRequest request) {
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {

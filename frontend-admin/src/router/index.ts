@@ -416,6 +416,71 @@ const router = createRouter({
 
 const WHITE_LIST = ['/login']
 
+const ROUTE_PERMISSION_MAP: Record<string, string> = {
+  Dashboard: 'dashboard:view',
+  Contract: 'contract:query',
+  ContractLedger: 'contract:query',
+  ContractCreate: 'contract:add',
+  ContractDetail: 'contract:query',
+  ContractEdit: 'contract:edit',
+  Cost: 'cost:query',
+  CostLedger: 'cost:query',
+  CostSummary: 'cost:query',
+  CostSubject: 'cost:subject:query',
+  CostTarget: 'cost:target:query',
+  CostTargetList: 'cost:target:query',
+  CostTargetCreate: 'cost:target:add',
+  CostTargetEdit: 'cost:target:edit',
+  Variation: 'variation:order:query',
+  VariationOrder: 'variation:order:query',
+  Settlement: 'settlement:query',
+  SettlementList: 'settlement:query',
+  SettlementDetail: 'settlement:query',
+  Project: 'project:query',
+  ProjectList: 'project:query',
+  ProjectOverview: 'project:query',
+  ProjectMembers: 'project:member:query',
+  ProjectEdit: 'project:edit',
+  Partner: 'partner:query',
+  Org: 'org:query',
+  Subcontract: 'subcontract:task:query',
+  SubcontractTask: 'subcontract:task:query',
+  SubcontractMeasure: 'subcontract:measure:query',
+  Purchase: 'purchase:order:query',
+  PurchaseOrder: 'purchase:order:query',
+  PurchaseReceipt: 'receipt:query',
+  Payment: 'payment:application:query',
+  PaymentApplication: 'payment:application:query',
+  Inventory: 'inventory:warehouse:query',
+  InventoryWarehouse: 'inventory:warehouse:query',
+  InventoryStock: 'inventory:stock:query',
+  InventoryTransaction: 'inventory:stock:query',
+  InventoryPurchaseRequest: 'purchase:request:query',
+  InventoryMaterialRequisition: 'requisition:query',
+  Invoice: 'invoice:query',
+  Material: 'material:query',
+  MaterialDictionary: 'material:query',
+  Alert: 'alert:query',
+  Approval: 'workflow:task:query',
+  ApprovalTodo: 'workflow:task:query',
+  ApprovalDone: 'workflow:task:query',
+  ApprovalCc: 'workflow:cc:query',
+  ApprovalMine: 'workflow:instance:query',
+  ApprovalProcess: 'workflow:process:query',
+  ApprovalDetail: 'workflow:instance:query',
+  System: 'system:dict:query',
+  SystemDict: 'system:dict:query',
+  SystemUsers: 'system:user:query',
+  SystemData: 'system:data:query',
+  RoleManagement: 'system:role:query',
+  SystemPermissions: 'system:permission:query',
+  Profile: 'profile:query',
+  Settings: 'settings:query',
+  Help: 'help:query',
+}
+
+applyRoutePermissions(routes)
+
 router.beforeEach((to) => {
   const userStore = useUserStore()
   if (to.meta?.public || WHITE_LIST.includes(to.path)) {
@@ -435,6 +500,20 @@ router.beforeEach((to) => {
 
 function isAdminRole(roles: string[]) {
   return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN')
+}
+
+function applyRoutePermissions(routeList: RouteRecordRaw[]) {
+  for (const route of routeList) {
+    if (typeof route.name === 'string' && !route.meta?.public) {
+      const permission = ROUTE_PERMISSION_MAP[route.name]
+      if (permission) {
+        route.meta = { ...route.meta, permission }
+      }
+    }
+    if (route.children) {
+      applyRoutePermissions(route.children)
+    }
+  }
 }
 
 router.afterEach((to) => {

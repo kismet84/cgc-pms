@@ -96,7 +96,7 @@ public class MatRequisitionService {
     // 创建
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(MatRequisition requisition) {
         // Auto-generate requisition code: REQ-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -131,7 +131,7 @@ public class MatRequisitionService {
     // 更新
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(MatRequisition requisition) {
         MatRequisition existing = requisitionMapper.selectById(requisition.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -153,7 +153,7 @@ public class MatRequisitionService {
     // 删除
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         MatRequisition existing = requisitionMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -175,7 +175,7 @@ public class MatRequisitionService {
     // 提交审批
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long requisitionId) {
         MatRequisition requisition = requisitionMapper.selectById(requisitionId);
         if (requisition == null || !requisition.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -225,7 +225,7 @@ public class MatRequisitionService {
     // 批量保存明细
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveItemsBatch(Long requisitionId, List<MatRequisitionItem> items) {
         MatRequisition requisition = requisitionMapper.selectById(requisitionId);
         if (requisition == null || !requisition.getTenantId().equals(UserContext.getCurrentTenantId()))

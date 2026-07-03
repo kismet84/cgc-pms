@@ -46,7 +46,7 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void onApproved(WorkflowContext context) {
         Long receiptId = resolveReceiptId(context.getInstance());
         log.info("材料验收审批通过，更新状态、自动入库并生成成本 receiptId={}", receiptId);

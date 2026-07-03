@@ -57,7 +57,7 @@ public class MatWarehouseService {
         return toVO(warehouse);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(MatWarehouse warehouse) {
         warehouse.setTenantId(UserContext.getCurrentTenantId());
         matWarehouseMapper.insert(warehouse);
@@ -65,7 +65,7 @@ public class MatWarehouseService {
         return warehouse.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(MatWarehouse warehouse) {
         MatWarehouse existing = matWarehouseMapper.selectById(warehouse.getId());
         if (existing == null) {
@@ -77,7 +77,7 @@ public class MatWarehouseService {
         matWarehouseMapper.updateById(warehouse);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, String status) {
         MatWarehouse existing = matWarehouseMapper.selectById(id);
         if (existing == null) {
@@ -90,7 +90,7 @@ public class MatWarehouseService {
         matWarehouseMapper.updateById(existing);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         MatWarehouse existing = matWarehouseMapper.selectById(id);
         if (existing == null) {

@@ -14,7 +14,7 @@ import java.util.Set;
  */
 public final class FileTypeValidator {
 
-    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024L; // 50 MB
+    private static final long MAX_FILE_SIZE = 20 * 1024 * 1024L; // 20 MB
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp",
@@ -68,7 +68,7 @@ public final class FileTypeValidator {
 
         // 文件大小
         if (content.length > MAX_FILE_SIZE) {
-            throw new BusinessException("FILE_TOO_LARGE", "文件大小不能超过 50MB");
+            throw new BusinessException("FILE_TOO_LARGE", "文件大小不能超过 20MB");
         }
 
         // 清洗文件名中的控制字符

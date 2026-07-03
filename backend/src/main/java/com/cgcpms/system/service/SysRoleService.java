@@ -49,7 +49,7 @@ public class SysRoleService {
         return toVO(role);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(SysRole role) {
         Long tenantId = UserContext.getCurrentTenantId();
         if (sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRole>()
@@ -64,7 +64,7 @@ public class SysRoleService {
         return role.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(SysRole role) {
         SysRole existing = sysRoleMapper.selectById(role.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -72,7 +72,7 @@ public class SysRoleService {
         sysRoleMapper.updateById(role);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         SysRole existing = sysRoleMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -85,7 +85,7 @@ public class SysRoleService {
         sysRoleMapper.deleteById(id);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void assignMenus(Long roleId, List<Long> menuIds) {
         Long tenantId = UserContext.getCurrentTenantId();
         Long operatorId = UserContext.getCurrentUserId();

@@ -79,7 +79,7 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void onApproved(WorkflowContext context) {
         Long targetId = resolveTargetId(context.getInstance());
         log.info("目标成本审批通过，激活版本并更新成本汇总 targetId={}", targetId);

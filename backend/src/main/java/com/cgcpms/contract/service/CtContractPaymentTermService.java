@@ -51,7 +51,7 @@ public class CtContractPaymentTermService {
         return ctContractPaymentTermMapper.selectList(wrapper);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(CtContractPaymentTerm term) {
         requireParentContract(term.getContractId());
         term.setTenantId(UserContext.getCurrentTenantId());
@@ -74,7 +74,7 @@ public class CtContractPaymentTermService {
      * 在 MySQL 下正常但在 H2 内存数据库并行测试中易触发表锁超时（H2 行锁粒度较粗）。
      * 付款条款通常 ≤10 条/合同，逐条插入性能差异可忽略。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void batchSave(Long contractId, List<CtContractPaymentTerm> newTerms) {
         requireDraftParentContract(contractId);
         LambdaQueryWrapper<CtContractPaymentTerm> deleteWrapper = new LambdaQueryWrapper<>();
@@ -93,7 +93,7 @@ public class CtContractPaymentTermService {
         }
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(CtContractPaymentTerm term) {
         requireDraftParentContract(term.getContractId());
         CtContractPaymentTerm existing = ctContractPaymentTermMapper.selectById(term.getId());
@@ -105,7 +105,7 @@ public class CtContractPaymentTermService {
         ctContractPaymentTermMapper.updateById(term);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long contractId, Long id) {
         requireDraftParentContract(contractId);
         CtContractPaymentTerm existing = ctContractPaymentTermMapper.selectById(id);

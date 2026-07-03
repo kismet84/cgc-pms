@@ -45,14 +45,14 @@ public class MdMaterialService {
         return toVO(material);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(MdMaterial material) {
         material.setTenantId(UserContext.getCurrentTenantId());
         mdMaterialMapper.insert(material);
         return material.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(MdMaterial material) {
         MdMaterial existing = mdMaterialMapper.selectById(material.getId());
         if (existing == null)
@@ -63,7 +63,7 @@ public class MdMaterialService {
         mdMaterialMapper.updateById(material);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, String status) {
         MdMaterial existing = mdMaterialMapper.selectById(id);
         if (existing == null)

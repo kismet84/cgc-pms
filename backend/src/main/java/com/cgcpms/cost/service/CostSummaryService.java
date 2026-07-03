@@ -508,12 +508,12 @@ public class CostSummaryService {
      * update) nor misses a pay_record inserted after the snapshot of a
      * running refresh.  See M-006.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updatePaidAmount(Long projectId) {
         updatePaidAmount(UserContext.getCurrentTenantId(), projectId);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updatePaidAmount(Long tenantId, Long projectId) {
         ReentrantLock lock = refreshLocks.computeIfAbsent(projectId, k -> new ReentrantLock());
         lock.lock();

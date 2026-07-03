@@ -111,7 +111,7 @@ public class MatPurchaseRequestService {
     // 创建
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(MatPurchaseRequest request) {
         // Auto-generate request code: PR-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -146,7 +146,7 @@ public class MatPurchaseRequestService {
     // 更新
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(MatPurchaseRequest request) {
         MatPurchaseRequest existing = requestMapper.selectById(request.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -167,7 +167,7 @@ public class MatPurchaseRequestService {
     // 提交审批
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long requestId) {
         MatPurchaseRequest request = requestMapper.selectById(requestId);
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -213,7 +213,7 @@ public class MatPurchaseRequestService {
     // 删除
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         MatPurchaseRequest existing = requestMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -235,7 +235,7 @@ public class MatPurchaseRequestService {
     // 批量保存明细
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveItemsBatch(Long requestId, List<MatPurchaseRequestItem> items) {
         MatPurchaseRequest request = requestMapper.selectById(requestId);
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -294,7 +294,7 @@ public class MatPurchaseRequestService {
     // 转采购订单（手动触发）
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void convertToPurchaseOrder(Long requestId) {
         MatPurchaseRequest request = requestMapper.selectById(requestId);
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))

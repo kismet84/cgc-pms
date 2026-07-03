@@ -26,7 +26,7 @@ public class WorkflowWithdrawService {
     private final WfInstanceMapper wfInstanceMapper;
     private final WfTaskMapper wfTaskMapper;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void withdraw(Long instanceId, Long userId, String username) {
 
         WfInstance tenantProbe = wfInstanceMapper.selectByIdIgnoringTenant(instanceId);

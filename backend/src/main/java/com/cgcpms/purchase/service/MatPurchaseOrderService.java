@@ -131,7 +131,7 @@ public class MatPurchaseOrderService {
         return items.stream().map(i -> toItemVO(i, materialNames)).toList();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(MatPurchaseOrder order) {
         // Auto-generate order code: PO-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -170,7 +170,7 @@ public class MatPurchaseOrderService {
         return order.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(MatPurchaseOrder order) {
         MatPurchaseOrder existing = matPurchaseOrderMapper.selectById(order.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -198,7 +198,7 @@ public class MatPurchaseOrderService {
     /**
      * 提交采购订单审批。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long orderId) {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(orderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -232,7 +232,7 @@ public class MatPurchaseOrderService {
                 null, null, null);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(id);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -245,7 +245,7 @@ public class MatPurchaseOrderService {
         matPurchaseOrderMapper.deleteById(id);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveItemsBatch(Long orderId, List<MatPurchaseOrderItem> items) {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(orderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))

@@ -114,7 +114,7 @@ public class VarOrderService {
                 .toList();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(VarOrder order) {
         // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -157,7 +157,7 @@ public class VarOrderService {
         return order.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(VarOrder order) {
         VarOrder existing = varOrderMapper.selectById(order.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -171,7 +171,7 @@ public class VarOrderService {
         varOrderMapper.updateById(order);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveItems(Long varOrderId, List<VarOrderItem> items) {
         // Verify order exists and belongs to tenant
         VarOrder order = varOrderMapper.selectById(varOrderId);
@@ -204,7 +204,7 @@ public class VarOrderService {
         varOrderMapper.updateById(order);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         VarOrder existing = varOrderMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -221,7 +221,7 @@ public class VarOrderService {
     /**
      * 提交签证变更审批。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long varOrderId) {
         VarOrder order = varOrderMapper.selectById(varOrderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))

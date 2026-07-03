@@ -44,7 +44,7 @@ public class WfCcService {
      * @param ccUserIds  抄送人用户ID列表（可为空）
      * @param tenantId   租户ID（来自 wfInstance，不来自 UserContext）
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void createCc(Long instanceId, List<Long> ccUserIds, Long tenantId) {
         if (ccUserIds == null || ccUserIds.isEmpty()) {
             return;

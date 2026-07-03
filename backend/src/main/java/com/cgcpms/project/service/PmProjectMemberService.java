@@ -71,7 +71,7 @@ public class PmProjectMemberService {
         return toVO(member);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(Long projectId, PmProjectMember member) {
         verifyProjectOwnership(projectId);
 
@@ -96,7 +96,7 @@ public class PmProjectMemberService {
         return member.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(Long projectId, Long id, PmProjectMember member) {
         verifyProjectOwnership(projectId);
 
@@ -118,7 +118,7 @@ public class PmProjectMemberService {
         memberMapper.updateById(member);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long projectId, Long id) {
         verifyProjectOwnership(projectId);
 

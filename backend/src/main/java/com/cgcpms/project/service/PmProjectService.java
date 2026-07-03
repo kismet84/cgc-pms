@@ -130,7 +130,7 @@ public class PmProjectService {
         return toVO(project);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(PmProject project) {
         log.info("Creating project: {}", project.getProjectName());
 
@@ -171,7 +171,7 @@ public class PmProjectService {
         return project.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(PmProject project) {
         PmProject existing = pmProjectMapper.selectById(project.getId());
         if (existing == null)
@@ -188,7 +188,7 @@ public class PmProjectService {
      * Archive project — set status=ARCHIVED after verifying no active dependencies.
      * Active contracts, payments, settlements, or running workflows block archiving.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void archive(Long id) {
         PmProject existing = pmProjectMapper.selectById(id);
         if (existing == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
@@ -250,7 +250,7 @@ public class PmProjectService {
      * Physical delete — SUPER_ADMIN only, and only for projects with zero dependencies.
      * For normal delete, use {@link #archive(Long)} instead.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         if (!UserContext.hasRole("SUPER_ADMIN")) {
             throw new BusinessException("DELETE_FORBIDDEN",

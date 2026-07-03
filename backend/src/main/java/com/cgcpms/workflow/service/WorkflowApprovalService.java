@@ -24,7 +24,7 @@ public class WorkflowApprovalService {
     private final WfNodeInstanceMapper wfNodeInstanceMapper;
     private final WfTaskMapper wfTaskMapper;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void approve(Long taskId, Long userId, String username,
                         String comment, String idempotencyKey) {
         WfTask task = validateAndCasUpdateTask(taskId, userId, idempotencyKey,
@@ -96,7 +96,7 @@ public class WorkflowApprovalService {
         }
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void reject(Long taskId, Long userId, String username,
                        String comment, String idempotencyKey) {
         WfTask task = validateAndCasUpdateTask(taskId, userId, idempotencyKey,

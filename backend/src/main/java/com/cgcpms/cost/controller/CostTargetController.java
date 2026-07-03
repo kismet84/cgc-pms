@@ -92,7 +92,7 @@ public class CostTargetController {
     @PostMapping("/{targetId}/items")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:edit')")
     public ApiResponse<Void> batchSaveItems(@PathVariable Long targetId,
-                                            @RequestBody List<CostTargetItem> items) {
+                                            @RequestBody List<@Valid CostTargetItem> items) {
         log.info("POST /cost-targets/{}/items — batch save {} items", targetId, items != null ? items.size() : 0);
         costTargetService.batchSaveItems(targetId, items);
         return ApiResponse.success();

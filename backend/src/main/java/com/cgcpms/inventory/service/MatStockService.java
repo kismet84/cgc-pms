@@ -54,7 +54,7 @@ public class MatStockService {
      * 如该组合尚无库存记录则自动创建；已存在则在现有记录上累加。
      * 每次入库生成一条 txn_type='IN' 的流水。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public MatStock stockIn(Long warehouseId, Long materialId, BigDecimal quantity) {
         return stockIn(warehouseId, materialId, quantity, null, null);
     }
@@ -65,9 +65,10 @@ public class MatStockService {
      * @param sourceType 来源业务类型，如 "MAT_RECEIPT"；可为 null
      * @param sourceId   来源业务ID，如验收单ID；可为 null
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public MatStock stockIn(Long warehouseId, Long materialId, BigDecimal quantity,
                             String sourceType, Long sourceId) {
+        validatePositiveQuantity(quantity);
         Long tenantId = UserContext.getCurrentTenantId();
 
         MatStock stock = findStock(tenantId, warehouseId, materialId);
@@ -122,7 +123,12 @@ public class MatStockService {
         int retries = 0;
         while (true) {
             // 基于当前最新 stock 快照累加 availableQty
-            stock.setAvailableQty(stock.getAvailableQty().add(quantity));
+            BigDecimal nextAvailableQty = stock.getAvailableQty().add(quantity);
+            if (nextAvailableQty.compareTo(BigDecimal.ZERO) < 0) {
+                throw new BusinessException("INSUFFICIENT_STOCK",
+                        "库存不足：可用 " + stock.getAvailableQty() + "，请求变更 " + quantity);
+            }
+            stock.setAvailableQty(nextAvailableQty);
             // @Version 乐观锁：若版本冲突则 updateById 返回 0
             int updated = matStockMapper.updateById(stock);
             if (updated > 0) return stock;
@@ -143,7 +149,7 @@ public class MatStockService {
      * <p>
      * 乐观锁冲突自动重试最多 3 次；重试时重新校验余量。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public MatStock stockOut(Long warehouseId, Long materialId, BigDecimal quantity) {
         return stockOut(warehouseId, materialId, quantity, null, null);
     }
@@ -154,9 +160,10 @@ public class MatStockService {
      * @param sourceType 来源业务类型；可为 null
      * @param sourceId   来源业务ID；可为 null
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public MatStock stockOut(Long warehouseId, Long materialId, BigDecimal quantity,
                              String sourceType, Long sourceId) {
+        validatePositiveQuantity(quantity);
         Long tenantId = UserContext.getCurrentTenantId();
 
         MatStock stock = findStock(tenantId, warehouseId, materialId);
@@ -192,6 +199,14 @@ public class MatStockService {
                 stock.getAvailableQty(), sourceType, sourceId);
 
         return stock;
+    }
+
+    private void validatePositiveQuantity(BigDecimal quantity) {
+        // 0 被视为合法的占位调整（MatStockServiceTest 边界保留），仅在 null 或负值时报错。
+        // 终态非负防御在 doUpdateIncrement / stockOut 内部由"变更后≥0"保证。
+        if (quantity == null || quantity.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException("STOCK_QUANTITY_INVALID", "库存数量不能为负或为空");
+        }
     }
 
     /**

@@ -58,7 +58,7 @@ public class MdPartnerService {
      * 当手动指定 {@code partnerCode} 时不自动添加前缀，调用方负责保证编码格式和唯一性。
      * 此设计允许外部系统导入时保留原始编码。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(MdPartner partner) {
         // Auto-generate partner code: PTN-yyyyMMdd-NNN
         if (!StringUtils.hasText(partner.getPartnerCode())) {
@@ -99,7 +99,7 @@ public class MdPartnerService {
         return partner.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(MdPartner partner) {
         MdPartner existing = mdPartnerMapper.selectById(partner.getId());
         if (existing == null)
@@ -110,7 +110,7 @@ public class MdPartnerService {
         mdPartnerMapper.updateById(partner);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         MdPartner existing = mdPartnerMapper.selectById(id);
         if (existing == null)

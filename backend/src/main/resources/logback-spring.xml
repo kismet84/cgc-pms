@@ -21,9 +21,9 @@
     <springProfile name="prod">
         <!-- Console appender (structured JSON for log aggregation) -->
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] - %replace(%replace(%replace(%replace(%msg){'(?&lt;!\d)(1[3-9]\d)(\d{4})(\d{4})(?!\d)','$1****$3'}){'(?&lt;!\d)(\d{3})(\d{12})(\d{3})(?!\d)','$1********$3'}){'(?&lt;!\d)(\d{4})(\d{8,11})(\d{4})(?!\d)','$1********$3'}){'(?i)(password|token|secret|authorization|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard|身份证|手机号|银行卡|密码|令牌)\s*[:=]\s*[^\s,;&amp;]+','$1=***MASKED***'}%n</pattern>
-                <charset>UTF-8</charset>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdc>true</includeMdc>
+                <customFields>{"app":"cgc-pms-backend"}</customFields>
             </encoder>
         </appender>
 
@@ -36,9 +36,9 @@
                 <maxHistory>30</maxHistory>
                 <totalSizeCap>3GB</totalSizeCap>
             </rollingPolicy>
-            <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] - %replace(%replace(%replace(%replace(%msg){'(?&lt;!\d)(1[3-9]\d)(\d{4})(\d{4})(?!\d)','$1****$3'}){'(?&lt;!\d)(\d{3})(\d{12})(\d{3})(?!\d)','$1********$3'}){'(?&lt;!\d)(\d{4})(\d{8,11})(\d{4})(?!\d)','$1********$3'}){'(?i)(password|token|secret|authorization|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard|身份证|手机号|银行卡|密码|令牌)\s*[:=]\s*[^\s,;&amp;]+','$1=***MASKED***'}%n</pattern>
-                <charset>UTF-8</charset>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdc>true</includeMdc>
+                <customFields>{"app":"cgc-pms-backend"}</customFields>
             </encoder>
         </appender>
 

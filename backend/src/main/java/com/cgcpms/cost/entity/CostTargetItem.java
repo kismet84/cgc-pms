@@ -5,6 +5,8 @@ import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -37,9 +39,12 @@ public class CostTargetItem extends BaseEntity {
 
     /** 关联 cost_subject.id */
     @JsonSerialize(using = ToStringSerializer.class)
+    @NotNull(message = "成本科目不能为空")
     private Long costSubjectId;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    @NotNull(message = "目标金额不能为空")
+    @DecimalMin(value = "0.00", message = "目标金额不能为负数")
     private BigDecimal targetAmount;
 
     // ── V22 使用 created_time / updated_time ──

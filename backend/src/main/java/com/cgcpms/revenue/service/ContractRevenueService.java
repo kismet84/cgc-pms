@@ -125,7 +125,7 @@ public class ContractRevenueService {
     // CRUD
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(ContractRevenue revenue) {
         revenue.setTenantId(UserContext.getCurrentTenantId());
         revenue.setApprovalStatus("DRAFT");
@@ -141,7 +141,7 @@ public class ContractRevenueService {
         return revenue.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(ContractRevenue revenue) {
         ContractRevenue existing = requireExisting(revenue.getId());
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
@@ -177,7 +177,7 @@ public class ContractRevenueService {
         }
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         ContractRevenue existing = requireExisting(id);
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
@@ -189,7 +189,7 @@ public class ContractRevenueService {
     /**
      * 提交审批：状态从 DRAFT -> PENDING，同时创建工作流实例。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long id) {
         ContractRevenue existing = requireExisting(id);
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
@@ -230,7 +230,7 @@ public class ContractRevenueService {
      * 并发保护：使用 CAS 更新状态（PENDING → APPROVED），
      * 只有第一个成功的线程会写入 cost_item。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void onApproved(Long id) {
         ContractRevenue revenue = requireExisting(id);
 
@@ -272,7 +272,7 @@ public class ContractRevenueService {
     /**
      * 审批驳回后回调：仅 PENDING 状态可驳回。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void onRejected(Long id) {
         ContractRevenue revenue = requireExisting(id);
         int rows = mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractRevenue>()

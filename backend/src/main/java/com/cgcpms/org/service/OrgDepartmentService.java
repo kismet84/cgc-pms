@@ -93,7 +93,7 @@ public class OrgDepartmentService {
         return toVO(dept);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(OrgDepartment dept) {
         // Validate parent exists if specified
         if (dept.getParentId() != null && dept.getParentId() != 0L) {
@@ -113,7 +113,7 @@ public class OrgDepartmentService {
         return dept.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(OrgDepartment dept) {
         OrgDepartment existing = orgDepartmentMapper.selectById(dept.getId());
         if (existing == null)
@@ -128,7 +128,7 @@ public class OrgDepartmentService {
         orgDepartmentMapper.updateById(dept);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         OrgDepartment existing = orgDepartmentMapper.selectById(id);
         if (existing == null)

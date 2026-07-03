@@ -5,6 +5,7 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.service.CtContractChangeService;
+import com.cgcpms.contract.vo.CtContractChangeVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,7 +20,7 @@ public class CtContractChangeController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:query')")
-    public ApiResponse<PageResult<CtContractChange>> list(
+    public ApiResponse<PageResult<CtContractChangeVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
             @RequestParam(required = false) Long projectId,
@@ -29,14 +30,13 @@ public class CtContractChangeController {
             @RequestParam(required = false) String changeCode) {
         IPage<CtContractChange> page = ctContractChangeService.getPage(
                 pageNo, pageSize, projectId, contractId, changeType, approvalStatus, changeCode);
-        return ApiResponse.success(PageResult.of(page));
+        return ApiResponse.success(PageResult.of(page.convert(CtContractChangeVO::fromEntity)));
     }
 
-    // TODO: 创建 CtContractChangeVO 替代直接暴露 Entity（当前 CtContractChange 无对应 VO）
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:change:query')")
-    public ApiResponse<CtContractChange> getById(@PathVariable Long id) {
-        return ApiResponse.success(ctContractChangeService.getById(id));
+    public ApiResponse<CtContractChangeVO> getById(@PathVariable Long id) {
+        return ApiResponse.success(CtContractChangeVO.fromEntity(ctContractChangeService.getById(id)));
     }
 
     @PostMapping

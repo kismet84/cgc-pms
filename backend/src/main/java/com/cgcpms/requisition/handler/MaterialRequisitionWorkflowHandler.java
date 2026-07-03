@@ -45,7 +45,7 @@ public class MaterialRequisitionWorkflowHandler implements WorkflowBusinessHandl
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void onApproved(WorkflowContext context) {
         Long requisitionId = resolveRequisitionId(context.getInstance());
         log.info("领料申请审批通过，开始出库 requisitionId={}", requisitionId);

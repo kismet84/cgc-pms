@@ -71,7 +71,7 @@ public class WorkflowTemplateService {
         return vo;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updateTemplate(Long templateId, WorkflowTemplateUpdateRequest request) {
         WfTemplate template = getTemplateOrThrow(templateId);
         validateAmountRange(request.getAmountMin(), request.getAmountMax());
@@ -91,7 +91,7 @@ public class WorkflowTemplateService {
     //  Node CRUD (创建/更新/删除/排序)
     // ═══════════════════════════════════════════════════════════
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public WfTemplateNodeVO createNode(Long templateId, WorkflowTemplateNodeRequest request) {
         WfTemplate template = getTemplateOrThrow(templateId);
         validateNodeRequest(request);
@@ -104,7 +104,7 @@ public class WorkflowTemplateService {
         return voAssembler.toTemplateNodeVO(nodeMapper.selectById(node.getId()));
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void updateNode(Long templateId, Long nodeId, WorkflowTemplateNodeRequest request) {
         getTemplateOrThrow(templateId);
         validateNodeRequest(request);
@@ -120,7 +120,7 @@ public class WorkflowTemplateService {
         normalizeOrders(templateId);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void deleteNode(Long templateId, Long nodeId) {
         getTemplateOrThrow(templateId);
         getNodeOrThrow(templateId, nodeId);
@@ -129,7 +129,7 @@ public class WorkflowTemplateService {
         normalizeOrders(templateId);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void reorderNodes(Long templateId, WorkflowTemplateNodeReorderRequest request) {
         getTemplateOrThrow(templateId);
         List<WfTemplateNode> nodes = listNodes(templateId);

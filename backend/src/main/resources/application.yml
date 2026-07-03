@@ -49,3 +49,18 @@ rate-limit:
     enabled: true
     max-requests: 120
     window-seconds: 60
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      minio:
+        sliding-window-type: count_based
+        sliding-window-size: 20
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      minio:
+        timeout-duration: 10s

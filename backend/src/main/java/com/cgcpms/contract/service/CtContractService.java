@@ -160,7 +160,7 @@ public class CtContractService {
         return toVO(c);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(CtContract contract) {
         validateContractParties(contract);
         String code = codeGenerationService.nextCode(
@@ -179,7 +179,7 @@ public class CtContractService {
         return contract.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(CtContract contract) {
         CtContract existing = ctContractMapper.selectById(contract.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -219,7 +219,7 @@ public class CtContractService {
     /**
      * 提交合同审批。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long contractId) {
         CtContract contract = ctContractMapper.selectById(contractId);
         if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -256,7 +256,7 @@ public class CtContractService {
     /**
      * 删除合同（软删除，仅限 DRAFT 状态）。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         CtContract existing = ctContractMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -277,7 +277,7 @@ public class CtContractService {
      * <p>
      * 所有子表采用 delete-then-insert 策略，与现有 batchSave 行为一致。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long compositeSave(ContractSaveRequest request) {
         CtContract contract = request.getContract();
         validateContractParties(contract);

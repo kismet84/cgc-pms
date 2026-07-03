@@ -60,7 +60,7 @@ public class PayRecordService {
      * Authoritative payment writeback — the ONLY path to create a pay_record.
      * Idempotent by externalTxnNo: duplicate returns existing record without double-posting.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public PayRecordVO writeback(PayRecord input) {
         Long payApplicationId = input.getPayApplicationId();
         if (payApplicationId == null)

@@ -95,9 +95,17 @@ const overviewItems = [
   { icon: DollarOutlined, label: '本月产值', value: '18.76 亿元' },
 ]
 
+function isPasswordComplex(password: string) {
+  return password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password)
+}
+
 async function handleSubmit() {
   if (!formState.username || !formState.password) {
     message.warning('请输入用户名和密码')
+    return
+  }
+  if (!isPasswordComplex(formState.password)) {
+    message.warning('密码至少 8 位，并包含字母和数字')
     return
   }
   loading.value = true

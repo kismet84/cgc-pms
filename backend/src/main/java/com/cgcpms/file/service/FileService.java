@@ -7,6 +7,7 @@ import com.cgcpms.config.MinioConfig;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.vo.SysFileVO;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -26,7 +27,9 @@ import com.cgcpms.common.util.DateTimeUtils;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import jakarta.annotation.PostConstruct;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -66,7 +69,8 @@ public class FileService {
     /**
      * Upload a file and associate it with a business entity.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CircuitBreaker(name = "minio", fallbackMethod = "uploadFallback")
     public SysFileVO upload(MultipartFile file, String businessType, Long businessId) {
         if (file.isEmpty()) {
             throw new BusinessException("FILE_EMPTY", "上传文件不能为空");
@@ -118,7 +122,7 @@ public class FileService {
             sysFileMapper.insert(sysFile);
 
             // Generate presigned URL for response
-            String presignedUrl = genPresignedUrl(bucketName, storagePath);
+            String presignedUrl = genPresignedUrl(bucketName, storagePath, sysFile);
             return toVO(sysFile, presignedUrl);
 
         } catch (BusinessException e) {
@@ -143,7 +147,7 @@ public class FileService {
         // 业务对象读权限校验
         authorizer.checkReadAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
         try {
-            return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath());
+            return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath(), sysFile);
         } catch (Exception e) {
             log.error("Failed to generate presigned URL for file: {}", fileId, e);
             throw new BusinessException("FILE_URL_ERROR", "获取下载链接失败，请稍后重试");
@@ -153,7 +157,8 @@ public class FileService {
     /**
      * Delete a file (logical delete in DB + remove from MinIO).
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
+    @CircuitBreaker(name = "minio", fallbackMethod = "deleteFallback")
     public void delete(Long fileId) {
         SysFile sysFile = sysFileMapper.selectById(fileId);
         if (sysFile == null) {
@@ -203,7 +208,7 @@ public class FileService {
         List<SysFile> files = sysFileMapper.selectList(wrapper);
 
         return files.stream()
-                .map(f -> toVO(f, genPresignedUrl(f.getBucketName(), f.getStoragePath())))
+                .map(f -> toVO(f, genPresignedUrl(f.getBucketName(), f.getStoragePath(), f)))
                 .toList();
     }
 
@@ -212,6 +217,22 @@ public class FileService {
      */
     public void checkBizReadPermission(String businessType, Long businessId) {
         authorizer.checkReadAccess(businessType, businessId);
+    }
+
+    private SysFileVO uploadFallback(MultipartFile file, String businessType, Long businessId, Throwable throwable) {
+        if (throwable instanceof BusinessException businessException) {
+            throw businessException;
+        }
+        log.error("MinIO circuit breaker fallback on upload: businessType={}, businessId={}", businessType, businessId, throwable);
+        throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务暂不可用，请稍后重试");
+    }
+
+    private void deleteFallback(Long fileId, Throwable throwable) {
+        if (throwable instanceof BusinessException businessException) {
+            throw businessException;
+        }
+        log.error("MinIO circuit breaker fallback on delete: fileId={}", fileId, throwable);
+        throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务暂不可用，请稍后重试");
     }
 
     // ---- private helpers ----
@@ -249,11 +270,21 @@ public class FileService {
     }
 
     private String genPresignedUrl(String bucket, String object) {
+        return genPresignedUrl(bucket, object, null);
+    }
+
+    private String genPresignedUrl(String bucket, String object, SysFile file) {
         try {
+            Map<String, String> extraQueryParams = new HashMap<>();
+            if (file != null && isTextFile(file)) {
+                extraQueryParams.put("response-content-type", "text/plain; charset=utf-8");
+                extraQueryParams.put("response-content-disposition", "attachment; filename=\"" + file.getFileName() + "\"");
+            }
             return minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .bucket(bucket)
                             .object(object)
+                            .extraQueryParams(extraQueryParams)
                             .expiry(PRESIGNED_URL_EXPIRE_MINUTES, TimeUnit.MINUTES)
                             .method(Method.GET)
                             .build());
@@ -261,6 +292,13 @@ public class FileService {
             log.error("Failed to generate presigned URL: bucket={}, object={}", bucket, object, e);
             throw new BusinessException("FILE_URL_ERROR", "生成下载链接失败: " + e.getMessage());
         }
+    }
+
+    private boolean isTextFile(SysFile file) {
+        String contentType = file.getContentType();
+        String fileName = file.getFileName();
+        return "text/plain".equalsIgnoreCase(contentType)
+                || (fileName != null && (fileName.endsWith(".txt") || fileName.endsWith(".csv")));
     }
 
     private SysFileVO toVO(SysFile f, String presignedUrl) {

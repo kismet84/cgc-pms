@@ -42,7 +42,7 @@ public class OrgCompanyService {
         return toVO(company);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(OrgCompany company) {
         // Force tenantId from authenticated context, ignore client-supplied value
         company.setTenantId(UserContext.getCurrentTenantId());
@@ -59,7 +59,7 @@ public class OrgCompanyService {
         return company.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(OrgCompany company) {
         OrgCompany existing = orgCompanyMapper.selectById(company.getId());
         if (existing == null)
@@ -80,7 +80,7 @@ public class OrgCompanyService {
         orgCompanyMapper.updateById(company);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         OrgCompany existing = orgCompanyMapper.selectById(id);
         if (existing == null)

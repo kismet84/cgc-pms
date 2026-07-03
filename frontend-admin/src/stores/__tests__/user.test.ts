@@ -13,8 +13,8 @@ import { useUserStore } from '../user'
 
 const STORAGE_KEY = 'cgc_pms_userinfo'
 
-function seedLocalStorage() {
-  localStorage.setItem(
+function seedSessionStorage() {
+  sessionStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
       userId: '1',
@@ -35,8 +35,9 @@ describe('userStore — logout', () => {
     // Reset pinia
     setActivePinia(createPinia())
 
-    // Reset localStorage
+    // Reset browser storage
     localStorage.clear()
+    sessionStorage.clear()
   })
 
   it('should call authLogout once on logout', async () => {
@@ -48,20 +49,20 @@ describe('userStore — logout', () => {
     expect(mockAuthLogout).toHaveBeenCalledOnce()
   })
 
-  it('should clear localStorage cgc_pms_userinfo on logout', async () => {
-    seedLocalStorage()
-    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull()
+  it('should clear sessionStorage cgc_pms_userinfo on logout', async () => {
+    seedSessionStorage()
+    expect(sessionStorage.getItem(STORAGE_KEY)).not.toBeNull()
 
     const store = useUserStore()
     mockAuthLogout.mockResolvedValue(undefined)
 
     await store.logout()
 
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 
   it('should set userInfo to null on logout', async () => {
-    seedLocalStorage()
+    seedSessionStorage()
     const store = useUserStore()
     expect(store.userInfo).not.toBeNull()
     mockAuthLogout.mockResolvedValue(undefined)
@@ -72,7 +73,7 @@ describe('userStore — logout', () => {
   })
 
   it('should set isLogin to false after logout', async () => {
-    seedLocalStorage()
+    seedSessionStorage()
     const store = useUserStore()
     expect(store.isLogin).toBe(true)
     mockAuthLogout.mockResolvedValue(undefined)
@@ -82,9 +83,9 @@ describe('userStore — logout', () => {
     expect(store.isLogin).toBe(false)
   })
 
-  it('should clear localStorage even when authLogout API rejects', async () => {
-    seedLocalStorage()
-    expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull()
+  it('should clear sessionStorage even when authLogout API rejects', async () => {
+    seedSessionStorage()
+    expect(sessionStorage.getItem(STORAGE_KEY)).not.toBeNull()
 
     const store = useUserStore()
     mockAuthLogout.mockRejectedValue(new Error('Network error'))
@@ -93,7 +94,7 @@ describe('userStore — logout', () => {
     await store.logout()
 
     expect(mockAuthLogout).toHaveBeenCalledOnce()
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull()
     expect(store.userInfo).toBeNull()
   })
 
@@ -112,7 +113,7 @@ describe('userStore — logout', () => {
       roleName: '系统管理员',
     })
 
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') as Record<string, unknown>
+    const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}') as Record<string, unknown>
     expect(saved).toEqual({
       userId: '1',
       username: 'admin',
@@ -127,7 +128,7 @@ describe('userStore — logout', () => {
   })
 
   it('should keep permission checks working after reload from auth-only cache', () => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         userId: '1',
@@ -147,7 +148,7 @@ describe('userStore — logout', () => {
   })
 
   it('should NOT await the API call — clears state synchronously before promise settles', () => {
-    seedLocalStorage()
+    seedSessionStorage()
     const store = useUserStore()
 
     // Use a deferred promise so the API never settles during this tick
@@ -160,7 +161,7 @@ describe('userStore — logout', () => {
     // Call logout — store must clear state synchronously (fire-and-forget semantics)
     store.logout()
     // The API call was fired but not awaited; the local state is already cleared
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull()
     expect(store.userInfo).toBeNull()
 
     // Clean up

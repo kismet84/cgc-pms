@@ -51,7 +51,7 @@ public class CtContractChangeService {
         return entity;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(CtContractChange change) {
         // 校验合同状态：PERFORMING/APPROVED 才允许创建变更
         CtContract contract = ctContractMapper.selectById(change.getContractId());
@@ -96,7 +96,7 @@ public class CtContractChangeService {
         return change.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(CtContractChange change) {
         CtContractChange existing = ctContractChangeMapper.selectById(change.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -110,7 +110,7 @@ public class CtContractChangeService {
         ctContractChangeMapper.updateById(change);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         CtContractChange existing = ctContractChangeMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -127,7 +127,7 @@ public class CtContractChangeService {
     /**
      * 提交合同变更审批。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long id) {
         CtContractChange existing = ctContractChangeMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))

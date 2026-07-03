@@ -3,6 +3,7 @@ package com.cgcpms.system.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.system.dto.UpdateUserStatusRequest;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.service.SysUserService;
 import com.cgcpms.system.vo.SysUserVO;
@@ -12,11 +13,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
-
-import com.cgcpms.system.dto.AssignRolesRequest;
-import jakarta.validation.Valid;
-
 @RestController
 @RequestMapping("/system/users")
 @RequiredArgsConstructor
@@ -58,8 +54,8 @@ public class SysUserController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:user:edit')")
-    public ApiResponse<Void> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        sysUserService.updateStatus(id, body.get("status"));
+    public ApiResponse<Void> updateStatus(@PathVariable Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
+        sysUserService.updateStatus(id, request.getStatus());
         return ApiResponse.success();
     }
 

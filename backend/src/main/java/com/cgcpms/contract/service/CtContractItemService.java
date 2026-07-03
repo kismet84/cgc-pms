@@ -50,7 +50,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
         return mapper.selectList(wrapper);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(CtContractItem item) {
         requireParentContract(item.getContractId());
         item.setTenantId(UserContext.getCurrentTenantId());
@@ -58,7 +58,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
         return item.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void batchSave(Long contractId, List<CtContractItem> items) {
         requireDraftParentContract(contractId);
         LambdaQueryWrapper<CtContractItem> wrapper = new LambdaQueryWrapper<>();
@@ -75,7 +75,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
         }
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(CtContractItem item) {
         requireDraftParentContract(item.getContractId());
         CtContractItem existing = mapper.selectById(item.getId());
@@ -86,7 +86,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
         mapper.updateById(item);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long contractId, Long id) {
         requireDraftParentContract(contractId);
         CtContractItem existing = mapper.selectById(id);

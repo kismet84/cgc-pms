@@ -65,7 +65,7 @@ public class AccountingEntryService {
                 .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void post(Long id) {
         AccountingEntry entry = requireExisting(id);
         if (!"DRAFT".equals(entry.getEntryStatus()))
@@ -74,7 +74,7 @@ public class AccountingEntryService {
         entryMapper.updateById(entry);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void reverse(Long id) {
         AccountingEntry entry = requireExisting(id);
         if (!"POSTED".equals(entry.getEntryStatus()))

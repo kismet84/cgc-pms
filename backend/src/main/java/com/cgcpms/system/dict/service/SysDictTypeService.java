@@ -44,7 +44,7 @@ public class SysDictTypeService {
         return toVO(entity);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(SysDictType entity) {
         if (sysDictTypeMapper.selectCount(new LambdaQueryWrapper<SysDictType>()
                 .eq(SysDictType::getDictCode, entity.getDictCode())
@@ -58,7 +58,7 @@ public class SysDictTypeService {
         return entity.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(SysDictType entity) {
         SysDictType existing = sysDictTypeMapper.selectById(entity.getId());
         if (existing == null) throw new BusinessException("DICT_TYPE_NOT_FOUND", "字典类型不存在");
@@ -68,7 +68,7 @@ public class SysDictTypeService {
         sysDictTypeMapper.updateById(entity);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         SysDictType existing = sysDictTypeMapper.selectById(id);
         if (existing == null) throw new BusinessException("DICT_TYPE_NOT_FOUND", "字典类型不存在");

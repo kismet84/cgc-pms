@@ -112,8 +112,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleConstraintViolation(ConstraintViolationException e) {
-        log.warn("参数校验失败: {}", e.getMessage());
-        return ApiResponse.fail(VALIDATION_ERROR_CODE, "参数校验失败: " + e.getMessage());
+        String message = e.getConstraintViolations().stream()
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .collect(Collectors.joining("; "));
+        log.warn("参数校验失败: {}", message);
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "参数校验失败: " + message);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

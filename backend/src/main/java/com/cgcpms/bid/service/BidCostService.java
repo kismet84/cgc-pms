@@ -50,7 +50,7 @@ public class BidCostService {
         return requireExisting(id);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(BidCost bid) {
         bid.setTenantId(UserContext.getCurrentTenantId());
         bid.setBidStatus("BIDDING");
@@ -58,7 +58,7 @@ public class BidCostService {
         return bid.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(BidCost bid) {
         BidCost existing = requireExisting(bid.getId());
         if (!"BIDDING".equals(existing.getBidStatus())) {
@@ -67,7 +67,7 @@ public class BidCostService {
         mapper.updateById(bid);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         BidCost existing = requireExisting(id);
         if (!"BIDDING".equals(existing.getBidStatus())) {
@@ -79,7 +79,7 @@ public class BidCostService {
     /**
      * 标记为中标：关联项目 → 费用结转 → 刷新汇总。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void markAsWon(Long bidCostId, Long projectId) {
         BidCost bid = requireExisting(bidCostId);
         if (!"BIDDING".equals(bid.getBidStatus())) {
@@ -109,7 +109,7 @@ public class BidCostService {
     /**
      * 标记为未中标：费用冲销 → cost_status = WRITE_OFF。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void markAsLost(Long bidCostId) {
         BidCost bid = requireExisting(bidCostId);
         if (!"BIDDING".equals(bid.getBidStatus())) {

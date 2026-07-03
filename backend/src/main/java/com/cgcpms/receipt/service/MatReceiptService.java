@@ -33,6 +33,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class MatReceiptService {
 
+    private static final int ORDER_ITEM_UPDATE_MAX_RETRIES = 3;
+
     private final MatReceiptMapper matReceiptMapper;
     private final MatReceiptItemMapper matReceiptItemMapper;
     private final MatPurchaseOrderMapper matPurchaseOrderMapper;
@@ -109,7 +111,7 @@ public class MatReceiptService {
 
     // ──────────────────────── CRUD ────────────────────────
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(MatReceipt receipt) {
         // Auto-generate receipt code: MR-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -149,7 +151,7 @@ public class MatReceiptService {
         return receipt.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(MatReceipt receipt) {
         MatReceipt existing = matReceiptMapper.selectById(receipt.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -168,7 +170,7 @@ public class MatReceiptService {
         matReceiptMapper.updateById(receipt);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         MatReceipt receipt = matReceiptMapper.selectById(id);
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -188,7 +190,7 @@ public class MatReceiptService {
     /**
      * 提交材料验收审批。
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long receiptId) {
         MatReceipt receipt = matReceiptMapper.selectById(receiptId);
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -224,7 +226,7 @@ public class MatReceiptService {
      * Batch save receipt items with quantity validation.
      * W0 Decision 3: WARN but don't block when receipt qty > order remaining qty.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveItemsBatch(Long receiptId, List<MatReceiptItem> items) {
         MatReceipt receipt = matReceiptMapper.selectById(receiptId);
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -244,16 +246,8 @@ public class MatReceiptService {
         List<MatReceiptItem> oldItems = matReceiptItemMapper.selectList(oldItemWrapper);
         for (MatReceiptItem oldItem : oldItems) {
             if (oldItem.getOrderItemId() != null) {
-                MatPurchaseOrderItem orderItem = matPurchaseOrderItemMapper.selectById(oldItem.getOrderItemId());
-                if (orderItem != null) {
-                    BigDecimal oldQty = oldItem.getActualQuantity() != null ? oldItem.getActualQuantity() : BigDecimal.ZERO;
-                    BigDecimal currentReceived = orderItem.getReceivedQuantity() != null
-                            ? orderItem.getReceivedQuantity() : BigDecimal.ZERO;
-                    BigDecimal newReceived = currentReceived.subtract(oldQty);
-                    if (newReceived.compareTo(BigDecimal.ZERO) < 0) newReceived = BigDecimal.ZERO;
-                    orderItem.setReceivedQuantity(newReceived);
-                    matPurchaseOrderItemMapper.updateById(orderItem);
-                }
+                BigDecimal oldQty = oldItem.getActualQuantity() != null ? oldItem.getActualQuantity() : BigDecimal.ZERO;
+                adjustOrderItemReceivedQuantity(oldItem.getOrderItemId(), oldQty.negate(), true);
             }
         }
 
@@ -275,14 +269,7 @@ public class MatReceiptService {
 
             // Update order item received_quantity (W0 Decision 3: always update, warn if exceeds)
             if (item.getOrderItemId() != null) {
-                MatPurchaseOrderItem orderItem = matPurchaseOrderItemMapper.selectById(item.getOrderItemId());
-                if (orderItem != null) {
-                    BigDecimal currentReceived = orderItem.getReceivedQuantity() != null
-                            ? orderItem.getReceivedQuantity() : BigDecimal.ZERO;
-                    BigDecimal newReceived = currentReceived.add(item.getActualQuantity());
-                    orderItem.setReceivedQuantity(newReceived);
-                    matPurchaseOrderItemMapper.updateById(orderItem);
-                }
+                adjustOrderItemReceivedQuantity(item.getOrderItemId(), item.getActualQuantity(), false);
             }
         }
 
@@ -296,5 +283,29 @@ public class MatReceiptService {
         updateWrapper.eq(MatReceipt::getId, receiptId)
                 .set(MatReceipt::getTotalAmount, totalAmount);
         matReceiptMapper.update(null, updateWrapper);
+    }
+
+    private void adjustOrderItemReceivedQuantity(Long orderItemId, BigDecimal delta, boolean floorAtZero) {
+        int retries = 0;
+        while (true) {
+            MatPurchaseOrderItem orderItem = matPurchaseOrderItemMapper.selectById(orderItemId);
+            if (orderItem == null || !orderItem.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                return;
+            }
+            BigDecimal currentReceived = orderItem.getReceivedQuantity() != null
+                    ? orderItem.getReceivedQuantity() : BigDecimal.ZERO;
+            BigDecimal nextReceived = currentReceived.add(delta != null ? delta : BigDecimal.ZERO);
+            if (floorAtZero && nextReceived.compareTo(BigDecimal.ZERO) < 0) {
+                nextReceived = BigDecimal.ZERO;
+            }
+            orderItem.setReceivedQuantity(nextReceived);
+            int updated = matPurchaseOrderItemMapper.updateById(orderItem);
+            if (updated > 0) {
+                return;
+            }
+            if (++retries >= ORDER_ITEM_UPDATE_MAX_RETRIES) {
+                throw new BusinessException("ORDER_ITEM_CONCURRENT_CONFLICT", "采购订单明细并发更新冲突，请稍后重试");
+            }
+        }
     }
 }

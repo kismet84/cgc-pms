@@ -28,7 +28,7 @@ public class WorkflowSubmitService {
     private final WfTaskMapper wfTaskMapper;
     private final WfCcService wfCcService;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public WfInstance submit(Long userId, String username, Long tenantId,
                              String businessType, Long businessId,
                              String title, java.math.BigDecimal amount,
@@ -100,7 +100,7 @@ public class WorkflowSubmitService {
         return instance;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public WfInstance resubmit(Long instanceId, Long userId, String username) {
 
         WfInstance tenantProbe = wfInstanceMapper.selectByIdIgnoringTenant(instanceId);

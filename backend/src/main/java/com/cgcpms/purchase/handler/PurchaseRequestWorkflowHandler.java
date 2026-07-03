@@ -50,7 +50,7 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void onApproved(WorkflowContext context) {
         Long requestId = resolveRequestId(context.getInstance());
         log.info("采购申请审批通过，开始处理 requestId={}", requestId);

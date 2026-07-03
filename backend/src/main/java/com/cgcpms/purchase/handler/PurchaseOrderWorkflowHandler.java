@@ -42,7 +42,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void onApproved(WorkflowContext context) {
         Long orderId = resolveOrderId(context.getInstance());
         log.info("采购订单审批通过，更新状态 orderId={}", orderId);

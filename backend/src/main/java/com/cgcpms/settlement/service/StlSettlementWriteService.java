@@ -53,7 +53,7 @@ public class StlSettlementWriteService {
     // Create
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(StlSettlement settlement) {
         Long tenantId = UserContext.getCurrentTenantId();
         settlement.setTenantId(tenantId);
@@ -118,7 +118,7 @@ public class StlSettlementWriteService {
     // Update / Delete
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(StlSettlement settlement) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement existing = queryService.validateAndGetSettlement(settlement.getId());
@@ -136,7 +136,7 @@ public class StlSettlementWriteService {
         stlSettlementMapper.updateById(settlement);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement existing = queryService.validateAndGetSettlement(id);
@@ -154,7 +154,7 @@ public class StlSettlementWriteService {
     // Items management
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void saveItems(Long settlementId, List<StlSettlementItem> items) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement settlement = queryService.validateAndGetSettlement(settlementId);
@@ -180,7 +180,7 @@ public class StlSettlementWriteService {
     // Workflow
     // ================================================================
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long settlementId) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement settlement = stlSettlementMapper.selectById(settlementId);

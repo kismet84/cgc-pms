@@ -47,7 +47,7 @@ public class SysMenuService {
         return menu;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Long create(SysMenu menu) {
         // Force tenantId from authenticated context, ignore client-supplied value
         menu.setTenantId(com.cgcpms.auth.context.UserContext.getCurrentTenantId());
@@ -58,7 +58,7 @@ public class SysMenuService {
         return menu.getId();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void update(SysMenu menu) {
         Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
         SysMenu existing = sysMenuMapper.selectById(menu.getId());
@@ -67,7 +67,7 @@ public class SysMenuService {
         sysMenuMapper.updateById(menu);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
         SysMenu existing = sysMenuMapper.selectById(id);
