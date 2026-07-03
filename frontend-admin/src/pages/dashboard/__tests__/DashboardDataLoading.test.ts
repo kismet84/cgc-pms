@@ -73,6 +73,20 @@ describe('Dashboard data loading behavior', () => {
     expect(composableSource).toMatch(/getProjectManagerView\(pid,\s*month\)/)
   })
 
+  it('defaults selectedProjectId to the all-project option', () => {
+    expect(composableSource).toMatch(/export\s+const\s+ALL_PROJECT_ID\s*=\s*['"][^'"]+['"]/)
+    expect(composableSource).not.toMatch(/export\s+const\s+ALL_PROJECT_ID\s*=\s*['"]{2}/)
+    expect(composableSource).toMatch(
+      /const\s+selectedProjectId\s*=\s*ref<[^>]+>\(ALL_PROJECT_ID\)/,
+    )
+  })
+
+  it('maps the all-project sentinel to undefined before calling dashboard APIs', () => {
+    expect(composableSource).toMatch(
+      /const\s+pid\s*=\s*selectedProjectId\.value\s*===\s*ALL_PROJECT_ID\s*\?\s*undefined\s*:\s*selectedProjectId\.value/,
+    )
+  })
+
   it('passes selectedProjectId to getBusinessManagerView', () => {
     expect(composableSource).toMatch(/getBusinessManagerView\(pid\)/)
   })
@@ -118,13 +132,15 @@ describe('Dashboard data loading behavior', () => {
     expect(composableSource).toMatch(
       /onMounted\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*Promise\.allSettled\(\[\s*fetchProjects\(\),\s*fetchViewData\(\)\s*\]\)/,
     )
-    expect(composableSource).toMatch(/selectedProjectId\.value\s*=\s*projectList\.value\[0\]\.id/)
-    expect(composableSource).toMatch(/await\s+fetchViewData\s*\(\s*\)/)
+    expect(composableSource).not.toMatch(
+      /selectedProjectId\.value\s*=\s*projectList\.value\[0\]\.id/,
+    )
     const mountedBlock = composableSource.match(
       /onMounted\s*\(\s*async\s*\(\s*\)\s*=>\s*\{[\s\S]*?\n  \}\)/,
     )?.[0]
     expect(mountedBlock).toBeDefined()
     expect(mountedBlock).not.toContain('return')
+    expect(mountedBlock).not.toMatch(/await\s+fetchViewData\s*\(\s*\)/)
   })
 
   // ── Error handling ──
@@ -147,6 +163,13 @@ describe('Dashboard data loading behavior', () => {
   it('hides project selector for mgmt role', () => {
     const indexSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
     expect(indexSource).toMatch(/activeRole\s*!==\s*'mgmt'/)
+  })
+
+  it('renders an explicit all-project option in the project selector', () => {
+    const indexSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
+    expect(indexSource).toMatch(
+      /<a-select-option\s+:value="ALL_PROJECT_ID">\s*全部\s*<\/a-select-option>/,
+    )
   })
 
   // ── Default empty state ──

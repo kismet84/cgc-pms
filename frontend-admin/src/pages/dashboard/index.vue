@@ -10,7 +10,7 @@ import {
   ToolOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue'
-import { useDashboardData } from './composables/useDashboardData'
+import { ALL_PROJECT_ID, useDashboardData } from './composables/useDashboardData'
 import { fmtWan, fmtDeviation, devColor, devSign } from './utils/formatUtils'
 import { drillCols } from './utils/tableColumns'
 import type { DashboardRole } from '@/types/dashboard'
@@ -99,6 +99,7 @@ function toggleFullscreen() {
       <div class="dashboard-actions">
         <div v-if="activeRole !== 'mgmt'" class="project-field">
           <a-select v-model:value="selectedProjectId" placeholder="请选择项目" style="width: 300px">
+            <a-select-option :value="ALL_PROJECT_ID">全部</a-select-option>
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
               {{ p.projectName }}
             </a-select-option>

@@ -35,6 +35,7 @@ export function formatDashboardMonth(date: Date) {
 }
 
 export const ALL_DASHBOARD_MONTH = ''
+export const ALL_PROJECT_ID = '__ALL__'
 
 export function buildDashboardMonthOptions(now: Date = new Date()) {
   return [
@@ -86,7 +87,7 @@ export function useDashboardData() {
   }
 
   const projectList = ref<ProjectVO[]>([])
-  const selectedProjectId = ref<string | undefined>(undefined)
+  const selectedProjectId = ref<string | undefined>(ALL_PROJECT_ID)
   const selectedMonth = ref(ALL_DASHBOARD_MONTH)
   const monthOptions = computed(() => buildDashboardMonthOptions())
   const pmData = ref<ProjectManagerDashboardVO | null>(null)
@@ -119,7 +120,7 @@ export function useDashboardData() {
   }
 
   async function fetchViewData() {
-    const pid = selectedProjectId.value || undefined
+    const pid = selectedProjectId.value === ALL_PROJECT_ID ? undefined : selectedProjectId.value
     const month = selectedMonth.value || undefined
     loading.value = true
     try {
@@ -186,12 +187,7 @@ export function useDashboardData() {
   }
 
   onMounted(async () => {
-    const roleAtBoot = activeRole.value
     await Promise.allSettled([fetchProjects(), fetchViewData()])
-    if (needsProject(roleAtBoot) && !selectedProjectId.value && projectList.value.length > 0) {
-      selectedProjectId.value = projectList.value[0].id
-      await fetchViewData()
-    }
     bootstrapping.value = false
   })
 
