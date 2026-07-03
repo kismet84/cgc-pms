@@ -69,12 +69,6 @@ const projectsLoading = ref(false)
 const pageNo = ref(1)
 const pageSize = ref(20)
 const total = computed(() => store.total)
-const ruleTypeOptions = computed(() =>
-  Object.entries(RULE_TYPE_LABELS).map(([value, label]) => ({ value, label })),
-)
-const categoryOptions = computed(() =>
-  Object.entries(RULE_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
-)
 const processStatusOptions = computed(() =>
   Object.entries(ALERT_PROCESS_STATUS_LABELS).map(([value, label]) => ({ value, label })),
 )
@@ -316,7 +310,7 @@ function alertPercent(value: number): number {
 
 // ── Columns ──
 const gridColumns = computed(() => [
-  { field: 'message', title: '预警内容', ellipsis: true, minWidth: 260 },
+  { field: 'message', title: '预警内容', ellipsis: true, minWidth: 260, slots: { default: 'message' } },
   {
     field: 'projectId',
     title: '项目',
@@ -328,7 +322,7 @@ const gridColumns = computed(() => [
   { field: 'category', title: '分类', width: 96, slots: { default: 'category' } },
   { field: 'alertCategory', title: '标签', width: 108, slots: { default: 'alertCategory' } },
   { field: 'ruleType', title: '规则类型', width: 116, slots: { default: 'ruleType' } },
-  { field: 'triggeredAt', title: '触发时间', width: 160 },
+  { field: 'triggeredAt', title: '触发时间', width: 120, slots: { default: 'triggeredAt' } },
   { field: 'isRead', title: '状态', width: 82, slots: { default: 'isRead' } },
   { field: 'processStatus', title: '处理口径', width: 104, slots: { default: 'processStatus' } },
   { title: '操作', width: 92, slots: { default: 'action' } },
@@ -357,6 +351,16 @@ function getAlertTagLabel(record: AlertLogVO): string {
 
 function getProcessStatusLabel(record: AlertLogVO): string {
   return ALERT_PROCESS_STATUS_LABELS[String(record.processStatus ?? 'OPEN').trim()] || '待处理'
+}
+
+function getAlertMessageText(value: unknown): string {
+  const text = String(value ?? '').trim()
+  return text || '-'
+}
+
+function formatTriggeredDate(value: unknown): string {
+  const text = String(value ?? '').trim()
+  return text ? text.slice(0, 10) : '-'
 }
 
 function buildAlertBusinessPath(record: AlertLogVO): string {
@@ -483,7 +487,7 @@ onMounted(async () => {
         <a-input
           v-model:value="filter.keyword"
           class="alert-search-input"
-          placeholder="搜索预警内容、项目、规则类型…"
+          placeholder="搜索预警内容、项目…"
           allow-clear
           size="large"
           @press-enter="handleSearch"
@@ -535,30 +539,6 @@ onMounted(async () => {
           @change="handleSearch"
         >
           <a-select-option v-for="item in processStatusOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.category"
-          class="alert-search-select is-compact"
-          placeholder="预警分类"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="item in categoryOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.ruleType"
-          class="alert-search-select"
-          placeholder="规则类型"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="item in ruleTypeOptions" :key="item.value" :value="item.value">
             {{ item.label }}
           </a-select-option>
         </a-select>
@@ -669,8 +649,21 @@ onMounted(async () => {
               border="inner"
               size="small"
             >
+              <template #message="{ row }">
+                <a-tooltip :title="row.message">
+                  <span class="alert-message-text">{{ getAlertMessageText(row.message) }}</span>
+                </a-tooltip>
+              </template>
               <template #projectId="{ row }">
-                <span class="al-muted">{{ getProjectName(row.projectId) }}</span>
+                <button
+                  v-if="canOpenBusinessEntry(row)"
+                  type="button"
+                  class="alert-project-link"
+                  @click="openBusinessEntry(row)"
+                >
+                  {{ getProjectName(row.projectId) }}
+                </button>
+                <span v-else class="al-muted">{{ getProjectName(row.projectId) }}</span>
               </template>
               <template #severity="{ row }">
                 <a-tag :color="SEVERITY_COLOR[row.severity] ?? 'default'">
@@ -685,6 +678,9 @@ onMounted(async () => {
               </template>
               <template #ruleType="{ row }">
                 <a-tag>{{ RULE_TYPE_LABELS[row.ruleType] || row.ruleType }}</a-tag>
+              </template>
+              <template #triggeredAt="{ row }">
+                <span>{{ formatTriggeredDate(row.triggeredAt) }}</span>
               </template>
               <template #isRead="{ row }">
                 <a-badge v-if="row.isRead === 0" status="processing" text="未读" />
@@ -1092,6 +1088,31 @@ onMounted(async () => {
 .alert-toolbar-hint {
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.alert-message-text {
+  display: inline-block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert-project-link {
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  color: var(--primary);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.alert-project-link:hover {
+  text-decoration: underline;
 }
 
 .alert-analysis-rail {
