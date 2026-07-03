@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
+import type { Dayjs } from 'dayjs'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
   AlertOutlined,
@@ -13,11 +15,38 @@ import {
 } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
-import { RULE_TYPE_LABELS, SEVERITY_COLOR, type AlertLogVO } from '@/types/alert'
+import { useUserStore } from '@/stores/user'
+import { getAlertSubscription, updateAlertSubscription } from '@/api/modules/alert'
+import {
+  ALERT_CHANNEL_LABELS,
+  ALERT_CATEGORY_LABELS,
+  ALERT_PROCESS_STATUS_COLOR,
+  ALERT_PROCESS_STATUS_LABELS,
+  RULE_CATEGORY_LABELS,
+  RULE_TYPE_LABELS,
+  SEVERITY_COLOR,
+  getAlertRuleCategory,
+  type AlertSubscriptionConfig,
+  type AlertSubscriptionResponse,
+  type AlertLogVO,
+} from '@/types/alert'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 
+const router = useRouter()
 const store = useAlertStore()
+const userStore = useUserStore()
+const subscriptionVisible = ref(false)
+const subscriptionLoading = ref(false)
+const subscriptionSaving = ref(false)
+const subscriptionState = ref<AlertSubscriptionResponse | null>(null)
+const subscriptionForm = reactive<AlertSubscriptionConfig>({
+  enabled: false,
+  channels: [],
+  domains: [],
+  minSeverity: 'HIGH',
+  notifyOnStatusChanged: false,
+})
 
 // ── Filters ──
 const filter = reactive({
@@ -25,6 +54,11 @@ const filter = reactive({
   projectId: undefined as string | undefined,
   severity: undefined as string | undefined,
   isRead: undefined as number | undefined,
+  processStatus: undefined as string | undefined,
+  ruleType: undefined as string | undefined,
+  category: undefined as string | undefined,
+  triggeredAtRange: null as [Dayjs, Dayjs] | null,
+  onlyDefaultScope: false,
 })
 
 // ── Project dropdown ──
@@ -32,24 +66,100 @@ const referenceStore = useReferenceStore()
 const projectOptions = computed(() => referenceStore.projects ?? [])
 const projectsLoading = ref(false)
 
-// ── Store-based pagination (frontend-side slice) ──
 const pageNo = ref(1)
 const pageSize = ref(20)
+const total = computed(() => store.total)
+const ruleTypeOptions = computed(() =>
+  Object.entries(RULE_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+)
+const categoryOptions = computed(() =>
+  Object.entries(RULE_CATEGORY_LABELS).map(([value, label]) => ({ value, label })),
+)
+const processStatusOptions = computed(() =>
+  Object.entries(ALERT_PROCESS_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+)
+const currentPageUnreadAlerts = computed(() => store.alerts.filter((item) => item.isRead === 0))
+const roleDefaultApplied = ref(false)
 
-const pagedAlerts = computed(() => {
-  const start = (pageNo.value - 1) * pageSize.value
-  return store.alerts.slice(start, start + pageSize.value)
-})
+type AlertRolePreset = {
+  alertDomain?: string
+  onlyDefaultScope?: boolean
+  downgraded?: boolean
+}
 
-const total = computed(() => store.alerts.length)
+function resolveRoleDefaultPreset(): AlertRolePreset {
+  const roleCodes = userStore.roles.map((item) => String(item).toUpperCase())
+  const roleName = String(userStore.userInfo?.roleName ?? '')
+
+  if (roleCodes.includes('SUPER_ADMIN') || roleCodes.includes('ADMIN') || roleName.includes('超级管理员')) {
+    return {}
+  }
+  if (roleCodes.includes('PROJECT_MANAGER') || roleName.includes('项目经理')) {
+    return {}
+  }
+  if (roleCodes.includes('COMMERCIAL_MANAGER') || roleName.includes('商务经理')) {
+    return {}
+  }
+  if (roleCodes.includes('PURCHASE_MANAGER') || roleName.includes('采购经理')) {
+    return { alertDomain: 'PURCHASE' }
+  }
+  if (roleCodes.includes('PRODUCTION_MANAGER') || roleName.includes('生产经理')) {
+    return { downgraded: true }
+  }
+  if (roleCodes.includes('CHIEF_ENGINEER') || roleName.includes('总工程师')) {
+    return { downgraded: true }
+  }
+
+  return {}
+}
+
+function applyRoleDefaultView(force = false) {
+  if (roleDefaultApplied.value && !force) return
+  const preset = resolveRoleDefaultPreset()
+  filter.category = preset.alertDomain
+  filter.onlyDefaultScope = preset.onlyDefaultScope ?? false
+  roleDefaultApplied.value = true
+}
+
+const activeRolePreset = computed(() => resolveRoleDefaultPreset())
+const hasDefaultScopeDomain = computed(() => Boolean(activeRolePreset.value.alertDomain))
+const availableSubscriptionDomains = computed(() => subscriptionState.value?.availableOptions.domains ?? [])
+const availableSubscriptionChannels = computed(() => subscriptionState.value?.availableOptions.channels ?? [])
+const availableSeverityOptions = computed(
+  () => subscriptionState.value?.availableOptions.minSeverityOptions ?? ['LOW', 'MEDIUM', 'HIGH'],
+)
+const defaultSubscriptionEnabled = computed(
+  () => Boolean(subscriptionState.value?.defaultSubscription.enabled),
+)
+const defaultStatusChangeEnabled = computed(
+  () => Boolean(subscriptionState.value?.defaultSubscription.notifyOnStatusChanged),
+)
+
+function resolveSearchAlertDomain() {
+  const preset = activeRolePreset.value
+  if (filter.onlyDefaultScope && preset.alertDomain) {
+    return preset.alertDomain
+  }
+  return filter.category
+}
 
 // ── Fetch ──
 async function fetchData() {
   try {
     await store.fetchAlerts({
+      keyword: filter.keyword.trim() || undefined,
+      pageNo: pageNo.value,
+      pageNum: pageNo.value,
+      pageSize: pageSize.value,
       projectId: filter.projectId,
       severity: filter.severity,
       isRead: filter.isRead,
+      processStatus: filter.processStatus,
+      ruleType: filter.ruleType,
+      alertDomain: resolveSearchAlertDomain(),
+      triggeredStart: filter.triggeredAtRange?.[0]?.startOf('day').format('YYYY-MM-DD HH:mm:ss'),
+      triggeredEnd: filter.triggeredAtRange?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss'),
+      onlyDefaultScope: filter.onlyDefaultScope || undefined,
     })
   } catch (e: unknown) {
     console.error(e)
@@ -63,21 +173,27 @@ function handleSearch() {
 }
 
 function handleReset() {
+  applyRoleDefaultView(true)
   filter.keyword = ''
   filter.projectId = undefined
   filter.severity = undefined
   filter.isRead = undefined
+  filter.processStatus = undefined
+  filter.ruleType = undefined
+  filter.triggeredAtRange = null
   pageNo.value = 1
   fetchData()
 }
 
 function handlePageChange(page: number) {
   pageNo.value = page
+  fetchData()
 }
 
 function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
+  fetchData()
 }
 
 // ── Actions ──
@@ -88,6 +204,20 @@ async function handleMarkRead(record: AlertLogVO) {
   } catch (e: unknown) {
     console.error(e)
     message.error('操作失败')
+  }
+}
+
+async function handleBatchMarkRead() {
+  if (!currentPageUnreadAlerts.value.length) {
+    message.info('当前页没有未读预警')
+    return
+  }
+  try {
+    const count = await store.batchMarkRead(currentPageUnreadAlerts.value.map((item) => item.id))
+    message.success(`已标记 ${count} 条预警为已读`)
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('批量已读失败')
   }
 }
 
@@ -102,6 +232,26 @@ async function handleBatchEvaluate() {
   }
 }
 
+async function handleChangeStatus(
+  record: AlertLogVO,
+  processStatus: 'PROCESSED' | 'ARCHIVED' | 'INVALID',
+  statusRemark?: string,
+) {
+  try {
+    await store.changeStatus(record.id, processStatus, statusRemark)
+    message.success(
+      processStatus === 'PROCESSED'
+        ? '已标记为已处理'
+        : processStatus === 'ARCHIVED'
+          ? '已归档'
+          : '已标记为失效',
+    )
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('状态更新失败')
+  }
+}
+
 // ── KPI ──
 const kpi = computed(() => {
   const all = store.alerts
@@ -110,16 +260,17 @@ const kpi = computed(() => {
   const unreadCount = all.filter((a) => a.isRead === 0).length
   const readCount = all.filter((a) => a.isRead === 1).length
   return {
-    total: all.length,
+    total: total.value,
     high: highCount,
     medium: mediumCount,
     unread: unreadCount,
     read: readCount,
+    pageCount: all.length,
   }
 })
 
 const kpiMax = computed(() => ({
-  total: Math.max(kpi.value.total, 1),
+  total: Math.max(kpi.value.pageCount, 1),
   high: Math.max(kpi.value.high, 1),
   unread: Math.max(kpi.value.unread, 1),
 }))
@@ -159,8 +310,8 @@ function kpiPct(value: number, max: number): number {
 }
 
 function alertPercent(value: number): number {
-  if (!kpi.value.total) return 0
-  return Math.min(Math.round((value / kpi.value.total) * 100), 100)
+  if (!kpi.value.pageCount) return 0
+  return Math.min(Math.round((value / kpi.value.pageCount) * 100), 100)
 }
 
 // ── Columns ──
@@ -174,10 +325,13 @@ const gridColumns = computed(() => [
     slots: { default: 'projectId' },
   },
   { field: 'severity', title: '严重度', width: 92, slots: { default: 'severity' } },
+  { field: 'category', title: '分类', width: 96, slots: { default: 'category' } },
+  { field: 'alertCategory', title: '标签', width: 108, slots: { default: 'alertCategory' } },
   { field: 'ruleType', title: '规则类型', width: 116, slots: { default: 'ruleType' } },
   { field: 'triggeredAt', title: '触发时间', width: 160 },
   { field: 'isRead', title: '状态', width: 82, slots: { default: 'isRead' } },
-  { title: '操作', width: 76, slots: { default: 'action' } },
+  { field: 'processStatus', title: '处理口径', width: 104, slots: { default: 'processStatus' } },
+  { title: '操作', width: 92, slots: { default: 'action' } },
 ])
 
 const {
@@ -192,26 +346,121 @@ function getProjectName(projectId: string): string {
   return p ? `${p.projectCode} ${p.projectName}` : `项目#${projectId}`
 }
 
-// ── Keyword filter ──
-const filteredAlerts = computed(() => {
-  const kw = filter.keyword.trim().toLowerCase()
-  if (!kw) return pagedAlerts.value
-  return pagedAlerts.value.filter(
-    (a) =>
-      a.message.toLowerCase().includes(kw) ||
-      getProjectName(a.projectId).toLowerCase().includes(kw) ||
-      (RULE_TYPE_LABELS[a.ruleType] || a.ruleType).toLowerCase().includes(kw),
-  )
-})
+function getAlertCategoryLabel(record: AlertLogVO): string {
+  const category = getAlertRuleCategory(record.ruleType, record.alertDomain, record.category)
+  return RULE_CATEGORY_LABELS[category] || '未分类'
+}
+
+function getAlertTagLabel(record: AlertLogVO): string {
+  return ALERT_CATEGORY_LABELS[String(record.alertCategory ?? '').trim()] || '未细分'
+}
+
+function getProcessStatusLabel(record: AlertLogVO): string {
+  return ALERT_PROCESS_STATUS_LABELS[String(record.processStatus ?? 'OPEN').trim()] || '待处理'
+}
+
+function buildAlertBusinessPath(record: AlertLogVO): string {
+  const businessType = String(record.sourceType ?? record.businessType ?? '').trim()
+  const businessId = String(record.sourceId ?? record.businessId ?? '').trim()
+  if (businessType && businessId) {
+    const dynamicRouteMap: Record<string, (id: string) => string> = {
+      CONTRACT: (id) => `/contract/${id}`,
+      CONTRACT_APPROVAL: (id) => `/contract/${id}`,
+      PURCHASE_REQUEST: (id) => `/inventory/purchase-request?businessId=${id}`,
+      SUB_MEASURE: (id) => `/subcontract/measure?businessId=${id}`,
+      PAY_APPLICATION: (id) => `/payment/application?businessId=${id}`,
+      PAY_REQUEST: (id) => `/payment/application?businessId=${id}`,
+      PURCHASE_ORDER: (id) => `/purchase/order?businessId=${id}`,
+      VAR_ORDER: (id) => `/variation/order?businessId=${id}`,
+      VARIATION: (id) => `/variation/order?businessId=${id}`,
+      PURCHASE: (id) => `/purchase/order?businessId=${id}`,
+    }
+    return dynamicRouteMap[businessType]?.(businessId) ?? ''
+  }
+
+  const contractId = String(record.contractId ?? '').trim()
+  if (
+    contractId &&
+    ['CONTRACT_OVERDUE', 'CONTRACT_EXPIRING'].includes(String(record.ruleType ?? '').trim())
+  ) {
+    return `/contract/${contractId}`
+  }
+
+  return ''
+}
+
+function canOpenBusinessEntry(record: AlertLogVO): boolean {
+  return Boolean(buildAlertBusinessPath(record))
+}
+
+function openBusinessEntry(record: AlertLogVO) {
+  const path = buildAlertBusinessPath(record)
+  if (path) router.push(path)
+}
+
+function applySubscriptionForm(data: AlertSubscriptionConfig) {
+  subscriptionForm.enabled = Boolean(data.enabled)
+  subscriptionForm.channels = [...(data.channels ?? [])]
+  subscriptionForm.domains = [...(data.domains ?? [])]
+  subscriptionForm.minSeverity = data.minSeverity ?? 'HIGH'
+  subscriptionForm.notifyOnStatusChanged = Boolean(data.notifyOnStatusChanged)
+}
+
+async function loadSubscription() {
+  subscriptionLoading.value = true
+  try {
+    const result = await getAlertSubscription()
+    subscriptionState.value = result
+    applySubscriptionForm(result.effectiveSubscription)
+  } catch (error) {
+    console.error(error)
+    message.error('加载通知订阅失败')
+  } finally {
+    subscriptionLoading.value = false
+  }
+}
+
+function openSubscriptionModal() {
+  subscriptionVisible.value = true
+  if (!subscriptionState.value) {
+    loadSubscription()
+    return
+  }
+  applySubscriptionForm(subscriptionState.value.effectiveSubscription)
+}
+
+async function handleSaveSubscription() {
+  subscriptionSaving.value = true
+  try {
+    const result = await updateAlertSubscription({
+      enabled: subscriptionForm.enabled,
+      channels: subscriptionForm.channels,
+      domains: subscriptionForm.domains,
+      minSeverity: subscriptionForm.minSeverity,
+      notifyOnStatusChanged: subscriptionForm.notifyOnStatusChanged,
+    })
+    subscriptionState.value = result
+    applySubscriptionForm(result.effectiveSubscription)
+    subscriptionVisible.value = false
+    message.success('通知订阅已保存')
+  } catch (error) {
+    console.error(error)
+    message.error('通知订阅保存失败')
+  } finally {
+    subscriptionSaving.value = false
+  }
+}
 
 // ── Init ──
 onMounted(async () => {
+  applyRoleDefaultView()
   projectsLoading.value = true
   try {
     await referenceStore.fetchProjects()
   } finally {
     projectsLoading.value = false
   }
+  await loadSubscription()
   fetchData()
 })
 </script>
@@ -277,6 +526,56 @@ onMounted(async () => {
           <a-select-option :value="0">未读</a-select-option>
           <a-select-option :value="1">已读</a-select-option>
         </a-select>
+        <a-select
+          v-model:value="filter.processStatus"
+          class="alert-search-select is-compact"
+          placeholder="处理口径"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="item in processStatusOptions" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.category"
+          class="alert-search-select is-compact"
+          placeholder="预警分类"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="item in categoryOptions" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.ruleType"
+          class="alert-search-select"
+          placeholder="规则类型"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="item in ruleTypeOptions" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </a-select-option>
+        </a-select>
+        <a-range-picker
+          v-model:value="filter.triggeredAtRange"
+          class="alert-search-range"
+          show-time
+          value-format="YYYY-MM-DD HH:mm:ss"
+        />
+        <div class="alert-default-scope-switch">
+          <span>只看默认域</span>
+          <a-switch
+            v-model:checked="filter.onlyDefaultScope"
+            :disabled="!hasDefaultScopeDomain"
+            @change="handleSearch"
+          />
+        </div>
       </div>
       <div class="alert-search-actions">
         <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
@@ -339,6 +638,12 @@ onMounted(async () => {
                 <template #icon><ReloadOutlined /></template>
                 刷新
               </a-button>
+              <a-button :loading="subscriptionLoading" @click="openSubscriptionModal">
+                通知订阅
+              </a-button>
+              <a-button :disabled="!currentPageUnreadAlerts.length" @click="handleBatchMarkRead">
+                当前页未读标已读
+              </a-button>
               <a-button
                 type="primary"
                 danger
@@ -356,7 +661,7 @@ onMounted(async () => {
           <!-- 表格 -->
           <div class="lg-table-wrap">
             <vxe-grid
-              :data="filteredAlerts"
+              :data="store.alerts"
               :columns="visibleGridColumns"
               :loading="store.loading"
               :column-config="{ resizable: true }"
@@ -372,6 +677,12 @@ onMounted(async () => {
                   {{ row.severity === 'HIGH' ? '高' : row.severity === 'MEDIUM' ? '中' : '低' }}
                 </a-tag>
               </template>
+              <template #category="{ row }">
+                <a-tag>{{ getAlertCategoryLabel(row) }}</a-tag>
+              </template>
+              <template #alertCategory="{ row }">
+                <a-tag color="purple">{{ getAlertTagLabel(row) }}</a-tag>
+              </template>
               <template #ruleType="{ row }">
                 <a-tag>{{ RULE_TYPE_LABELS[row.ruleType] || row.ruleType }}</a-tag>
               </template>
@@ -379,19 +690,38 @@ onMounted(async () => {
                 <a-badge v-if="row.isRead === 0" status="processing" text="未读" />
                 <span v-else class="al-muted">已读</span>
               </template>
+              <template #processStatus="{ row }">
+                <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(row.processStatus ?? 'OPEN')] ?? 'default'">
+                  {{ getProcessStatusLabel(row) }}
+                </a-tag>
+              </template>
               <template #action="{ row }">
-                <a-dropdown v-if="row.isRead === 0" :trigger="['click']">
+                <a-dropdown v-if="row.isRead === 0 || canOpenBusinessEntry(row) || row.processStatus !== 'ARCHIVED'" :trigger="['click']">
                   <a-button
                     class="lg-row-action-trigger"
                     size="small"
                     type="text"
-                    :loading="store.markingRead.has(row.id)"
+                    :loading="store.markingRead.has(String(row.id))"
                   >
                     <MoreOutlined />
                   </a-button>
                   <template #overlay>
                     <a-menu>
-                      <a-menu-item @click="handleMarkRead(row)">标为已读</a-menu-item>
+                      <a-menu-item v-if="row.isRead === 0" @click="handleMarkRead(row)">
+                        标为已读
+                      </a-menu-item>
+                      <a-menu-item v-if="row.processStatus !== 'PROCESSED'" @click="handleChangeStatus(row, 'PROCESSED')">
+                        标为已处理
+                      </a-menu-item>
+                      <a-menu-item v-if="row.processStatus !== 'ARCHIVED'" @click="handleChangeStatus(row, 'ARCHIVED')">
+                        归档
+                      </a-menu-item>
+                      <a-menu-item v-if="row.processStatus !== 'INVALID'" @click="handleChangeStatus(row, 'INVALID')">
+                        标为失效
+                      </a-menu-item>
+                      <a-menu-item v-if="canOpenBusinessEntry(row)" @click="openBusinessEntry(row)">
+                        查看业务单据
+                      </a-menu-item>
                     </a-menu>
                   </template>
                 </a-dropdown>
@@ -473,6 +803,64 @@ onMounted(async () => {
         </div>
       </aside>
     </div>
+
+    <a-modal
+      v-model:open="subscriptionVisible"
+      title="通知订阅"
+      :confirm-loading="subscriptionSaving"
+      @ok="handleSaveSubscription"
+    >
+      <a-spin :spinning="subscriptionLoading">
+        <div class="alert-subscription-form">
+          <div class="alert-subscription-row">
+            <span class="alert-subscription-label">接收通知</span>
+            <a-switch
+              v-model:checked="subscriptionForm.enabled"
+              :disabled="!defaultSubscriptionEnabled"
+            />
+          </div>
+          <div class="alert-subscription-row is-block">
+            <span class="alert-subscription-label">通知渠道</span>
+            <a-checkbox-group v-model:value="subscriptionForm.channels">
+              <a-checkbox
+                v-for="channel in availableSubscriptionChannels"
+                :key="channel"
+                :value="channel"
+              >
+                {{ ALERT_CHANNEL_LABELS[channel] ?? channel }}
+              </a-checkbox>
+            </a-checkbox-group>
+          </div>
+          <div class="alert-subscription-row is-block">
+            <span class="alert-subscription-label">预警域</span>
+            <a-checkbox-group v-model:value="subscriptionForm.domains">
+              <a-checkbox
+                v-for="domain in availableSubscriptionDomains"
+                :key="domain"
+                :value="domain"
+              >
+                {{ RULE_CATEGORY_LABELS[domain] ?? domain }}
+              </a-checkbox>
+            </a-checkbox-group>
+          </div>
+          <div class="alert-subscription-row is-block">
+            <span class="alert-subscription-label">最低严重度</span>
+            <a-radio-group v-model:value="subscriptionForm.minSeverity">
+              <a-radio-button v-for="item in availableSeverityOptions" :key="item" :value="item">
+                {{ item === 'HIGH' ? '高危' : item === 'MEDIUM' ? '中危' : '低危' }}
+              </a-radio-button>
+            </a-radio-group>
+          </div>
+          <div class="alert-subscription-row">
+            <span class="alert-subscription-label">状态变更通知</span>
+            <a-switch
+              v-model:checked="subscriptionForm.notifyOnStatusChanged"
+              :disabled="!defaultStatusChangeEnabled"
+            />
+          </div>
+        </div>
+      </a-spin>
+    </a-modal>
   </div>
 </template>
 
@@ -512,6 +900,8 @@ onMounted(async () => {
 }
 
 .alert-search-bar {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -521,6 +911,7 @@ onMounted(async () => {
 .alert-search-fields {
   display: flex;
   flex: 1 1 auto;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   min-width: 0;
@@ -546,11 +937,27 @@ onMounted(async () => {
   flex-basis: 150px;
 }
 
+.alert-search-range {
+  width: 320px;
+  flex: 0 0 320px;
+}
+
+.alert-default-scope-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+}
+
 .alert-search-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .alert-workspace {
@@ -761,6 +1168,29 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.alert-subscription-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.alert-subscription-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.alert-subscription-row.is-block {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.alert-subscription-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
 @media (max-width: 1200px) {
   .alert-page-head,
   .alert-search-bar,
@@ -777,10 +1207,15 @@ onMounted(async () => {
 
   .alert-search-input,
   .alert-search-select,
-  .alert-search-select.is-compact {
+  .alert-search-select.is-compact,
+  .alert-search-range {
     width: 100%;
     min-width: 0;
     flex: 1 1 100%;
+  }
+
+  .alert-default-scope-switch {
+    justify-content: space-between;
   }
 
   .alert-search-actions {

@@ -2,8 +2,11 @@ package com.cgcpms.alert;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.entity.AlertLog;
+import com.cgcpms.alert.entity.AlertRuleConfig;
 import com.cgcpms.alert.mapper.AlertLogMapper;
+import com.cgcpms.alert.mapper.AlertRuleConfigMapper;
 import com.cgcpms.alert.service.AlertEvaluationService;
+import com.cgcpms.alert.service.AlertSubscriptionService;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
@@ -12,15 +15,20 @@ import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostSummary;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
+import com.cgcpms.notification.entity.SysNotification;
+import com.cgcpms.notification.mapper.SysNotificationMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +36,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,11 +47,21 @@ class AlertEvaluationServiceTest {
 
     private static final long TENANT_ID = 0L;
     private static final long USER_ADMIN = 1L;
+    private static final long USER_CREATOR = 2L;
+    private static final long USER_PROJECT_MANAGER = 91001L;
+    private static final long USER_PURCHASE_MANAGER = 91002L;
+    private static final long USER_COMMERCIAL_MANAGER = 91003L;
+    private static final long USER_PRODUCTION_MANAGER = 91004L;
+    private static final long USER_CHIEF_ENGINEER = 91005L;
 
     @Autowired
     private AlertEvaluationService alertService;
     @Autowired
+    private AlertSubscriptionService alertSubscriptionService;
+    @Autowired
     private AlertLogMapper alertLogMapper;
+    @Autowired
+    private AlertRuleConfigMapper alertRuleConfigMapper;
     @Autowired
     private PmProjectMapper projectMapper;
     @Autowired
@@ -55,6 +74,12 @@ class AlertEvaluationServiceTest {
     private CostSummaryMapper costSummaryMapper;
     @Autowired
     private CostSubjectMapper costSubjectMapper;
+    @Autowired
+    private MatPurchaseOrderMapper purchaseOrderMapper;
+    @Autowired
+    private SysNotificationMapper notificationMapper;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private Long testProjectId;
     private Long testContractId;
@@ -132,7 +157,19 @@ class AlertEvaluationServiceTest {
         // 清理告警日志
         alertLogMapper.delete(new LambdaQueryWrapper<AlertLog>()
                 .eq(AlertLog::getTenantId, TENANT_ID)
-                .eq(AlertLog::getProjectId, testProjectId));
+                .in(AlertLog::getProjectId, List.of(testProjectId, 82001L, 82002L, 83001L, 83002L)));
+        purchaseOrderMapper.delete(new LambdaQueryWrapper<MatPurchaseOrder>()
+                .eq(MatPurchaseOrder::getTenantId, TENANT_ID)
+                .in(MatPurchaseOrder::getProjectId, List.of(testProjectId, 82001L, 82002L, 83001L, 83002L))
+                .likeRight(MatPurchaseOrder::getOrderCode, "ALERT-PO-"));
+        notificationMapper.delete(new LambdaQueryWrapper<SysNotification>()
+                .eq(SysNotification::getTenantId, TENANT_ID)
+                .in(SysNotification::getBizType, List.of("ALERT", "ALERT_STATUS")));
+        jdbcTemplate.update("""
+                delete from sys_user_preference
+                where tenant_id = ? and user_id in (?, ?, ?, ?, ?, ?)
+                """, TENANT_ID, USER_ADMIN, USER_CREATOR, USER_PROJECT_MANAGER, USER_PURCHASE_MANAGER,
+                USER_COMMERCIAL_MANAGER, USER_CHIEF_ENGINEER);
         TestUserContext.clear();
     }
 
@@ -322,6 +359,197 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("TA8b: page — 后端分页并支持规则类型、分类、触发时间、已读、项目筛选")
+    void testPage_FilterByRuleDomainTriggeredReadAndProject() {
+        AlertLog hit = new AlertLog();
+        hit.setTenantId(TENANT_ID);
+        hit.setProjectId(testProjectId);
+        hit.setRuleType("PURCHASE_DELIVERY_OVERDUE");
+        hit.setAlertDomain("PURCHASE");
+        hit.setSeverity("MEDIUM");
+        hit.setMessage("命中过滤条件");
+        hit.setTriggeredAt(LocalDateTime.now().minusHours(1));
+        hit.setIsRead(0);
+        hit.setDeletedFlag(0);
+        alertLogMapper.insert(hit);
+
+        AlertLog miss = new AlertLog();
+        miss.setTenantId(TENANT_ID);
+        miss.setProjectId(testProjectId);
+        miss.setRuleType("CONTRACT_OVERDUE");
+        miss.setAlertDomain("CONTRACT");
+        miss.setSeverity("HIGH");
+        miss.setMessage("不应命中过滤条件");
+        miss.setTriggeredAt(LocalDateTime.now().minusDays(3));
+        miss.setIsRead(1);
+        miss.setDeletedFlag(0);
+        alertLogMapper.insert(miss);
+
+        var page = alertService.page(TENANT_ID, 1, 1, testProjectId,
+                "PURCHASE_DELIVERY_OVERDUE", "PURCHASE", null, 0,
+                LocalDateTime.now().minusDays(1), LocalDateTime.now(), null);
+
+        assertEquals(1, page.getTotal());
+        assertEquals(1, page.getRecords().size());
+        AlertLog only = page.getRecords().get(0);
+        assertEquals("PURCHASE_DELIVERY_OVERDUE", only.getRuleType());
+        assertEquals("PURCHASE", only.getAlertDomain());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA8b-2: page — 支持 processStatus 筛选")
+    void testPage_FilterByProcessStatus() {
+        AlertLog processed = new AlertLog();
+        processed.setTenantId(TENANT_ID);
+        processed.setProjectId(testProjectId);
+        processed.setRuleType("PROCESS_TEST");
+        processed.setAlertDomain("CONTRACT");
+        processed.setAlertCategory("CONTRACT_TERM");
+        processed.setSeverity("LOW");
+        processed.setMessage("已处理预警");
+        processed.setTriggeredAt(LocalDateTime.now());
+        processed.setIsRead(1);
+        processed.setProcessStatus("PROCESSED");
+        processed.setDeletedFlag(0);
+        alertLogMapper.insert(processed);
+
+        AlertLog open = new AlertLog();
+        open.setTenantId(TENANT_ID);
+        open.setProjectId(testProjectId);
+        open.setRuleType("PROCESS_TEST_OPEN");
+        open.setAlertDomain("CONTRACT");
+        open.setAlertCategory("CONTRACT_TERM");
+        open.setSeverity("LOW");
+        open.setMessage("待处理预警");
+        open.setTriggeredAt(LocalDateTime.now());
+        open.setIsRead(0);
+        open.setProcessStatus("OPEN");
+        open.setDeletedFlag(0);
+        alertLogMapper.insert(open);
+
+        var page = alertService.page(TENANT_ID, 1, 10, testProjectId,
+                null, null, null, null, null, null, "PROCESSED");
+
+        assertEquals(1, page.getRecords().size());
+        assertEquals("PROCESSED", page.getRecords().get(0).getProcessStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA8c: evaluatePurchaseDeliveryOverdue — 逾期未完成采购订单触发可跳转预警")
+    void testEvaluatePurchaseDeliveryOverdue_TriggersWithSource() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setTenantId(TENANT_ID);
+        order.setProjectId(testProjectId);
+        order.setOrderCode("ALERT-PO-OVERDUE-001");
+        order.setOrderType("MATERIAL");
+        order.setOrderDate(LocalDate.now().minusDays(10));
+        order.setDeliveryDate(LocalDate.now().minusDays(2));
+        order.setOrderStatus("APPROVED");
+        order.setApprovalStatus("APPROVED");
+        order.setTotalAmount(new BigDecimal("1200.00"));
+        order.setDeletedFlag(0);
+        purchaseOrderMapper.insert(order);
+
+        int count = alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        assertTrue(count > 0);
+        List<AlertLog> alerts = alertLogMapper.selectList(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, testProjectId)
+                .eq(AlertLog::getRuleType, "PURCHASE_DELIVERY_OVERDUE"));
+        assertEquals(1, alerts.size());
+        AlertLog alert = alerts.get(0);
+        assertEquals("PURCHASE", alert.getAlertDomain());
+        assertEquals("PURCHASE_DELIVERY", alert.getAlertCategory());
+        assertEquals("PURCHASE_ORDER", alert.getSourceType());
+        assertEquals(order.getId(), alert.getSourceId());
+        assertEquals("OPEN", alert.getProcessStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA8d: page — alertDomain 为空的旧合同预警按规则类型归入合同类")
+    void testPage_LegacyNullDomainMatchesContractDomain() {
+        AlertLog legacy = new AlertLog();
+        legacy.setTenantId(TENANT_ID);
+        legacy.setProjectId(testProjectId);
+        legacy.setRuleType("CONTRACT_OVERDUE");
+        legacy.setSeverity("HIGH");
+        legacy.setMessage("旧合同类告警");
+        legacy.setTriggeredAt(LocalDateTime.now());
+        legacy.setIsRead(0);
+        legacy.setDeletedFlag(0);
+        alertLogMapper.insert(legacy);
+
+        var page = alertService.page(TENANT_ID, 1, 10, testProjectId,
+                null, "CONTRACT", null, null, null, null, null);
+
+        assertTrue(page.getRecords().stream()
+                .anyMatch(a -> "CONTRACT_OVERDUE".equals(a.getRuleType())));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA8e: evaluateProject — 新预警按成员订阅派发，仅向有效站内信接收人发送")
+    void testEvaluateProject_DispatchesToSubscribedMembersOnly() {
+        seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
+        seedMember(testProjectId, USER_COMMERCIAL_MANAGER, "COMMERCIAL_MANAGER");
+        seedMember(testProjectId, USER_PURCHASE_MANAGER, "PURCHASE_MANAGER");
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().minusDays(1));
+        contractMapper.updateById(contract);
+
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+        alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_PROJECT_MANAGER, List.of("PROJECT_MANAGER"),
+                java.util.Map.of("enabled", false));
+        TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        AlertLog alert = alertLogMapper.selectOne(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, testProjectId)
+                .eq(AlertLog::getRuleType, "CONTRACT_OVERDUE"));
+        assertNotNull(alert);
+
+        List<SysNotification> notifications = notificationMapper.selectList(new LambdaQueryWrapper<SysNotification>()
+                .eq(SysNotification::getTenantId, TENANT_ID)
+                .eq(SysNotification::getBizType, "ALERT")
+                .eq(SysNotification::getBizId, alert.getId()));
+        Set<Long> recipients = notifications.stream().map(SysNotification::getUserId)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of(USER_ADMIN, USER_COMMERCIAL_MANAGER), recipients,
+                "合同域新预警应只通知具备该域权限且订阅开启的成员");
+
+        Integer channels = jdbcTemplate.queryForObject("""
+                select count(*) from alert_notification_send_record
+                where tenant_id = ? and alert_id = ?
+                """, Integer.class, TENANT_ID, alert.getId());
+        assertEquals(2, channels, "默认订阅仅发送 IN_APP，且仅为有效接收人落记录");
+
+        Integer sent = jdbcTemplate.queryForObject("""
+                select count(*) from alert_notification_send_record
+                where tenant_id = ? and alert_id = ? and channel = 'IN_APP' and send_status = 'SENT'
+                """, Integer.class, TENANT_ID, alert.getId());
+        assertEquals(2, sent);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA8f: notification — 外部渠道通过适配接口占位，不直接复用站内信服务")
+    void testAlertNotification_ExternalChannelsHaveAdapters() {
+        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.AlertNotificationSender"));
+        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.InAppAlertNotificationSender"));
+        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.EmailAlertNotificationSender"));
+        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.WechatAlertNotificationSender"));
+        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.SmsAlertNotificationSender"));
+        assertDoesNotThrow(() -> Class.forName("com.cgcpms.alert.notification.AlertNotificationChannelProperties"));
+    }
+
+    @Test
+    @Transactional
     @DisplayName("TA9: markRead — 标记已读成功")
     void testMarkRead_Success() {
         AlertLog alert = new AlertLog();
@@ -372,6 +600,280 @@ class AlertEvaluationServiceTest {
         assertFalse(result, "不存在的告警应返回 false");
     }
 
+    @Test
+    @Transactional
+    @DisplayName("TA11b: updateStatus — 可将预警标记为已处理与已归档")
+    void testUpdateStatus_Success() {
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(testProjectId);
+        alert.setRuleType("TEST_STATUS");
+        alert.setAlertDomain("CONTRACT");
+        alert.setAlertCategory("CONTRACT_TERM");
+        alert.setSeverity("LOW");
+        alert.setMessage("状态测试");
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setDeletedFlag(0);
+        alertLogMapper.insert(alert);
+
+        assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "PROCESSED", "已处理"));
+        AlertLog processed = alertLogMapper.selectById(alert.getId());
+        assertEquals("PROCESSED", processed.getProcessStatus());
+        assertNotNull(processed.getProcessedAt());
+
+        assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "ARCHIVED", "归档"));
+        AlertLog archived = alertLogMapper.selectById(alert.getId());
+        assertEquals("ARCHIVED", archived.getProcessStatus());
+        assertNotNull(archived.getArchivedAt());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11c: updateStatus — 状态流转也受订阅约束")
+    void testUpdateStatus_DispatchesStatusNotificationBySubscription() {
+        seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
+        seedMember(testProjectId, USER_COMMERCIAL_MANAGER, "COMMERCIAL_MANAGER");
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(testProjectId);
+        alert.setRuleType("TEST_STATUS_NOTIFY");
+        alert.setAlertDomain("CONTRACT");
+        alert.setAlertCategory("CONTRACT_TERM");
+        alert.setSeverity("LOW");
+        alert.setMessage("状态通知测试");
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setCreatedBy(USER_CREATOR);
+        alert.setDeletedFlag(0);
+        alertLogMapper.insert(alert);
+
+        TestUserContext.setUser(TENANT_ID, USER_COMMERCIAL_MANAGER, "commercial", List.of("COMMERCIAL_MANAGER"));
+        alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
+                List.of("COMMERCIAL_MANAGER"), java.util.Map.of("notifyOnStatusChanged", false));
+        TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
+
+        assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "PROCESSED", "已处理"));
+
+        List<SysNotification> notifications = notificationMapper.selectList(new LambdaQueryWrapper<SysNotification>()
+                .eq(SysNotification::getTenantId, TENANT_ID)
+                .eq(SysNotification::getBizType, "ALERT_STATUS")
+                .eq(SysNotification::getBizId, alert.getId()));
+        Set<Long> recipients = notifications.stream().map(SysNotification::getUserId)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of(USER_ADMIN, USER_PROJECT_MANAGER), recipients);
+        assertTrue(notifications.stream().allMatch(item -> item.getTitle().contains("已处理")));
+
+        Integer sent = jdbcTemplate.queryForObject("""
+                select count(*) from alert_notification_send_record
+                where tenant_id = ? and alert_id = ? and channel = 'IN_APP'
+                  and event_type = 'STATUS_CHANGED' and send_status = 'SENT'
+                """, Integer.class, TENANT_ID, alert.getId());
+        assertEquals(2, sent);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11i: subscription — 默认订阅按角色与可见域计算")
+    void testSubscription_DefaultsByRole() {
+        TestUserContext.setUser(TENANT_ID, USER_PURCHASE_MANAGER, "purchase", List.of("PURCHASE_MANAGER"));
+
+        var result = alertSubscriptionService.getCurrentUserSubscription(TENANT_ID, USER_PURCHASE_MANAGER,
+                List.of("PURCHASE_MANAGER"));
+
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> effective = (java.util.Map<String, Object>) result.get("effectiveSubscription");
+        assertEquals(true, effective.get("enabled"));
+        assertEquals(List.of("IN_APP"), effective.get("channels"));
+        assertEquals(List.of("PURCHASE"), effective.get("domains"));
+        assertEquals("LOW", effective.get("minSeverity"));
+        assertEquals(true, effective.get("notifyOnStatusChanged"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11j: subscription — 用户覆盖只能缩小不能放大，保存时统一收敛")
+    void testSubscription_OverridesAreClamped() {
+        TestUserContext.setUser(TENANT_ID, USER_COMMERCIAL_MANAGER, "commercial", List.of("COMMERCIAL_MANAGER"));
+
+        alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
+                List.of("COMMERCIAL_MANAGER"), java.util.Map.of(
+                        "enabled", true,
+                        "channels", List.of("IN_APP", "EMAIL"),
+                        "domains", List.of("CONTRACT", "PURCHASE"),
+                        "minSeverity", "LOW",
+                        "notifyOnStatusChanged", true
+                ));
+
+        var result = alertSubscriptionService.getCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
+                List.of("COMMERCIAL_MANAGER"));
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> effective = (java.util.Map<String, Object>) result.get("effectiveSubscription");
+        assertEquals(List.of("IN_APP"), effective.get("channels"));
+        assertEquals(List.of("CONTRACT"), effective.get("domains"));
+        assertEquals("LOW", effective.get("minSeverity"));
+        assertEquals(true, effective.get("notifyOnStatusChanged"));
+
+        alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
+                List.of("COMMERCIAL_MANAGER"), java.util.Map.of(
+                        "enabled", false,
+                        "channels", List.of("EMAIL"),
+                        "domains", List.of("PAYMENT"),
+                        "minSeverity", "HIGH",
+                        "notifyOnStatusChanged", false
+                ));
+
+        result = alertSubscriptionService.getCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
+                List.of("COMMERCIAL_MANAGER"));
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> narrowed = (java.util.Map<String, Object>) result.get("effectiveSubscription");
+        assertEquals(false, narrowed.get("enabled"));
+        assertEquals(List.of(), narrowed.get("channels"));
+        assertEquals(List.of("PAYMENT"), narrowed.get("domains"));
+        assertEquals("HIGH", narrowed.get("minSeverity"));
+        assertEquals(false, narrowed.get("notifyOnStatusChanged"));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11k: subscription — fail-close 角色默认关闭且不能被用户打开")
+    void testSubscription_FailCloseCannotEnable() {
+        TestUserContext.setUser(TENANT_ID, USER_CHIEF_ENGINEER, "chief", List.of("CHIEF_ENGINEER"));
+
+        alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_CHIEF_ENGINEER,
+                List.of("CHIEF_ENGINEER"), java.util.Map.of(
+                        "enabled", true,
+                        "channels", List.of("IN_APP"),
+                        "domains", List.of("CONTRACT"),
+                        "minSeverity", "LOW",
+                        "notifyOnStatusChanged", true
+                ));
+
+        var result = alertSubscriptionService.getCurrentUserSubscription(TENANT_ID, USER_CHIEF_ENGINEER,
+                List.of("CHIEF_ENGINEER"));
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> effective = (java.util.Map<String, Object>) result.get("effectiveSubscription");
+        assertEquals(false, effective.get("enabled"));
+        assertEquals(List.of(), effective.get("domains"));
+        assertEquals(List.of("IN_APP"), effective.get("channels"));
+        assertEquals("HIGH", effective.get("minSeverity"));
+        assertEquals(false, effective.get("notifyOnStatusChanged"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 权限隔离
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Transactional
+    @DisplayName("TA11d: PURCHASE_MANAGER — 只能看到采购域，不能看到同项目合同域")
+    void testAccess_PurchaseManagerOnlyPurchaseDomain() {
+        seedMember(testProjectId, USER_PURCHASE_MANAGER, "PURCHASE_MANAGER");
+        insertAlert(testProjectId, "PURCHASE", "PURCHASE_DELIVERY_OVERDUE");
+        insertAlert(testProjectId, "CONTRACT", "CONTRACT_OVERDUE");
+        TestUserContext.setUser(TENANT_ID, USER_PURCHASE_MANAGER, "purchase", List.of("PURCHASE_MANAGER"));
+
+        var page = alertService.page(TENANT_ID, 1, 10, testProjectId,
+                null, null, null, null, null, null, null);
+
+        assertEquals(1, page.getRecords().size());
+        assertEquals("PURCHASE", page.getRecords().get(0).getAlertDomain());
+
+        var contractPage = alertService.page(TENANT_ID, 1, 10, testProjectId,
+                null, "CONTRACT", null, null, null, null, null);
+        assertEquals(0, contractPage.getTotal(), "指定未授权域应返回空页，不放大范围");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11e: COMMERCIAL_MANAGER — 只能看到合同、付款、变更域")
+    void testAccess_CommercialManagerDomains() {
+        seedMember(testProjectId, USER_COMMERCIAL_MANAGER, "COMMERCIAL_MANAGER");
+        insertAlert(testProjectId, "CONTRACT", "CONTRACT_OVERDUE");
+        insertAlert(testProjectId, "PAYMENT", "PAYMENT_EXCEEDS_RATIO");
+        insertAlert(testProjectId, "VARIATION", "VARIATION_UNCONFIRMED");
+        insertAlert(testProjectId, "PURCHASE", "PURCHASE_DELIVERY_OVERDUE");
+        TestUserContext.setUser(TENANT_ID, USER_COMMERCIAL_MANAGER, "commercial", List.of("COMMERCIAL_MANAGER"));
+
+        var page = alertService.page(TENANT_ID, 1, 10, testProjectId,
+                null, null, null, null, null, null, null);
+
+        assertEquals(3, page.getRecords().size());
+        Set<String> domains = page.getRecords().stream().map(AlertLog::getAlertDomain).collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of("CONTRACT", "PAYMENT", "VARIATION"), domains);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11f: PROJECT_MANAGER — 可见本人项目全域，但不能看无权限项目")
+    void testAccess_ProjectManagerOwnProjectsOnly() {
+        Long otherProjectId = 82001L;
+        seedProject(otherProjectId, "ALERT-OTHER-001", USER_CREATOR);
+        seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
+        insertAlert(testProjectId, "COST", "DYNAMIC_COST_EXCEEDS_TARGET");
+        insertAlert(testProjectId, "CONTRACT", "CONTRACT_OVERDUE");
+        insertAlert(otherProjectId, "PURCHASE", "PURCHASE_DELIVERY_OVERDUE");
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+
+        var page = alertService.page(TENANT_ID, 1, 10, null,
+                null, null, null, null, null, null, null);
+
+        assertEquals(2, page.getRecords().size());
+        assertTrue(page.getRecords().stream().allMatch(a -> testProjectId.equals(a.getProjectId())));
+        assertThrows(BusinessException.class, () -> alertService.page(TENANT_ID, 1, 10, otherProjectId,
+                null, null, null, null, null, null, null));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11f2: PROJECT_MANAGER — 无权限 projectId 与越权域并存时仍优先拒绝项目")
+    void testAccess_ProjectManagerUnauthorizedProjectBeatsUnauthorizedDomain() {
+        Long otherProjectId = 82002L;
+        seedProject(otherProjectId, "ALERT-OTHER-002", USER_CREATOR);
+        seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+
+        assertThrows(BusinessException.class, () -> alertService.page(TENANT_ID, 1, 10, otherProjectId,
+                null, "OTHER", null, null, null, null, null));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11g: PRODUCTION_MANAGER / CHIEF_ENGINEER — 预警中心 fail-close")
+    void testAccess_FailCloseRoles() {
+        seedMember(testProjectId, USER_PRODUCTION_MANAGER, "PRODUCTION_MANAGER");
+        seedMember(testProjectId, USER_CHIEF_ENGINEER, "CHIEF_ENGINEER");
+        insertAlert(testProjectId, "COST", "DYNAMIC_COST_EXCEEDS_TARGET");
+
+        TestUserContext.setUser(TENANT_ID, USER_PRODUCTION_MANAGER, "production", List.of("PRODUCTION_MANAGER"));
+        var productionPage = alertService.page(TENANT_ID, 1, 10, null,
+                null, null, null, null, null, null, null);
+        assertEquals(0, productionPage.getTotal());
+
+        TestUserContext.setUser(TENANT_ID, USER_CHIEF_ENGINEER, "chief", List.of("CHIEF_ENGINEER"));
+        var chiefPage = alertService.page(TENANT_ID, 1, 10, null,
+                null, null, null, null, null, null, null);
+        assertEquals(0, chiefPage.getTotal());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11h: markRead / updateStatus — 按项目与域双重校验越权失败")
+    void testAccess_MarkReadAndUpdateStatusDenied() {
+        seedMember(testProjectId, USER_PURCHASE_MANAGER, "PURCHASE_MANAGER");
+        AlertLog contractAlert = insertAlert(testProjectId, "CONTRACT", "CONTRACT_OVERDUE");
+        TestUserContext.setUser(TENANT_ID, USER_PURCHASE_MANAGER, "purchase", List.of("PURCHASE_MANAGER"));
+
+        assertThrows(BusinessException.class, () -> alertService.markRead(TENANT_ID, contractAlert.getId()));
+        assertThrows(BusinessException.class, () -> alertService.updateStatus(TENANT_ID, contractAlert.getId(), "PROCESSED", "done"));
+
+        AlertLog unchanged = alertLogMapper.selectById(contractAlert.getId());
+        assertEquals(0, unchanged.getIsRead());
+        assertEquals("OPEN", unchanged.getProcessStatus());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // batchEvaluate
     // ═══════════════════════════════════════════════════════════════
@@ -383,6 +885,34 @@ class AlertEvaluationServiceTest {
         int count = alertService.batchEvaluate(TENANT_ID);
         // 至少不会抛异常
         assertTrue(count >= 0, "batchEvaluate 应返回 >=0 的告警数");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA12b: batchEvaluate — 非管理员只评估可访问项目集合")
+    void testBatchEvaluate_NonAdminOnlyAccessibleProjects() {
+        Long ownProjectId = 83001L;
+        Long otherProjectId = 83002L;
+        seedProject(ownProjectId, "ALERT-BATCH-OWN", USER_CREATOR);
+        seedProject(otherProjectId, "ALERT-BATCH-OTHER", USER_CREATOR);
+        seedMember(ownProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
+        seedOverdueContract(83001L, ownProjectId, "A-CT-BATCH-OWN");
+        seedOverdueContract(83002L, otherProjectId, "A-CT-BATCH-OTHER");
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+
+        alertService.batchEvaluate(TENANT_ID);
+
+        Long ownAlerts = alertLogMapper.selectCount(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, ownProjectId)
+                .eq(AlertLog::getRuleType, "CONTRACT_OVERDUE"));
+        Long otherAlerts = alertLogMapper.selectCount(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, otherProjectId)
+                .eq(AlertLog::getRuleType, "CONTRACT_OVERDUE"));
+
+        assertTrue(ownAlerts > 0, "本人可访问项目仍应被评估");
+        assertEquals(0L, otherAlerts, "非管理员批量评估不能越界到无权限项目");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -407,17 +937,21 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("TA14: 告警去重 — 24小时内同规则未读告警不重复生成")
+    @DisplayName("TA14: 告警去重 — 24小时内同 dedupKey 的活跃告警不重复生成")
     void testAlertDeduplication() {
-        // 插入一条 1 小时前未读的 CONTRACT_OVERDUE 告警
+        // 插入一条 1 小时前已读但仍未归档的 CONTRACT_OVERDUE 告警
         AlertLog existing = new AlertLog();
         existing.setTenantId(TENANT_ID);
         existing.setProjectId(testProjectId);
         existing.setRuleType("CONTRACT_OVERDUE");
+        existing.setAlertDomain("CONTRACT");
+        existing.setAlertCategory("CONTRACT_TERM");
+        existing.setDedupKey("P:" + testProjectId + ":R:CONTRACT_OVERDUE");
         existing.setSeverity("HIGH");
         existing.setMessage("已有告警");
         existing.setTriggeredAt(LocalDateTime.now().minusHours(1));
-        existing.setIsRead(0);
+        existing.setIsRead(1);
+        existing.setProcessStatus("OPEN");
         existing.setDeletedFlag(0);
         alertLogMapper.insert(existing);
 
@@ -436,5 +970,93 @@ class AlertEvaluationServiceTest {
                         .eq(AlertLog::getProjectId, testProjectId)
                         .eq(AlertLog::getRuleType, "CONTRACT_OVERDUE"));
         assertEquals(1, overdueAlerts.size(), "24小时内去重应生效，同规则只保留1条");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA15: 规则配置 — CONTRACT_EXPIRING 的 windowDays 可覆盖默认 30 天")
+    void testRuleConfig_WindowDaysOverride() {
+        AlertRuleConfig config = alertRuleConfigMapper.selectOne(new LambdaQueryWrapper<AlertRuleConfig>()
+                .eq(AlertRuleConfig::getTenantId, TENANT_ID)
+                .eq(AlertRuleConfig::getRuleType, "CONTRACT_EXPIRING"));
+        assertNotNull(config);
+        config.setWindowDays(10);
+        alertRuleConfigMapper.updateById(config);
+
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().plusDays(15));
+        contractMapper.updateById(contract);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+        List<AlertLog> alerts = alertLogMapper.selectList(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, testProjectId)
+                .eq(AlertLog::getRuleType, "CONTRACT_EXPIRING"));
+        assertTrue(alerts.isEmpty(), "windowDays=10 时，15天后的合同不应触发到期预警");
+    }
+
+    private void seedProject(Long projectId, String projectCode, Long createdBy) {
+        if (projectMapper.selectById(projectId) != null) {
+            return;
+        }
+        PmProject project = new PmProject();
+        project.setId(projectId);
+        project.setProjectCode(projectCode);
+        project.setProjectName(projectCode);
+        project.setProjectType("CONSTRUCTION");
+        project.setContractAmount(new BigDecimal("1000000.00"));
+        project.setTargetCost(new BigDecimal("800000.00"));
+        project.setStatus("ACTIVE");
+        project.setApprovalStatus("APPROVED");
+        project.setTenantId(TENANT_ID);
+        project.setCreatedBy(createdBy);
+        projectMapper.insert(project);
+    }
+
+    private void seedMember(Long projectId, Long userId, String roleCode) {
+        PmProjectMember member = new PmProjectMember();
+        member.setTenantId(TENANT_ID);
+        member.setProjectId(projectId);
+        member.setUserId(userId);
+        member.setRoleCode(roleCode);
+        member.setStatus("ACTIVE");
+        projectMemberMapper.insert(member);
+    }
+
+    private AlertLog insertAlert(Long projectId, String alertDomain, String ruleType) {
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(projectId);
+        alert.setRuleType(ruleType);
+        alert.setAlertDomain(alertDomain);
+        alert.setSeverity("LOW");
+        alert.setMessage("权限隔离测试预警");
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setDeletedFlag(0);
+        alertLogMapper.insert(alert);
+        return alert;
+    }
+
+    private void seedOverdueContract(Long contractId, Long projectId, String contractCode) {
+        CtContract contract = new CtContract();
+        contract.setId(contractId);
+        contract.setProjectId(projectId);
+        contract.setContractCode(contractCode);
+        contract.setContractName(contractCode);
+        contract.setContractType("SUB");
+        contract.setPartyAId(81001L);
+        contract.setPartyBId(81002L);
+        contract.setContractAmount(new BigDecimal("1000000.00"));
+        contract.setCurrentAmount(new BigDecimal("1000000.00"));
+        contract.setPaidAmount(BigDecimal.ZERO);
+        contract.setTaxRate(new BigDecimal("13.00"));
+        contract.setContractStatus("PERFORMING");
+        contract.setApprovalStatus("APPROVED");
+        contract.setStartDate(LocalDate.of(2024, 1, 1));
+        contract.setEndDate(LocalDate.now().minusDays(1));
+        contract.setTenantId(TENANT_ID);
+        contractMapper.insert(contract);
     }
 }

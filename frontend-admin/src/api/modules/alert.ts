@@ -1,15 +1,34 @@
 import { request } from '@/api/request'
-import type { AlertLogVO } from '@/types/alert'
+import type { PageParams, PageResult } from '@/types/api'
+import type { AlertLogVO, AlertSubscriptionConfig, AlertSubscriptionResponse } from '@/types/alert'
 
-export interface AlertListParams {
+export interface AlertListParams extends PageParams {
+  keyword?: string
   projectId?: string
   severity?: string
   isRead?: number
+  processStatus?: string
+  ruleType?: string
+  alertDomain?: string
+  category?: string
+  triggeredStart?: string
+  triggeredEnd?: string
+  triggeredAtStart?: string
+  triggeredAtEnd?: string
+  onlyDefaultScope?: boolean
 }
+
+export type AlertListResponse = PageResult<AlertLogVO> | AlertLogVO[]
 
 export interface MarkReadResult {
   success: boolean
   alertId: string
+}
+
+export interface UpdateAlertStatusResult {
+  success: boolean
+  alertId: string
+  processStatus: string
 }
 
 export interface BatchEvaluateResult {
@@ -17,12 +36,20 @@ export interface BatchEvaluateResult {
   tenantId: string
 }
 
+export type UpdateAlertSubscriptionPayload = Partial<AlertSubscriptionConfig>
+
 /** 预警列表（按项目/严重度/已读状态筛选） */
 export function getAlertList(params: AlertListParams) {
-  return request<AlertLogVO[]>({
+  return request<AlertListResponse>({
     url: '/alerts',
     method: 'get',
-    params,
+    params: {
+      ...params,
+      alertDomain: params.alertDomain ?? params.category,
+      triggeredStart: params.triggeredStart ?? params.triggeredAtStart,
+      triggeredEnd: params.triggeredEnd ?? params.triggeredAtEnd,
+      pageNum: params.pageNo ?? params.pageNum,
+    },
   })
 }
 
@@ -34,10 +61,36 @@ export function markAlertRead(id: string) {
   })
 }
 
+export function updateAlertStatus(
+  id: string,
+  data: { processStatus: string; statusRemark?: string },
+) {
+  return request<UpdateAlertStatusResult>({
+    url: `/alerts/${id}/status`,
+    method: 'put',
+    data,
+  })
+}
+
 /** 手动触发批量评估 */
 export function batchEvaluate() {
   return request<BatchEvaluateResult>({
     url: '/alerts/batch-evaluate',
     method: 'post',
+  })
+}
+
+export function getAlertSubscription() {
+  return request<AlertSubscriptionResponse>({
+    url: '/alerts/subscription',
+    method: 'get',
+  })
+}
+
+export function updateAlertSubscription(data: UpdateAlertSubscriptionPayload) {
+  return request<AlertSubscriptionResponse>({
+    url: '/alerts/subscription',
+    method: 'put',
+    data,
   })
 }

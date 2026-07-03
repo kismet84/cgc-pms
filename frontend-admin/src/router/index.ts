@@ -460,7 +460,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   Invoice: 'invoice:query',
   Material: 'material:query',
   MaterialDictionary: 'material:query',
-  Alert: 'alert:query',
+  Alert: 'alert:view',
   Approval: 'workflow:task:query',
   ApprovalTodo: 'workflow:task:query',
   ApprovalDone: 'workflow:task:query',

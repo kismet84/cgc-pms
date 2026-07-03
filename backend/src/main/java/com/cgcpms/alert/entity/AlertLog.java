@@ -30,6 +30,21 @@ public class AlertLog implements Serializable {
     @TableField("contract_id")
     private Long contractId;
 
+    /** 业务分类: COST / CONTRACT / PURCHASE / PAYMENT / VARIATION. */
+    private String alertDomain;
+
+    /** 细分类标签：如 PURCHASE_DELIVERY / CONTRACT_TERM. */
+    private String alertCategory;
+
+    /** 最小跳转定位类型，如 PURCHASE_ORDER. */
+    private String sourceType;
+
+    /** 最小跳转定位 ID. */
+    private Long sourceId;
+
+    /** 去重键：用于 M2 规则治理增强后的最小抑制 / 去重闭环。 */
+    private String dedupKey;
+
     /** Rule type identifier, e.g. {@code DYNAMIC_COST_EXCEEDS_TARGET}. */
     private String ruleType;
 
@@ -44,6 +59,18 @@ public class AlertLog implements Serializable {
 
     /** 0 = unread, 1 = read. */
     private Integer isRead;
+
+    /** OPEN / PROCESSED / ARCHIVED / INVALID. */
+    private String processStatus;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime processedAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime archivedAt;
+
+    /** 状态备注：处理说明、归档原因、失效原因等。 */
+    private String statusRemark;
 
     @TableField(fill = FieldFill.INSERT)
     private Long createdBy;
