@@ -4,6 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { login } from '@/api/modules/auth'
 import LoginPage from '../index.vue'
 
+const validPassword = 'secret123'
+
 // ── Mock router ──
 const mockPush = vi.fn()
 const mockRoute = { query: {} as Record<string, string | string[]> }
@@ -75,7 +77,7 @@ describe('login/index.vue', () => {
     const wrapper = mount(LoginPage)
 
     wrapper.vm.formState.username = 'admin'
-    wrapper.vm.formState.password = 'secret'
+    wrapper.vm.formState.password = validPassword
     await wrapper.vm.handleSubmit()
 
     expect(mockPush).toHaveBeenCalledWith('/contract/list?status=pending')
@@ -86,7 +88,7 @@ describe('login/index.vue', () => {
     const wrapper = mount(LoginPage)
 
     wrapper.vm.formState.username = 'admin'
-    wrapper.vm.formState.password = 'secret'
+    wrapper.vm.formState.password = validPassword
     await wrapper.vm.handleSubmit()
 
     expect(mockPush).toHaveBeenCalledWith('/')
@@ -97,7 +99,7 @@ describe('login/index.vue', () => {
     const wrapper = mount(LoginPage)
 
     wrapper.vm.formState.username = 'admin'
-    wrapper.vm.formState.password = 'secret'
+    wrapper.vm.formState.password = validPassword
     await wrapper.vm.handleSubmit()
 
     expect(mockPush).toHaveBeenCalledWith('/')
@@ -108,7 +110,7 @@ describe('login/index.vue', () => {
     const wrapper = mount(LoginPage)
 
     wrapper.vm.formState.username = 'admin'
-    wrapper.vm.formState.password = 'secret'
+    wrapper.vm.formState.password = validPassword
     await wrapper.vm.handleSubmit()
 
     expect(mockPush).toHaveBeenCalledWith('/invoice')
@@ -129,7 +131,7 @@ describe('login/index.vue', () => {
     const wrapper = mount(LoginPage)
 
     wrapper.vm.formState.username = 'admin'
-    wrapper.vm.formState.password = 'secret'
+    wrapper.vm.formState.password = validPassword
     await wrapper.vm.handleSubmit()
 
     expect(mockPush).toHaveBeenCalledWith('/')
@@ -140,7 +142,7 @@ describe('login/index.vue', () => {
     const wrapper = mount(LoginPage)
 
     wrapper.vm.formState.username = 'admin'
-    wrapper.vm.formState.password = 'wrong'
+    wrapper.vm.formState.password = 'wrong123'
     await wrapper.vm.handleSubmit()
 
     expect(mockPush).not.toHaveBeenCalled()

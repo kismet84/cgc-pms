@@ -31,11 +31,19 @@ test.describe('Login Smoke Test', () => {
     await page.goto('/login')
 
     await page.fill('input[placeholder="请输入用户名"]', 'admin')
-    await page.fill('input[placeholder="请输入密码"]', 'wrong-password')
+    await page.fill('input[placeholder="请输入密码"]', 'Wrongpass1')
+
+    const loginResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes('/auth/login') && response.request().method() === 'POST',
+    )
 
     await page.click('button[type="submit"]')
 
-    // Wait for error message to appear
+    const loginResponse = await loginResponsePromise
+
+    expect(loginResponse.status()).toBe(400)
+    await expect(page).toHaveURL(/\/login/)
     await expect(page.getByText('用户名或密码错误').first()).toBeVisible({ timeout: 10000 })
   })
 })

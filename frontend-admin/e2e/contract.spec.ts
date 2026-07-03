@@ -1,6 +1,25 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
 
 const SYSTEM_ERROR = '系统异常，请稍后重试'
+
+let sharedContext: BrowserContext
+let sharedPage: Page
+
+async function createAuthenticatedPage(browser: Browser) {
+  const context = await browser.newContext({ storageState: 'e2e/.auth/admin.json' })
+  await context.addInitScript((userInfo) => {
+    window.sessionStorage.setItem('cgc_pms_userinfo', JSON.stringify(userInfo))
+  }, {
+    userId: '1',
+    username: 'admin',
+    roles: ['SUPER_ADMIN'],
+    permissions: ['*'],
+    roleName: 'SUPER_ADMIN',
+  })
+
+  const page = await context.newPage()
+  return { context, page }
+}
 
 async function selectFirstOption(select: Locator) {
   await select.click()
@@ -65,97 +84,109 @@ async function waitForContractLedger(page: Page) {
 }
 
 test.describe('Contract draft-save and ledger regression', () => {
-  test.beforeEach(async () => {})
+  test.describe.configure({ mode: 'serial' })
 
-  test('saves draft with one detail and one payment term through composite endpoint', async ({ page }) => {
-    await page.goto('/contract/create')
-    await expect(page.getByText('新建合同').first()).toBeVisible({ timeout: 10000 })
+  test.beforeAll(async ({ browser }) => {
+    const auth = await createAuthenticatedPage(browser)
+    sharedContext = auth.context
+    sharedPage = auth.page
+  })
 
-    await fillContractBasicInfo(page)
-    await page.getByRole('button', { name: '下一步' }).click()
+  test.afterAll(async () => {
+    await sharedPage?.close()
+    await sharedContext?.close()
+  })
 
-    await expect(page.locator('.item-editor')).toBeVisible({ timeout: 10000 })
-    await page.getByRole('button', { name: '添加明细' }).click()
-    const itemRow = page.locator('.item-editor .ant-table-tbody tr.ant-table-row').first()
+  test('saves draft with one detail and one payment term through composite endpoint', async () => {
+    await sharedPage.goto('/contract/create')
+    await expect(sharedPage.locator('input[placeholder="请输入合同名称"]')).toBeVisible({ timeout: 10000 })
+    await expect(sharedPage.getByRole('button', { name: '下一步' })).toBeVisible({ timeout: 10000 })
+
+    await fillContractBasicInfo(sharedPage)
+    await sharedPage.getByRole('button', { name: '下一步' }).click()
+
+    await expect(sharedPage.locator('.item-editor')).toBeVisible({ timeout: 10000 })
+    await sharedPage.getByRole('button', { name: '添加明细' }).click()
+    const itemRow = sharedPage.locator('.item-editor .ant-table-tbody tr.ant-table-row').first()
     await itemRow.locator('input[placeholder="请输入名称"]').fill('AUTO')
     await itemRow.locator('input[placeholder="规格"]').fill('1')
     await itemRow.locator('.ant-input-number-input').nth(0).fill('1')
     await itemRow.locator('.ant-input-number-input').nth(1).fill('1000')
-    await page.getByRole('button', { name: '下一步' }).click()
+    await sharedPage.getByRole('button', { name: '下一步' }).click()
 
-    await expect(page.locator('.term-editor')).toBeVisible({ timeout: 10000 })
-    await page.getByRole('button', { name: '添加付款条款' }).click()
-    const termRow = page.locator('.term-editor .ant-table-tbody tr.ant-table-row').first()
+    await expect(sharedPage.locator('.term-editor')).toBeVisible({ timeout: 10000 })
+    await sharedPage.getByRole('button', { name: '添加付款条款' }).click()
+    const termRow = sharedPage.locator('.term-editor .ant-table-tbody tr.ant-table-row').first()
     await termRow.locator('input[placeholder="如：预付款、进度款"]').fill('term1')
     await termRow.locator('.ant-input-number-input').nth(0).fill('100')
     await termRow.locator('.ant-input-number-input').nth(1).fill('1000')
     await termRow.locator('input[placeholder="付款触发条件"]').fill('auto')
     await selectTodayFromPicker(termRow.locator('.ant-picker'))
-    await page.getByRole('button', { name: '下一步' }).click()
+    await sharedPage.getByRole('button', { name: '下一步' }).click()
 
-    await expect(page.locator('.cf-review')).toBeVisible({ timeout: 10000 })
-    await page.getByRole('button', { name: '保存草稿' }).click()
+    await expect(sharedPage.locator('.cf-review')).toBeVisible({ timeout: 10000 })
+    await sharedPage.getByRole('button', { name: '保存草稿' }).click()
 
-    await expect(page.getByText('合同已保存为草稿')).toBeVisible({ timeout: 15000 })
-    await page.waitForURL(/\/contract\/ledger/, { timeout: 15000 })
-    await expect(page.getByText('保存失败，请稍后重试')).toHaveCount(0)
-    await expect(page.getByText(SYSTEM_ERROR)).toHaveCount(0)
+    await expect(sharedPage.getByText('合同已保存为草稿')).toBeVisible({ timeout: 15000 })
+    await sharedPage.waitForURL(/\/contract\/ledger/, { timeout: 15000 })
+    await expect(sharedPage.getByText('保存失败，请稍后重试')).toHaveCount(0)
+    await expect(sharedPage.getByText(SYSTEM_ERROR)).toHaveCount(0)
   })
 
-  test('created contract appears as draft in ledger list', async ({ page }) => {
-    await waitForContractLedger(page)
+  test('created contract appears as draft in ledger list', async () => {
+    await waitForContractLedger(sharedPage)
 
-    await expect(page.locator('.cl-table-title').filter({ hasText: '合同列表' })).toBeVisible()
-    const headerText = (await page.locator('.vxe-header--column').allTextContents()).join(' ')
+    await expect(sharedPage.locator('.cl-table-title').filter({ hasText: '合同列表' })).toBeVisible()
+    const headerText = (await sharedPage.locator('.vxe-header--column').allTextContents()).join(' ')
     expect(headerText).toContain('合同编号')
     expect(headerText).toContain('合同名称')
     expect(headerText).toContain('合同状态')
 
-    await expect(page.locator('.cl-query-actions button').filter({ hasText: '查询' })).toBeVisible()
-    await expect(page.locator('.cl-query-actions button').filter({ hasText: '重置' })).toBeVisible()
+    await expect(sharedPage.locator('.cl-query-actions button').filter({ hasText: '查询' })).toBeVisible()
+    await expect(sharedPage.locator('.cl-query-actions button').filter({ hasText: '重置' })).toBeVisible()
 
-    await page.screenshot({ path: 'e2e/screenshots/contract-ledger-list.png', fullPage: true })
+    await sharedPage.screenshot({ path: 'e2e/screenshots/contract-ledger-list.png', fullPage: true })
   })
 
-  test('contract detail shows core tabs from ledger link', async ({ page }) => {
-    await waitForContractLedger(page)
+  test('contract detail shows core tabs from ledger link', async () => {
+    await waitForContractLedger(sharedPage)
 
-    const firstLink = page.locator('button.cl-contract-link').first()
+    const firstLink = sharedPage.locator('.cl-table-wrap button.cl-contract-link').first()
     if (!(await firstLink.isVisible({ timeout: 5000 }).catch(() => false))) {
       console.log('No contracts in ledger, skipping detail test')
       return
     }
 
     await firstLink.click()
-    await expect(page.locator('.contract-detail-page')).toBeVisible({ timeout: 10000 })
-    await expect(page.locator('.ant-tabs-tab').filter({ hasText: '合同清单' })).toBeVisible()
-    await expect(page.locator('.ant-tabs-tab').filter({ hasText: '付款条件' })).toBeVisible()
-    await expect(page.locator('.ant-tabs-tab').filter({ hasText: '审批记录' })).toBeVisible()
+    await expect(sharedPage.locator('.contract-detail-page')).toBeVisible({ timeout: 10000 })
+    await expect(sharedPage.locator('.ant-tabs-tab').filter({ hasText: '合同清单' })).toBeVisible()
+    await expect(sharedPage.locator('.ant-tabs-tab').filter({ hasText: '付款条件' })).toBeVisible()
+    await expect(sharedPage.locator('.ant-tabs-tab').filter({ hasText: '审批记录' })).toBeVisible()
 
-    await page.screenshot({ path: 'e2e/screenshots/contract-detail.png', fullPage: true })
+    await sharedPage.screenshot({ path: 'e2e/screenshots/contract-detail.png', fullPage: true })
   })
 
-  test('contract search filter by contract type works', async ({ page }) => {
-    await waitForContractLedger(page)
+  test('contract search filter by contract type works', async () => {
+    await waitForContractLedger(sharedPage)
 
-    const typeSelect = page.locator('.cl-query-panel .cl-query-select').nth(1)
+    const typeSelect = sharedPage.locator('.cl-query-panel .cl-query-select').nth(1)
     if (await typeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
       await selectFirstOption(typeSelect)
-      await page.locator('.cl-query-actions button').filter({ hasText: '查询' }).click()
-      await expect(page.locator('.vxe-table').first()).toBeVisible({ timeout: 5000 })
-      await page.locator('.cl-query-actions button').filter({ hasText: '重置' }).click()
+      await sharedPage.locator('.cl-query-actions button').filter({ hasText: '查询' }).click()
+      await expect(sharedPage.locator('.vxe-table').first()).toBeVisible({ timeout: 5000 })
+      await sharedPage.locator('.cl-query-actions button').filter({ hasText: '重置' }).click()
     }
 
-    await page.screenshot({ path: 'e2e/screenshots/contract-filter.png', fullPage: true })
+    await sharedPage.screenshot({ path: 'e2e/screenshots/contract-filter.png', fullPage: true })
   })
 
-  test('contract list KPI cards are visible', async ({ page }) => {
-    await waitForContractLedger(page)
+  test('contract list KPI cards are visible', async () => {
+    await waitForContractLedger(sharedPage)
 
-    await expect(page.getByText('合同总数')).toBeVisible({ timeout: 5000 })
-    await expect(page.getByText('合同总金额(含税)')).toBeVisible({ timeout: 5000 })
-    await expect(page.getByText('已付款')).toBeVisible({ timeout: 5000 })
+    await expect(sharedPage.getByText('合同总数')).toBeVisible({ timeout: 5000 })
+    await expect(sharedPage.getByText('合同总金额(含税)')).toBeVisible({ timeout: 5000 })
+    await expect(sharedPage.getByText('已付款')).toBeVisible({ timeout: 5000 })
 
-    await page.screenshot({ path: 'e2e/screenshots/contract-kpi.png', fullPage: true })
+    await sharedPage.screenshot({ path: 'e2e/screenshots/contract-kpi.png', fullPage: true })
   })
 })

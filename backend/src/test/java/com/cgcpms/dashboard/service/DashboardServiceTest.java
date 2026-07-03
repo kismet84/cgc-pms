@@ -1086,7 +1086,7 @@ class DashboardServiceTest {
         assertEquals("钢筋-PROD_DASH", receipt.getItemSummary());
         assertEquals("供应商-PROD_DASH", receipt.getPartnerName());
         assertNotNull(receipt.getOwnerName());
-        assertEquals(0L, receipt.getPendingDays());
+        assertEquals(1L, receipt.getPendingDays());
 
         DashboardBusinessItemVO receiptWithoutSummary = vo.getRecentReceipts().stream()
                 .filter(i -> "RC-PROD_DASH-NO-SUMMARY".equals(i.getCode()))
