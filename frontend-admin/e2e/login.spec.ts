@@ -21,9 +21,7 @@ test.describe('Login Smoke Test', () => {
 
     // Verify some dashboard content is visible
     // The dashboard typically has the app title or navigation
-    await expect(
-      page.locator('text=建筑工程总包项目管理系统').or(page.locator('.ant-layout')),
-    ).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('.basic-layout')).toBeVisible({ timeout: 10000 })
 
     // Take screenshot on success
     await page.screenshot({ path: 'e2e/screenshots/login-success.png', fullPage: false })
@@ -38,8 +36,6 @@ test.describe('Login Smoke Test', () => {
     await page.click('button[type="submit"]')
 
     // Wait for error message to appear
-    await expect(
-      page.locator('.ant-message-error').or(page.locator('.ant-message-notice')),
-    ).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('用户名或密码错误').first()).toBeVisible({ timeout: 10000 })
   })
 })
