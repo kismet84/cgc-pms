@@ -55,6 +55,7 @@ const modalVisible = ref(false)
 const modalTitle = ref('新建付款申请')
 const editingId = ref<string | null>(null)
 const formData = reactive<Partial<PayApplicationVO>>({
+  applyCode: '',
   projectId: undefined,
   contractId: undefined,
   partnerId: undefined,
@@ -168,6 +169,7 @@ function handleAdd() {
   modalTitle.value = '新建付款申请'
   editingId.value = null
   Object.assign(formData, {
+    applyCode: '',
     projectId: undefined,
     contractId: undefined,
     partnerId: undefined,
@@ -183,6 +185,7 @@ async function handleEdit(record: PayApplicationVO) {
   modalTitle.value = '编辑付款申请'
   editingId.value = record.id
   Object.assign(formData, {
+    applyCode: record.applyCode,
     projectId: record.projectId,
     contractId: record.contractId,
     partnerId: record.partnerId,
@@ -767,6 +770,12 @@ onMounted(() => {
           >
         </a-row>
         <a-row :gutter="16">
+          <a-col :span="12"
+            ><a-form-item label="申请编号" required
+              ><a-input
+                v-model:value="formData.applyCode"
+                placeholder="请输入申请编号" /></a-form-item
+          ></a-col>
           <a-col :span="12"
             ><a-form-item label="申请金额"
               ><a-input-number

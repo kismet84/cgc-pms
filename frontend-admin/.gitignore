@@ -8,3 +8,4 @@ dist-ssr
 *.log
 .tmp
 .pnpm-store
+e2e/.auth/admin-user.json

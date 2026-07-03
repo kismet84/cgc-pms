@@ -109,6 +109,26 @@ class PayApplicationServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("create -- 传入 applyCode 时保留原值")
+    void testCreate_KeepsProvidedApplyCode() {
+        PayApplication app = new PayApplication();
+        app.setProjectId(10001L);
+        app.setContractId(30001L);
+        app.setPartnerId(20002L);
+        app.setApplyCode("CUSTOM-APPLY-001");
+        app.setApplyAmount(new BigDecimal("100000.00"));
+        app.setPayType("进度款");
+
+        Long id = payApplicationService.create(app);
+
+        PayApplication saved = payApplicationMapper.selectById(id);
+        assertEquals("CUSTOM-APPLY-001", saved.getApplyCode(), "显式传入的 applyCode 不应被覆盖");
+        assertEquals("PENDING", saved.getPayStatus(), "默认 payStatus 应为 PENDING");
+        assertEquals("DRAFT", saved.getApprovalStatus(), "默认 approvalStatus 应为 DRAFT");
+    }
+
+    @Test
+    @Transactional
     @DisplayName("create -- applyCode 序列号递增")
     void testCreate_ApplyCodeSequenceNumber() {
         String lastSuffix = null;

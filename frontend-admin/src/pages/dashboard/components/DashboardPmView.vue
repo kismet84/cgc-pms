@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
   AuditOutlined,
   WarningOutlined,
@@ -17,6 +18,11 @@ const props = defineProps<{
   data: ProjectManagerDashboardVO
   loading: boolean
 }>()
+
+const pendingTasks = computed(() => props.data.pendingTasks ?? [])
+const pendingApprovals = computed(() => props.data.pendingApprovals ?? [])
+const laggingProjects = computed(() => props.data.laggingProjects ?? [])
+const expiringContracts = computed(() => props.data.expiringContracts ?? [])
 
 const pmTaskCols = [
   { title: '任务摘要', dataIndex: 'itemSummary', width: 220, ellipsis: true },
@@ -184,12 +190,12 @@ function pendingText(value?: number) {
         <div class="role-reference-panel role-mini-panel is-blue">
           <div class="role-reference-panel-head mini">
             <strong
-              >待办任务 <b>（{{ data.pendingTasks.length }}）</b></strong
+              >待办任务 <b>（{{ pendingTasks.length }}）</b></strong
             >
           </div>
           <a-table
             :columns="pmTaskCols"
-            :data-source="data.pendingTasks"
+            :data-source="pendingTasks"
             :loading="loading"
             :pagination="false"
             :scroll="{ x: 728, y: 216 }"
@@ -222,12 +228,12 @@ function pendingText(value?: number) {
         <div class="role-reference-panel role-mini-panel is-orange">
           <div class="role-reference-panel-head mini">
             <strong
-              >待审批 <b>（{{ data.pendingApprovals.length }}）</b></strong
+              >待审批 <b>（{{ pendingApprovals.length }}）</b></strong
             >
           </div>
           <a-table
             :columns="pmTaskCols"
-            :data-source="data.pendingApprovals"
+            :data-source="pendingApprovals"
             :loading="loading"
             :pagination="false"
             :scroll="{ x: 728, y: 216 }"
@@ -269,7 +275,7 @@ function pendingText(value?: number) {
         </div>
         <a-table
           :columns="pmProjectCols"
-          :data-source="data.laggingProjects"
+          :data-source="laggingProjects"
           :loading="loading"
           :pagination="false"
           :scroll="{ x: 'max-content', y: 248 }"
@@ -295,7 +301,7 @@ function pendingText(value?: number) {
         </div>
         <a-table
           :columns="pmContractCols"
-          :data-source="data.expiringContracts"
+          :data-source="expiringContracts"
           :loading="loading"
           :pagination="false"
           :scroll="{ x: 'max-content', y: 248 }"

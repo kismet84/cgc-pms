@@ -1,10 +1,19 @@
-import { test, expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type Locator,
+  type Page,
+  type Playwright,
+} from '@playwright/test'
 
 /**
  * Payment / Invoice minimum smoke for BCD closure.
  *
  * Scope boundary:
- * - Payment: application list, headers/status tags, pay type filter.
+ * - Payment: application list, headers/status tags, pay type filter, real create -> list readback.
  * - Invoice: current single-page /invoice list, verify-status filter, add modal.
  * - Excluded from this file: /payment/record route and invoice detail route, which do not exist
  *   in the current frontend router.
@@ -12,6 +21,41 @@ import { test, expect, type Browser, type BrowserContext, type Locator, type Pag
 
 let sharedContext: BrowserContext
 let sharedPage: Page
+let apiContext: APIRequestContext
+
+const API_BASE_URL = 'http://localhost:8080'
+const PAY_STATUS_LABEL: Record<string, string> = {
+  PENDING: '待付款',
+  APPROVED: '已批未付',
+  UNPAID: '未支付',
+  PARTIAL: '部分支付',
+  PARTIALLY_PAID: '部分支付',
+  PAID: '已支付',
+}
+const APPROVAL_STATUS_LABEL: Record<string, string> = {
+  DRAFT: '草稿',
+  APPROVING: '审批中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+}
+
+type PaymentSeed = {
+  projectId: string
+  contractId: string
+  partnerId: string
+  projectName: string
+  contractName: string
+}
+
+type PayApplicationDetail = {
+  id: string
+  applyCode: string
+  contractName?: string
+  payType: string
+  applyAmount: string
+  payStatus: string
+  approvalStatus: string
+}
 
 function screenshotPath(name: string) {
   return `e2e/screenshots/${name}-${Date.now()}.png`
@@ -49,6 +93,152 @@ async function selectFirstAvailableOption(select: Locator) {
   return true
 }
 
+async function selectOptionByText(select: Locator, text: string) {
+  await select.click()
+  const dropdown = select.page().locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+  await expect(dropdown).toBeVisible({ timeout: 10000 })
+  const option = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)').filter({ hasText: text }).first()
+  await expect(option).toBeVisible({ timeout: 10000 })
+  await option.click()
+  await dropdown.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
+}
+
+async function expectApiOk<T>(response: Awaited<ReturnType<APIRequestContext['get']>>): Promise<T> {
+  expect(response.ok(), `API ${response.url()} should return HTTP 2xx`).toBeTruthy()
+  const body = (await response.json()) as { code?: string; message?: string; data?: T }
+  expect(body.code, `API ${response.url()} business code`).toMatch(/^(0|00000)$/)
+  return body.data as T
+}
+
+function runId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+async function loginApi(playwright: Playwright) {
+  apiContext = await playwright.request.newContext({ baseURL: API_BASE_URL })
+  const response = await apiContext.post('/api/auth/login', {
+    data: { username: 'admin', password: 'admin123' },
+  })
+  await expectApiOk<{ token?: string }>(response)
+}
+
+async function apiPost<T>(url: string, data: Record<string, unknown>) {
+  const response = await apiContext.post(url, { data })
+  return expectApiOk<T>(response)
+}
+
+async function apiGet<T>(url: string, params?: Record<string, string | number>) {
+  const response = await apiContext.get(url, params ? { params } : undefined)
+  return expectApiOk<T>(response)
+}
+
+async function seedPaymentCreateContext() {
+  const sampleId = runId('PAYUI')
+  const projectName = `E2E付款项目-${sampleId}`
+  const contractName = `E2E付款合同-${sampleId}`
+
+  const projectId = String(
+    await apiPost<string>('/api/projects', {
+      projectCode: runId('PRJ'),
+      projectName,
+      projectType: 'BUILDING',
+      contractAmount: '5000000',
+      plannedStartDate: '2025-01-01',
+      plannedEndDate: '2026-12-31',
+      status: 'ACTIVE',
+    }),
+  )
+
+  const partyAId = String(
+    await apiPost<string>('/api/partners', {
+      partnerCode: runId('PTA'),
+      partnerName: `E2E甲方-${sampleId}`,
+      partnerType: 'PARTY_A',
+      status: 'ENABLE',
+      blacklistFlag: 0,
+    }),
+  )
+
+  const partyBId = String(
+    await apiPost<string>('/api/partners', {
+      partnerCode: runId('PTB'),
+      partnerName: `E2E乙方-${sampleId}`,
+      partnerType: 'PARTY_B',
+      status: 'ENABLE',
+      blacklistFlag: 0,
+    }),
+  )
+
+  const contractId = String(
+    await apiPost<string>('/api/contracts/composite', {
+      contract: {
+        contractCode: runId('CT'),
+        contractName,
+        contractType: 'SUB',
+        projectId,
+        partyAId,
+        partyBId,
+        contractAmount: '100000',
+        signedDate: '2025-06-01',
+        paymentMethod: '银行转账',
+        settlementMethod: '按进度结算',
+      },
+      items: [
+        {
+          itemName: 'AUTO',
+          itemSpec: '1',
+          unit: '项',
+          quantity: 1,
+          unitPrice: '100000',
+        },
+      ],
+      paymentTerms: [
+        {
+          termName: '进度款',
+          paymentRatio: 100,
+          paymentAmount: '100000',
+          paymentCondition: '完工后支付',
+          plannedDate: '2026-06-01',
+        },
+      ],
+      submitForApproval: false,
+    }),
+  )
+
+  return {
+    projectId,
+    contractId,
+    partnerId: partyBId,
+    projectName,
+    contractName,
+  } satisfies PaymentSeed
+}
+
+async function createPaymentApplication(seed: PaymentSeed) {
+  const applyCode = runId('PAYAPP')
+  const applyReason = `真实回读-${runId('PAYREAD')}`
+  const createdId = await apiPost<string>('/api/pay-applications', {
+    projectId: seed.projectId,
+    contractId: seed.contractId,
+    partnerId: seed.partnerId,
+    applyCode,
+    payType: 'PROGRESS',
+    applyAmount: '100000',
+    applyReason,
+  })
+  return { createdId, applyCode, applyReason }
+}
+
+async function waitForContractsReload(page: Page) {
+  await page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      response.url().includes('/api/contracts') &&
+      response.url().includes('projectId='),
+    { timeout: 10000 },
+  )
+}
+
 async function waitForPaymentList(page: Page) {
   await page.goto('/payment/application')
   await expect(page.locator('.payment-page')).toBeVisible({ timeout: 10000 })
@@ -71,9 +261,14 @@ test.beforeAll(async ({ browser }) => {
   sharedPage = auth.page
 })
 
+test.beforeAll(async ({ playwright }) => {
+  await loginApi(playwright)
+})
+
 test.afterAll(async () => {
   await sharedPage?.close()
   await sharedContext?.close()
+  await apiContext?.dispose()
 })
 
 test.describe('Payment: Application list and detail', () => {
@@ -115,6 +310,40 @@ test.describe('Payment: Application list and detail', () => {
     }
 
     await sharedPage.screenshot({ path: screenshotPath('payment-filter-paytype'), fullPage: true })
+  })
+
+  test('creates a real payment application then reads back status from list', async () => {
+    const seed = await seedPaymentCreateContext()
+    const createdMeta = await createPaymentApplication(seed)
+    await waitForPaymentList(sharedPage)
+    const created = await apiGet<PayApplicationDetail>(`/api/pay-applications/${createdMeta.createdId}`)
+    expect(created.applyCode, '创建后应返回申请编号').toBeTruthy()
+    expect(created.payStatus, '创建后应返回支付状态').toBeTruthy()
+    expect(created.approvalStatus, '创建后应返回审批状态').toBeTruthy()
+
+    await waitForPaymentList(sharedPage)
+    const searchProjectSelect = sharedPage.locator('.payment-search-select').first()
+    const searchContractSelect = sharedPage.locator('.payment-search-select').nth(1)
+    const searchContractsReload = waitForContractsReload(sharedPage)
+    await selectOptionByText(searchProjectSelect, seed.projectName)
+    await searchContractsReload
+    await selectOptionByText(
+      searchContractSelect,
+      seed.contractName,
+    )
+    await sharedPage.locator('.payment-search-actions button').filter({ hasText: '查询' }).click()
+
+    const createdRow = sharedPage.locator('.vxe-body--row').filter({ hasText: created.applyCode }).first()
+    await expect(createdRow).toBeVisible({ timeout: 10000 })
+    await expect(createdRow).toContainText(seed.contractName)
+    await expect(createdRow).toContainText('10.00 万')
+    await expect(createdRow).toContainText('进度款')
+    await expect(createdRow).toContainText(PAY_STATUS_LABEL[created.payStatus] ?? created.payStatus)
+    await expect(createdRow).toContainText(
+      APPROVAL_STATUS_LABEL[created.approvalStatus] ?? created.approvalStatus,
+    )
+
+    await sharedPage.screenshot({ path: screenshotPath('payment-created-readback'), fullPage: true })
   })
 })
 
