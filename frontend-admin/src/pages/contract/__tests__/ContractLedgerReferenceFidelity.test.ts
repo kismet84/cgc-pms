@@ -22,7 +22,7 @@ const columnSettingsSource = readFileSync(
 describe('ContractLedger reference fidelity', () => {
   it('keeps the approved ledger copy and adds the reference analysis rail structure', () => {
     // Page-level strings
-    for (const label of ['新建合同', '合同管理', '合同台账']) {
+    for (const label of ['新建合同', '合同管理', '合同列表']) {
       expect(ledgerSource).toContain(label)
     }
     expect(ledgerSource).toContain('ColumnSettingsButton')

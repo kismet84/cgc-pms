@@ -711,8 +711,13 @@ const {
         <main class="lg-list-table-panel project-table-panel">
           <div class="lg-toolbar project-table-toolbar">
             <div class="lg-toolbar-left">
-              <span class="project-table-title">项目列表</span>
-              <span class="project-table-count">共 {{ total }} 条</span>
+              <div class="project-table-heading">
+                <span class="project-table-title">项目列表</span>
+                <span class="project-table-count">共 {{ total }} 条</span>
+              </div>
+            </div>
+            <div class="lg-toolbar-right project-table-toolbar-right">
+              <span class="project-toolbar-hint">编号可进入总览，更多操作收在行末菜单</span>
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -726,9 +731,6 @@ const {
                 <template #icon><PlusOutlined /></template>
                 新建项目
               </a-button>
-            </div>
-            <div class="lg-toolbar-right">
-              <span class="project-toolbar-hint">当前页结果 / 金额单位万元 / 编号可查看总览</span>
             </div>
           </div>
 
@@ -993,10 +995,15 @@ const {
 .project-workspace {
   align-items: stretch;
   min-height: 0;
+  height: calc(100vh - 174px);
 }
 
 .project-main-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   gap: 12px;
+  min-height: 0;
 }
 
 .project-kpi-summary {
@@ -1082,12 +1089,23 @@ const {
 }
 
 .project-table-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
+  min-height: 0;
 }
 
 .project-table-toolbar {
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.project-table-heading,
+.project-table-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .project-table-title {
@@ -1105,7 +1123,8 @@ const {
 }
 
 .project-table-wrap {
-  min-height: 520px;
+  flex: 1;
+  min-height: 0;
 }
 
 .project-mobile-list {
@@ -1166,6 +1185,10 @@ const {
   text-align: center;
 }
 
+.project-table-wrap :deep(.vxe-grid) {
+  height: 100%;
+}
+
 .project-code-link,
 .project-name-text,
 .project-contract-amount {
@@ -1191,6 +1214,7 @@ const {
 
 .project-analysis-rail {
   width: 336px;
+  min-height: 0;
 }
 
 .project-analysis-panel {
@@ -1275,6 +1299,10 @@ const {
   .project-analysis-rail {
     width: 100%;
     max-width: none;
+  }
+
+  .project-table-toolbar-right {
+    flex-wrap: wrap;
   }
 
   .project-kpi-summary {

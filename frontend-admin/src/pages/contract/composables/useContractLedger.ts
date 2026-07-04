@@ -356,7 +356,7 @@ export function useContractLedger() {
       showOverflow: 'tooltip',
       slots: { default: 'status' },
     },
-    { field: 'ops', title: '操作', width: 76, slots: { default: 'ops' } },
+    { field: 'ops', title: '操作', width: 76, align: 'center' as const, headerAlign: 'center' as const, slots: { default: 'ops' } },
   ])
   const { visibleColumns, columnSettings, colVisible, toggleCol } = useColumnSettings(
     'contract_ledger_cols_v2',

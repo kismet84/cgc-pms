@@ -471,7 +471,7 @@ function genTermKey(): string {
     <div v-if="!isEmbedded" class="pt-page-head">
       <a-breadcrumb class="pt-breadcrumb">
         <a-breadcrumb-item>合同管理</a-breadcrumb-item>
-        <a-breadcrumb-item>合同台账</a-breadcrumb-item>
+        <a-breadcrumb-item>合同列表</a-breadcrumb-item>
         <a-breadcrumb-item>{{ isEdit ? '编辑合同' : '新建合同' }}</a-breadcrumb-item>
       </a-breadcrumb>
     </div>

@@ -63,9 +63,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       <div class="cl-page-meta-row">
         <a-breadcrumb class="cl-breadcrumb">
           <a-breadcrumb-item>合同管理</a-breadcrumb-item>
-          <a-breadcrumb-item>合同台账</a-breadcrumb-item>
+          <a-breadcrumb-item>合同列表</a-breadcrumb-item>
         </a-breadcrumb>
-        <span class="cl-page-subtitle">统一查看合同履约、回款与风险状态</span>
       </div>
     </div>
 
@@ -148,8 +147,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         <main class="lg-list-table-panel cl-table-panel">
           <div class="lg-toolbar cl-table-toolbar">
             <div class="lg-toolbar-left">
-              <span class="cl-table-title">合同列表</span>
-              <span class="cl-table-count">共 {{ total }} 条</span>
+              <div class="cl-table-heading">
+                <span class="cl-table-title">合同列表</span>
+                <span class="cl-table-count">共 {{ total }} 条</span>
+              </div>
+            </div>
+            <div class="lg-toolbar-right cl-table-toolbar-right">
+              <span class="cl-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
@@ -165,9 +169,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 新建合同
               </a-button>
             </div>
-            <div class="lg-toolbar-right">
-              <span class="cl-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
-            </div>
           </div>
 
           <div v-if="!isMobile" class="lg-table-wrap cl-table-wrap">
@@ -175,7 +176,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               :data="tableData"
               :columns="visibleColumns"
               :loading="loading"
-              :column-config="{ resizable: true }"
+              :column-config="{ resizable: true, useKey: true }"
+              show-overflow="title"
+              show-header-overflow="title"
               stripe
               border="inner"
               size="small"
@@ -201,25 +204,23 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 <ContractStatusTag :status="row.contractStatus as ContractStatus" />
               </template>
               <template #ops="{ row }">
-                <div class="cl-row-actions">
-                  <a-dropdown :trigger="['click']">
-                    <a-button
-                      class="lg-row-action-trigger"
-                      size="small"
-                      type="text"
-                      :aria-label="`打开合同操作菜单：${row.contractCode}`"
-                      :title="`打开合同操作菜单：${row.contractCode}`"
-                    >
-                      <MoreOutlined />
-                    </a-button>
-                    <template #overlay>
-                      <a-menu>
-                        <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                        <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
-                      </a-menu>
-                    </template>
-                  </a-dropdown>
-                </div>
+                <a-dropdown :trigger="['click']">
+                  <a-button
+                    class="lg-row-action-trigger"
+                    size="small"
+                    type="text"
+                    :aria-label="`打开合同操作菜单：${row.contractCode}`"
+                    :title="`打开合同操作菜单：${row.contractCode}`"
+                  >
+                    <MoreOutlined />
+                  </a-button>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
               </template>
             </vxe-grid>
           </div>
@@ -326,13 +327,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   min-width: 0;
 }
 
-.cl-page-subtitle {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
 .cl-query-panel {
   align-items: center;
   justify-content: space-between;
@@ -375,15 +369,24 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .cl-workspace {
   align-items: stretch;
   min-height: 0;
+  height: calc(100vh - 174px);
 }
 
 .cl-main-column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
 .cl-table-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
+  min-height: 0;
 }
 
 .cl-table-toolbar {
@@ -396,6 +399,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   font-weight: 700;
 }
 
+.cl-table-heading,
+.cl-table-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .cl-table-count,
 .cl-toolbar-hint {
   color: var(--text-secondary);
@@ -403,7 +413,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cl-table-wrap {
-  min-height: 520px;
+  flex: 1;
+  min-height: 0;
 }
 
 .cl-table-wrap :deep(.vxe-header--column .vxe-cell) {
@@ -411,24 +422,22 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   text-align: center;
 }
 
+.cl-table-wrap :deep(.vxe-grid) {
+  height: 100%;
+}
+
+.cl-workspace :deep(.cl-analysis-rail) {
+  min-height: 0;
+}
+
+.cl-workspace :deep(.cl-analysis-panel) {
+  height: 100%;
+}
+
 .cl-contract-link {
   height: auto;
   padding: 0;
   font-weight: 700;
-}
-
-.cl-row-actions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  width: 100%;
-}
-
-.cl-row-actions :deep(.ant-btn-link) {
-  height: 26px;
-  padding: 0 4px;
-  font-size: 13px;
 }
 
 .cl-pagination {
@@ -445,6 +454,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
   .cl-query-actions {
     justify-content: flex-start;
+  }
+
+  .cl-table-toolbar-right {
+    flex-wrap: wrap;
   }
 
   .cl-keyword-search,

@@ -30,7 +30,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'ledger',
             name: 'ContractLedger',
             component: () => import('@/pages/contract/ContractLedgerPage.vue'),
-            meta: { title: '合同台账' },
+            meta: { title: '合同列表' },
           },
           {
             path: 'create',
@@ -108,13 +108,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'variation',
         name: 'Variation',
         redirect: '/variation/order',
-        meta: { title: '变更签证', icon: 'SwapOutlined' },
+        meta: { title: '签证列表', icon: 'SwapOutlined' },
         children: [
           {
             path: 'order',
             name: 'VariationOrder',
             component: () => import('@/pages/variation/order.vue'),
-            meta: { title: '变更签证' },
+            meta: { title: '签证列表' },
           },
         ],
       },

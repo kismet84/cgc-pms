@@ -25,8 +25,8 @@ export const navigationItems: NavigationItem[] = [
     icon: 'FileTextOutlined',
     matchPrefixes: ['/contract', '/variation'],
     children: [
-      { key: '/contract/ledger', label: '合同台账' },
-      { key: '/variation/order', label: '变更签证' },
+      { key: '/contract/ledger', label: '合同列表' },
+      { key: '/variation/order', label: '签证列表' },
     ],
   },
   {

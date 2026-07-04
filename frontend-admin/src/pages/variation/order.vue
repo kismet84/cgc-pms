@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -44,12 +44,14 @@ const tableData = ref<VarOrderVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const MOBILE_BP = 768
+const isMobile = ref(false)
 
 const referenceStore = useReferenceStore()
 const { projects: projectList, contracts: contractList } = storeToRefs(referenceStore)
 
 const modalVisible = ref(false)
-const modalTitle = ref('新建变更签证')
+const modalTitle = ref('新建签证')
 const editingId = ref<string | null>(null)
 const modalReadonly = ref(false)
 const formData = reactive<Partial<VarOrderVO>>({
@@ -119,13 +121,13 @@ const VAR_TYPE_COLOR: Record<string, string> = {
 }
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
-  PENDING: '审批中',
+  APPROVING: '审批中',
   APPROVED: '已通过',
   REJECTED: '已驳回',
 }
 const APPROVAL_STATUS_COLOR: Record<string, string> = {
   DRAFT: 'processing',
-  PENDING: 'warning',
+  APPROVING: 'warning',
   APPROVED: 'success',
   REJECTED: 'error',
 }
@@ -178,7 +180,7 @@ const gridColumns = computed(() => [
     width: 108,
     slots: { default: 'approvalStatus' },
   },
-  { key: 'ops', title: '操作', width: 76, slots: { default: 'ops' } },
+  { key: 'ops', title: '操作', width: 76, align: 'center' as const, headerAlign: 'center' as const, slots: { default: 'ops' } },
 ])
 const {
   visibleColumns: visibleGridColumns,
@@ -211,7 +213,7 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('加载变更签证列表失败')
+    message.error('加载签证列表失败')
   } finally {
     loading.value = false
   }
@@ -233,6 +235,7 @@ function handleReset() {
 }
 function handleProjectChange(val: string | undefined) {
   filter.contractId = undefined
+  filter.partnerId = undefined
   if (val) referenceStore.fetchContracts({ projectId: val })
   handleSearch()
 }
@@ -247,7 +250,7 @@ function handlePageSizeChange(_cur: number, size: number) {
 }
 
 async function handleAdd() {
-  modalTitle.value = '新建变更签证'
+  modalTitle.value = '新建签证'
   editingId.value = null
   modalReadonly.value = false
   Object.assign(formData, {
@@ -268,7 +271,7 @@ async function handleAdd() {
 }
 
 async function openVarOrderModal(record: VarOrderVO, readonly: boolean) {
-  modalTitle.value = readonly ? '查看变更签证' : '编辑变更签证'
+  modalTitle.value = readonly ? '查看签证' : '编辑签证'
   editingId.value = record.id
   modalReadonly.value = readonly
   Object.assign(formData, {
@@ -305,7 +308,7 @@ async function handleEdit(record: VarOrderVO) {
 async function handleSubmitApproval(record: VarOrderVO) {
   Modal.confirm({
     title: '提交审批',
-    content: `确认提交变更签证 ${record.varCode}？`,
+    content: `确认提交签证 ${record.varCode}？`,
     onOk: async () => {
       await submitVarOrderForApproval(record.id)
       message.success('已提交审批')
@@ -316,7 +319,7 @@ async function handleSubmitApproval(record: VarOrderVO) {
 async function handleDelete(record: VarOrderVO) {
   Modal.confirm({
     title: '确认删除',
-    content: `确定删除变更签证 ${record.varCode}？`,
+    content: `确定删除签证 ${record.varCode}？`,
     okType: 'danger',
     onOk: async () => {
       await deleteVarOrder(record.id)
@@ -453,7 +456,7 @@ const variationTypeSummary = computed(() =>
 const approvalStatusSummary = computed(() => {
   const labels: Record<string, string> = {
     DRAFT: '草稿',
-    PENDING: '审批中',
+    APPROVING: '审批中',
     APPROVED: '已通过',
     REJECTED: '已驳回',
   }
@@ -476,11 +479,21 @@ function fmtWan(val: string | undefined): string {
   return isNaN(n) ? '0.00' : (n / 10000).toFixed(2)
 }
 
+function onResize() {
+  isMobile.value = window.innerWidth < MOBILE_BP
+}
+
 onMounted(() => {
+  onResize()
+  window.addEventListener('resize', onResize)
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({})
   referenceStore.fetchPartners()
   fetchData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
 })
 </script>
 
@@ -490,9 +503,8 @@ onMounted(() => {
       <div class="vo-page-meta-row">
         <a-breadcrumb class="vo-breadcrumb">
           <a-breadcrumb-item>合同管理</a-breadcrumb-item>
-          <a-breadcrumb-item>变更签证</a-breadcrumb-item>
+          <a-breadcrumb-item>签证列表</a-breadcrumb-item>
         </a-breadcrumb>
-        <span class="vo-page-subtitle">统一查看合同变更、现场签证、审批与金额影响</span>
       </div>
     </div>
 
@@ -582,9 +594,15 @@ onMounted(() => {
         <main class="lg-list-table-panel vo-table-panel">
           <div class="lg-toolbar vo-table-toolbar">
             <div class="lg-toolbar-left">
-              <span class="vo-table-title">变更签证列表</span>
-              <span class="vo-table-count">共 {{ total }} 条</span>
+              <div class="vo-table-heading">
+                <span class="vo-table-title">签证列表</span>
+                <span class="vo-table-count">共 {{ total }} 条</span>
+              </div>
+            </div>
+            <div class="lg-toolbar-right vo-table-toolbar-right">
+              <span class="vo-toolbar-hint">当前页结果 / 金额单位万元 / 编号可查看详情</span>
               <ColumnSettingsButton
+                v-if="!isMobile"
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
@@ -598,17 +616,57 @@ onMounted(() => {
                 新建签证
               </a-button>
             </div>
-            <div class="lg-toolbar-right">
-              <span class="vo-toolbar-hint">固定表头 / 金额右对齐 / 编号可查看详情</span>
-            </div>
           </div>
 
-          <div class="lg-table-wrap vo-table-wrap">
+          <div v-if="isMobile" class="vo-mobile-list">
+            <div v-if="loading" class="vo-mobile-state">
+              <a-spin />
+            </div>
+            <a-empty v-else-if="!tableData.length" description="暂无变更签证" />
+            <template v-else>
+              <article v-for="row in tableData" :key="row.id" class="vo-mobile-card">
+                <div class="vo-mobile-card-head">
+                  <a-button class="vo-var-link" type="link" @click="handleView(row)">
+                    {{ row.varCode || '-' }}
+                  </a-button>
+                  <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus]" size="small">
+                    {{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}
+                  </a-tag>
+                </div>
+                <div class="vo-mobile-card-title">{{ row.varName || '-' }}</div>
+                <div class="vo-mobile-card-project">{{ row.projectName || '-' }}</div>
+                <div class="vo-mobile-card-meta">
+                  <span>{{ VAR_TYPE_LABEL[row.varType] ?? row.varType ?? '-' }}</span>
+                  <span>{{ row.direction === 'COST' ? '成本' : row.direction || '-' }}</span>
+                </div>
+                <div class="vo-mobile-card-amount">上报金额：{{ fmtWan(row.reportedAmount) }} 万元</div>
+                <div class="vo-mobile-card-actions">
+                  <a-button type="link" size="small" @click="handleView(row)">查看</a-button>
+                  <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>
+                  <a-button
+                    v-if="row.approvalStatus === 'DRAFT'"
+                    type="link"
+                    size="small"
+                    @click="handleSubmitApproval(row)"
+                  >
+                    提交
+                  </a-button>
+                  <a-button danger type="link" size="small" @click="handleDelete(row)"
+                    >删除</a-button
+                  >
+                </div>
+              </article>
+            </template>
+          </div>
+
+          <div v-else class="lg-table-wrap vo-table-wrap">
             <vxe-grid
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
-              :column-config="{ resizable: true }"
+              :column-config="{ resizable: true, useKey: true }"
+              show-overflow="title"
+              show-header-overflow="title"
               stripe
               border="inner"
               size="small"
@@ -943,13 +1001,6 @@ onMounted(() => {
   min-width: 0;
 }
 
-.vo-page-subtitle {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
 .vo-query-panel {
   align-items: center;
   justify-content: space-between;
@@ -966,8 +1017,9 @@ onMounted(() => {
 }
 
 .vo-keyword-search {
-  width: min(640px, 34vw);
-  min-width: 420px;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
 }
 
 .vo-search-prefix-icon {
@@ -975,6 +1027,7 @@ onMounted(() => {
 }
 
 .vo-query-select {
+  flex: 0 0 160px;
   width: 160px;
 }
 
@@ -988,10 +1041,15 @@ onMounted(() => {
 .vo-workspace {
   align-items: stretch;
   min-height: 0;
+  height: calc(100vh - 174px);
 }
 
 .vo-main-column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
 .vo-kpi-summary {
@@ -1077,8 +1135,12 @@ onMounted(() => {
 }
 
 .vo-table-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
+  min-height: 0;
 }
 
 .vo-table-toolbar {
@@ -1091,6 +1153,13 @@ onMounted(() => {
   font-weight: 700;
 }
 
+.vo-table-heading,
+.vo-table-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .vo-table-count,
 .vo-toolbar-hint,
 .vo-analysis-subtitle,
@@ -1100,12 +1169,68 @@ onMounted(() => {
 }
 
 .vo-table-wrap {
-  min-height: 520px;
+  flex: 1;
+  min-height: 0;
+}
+
+.vo-mobile-list {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.vo-mobile-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.vo-mobile-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.vo-mobile-card-head,
+.vo-mobile-card-meta,
+.vo-mobile-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.vo-mobile-card-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
+  word-break: break-word;
+}
+
+.vo-mobile-card-project,
+.vo-mobile-card-meta,
+.vo-mobile-card-amount {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+  word-break: break-word;
 }
 
 .vo-table-wrap :deep(.vxe-header--column .vxe-cell) {
   justify-content: center;
   text-align: center;
+}
+
+.vo-table-wrap :deep(.vxe-grid) {
+  height: 100%;
 }
 
 .vo-var-link {
@@ -1126,6 +1251,7 @@ onMounted(() => {
 
 .vo-analysis-rail {
   width: 336px;
+  min-height: 0;
 }
 
 .vo-analysis-panel {
@@ -1200,11 +1326,47 @@ onMounted(() => {
     justify-content: flex-start;
   }
 
+  .vo-table-toolbar-right {
+    flex-wrap: wrap;
+  }
+
   .vo-keyword-search,
   .vo-query-select,
   .vo-analysis-rail {
     width: 100%;
     min-width: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .vo-page-meta-row {
+    gap: 6px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .vo-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vo-kpi-item {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .vo-kpi-item:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+
+  .vo-table-toolbar,
+  .vo-table-toolbar .lg-toolbar-left,
+  .vo-table-toolbar .lg-toolbar-right {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .vo-toolbar-hint {
+    white-space: normal;
   }
 }
 </style>

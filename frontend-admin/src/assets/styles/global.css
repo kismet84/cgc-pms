@@ -1368,6 +1368,14 @@ a {
   max-width: none;
 }
 
+.lg-list-page .lg-table-wrap .vxe-body--column:has(.lg-row-action-trigger),
+.lg-list-page .lg-table-wrap .vxe-body--column:has(.lg-row-action-trigger) .vxe-cell,
+.lg-list-page .lg-table-wrap .vxe-body--column:has(.lg-row-action-trigger) .vxe-cell--wrapper {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
 .lg-list-page .lg-table-wrap .ant-table-thead > tr > th:first-child,
 .lg-list-page .lg-table-wrap .ant-table-tbody > tr > td:first-child {
   padding-left: 16px;
