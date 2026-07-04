@@ -170,6 +170,44 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.data.effectiveSubscription.notifyOnStatusChanged").value(false));
     }
 
+    @Test @Order(10) @DisplayName("PUT /alerts/batch/read -> 支持部分成功")
+    void testBatchMarkRead_PartialSuccess() throws Exception {
+        AlertLog alert = newAlert("TEST_BATCH_READ", 10001L);
+        alertLogMapper.insert(alert);
+
+        mockMvc.perform(u("/alerts/batch/read").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alertIds\":[" + alert.getId() + ",999999]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.success").value(1))
+                .andExpect(jsonPath("$.data.failed").value(1))
+                .andExpect(jsonPath("$.data.failures[0].alertId").value(999999));
+
+        AlertLog updated = alertLogMapper.selectById(alert.getId());
+        Assertions.assertEquals(1, updated.getIsRead());
+    }
+
+    @Test @Order(11) @DisplayName("PUT /alerts/batch/status -> 非法状态逐条失败")
+    void testBatchUpdateStatus_InvalidStatus() throws Exception {
+        AlertLog alert = newAlert("TEST_BATCH_STATUS_INVALID", 10001L);
+        alertLogMapper.insert(alert);
+
+        mockMvc.perform(u("/alerts/batch/status").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alertIds\":[" + alert.getId() + "],\"processStatus\":\"OPEN\",\"statusRemark\":\"bad\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.success").value(0))
+                .andExpect(jsonPath("$.data.failed").value(1))
+                .andExpect(jsonPath("$.data.failures[0].reason").value("预警状态不合法"));
+
+        AlertLog unchanged = alertLogMapper.selectById(alert.getId());
+        Assertions.assertEquals("OPEN", unchanged.getProcessStatus());
+    }
+
     private void seedProjectIfAbsent(long projectId, String projectCode) {
         if (projectMapper.selectById(projectId) != null) {
             return;
@@ -204,6 +242,22 @@ class AlertControllerTest {
         member.setRoleCode(roleCode);
         member.setStatus("ACTIVE");
         projectMemberMapper.insert(member);
+    }
+
+    private AlertLog newAlert(String ruleType, long projectId) {
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(projectId);
+        alert.setRuleType(ruleType);
+        alert.setAlertDomain("CONTRACT");
+        alert.setAlertCategory("CONTRACT_TERM");
+        alert.setSeverity("LOW");
+        alert.setMessage(ruleType);
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setDeletedFlag(0);
+        return alert;
     }
 
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }

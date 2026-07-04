@@ -888,6 +888,10 @@ public class AlertEvaluationService {
         return alertLogMapper.updateById(alert) > 0;
     }
 
+    public Map<String, Object> batchMarkRead(Long tenantId, List<Long> alertIds) {
+        return batch(alertIds, alertId -> markRead(tenantId, alertId));
+    }
+
     public boolean updateStatus(Long tenantId, Long alertId, String processStatus, String statusRemark) {
         if (!List.of("PROCESSED", "ARCHIVED", "INVALID").contains(processStatus)) {
             throw new BusinessException("ALERT_STATUS_INVALID", "预警状态不合法");
@@ -915,6 +919,42 @@ public class AlertEvaluationService {
             }
         }
         return updated;
+    }
+
+    public Map<String, Object> batchUpdateStatus(Long tenantId, List<Long> alertIds,
+                                                 String processStatus, String statusRemark) {
+        return batch(alertIds, alertId -> updateStatus(tenantId, alertId, processStatus, statusRemark));
+    }
+
+    private Map<String, Object> batch(List<Long> alertIds, AlertBatchAction action) {
+        List<Long> ids = alertIds == null ? List.of() : alertIds;
+        List<Long> successIds = new ArrayList<>();
+        List<Map<String, Object>> failures = new ArrayList<>();
+        for (Long alertId : ids) {
+            try {
+                if (Boolean.TRUE.equals(action.apply(alertId))) {
+                    successIds.add(alertId);
+                } else {
+                    failures.add(batchFailure(alertId, "预警不存在或不属于当前租户"));
+                }
+            } catch (BusinessException e) {
+                failures.add(batchFailure(alertId, e.getMessage()));
+            }
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", ids.size());
+        result.put("success", successIds.size());
+        result.put("failed", failures.size());
+        result.put("successIds", successIds);
+        result.put("failures", failures);
+        return result;
+    }
+
+    private Map<String, Object> batchFailure(Long alertId, String reason) {
+        Map<String, Object> failure = new HashMap<>();
+        failure.put("alertId", alertId);
+        failure.put("reason", reason);
+        return failure;
     }
 
     private String getStatusTitle(String processStatus) {
@@ -955,6 +995,11 @@ public class AlertEvaluationService {
     @FunctionalInterface
     private interface SubscriptionDispatchAction {
         void dispatch(Long userId, Map<String, Object> subscription);
+    }
+
+    @FunctionalInterface
+    private interface AlertBatchAction {
+        boolean apply(Long alertId);
     }
 
     // M-009: Batch-load contracts to avoid N+1 in rule evaluation loops

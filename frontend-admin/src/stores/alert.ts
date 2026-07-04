@@ -6,9 +6,13 @@ import {
   getAlertList,
   markAlertRead,
   updateAlertStatus,
+  batchMarkAlertRead,
+  batchUpdateAlertStatus,
   batchEvaluate,
   type AlertListResponse,
   type AlertListParams,
+  type AlertProcessStatus,
+  type BatchAlertOperationResult,
 } from '@/api/modules/alert'
 
 export const useAlertStore = defineStore('alert', () => {
@@ -22,6 +26,71 @@ export const useAlertStore = defineStore('alert', () => {
 
   function normalizeId(value: unknown): string {
     return String(value ?? '')
+  }
+
+  function normalizeIds(ids: Array<string | number>) {
+    return Array.from(new Set(ids.map((id) => normalizeId(id)).filter((id) => id.length > 0)))
+  }
+
+  function markBusy(ids: string[]) {
+    ids.forEach((id) => markingRead.value.add(id))
+  }
+
+  function clearBusy(ids: string[]) {
+    ids.forEach((id) => markingRead.value.delete(id))
+  }
+
+  function applyReadState(ids: Array<string | number>) {
+    const idSet = new Set(ids.map((id) => normalizeId(id)))
+    alerts.value.forEach((alert) => {
+      if (idSet.has(normalizeId(alert.id))) {
+        alert.isRead = 1
+      }
+    })
+  }
+
+  function applyStatusState(
+    ids: Array<string | number>,
+    processStatus: AlertProcessStatus,
+    statusRemark?: string,
+  ) {
+    const idSet = new Set(ids.map((id) => normalizeId(id)))
+    const now = new Date().toISOString()
+    alerts.value.forEach((alert) => {
+      if (!idSet.has(normalizeId(alert.id))) return
+      alert.processStatus = processStatus
+      if (processStatus === 'PROCESSED') {
+        alert.processedAt = now
+      }
+      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') {
+        alert.archivedAt = now
+      }
+      alert.statusRemark = statusRemark
+    })
+  }
+
+  function normalizeBatchResult(
+    result: BatchAlertOperationResult,
+    fallbackIds: string[],
+  ): BatchAlertOperationResult {
+    const successIds = Array.isArray(result?.successIds) && result.successIds.length
+      ? result.successIds.map((id) => normalizeId(id))
+      : Number(result?.failed ?? 0) === 0
+        ? fallbackIds
+        : []
+    const failures = Array.isArray(result?.failures)
+      ? result.failures.map((item) => ({
+          alertId: normalizeId(item.alertId),
+          reason: String(item.reason ?? '未知原因'),
+        }))
+      : []
+    return {
+      total: Number(result?.total ?? fallbackIds.length),
+      success: Number(result?.success ?? successIds.length),
+      failed: Number(result?.failed ?? failures.length),
+      successIds,
+      failures,
+    }
   }
 
   function isDefaultScopeAlert(alert: AlertLogVO): boolean {
@@ -117,33 +186,37 @@ export const useAlertStore = defineStore('alert', () => {
   }
 
   async function markRead(id: string) {
-    markingRead.value.add(normalizeId(id))
+    const normalizedId = normalizeId(id)
+    markingRead.value.add(normalizedId)
     try {
       const result = await markAlertRead(id)
       if (result.success) {
-        const alert = alerts.value.find((a) => normalizeId(a.id) === normalizeId(id))
-        if (alert) {
-          alert.isRead = 1
-        }
+        applyReadState([normalizedId])
       }
     } finally {
-      markingRead.value.delete(normalizeId(id))
+      markingRead.value.delete(normalizedId)
     }
   }
 
   async function batchMarkRead(ids: Array<string | number>) {
-    const uniqueIds = Array.from(
-      new Set(ids.map((id) => normalizeId(id)).filter((id) => id.length > 0)),
-    )
-    if (!uniqueIds.length) return 0
+    const uniqueIds = normalizeIds(ids)
+    if (!uniqueIds.length) {
+      return { total: 0, success: 0, failed: 0, successIds: [], failures: [] }
+    }
 
-    const results = await Promise.allSettled(uniqueIds.map((id) => markRead(id)))
-    return results.filter((item) => item.status === 'fulfilled').length
+    markBusy(uniqueIds)
+    try {
+      const result = normalizeBatchResult(await batchMarkAlertRead({ alertIds: uniqueIds }), uniqueIds)
+      applyReadState(result.successIds)
+      return result
+    } finally {
+      clearBusy(uniqueIds)
+    }
   }
 
   async function changeStatus(
     id: string | number,
-    processStatus: 'PROCESSED' | 'ARCHIVED' | 'INVALID',
+    processStatus: AlertProcessStatus,
     statusRemark?: string,
   ) {
     const normalizedId = normalizeId(id)
@@ -151,20 +224,33 @@ export const useAlertStore = defineStore('alert', () => {
     try {
       const result = await updateAlertStatus(normalizedId, { processStatus, statusRemark })
       if (result.success) {
-        const alert = alerts.value.find((item) => normalizeId(item.id) === normalizedId)
-        if (alert) {
-          alert.processStatus = processStatus
-          if (processStatus === 'PROCESSED') {
-            alert.processedAt = new Date().toISOString()
-          }
-          if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') {
-            alert.archivedAt = new Date().toISOString()
-          }
-          alert.statusRemark = statusRemark
-        }
+        applyStatusState([normalizedId], processStatus, statusRemark)
       }
     } finally {
       markingRead.value.delete(normalizedId)
+    }
+  }
+
+  async function batchChangeStatus(
+    ids: Array<string | number>,
+    processStatus: AlertProcessStatus,
+    statusRemark?: string,
+  ) {
+    const uniqueIds = normalizeIds(ids)
+    if (!uniqueIds.length) {
+      return { total: 0, success: 0, failed: 0, successIds: [], failures: [] }
+    }
+
+    markBusy(uniqueIds)
+    try {
+      const result = normalizeBatchResult(
+        await batchUpdateAlertStatus({ alertIds: uniqueIds, processStatus, statusRemark }),
+        uniqueIds,
+      )
+      applyStatusState(result.successIds, processStatus, statusRemark)
+      return result
+    } finally {
+      clearBusy(uniqueIds)
     }
   }
 
@@ -204,6 +290,7 @@ export const useAlertStore = defineStore('alert', () => {
     markRead,
     batchMarkRead,
     changeStatus,
+    batchChangeStatus,
     updateListState,
     triggerBatchEvaluate,
     resetState,

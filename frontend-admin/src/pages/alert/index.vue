@@ -1,34 +1,38 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { Dayjs } from 'dayjs'
 import { useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import {
-  AlertOutlined,
-  ClockCircleOutlined,
-  CheckCircleOutlined,
-  FileTextOutlined,
-  MoreOutlined,
+  BellOutlined,
+  FolderOpenOutlined,
+  InboxOutlined,
   ReloadOutlined,
   SearchOutlined,
+  ThunderboltOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { useUserStore } from '@/stores/user'
-import { getAlertSubscription, updateAlertSubscription } from '@/api/modules/alert'
 import {
-  ALERT_CHANNEL_LABELS,
+  getAlertSubscription,
+  updateAlertSubscription,
+  type AlertProcessStatus,
+  type BatchAlertOperationResult,
+} from '@/api/modules/alert'
+import {
   ALERT_CATEGORY_LABELS,
+  ALERT_CHANNEL_LABELS,
   ALERT_PROCESS_STATUS_COLOR,
   ALERT_PROCESS_STATUS_LABELS,
   RULE_CATEGORY_LABELS,
   RULE_TYPE_LABELS,
   SEVERITY_COLOR,
   getAlertRuleCategory,
+  type AlertLogVO,
   type AlertSubscriptionConfig,
   type AlertSubscriptionResponse,
-  type AlertLogVO,
 } from '@/types/alert'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
@@ -36,6 +40,8 @@ import { ColumnSettingsButton } from '@/components/list-page'
 const router = useRouter()
 const store = useAlertStore()
 const userStore = useUserStore()
+const referenceStore = useReferenceStore()
+
 const subscriptionVisible = ref(false)
 const subscriptionLoading = ref(false)
 const subscriptionSaving = ref(false)
@@ -48,32 +54,33 @@ const subscriptionForm = reactive<AlertSubscriptionConfig>({
   notifyOnStatusChanged: false,
 })
 
-// ── Filters ──
 const filter = reactive({
   keyword: '',
   projectId: undefined as string | undefined,
+  alertDomain: undefined as string | undefined,
+  ruleType: undefined as string | undefined,
   severity: undefined as string | undefined,
   isRead: undefined as number | undefined,
   processStatus: undefined as string | undefined,
-  ruleType: undefined as string | undefined,
-  category: undefined as string | undefined,
   triggeredAtRange: null as [Dayjs, Dayjs] | null,
   onlyDefaultScope: false,
 })
 
-// ── Project dropdown ──
-const referenceStore = useReferenceStore()
-const projectOptions = computed(() => referenceStore.projects ?? [])
 const projectsLoading = ref(false)
-
 const pageNo = ref(1)
 const pageSize = ref(20)
+const selectedRowKeys = ref<Array<string | number>>([])
+const activeRecord = ref<AlertLogVO | null>(null)
+const statusRemarkDraft = ref('')
+const gridRef = ref()
+const roleDefaultApplied = ref(false)
+
+const projectOptions = computed(() => referenceStore.projects ?? [])
 const total = computed(() => store.total)
+const alerts = computed(() => store.alerts)
 const processStatusOptions = computed(() =>
   Object.entries(ALERT_PROCESS_STATUS_LABELS).map(([value, label]) => ({ value, label })),
 )
-const currentPageUnreadAlerts = computed(() => store.alerts.filter((item) => item.isRead === 0))
-const roleDefaultApplied = ref(false)
 
 type AlertRolePreset = {
   alertDomain?: string
@@ -103,14 +110,13 @@ function resolveRoleDefaultPreset(): AlertRolePreset {
   if (roleCodes.includes('CHIEF_ENGINEER') || roleName.includes('总工程师')) {
     return { downgraded: true }
   }
-
   return {}
 }
 
 function applyRoleDefaultView(force = false) {
   if (roleDefaultApplied.value && !force) return
   const preset = resolveRoleDefaultPreset()
-  filter.category = preset.alertDomain
+  filter.alertDomain = preset.alertDomain
   filter.onlyDefaultScope = preset.onlyDefaultScope ?? false
   roleDefaultApplied.value = true
 }
@@ -128,16 +134,85 @@ const defaultSubscriptionEnabled = computed(
 const defaultStatusChangeEnabled = computed(
   () => Boolean(subscriptionState.value?.defaultSubscription.notifyOnStatusChanged),
 )
+const currentOperator = computed(
+  () =>
+    String(
+      userStore.userInfo?.nickName ??
+        userStore.userInfo?.nickname ??
+        userStore.userInfo?.username ??
+        '',
+    ).trim() || '-',
+)
 
 function resolveSearchAlertDomain() {
   const preset = activeRolePreset.value
   if (filter.onlyDefaultScope && preset.alertDomain) {
     return preset.alertDomain
   }
-  return filter.category
+  return filter.alertDomain
 }
 
-// ── Fetch ──
+function syncActiveRecord(id: string | number, updater: (record: AlertLogVO) => void) {
+  if (activeRecord.value && String(activeRecord.value.id) === String(id)) {
+    updater(activeRecord.value)
+  }
+}
+
+function syncBatchReadResult(successIds: Array<string | number>) {
+  successIds.forEach((id) => {
+    syncActiveRecord(id, (item) => {
+      item.isRead = 1
+    })
+  })
+}
+
+function syncBatchStatusResult(
+  successIds: Array<string | number>,
+  processStatus: AlertProcessStatus,
+  statusRemark?: string,
+) {
+  successIds.forEach((id) => {
+    syncActiveRecord(id, (item) => {
+      item.processStatus = processStatus
+      item.statusRemark = statusRemark
+      if (processStatus === 'PROCESSED') item.processedAt = new Date().toISOString()
+      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') item.archivedAt = new Date().toISOString()
+    })
+  })
+}
+
+function buildBatchFailureMessage(result: BatchAlertOperationResult) {
+  if (!result.failed) return ''
+  return result.failures
+    .slice(0, 3)
+    .map((item) => `#${item.alertId} ${item.reason}`)
+    .join('；')
+}
+
+function showBatchResult(actionText: string, result: BatchAlertOperationResult) {
+  if (!result.failed) {
+    message.success(`${actionText}成功 ${result.success} 条`)
+    return
+  }
+  const detail = buildBatchFailureMessage(result)
+  message.warning(
+    `${actionText}部分完成：成功 ${result.success} 条，失败 ${result.failed} 条${detail ? `，失败原因：${detail}` : ''}`,
+  )
+}
+
+function syncActiveRecordFromList() {
+  const list = alerts.value
+  if (!list.length) {
+    activeRecord.value = null
+    return
+  }
+  const currentId = activeRecord.value?.id
+  const matched = currentId
+    ? list.find((item) => String(item.id) === String(currentId))
+    : null
+  activeRecord.value = { ...(matched ?? list[0]) }
+}
+
 async function fetchData() {
   try {
     await store.fetchAlerts({
@@ -155,14 +230,20 @@ async function fetchData() {
       triggeredEnd: filter.triggeredAtRange?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss'),
       onlyDefaultScope: filter.onlyDefaultScope || undefined,
     })
-  } catch (e: unknown) {
-    console.error(e)
+    syncActiveRecordFromList()
+  } catch (error) {
+    console.error(error)
     message.error('加载预警列表失败，请稍后重试')
   }
 }
 
+function clearSelection() {
+  selectedRowKeys.value = []
+}
+
 function handleSearch() {
   pageNo.value = 1
+  clearSelection()
   fetchData()
 }
 
@@ -170,69 +251,132 @@ function handleReset() {
   applyRoleDefaultView(true)
   filter.keyword = ''
   filter.projectId = undefined
+  filter.alertDomain = activeRolePreset.value.alertDomain
+  filter.ruleType = undefined
   filter.severity = undefined
   filter.isRead = undefined
   filter.processStatus = undefined
-  filter.ruleType = undefined
   filter.triggeredAtRange = null
   pageNo.value = 1
+  clearSelection()
   fetchData()
 }
 
 function handlePageChange(page: number) {
   pageNo.value = page
+  clearSelection()
   fetchData()
 }
 
 function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
+  clearSelection()
   fetchData()
 }
 
-// ── Actions ──
+function isRowSelected(id: string | number) {
+  return selectedRowKeys.value.some((item) => String(item) === String(id))
+}
+
+function toggleRowSelection(record: AlertLogVO, checked: boolean) {
+  if (checked) {
+    if (!isRowSelected(record.id)) {
+      selectedRowKeys.value = [...selectedRowKeys.value, record.id]
+    }
+    return
+  }
+  selectedRowKeys.value = selectedRowKeys.value.filter((item) => String(item) !== String(record.id))
+}
+
+const allPageSelected = computed(
+  () => alerts.value.length > 0 && alerts.value.every((item) => isRowSelected(item.id)),
+)
+
+const pageSelectionIndeterminate = computed(
+  () => selectedRowKeys.value.length > 0 && !allPageSelected.value,
+)
+
+function togglePageSelection(checked: boolean) {
+  selectedRowKeys.value = checked ? alerts.value.map((item) => item.id) : []
+}
+
+function getSelectedRows(): AlertLogVO[] {
+  const selected = new Set(selectedRowKeys.value.map((item) => String(item)))
+  return alerts.value.filter((item) => selected.has(String(item.id)))
+}
+
+function openDetail(record: AlertLogVO) {
+  activeRecord.value = { ...record }
+}
+
 async function handleMarkRead(record: AlertLogVO) {
   try {
-    await store.markRead(record.id)
+    await store.markRead(String(record.id))
+    syncActiveRecord(record.id, (item) => {
+      item.isRead = 1
+    })
     message.success('已标记为已读')
-  } catch (e: unknown) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
     message.error('操作失败')
   }
 }
 
 async function handleBatchMarkRead() {
-  if (!currentPageUnreadAlerts.value.length) {
-    message.info('当前页没有未读预警')
+  const unreadIds = getSelectedRows()
+    .filter((item) => item.isRead === 0)
+    .map((item) => item.id)
+  if (!unreadIds.length) {
+    message.info('所选告警均已读，或尚未勾选记录')
     return
   }
   try {
-    const count = await store.batchMarkRead(currentPageUnreadAlerts.value.map((item) => item.id))
-    message.success(`已标记 ${count} 条预警为已读`)
-  } catch (e: unknown) {
-    console.error(e)
+    const result = await store.batchMarkRead(unreadIds)
+    syncBatchReadResult(result.successIds)
+    showBatchResult('批量标记已读', result)
+    clearSelection()
+  } catch (error) {
+    console.error(error)
     message.error('批量已读失败')
   }
 }
 
-async function handleBatchEvaluate() {
-  try {
-    const result = await store.triggerBatchEvaluate()
-    message.success(`评估完成，生成 ${result.alertsGenerated} 条预警`)
-    await fetchData()
-  } catch (e: unknown) {
-    console.error(e)
-    message.error('触发评估失败')
+async function handleBatchStatus(processStatus: AlertProcessStatus) {
+  const rows = getSelectedRows()
+  if (!rows.length) {
+    message.info('请先勾选告警')
+    return
   }
+
+  Modal.confirm({
+    title: '确认批量处理',
+    content: `将对 ${rows.length} 条告警执行${ALERT_PROCESS_STATUS_LABELS[processStatus]}，继续吗？`,
+    async onOk() {
+      const result = await store.batchChangeStatus(
+        rows.map((item) => item.id),
+        processStatus,
+      )
+      syncBatchStatusResult(result.successIds, processStatus)
+      showBatchResult(`批量${ALERT_PROCESS_STATUS_LABELS[processStatus]}`, result)
+      clearSelection()
+    },
+  })
 }
 
 async function handleChangeStatus(
   record: AlertLogVO,
-  processStatus: 'PROCESSED' | 'ARCHIVED' | 'INVALID',
+  processStatus: AlertProcessStatus,
   statusRemark?: string,
 ) {
   try {
     await store.changeStatus(record.id, processStatus, statusRemark)
+    syncActiveRecord(record.id, (item) => {
+      item.processStatus = processStatus
+      item.statusRemark = statusRemark
+      if (processStatus === 'PROCESSED') item.processedAt = new Date().toISOString()
+      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') item.archivedAt = new Date().toISOString()
+    })
     message.success(
       processStatus === 'PROCESSED'
         ? '已标记为已处理'
@@ -240,92 +384,115 @@ async function handleChangeStatus(
           ? '已归档'
           : '已标记为失效',
     )
-  } catch (e: unknown) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
     message.error('状态更新失败')
   }
 }
 
-// ── KPI ──
+async function handleSaveActiveResult() {
+  if (!activeRecord.value) return
+  const nextStatus: AlertProcessStatus =
+    String(activeRecord.value.processStatus ?? 'OPEN') === 'ARCHIVED' ? 'ARCHIVED' : 'PROCESSED'
+  await handleChangeStatus(activeRecord.value, nextStatus, statusRemarkDraft.value.trim() || undefined)
+}
+
+function isSameLocalDay(value: unknown, target = new Date()) {
+  const date = new Date(String(value ?? ''))
+  if (Number.isNaN(date.getTime())) return false
+  return (
+    date.getFullYear() === target.getFullYear() &&
+    date.getMonth() === target.getMonth() &&
+    date.getDate() === target.getDate()
+  )
+}
+
 const kpi = computed(() => {
-  const all = store.alerts
-  const highCount = all.filter((a) => a.severity === 'HIGH').length
-  const mediumCount = all.filter((a) => a.severity === 'MEDIUM').length
-  const unreadCount = all.filter((a) => a.isRead === 0).length
-  const readCount = all.filter((a) => a.isRead === 1).length
-  return {
-    total: total.value,
-    high: highCount,
-    medium: mediumCount,
-    unread: unreadCount,
-    read: readCount,
-    pageCount: all.length,
-  }
+  const list = alerts.value
+  const open = list.filter((item) => String(item.processStatus ?? 'OPEN') === 'OPEN').length
+  const high = list.filter((item) => item.severity === 'HIGH').length
+  const today = list.filter((item) => isSameLocalDay(item.triggeredAt)).length
+  const archived = list.filter((item) => String(item.processStatus ?? '') === 'ARCHIVED').length
+  return { open, high, today, archived }
 })
 
-const kpiMax = computed(() => ({
-  total: Math.max(kpi.value.pageCount, 1),
-  high: Math.max(kpi.value.high, 1),
-  unread: Math.max(kpi.value.unread, 1),
-}))
-const severitySummary = computed(() => [
+const kpiCards = computed(() => [
   {
-    label: '高危',
-    count: store.alerts.filter((a) => a.severity === 'HIGH').length,
-    color: '#ff4d4f',
+    key: 'open',
+    titleCn: '待处理',
+    titleEn: 'OPEN',
+    value: kpi.value.open,
+    hint: `较昨日 ${Math.max(kpi.value.high - kpi.value.today, 0)}`,
+    icon: BellOutlined,
+    tone: 'danger',
   },
   {
-    label: '中危',
-    count: store.alerts.filter((a) => a.severity === 'MEDIUM').length,
-    color: '#faad14',
+    key: 'high',
+    titleCn: '高危',
+    titleEn: 'HIGH',
+    value: kpi.value.high,
+    hint: `较昨日 ${Math.max(kpi.value.open - kpi.value.archived, 0)}`,
+    icon: WarningOutlined,
+    tone: 'warning',
   },
   {
-    label: '低危',
-    count: store.alerts.filter((a) => a.severity === 'LOW').length,
-    color: '#52c41a',
+    key: 'today',
+    titleCn: '今日触发',
+    titleEn: '',
+    value: kpi.value.today,
+    hint: `当前页 ${alerts.value.length}`,
+    icon: ThunderboltOutlined,
+    tone: 'primary',
+  },
+  {
+    key: 'archived',
+    titleCn: '已归档',
+    titleEn: 'ARCHIVED',
+    value: kpi.value.archived,
+    hint: `总计 ${total.value}`,
+    icon: InboxOutlined,
+    tone: 'success',
   },
 ])
-const readStatusSummary = computed(() => [
-  {
-    label: '未读',
-    count: kpi.value.unread,
-    color: '#1677ff',
-  },
-  {
-    label: '已读',
-    count: kpi.value.read,
-    color: '#52c41a',
-  },
-])
-const recentUnreadAlerts = computed(() => store.alerts.filter((a) => a.isRead === 0).slice(0, 4))
-function kpiPct(value: number, max: number): number {
-  if (max === 0) return 0
-  return Math.min(Math.round((value / max) * 100), 100)
+
+const selectedCount = computed(() => selectedRowKeys.value.length)
+const tableHeight = '100%'
+const checkboxColumn = {
+  field: '__selection',
+  title: '',
+  width: 56,
+  fixed: 'left',
+  align: 'center' as const,
+  headerAlign: 'center' as const,
+  slots: { header: 'selectionHeader', default: 'selection' },
 }
 
-function alertPercent(value: number): number {
-  if (!kpi.value.pageCount) return 0
-  return Math.min(Math.round((value / kpi.value.pageCount) * 100), 100)
-}
+const subscriptionRows = computed(() => {
+  const effective = subscriptionState.value?.effectiveSubscription
+  const channels = availableSubscriptionChannels.value.length
+    ? availableSubscriptionChannels.value
+    : ['IN_APP', 'EMAIL', 'WECHAT', 'SMS']
+  return channels.map((channel) => ({
+    channel,
+    label: ALERT_CHANNEL_LABELS[channel] ?? channel,
+    enabled: Boolean(effective?.enabled && effective.channels.includes(channel)),
+    minSeverity:
+      effective?.minSeverity === 'HIGH' ? 'HIGH' : effective?.minSeverity === 'MEDIUM' ? 'MEDIUM' : 'LOW',
+  }))
+})
 
-// ── Columns ──
 const gridColumns = computed(() => [
-  { field: 'message', title: '预警内容', ellipsis: true, minWidth: 260, slots: { default: 'message' } },
-  {
-    field: 'projectId',
-    title: '项目',
-    width: 130,
-    ellipsis: true,
-    slots: { default: 'projectId' },
-  },
-  { field: 'severity', title: '严重度', width: 92, slots: { default: 'severity' } },
-  { field: 'category', title: '分类', width: 96, slots: { default: 'category' } },
-  { field: 'alertCategory', title: '标签', width: 108, slots: { default: 'alertCategory' } },
-  { field: 'ruleType', title: '规则类型', width: 116, slots: { default: 'ruleType' } },
-  { field: 'triggeredAt', title: '触发时间', width: 120, slots: { default: 'triggeredAt' } },
-  { field: 'isRead', title: '状态', width: 82, slots: { default: 'isRead' } },
-  { field: 'processStatus', title: '处理口径', width: 104, slots: { default: 'processStatus' } },
-  { title: '操作', width: 92, slots: { default: 'action' } },
+  { field: 'id', title: '告警ID', width: 188, showOverflow: 'title', slots: { default: 'id' } },
+  { field: 'projectId', title: '项目', minWidth: 220, showOverflow: 'title', slots: { default: 'projectId' } },
+  { field: 'alertDomain', title: '规则域', width: 108, slots: { default: 'alertDomain' } },
+  { field: 'ruleType', title: '规则类型', minWidth: 148, slots: { default: 'ruleType' } },
+  { field: 'alertCategory', title: '细分类', width: 118, slots: { default: 'alertCategory' } },
+  { field: 'severity', title: '严重度', width: 98, slots: { default: 'severity' } },
+  { field: 'processStatus', title: '处理状态', width: 108, slots: { default: 'processStatus' } },
+  { field: 'isRead', title: '已读', width: 88, slots: { default: 'isRead' } },
+  { field: 'triggeredAt', title: '触发时间', width: 162, slots: { default: 'triggeredAt' } },
+  { field: 'message', title: '消息摘要', minWidth: 300, slots: { default: 'message' } },
+  { title: '操作', width: 220, fixed: 'right', slots: { default: 'action' } },
 ])
 
 const {
@@ -334,15 +501,16 @@ const {
   colVisible,
   toggleCol,
 } = useColumnSettings('alert_list_cols', gridColumns)
+const tableColumns = computed(() => [checkboxColumn, ...visibleGridColumns.value])
 
-function getProjectName(projectId: string): string {
-  const p = projectOptions.value.find((o) => String(o.id) === String(projectId))
-  return p ? `${p.projectCode} ${p.projectName}` : `项目#${projectId}`
+function getProjectName(projectId: string | number): string {
+  const project = projectOptions.value.find((item) => String(item.id) === String(projectId))
+  return project ? `${project.projectCode} ${project.projectName}` : `项目#${projectId}`
 }
 
-function getAlertCategoryLabel(record: AlertLogVO): string {
+function getAlertDomainLabel(record: AlertLogVO): string {
   const category = getAlertRuleCategory(record.ruleType, record.alertDomain, record.category)
-  return RULE_CATEGORY_LABELS[category] || '未分类'
+  return RULE_CATEGORY_LABELS[category] || category || '未分类'
 }
 
 function getAlertTagLabel(record: AlertLogVO): string {
@@ -358,9 +526,13 @@ function getAlertMessageText(value: unknown): string {
   return text || '-'
 }
 
-function formatTriggeredDate(value: unknown): string {
+function formatDateTime(value: unknown): string {
   const text = String(value ?? '').trim()
-  return text ? text.slice(0, 10) : '-'
+  return text || '-'
+}
+
+function formatSeverityText(value: string) {
+  return value === 'HIGH' ? 'HIGH' : value === 'MEDIUM' ? 'MEDIUM' : 'LOW'
 }
 
 function buildAlertBusinessPath(record: AlertLogVO): string {
@@ -383,10 +555,7 @@ function buildAlertBusinessPath(record: AlertLogVO): string {
   }
 
   const contractId = String(record.contractId ?? '').trim()
-  if (
-    contractId &&
-    ['CONTRACT_OVERDUE', 'CONTRACT_EXPIRING'].includes(String(record.ruleType ?? '').trim())
-  ) {
+  if (contractId && ['CONTRACT_OVERDUE', 'CONTRACT_EXPIRING'].includes(String(record.ruleType ?? '').trim())) {
     return `/contract/${contractId}`
   }
 
@@ -455,279 +624,281 @@ async function handleSaveSubscription() {
   }
 }
 
-// ── Init ──
+function exportCurrentView() {
+  if (!alerts.value.length) {
+    message.info('当前没有可导出的预警数据')
+    return
+  }
+  const rows = alerts.value.map((item) => [
+    item.id,
+    getProjectName(item.projectId),
+    getAlertDomainLabel(item),
+    RULE_TYPE_LABELS[item.ruleType] || item.ruleType,
+    getAlertTagLabel(item),
+    formatSeverityText(item.severity),
+    getProcessStatusLabel(item),
+    item.isRead === 0 ? '未读' : '已读',
+    formatDateTime(item.triggeredAt),
+    getAlertMessageText(item.message).replace(/\r?\n/g, ' '),
+  ])
+  const header = ['告警ID', '项目', '规则域', '规则类型', '细分类', '严重度', '处理状态', '已读', '触发时间', '消息摘要']
+  const csv = [header, ...rows]
+    .map((line) =>
+      line
+        .map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`)
+        .join(','),
+    )
+    .join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `alerts-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+  message.success('已导出当前列表')
+}
+
+watch(activeRecord, (value) => {
+  statusRemarkDraft.value = String(value?.statusRemark ?? '')
+}, { immediate: true })
+
 onMounted(async () => {
   applyRoleDefaultView()
   projectsLoading.value = true
   try {
-    await referenceStore.fetchProjects()
+    if (!referenceStore.projects?.length) {
+      await referenceStore.loadProjects()
+    }
+  } catch (error) {
+    console.error(error)
   } finally {
     projectsLoading.value = false
   }
-  await loadSubscription()
-  fetchData()
+  await Promise.all([fetchData(), loadSubscription()])
 })
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page alert-page">
-    <div class="lg-page-head alert-page-head">
-      <div class="alert-page-meta-row">
-        <a-breadcrumb class="al-breadcrumb">
+  <div class="lg-page app-page alert-page">
+    <div class="lg-page-head">
+      <div>
+        <a-breadcrumb class="lg-page-head-breadcrumb">
+          <a-breadcrumb-item>首页</a-breadcrumb-item>
           <a-breadcrumb-item>预警中心</a-breadcrumb-item>
-          <a-breadcrumb-item>预警列表</a-breadcrumb-item>
         </a-breadcrumb>
-        <span class="alert-page-subtitle">统一管理风险等级、阅读状态与规则触发记录</span>
       </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <div class="lg-search-bar alert-search-bar">
-      <div class="alert-search-fields">
-        <a-input
-          v-model:value="filter.keyword"
-          class="alert-search-input"
-          placeholder="搜索预警内容、项目…"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix><SearchOutlined class="alert-search-prefix-icon" /></template>
-        </a-input>
-        <a-select
-          v-model:value="filter.projectId"
-          class="alert-search-select"
-          placeholder="全部项目"
-          allow-clear
-          size="large"
-          :loading="projectsLoading"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in projectOptions" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.severity"
-          class="alert-search-select is-compact"
-          placeholder="预警等级"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option value="HIGH">高危</a-select-option>
-          <a-select-option value="MEDIUM">中危</a-select-option>
-          <a-select-option value="LOW">低危</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.isRead"
-          class="alert-search-select is-compact"
-          placeholder="阅读状态"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option :value="0">未读</a-select-option>
-          <a-select-option :value="1">已读</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.processStatus"
-          class="alert-search-select is-compact"
-          placeholder="处理口径"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="item in processStatusOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
-        <a-range-picker
-          v-model:value="filter.triggeredAtRange"
-          class="alert-search-range"
-          show-time
-          value-format="YYYY-MM-DD HH:mm:ss"
-        />
-        <div class="alert-default-scope-switch">
-          <span>只看默认域</span>
-          <a-switch
-            v-model:checked="filter.onlyDefaultScope"
-            :disabled="!hasDefaultScopeDomain"
-            @change="handleSearch"
-          />
-        </div>
-      </div>
-      <div class="alert-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
-    </div>
+    <div class="alert-shell">
+      <div class="alert-main">
+        <section class="alert-kpi-grid">
+          <article
+            v-for="card in kpiCards"
+            :key="card.key"
+            class="alert-kpi-card"
+            :class="`is-${card.tone}`"
+          >
+            <div class="alert-kpi-content">
+              <div class="alert-kpi-label">
+                <span>{{ card.titleCn }}</span>
+                <small v-if="card.titleEn">{{ card.titleEn }}</small>
+              </div>
+              <div class="alert-kpi-value">{{ card.value }}</div>
+              <div class="alert-kpi-hint">{{ card.hint }}</div>
+            </div>
+            <div class="alert-kpi-icon">
+              <component :is="card.icon" />
+            </div>
+          </article>
+        </section>
 
-    <div class="lg-grid alert-workspace">
-      <div class="lg-left">
-        <!-- KPI 横条 -->
-        <div class="alert-kpi-summary" aria-label="预警关键指标">
-          <div class="alert-kpi-item">
-            <span class="alert-kpi-icon is-total"><FileTextOutlined /></span>
-            <span class="alert-kpi-label">预警总数</span>
-            <span class="alert-kpi-value">{{ kpi.total }} <small>条</small></span>
-          </div>
-          <div class="alert-kpi-item is-wide">
-            <span class="alert-kpi-icon is-overdue"><AlertOutlined /></span>
-            <span class="alert-kpi-label">高危预警</span>
-            <span class="alert-kpi-value">{{ kpi.high }} <small>条</small></span>
-          </div>
-          <div class="alert-kpi-item is-progress">
-            <span class="alert-kpi-icon is-amount"><WarningOutlined /></span>
-            <span class="alert-kpi-label">中危预警</span>
-            <span class="alert-kpi-value">{{ kpi.medium }} <small>条</small></span>
-            <span class="alert-kpi-progress">
-              <span :style="{ width: kpiPct(kpi.medium, kpiMax.total) + '%' }"></span>
-            </span>
-          </div>
-          <div class="alert-kpi-item is-progress is-unread">
-            <span class="alert-kpi-icon is-unpaid"><ClockCircleOutlined /></span>
-            <span class="alert-kpi-label">未读预警</span>
-            <span class="alert-kpi-value">{{ kpi.unread }} <small>条</small></span>
-            <span class="alert-kpi-progress">
-              <span :style="{ width: kpiPct(kpi.unread, kpiMax.total) + '%' }"></span>
-            </span>
-          </div>
-          <div class="alert-kpi-item">
-            <span class="alert-kpi-icon is-paid"><CheckCircleOutlined /></span>
-            <span class="alert-kpi-label">已读预警</span>
-            <span class="alert-kpi-value">{{ kpi.read }} <small>条</small></span>
-          </div>
-        </div>
-
-        <main class="lg-list-table-panel alert-table-panel">
-          <!-- 工具栏 -->
-          <div class="lg-toolbar alert-toolbar">
-            <div class="lg-toolbar-left">
-              <span class="alert-table-title">预警记录</span>
-              <span class="alert-table-count">共 {{ total }} 条</span>
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
+        <section class="alert-panel alert-filter-panel">
+          <div class="alert-filter-grid">
+            <div class="alert-filter-item">
+              <label>项目</label>
+              <a-select
+                v-model:value="filter.projectId"
+                allow-clear
+                show-search
+                :loading="projectsLoading"
+                :options="projectOptions.map((item) => ({ value: String(item.id), label: `${item.projectCode} ${item.projectName}` }))"
+                placeholder="请选择项目"
               />
-              <a-button @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
-                刷新
-              </a-button>
-              <a-button :loading="subscriptionLoading" @click="openSubscriptionModal">
-                通知订阅
-              </a-button>
-              <a-button :disabled="!currentPageUnreadAlerts.length" @click="handleBatchMarkRead">
-                当前页未读标已读
-              </a-button>
-              <a-button
-                type="primary"
-                danger
-                :loading="store.evaluating"
-                @click="handleBatchEvaluate"
-              >
-                触发评估
-              </a-button>
             </div>
-            <div class="lg-toolbar-right">
-              <span class="alert-toolbar-hint">固定表头 / 风险分级 / 行操作可展开</span>
+            <div class="alert-filter-item">
+              <label>严重度</label>
+              <a-select
+                v-model:value="filter.severity"
+                allow-clear
+                :options="[
+                  { value: 'HIGH', label: '高危' },
+                  { value: 'MEDIUM', label: '中危' },
+                  { value: 'LOW', label: '低危' },
+                ]"
+                placeholder="请选择严重度"
+              />
+            </div>
+            <div class="alert-filter-item">
+              <label>已读状态</label>
+              <a-select
+                v-model:value="filter.isRead"
+                allow-clear
+                :options="[
+                  { value: 0, label: '未读' },
+                  { value: 1, label: '已读' },
+                ]"
+                placeholder="全部"
+              />
+            </div>
+            <div class="alert-filter-item">
+              <label>处理状态</label>
+              <a-select
+                v-model:value="filter.processStatus"
+                allow-clear
+                :options="processStatusOptions"
+                placeholder="全部"
+              />
+            </div>
+            <div class="alert-filter-item alert-filter-item-range">
+              <label>触发时间</label>
+              <a-range-picker v-model:value="filter.triggeredAtRange" value-format="" style="width: 100%" />
             </div>
           </div>
+          <div class="alert-filter-foot">
+            <div class="alert-filter-item alert-filter-item-keyword">
+              <a-input
+                v-model:value="filter.keyword"
+                allow-clear
+                placeholder="告警ID/消息摘要/业务单据号"
+              >
+                <template #prefix>
+                  <SearchOutlined />
+                </template>
+              </a-input>
+            </div>
+            <div class="alert-filter-actions">
+              <a-button type="primary" @click="handleSearch">搜索</a-button>
+              <a-button @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </div>
+            <div v-if="hasDefaultScopeDomain" class="alert-filter-scope">
+              <a-checkbox v-model:checked="filter.onlyDefaultScope">仅看默认范围</a-checkbox>
+            </div>
+          </div>
+        </section>
 
-          <!-- 表格 -->
-          <div class="lg-table-wrap">
+        <section class="alert-panel alert-table-panel">
+          <div class="alert-toolbar">
+            <div class="alert-toolbar-left">
+              <a-button type="primary" :disabled="selectedCount === 0" @click="handleBatchStatus('PROCESSED')">批量处理</a-button>
+              <a-button :disabled="selectedCount === 0" @click="handleBatchMarkRead">标记已读</a-button>
+              <a-button :disabled="selectedCount === 0" @click="handleBatchStatus('ARCHIVED')">归档</a-button>
+              <a-button @click="exportCurrentView">导出</a-button>
+              <span class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>
+            </div>
+            <ColumnSettingsButton
+              :columns="columnSettings"
+              :visible="colVisible"
+              @toggle="toggleCol"
+            />
+          </div>
+
+          <div class="lg-table-wrap alert-grid-wrap">
             <vxe-grid
-              :data="store.alerts"
-              :columns="visibleGridColumns"
+              ref="gridRef"
+              :data="alerts"
+              :columns="tableColumns"
               :loading="store.loading"
+              :height="tableHeight"
               :column-config="{ resizable: true }"
-              stripe
+              :row-config="{ isHover: true }"
               border="inner"
-              size="small"
+              size="mini"
+              show-overflow="title"
             >
-              <template #message="{ row }">
-                <a-tooltip :title="row.message">
-                  <span class="alert-message-text">{{ getAlertMessageText(row.message) }}</span>
-                </a-tooltip>
+              <template #selectionHeader>
+                <a-checkbox
+                  :checked="allPageSelected"
+                  :indeterminate="pageSelectionIndeterminate"
+                  @change="(event) => togglePageSelection(event.target.checked)"
+                />
+              </template>
+              <template #selection="{ row }">
+                <a-checkbox
+                  :checked="isRowSelected(row.id)"
+                  @change="(event) => toggleRowSelection(row, event.target.checked)"
+                />
+              </template>
+              <template #id="{ row }">
+                <button type="button" class="alert-link" @click="openDetail(row)">{{ row.id }}</button>
               </template>
               <template #projectId="{ row }">
-                <button
-                  v-if="canOpenBusinessEntry(row)"
-                  type="button"
-                  class="alert-project-link"
-                  @click="openBusinessEntry(row)"
-                >
+                <button type="button" class="alert-link alert-project-link" @click="openDetail(row)">
                   {{ getProjectName(row.projectId) }}
                 </button>
-                <span v-else class="al-muted">{{ getProjectName(row.projectId) }}</span>
               </template>
-              <template #severity="{ row }">
-                <a-tag :color="SEVERITY_COLOR[row.severity] ?? 'default'">
-                  {{ row.severity === 'HIGH' ? '高' : row.severity === 'MEDIUM' ? '中' : '低' }}
-                </a-tag>
-              </template>
-              <template #category="{ row }">
-                <a-tag>{{ getAlertCategoryLabel(row) }}</a-tag>
-              </template>
-              <template #alertCategory="{ row }">
-                <a-tag color="purple">{{ getAlertTagLabel(row) }}</a-tag>
+              <template #alertDomain="{ row }">
+                <span class="alert-cell-text">{{ getAlertDomainLabel(row) }}</span>
               </template>
               <template #ruleType="{ row }">
-                <a-tag>{{ RULE_TYPE_LABELS[row.ruleType] || row.ruleType }}</a-tag>
+                <span class="alert-cell-text">{{ RULE_TYPE_LABELS[row.ruleType] || row.ruleType }}</span>
               </template>
-              <template #triggeredAt="{ row }">
-                <span>{{ formatTriggeredDate(row.triggeredAt) }}</span>
+              <template #alertCategory="{ row }">
+                <span class="alert-cell-text">{{ getAlertTagLabel(row) }}</span>
               </template>
-              <template #isRead="{ row }">
-                <a-badge v-if="row.isRead === 0" status="processing" text="未读" />
-                <span v-else class="al-muted">已读</span>
-              </template>
-              <template #processStatus="{ row }">
-                <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(row.processStatus ?? 'OPEN')] ?? 'default'">
-                  {{ getProcessStatusLabel(row) }}
+              <template #severity="{ row }">
+                <a-tag :color="SEVERITY_COLOR[row.severity] ?? 'default'" class="alert-tag">
+                  {{ formatSeverityText(row.severity) }}
                 </a-tag>
               </template>
+              <template #processStatus="{ row }">
+                <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(row.processStatus ?? 'OPEN')] ?? 'default'" class="alert-tag">
+                  {{ String(row.processStatus ?? 'OPEN') }}
+                </a-tag>
+              </template>
+              <template #isRead="{ row }">
+                <span class="alert-read-state" :class="{ 'is-unread': row.isRead === 0 }">
+                  <i></i>
+                  {{ row.isRead === 0 ? '未读' : '已读' }}
+                </span>
+              </template>
+              <template #triggeredAt="{ row }">
+                <span class="alert-cell-text">{{ formatDateTime(row.triggeredAt) }}</span>
+              </template>
+              <template #message="{ row }">
+                <button type="button" class="alert-message-button" @click="openDetail(row)">
+                  {{ getAlertMessageText(row.message) }}
+                </button>
+              </template>
               <template #action="{ row }">
-                <a-dropdown v-if="row.isRead === 0 || canOpenBusinessEntry(row) || row.processStatus !== 'ARCHIVED'" :trigger="['click']">
+                <div class="alert-row-actions">
+                  <a-button v-if="row.isRead === 0" type="link" size="small" @click="handleMarkRead(row)">标记已读</a-button>
                   <a-button
-                    class="lg-row-action-trigger"
+                    v-if="String(row.processStatus ?? 'OPEN') !== 'PROCESSED'"
+                    type="link"
                     size="small"
-                    type="text"
-                    :loading="store.markingRead.has(String(row.id))"
+                    @click="handleChangeStatus(row, 'PROCESSED')"
                   >
-                    <MoreOutlined />
+                    处理
                   </a-button>
-                  <template #overlay>
-                    <a-menu>
-                      <a-menu-item v-if="row.isRead === 0" @click="handleMarkRead(row)">
-                        标为已读
-                      </a-menu-item>
-                      <a-menu-item v-if="row.processStatus !== 'PROCESSED'" @click="handleChangeStatus(row, 'PROCESSED')">
-                        标为已处理
-                      </a-menu-item>
-                      <a-menu-item v-if="row.processStatus !== 'ARCHIVED'" @click="handleChangeStatus(row, 'ARCHIVED')">
-                        归档
-                      </a-menu-item>
-                      <a-menu-item v-if="row.processStatus !== 'INVALID'" @click="handleChangeStatus(row, 'INVALID')">
-                        标为失效
-                      </a-menu-item>
-                      <a-menu-item v-if="canOpenBusinessEntry(row)" @click="openBusinessEntry(row)">
-                        查看业务单据
-                      </a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
-                <span v-else class="al-muted">-</span>
+                  <a-button
+                    v-if="String(row.processStatus ?? 'OPEN') !== 'ARCHIVED'"
+                    type="link"
+                    size="small"
+                    @click="handleChangeStatus(row, 'ARCHIVED')"
+                  >
+                    归档
+                  </a-button>
+                  <a-button type="link" size="small" @click="openDetail(row)">详情</a-button>
+                </div>
               </template>
             </vxe-grid>
           </div>
 
-          <!-- 分页 -->
-          <div class="lg-pagination">
+          <div class="lg-pagination alert-pagination">
             <span class="lg-total">共 {{ total }} 条</span>
             <a-pagination
               v-model:current="pageNo"
@@ -740,62 +911,130 @@ onMounted(async () => {
               @show-size-change="handlePageSizeChange"
             />
           </div>
-        </main>
+        </section>
       </div>
 
-      <aside class="lg-analysis-rail alert-analysis-rail" aria-label="预警辅助分析">
-        <div class="alert-analysis-panel">
-          <header class="alert-analysis-head">
-            <div>
-              <div class="alert-analysis-title">预警分析</div>
-              <div class="alert-analysis-subtitle">等级、状态与未读风险</div>
-            </div>
-            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
-          </header>
+      <aside class="alert-detail-panel">
+        <div class="alert-detail-head">
+          <div class="alert-detail-title">告警详情</div>
+        </div>
 
-          <section class="alert-analysis-section">
-            <div class="alert-section-title">预警等级分布</div>
-            <div v-for="item in severitySummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.color }"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{ width: alertPercent(item.count) + '%', background: item.color }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ item.count }}</span>
-              <span class="lg-type-pct">{{ alertPercent(item.count) }}%</span>
+        <template v-if="activeRecord">
+          <section class="alert-detail-section">
+            <div class="alert-section-title">基本信息</div>
+            <div class="alert-detail-grid">
+              <div class="alert-detail-item">
+                <span>告警ID</span>
+                <strong>{{ activeRecord.id }}</strong>
+              </div>
+              <div class="alert-detail-item">
+                <span>严重度</span>
+                <a-tag :color="SEVERITY_COLOR[activeRecord.severity] ?? 'default'">{{ formatSeverityText(activeRecord.severity) }}</a-tag>
+              </div>
+              <div class="alert-detail-item">
+                <span>处理状态</span>
+                <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(activeRecord.processStatus ?? 'OPEN')] ?? 'default'">
+                  {{ String(activeRecord.processStatus ?? 'OPEN') }}
+                </a-tag>
+              </div>
+              <div class="alert-detail-item">
+                <span>已读状态</span>
+                <span class="alert-read-state" :class="{ 'is-unread': activeRecord.isRead === 0 }">
+                  <i></i>
+                  {{ activeRecord.isRead === 0 ? '未读' : '已读' }}
+                </span>
+              </div>
+              <div class="alert-detail-item">
+                <span>触发时间</span>
+                <strong>{{ formatDateTime(activeRecord.triggeredAt) }}</strong>
+              </div>
             </div>
           </section>
 
-          <section class="alert-analysis-section">
-            <div class="alert-section-title">阅读状态</div>
-            <div v-for="item in readStatusSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.color }"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{ width: alertPercent(item.count) + '%', background: item.color }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ item.count }}</span>
-              <span class="lg-type-pct">{{ alertPercent(item.count) }}%</span>
+          <section class="alert-detail-section">
+            <div class="alert-section-title">告警内容</div>
+            <div class="alert-content-list">
+              <div class="alert-content-row">
+                <span>规则域</span>
+                <strong>{{ getAlertDomainLabel(activeRecord) }}</strong>
+              </div>
+              <div class="alert-content-row">
+                <span>项目</span>
+                <strong>{{ getProjectName(activeRecord.projectId) }}</strong>
+              </div>
+              <div class="alert-content-row">
+                <span>消息摘要</span>
+                <strong class="is-message">{{ getAlertMessageText(activeRecord.message) }}</strong>
+              </div>
             </div>
           </section>
 
-          <section class="alert-analysis-section">
-            <div class="lg-warning-head">
-              <div class="alert-section-title">未读预警</div>
-              <span class="alert-warning-count">{{ recentUnreadAlerts.length }} 项</span>
+          <section class="alert-detail-section">
+            <div class="alert-section-title">状态备注</div>
+            <a-textarea
+              v-model:value="statusRemarkDraft"
+              :maxlength="200"
+              :auto-size="{ minRows: 4, maxRows: 6 }"
+              placeholder="请填写处理备注，支持 200 字以内"
+            />
+            <div class="alert-detail-tip">
+              当前状态：{{ getProcessStatusLabel(activeRecord) }}，保存时会同步备注。
             </div>
-            <div v-for="item in recentUnreadAlerts" :key="item.id" class="lg-warning-item">
-              <span class="lg-warning-project">{{ getProjectName(item.projectId) }}</span>
-              <span class="lg-warning-title">{{ item.message }}</span>
-            </div>
-            <div v-if="!recentUnreadAlerts.length" class="lg-warning-empty">暂无未读预警</div>
           </section>
+
+          <section class="alert-detail-section">
+            <div class="alert-section-title">处理信息</div>
+            <div class="alert-content-list">
+              <div class="alert-content-row">
+                <span>处理人</span>
+                <strong>{{ currentOperator }}</strong>
+              </div>
+              <div class="alert-content-row">
+                <span>处理时间</span>
+                <strong>{{ formatDateTime(activeRecord.processedAt) }}</strong>
+              </div>
+              <div class="alert-content-row">
+                <span>归档时间</span>
+                <strong>{{ formatDateTime(activeRecord.archivedAt) }}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="alert-detail-section">
+            <div class="alert-section-row">
+              <div class="alert-section-title">通知订阅</div>
+              <a-button type="link" size="small" @click="openSubscriptionModal">编辑</a-button>
+            </div>
+            <div class="alert-subscription-summary">{{ subscriptionSummaryText }}</div>
+            <div class="alert-subscription-table">
+              <div class="alert-subscription-header">
+                <span>通知渠道</span>
+                <span>是否启用</span>
+                <span>最低严重度</span>
+              </div>
+              <div v-for="item in subscriptionRows" :key="item.channel" class="alert-subscription-line">
+                <span>{{ item.label }}</span>
+                <a-switch :checked="item.enabled" disabled size="small" />
+                <span>{{ item.minSeverity }}</span>
+              </div>
+            </div>
+          </section>
+
+          <div class="alert-detail-actions">
+            <a-button v-if="activeRecord.isRead === 0" @click="handleMarkRead(activeRecord)">标记已读</a-button>
+            <a-button v-if="String(activeRecord.processStatus ?? 'OPEN') !== 'ARCHIVED'" @click="handleChangeStatus(activeRecord, 'ARCHIVED', statusRemarkDraft.trim() || undefined)">
+              归档
+            </a-button>
+            <a-button v-if="canOpenBusinessEntry(activeRecord)" @click="openBusinessEntry(activeRecord)">
+              查看业务单据
+            </a-button>
+            <a-button type="primary" @click="handleSaveActiveResult">保存处理结果</a-button>
+          </div>
+        </template>
+
+        <div v-else class="alert-detail-empty">
+          <div class="alert-detail-empty-title">未选择预警</div>
+          <div class="alert-detail-empty-text">请从左侧列表选择一条告警查看详情。</div>
         </div>
       </aside>
     </div>
@@ -810,19 +1049,12 @@ onMounted(async () => {
         <div class="alert-subscription-form">
           <div class="alert-subscription-row">
             <span class="alert-subscription-label">接收通知</span>
-            <a-switch
-              v-model:checked="subscriptionForm.enabled"
-              :disabled="!defaultSubscriptionEnabled"
-            />
+            <a-switch v-model:checked="subscriptionForm.enabled" :disabled="!defaultSubscriptionEnabled" />
           </div>
           <div class="alert-subscription-row is-block">
             <span class="alert-subscription-label">通知渠道</span>
             <a-checkbox-group v-model:value="subscriptionForm.channels">
-              <a-checkbox
-                v-for="channel in availableSubscriptionChannels"
-                :key="channel"
-                :value="channel"
-              >
+              <a-checkbox v-for="channel in availableSubscriptionChannels" :key="channel" :value="channel">
                 {{ ALERT_CHANNEL_LABELS[channel] ?? channel }}
               </a-checkbox>
             </a-checkbox-group>
@@ -830,11 +1062,7 @@ onMounted(async () => {
           <div class="alert-subscription-row is-block">
             <span class="alert-subscription-label">预警域</span>
             <a-checkbox-group v-model:value="subscriptionForm.domains">
-              <a-checkbox
-                v-for="domain in availableSubscriptionDomains"
-                :key="domain"
-                :value="domain"
-              >
+              <a-checkbox v-for="domain in availableSubscriptionDomains" :key="domain" :value="domain">
                 {{ RULE_CATEGORY_LABELS[domain] ?? domain }}
               </a-checkbox>
             </a-checkbox-group>
@@ -849,10 +1077,7 @@ onMounted(async () => {
           </div>
           <div class="alert-subscription-row">
             <span class="alert-subscription-label">状态变更通知</span>
-            <a-switch
-              v-model:checked="subscriptionForm.notifyOnStatusChanged"
-              :disabled="!defaultStatusChangeEnabled"
-            />
+            <a-switch v-model:checked="subscriptionForm.notifyOnStatusChanged" :disabled="!defaultStatusChangeEnabled" />
           </div>
         </div>
       </a-spin>
@@ -862,132 +1087,90 @@ onMounted(async () => {
 
 <style scoped>
 .alert-page {
-  gap: 14px;
+  gap: 16px;
+  min-height: 100%;
+  background: #f5f7fb;
 }
 
-.alert-page-head {
-  align-items: center;
-  justify-content: space-between;
-  min-height: 0;
-  padding: 0;
-}
-
-.alert-page-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 5em;
-  min-width: 0;
-}
-
-.al-breadcrumb {
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.alert-page-subtitle {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
-.al-muted {
-  color: var(--muted);
-}
-
-.alert-search-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 74px;
-}
-
-.alert-search-fields {
-  display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  min-width: 0;
-}
-
-.alert-search-input {
-  width: min(520px, 31vw);
-  min-width: 320px;
-  flex: 1 1 auto;
-}
-
-.alert-search-prefix-icon {
-  color: var(--text-secondary);
-}
-
-.alert-search-select {
-  width: 180px;
-  flex: 0 0 180px;
-}
-
-.alert-search-select.is-compact {
-  width: 150px;
-  flex-basis: 150px;
-}
-
-.alert-search-range {
-  width: 320px;
-  flex: 0 0 320px;
-}
-
-.alert-default-scope-switch {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  position: relative;
-  z-index: 1;
-}
-
-.alert-search-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.alert-workspace {
-  align-items: stretch;
-  min-height: 0;
-}
-
-.alert-kpi-summary {
+.alert-shell {
   display: grid;
-  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 16px;
+  align-items: stretch;
+  height: calc(100vh - 74px);
+  min-height: 720px;
+}
+
+.alert-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.alert-panel,
+.alert-detail-panel {
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(31, 35, 41, 0.04);
+}
+
+.alert-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
   overflow: hidden;
-  min-height: 84px;
-  margin-bottom: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  background: #fff;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(31, 35, 41, 0.04);
 }
 
-.alert-kpi-item {
-  position: relative;
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-rows: 19px 27px 8px;
-  column-gap: 10px;
+.alert-kpi-card {
+  display: flex;
   align-items: center;
-  min-width: 0;
-  padding: 16px 18px;
-  border-right: 1px solid var(--border-subtle);
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 18px;
+  min-height: 72px;
 }
 
-.alert-kpi-item:last-child {
-  border-right: 0;
+.alert-kpi-card + .alert-kpi-card {
+  border-left: 1px solid #eef2f7;
+}
+
+.alert-kpi-content {
+  min-width: 0;
+}
+
+.alert-kpi-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #5f6b7a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.alert-kpi-label small {
+  color: #8a94a6;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.alert-kpi-value {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.alert-kpi-hint {
+  margin-top: 6px;
+  color: #8a94a6;
+  font-size: 12px;
 }
 
 .alert-kpi-icon {
@@ -996,197 +1179,351 @@ onMounted(async () => {
   justify-content: center;
   width: 34px;
   height: 34px;
-  color: var(--primary);
-  background: var(--primary-soft);
-  border-radius: var(--radius-sm);
-  grid-row: 1 / span 2;
+  font-size: 18px;
+  border-radius: 10px;
+  flex: 0 0 auto;
 }
 
-.alert-kpi-icon.is-amount {
-  color: var(--warning);
-  background: var(--warning-soft);
+.alert-kpi-card.is-danger .alert-kpi-value {
+  color: #ff4d4f;
 }
 
-.alert-kpi-icon.is-paid {
-  color: var(--success);
-  background: var(--success-soft);
+.alert-kpi-card.is-danger .alert-kpi-icon {
+  color: #ff4d4f;
+  background: #fff1f0;
 }
 
-.alert-kpi-icon.is-unpaid {
-  color: var(--primary);
-  background: var(--surface-tint);
+.alert-kpi-card.is-warning .alert-kpi-value {
+  color: #fa8c16;
 }
 
-.alert-kpi-icon.is-overdue {
-  color: var(--error);
-  background: var(--error-soft);
+.alert-kpi-card.is-warning .alert-kpi-icon {
+  color: #fa8c16;
+  background: #fff7e8;
 }
 
-.alert-kpi-label {
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.alert-kpi-card.is-primary .alert-kpi-value {
+  color: #1677ff;
 }
 
-.alert-kpi-value {
-  overflow: hidden;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 28px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.alert-kpi-card.is-primary .alert-kpi-icon {
+  color: #1677ff;
+  background: #eaf2ff;
 }
 
-.alert-kpi-value small {
-  margin-left: 4px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
+.alert-kpi-card.is-success .alert-kpi-value {
+  color: #16a34a;
 }
 
-.alert-kpi-progress {
+.alert-kpi-card.is-success .alert-kpi-icon {
+  color: #16a34a;
+  background: #edf9f0;
+}
+
+.alert-filter-panel {
+  padding: 12px 18px;
+}
+
+.alert-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.alert-filter-item {
+  min-width: 0;
+}
+
+.alert-filter-item :deep(.ant-select),
+.alert-filter-item :deep(.ant-picker),
+.alert-filter-item :deep(.ant-input-affix-wrapper) {
+  width: 100%;
+}
+
+.alert-filter-item label {
   display: block;
-  overflow: hidden;
-  height: 4px;
-  background: var(--surface-subtle);
-  border-radius: var(--radius-sm);
-  grid-column: 2;
+  margin-bottom: 4px;
+  color: #3b4554;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.alert-kpi-progress > span {
-  display: block;
-  height: 100%;
-  background: var(--warning);
-  border-radius: var(--radius-sm);
+.alert-filter-item-keyword {
+  min-width: 0;
 }
 
-.alert-kpi-item.is-unread .alert-kpi-progress > span {
-  background: var(--primary);
+.alert-filter-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.alert-filter-foot .alert-filter-item-keyword {
+  flex: 1 1 auto;
+}
+
+.alert-filter-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.alert-filter-scope {
+  margin-left: auto;
+  color: #5f6b7a;
+  font-size: 13px;
 }
 
 .alert-table-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
 }
 
 .alert-toolbar {
-  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #eef2f7;
 }
 
-.alert-table-title {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
+.alert-toolbar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
-.alert-table-count,
-.alert-toolbar-hint {
-  color: var(--text-secondary);
+.alert-toolbar-meta {
+  margin-left: 4px;
+  color: #8a94a6;
   font-size: 13px;
 }
 
-.alert-message-text {
-  display: inline-block;
-  width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.alert-grid-wrap {
+  flex: 1;
+  min-height: 0;
+  padding: 0 14px 6px;
 }
 
-.alert-project-link {
-  max-width: 100%;
+.alert-pagination {
+  padding: 16px 18px 18px;
+}
+
+.alert-link,
+.alert-message-button {
   padding: 0;
-  overflow: hidden;
-  color: var(--primary);
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
   background: transparent;
   border: 0;
 }
 
-.alert-project-link:hover {
-  text-decoration: underline;
+.alert-link {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  color: #1677ff;
+  line-height: 20px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.alert-analysis-rail {
-  width: 336px;
+.alert-project-link {
+  text-align: left;
 }
 
-.alert-analysis-panel {
+.alert-message-button {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  color: #1f2329;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.alert-cell-text {
+  display: block;
+  overflow: hidden;
+  color: #1f2329;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert-tag {
+  font-weight: 600;
+}
+
+.alert-read-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #5f6b7a;
+}
+
+.alert-read-state i {
+  width: 7px;
+  height: 7px;
+  background: #52c41a;
+  border-radius: 50%;
+}
+
+.alert-read-state.is-unread {
+  color: #ff4d4f;
+}
+
+.alert-read-state.is-unread i {
+  background: #ff4d4f;
+}
+
+.alert-row-actions {
   display: flex;
-  flex-direction: column;
-  gap: 18px;
-  height: 100%;
-  padding: 18px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-left: -8px;
 }
 
-.alert-analysis-head,
-.alert-analysis-section .lg-warning-head {
+.alert-detail-panel {
+  position: sticky;
+  top: 0;
+  height: 100%;
+  min-height: 0;
+  padding: 0 0 10px;
+}
+
+.alert-detail-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eef2f7;
 }
 
-.alert-analysis-title {
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 22px;
+.alert-detail-title {
+  color: #1f2329;
+  font-size: 15px;
+  font-weight: 700;
 }
 
-.alert-analysis-subtitle,
-.alert-warning-count {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.alert-analysis-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
+.alert-detail-section {
+  padding: 10px 16px 0;
 }
 
 .alert-section-title {
-  color: var(--text);
-  font-size: 14px;
+  margin-bottom: 8px;
+  color: #1f2329;
+  font-size: 15px;
   font-weight: 700;
-  line-height: 20px;
 }
 
-.alert-analysis-section :deep(.lg-type-row),
-.alert-analysis-section .lg-type-row {
-  display: grid;
-  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
+.alert-section-row {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--text);
-  line-height: 1.5;
+  justify-content: space-between;
 }
 
-.alert-analysis-section .lg-type-dot {
-  margin-top: 0;
+.alert-detail-grid,
+.alert-content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
 }
 
-.alert-analysis-section .lg-type-label {
+.alert-detail-item,
+.alert-content-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  color: #5f6b7a;
+  font-size: 12px;
+}
+
+.alert-detail-item strong,
+.alert-content-row strong {
+  color: #1f2329;
+  font-weight: 600;
+  text-align: right;
+}
+
+.alert-content-row .is-message {
+  max-width: 220px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.alert-detail-tip,
+.alert-subscription-summary {
+  margin-top: 6px;
+  color: #8a94a6;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.alert-subscription-table {
+  margin-top: 8px;
   overflow: hidden;
-  color: var(--text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+}
+
+.alert-subscription-header,
+.alert-subscription-line {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 0.8fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.alert-subscription-header {
+  color: #5f6b7a;
+  font-weight: 600;
+  background: #fafbfd;
+}
+
+.alert-subscription-line + .alert-subscription-line {
+  border-top: 1px solid #eef2f7;
+}
+
+.alert-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-top: 10px;
+  border-top: 1px solid #eef2f7;
+}
+
+.alert-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 420px;
+  color: #8a94a6;
+  text-align: center;
+}
+
+.alert-detail-empty-title {
+  color: #1f2329;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.alert-detail-empty-text {
+  margin-top: 8px;
+  font-size: 13px;
 }
 
 .alert-subscription-form {
@@ -1208,55 +1545,113 @@ onMounted(async () => {
 }
 
 .alert-subscription-label {
-  color: var(--text);
+  color: #1f2329;
   font-weight: 600;
 }
 
-@media (max-width: 1200px) {
-  .alert-page-head,
-  .alert-search-bar,
-  .alert-search-fields {
-    align-items: stretch;
-    flex-direction: column;
+:deep(.alert-grid-wrap .vxe-grid) {
+  height: 100%;
+}
+
+:deep(.alert-grid-wrap .vxe-table--header-wrapper),
+:deep(.alert-grid-wrap .vxe-table--body-wrapper) {
+  width: 100%;
+}
+
+:deep(.alert-grid-wrap .vxe-header--column),
+:deep(.alert-grid-wrap .vxe-body--column) {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+:deep(.alert-grid-wrap .vxe-cell) {
+  padding: 0 6px;
+  line-height: 16px;
+  font-size: 12px;
+}
+
+:deep(.alert-grid-wrap .vxe-header--column .vxe-cell) {
+  line-height: 24px;
+  font-size: 12px;
+}
+
+:deep(.alert-grid-wrap .vxe-body--row) {
+  height: 16px;
+}
+
+:deep(.alert-grid-wrap .ant-tag) {
+  margin: 0;
+  padding: 0 3px;
+  line-height: 14px;
+  font-size: 10px;
+}
+
+:deep(.alert-grid-wrap .ant-btn-sm) {
+  height: 16px;
+  padding: 0 2px;
+  line-height: 14px;
+  font-size: 12px;
+}
+
+:deep(.alert-grid-wrap .vxe-table--body-wrapper) {
+  min-height: 0;
+}
+
+@media (max-width: 1440px) {
+  .alert-shell {
+    grid-template-columns: 1fr;
   }
 
-  .alert-page-meta-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 4px;
+  .alert-detail-panel {
+    position: static;
+    min-height: 0;
   }
+}
 
-  .alert-search-input,
-  .alert-search-select,
-  .alert-search-select.is-compact,
-  .alert-search-range {
-    width: 100%;
-    min-width: 0;
-    flex: 1 1 100%;
-  }
-
-  .alert-default-scope-switch {
-    justify-content: space-between;
-  }
-
-  .alert-search-actions {
-    justify-content: flex-start;
-  }
-
-  .alert-kpi-summary {
+@media (max-width: 1100px) {
+  .alert-kpi-grid,
+  .alert-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .alert-kpi-item {
-    border-bottom: 1px solid var(--border-subtle);
+  .alert-filter-foot {
+    flex-wrap: wrap;
   }
 
-  .alert-analysis-rail {
+  .alert-filter-item-keyword {
+    flex-basis: 100%;
+  }
+
+  .alert-filter-scope {
     width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .alert-kpi-grid,
+  .alert-filter-grid {
+    grid-template-columns: 1fr;
   }
 
-  .alert-toolbar-hint {
-    display: none;
+  .alert-kpi-card + .alert-kpi-card {
+    border-top: 1px solid #eef2f7;
+    border-left: 0;
+  }
+
+  .alert-filter-foot,
+  .alert-filter-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .alert-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .alert-filter-scope {
+    width: auto;
   }
 }
 </style>

@@ -31,6 +31,30 @@ export interface UpdateAlertStatusResult {
   processStatus: string
 }
 
+export type AlertProcessStatus = 'PROCESSED' | 'ARCHIVED' | 'INVALID'
+
+export interface BatchAlertOperatePayload {
+  alertIds: Array<string | number>
+}
+
+export interface BatchUpdateAlertStatusPayload extends BatchAlertOperatePayload {
+  processStatus: AlertProcessStatus
+  statusRemark?: string
+}
+
+export interface BatchAlertOperationFailure {
+  alertId: string | number
+  reason: string
+}
+
+export interface BatchAlertOperationResult {
+  total: number
+  success: number
+  failed: number
+  successIds: Array<string | number>
+  failures: BatchAlertOperationFailure[]
+}
+
 export interface BatchEvaluateResult {
   alertsGenerated: number
   tenantId: string
@@ -63,10 +87,26 @@ export function markAlertRead(id: string) {
 
 export function updateAlertStatus(
   id: string,
-  data: { processStatus: string; statusRemark?: string },
+  data: { processStatus: AlertProcessStatus; statusRemark?: string },
 ) {
   return request<UpdateAlertStatusResult>({
     url: `/alerts/${id}/status`,
+    method: 'put',
+    data,
+  })
+}
+
+export function batchMarkAlertRead(data: BatchAlertOperatePayload) {
+  return request<BatchAlertOperationResult>({
+    url: '/alerts/batch/read',
+    method: 'put',
+    data,
+  })
+}
+
+export function batchUpdateAlertStatus(data: BatchUpdateAlertStatusPayload) {
+  return request<BatchAlertOperationResult>({
+    url: '/alerts/batch/status',
     method: 'put',
     data,
   })
