@@ -27,6 +27,8 @@ import type { PageResult } from '@/types/api'
 
 const filter = reactive({
   keyword: '',
+  projectType: undefined as string | undefined,
+  status: undefined as string | undefined,
 })
 
 const loading = ref(false)
@@ -99,9 +101,7 @@ async function handleEditModalOpen(record: ProjectVO) {
     editForm.ownerUnit = project.ownerUnit || ''
     editForm.supervisorUnit = project.supervisorUnit || ''
     editForm.designUnit = project.designUnit || ''
-    editForm.contractAmount = project.contractAmount
-      ? parseFloat(project.contractAmount) / 10000
-      : undefined
+    editForm.contractAmount = amountYuanToWan(project.contractAmount)
     editForm.plannedStartDate = project.plannedStartDate
     editForm.plannedEndDate = project.plannedEndDate
   } catch (e: unknown) {
@@ -131,8 +131,7 @@ async function handleEditSubmit() {
       ownerUnit: editForm.ownerUnit || undefined,
       supervisorUnit: editForm.supervisorUnit || undefined,
       designUnit: editForm.designUnit || undefined,
-      contractAmount:
-        editForm.contractAmount != null ? String(editForm.contractAmount * 10000) : undefined,
+      contractAmount: amountWanToYuan(editForm.contractAmount),
       plannedStartDate: editForm.plannedStartDate,
       plannedEndDate: editForm.plannedEndDate,
     })
@@ -182,8 +181,7 @@ async function handleCreateSubmit() {
       ownerUnit: createForm.ownerUnit || undefined,
       supervisorUnit: createForm.supervisorUnit || undefined,
       designUnit: createForm.designUnit || undefined,
-      contractAmount:
-        createForm.contractAmount != null ? String(createForm.contractAmount) : undefined,
+      contractAmount: amountWanToYuan(createForm.contractAmount),
       plannedStartDate: createForm.plannedStartDate,
       plannedEndDate: createForm.plannedEndDate,
     })
@@ -202,9 +200,11 @@ async function fetchData() {
   loading.value = true
   try {
     const res: PageResult<ProjectVO> = await getProjectList({
-      pageNum: pageNo.value,
+      pageNo: pageNo.value,
       pageSize: pageSize.value,
       keyword: filter.keyword || undefined,
+      projectType: filter.projectType || undefined,
+      status: filter.status || undefined,
     })
     tableData.value = res.records
     total.value = Number(res.total) || 0
@@ -224,6 +224,8 @@ function handleSearch() {
 }
 function handleReset() {
   filter.keyword = ''
+  filter.projectType = undefined
+  filter.status = undefined
   pageNo.value = 1
   fetchData()
 }
@@ -254,6 +256,17 @@ function fmtAmount(val: string): string {
     (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
     ' 万元'
   )
+}
+
+function amountYuanToWan(val?: string): number | undefined {
+  const amount = Number(val)
+  if (!Number.isFinite(amount)) return undefined
+  return amount / 10000
+}
+
+function amountWanToYuan(val?: number): string | undefined {
+  if (val == null || Number.isNaN(val)) return undefined
+  return String(val * 10000)
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -298,6 +311,9 @@ const PROJECT_TYPE_COLOR: Record<string, string> = {
   劳务分包: 'orange',
   材料采购: 'purple',
 }
+
+const PROJECT_TYPE_OPTIONS = Object.keys(PROJECT_TYPE_COLOR)
+const PROJECT_STATUS_OPTIONS = ['DRAFT', 'ACTIVE', 'ONGOING', 'COMPLETED', 'SUSPENDED', 'CLOSED']
 
 function calcCodeColumnWidth(values: Array<string | undefined>, title = '项目编号') {
   const longest = Math.max(title.length, ...values.map((value) => String(value ?? '').length))
@@ -447,7 +463,6 @@ const {
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目列表</a-breadcrumb-item>
         </a-breadcrumb>
-        <span class="project-page-subtitle">统一查看项目基础信息、状态、工期与合同金额</span>
       </div>
     </div>
 
@@ -462,6 +477,30 @@ const {
       >
         <template #prefix><SearchOutlined class="project-search-icon" /></template>
       </a-input>
+      <a-select
+        v-model:value="filter.projectType"
+        placeholder="项目类型"
+        allow-clear
+        size="large"
+        class="project-search-select"
+        @change="handleSearch"
+      >
+        <a-select-option v-for="item in PROJECT_TYPE_OPTIONS" :key="item" :value="item">
+          {{ item }}
+        </a-select-option>
+      </a-select>
+      <a-select
+        v-model:value="filter.status"
+        placeholder="项目状态"
+        allow-clear
+        size="large"
+        class="project-search-select"
+        @change="handleSearch"
+      >
+        <a-select-option v-for="item in PROJECT_STATUS_OPTIONS" :key="item" :value="item">
+          {{ STATUS_LABEL[item] ?? item }}
+        </a-select-option>
+      </a-select>
       <div class="project-search-actions">
         <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
         <a-button size="large" @click="handleReset">
@@ -689,12 +728,68 @@ const {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <span class="project-toolbar-hint">固定表头 / 金额右对齐 / 编号可查看总览</span>
+              <span class="project-toolbar-hint">当前页结果 / 金额单位万元 / 编号可查看总览</span>
             </div>
           </div>
 
           <div class="lg-table-wrap project-table-wrap">
+            <div v-if="isMobile" class="project-mobile-list">
+              <a-spin :spinning="loading">
+                <div v-if="tableData.length" class="project-mobile-cards">
+                  <article
+                    v-for="row in tableData"
+                    :key="row.id"
+                    class="project-mobile-card"
+                    @click="router.push(`/project/${row.id}/overview`)"
+                  >
+                    <div class="project-mobile-card-head">
+                      <div class="project-mobile-card-title">{{ row.projectName }}</div>
+                      <a-tag :color="STATUS_COLOR[row.status]" size="small">
+                        {{ STATUS_LABEL[row.status] ?? row.status }}
+                      </a-tag>
+                    </div>
+                    <div class="project-mobile-card-meta">
+                      <span class="project-mobile-card-code">{{ row.projectCode || '-' }}</span>
+                      <a-tag :color="PROJECT_TYPE_COLOR[row.projectType]" size="small">
+                        {{ row.projectType || '未分类' }}
+                      </a-tag>
+                    </div>
+                    <div class="project-mobile-card-row">
+                      <span>合同金额</span>
+                      <span class="project-contract-amount">{{ fmtAmount(row.contractAmount) }}</span>
+                    </div>
+                    <div class="project-mobile-card-row">
+                      <span>计划工期</span>
+                      <span>
+                        {{
+                          row.plannedStartDate || row.plannedEndDate
+                            ? `${row.plannedStartDate || '-'} ~ ${row.plannedEndDate || '-'}`
+                            : '-'
+                        }}
+                      </span>
+                    </div>
+                    <div class="project-mobile-card-row">
+                      <span>审批状态</span>
+                      <a-tag
+                        v-if="row.approvalStatus"
+                        :color="APPROVAL_STATUS_COLOR[row.approvalStatus]"
+                        size="small"
+                      >
+                        {{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}
+                      </a-tag>
+                      <span v-else class="project-empty-text">-</span>
+                    </div>
+                    <div class="project-mobile-card-actions">
+                      <a-button size="small" @click.stop="handleEditModalOpen(row)">编辑</a-button>
+                      <a-button size="small" danger @click.stop="handleDelete(row)">删除</a-button>
+                    </div>
+                  </article>
+                </div>
+                <a-empty v-else description="暂无项目数据" />
+              </a-spin>
+            </div>
             <vxe-grid
+              v-else
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -867,13 +962,6 @@ const {
   line-height: 20px;
 }
 
-.project-page-subtitle {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
 .project-query-panel {
   align-items: center;
   justify-content: space-between;
@@ -885,6 +973,10 @@ const {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 640px;
+}
+
+.project-search-select {
+  width: 180px;
 }
 
 .project-search-icon {
@@ -1016,6 +1108,59 @@ const {
   min-height: 520px;
 }
 
+.project-mobile-list {
+  padding: 12px;
+}
+
+.project-mobile-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.project-mobile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.project-mobile-card-head,
+.project-mobile-card-meta,
+.project-mobile-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.project-mobile-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.project-mobile-card-title,
+.project-mobile-card-code,
+.project-mobile-card-row span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-mobile-card-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.project-mobile-card-code {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 .project-table-wrap :deep(.vxe-header--column .vxe-cell) {
   justify-content: center;
   text-align: center;
@@ -1126,6 +1271,7 @@ const {
   }
 
   .project-search-input,
+  .project-search-select,
   .project-analysis-rail {
     width: 100%;
     max-width: none;
@@ -1133,6 +1279,21 @@ const {
 
   .project-kpi-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .project-kpi-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .project-kpi-item {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .project-kpi-item:last-child {
+    border-bottom: 0;
   }
 }
 </style>
