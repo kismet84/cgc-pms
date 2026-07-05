@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
-import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -36,7 +35,6 @@ import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import com.cgcpms.common.util.DateTimeUtils;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,7 +44,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-// TODO: 拆分超大文件 (634行) — 拆分为 CostSummaryQueryService + CostSummaryWriteService + CostSummaryAssembler
+// 已提取共享计算逻辑到 CostSummaryAssembler，后续可进一步拆分为 Query/Write 子服务
 public class CostSummaryService {
 
     private final CostSummaryMapper costSummaryMapper;
@@ -58,6 +56,7 @@ public class CostSummaryService {
     private final SubMeasureMapper subMeasureMapper;
     private final MatReceiptMapper matReceiptMapper;
     private final VarOrderMapper varOrderMapper;
+    private final CostSummaryAssembler assembler;
 
     /**
      * Prevents overlapping executions of the scheduled refresh task.
@@ -115,7 +114,7 @@ public class CostSummaryService {
     private CostProjectSummaryVO doRefreshSummary(Long tenantId, Long projectId) {
         log.info("Refreshing cost summary for projectId={}, tenantId={}", projectId, tenantId);
 
-        PmProject project = requireProjectInTenant(tenantId, projectId);
+        PmProject project = assembler.requireProjectInTenant(tenantId, projectId);
 
         // 1. Remove today's snapshot rows for this project so re-inserts are idempotent
         costSummaryMapper.physicalDeleteByTenantProjectAndDate(tenantId, projectId, LocalDate.now());
@@ -151,10 +150,10 @@ public class CostSummaryService {
         }
 
         // 5. Compute project-level values (same for all subjects)
-        BigDecimal projectEstimatedRemainingCost = computeProjectEstimatedRemainingCost(tenantId, projectId);
-        BigDecimal projectContractIncome = computeProjectContractIncome(tenantId, projectId);
-        BigDecimal projectConfirmedRevenue = computeProjectConfirmedRevenue(tenantId, projectId);
-        BigDecimal projectPaidAmount = computeProjectPaidAmount(tenantId, projectId);
+        BigDecimal projectEstimatedRemainingCost = assembler.computeProjectEstimatedRemainingCost(tenantId, projectId);
+        BigDecimal projectContractIncome = assembler.computeProjectContractIncome(tenantId, projectId);
+        BigDecimal projectConfirmedRevenue = assembler.computeProjectConfirmedRevenue(tenantId, projectId);
+        BigDecimal projectPaidAmount = assembler.computeProjectPaidAmount(tenantId, projectId);
 
         // 6. For each cost subject, calculate and insert summary
         LocalDate today = LocalDate.now();
@@ -172,7 +171,7 @@ public class CostSummaryService {
 
             // Aggregate actualCost: include all cost source types plus bid_cost and overhead
             BigDecimal actualCost = subjectItems.stream()
-                    .filter(this::isActualCostSource)
+                    .filter(assembler::isActualCostSource)
                     .map(CostItem::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -213,20 +212,6 @@ public class CostSummaryService {
         return getProjectSummary(tenantId, projectId);
     }
 
-    private boolean isActualCostSource(CostItem item) {
-        if (item == null) {
-            return false;
-        }
-        String sourceType = item.getSourceType();
-        return "MAT_RECEIPT".equals(sourceType)
-                || "SUB_MEASURE".equals(sourceType)
-                || "VAR_ORDER".equals(sourceType)
-                || "CT_CHANGE".equals(sourceType)
-                || "BID_COST".equals(sourceType)
-                || "BID_COST_TRANSFERRED".equals(sourceType)
-                || "OVERHEAD_ALLOCATION".equals(sourceType);
-    }
-
     public List<CostSummaryVO> getSummary(Long projectId) {
         return getSummary(UserContext.getCurrentTenantId(), projectId);
     }
@@ -254,7 +239,7 @@ public class CostSummaryService {
         wrapper.orderByAsc(CostSummary::getCostSubjectId);
 
         List<CostSummary> summaries = costSummaryMapper.selectList(wrapper);
-        return toVOList(summaries);
+        return assembler.toVOList(summaries);
     }
 
     public CostProjectSummaryVO getProjectSummary(Long projectId) {
@@ -262,7 +247,7 @@ public class CostSummaryService {
     }
 
     public CostProjectSummaryVO getProjectSummary(Long tenantId, Long projectId) {
-        PmProject project = requireProjectInTenant(tenantId, projectId);
+        PmProject project = assembler.requireProjectInTenant(tenantId, projectId);
         List<CostSummaryVO> subjects = getSummary(tenantId, projectId);
 
         String projectName = project.getProjectName();
@@ -280,9 +265,9 @@ public class CostSummaryService {
                 : new BigDecimal(subjects.get(0).getPaidAmount());
 
         // Project-level fields: compute directly (not aggregated from subjects, to avoid N× duplication)
-        BigDecimal estimatedRemainingCost = computeProjectEstimatedRemainingCost(tenantId, projectId);
-        BigDecimal contractIncome = computeProjectContractIncome(tenantId, projectId);
-        BigDecimal projectConfirmedRevenue = computeProjectConfirmedRevenue(tenantId, projectId);
+        BigDecimal estimatedRemainingCost = assembler.computeProjectEstimatedRemainingCost(tenantId, projectId);
+        BigDecimal contractIncome = assembler.computeProjectContractIncome(tenantId, projectId);
+        BigDecimal projectConfirmedRevenue = assembler.computeProjectConfirmedRevenue(tenantId, projectId);
         BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
         BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
         BigDecimal costDeviation = dynamicCost.subtract(targetCost);
@@ -427,7 +412,7 @@ public class CostSummaryService {
             BigDecimal estimatedRemainingCost = totalCurrentAmount
                     .subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
             BigDecimal contractIncome = totalContractAmount.add(incomeVarAmount);
-            BigDecimal projectConfirmedRevenue = computeBatchProjectConfirmedRevenue(tenantId, projectId);
+            BigDecimal projectConfirmedRevenue = assembler.computeBatchProjectConfirmedRevenue(tenantId, projectId);
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
             BigDecimal costDeviation = dynamicCost.subtract(targetCost);
@@ -462,7 +447,7 @@ public class CostSummaryService {
         wrapper.orderByDesc(CostSummary::getSummaryDate, CostSummary::getCostSubjectId);
 
         List<CostSummary> summaries = costSummaryMapper.selectList(wrapper);
-        return toVOList(summaries);
+        return assembler.toVOList(summaries);
     }
 
     /**
@@ -541,185 +526,5 @@ public class CostSummaryService {
                 .eq(CostSummary::getTenantId, tenantId)
                 .eq(CostSummary::getProjectId, projectId)
                 .set(CostSummary::getPaidAmount, totalPaid));
-    }
-
-    private List<CostSummaryVO> toVOList(List<CostSummary> summaries) {
-        if (CollectionUtils.isEmpty(summaries)) {
-            return Collections.emptyList();
-        }
-
-        // Batch load project names
-        Set<Long> projectIds = summaries.stream()
-                .map(CostSummary::getProjectId)
-                .collect(Collectors.toSet());
-        Map<Long, String> projectNameMap = Collections.emptyMap();
-        if (!projectIds.isEmpty()) {
-            List<PmProject> projects = projectMapper.selectBatchIds(projectIds);
-            projectNameMap = projects.stream()
-                    .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
-        }
-
-        // Batch load cost subject names
-        Set<Long> subjectIds = summaries.stream()
-                .map(CostSummary::getCostSubjectId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<Long, String> subjectNameMap = Collections.emptyMap();
-        if (!subjectIds.isEmpty()) {
-            List<CostSubject> subjects = costSubjectMapper.selectBatchIds(subjectIds);
-            subjectNameMap = subjects.stream()
-                    .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
-        }
-
-        Map<Long, String> finalProjectNameMap = projectNameMap;
-        Map<Long, String> finalSubjectNameMap = subjectNameMap;
-        return summaries.stream().map(s -> {
-            CostSummaryVO vo = new CostSummaryVO();
-            vo.setId(s.getId() != null ? s.getId().toString() : null);
-            vo.setTenantId(s.getTenantId() != null ? s.getTenantId().toString() : null);
-            vo.setProjectId(s.getProjectId() != null ? s.getProjectId().toString() : null);
-            vo.setProjectName(s.getProjectId() != null ? finalProjectNameMap.getOrDefault(s.getProjectId(), "") : "");
-            vo.setSummaryDate(s.getSummaryDate() != null ? s.getSummaryDate().toString() : null);
-            vo.setCostSubjectId(s.getCostSubjectId() != null ? s.getCostSubjectId().toString() : null);
-            vo.setCostSubjectName(s.getCostSubjectId() != null ? finalSubjectNameMap.getOrDefault(s.getCostSubjectId(), "") : "");
-            vo.setTargetCost(s.getTargetCost() != null ? s.getTargetCost().toPlainString() : "0");
-            vo.setContractLockedCost(s.getContractLockedCost() != null ? s.getContractLockedCost().toPlainString() : "0");
-            vo.setActualCost(s.getActualCost() != null ? s.getActualCost().toPlainString() : "0");
-            vo.setPaidAmount(s.getPaidAmount() != null ? s.getPaidAmount().toPlainString() : "0");
-            vo.setEstimatedRemainingCost(s.getEstimatedRemainingCost() != null ? s.getEstimatedRemainingCost().toPlainString() : "0");
-            vo.setDynamicCost(s.getDynamicCost() != null ? s.getDynamicCost().toPlainString() : "0");
-            vo.setContractIncome(s.getContractIncome() != null ? s.getContractIncome().toPlainString() : "0");
-            vo.setConfirmedRevenue(s.getConfirmedRevenue() != null ? s.getConfirmedRevenue().toPlainString() : "0");
-            vo.setExpectedProfit(s.getExpectedProfit() != null ? s.getExpectedProfit().toPlainString() : "0");
-            vo.setCostDeviation(s.getCostDeviation() != null ? s.getCostDeviation().toPlainString() : "0");
-            vo.setCreatedBy(s.getCreatedBy() != null ? s.getCreatedBy().toString() : null);
-            vo.setCreatedAt(s.getCreatedAt() != null ? DateTimeUtils.DTF.format(s.getCreatedAt()) : null);
-            vo.setUpdatedAt(s.getUpdatedAt() != null ? DateTimeUtils.DTF.format(s.getUpdatedAt()) : null);
-            vo.setRemark(s.getRemark());
-            return vo;
-        }).collect(Collectors.toList());
-    }
-
-    /**
-     * Compute project-level estimatedRemainingCost:
-     * SUM(ct_contract.currentAmount) - SUM(sub_measure.approvedAmount WHERE approved)
-     *                                 - SUM(mat_receipt.totalAmount WHERE approved)
-     * <p>
-     * 注意：getBatchProjectSummaries 中有等价的批量内联版本（使用预取数据避免逐项目查询）；
-     * 修改本方法时必须同步更新 getBatchProjectSummaries 中的对应内联逻辑。
-     */
-    private BigDecimal computeProjectEstimatedRemainingCost(Long tenantId, Long projectId) {
-        BigDecimal totalCurrentAmount = ctContractMapper.selectList(
-                new LambdaQueryWrapper<CtContract>()
-                        .eq(CtContract::getTenantId, tenantId)
-                        .eq(CtContract::getProjectId, projectId))
-                .stream()
-                .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal confirmedMeasureAmount = subMeasureMapper.selectList(
-                new LambdaQueryWrapper<SubMeasure>()
-                        .eq(SubMeasure::getTenantId, tenantId)
-                        .eq(SubMeasure::getProjectId, projectId)
-                        .eq(SubMeasure::getApprovalStatus, "APPROVED"))
-                .stream()
-                .map(m -> m.getApprovedAmount() != null ? m.getApprovedAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal confirmedReceiptAmount = matReceiptMapper.selectList(
-                new LambdaQueryWrapper<MatReceipt>()
-                        .eq(MatReceipt::getTenantId, tenantId)
-                        .eq(MatReceipt::getProjectId, projectId)
-                        .eq(MatReceipt::getApprovalStatus, "APPROVED"))
-                .stream()
-                .map(r -> r.getTotalAmount() != null ? r.getTotalAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return totalCurrentAmount.subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
-    }
-
-    /**
-     * Compute project-level contractIncome:
-     * SUM(ct_contract.contractAmount) + SUM(var_order.approvedAmount WHERE direction='INCOME' AND approved)
-     * <p>
-     * 注意：getBatchProjectSummaries 中有等价的批量内联版本（使用预取数据避免逐项目查询）；
-     * 修改本方法时必须同步更新 getBatchProjectSummaries 中的对应内联逻辑。
-     */
-    private BigDecimal computeProjectContractIncome(Long tenantId, Long projectId) {
-        BigDecimal totalContractAmount = ctContractMapper.selectList(
-                new LambdaQueryWrapper<CtContract>()
-                        .eq(CtContract::getTenantId, tenantId)
-                        .eq(CtContract::getProjectId, projectId))
-                .stream()
-                .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal incomeVarAmount = varOrderMapper.selectList(
-                new LambdaQueryWrapper<VarOrder>()
-                        .eq(VarOrder::getTenantId, tenantId)
-                        .eq(VarOrder::getProjectId, projectId)
-                        .eq(VarOrder::getDirection, "INCOME")
-                        .eq(VarOrder::getApprovalStatus, "APPROVED"))
-                .stream()
-                .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return totalContractAmount.add(incomeVarAmount);
-    }
-
-    /**
-     * Compute project-level paidAmount:
-     * SUM(pay_record.payAmount WHERE payStatus='SUCCESS')
-     */
-    private BigDecimal computeProjectPaidAmount(Long tenantId, Long projectId) {
-        List<PayRecord> records = payRecordMapper.selectList(
-                new LambdaQueryWrapper<PayRecord>()
-                        .eq(PayRecord::getTenantId, tenantId)
-                        .eq(PayRecord::getProjectId, projectId)
-                        .eq(PayRecord::getPayStatus, "SUCCESS"));
-        return records.stream()
-                .map(r -> r.getPayAmount() == null ? BigDecimal.ZERO : r.getPayAmount())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    /**
-     * Compute project-level confirmed revenue:
-     * SUM(cost_item.amount WHERE cost_type='REVENUE_CONFIRMED')
-     */
-    private BigDecimal computeBatchProjectConfirmedRevenue(Long tenantId, Long projectId) {
-        return costItemMapper.selectList(
-                new LambdaQueryWrapper<CostItem>()
-                        .eq(CostItem::getTenantId, tenantId)
-                        .eq(CostItem::getProjectId, projectId)
-                        .eq(CostItem::getCostStatus, "CONFIRMED")
-                        .eq(CostItem::getSourceType, "REVENUE"))
-                .stream()
-                .map(CostItem::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal computeProjectConfirmedRevenue(Long tenantId, Long projectId) {
-        return costItemMapper.selectList(
-                new LambdaQueryWrapper<CostItem>()
-                        .eq(CostItem::getTenantId, tenantId)
-                        .eq(CostItem::getProjectId, projectId)
-                        .eq(CostItem::getCostType, "REVENUE_CONFIRMED")
-                        .eq(CostItem::getCostStatus, "CONFIRMED"))
-                .stream()
-                .map(CostItem::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private PmProject requireProjectInTenant(Long tenantId, Long projectId) {
-        if (tenantId == null || projectId == null) {
-            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
-        }
-        PmProject project = projectMapper.selectById(projectId);
-        if (project == null || !Objects.equals(project.getTenantId(), tenantId)) {
-            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
-        }
-        return project;
     }
 }
