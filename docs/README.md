@@ -67,17 +67,20 @@ Prompt 类文档索引见 [prompt/README.md](prompt/README.md)。
 
 ## 质量与审计
 
-### 当前有效结论入口（2026-07-03）
+### 当前有效结论入口（第 21 条主线最终收口）
 
-1. [第 13 条主线收口报告](quality/mainline-13-closeout-2026-07-03.md)：**当前有效上线准备结论**，口径为“通过 / 非阻塞 / 可进入上线准备”。
-2. [第 13 条主线历史阻断项复核报告](quality/mainline-13-historical-blockers-review-2026-07-03.md)：**当前有效历史 blocker 复核入口**。
+1. [第 21 条主线最终质量归档与收口报告](quality/mainline-21-legacy-governance-closure-2026-07-05.md)：**当前有效最终收口入口**，口径为“通过 / 非阻塞 / 可关闭第 21 条主线”。
+2. [第 21 条主线 P0-2：上线前总控状态校准与决策包重建报告](quality/mainline-21-p0-2-release-control-calibration-2026-07-05.md)：第 21 条阶段总控校准入口，口径为“通过 / 非阻塞 / 可进入 P1”。
+3. [第 13 条主线收口报告](quality/mainline-13-closeout-2026-07-03.md)：历史上线准备结论入口，仅作背景回看，不再替代当前最终收口或当前总控校准。
+4. [第 13 条主线历史阻断项复核报告](quality/mainline-13-historical-blockers-review-2026-07-03.md)：历史 blocker 复核入口，仅作背景回看。
 
-以下旧报告均只作为历史背景，不得替代上面两份 2026-07-03 当前结论。
+以下旧报告均只作为历史背景，不得替代上面 2026-07-05 当前校准结论。
 
 | 日期 | 文档 | 当前使用方式 |
 |------|------|--------------|
-| 2026-07-03 | [第 13 条主线收口报告](quality/mainline-13-closeout-2026-07-03.md) | 当前有效结论入口；用于上线准备判断 |
-| 2026-07-03 | [第 13 条主线历史阻断项复核报告](quality/mainline-13-historical-blockers-review-2026-07-03.md) | 当前有效 blocker 复核入口 |
+| 2026-07-05 | [第 21 条主线 P0-2：上线前总控状态校准与决策包重建报告](quality/mainline-21-p0-2-release-control-calibration-2026-07-05.md) | 当前阶段总控校准入口；用于回看 P0-2 校准证据 |
+| 2026-07-03 | [第 13 条主线收口报告](quality/mainline-13-closeout-2026-07-03.md) | 历史上线准备结论 |
+| 2026-07-03 | [第 13 条主线历史阻断项复核报告](quality/mainline-13-historical-blockers-review-2026-07-03.md) | 历史 blocker 复核入口 |
 | 2026-06-25 | [上线前代码审计报告](quality/code-audit-2026-06-25-pre-release.md) | 历史审计结论；上线前需重新验证 |
 | 2026-06-25 | [全量代码审计报告](quality/code-audit-2026-06-25-full-repo.md) | 历史审计结论；用于回看问题类型 |
 | 2026-06-25 | [Vite 大 chunk 警告专项审计](quality/code-audit-2026-06-25-vite-large-chunk-warning.md) | 历史专项结论 |

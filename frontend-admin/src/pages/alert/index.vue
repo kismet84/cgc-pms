@@ -668,7 +668,7 @@ onMounted(async () => {
   projectsLoading.value = true
   try {
     if (!referenceStore.projects?.length) {
-      await referenceStore.loadProjects()
+      await referenceStore.fetchProjects()
     }
   } catch (error) {
     console.error(error)

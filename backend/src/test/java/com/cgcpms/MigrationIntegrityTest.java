@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -327,6 +329,31 @@ class MigrationIntegrityTest {
     }
 
     @Test
+    void p01PermissionFixPackStaysMinimalAndDualTrack() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V128__p01_minimal_permission_fix_pack.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V128__p01_minimal_permission_fix_pack.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        assertP01PermissionFixPack(readString(mysqlMigration), true);
+        assertP01PermissionFixPack(readString(h2Migration), false);
+    }
+
+    @Test
+    void highRiskDbOnlyPermissionCleanupStaysPointedAndDoesNotTouchRoleBindings() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V129__clear_high_risk_db_only_permissions.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V129__clear_high_risk_db_only_permissions.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            assertHighRiskDbOnlyPermissionCleanup(sql);
+        }
+    }
+
+    @Test
     void payRecordExternalTxnNoUniqueConstraintRemainsTenantScopedForMysqlAndH2() throws IOException {
         Path mysqlMigration = MIGRATION_DIR.resolve("V76__fix_pay_record_external_txn_no_unique.sql");
         Path h2Migration = H2_MIGRATION_DIR.resolve("V76__fix_pay_record_external_txn_no_unique.sql");
@@ -366,5 +393,75 @@ class MigrationIntegrityTest {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read migration " + path, e);
         }
+    }
+
+    private static void assertP01PermissionFixPack(String sql, boolean mysql) {
+        String normalizedSql = normalizeSql(sql);
+        Set<String> bindings = roleMenuBindings(normalizedSql);
+        assertTrue(normalizedSql.contains("id = 751"));
+        assertTrue(normalizedSql.contains("perms = 'invoice:list'"));
+        assertTrue(normalizedSql.contains("id = 201"));
+        assertTrue(normalizedSql.contains("perms = 'project:list'"));
+        assertTrue(normalizedSql.contains("'requisition:submit'"));
+        assertTrue(normalizedSql.contains("role_id"));
+        assertTrue(normalizedSql.contains("menu_id"));
+        assertTrue(bindings.contains("(1,917)"),
+                "V128 must backfill role/menu binding (1,917) for " + (mysql ? "MySQL" : "H2"));
+        assertTrue(bindings.contains("(1,918)"),
+                "V128 must backfill role/menu binding (1,918) for " + (mysql ? "MySQL" : "H2"));
+        assertTrue(bindings.contains("(5,917)"),
+                "V128 must backfill role/menu binding (5,917) for " + (mysql ? "MySQL" : "H2"));
+        assertTrue(bindings.contains("(5,918)"),
+                "V128 must backfill role/menu binding (5,918) for " + (mysql ? "MySQL" : "H2"));
+        assertFalse(normalizedSql.contains("project:delete"));
+        assertFalse(normalizedSql.contains("update sys_role_menu"));
+        assertFalse(normalizedSql.contains("delete from sys_role_menu"));
+    }
+
+    private static void assertHighRiskDbOnlyPermissionCleanup(String sql) {
+        String normalizedSql = normalizeSql(sql);
+        assertEquals(4, countOccurrences(normalizedSql, "update sys_menu set perms = null"),
+                "V129 must only clear the four approved high-risk DB-only permission codes");
+        assertTrue(normalizedSql.contains("where id = 204 and perms = 'project:delete'"));
+        assertTrue(normalizedSql.contains("where id = 501 and perms = 'system:user:list'"));
+        assertTrue(normalizedSql.contains("where id = 502 and perms = 'system:role:list'"));
+        assertTrue(normalizedSql.contains("where id = 503 and perms = 'system:menu:list'"));
+        assertFalse(normalizedSql.contains("delete from sys_menu"));
+        assertFalse(normalizedSql.contains("delete from sys_role_menu"));
+        assertFalse(normalizedSql.contains("update sys_role_menu"));
+        assertFalse(normalizedSql.contains("insert into sys_role_menu"));
+    }
+
+    private static String normalizeSql(String sql) {
+        return sql.toLowerCase()
+                .replaceAll("\\s+", " ")
+                .replace("( ", "(")
+                .replace(" )", ")")
+                .replace(", ", ",");
+    }
+
+    private static Set<String> roleMenuBindings(String normalizedSql) {
+        Pattern valuesPattern = Pattern.compile("\\(\\d+,(\\d+),(\\d+)\\)");
+        Pattern selectPattern = Pattern.compile("select\\s+\\d+,(\\d+),(\\d+)\\s+where not exists");
+        Set<String> bindings = new LinkedHashSet<>();
+        var valuesMatcher = valuesPattern.matcher(normalizedSql);
+        while (valuesMatcher.find()) {
+            bindings.add("(" + valuesMatcher.group(1) + "," + valuesMatcher.group(2) + ")");
+        }
+        var selectMatcher = selectPattern.matcher(normalizedSql);
+        while (selectMatcher.find()) {
+            bindings.add("(" + selectMatcher.group(1) + "," + selectMatcher.group(2) + ")");
+        }
+        return bindings;
+    }
+
+    private static int countOccurrences(String value, String needle) {
+        int count = 0;
+        int index = 0;
+        while ((index = value.indexOf(needle, index)) >= 0) {
+            count++;
+            index += needle.length();
+        }
+        return count;
     }
 }

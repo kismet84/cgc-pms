@@ -495,6 +495,22 @@ class SysRoleServiceTest {
     @Test
     @Order(21)
     @Transactional
+    @DisplayName("分配菜单 — 禁止编辑roleLevel=0角色")
+    void testAssignMenus_RoleLevelZeroRejected() {
+        SysRole role = new SysRole();
+        role.setRoleCode("ROLE_LEVEL_ZERO");
+        role.setRoleName("冻结级别角色");
+        role.setRoleLevel(0);
+        Long roleId = roleService.create(role);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> roleService.assignMenus(roleId, List.of(201L)));
+        assertEquals("ROLE_MENU_SUPER_ADMIN_PROTECTED", ex.getCode());
+    }
+
+    @Test
+    @Order(22)
+    @Transactional
     @DisplayName("分配菜单 — 禁止编辑当前用户持有的角色")
     void testAssignMenus_SelfRoleRejected() {
         SysRole role = new SysRole();
@@ -513,7 +529,7 @@ class SysRoleServiceTest {
     }
 
     @Test
-    @Order(22)
+    @Order(23)
     @Transactional
     @DisplayName("分配菜单 — 高危系统权限diff被拒绝")
     void testAssignMenus_HighRiskSystemPermissionRejected() {
@@ -531,7 +547,7 @@ class SysRoleServiceTest {
     }
 
     @Test
-    @Order(23)
+    @Order(24)
     @Transactional
     @DisplayName("分配菜单 — 普通角色菜单绑定成功并写入审计快照")
     void testAssignMenus_AuditSnapshotCreated() {
@@ -554,6 +570,46 @@ class SysRoleServiceTest {
         assertEquals("[201,301]", snapshot.getAfterMenuIds());
         assertEquals(1, snapshot.getSuccessFlag());
         assertNull(snapshot.getErrorSummary());
+    }
+
+    @Test
+    @Order(25)
+    @Transactional
+    @DisplayName("分配菜单 — 失败审计快照可落库且移除高危项后可恢复成功")
+    void testAssignMenus_FailureAuditAndRecovery() {
+        Long highRiskMenuId = 991002L;
+        seedMenu(highRiskMenuId, "10C高危角色权限", "system:role:query");
+
+        SysRole role = new SysRole();
+        role.setRoleCode("AUDIT_RECOVERY_ROLE");
+        role.setRoleName("审计恢复角色");
+        Long roleId = roleService.create(role);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> roleService.assignMenus(roleId, List.of(highRiskMenuId)));
+        assertEquals("ROLE_MENU_HIGH_RISK_FORBIDDEN", ex.getCode());
+
+        roleService.assignMenus(roleId, List.of(201L, 301L));
+
+        List<SysRoleMenuAuditSnapshot> snapshots = auditSnapshotMapper.selectList(
+                new LambdaQueryWrapper<SysRoleMenuAuditSnapshot>()
+                        .eq(SysRoleMenuAuditSnapshot::getRoleId, roleId)
+                        .orderByAsc(SysRoleMenuAuditSnapshot::getCreatedAt));
+        assertEquals(2, snapshots.size());
+
+        SysRoleMenuAuditSnapshot failure = snapshots.get(0);
+        assertEquals(0, failure.getSuccessFlag());
+        assertEquals("ROLE_MENU_HIGH_RISK_FORBIDDEN", failure.getErrorSummary());
+        assertEquals("[]", failure.getBeforeMenuIds());
+        assertEquals("[" + highRiskMenuId + "]", failure.getAfterMenuIds());
+
+        SysRoleMenuAuditSnapshot success = snapshots.get(1);
+        assertEquals(1, success.getSuccessFlag());
+        assertNull(success.getErrorSummary());
+        assertEquals("[201,301]", success.getAfterMenuIds());
+
+        SysRoleVO vo = roleService.getById(roleId);
+        assertEquals(List.of(201L, 301L), vo.getMenuIds());
     }
 
     private void seedMenu(Long id, String name, String perms) {

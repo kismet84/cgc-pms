@@ -31,6 +31,13 @@ beforeEach(() => {
   setActivePinia(createPinia())
 })
 
+function buildUserInfo(overrides: Partial<UserInfo>): UserInfo {
+  return {
+    ...sessionUserInfo,
+    ...overrides,
+  }
+}
+
 describe('router lazy loading', () => {
   it('login route is lazily loaded', () => {
     const loginRoute = routes.find((r) => r.path === '/login')
@@ -106,6 +113,14 @@ describe('router lazy loading', () => {
     expect(approvalRoute?.meta?.title).toBe('审批中心')
   })
 
+  it('uses the transaction list authority for the inventory transaction entry', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const inventoryRoute = rootRoute?.children?.find((c) => c.name === 'Inventory')
+    const transactionRoute = inventoryRoute?.children?.find((c) => c.name === 'InventoryTransaction')
+
+    expect(transactionRoute?.meta?.permission).toBe('inventory:transaction:list')
+  })
+
   it('registers dedicated approval done, cc and mine routes', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')
@@ -168,5 +183,62 @@ describe('router lazy loading', () => {
       path: '/login',
       query: { redirect: '/alert' },
     })
+  })
+
+  it('allows dashboard route when user only has legacy dashboard:view', async () => {
+    const userStore = useUserStore()
+    userStore.setUserInfo(
+      buildUserInfo({
+        roles: ['USER'],
+        permissions: ['dashboard:view'],
+      }),
+    )
+
+    const result = await handleAuthGuard({
+      path: '/dashboard',
+      fullPath: '/dashboard',
+      meta: { permission: 'dashboard:view' },
+    } as never)
+
+    expect(mockGetUserInfo).not.toHaveBeenCalled()
+    expect(result).toBe(true)
+  })
+
+  it('allows dashboard route when user only has a scoped dashboard permission', async () => {
+    const userStore = useUserStore()
+    userStore.setUserInfo(
+      buildUserInfo({
+        roles: ['USER'],
+        permissions: ['dashboard:project-manager:view'],
+      }),
+    )
+
+    const result = await handleAuthGuard({
+      path: '/dashboard',
+      fullPath: '/dashboard',
+      meta: { permission: 'dashboard:view' },
+    } as never)
+
+    expect(mockGetUserInfo).not.toHaveBeenCalled()
+    expect(result).toBe(true)
+  })
+
+  it('blocks dashboard route when user has no dashboard permission', async () => {
+    const userStore = useUserStore()
+    userStore.setUserInfo(
+      buildUserInfo({
+        roles: ['USER'],
+        permissions: ['alert:view'],
+      }),
+    )
+
+    const result = await handleAuthGuard({
+      path: '/dashboard',
+      fullPath: '/dashboard',
+      meta: { permission: 'dashboard:view' },
+    } as never)
+
+    expect(mockGetUserInfo).not.toHaveBeenCalled()
+    expect(result).toBe(false)
   })
 })

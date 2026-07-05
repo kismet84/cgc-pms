@@ -36,6 +36,36 @@ export function formatDashboardMonth(date: Date) {
 
 export const ALL_DASHBOARD_MONTH = ''
 export const ALL_PROJECT_ID = '__ALL__'
+export const ALL_DASHBOARD_ROLES: DashboardRole[] = [
+  'pm',
+  'bm',
+  'cost',
+  'purchase',
+  'production',
+  'chiefEngineer',
+  'finance',
+  'mgmt',
+]
+
+const DASHBOARD_ROLE_PERMISSION_ENTRIES: ReadonlyArray<readonly [DashboardRole, string]> = [
+  ['pm', 'dashboard:project-manager:view'],
+  ['bm', 'dashboard:business-manager:view'],
+  ['cost', 'dashboard:cost-manager:view'],
+  ['purchase', 'dashboard:purchase-manager:view'],
+  ['production', 'dashboard:production-manager:view'],
+  ['chiefEngineer', 'dashboard:chief-engineer:view'],
+  ['finance', 'dashboard:finance:view'],
+  ['mgmt', 'dashboard:management:view'],
+]
+
+export function resolveAvailableDashboardRoles(userRoles: string[], permissions: string[]): DashboardRole[] {
+  if (userRoles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')) {
+    return ALL_DASHBOARD_ROLES
+  }
+  return DASHBOARD_ROLE_PERMISSION_ENTRIES.filter(([, permission]) =>
+    permissions.includes(permission),
+  ).map(([role]) => role)
+}
 
 export function buildDashboardMonthOptions(now: Date = new Date()) {
   return [
@@ -52,22 +82,7 @@ export function useDashboardData() {
   const userStore = useUserStore()
 
   const availableRoles = computed<DashboardRole[]>(() => {
-    const perms = userStore.permissions
-    const roles: DashboardRole[] = []
-    if (userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')) {
-      return ['pm', 'bm', 'cost', 'purchase', 'production', 'chiefEngineer', 'finance', 'mgmt']
-    }
-    if (perms.includes('dashboard:project-manager:view')) roles.push('pm')
-    if (perms.includes('dashboard:business-manager:view')) roles.push('bm')
-    if (perms.includes('dashboard:cost-manager:view')) roles.push('cost')
-    if (perms.includes('dashboard:purchase-manager:view')) roles.push('purchase')
-    if (perms.includes('dashboard:production-manager:view')) roles.push('production')
-    if (perms.includes('dashboard:chief-engineer:view')) roles.push('chiefEngineer')
-    if (perms.includes('dashboard:finance:view')) roles.push('finance')
-    if (perms.includes('dashboard:management:view')) roles.push('mgmt')
-    return roles.length > 0
-      ? roles
-      : ['pm', 'bm', 'cost', 'purchase', 'production', 'chiefEngineer', 'finance', 'mgmt']
+    return resolveAvailableDashboardRoles(userStore.roles, userStore.permissions)
   })
 
   const initialRole: DashboardRole = availableRoles.value.includes('cost')
@@ -120,6 +135,9 @@ export function useDashboardData() {
   }
 
   async function fetchViewData() {
+    if (!availableRoles.value.includes(activeRole.value)) {
+      return
+    }
     const pid = selectedProjectId.value === ALL_PROJECT_ID ? undefined : selectedProjectId.value
     const month = selectedMonth.value || undefined
     loading.value = true

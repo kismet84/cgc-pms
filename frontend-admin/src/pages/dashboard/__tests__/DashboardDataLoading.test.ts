@@ -159,6 +159,18 @@ describe('Dashboard data loading behavior', () => {
     expect(composableSource).toContain("'chiefEngineer'")
   })
 
+  it('does not fall back to all dashboard roles when only legacy dashboard:view exists', () => {
+    expect(composableSource).not.toMatch(
+      /return\s+roles\.length\s*>\s*0\s*\?\s*roles\s*:\s*\[[\s\S]*'mgmt'[\s\S]*\]/,
+    )
+  })
+
+  it('skips dashboard data fetch when no scoped dashboard role is available', () => {
+    expect(composableSource).toMatch(
+      /if\s*\(\s*!availableRoles\.value\.includes\(activeRole\.value\)\s*\)\s*\{\s*return\s*\}/,
+    )
+  })
+
   // ── Management view has no project selector ──
   it('hides project selector for mgmt role', () => {
     const indexSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')

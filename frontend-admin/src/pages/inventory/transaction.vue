@@ -3,6 +3,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { stockIn, stockOut, getWarehouseList } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
+import { useUserStore } from '@/stores/user'
 import type { WarehouseVO } from '@/types/inventory'
 import type { SelectOption } from '@/types/ui'
 
@@ -10,7 +11,9 @@ const activeTab = ref<'in' | 'out'>('in')
 
 const warehouseList = ref<WarehouseVO[]>([])
 const referenceStore = useReferenceStore()
+const userStore = useUserStore()
 const materialList = computed(() => referenceStore.materials ?? [])
+const canSubmitTransaction = computed(() => userStore.hasPermission('inventory:transaction:add'))
 
 const inForm = reactive({
   warehouseId: undefined as string | undefined,
@@ -208,6 +211,7 @@ onMounted(() => {
           </a-form-item>
           <a-form-item :wrapper-col="{ offset: 4 }">
             <a-button
+              v-if="canSubmitTransaction"
               type="primary"
               :loading="inSubmitting"
               @click="handleStockIn"
@@ -281,6 +285,7 @@ onMounted(() => {
           </a-form-item>
           <a-form-item :wrapper-col="{ offset: 4 }">
             <a-button
+              v-if="canSubmitTransaction"
               type="primary"
               danger
               :loading="outSubmitting"

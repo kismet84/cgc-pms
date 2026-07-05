@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import AlertPage from '../index.vue'
 
-const { mockGetAlertSubscription, mockUpdateAlertSubscription } = vi.hoisted(() => ({
+const { mockGetAlertSubscription, mockUpdateAlertSubscription, mockRouterPush } = vi.hoisted(() => ({
   mockGetAlertSubscription: vi.fn().mockResolvedValue({
     defaultSubscription: {
       enabled: true,
@@ -29,6 +29,7 @@ const { mockGetAlertSubscription, mockUpdateAlertSubscription } = vi.hoisted(() 
     },
   }),
   mockUpdateAlertSubscription: vi.fn().mockResolvedValue(undefined),
+  mockRouterPush: vi.fn(),
 }))
 
 // ── Mock stores ──
@@ -64,6 +65,9 @@ vi.mock('@/stores/reference', () => ({
 vi.mock('@/stores/user', () => ({
   useUserStore: () => mockUserStore,
 }))
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: mockRouterPush }),
+}))
 vi.mock('@/api/modules/alert', () => ({
   getAlertSubscription: mockGetAlertSubscription,
   updateAlertSubscription: mockUpdateAlertSubscription,
@@ -88,12 +92,13 @@ describe('alert/index.vue', () => {
     const wrapper = mount(AlertPage, {
       global: {
         stubs: {
+          ColumnSettingsButton: { template: '<button>列设置</button>' },
           VxeGrid: { template: '<div class="vxe-grid-stub"><slot /></div>' },
           VxeGridInstance: true,
           VxeColumn: true,
           'a-card': { template: '<div class="stub-card"><slot /></div>' },
           'a-input': { template: '<input />' },
-          'a-select': { template: '<select><slot /></select>' },
+          'a-select': { template: '<div><slot /></div>' },
           'a-select-option': { template: '<option><slot /></option>' },
           'a-button': { template: '<button><slot /></button>' },
           'a-tag': { template: '<span><slot /></span>' },
@@ -114,8 +119,14 @@ describe('alert/index.vue', () => {
           'a-radio-group': { template: '<div><slot /></div>' },
           'a-radio-button': { template: '<button><slot /></button>' },
           'a-spin': { template: '<div><slot /></div>' },
+          'a-textarea': { template: '<textarea />' },
           SearchOutlined: true,
           ReloadOutlined: true,
+          BellOutlined: true,
+          FolderOpenOutlined: true,
+          InboxOutlined: true,
+          ThunderboltOutlined: true,
+          WarningOutlined: true,
         },
       },
     })
@@ -123,7 +134,11 @@ describe('alert/index.vue', () => {
     await flushPromises()
 
     expect(wrapper.exists()).toBe(true)
-    expect(wrapper.text()).toContain('当前页未读标已读')
+    expect(wrapper.text()).toContain('仅看默认范围')
+    expect(wrapper.text()).toContain('接收通知')
+    expect(wrapper.text()).toContain('标记已读')
+    expect(wrapper.text()).toContain('未选择预警')
+    expect(mockReferenceStore.fetchProjects).toHaveBeenCalled()
     expect(mockAlertStore.fetchAlerts).toHaveBeenCalledWith(
       expect.objectContaining({
         alertDomain: 'PURCHASE',
@@ -143,26 +158,26 @@ describe('alert/index.vue', () => {
     expect(pageSource).toContain('triggeredAtRange')
     expect(pageSource).toContain('alertDomain')
     expect(pageSource).toContain('ruleType')
-    expect(pageSource).toContain('当前页未读标已读')
+    expect(pageSource).toContain('仅看默认范围')
     expect(pageSource).toContain('查看业务单据')
-    expect(pageSource).toContain('标为已处理')
-    expect(pageSource).toContain('标为失效')
+    expect(pageSource).toContain('标记已读')
+    expect(pageSource).toContain("handleChangeStatus(row, 'PROCESSED')")
     expect(pageSource).toContain('归档')
+    expect(pageSource).toContain('保存处理结果')
     expect(pageSource).toContain('pageNo: pageNo.value')
     expect(pageSource).toContain('pageSize: pageSize.value')
     expect(pageSource).toContain('sourceType ?? record.businessType')
     expect(pageSource).toContain('sourceId ?? record.businessId')
     expect(pageSource).toContain('buildAlertBusinessPath(record)')
-    expect(pageSource).toContain('openBusinessEntry(row)')
+    expect(pageSource).toContain('openBusinessEntry(activeRecord)')
     expect(pageSource).toContain('resolveRoleDefaultPreset')
     expect(pageSource).toContain('resolveSearchAlertDomain')
     expect(pageSource).toContain('filter.onlyDefaultScope && preset.alertDomain')
     expect(pageSource).toContain("return { alertDomain: 'PURCHASE' }")
-    expect(pageSource).toContain('.alert-search-bar')
+    expect(pageSource).toContain('.alert-toolbar-left')
     expect(pageSource).toContain('flex-wrap: wrap')
-    expect(pageSource).toContain('.alert-default-scope-switch')
-    expect(pageSource).toContain('z-index: 1')
-    expect(pageSource).toContain(':disabled="!hasDefaultScopeDomain"')
+    expect(pageSource).toContain('.alert-filter-scope')
+    expect(pageSource).toContain('position: sticky')
     expect(pageSource).toContain('ALERT_PROCESS_STATUS_LABELS')
     expect(pageSource).toContain('getAlertTagLabel')
     expect(pageSource).toContain('通知订阅')
@@ -174,16 +189,13 @@ describe('alert/index.vue', () => {
     expect(pageSource).not.toContain('placeholder="预警分类"')
     expect(pageSource).not.toContain('placeholder="规则类型"')
     expect(pageSource).toContain('<template #message="{ row }">')
-    expect(pageSource).toContain('class="alert-message-text"')
-    expect(pageSource).toContain('<a-tooltip :title="row.message">')
+    expect(pageSource).toContain('class="alert-message-button"')
     expect(pageSource).toContain('field: \'message\'')
     expect(pageSource).toContain("slots: { default: 'message' }")
     expect(pageSource).toContain('<template #triggeredAt="{ row }">')
-    expect(pageSource).toContain('formatTriggeredDate(row.triggeredAt)')
+    expect(pageSource).toContain('formatDateTime(row.triggeredAt)')
     expect(pageSource).toContain("field: 'triggeredAt'")
     expect(pageSource).toContain("slots: { default: 'triggeredAt' }")
     expect(pageSource).toContain('<button')
-    expect(pageSource).toContain('v-if="canOpenBusinessEntry(row)"')
-    expect(pageSource).toContain('class="alert-project-link"')
   })
 })

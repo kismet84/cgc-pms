@@ -455,7 +455,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   Inventory: 'inventory:warehouse:query',
   InventoryWarehouse: 'inventory:warehouse:query',
   InventoryStock: 'inventory:stock:query',
-  InventoryTransaction: 'inventory:stock:query',
+  InventoryTransaction: 'inventory:transaction:list',
   InventoryPurchaseRequest: 'purchase:request:query',
   InventoryMaterialRequisition: 'requisition:query',
   Invoice: 'invoice:query',
@@ -503,6 +503,17 @@ async function restoreUserSession() {
   return pendingUserInfoRequest
 }
 
+function hasDashboardRouteAccess(roles: string[], permissions: string[]) {
+  return (
+    isAdminRole(roles) ||
+    permissions.includes('*') ||
+    permissions.includes('dashboard:view') ||
+    permissions.some(
+      (permission) => permission.startsWith('dashboard:') && permission.endsWith(':view'),
+    )
+  )
+}
+
 export async function handleAuthGuard(to: RouteLocationNormalized) {
   const userStore = useUserStore()
   if (to.meta?.public || WHITE_LIST.includes(to.path)) {
@@ -514,7 +525,13 @@ export async function handleAuthGuard(to: RouteLocationNormalized) {
   if (to.meta?.adminOnly && !isAdminRole(userStore.roles)) {
     return { path: '/dashboard' }
   }
-  if (to.meta?.permission && !userStore.hasPermission(to.meta.permission)) {
+  if (
+    to.meta?.permission === 'dashboard:view' &&
+    !hasDashboardRouteAccess(userStore.roles, userStore.permissions)
+  ) {
+    return false
+  }
+  if (to.meta?.permission !== 'dashboard:view' && to.meta?.permission && !userStore.hasPermission(to.meta.permission)) {
     return { path: '/dashboard' }
   }
   return true
