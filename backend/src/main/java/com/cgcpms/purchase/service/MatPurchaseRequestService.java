@@ -104,7 +104,12 @@ public class MatPurchaseRequestService {
                 new LambdaQueryWrapper<MatPurchaseRequestItem>()
                         .eq(MatPurchaseRequestItem::getRequestId, requestId)
                         .eq(MatPurchaseRequestItem::getTenantId, UserContext.getCurrentTenantId()));
-        return items.stream().map(this::toItemVO).collect(Collectors.toList());
+        Set<Long> materialIds = items.stream().map(MatPurchaseRequestItem::getMaterialId)
+                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> materialNames = materialIds.isEmpty() ? Map.of()
+                : mdMaterialMapper.selectBatchIds(materialIds).stream()
+                        .collect(Collectors.toMap(MdMaterial::getId, MdMaterial::getMaterialName, (a, b) -> a));
+        return items.stream().map(item -> toItemVO(item, materialNames)).collect(Collectors.toList());
     }
 
     // ================================================================
@@ -253,6 +258,7 @@ public class MatPurchaseRequestService {
         // Insert new items
         Long tenantId = UserContext.getCurrentTenantId();
         for (MatPurchaseRequestItem item : items) {
+            item.setId(null);
             item.setRequestId(requestId);
             item.setTenantId(tenantId);
             // Auto-create material if name provided but no existing materialId
@@ -349,12 +355,13 @@ public class MatPurchaseRequestService {
         return vo;
     }
 
-    private MatPurchaseRequestItemVO toItemVO(MatPurchaseRequestItem item) {
+    private MatPurchaseRequestItemVO toItemVO(MatPurchaseRequestItem item, Map<Long, String> materialNames) {
         MatPurchaseRequestItemVO vo = new MatPurchaseRequestItemVO();
         vo.setId(String.valueOf(item.getId()));
         vo.setTenantId(String.valueOf(item.getTenantId()));
         vo.setRequestId(String.valueOf(item.getRequestId()));
-        vo.setMaterialId(String.valueOf(item.getMaterialId()));
+        vo.setMaterialId(item.getMaterialId() != null ? String.valueOf(item.getMaterialId()) : null);
+        vo.setMaterialName(item.getMaterialId() != null ? materialNames.get(item.getMaterialId()) : item.getMaterialName());
         vo.setQuantity(String.valueOf(item.getQuantity()));
         vo.setUnit(item.getUnit());
         vo.setPlannedDate(item.getPlannedDate() != null ? item.getPlannedDate().toString() : null);

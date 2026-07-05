@@ -1,0 +1,52 @@
+{
+  "planFile": "D:\\projects-test\\cgc-pms\\docs\\plans\\第13条-主线后续任务计划-2026-07-03.md",
+  "startedAt": "2026-07-03T09:58:40.0415285+08:00",
+  "lastUpdatedAt": "2026-07-03T11:34:55.2838935+08:00",
+  "phases": [
+    {
+      "id": "M1",
+      "title": "质量门禁复核与证据固化",
+      "status": "completed",
+      "tasksCompleted": 4,
+      "tasksTotal": 4,
+      "tasksSkipped": [],
+      "notes": "后端 verify、前端 type-check、build、unit 结果已固化；当前证据为 144 个 surefire XML suite、1397 tests、4411 modules transformed、54 files/266 tests。"
+    },
+    {
+      "id": "M2",
+      "title": "历史阻断项逐条重判",
+      "status": "completed",
+      "tasksCompleted": 1,
+      "tasksTotal": 1,
+      "tasksSkipped": [],
+      "notes": "历史 blocker 已完成当前口径重判；deploy/.env.example 的 ENC( 残留经复核关闭，前端完整门禁需要确认项已被 M1 覆盖。"
+    },
+    {
+      "id": "M3",
+      "title": "核心业务链路最小回归",
+      "status": "completed",
+      "tasksCompleted": 1,
+      "tasksTotal": 1,
+      "tasksSkipped": [],
+      "notes": "指定 Playwright 主链路命令执行结果为 36 tests / 36 passed，覆盖登录、驾驶舱、合同、成本、付款、审批、库存、采购、签证。"
+    },
+    {
+      "id": "M4",
+      "title": "文档索引校准与当前结论统一",
+      "status": "completed",
+      "tasksCompleted": 1,
+      "tasksTotal": 1,
+      "tasksSkipped": [],
+      "notes": "docs/README.md 已补第 13 条当前有效结论入口，并明确旧报告仅为历史背景。"
+    },
+    {
+      "id": "M5",
+      "title": "上线准备决策包输出",
+      "status": "completed",
+      "tasksCompleted": 1,
+      "tasksTotal": 1,
+      "tasksSkipped": [],
+      "notes": "主线收口报告、历史 blocker 复核报告、execution summary 与 handoff 已生成；最终结论为通过 / 非阻塞 / 可进入上线准备。"
+    }
+  ]
+}

@@ -25,10 +25,14 @@ import type { PartnerVO } from '@/types/partner'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { normalizeArray } from '@/utils/normalizeArray'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量
 const STATUS_ENABLE = 'ENABLE'
 const STATUS_DISABLE = 'DISABLE'
+const COMMON_STATUS_DICT = 'common_status'
+const STATUS_LABEL: Record<string, string> = { ENABLE: '启用', DISABLE: '禁用' }
+const STATUS_COLOR: Record<string, string> = { ENABLE: 'success', DISABLE: 'default' }
 
 const filter = reactive({
   partnerCode: '',
@@ -87,6 +91,10 @@ const partnerTypeColor = (val: string): string => {
   const map: Record<string, string> = { PARTY_A: 'blue', PARTY_B: 'green', OTHER: 'default' }
   return map[val] ?? 'default'
 }
+const statusLabel = (val: string | undefined) =>
+  getDictLabelSync(COMMON_STATUS_DICT, val ?? '', STATUS_LABEL)
+const statusColor = (val: string | undefined) =>
+  getDictTagColorSync(COMMON_STATUS_DICT, val ?? '', STATUS_COLOR)
 
 async function fetchPartnerTypes() {
   try {
@@ -164,13 +172,13 @@ const recentPartners = computed(() => tableData.value.slice(0, 4))
 const partnerStatusSummary = computed(() => [
   {
     key: STATUS_ENABLE,
-    label: '启用',
+    label: statusLabel(STATUS_ENABLE),
     count: tableData.value.filter((item) => item.status === STATUS_ENABLE).length,
     color: '#31c48d',
   },
   {
     key: STATUS_DISABLE,
-    label: '禁用',
+    label: statusLabel(STATUS_DISABLE),
     count: tableData.value.filter((item) => item.status === STATUS_DISABLE).length,
     color: '#94a3b8',
   },
@@ -341,6 +349,7 @@ function handleModalCancel() {
 }
 
 onMounted(() => {
+  fetchDictData(COMMON_STATUS_DICT)
   fetchData()
   fetchPartnerTypes()
 })
@@ -459,8 +468,8 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template #status="{ row }">
-                <a-tag :color="row.status === STATUS_ENABLE ? 'success' : 'default'">
-                  {{ row.status === STATUS_ENABLE ? '启用' : '禁用' }}
+                <a-tag :color="statusColor(row.status)">
+                  {{ statusLabel(row.status) }}
                 </a-tag>
               </template>
               <template #ops="{ row }">
@@ -615,8 +624,8 @@ onMounted(() => {
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="formData.status">
-            <a-select-option value="ENABLE">启用</a-select-option>
-            <a-select-option value="DISABLE">禁用</a-select-option>
+            <a-select-option value="ENABLE">{{ statusLabel(STATUS_ENABLE) }}</a-select-option>
+            <a-select-option value="DISABLE">{{ statusLabel(STATUS_DISABLE) }}</a-select-option>
           </a-select>
         </a-form-item>
       </a-form>
@@ -649,8 +658,8 @@ onMounted(() => {
             </a-tag>
           </a-descriptions-item>
           <a-descriptions-item label="状态">
-            <a-tag :color="detailPartner.status === STATUS_ENABLE ? 'success' : 'default'">
-              {{ detailPartner.status === STATUS_ENABLE ? '启用' : '禁用' }}
+            <a-tag :color="statusColor(detailPartner.status)">
+              {{ statusLabel(detailPartner.status) }}
             </a-tag>
           </a-descriptions-item>
           <a-descriptions-item label="统一信用代码">

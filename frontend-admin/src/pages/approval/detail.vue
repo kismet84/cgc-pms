@@ -18,6 +18,9 @@ import {
   getWorkflowBusinessEntryPath,
   getWorkflowBusinessTypeLabel,
   getWorkflowInstanceStatusMeta,
+  getWorkflowNodeStatusMeta,
+  getWorkflowTaskStatusMeta,
+  preloadWorkflowDisplayDicts,
   WF_INSTANCE_RUNNING,
   WF_INSTANCE_APPROVED,
   WF_INSTANCE_REJECTED,
@@ -105,13 +108,11 @@ function getInstanceStatusMeta(status: unknown) {
 }
 
 function getNodeStatusMeta(status: unknown) {
-  const key = String(status ?? '')
-  return nodeStatusMap[key] ?? { text: '未知节点状态', color: 'default' }
+  return getWorkflowNodeStatusMeta(status, nodeStatusMap)
 }
 
 function getTaskStatusMeta(status: unknown) {
-  const key = String(status ?? '')
-  return taskStatusMap[key] ?? { text: '未知任务状态', color: 'default' }
+  return getWorkflowTaskStatusMeta(status, taskStatusMap)
 }
 
 function getRecordActionName(record: { actionType?: string; actionName?: string }) {
@@ -333,6 +334,7 @@ async function handleResubmit() {
 }
 
 onMounted(() => {
+  preloadWorkflowDisplayDicts()
   fetchDetail()
 })
 </script>

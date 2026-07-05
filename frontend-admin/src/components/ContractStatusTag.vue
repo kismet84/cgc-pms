@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import type { ContractStatus } from '@/types/contract'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 defineProps<{ status: ContractStatus }>()
 
+const DICT_CODE = 'contract_status'
 const label: Record<ContractStatus, string> = {
   DRAFT: '草稿',
   PERFORMING: '履约中',
@@ -16,8 +19,14 @@ const color: Record<ContractStatus, string> = {
   SETTLED: 'default',
   TERMINATED: 'warning',
 }
+
+onMounted(() => {
+  fetchDictData(DICT_CODE)
+})
 </script>
 
 <template>
-  <a-tag :color="color[status]">{{ label[status] || status }}</a-tag>
+  <a-tag :color="getDictTagColorSync(DICT_CODE, status, color)">
+    {{ getDictLabelSync(DICT_CODE, status, label) }}
+  </a-tag>
 </template>

@@ -75,11 +75,8 @@ login-snapshot.yml
 .trae/
 backend/nul
 graphify-out/
-skills-lock.json
 
 # Project config / local docs
 CLAUDE.md
-AGENTS.md
-docs/agents/
-docs/
 memory/
+.mimocode/

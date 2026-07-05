@@ -11,15 +11,20 @@ import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.service.SubMeasureService;
 import com.cgcpms.subcontract.vo.SubMeasureItemVO;
 import com.cgcpms.subcontract.vo.SubMeasureVO;
+import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,6 +44,8 @@ class SubMeasureServiceTest {
     @Autowired private SubMeasureMapper measureMapper;
     @Autowired private SubMeasureItemMapper itemMapper;
     @Autowired private SubTaskMapper subTaskMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private WfInstanceMapper wfInstanceMapper;
 
     @BeforeEach void setupContext() {
         UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")
@@ -136,7 +143,44 @@ class SubMeasureServiceTest {
     void testSubmitForApproval_NoSubTaskId() {
         Long id = service.create(buildMeasure());
         service.submitForApproval(id);
-        assertEquals("APPROVING", service.getById(id).getApprovalStatus());
+        SubMeasureVO vo = service.getById(id);
+        assertEquals("APPROVING", vo.getApprovalStatus());
+        assertEquals("APPROVING", vo.getStatus());
+        assertTrue(service.getPage(1, 20, PROJECT_ID, null, null, "APPROVING", null)
+                .getRecords().stream()
+                .anyMatch(record -> id.toString().equals(record.getId())
+                        && "APPROVING".equals(record.getApprovalStatus())
+                        && "APPROVING".equals(record.getStatus())), "列表应回读提交后的 APPROVING 状态");
+        assertPendingWorkflowTask(id);
+    }
+
+    @Test @Transactional @DisplayName("submitForApproval → PROJECT_ROLE缺成员时回退超管仍可提交")
+    void testSubmitForApproval_ProjectRoleFallbackWithoutProjectMembers() {
+        jdbcTemplate.update("DELETE FROM pm_project_member WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (
+                    id, tenant_id, username, password, real_name,
+                    status, is_admin, created_by, updated_by, created_at, updated_at,
+                    deleted_flag, remark
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?
+                )
+                """,
+                990001L, TENANT_ID, "submeasure-fallback-admin", "x", "分包计量兜底超管",
+                "ENABLE", 1, USER_ADMIN, USER_ADMIN, 0, "test fallback");
+        jdbcTemplate.update("""
+                INSERT INTO sys_user_role (id, user_id, role_id)
+                VALUES (?, ?, (SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = 'SUPER_ADMIN' AND deleted_flag = 0 LIMIT 1))
+                """,
+                990002L, 990001L, TENANT_ID);
+        Long id = service.create(buildMeasure());
+
+        service.submitForApproval(id);
+
+        SubMeasureVO vo = service.getById(id);
+        assertEquals("APPROVING", vo.getApprovalStatus());
+        assertEquals("APPROVING", vo.getStatus());
+        assertPendingWorkflowTask(id);
     }
 
     @Test @Transactional @DisplayName("getById → throws on non-existent")
@@ -196,7 +240,10 @@ class SubMeasureServiceTest {
     void testSubmitForApproval() {
         Long id = service.create(buildMeasure());
         service.submitForApproval(id);
-        assertEquals("APPROVING", service.getById(id).getApprovalStatus());
+        SubMeasureVO vo = service.getById(id);
+        assertEquals("APPROVING", vo.getApprovalStatus());
+        assertEquals("APPROVING", vo.getStatus());
+        assertPendingWorkflowTask(id);
     }
 
     @Test @Transactional @DisplayName("submitForApproval → duplicate throws")
@@ -204,5 +251,49 @@ class SubMeasureServiceTest {
         Long id = service.create(buildMeasure());
         service.submitForApproval(id);
         assertThrows(BusinessException.class, () -> service.submitForApproval(id));
+    }
+
+    @Test @Transactional @DisplayName("submitForApproval → withdrawn draft resubmits existing workflow")
+    void testSubmitForApproval_WithdrawnDraftResubmits() {
+        Long id = service.create(buildMeasure());
+        WfInstance withdrawn = new WfInstance();
+        withdrawn.setTenantId(TENANT_ID);
+        withdrawn.setTemplateId(50004L);
+        withdrawn.setBusinessType("SUB_MEASURE");
+        withdrawn.setBusinessId(id);
+        withdrawn.setProjectId(PROJECT_ID);
+        withdrawn.setContractId(CONTRACT_ID);
+        withdrawn.setTitle("撤回后重提测试");
+        withdrawn.setAmount(new BigDecimal("46000.00"));
+        withdrawn.setInstanceStatus(WorkflowConstants.INSTANCE_WITHDRAWN);
+        withdrawn.setCurrentRound(1);
+        withdrawn.setResubmitCount(0);
+        withdrawn.setBusinessRevision(1);
+        withdrawn.setInitiatorId(USER_ADMIN);
+        withdrawn.setStartedAt(LocalDateTime.now().minusDays(1));
+        withdrawn.setEndedAt(LocalDateTime.now());
+        wfInstanceMapper.insert(withdrawn);
+
+        service.submitForApproval(id);
+
+        SubMeasureVO vo = service.getById(id);
+        assertEquals("APPROVING", vo.getApprovalStatus());
+        assertEquals("APPROVING", vo.getStatus());
+        WfInstance resubmitted = wfInstanceMapper.selectById(withdrawn.getId());
+        assertEquals(WorkflowConstants.INSTANCE_RUNNING, resubmitted.getInstanceStatus());
+        assertEquals(2, resubmitted.getCurrentRound());
+        assertEquals(1, resubmitted.getResubmitCount());
+        assertPendingWorkflowTask(id);
+    }
+
+    private void assertPendingWorkflowTask(Long measureId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM wf_task
+                WHERE business_type = 'SUB_MEASURE'
+                  AND business_id = ?
+                  AND task_status = 'PENDING'
+                """, Integer.class, measureId);
+        assertTrue(count != null && count > 0, "提交后审批中心应存在待办任务");
     }
 }

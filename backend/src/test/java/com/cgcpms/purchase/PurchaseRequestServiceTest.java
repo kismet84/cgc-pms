@@ -3,6 +3,8 @@ package com.cgcpms.purchase;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
@@ -41,6 +43,9 @@ class PurchaseRequestServiceTest {
 
     @Autowired
     private MatPurchaseRequestItemMapper requestItemMapper;
+
+    @Autowired
+    private MdMaterialMapper mdMaterialMapper;
 
     @BeforeEach
     void setupContext() {
@@ -253,6 +258,75 @@ class PurchaseRequestServiceTest {
 
         List<MatPurchaseRequestItemVO> items = requestService.getItems(requestId);
         assertEquals(2, items.size(), "应有2条明细");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 编辑草稿时明细应回填已有物料名称")
+    void testGetItemsBackfillsMaterialNameForExistingMaterial() {
+        MdMaterial material = new MdMaterial();
+        material.setTenantId(TENANT_ID);
+        material.setMaterialCode("PR-TDD-MAT-001");
+        material.setMaterialName("TDD测试钢筋");
+        material.setUnit("吨");
+        material.setStatus("ENABLE");
+        mdMaterialMapper.insert(material);
+
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+        Long requestId = requestService.create(request);
+
+        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
+        item.setMaterialId(material.getId());
+        item.setQuantity(new BigDecimal("3.50"));
+        item.setUnit("吨");
+        item.setPlannedDate(LocalDate.of(2026, 7, 20));
+        requestService.saveItemsBatch(requestId, List.of(item));
+
+        List<MatPurchaseRequestItemVO> items = requestService.getItems(requestId);
+
+        assertEquals(1, items.size(), "应回填1条明细");
+        MatPurchaseRequestItemVO vo = items.get(0);
+        assertEquals(String.valueOf(material.getId()), vo.getMaterialId());
+        assertEquals("TDD测试钢筋", vo.getMaterialName(), "编辑弹窗需要物料名称回显");
+        assertEquals(0, new BigDecimal("3.50").compareTo(new BigDecimal(vo.getQuantity())));
+        assertEquals("吨", vo.getUnit());
+        assertEquals("2026-07-20", vo.getPlannedDate());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 编辑草稿重保存明细时应忽略前端回传的旧明细ID")
+    void testResaveDraftItemsIgnoresClientItemIds() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+        Long requestId = requestService.create(request);
+
+        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
+        item.setMaterialId(1L);
+        item.setQuantity(new BigDecimal("2.00"));
+        item.setUnit("吨");
+        requestService.saveItemsBatch(requestId, List.of(item));
+
+        Long oldItemId = requestItemMapper.selectList(null).stream()
+                .filter(i -> requestId.equals(i.getRequestId()))
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        MatPurchaseRequestItem edited = new MatPurchaseRequestItem();
+        edited.setId(oldItemId);
+        edited.setRequestId(requestId);
+        edited.setMaterialId(1L);
+        edited.setQuantity(new BigDecimal("5.00"));
+        edited.setUnit("吨");
+
+        assertDoesNotThrow(() -> requestService.saveItemsBatch(requestId, List.of(edited)));
+
+        List<MatPurchaseRequestItemVO> items = requestService.getItems(requestId);
+        assertEquals(1, items.size(), "重保存后应只有1条有效明细");
+        assertEquals(0, new BigDecimal("5.00").compareTo(new BigDecimal(items.get(0).getQuantity())));
+        assertNotEquals(String.valueOf(oldItemId), items.get(0).getId(), "后端应重新生成明细ID");
     }
 
     // ═══════════════════════════════════════════════════════════

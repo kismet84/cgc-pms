@@ -28,6 +28,7 @@ import type { PurchaseRequestVO, PurchaseRequestItemVO } from '@/types/inventory
 import { getContractLedger } from '@/api/modules/contract'
 import type { ContractVO } from '@/types/contract'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -82,6 +83,16 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',
   CONVERTED: 'cyan',
+}
+const STATUS_DICT = 'purchase_request_status'
+const APPROVAL_STATUS_DICT = 'approval_status'
+
+function businessStatusLabel(status: string | undefined): string {
+  return getDictLabelSync(STATUS_DICT, status ?? '', STATUS_LABEL)
+}
+
+function businessStatusColor(status: string | undefined): string {
+  return getDictTagColorSync(STATUS_DICT, status ?? '', STATUS_COLOR)
 }
 
 const itemColumns = [
@@ -466,7 +477,7 @@ const statusBreakdown = computed(() => {
   })
   return Object.entries(m).map(([key, count]) => ({
     key,
-    label: STATUS_LABEL[key] ?? key,
+    label: businessStatusLabel(key),
     count,
     pct: kpiPct(count, kpiMax.value.totalCount),
     color: key === 'CONVERTED' ? '#31c48d' : '#f59e0b',
@@ -492,7 +503,7 @@ const approvalBreakdown = computed(() => {
   }
   return Object.entries(m).map(([key, count]) => ({
     key,
-    label: labels[key] ?? key,
+    label: getDictLabelSync(APPROVAL_STATUS_DICT, key, labels),
     count,
     pct: kpiPct(count, kpiMax.value.totalCount),
     color: colors[key] ?? '#94a3b8',
@@ -500,6 +511,8 @@ const approvalBreakdown = computed(() => {
 })
 
 onMounted(() => {
+  fetchDictData(STATUS_DICT)
+  fetchDictData(APPROVAL_STATUS_DICT)
   referenceStore.fetchProjects()
   referenceStore.fetchMaterials()
   fetchData()
@@ -664,8 +677,8 @@ onMounted(() => {
                 <ApprovalStatusTag :status="row.approvalStatus" />
               </template>
               <template #status="{ row }">
-                <a-tag :color="STATUS_COLOR[row.status]">
-                  {{ STATUS_LABEL[row.status] ?? row.status }}
+                <a-tag :color="businessStatusColor(row.status)">
+                  {{ businessStatusLabel(row.status) }}
                 </a-tag>
               </template>
               <template #ops="{ row }">

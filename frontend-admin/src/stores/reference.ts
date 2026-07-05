@@ -12,6 +12,8 @@ import { getMaterialList } from '@/api/modules/material'
 export interface FetchContractsParams {
   projectId?: string
   contractType?: string
+  contractStatus?: string
+  approvalStatus?: string
 }
 
 export interface FetchPartnersParams {
@@ -144,10 +146,14 @@ export const useReferenceStore = defineStore('reference', () => {
   }
 
   async function fetchContracts(params?: FetchContractsParams): Promise<ContractVO[]> {
-    // When filters are provided, skip cache — do not pollute base cache
-    if (params && (params.projectId || params.contractType)) {
+    // Filtered queries should refresh the in-memory list that pages read from,
+    // but must not become the base TTL cache for later unfiltered callers.
+    if (params && (params.projectId || params.contractType || params.contractStatus || params.approvalStatus)) {
       const res = await getContractLedger({ pageNo: 1, pageSize: 50, ...params })
-      return (res.records ?? res.data ?? res) as ContractVO[]
+      const filtered = (res.records ?? res.data ?? res) as ContractVO[]
+      contracts.value = filtered
+      contractsFetchedAt = null
+      return filtered
     }
     // Base (unfiltered) query — cached + deduped + TTL
     if (contracts.value && !isExpired(contractsFetchedAt)) return contracts.value

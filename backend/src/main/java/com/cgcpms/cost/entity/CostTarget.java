@@ -5,6 +5,9 @@ import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -35,13 +38,18 @@ public class CostTarget extends BaseEntity {
     private Long tenantId;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    @NotNull(message = "所属项目不能为空")
     private Long projectId;
 
+    @NotBlank(message = "版本号不能为空")
     private String versionNo;
 
+    @NotBlank(message = "版本名称不能为空")
     private String versionName;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    @NotNull(message = "成本目标总额不能为空")
+    @DecimalMin(value = "0.00", message = "成本目标总额不能为负数")
     private BigDecimal totalTargetAmount;
 
     /** 是否生效版本：0否，1是。同一项目仅允许一个生效版本 */

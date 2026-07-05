@@ -10,9 +10,9 @@ describe('VariationOrderPage save chain integrity', () => {
   describe('createVarOrder returns string (not {id}) — Bug FE-01 fix', () => {
     it('handleSubmit uses returned string directly, not .id property', () => {
       // createVarOrder returns Promise<string>, so res is a string.
-      // The fix: const id = await createVarOrder(formData) then saveVarOrderItems(id, ...)
-      expect(orderSource).toMatch(/const\s+id\s+=\s+await\s+createVarOrder\(formData\)/)
-      expect(orderSource).toMatch(/await\s+saveVarOrderItems\(id,\s*effectiveItems\)/)
+      // The fix: const newId = await createVarOrder(formData) then saveVarOrderItems(newId, ...)
+      expect(orderSource).toMatch(/const\s+newId\s+=\s+await\s+createVarOrder\(formData\)/)
+      expect(orderSource).toMatch(/await\s+saveVarOrderItems\(newId,\s*effectiveItems\)/)
     })
 
     it('does NOT reference res.id for createVarOrder result', () => {
@@ -37,8 +37,23 @@ describe('VariationOrderPage save chain integrity', () => {
     })
 
     it('saves only detail rows with quantity greater than zero', () => {
-      expect(orderSource).toMatch(/effectiveItems\s*=\s*itemList\.value[\s\S]*?quantity[\s\S]*?>\s*0/)
-      expect(orderSource).toMatch(/saveVarOrderItems\(id,\s*effectiveItems\)/)
+      expect(orderSource).toMatch(/activeItems\s*=\s*itemList\.value[\s\S]*?quantity[\s\S]*?>\s*0/)
+      expect(orderSource).toMatch(/const\s+effectiveItems\s*=\s*activeItems/)
+      expect(orderSource).toMatch(/saveVarOrderItems\((id|newId),\s*effectiveItems\)/)
+    })
+
+    it('blocks submit when project/contract/varType or valid detail is missing', () => {
+      expect(orderSource).toMatch(/if\s*\(!formData\.projectId\)[\s\S]*?message\.warning\('请选择项目'\)/)
+      expect(orderSource).toMatch(/if\s*\(!formData\.contractId\)[\s\S]*?message\.warning\('请选择合同'\)/)
+      expect(orderSource).toMatch(/if\s*\(!formData\.varType\)[\s\S]*?message\.warning\('请选择变更类型'\)/)
+      expect(orderSource).toMatch(/if\s*\(!activeItems\.length\)[\s\S]*?message\.warning\('请至少保留一条有效明细'\)/)
+      expect(orderSource).toMatch(/missingCostSubject[\s\S]*?message\.warning\('请选择成本科目'\)/)
+    })
+
+    it('rolls back the newly created draft if saveVarOrderItems fails', () => {
+      expect(orderSource).toMatch(/const\s+newId\s+=\s+await\s+createVarOrder\(formData\)/)
+      expect(orderSource).toMatch(/await\s+saveVarOrderItems\(newId,\s*effectiveItems\)/)
+      expect(orderSource).toMatch(/await\s+deleteVarOrder\(newId\)\.catch\(\(\)\s*=>\s*undefined\)/)
     })
   })
 

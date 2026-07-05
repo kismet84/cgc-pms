@@ -26,6 +26,7 @@ import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchas
 import type { SelectOption } from '@/types/ui'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -115,6 +116,15 @@ const ORDER_STATUS_COLOR: Record<string, string> = {
   PERFORMING: 'blue',
   COMPLETED: 'success',
   CANCELLED: 'error',
+}
+const ORDER_STATUS_DICT = 'purchase_order_status'
+
+function orderStatusLabel(status: string | undefined): string {
+  return getDictLabelSync(ORDER_STATUS_DICT, status ?? '', ORDER_STATUS_LABEL)
+}
+
+function orderStatusColor(status: string | undefined): string {
+  return getDictTagColorSync(ORDER_STATUS_DICT, status ?? '', ORDER_STATUS_COLOR)
 }
 
 const gridColumns = computed(() => [
@@ -419,7 +429,7 @@ const orderStatusBreakdown = computed(() => {
   })
   return Object.entries(m).map(([key, count]) => ({
     key,
-    label: ORDER_STATUS_LABEL[key] ?? key,
+    label: orderStatusLabel(key),
     count,
     pct: kpiPct(count, kpiMax.value.totalCount),
     color:
@@ -467,13 +477,25 @@ const pendingOrders = computed(() =>
 
 function onFilterProjectChange(v: string | undefined) {
   filter.contractId = undefined
-  if (v) referenceStore.fetchContracts({ projectId: v, contractType: 'PURCHASE' })
+  if (v) {
+    referenceStore.fetchContracts({
+      projectId: v,
+      contractType: 'PURCHASE',
+      contractStatus: 'PERFORMING',
+      approvalStatus: 'APPROVED',
+    })
+  }
   handleSearch()
 }
 
 onMounted(() => {
+  fetchDictData(ORDER_STATUS_DICT)
   referenceStore.fetchProjects()
-  referenceStore.fetchContracts({ contractType: 'PURCHASE' })
+  referenceStore.fetchContracts({
+    contractType: 'PURCHASE',
+    contractStatus: 'PERFORMING',
+    approvalStatus: 'APPROVED',
+  })
   referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })
   referenceStore.fetchMaterials({ status: 'ENABLE' })
   fetchData()
@@ -537,8 +559,8 @@ onMounted(() => {
           size="large"
           @change="handleSearch"
         >
-          <a-select-option v-for="(label, key) in ORDER_STATUS_LABEL" :key="key" :value="key">
-            {{ label }}
+          <a-select-option v-for="(_, key) in ORDER_STATUS_LABEL" :key="key" :value="key">
+            {{ orderStatusLabel(String(key)) }}
           </a-select-option>
         </a-select>
       </div>
@@ -647,8 +669,8 @@ onMounted(() => {
                 <span v-else :style="{ color: 'var(--muted)' }">-</span>
               </template>
               <template #orderStatus="{ row }">
-                <a-tag :color="ORDER_STATUS_COLOR[row.orderStatus]">
-                  {{ ORDER_STATUS_LABEL[row.orderStatus] ?? row.orderStatus }}
+                <a-tag :color="orderStatusColor(row.orderStatus)">
+                  {{ orderStatusLabel(row.orderStatus) }}
                 </a-tag>
               </template>
               <template #approvalStatus="{ row }">
@@ -774,7 +796,12 @@ onMounted(() => {
               (v: string) => {
                 formData.contractId = undefined
                 formData.partnerId = undefined
-                referenceStore.fetchContracts({ projectId: v })
+                referenceStore.fetchContracts({
+                  projectId: v,
+                  contractType: 'PURCHASE',
+                  contractStatus: 'PERFORMING',
+                  approvalStatus: 'APPROVED',
+                })
               }
             "
             :filter-option="

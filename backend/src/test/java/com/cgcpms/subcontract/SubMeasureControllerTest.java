@@ -133,7 +133,12 @@ class SubMeasureControllerTest {
     void testSubmit() throws Exception {
         Assertions.assertNotNull(measureId);
         mockMvc.perform(postWithApi("/sub-measures/" + measureId + "/submit").cookie(adminCookie()))
-                .andExpect(status().is2xxSuccessful());
+                .andExpect(status().is2xxSuccessful())
+                .andExpect(jsonPath("$.code").value("0"));
+        mockMvc.perform(getWithApi("/sub-measures/" + measureId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.approvalStatus").value("APPROVING"))
+                .andExpect(jsonPath("$.data.status").value("APPROVING"));
     }
 
     @Test @Order(11) @DisplayName("GET /sub-measures/{id}/items -> 200 with items")

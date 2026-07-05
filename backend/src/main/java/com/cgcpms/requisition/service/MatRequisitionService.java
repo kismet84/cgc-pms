@@ -200,6 +200,9 @@ public class MatRequisitionService {
                 && i.getQuantity().compareTo(BigDecimal.ZERO) > 0);
         if (!hasQuantity)
             throw new BusinessException("REQUISITION_ZERO_QTY", "领料申请明细数量均为0，无法提交审批");
+        boolean hasMissingMaterial = items.stream().anyMatch(i -> i.getMaterialId() == null);
+        if (hasMissingMaterial)
+            throw new BusinessException("REQUISITION_ITEM_NO_MATERIAL", "领料申请明细物料不能为空，无法提交审批");
 
         // 更新审批状态为审批中
         LambdaUpdateWrapper<MatRequisition> updateWrapper = new LambdaUpdateWrapper<>();
@@ -245,6 +248,8 @@ public class MatRequisitionService {
         for (MatRequisitionItem item : items) {
             item.setRequisitionId(requisitionId);
             item.setTenantId(tenantId);
+            if (item.getMaterialId() == null)
+                throw new BusinessException("REQUISITION_ITEM_NO_MATERIAL", "领料申请明细物料不能为空");
             if (item.getQuantity() == null) item.setQuantity(BigDecimal.ZERO);
             if (item.getUnitPrice() == null) item.setUnitPrice(BigDecimal.ZERO);
             if (item.getAmount() == null) item.setAmount(BigDecimal.ZERO);

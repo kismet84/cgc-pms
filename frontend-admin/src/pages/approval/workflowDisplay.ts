@@ -1,3 +1,5 @@
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
+
 // 字典常量 - 工作流实例状态
 export const WF_INSTANCE_RUNNING = 'RUNNING'
 export const WF_INSTANCE_APPROVED = 'APPROVED'
@@ -90,6 +92,14 @@ const instanceStatusMap: Record<string, { text: string; color: string }> = {
   [WF_INSTANCE_VOIDED]: { text: '已作废', color: 'default' },
 }
 
+export function preloadWorkflowDisplayDicts() {
+  return Promise.all([
+    fetchDictData('wf_instance_status'),
+    fetchDictData('wf_task_status'),
+    fetchDictData('wf_node_status'),
+  ])
+}
+
 export function getWorkflowBusinessTypeLabel(value: unknown): string {
   const key = String(value ?? '').trim()
   if (!key) return '未知业务类型'
@@ -98,7 +108,37 @@ export function getWorkflowBusinessTypeLabel(value: unknown): string {
 
 export function getWorkflowInstanceStatusMeta(status: unknown) {
   const key = String(status ?? '').trim()
-  return instanceStatusMap[key] ?? { text: '未知状态', color: 'default' }
+  if (!key) return { text: '未知状态', color: 'default' }
+  return {
+    text: getDictLabelSync('wf_instance_status', key, mapStatusText(instanceStatusMap)),
+    color: getDictTagColorSync('wf_instance_status', key, mapStatusColor(instanceStatusMap)),
+  }
+}
+
+export function getWorkflowTaskStatusMeta(status: unknown, fallback: Record<string, { text: string; color: string }>) {
+  const key = String(status ?? '').trim()
+  if (!key) return { text: '未知任务状态', color: 'default' }
+  return {
+    text: getDictLabelSync('wf_task_status', key, mapStatusText(fallback)),
+    color: getDictTagColorSync('wf_task_status', key, mapStatusColor(fallback)),
+  }
+}
+
+export function getWorkflowNodeStatusMeta(status: unknown, fallback: Record<string, { text: string; color: string }>) {
+  const key = String(status ?? '').trim()
+  if (!key) return { text: '未知节点状态', color: 'default' }
+  return {
+    text: getDictLabelSync('wf_node_status', key, mapStatusText(fallback)),
+    color: getDictTagColorSync('wf_node_status', key, mapStatusColor(fallback)),
+  }
+}
+
+function mapStatusText(source: Record<string, { text: string; color: string }>) {
+  return Object.fromEntries(Object.entries(source).map(([key, value]) => [key, value.text]))
+}
+
+function mapStatusColor(source: Record<string, { text: string; color: string }>) {
+  return Object.fromEntries(Object.entries(source).map(([key, value]) => [key, value.color]))
 }
 
 export function getWorkflowBusinessEntryPath(record: {

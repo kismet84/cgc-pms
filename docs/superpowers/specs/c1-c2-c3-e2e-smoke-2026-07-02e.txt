@@ -1,0 +1,623 @@
+
+Running 37 tests using 8 workers
+
+  x   2 [chromium] › e2e\contract.spec.ts:82:3 › Contract draft-save and ledger regression › saves draft with one detail and one payment term through composite endpoint (17.1s)
+  x   6 [chromium] › e2e\contract.spec.ts:119:3 › Contract draft-save and ledger regression › created contract appears as draft in ledger list (17.2s)
+  x   4 [chromium] › e2e\approval.spec.ts:141:3 › Approval Workflow › should reject a pending task with required comment (17.2s)
+  x   1 [chromium] › e2e\approval.spec.ts:80:3 › Approval Workflow › should approve a pending task successfully (18.1s)
+  x   3 [chromium] › e2e\approval.spec.ts:30:3 › Approval Workflow › should display pending tasks and view approval detail (17.2s)
+  x   5 [chromium] › e2e\contract.spec.ts:138:3 › Contract draft-save and ledger regression › contract detail shows all tabs after creation (19.3s)
+  x   7 [chromium] › e2e\contract.spec.ts:174:3 › Contract draft-save and ledger regression › contract search filter by contract type works (18.6s)
+  x   8 [chromium] › e2e\contract.spec.ts:215:3 › Contract draft-save and ledger regression › contract list KPI cards are visible (18.1s)
+  x  10 [chromium] › e2e\dashboard.spec.ts:85:3 › Dashboard: Charts → Data Cards → Role Tabs › should render ECharts canvas in cost manager view (16.7s)
+  x  11 [chromium] › e2e\dashboard.spec.ts:138:3 › Dashboard: Charts → Data Cards → Role Tabs › should display at least 3 visible chart/panel areas (16.8s)
+  x  12 [chromium] › e2e\dashboard.spec.ts:159:3 › Dashboard: Charts → Data Cards → Role Tabs › should display KPI data cards with meaningful numbers (16.7s)
+  x   9 [chromium] › e2e\dashboard.spec.ts:51:3 › Dashboard: Charts → Data Cards → Role Tabs › should navigate to dashboard and verify page structure (18.4s)
+  x  13 [chromium] › e2e\dashboard.spec.ts:226:3 › Dashboard: Charts → Data Cards → Role Tabs › should switch between role tabs and verify content changes (17.8s)
+  x  14 [chromium] › e2e\inventory.spec.ts:132:3 › Inventory original failure regressions › inbound accepts warehouse/material JSON submit flow (16.7s)
+  -  22 [chromium] › e2e\inventory.spec.ts:144:3 › Inventory original failure regressions › outbound accepts warehouse/material JSON submit flow
+  -  23 [chromium] › e2e\inventory.spec.ts:158:3 › Inventory original failure regressions › stock ledger query does not surface system error
+  -  24 [chromium] › e2e\inventory.spec.ts:176:3 › Inventory original failure regressions › stock ledger pagination controls are visible
+  -  25 [chromium] › e2e\inventory.spec.ts:202:3 › Inventory original failure regressions › stock detail modal opens and displays data
+  -  26 [chromium] › e2e\inventory.spec.ts:235:3 › Inventory original failure regressions › stock KPI statistics are visible
+  -  27 [chromium] › e2e\inventory.spec.ts:260:3 › Inventory original failure regressions › inventory transaction page has both inbound and outbound tabs
+  -  28 [chromium] › e2e\inventory.spec.ts:272:3 › Inventory original failure regressions › stock ledger search by keyword works
+  x  15 [chromium] › e2e\payment-invoice.spec.ts:52:3 › Payment: Application list and detail › payment application table shows pay type and status tags (17.4s)
+  x  16 [chromium] › e2e\payment-invoice.spec.ts:26:3 › Payment: Application list and detail › should navigate to payment application list and verify page structure (17.1s)
+  x  17 [chromium] › e2e\payment-invoice.spec.ts:73:3 › Payment: Application list and detail › payment application filter by pay type works (17.0s)
+  x  18 [chromium] › e2e\payment-invoice.spec.ts:118:3 › Invoice: List → Registration → OCR › should navigate to invoice list and verify page structure (17.1s)
+  x  19 [chromium] › e2e\payment-invoice.spec.ts:142:3 › Invoice: List → Registration → OCR › invoice table shows verify status and invoice type tags (16.9s)
+  x  20 [chromium] › e2e\payment-invoice.spec.ts:162:3 › Invoice: List → Registration → OCR › invoice filter by verify status works (16.8s)
+  x  21 [chromium] › e2e\payment-invoice.spec.ts:201:3 › Invoice: List → Registration → OCR › should open invoice registration modal (16.6s)
+  x  29 [chromium] › e2e\payment-invoice.spec.ts:228:3 › Invoice: List → Registration → OCR › invoice detail page shows basic info (16.6s)
+  x  30 [chromium] › e2e\payment-invoice.spec.ts:267:3 › Invoice: List → Registration → OCR › pay record list is accessible (17.8s)
+  x  31 [chromium] › e2e\ui-refactor-smoke.spec.ts:37:3 › UI Refactor Smoke: Core Page Rendering › 1. 项目列表页 -- 页面渲染，表格可见 (0ms)
+  -  32 [chromium] › e2e\ui-refactor-smoke.spec.ts:58:3 › UI Refactor Smoke: Core Page Rendering › 2. 合同台账页 -- lg-grid 布局可见
+  -  33 [chromium] › e2e\ui-refactor-smoke.spec.ts:75:3 › UI Refactor Smoke: Core Page Rendering › 3. 成本台账页 -- 搜索栏和表格可见
+  -  34 [chromium] › e2e\ui-refactor-smoke.spec.ts:93:3 › UI Refactor Smoke: Core Page Rendering › 4. 付款申请页 -- KPI 卡片可见
+  -  35 [chromium] › e2e\ui-refactor-smoke.spec.ts:120:3 › UI Refactor Smoke: Core Page Rendering › 5. 库存台账页 -- 表格可见
+  -  36 [chromium] › e2e\ui-refactor-smoke.spec.ts:137:3 › UI Refactor Smoke: Core Page Rendering › 6. 审批中心 -- 待办列表可见
+  -  37 [chromium] › e2e\ui-refactor-smoke.spec.ts:155:3 › UI Refactor Smoke: Core Page Rendering › 7. 系统用户页 -- 表格可见
+
+
+  1) [chromium] › e2e\approval.spec.ts:30:3 › Approval Workflow › should display pending tasks and view approval detail 
+
+    TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+    Call log:
+      - waiting for locator('.wf-todo-page') to be visible
+
+
+      31 |     // Navigate to approval todo list
+      32 |     await page.goto('/approval/todo')
+    > 33 |     await page.waitForSelector('.wf-todo-page', { timeout: 10000 })
+         |                ^
+      34 |
+      35 |     // Verify the page header is visible
+      36 |     await expect(page.locator('.ant-page-header')).toBeVisible()
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\approval.spec.ts:33:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\approval-Approval-Workflow-b3479-ks-and-view-approval-detail-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\approval-Approval-Workflow-b3479-ks-and-view-approval-detail-chromium\error-context.md
+
+  2) [chromium] › e2e\approval.spec.ts:80:3 › Approval Workflow › should approve a pending task successfully 
+
+    TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+    Call log:
+      - waiting for locator('.wf-todo-page') to be visible
+
+
+      81 |     // Navigate to approval todo
+      82 |     await page.goto('/approval/todo')
+    > 83 |     await page.waitForSelector('.wf-todo-page', { timeout: 10000 })
+         |                ^
+      84 |
+      85 |     // Wait for table to load
+      86 |     await page.waitForSelector('.ant-table', { timeout: 10000 })
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\approval.spec.ts:83:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\approval-Approval-Workflow-700cc-a-pending-task-successfully-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\approval-Approval-Workflow-700cc-a-pending-task-successfully-chromium\error-context.md
+
+  3) [chromium] › e2e\approval.spec.ts:141:3 › Approval Workflow › should reject a pending task with required comment 
+
+    TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+    Call log:
+      - waiting for locator('.wf-todo-page') to be visible
+
+
+      142 |     // Navigate to approval todo
+      143 |     await page.goto('/approval/todo')
+    > 144 |     await page.waitForSelector('.wf-todo-page', { timeout: 10000 })
+          |                ^
+      145 |     await page.waitForSelector('.ant-table', { timeout: 10000 })
+      146 |
+      147 |     // Check if there are pending tasks
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\approval.spec.ts:144:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\approval-Approval-Workflow-b5ae0--task-with-required-comment-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\approval-Approval-Workflow-b5ae0--task-with-required-comment-chromium\error-context.md
+
+  4) [chromium] › e2e\contract.spec.ts:82:3 › Contract draft-save and ledger regression › saves draft with one detail and one payment term through composite endpoint 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('heading', { name: '新建合同' })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 10000ms
+      - waiting for getByRole('heading', { name: '新建合同' })
+
+
+      84 |   }) => {
+      85 |     await page.goto('/contract/create')
+    > 86 |     await expect(page.getByRole('heading', { name: '新建合同' })).toBeVisible({ timeout: 10000 })
+         |                                                               ^
+      87 |
+      88 |     await fillContractBasicInfo(page)
+      89 |     await page.getByRole('button', { name: '下一步' }).click()
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\contract.spec.ts:86:63
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\contract-Contract-draft-sa-6b60f--through-composite-endpoint-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\contract-Contract-draft-sa-6b60f--through-composite-endpoint-chromium\error-context.md
+
+  5) [chromium] › e2e\contract.spec.ts:119:3 › Contract draft-save and ledger regression › created contract appears as draft in ledger list 
+
+    TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+    Call log:
+      - waiting for locator('.ant-table') to be visible
+
+
+      119 |   test('created contract appears as draft in ledger list', async ({ page }) => {
+      120 |     await page.goto('/contract/ledger')
+    > 121 |     await page.waitForSelector('.ant-table', { timeout: 10000 })
+          |                ^
+      122 |
+      123 |     // Verify table is visible with headers
+      124 |     const headers = page.locator('.ant-table-thead th')
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\contract.spec.ts:121:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\contract-Contract-draft-sa-3cc69-ars-as-draft-in-ledger-list-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\contract-Contract-draft-sa-3cc69-ars-as-draft-in-ledger-list-chromium\error-context.md
+
+  6) [chromium] › e2e\contract.spec.ts:138:3 › Contract draft-save and ledger regression › contract detail shows all tabs after creation 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+       8 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+       9 |   await page.click('button[type="submit"]')
+    > 10 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      11 | }
+      12 |
+      13 | async function selectFirstOption(select: Locator) {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\contract.spec.ts:10:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\contract.spec.ts:79:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\contract-Contract-draft-sa-58c45-ows-all-tabs-after-creation-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\contract-Contract-draft-sa-58c45-ows-all-tabs-after-creation-chromium\error-context.md
+
+  7) [chromium] › e2e\contract.spec.ts:174:3 › Contract draft-save and ledger regression › contract search filter by contract type works 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+       8 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+       9 |   await page.click('button[type="submit"]')
+    > 10 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      11 | }
+      12 |
+      13 | async function selectFirstOption(select: Locator) {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\contract.spec.ts:10:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\contract.spec.ts:79:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\contract-Contract-draft-sa-7e43e-lter-by-contract-type-works-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\contract-Contract-draft-sa-7e43e-lter-by-contract-type-works-chromium\error-context.md
+
+  8) [chromium] › e2e\contract.spec.ts:215:3 › Contract draft-save and ledger regression › contract list KPI cards are visible 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+       8 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+       9 |   await page.click('button[type="submit"]')
+    > 10 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      11 | }
+      12 |
+      13 | async function selectFirstOption(select: Locator) {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\contract.spec.ts:10:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\contract.spec.ts:79:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\contract-Contract-draft-sa-c99af--list-KPI-cards-are-visible-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\contract-Contract-draft-sa-c99af--list-KPI-cards-are-visible-chromium\error-context.md
+
+  9) [chromium] › e2e\dashboard.spec.ts:51:3 › Dashboard: Charts → Data Cards → Role Tabs › should navigate to dashboard and verify page structure 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      41 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      42 |   await page.click('button[type="submit"]')
+    > 43 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      44 | }
+      45 |
+      46 | test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:43:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:48:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\dashboard-Dashboard-Charts-7454c-d-and-verify-page-structure-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\dashboard-Dashboard-Charts-7454c-d-and-verify-page-structure-chromium\error-context.md
+
+  10) [chromium] › e2e\dashboard.spec.ts:85:3 › Dashboard: Charts → Data Cards → Role Tabs › should render ECharts canvas in cost manager view 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      41 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      42 |   await page.click('button[type="submit"]')
+    > 43 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      44 | }
+      45 |
+      46 | test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:43:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:48:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\dashboard-Dashboard-Charts-f3a7a-canvas-in-cost-manager-view-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\dashboard-Dashboard-Charts-f3a7a-canvas-in-cost-manager-view-chromium\error-context.md
+
+  11) [chromium] › e2e\dashboard.spec.ts:138:3 › Dashboard: Charts → Data Cards → Role Tabs › should display at least 3 visible chart/panel areas 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      41 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      42 |   await page.click('button[type="submit"]')
+    > 43 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      44 | }
+      45 |
+      46 | test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:43:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:48:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\dashboard-Dashboard-Charts-dc660-3-visible-chart-panel-areas-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\dashboard-Dashboard-Charts-dc660-3-visible-chart-panel-areas-chromium\error-context.md
+
+  12) [chromium] › e2e\dashboard.spec.ts:159:3 › Dashboard: Charts → Data Cards → Role Tabs › should display KPI data cards with meaningful numbers 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      41 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      42 |   await page.click('button[type="submit"]')
+    > 43 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      44 | }
+      45 |
+      46 | test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:43:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:48:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\dashboard-Dashboard-Charts-a4cab-rds-with-meaningful-numbers-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\dashboard-Dashboard-Charts-a4cab-rds-with-meaningful-numbers-chromium\error-context.md
+
+  13) [chromium] › e2e\dashboard.spec.ts:226:3 › Dashboard: Charts → Data Cards → Role Tabs › should switch between role tabs and verify content changes 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      41 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      42 |   await page.click('button[type="submit"]')
+    > 43 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      44 | }
+      45 |
+      46 | test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:43:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\dashboard.spec.ts:48:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\dashboard-Dashboard-Charts-5f14d--and-verify-content-changes-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\dashboard-Dashboard-Charts-5f14d--and-verify-content-changes-chromium\error-context.md
+
+  14) [chromium] › e2e\inventory.spec.ts:132:3 › Inventory original failure regressions › inbound accepts warehouse/material JSON submit flow 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      11 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      12 |   await page.click('button[type="submit"]')
+    > 13 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      14 | }
+      15 |
+      16 | async function selectAntdOption(select: Locator, preferredText?: string): Promise<string> {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\inventory.spec.ts:13:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\inventory.spec.ts:129:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\inventory-Inventory-origin-811d8-e-material-JSON-submit-flow-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\inventory-Inventory-origin-811d8-e-material-JSON-submit-flow-chromium\error-context.md
+
+  15) [chromium] › e2e\payment-invoice.spec.ts:26:3 › Payment: Application list and detail › should navigate to payment application list and verify page structure 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:23:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Payment-Ap-d9470-t-and-verify-page-structure-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Payment-Ap-d9470-t-and-verify-page-structure-chromium\error-context.md
+
+  16) [chromium] › e2e\payment-invoice.spec.ts:52:3 › Payment: Application list and detail › payment application table shows pay type and status tags 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:23:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Payment-Ap-89ada-ws-pay-type-and-status-tags-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Payment-Ap-89ada-ws-pay-type-and-status-tags-chromium\error-context.md
+
+  17) [chromium] › e2e\payment-invoice.spec.ts:73:3 › Payment: Application list and detail › payment application filter by pay type works 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:23:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Payment-Ap-2ffb8-on-filter-by-pay-type-works-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Payment-Ap-2ffb8-on-filter-by-pay-type-works-chromium\error-context.md
+
+  18) [chromium] › e2e\payment-invoice.spec.ts:118:3 › Invoice: List → Registration → OCR › should navigate to invoice list and verify page structure 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:115:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Invoice-Li-099eb-t-and-verify-page-structure-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Invoice-Li-099eb-t-and-verify-page-structure-chromium\error-context.md
+
+  19) [chromium] › e2e\payment-invoice.spec.ts:142:3 › Invoice: List → Registration → OCR › invoice table shows verify status and invoice type tags 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:115:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Invoice-Li-1cfb2-tatus-and-invoice-type-tags-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Invoice-Li-1cfb2-tatus-and-invoice-type-tags-chromium\error-context.md
+
+  20) [chromium] › e2e\payment-invoice.spec.ts:162:3 › Invoice: List → Registration → OCR › invoice filter by verify status works 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:115:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Invoice-Li-5c69b-lter-by-verify-status-works-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Invoice-Li-5c69b-lter-by-verify-status-works-chromium\error-context.md
+
+  21) [chromium] › e2e\payment-invoice.spec.ts:201:3 › Invoice: List → Registration → OCR › should open invoice registration modal 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:115:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Invoice-Li-c7079--invoice-registration-modal-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Invoice-Li-c7079--invoice-registration-modal-chromium\error-context.md
+
+  22) [chromium] › e2e\payment-invoice.spec.ts:228:3 › Invoice: List → Registration → OCR › invoice detail page shows basic info 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:115:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Invoice-Li-2f56a-etail-page-shows-basic-info-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Invoice-Li-2f56a-etail-page-shows-basic-info-chromium\error-context.md
+
+  23) [chromium] › e2e\payment-invoice.spec.ts:267:3 › Invoice: List → Registration → OCR › pay record list is accessible 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      16 |   await page.fill('input[placeholder="请输入密码"]', 'admin123')
+      17 |   await page.click('button[type="submit"]')
+    > 18 |   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |              ^
+      19 | }
+      20 |
+      21 | test.describe('Payment: Application list and detail', () => {
+        at loginAsAdmin (D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:18:14)
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\payment-invoice.spec.ts:115:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\payment-invoice-Invoice-Li-ce2db-y-record-list-is-accessible-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\payment-invoice-Invoice-Li-ce2db-y-record-list-is-accessible-chromium\error-context.md
+
+  24) [chromium] › e2e\ui-refactor-smoke.spec.ts:37:3 › UI Refactor Smoke: Core Page Rendering › 1. 项目列表页 -- 页面渲染，表格可见 
+
+    TimeoutError: page.waitForURL: Timeout 15000ms exceeded.
+    =========================== logs ===========================
+    waiting for navigation until "load"
+    ============================================================
+
+      28 |     await sharedPage.fill('input[placeholder="请输入密码"]', 'admin123')
+      29 |     await sharedPage.click('button[type="submit"]')
+    > 30 |     await sharedPage.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 })
+         |                      ^
+      31 |   })
+      32 |
+      33 |   test.afterAll(async () => {
+        at D:\projects-test\cgc-pms\frontend-admin\e2e\ui-refactor-smoke.spec.ts:30:22
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\ui-refactor-smoke-UI-Refac-20155-dering-1-项目列表页----页面渲染，表格可见-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\ui-refactor-smoke-UI-Refac-20155-dering-1-项目列表页----页面渲染，表格可见-chromium\error-context.md
+
+    Error Context: test-results\ui-refactor-smoke-UI-Refac-20155-dering-1-项目列表页----页面渲染，表格可见-chromium\error-context.md
+
+  24 failed
+    [chromium] › e2e\approval.spec.ts:30:3 › Approval Workflow › should display pending tasks and view approval detail 
+    [chromium] › e2e\approval.spec.ts:80:3 › Approval Workflow › should approve a pending task successfully 
+    [chromium] › e2e\approval.spec.ts:141:3 › Approval Workflow › should reject a pending task with required comment 
+    [chromium] › e2e\contract.spec.ts:82:3 › Contract draft-save and ledger regression › saves draft with one detail and one payment term through composite endpoint 
+    [chromium] › e2e\contract.spec.ts:119:3 › Contract draft-save and ledger regression › created contract appears as draft in ledger list 
+    [chromium] › e2e\contract.spec.ts:138:3 › Contract draft-save and ledger regression › contract detail shows all tabs after creation 
+    [chromium] › e2e\contract.spec.ts:174:3 › Contract draft-save and ledger regression › contract search filter by contract type works 
+    [chromium] › e2e\contract.spec.ts:215:3 › Contract draft-save and ledger regression › contract list KPI cards are visible 
+    [chromium] › e2e\dashboard.spec.ts:51:3 › Dashboard: Charts → Data Cards → Role Tabs › should navigate to dashboard and verify page structure 
+    [chromium] › e2e\dashboard.spec.ts:85:3 › Dashboard: Charts → Data Cards → Role Tabs › should render ECharts canvas in cost manager view 
+    [chromium] › e2e\dashboard.spec.ts:138:3 › Dashboard: Charts → Data Cards → Role Tabs › should display at least 3 visible chart/panel areas 
+    [chromium] › e2e\dashboard.spec.ts:159:3 › Dashboard: Charts → Data Cards → Role Tabs › should display KPI data cards with meaningful numbers 
+    [chromium] › e2e\dashboard.spec.ts:226:3 › Dashboard: Charts → Data Cards → Role Tabs › should switch between role tabs and verify content changes 
+    [chromium] › e2e\inventory.spec.ts:132:3 › Inventory original failure regressions › inbound accepts warehouse/material JSON submit flow 
+    [chromium] › e2e\payment-invoice.spec.ts:26:3 › Payment: Application list and detail › should navigate to payment application list and verify page structure 
+    [chromium] › e2e\payment-invoice.spec.ts:52:3 › Payment: Application list and detail › payment application table shows pay type and status tags 
+    [chromium] › e2e\payment-invoice.spec.ts:73:3 › Payment: Application list and detail › payment application filter by pay type works 
+    [chromium] › e2e\payment-invoice.spec.ts:118:3 › Invoice: List → Registration → OCR › should navigate to invoice list and verify page structure 
+    [chromium] › e2e\payment-invoice.spec.ts:142:3 › Invoice: List → Registration → OCR › invoice table shows verify status and invoice type tags 
+    [chromium] › e2e\payment-invoice.spec.ts:162:3 › Invoice: List → Registration → OCR › invoice filter by verify status works 
+    [chromium] › e2e\payment-invoice.spec.ts:201:3 › Invoice: List → Registration → OCR › should open invoice registration modal 
+    [chromium] › e2e\payment-invoice.spec.ts:228:3 › Invoice: List → Registration → OCR › invoice detail page shows basic info 
+    [chromium] › e2e\payment-invoice.spec.ts:267:3 › Invoice: List → Registration → OCR › pay record list is accessible 
+    [chromium] › e2e\ui-refactor-smoke.spec.ts:37:3 › UI Refactor Smoke: Core Page Rendering › 1. 项目列表页 -- 页面渲染，表格可见 
+  13 did not run

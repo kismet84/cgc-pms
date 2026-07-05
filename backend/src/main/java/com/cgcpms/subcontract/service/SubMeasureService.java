@@ -20,6 +20,9 @@ import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.vo.SubMeasureItemVO;
 import com.cgcpms.subcontract.vo.SubMeasureVO;
+import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +50,7 @@ public class SubMeasureService {
     private final CtContractMapper ctContractMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final WorkflowEngine workflowEngine;
+    private final WfInstanceMapper wfInstanceMapper;
 
     public IPage<SubMeasureVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                         Long partnerId, String status, String measureCode) {
@@ -254,14 +258,30 @@ public class SubMeasureService {
         if (measure.getMeasureCode() == null || measure.getMeasureCode().isBlank())
             throw new BusinessException("SUB_MEASURE_NO_CODE", "计量单编号不能为空，无法提交审批");
 
-        // Update approval status to APPROVING
+        // Update submission state before starting workflow; transaction rolls back if workflow creation fails.
         subMeasureMapper.update(null, new LambdaUpdateWrapper<SubMeasure>()
                 .eq(SubMeasure::getId, measureId)
-                .set(SubMeasure::getApprovalStatus, "APPROVING"));
+                .set(SubMeasure::getApprovalStatus, "APPROVING")
+                .set(SubMeasure::getStatus, "APPROVING"));
 
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
         Long tenantId = UserContext.getCurrentTenantId();
+        WfInstance existingInstance = wfInstanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getTenantId, tenantId)
+                .eq(WfInstance::getBusinessType, "SUB_MEASURE")
+                .eq(WfInstance::getBusinessId, measureId)
+                .orderByDesc(WfInstance::getCreatedAt)
+                .last("LIMIT 1"));
+        if (existingInstance != null) {
+            String instanceStatus = existingInstance.getInstanceStatus();
+            if (WorkflowConstants.INSTANCE_REJECTED.equals(instanceStatus)
+                    || WorkflowConstants.INSTANCE_WITHDRAWN.equals(instanceStatus)) {
+                workflowEngine.resubmit(existingInstance.getId(), userId, username);
+                return;
+            }
+            throw new BusinessException("WORKFLOW_INSTANCE_EXISTS", "该业务已提交审批，请勿重复提交");
+        }
         workflowEngine.submit(userId, username, tenantId,
                 "SUB_MEASURE", measureId,
                 measure.getMeasureCode(),

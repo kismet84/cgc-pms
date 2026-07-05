@@ -24,7 +24,7 @@ describe('PurchaseOrderPage submit-approval button', () => {
   })
 
   it('renders 提交审批 button only when approvalStatus is DRAFT', () => {
-    expect(source).toMatch(/approvalStatus\s*===\s*'DRAFT'/)
+    expect(source).toMatch(/approvalStatus\s*===\s*APPROVAL_DRAFT/)
   })
 
   it('wires 提交审批 button to handleSubmitApproval handler', () => {
@@ -34,5 +34,21 @@ describe('PurchaseOrderPage submit-approval button', () => {
   it('maps contract purchase order type to Chinese display text', () => {
     expect(source).toMatch(/CONTRACT:\s*'合同采购'/)
     expect(source).toMatch(/ORDER_TYPE_LABEL\[row\.orderType\]\s*\?\?\s*row\.orderType/)
+  })
+
+  it('loads only approved performing purchase contracts on mount', () => {
+    expect(source).toContain("contractType: 'PURCHASE'")
+    expect(source).toContain("contractStatus: 'PERFORMING'")
+    expect(source).toContain("approvalStatus: 'APPROVED'")
+  })
+
+  it('reloads project contracts with approved performing purchase filters', () => {
+    expect(source).toContain('projectId: v')
+    expect(source).toContain('referenceStore.fetchContracts({')
+  })
+
+  it('reloads modal contract options with approved performing purchase filters after project change', () => {
+    expect(source).toContain('formData.contractId = undefined')
+    expect(source).toContain('formData.partnerId = undefined')
   })
 })

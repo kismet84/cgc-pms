@@ -28,6 +28,8 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class SysDictDataService {
 
+    private static final long SYSTEM_TENANT_ID = 0L;
+
     private final SysDictDataMapper sysDictDataMapper;
     private final SysDictTypeMapper sysDictTypeMapper;
 
@@ -136,25 +138,7 @@ public class SysDictDataService {
         return vo;
     }
     public java.util.List<SysDictDataVO> getByDictCode(String dictCode) {
-        Long tenantId = UserContext.getCurrentTenantId();
-        // 1. 查字典类型
-        SysDictType dictType = sysDictTypeMapper.selectOne(
-                new LambdaQueryWrapper<SysDictType>()
-                        .eq(SysDictType::getDictCode, dictCode)
-                        .eq(SysDictType::getTenantId, tenantId)
-        );
-        if (dictType == null) {
-            return java.util.List.of();
-        }
-        // 2. 查字典数据
-        java.util.List<SysDictData> dataList = sysDictDataMapper.selectList(
-                new LambdaQueryWrapper<SysDictData>()
-                        .eq(SysDictData::getDictTypeId, dictType.getId())
-                        .eq(SysDictData::getTenantId, tenantId)
-                        .eq(SysDictData::getStatus, "ENABLE")
-                        .orderByAsc(SysDictData::getOrderNum)
-        );
-        return dataList.stream().map(this::toVO).toList();
+        return fetchByDictCode(dictCode, currentTenantIdOrSystem());
     }
 
     /**
@@ -163,7 +147,7 @@ public class SysDictDataService {
      * @return 字典数据列表
      */
     public List<SysDictDataVO> getByDictCodeCached(String dictCode) {
-        Long tenantId = UserContext.getCurrentTenantId();
+        Long tenantId = currentTenantIdOrSystem();
         String cacheKey = tenantId + ":" + dictCode;
         try {
             return dictCache.get(cacheKey);
@@ -178,7 +162,7 @@ public class SysDictDataService {
      * @param dictCode 字典编码
      */
     public void evictCache(String dictCode) {
-        Long tenantId = UserContext.getCurrentTenantId();
+        Long tenantId = currentTenantIdOrSystem();
         String cacheKey = tenantId + ":" + dictCode;
         dictCache.invalidate(cacheKey);
         log.debug("Evicted dict cache for code: {}, tenantId: {}", dictCode, tenantId);
@@ -228,5 +212,10 @@ public class SysDictDataService {
                         .orderByAsc(SysDictData::getOrderNum)
         );
         return dataList.stream().map(this::toVO).toList();
+    }
+
+    private Long currentTenantIdOrSystem() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        return tenantId != null ? tenantId : SYSTEM_TENANT_ID;
     }
 }

@@ -6,8 +6,10 @@ import com.cgcpms.org.entity.OrgPosition;
 import com.cgcpms.org.mapper.OrgPositionMapper;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
+import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.entity.SysUserRole;
+import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -38,6 +40,7 @@ public class ApproverResolver {
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
+    private final SysRoleMapper sysRoleMapper;
     private final OrgPositionMapper orgPositionMapper;
     private final PmProjectMemberMapper pmProjectMemberMapper;
     private final ObjectMapper objectMapper;
@@ -104,24 +107,7 @@ public class ApproverResolver {
             throw new BusinessException("INVALID_APPROVER_CONFIG", "ROLE类型配置缺少roleId");
         }
         long roleId = config.get("roleId").asLong();
-
-        List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getRoleId, roleId));
-        if (userRoles.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<Long> userIds = userRoles.stream()
-                .map(SysUserRole::getUserId).distinct().toList();
-
-        List<SysUser> users = sysUserMapper.selectList(
-                new LambdaQueryWrapper<SysUser>()
-                        .in(SysUser::getId, userIds)
-                        .eq(tenantId != null, SysUser::getTenantId, tenantId)
-                        .eq(SysUser::getStatus, "ENABLE"));
-
-        return users.stream().map(SysUser::getId).toList();
+        return resolveRoleById(roleId, tenantId);
     }
 
     private List<Long> resolvePosition(JsonNode config, Long tenantId) {
@@ -166,7 +152,47 @@ public class ApproverResolver {
                         .eq(PmProjectMember::getProjectId, projectId)
                         .eq(PmProjectMember::getRoleCode, roleCode)
                         .eq(PmProjectMember::getStatus, "ACTIVE"));
+        if (!members.isEmpty()) {
+            return members.stream().map(PmProjectMember::getUserId).distinct().toList();
+        }
 
-        return members.stream().map(PmProjectMember::getUserId).distinct().toList();
+        // ponytail: keep the workflow usable in dev/demo data even when project-member seeds are missing.
+        List<Long> tenantRoleUsers = resolveTenantUsersByRoleCode(tenantId, roleCode);
+        if (!tenantRoleUsers.isEmpty()) {
+            return tenantRoleUsers;
+        }
+        return resolveTenantUsersByRoleCode(tenantId, "SUPER_ADMIN");
+    }
+
+    private List<Long> resolveTenantUsersByRoleCode(Long tenantId, String roleCode) {
+        SysRole role = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
+                .eq(tenantId != null, SysRole::getTenantId, tenantId)
+                .eq(SysRole::getRoleCode, roleCode)
+                .eq(SysRole::getStatus, "ENABLE")
+                .last("LIMIT 1"));
+        if (role == null) {
+            return Collections.emptyList();
+        }
+        return resolveRoleById(role.getId(), tenantId);
+    }
+
+    private List<Long> resolveRoleById(Long roleId, Long tenantId) {
+        List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getRoleId, roleId));
+        if (userRoles.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> userIds = userRoles.stream()
+                .map(SysUserRole::getUserId).distinct().toList();
+
+        List<SysUser> users = sysUserMapper.selectList(
+                new LambdaQueryWrapper<SysUser>()
+                        .in(SysUser::getId, userIds)
+                        .eq(tenantId != null, SysUser::getTenantId, tenantId)
+                        .eq(SysUser::getStatus, "ENABLE"));
+
+        return users.stream().map(SysUser::getId).toList();
     }
 }

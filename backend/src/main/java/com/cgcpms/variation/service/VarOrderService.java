@@ -29,6 +29,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -116,6 +117,8 @@ public class VarOrderService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(VarOrder order) {
+        validateDraftOrder(order);
+
         // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "VO-" + today + "-";
@@ -168,6 +171,8 @@ public class VarOrderService {
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
+        validateDraftOrder(order);
+
         varOrderMapper.updateById(order);
     }
 
@@ -183,21 +188,21 @@ public class VarOrderService {
         if (order.getCostGeneratedFlag() != null && order.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
+        List<VarOrderItem> validItems = normalizeDraftItems(items);
+
         // Delete old items
         varOrderItemMapper.delete(new LambdaQueryWrapper<VarOrderItem>()
                 .eq(VarOrderItem::getVarOrderId, varOrderId));
 
         // Batch insert new items and calculate total amount
         BigDecimal totalAmount = BigDecimal.ZERO;
-        if (items != null) {
-            for (VarOrderItem item : items) {
-                item.setVarOrderId(varOrderId);
-                item.setTenantId(UserContext.getCurrentTenantId());
-                item.setId(null);
-                totalAmount = totalAmount.add(item.getAmount() == null ? BigDecimal.ZERO : item.getAmount());
-            }
-            Db.saveBatch(items, 50);
+        for (VarOrderItem item : validItems) {
+            item.setVarOrderId(varOrderId);
+            item.setTenantId(UserContext.getCurrentTenantId());
+            item.setId(null);
+            totalAmount = totalAmount.add(item.getAmount() == null ? BigDecimal.ZERO : item.getAmount());
         }
+        Db.saveBatch(validItems, 50);
 
         // Update header reported amount
         order.setReportedAmount(totalAmount);
@@ -246,6 +251,45 @@ public class VarOrderService {
                 order.getProjectId(),
                 order.getContractId(),
                 null, null, null);
+    }
+
+    private void validateDraftOrder(VarOrder order) {
+        if (order.getProjectId() == null) {
+            throw new BusinessException("VAR_ORDER_PROJECT_REQUIRED", "请选择项目");
+        }
+        if (order.getContractId() == null) {
+            throw new BusinessException("VAR_ORDER_CONTRACT_REQUIRED", "请选择合同");
+        }
+        if (!StringUtils.hasText(order.getVarType())) {
+            throw new BusinessException("VAR_ORDER_TYPE_REQUIRED", "请选择变更类型");
+        }
+    }
+
+    private List<VarOrderItem> normalizeDraftItems(List<VarOrderItem> items) {
+        if (items == null || items.isEmpty()) {
+            throw new BusinessException("VAR_ORDER_ITEMS_REQUIRED", "请至少保留一条有效明细");
+        }
+        List<VarOrderItem> validItems = new ArrayList<>();
+        for (VarOrderItem item : items) {
+            if (item == null) {
+                continue;
+            }
+            BigDecimal quantity = item.getQuantity();
+            if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            if (!StringUtils.hasText(item.getItemName())) {
+                throw new BusinessException("VAR_ORDER_ITEM_NAME_REQUIRED", "请填写明细名称");
+            }
+            if (item.getCostSubjectId() == null) {
+                throw new BusinessException("VAR_ORDER_ITEM_COST_SUBJECT_REQUIRED", "请选择成本科目");
+            }
+            validItems.add(item);
+        }
+        if (validItems.isEmpty()) {
+            throw new BusinessException("VAR_ORDER_ITEMS_REQUIRED", "请至少保留一条有效明细");
+        }
+        return validItems;
     }
 
     // ---- VO conversion helpers ----

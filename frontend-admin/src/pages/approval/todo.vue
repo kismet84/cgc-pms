@@ -30,7 +30,10 @@ import {
   getWorkflowBusinessEntryPath,
   getWorkflowBusinessTypeLabel,
   getWorkflowInstanceStatusMeta,
+  getWorkflowNodeStatusMeta,
+  getWorkflowTaskStatusMeta,
   instanceStatusOptions,
+  preloadWorkflowDisplayDicts,
   WF_INSTANCE_RUNNING,
   WF_INSTANCE_APPROVED,
   WF_INSTANCE_REJECTED,
@@ -462,7 +465,16 @@ function shouldShowTableEmpty(): boolean {
   return total.value === 0 && tableData.value.length === 0
 }
 
+function getNodeStatusMeta(status: unknown) {
+  return getWorkflowNodeStatusMeta(status, nodeStatusMap)
+}
+
+function getTaskStatusMeta(status: unknown) {
+  return getWorkflowTaskStatusMeta(status, taskStatusMap)
+}
+
 onMounted(() => {
+  preloadWorkflowDisplayDicts()
   fetchData()
 })
 
@@ -731,16 +743,16 @@ watch(
               <a-step v-for="node in detailNodes" :key="node.id">
                 <template #title>
                   {{ node.nodeName }}
-                  <a-tag :color="nodeStatusMap[node.nodeStatus]?.color">
-                    {{ nodeStatusMap[node.nodeStatus]?.text || node.nodeStatus }}
+                  <a-tag :color="getNodeStatusMeta(node.nodeStatus).color">
+                    {{ getNodeStatusMeta(node.nodeStatus).text }}
                   </a-tag>
                 </template>
                 <template #description>
                   <div v-if="Array.isArray(node.tasks)" class="approval-node-tasks">
                     <span v-for="task in node.tasks" :key="task.id">
                       {{ task.approverName }}
-                      <a-tag :color="taskStatusMap[task.taskStatus]?.color">
-                        {{ taskStatusMap[task.taskStatus]?.text || task.taskStatus }}
+                      <a-tag :color="getTaskStatusMeta(task.taskStatus).color">
+                        {{ getTaskStatusMeta(task.taskStatus).text }}
                       </a-tag>
                     </span>
                   </div>

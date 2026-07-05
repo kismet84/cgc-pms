@@ -41,6 +41,7 @@ import type { SelectOption } from '@/types/ui'
 import type { ContractItem } from '@/types/contract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 const route = useRoute()
 const router = useRouter()
@@ -96,6 +97,15 @@ const STATUS_COLOR: Record<string, string> = {
   APPROVING: 'processing',
   CONFIRMED: 'blue',
   COMPLETED: 'success',
+}
+const STATUS_DICT = 'sub_measure_status'
+
+function measureStatusLabel(status: string | undefined): string {
+  return getDictLabelSync(STATUS_DICT, status ?? '', STATUS_LABEL)
+}
+
+function measureStatusColor(status: string | undefined): string {
+  return getDictTagColorSync(STATUS_DICT, status ?? '', STATUS_COLOR)
 }
 
 // ---- vxe-grid columns ----
@@ -478,13 +488,13 @@ const measureStatusSummary = computed(() => [
     pct: statusPct(kpiMeasurePending.value),
   },
   {
-    label: '已确认',
+    label: measureStatusLabel(STATUS_CONFIRMED),
     count: tableData.value.filter((r) => r.status === STATUS_CONFIRMED).length,
     color: '#1890ff',
     pct: statusPct(tableData.value.filter((r) => r.status === STATUS_CONFIRMED).length),
   },
   {
-    label: '已完成',
+    label: measureStatusLabel(STATUS_COMPLETED),
     count: tableData.value.filter((r) => r.status === STATUS_COMPLETED).length,
     color: '#52c41a',
     pct: statusPct(tableData.value.filter((r) => r.status === STATUS_COMPLETED).length),
@@ -507,6 +517,7 @@ function statusPct(count: number) {
 }
 
 onMounted(() => {
+  fetchDictData(STATUS_DICT)
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({ contractType: 'SUB' })
   referenceStore.fetchPartners({ partnerType: 'SUB' })
@@ -701,8 +712,8 @@ onMounted(() => {
                 <span v-else class="lg-none">-</span>
               </template>
               <template #status="{ row }">
-                <a-tag :color="STATUS_COLOR[row.status]">
-                  {{ STATUS_LABEL[row.status] ?? row.status }}
+                <a-tag :color="measureStatusColor(row.status)">
+                  {{ measureStatusLabel(row.status) }}
                 </a-tag>
               </template>
               <template #approvalStatus="{ row }">
@@ -799,7 +810,7 @@ onMounted(() => {
                 class="subcontract-measure-recent-item"
               >
                 <span>{{ item.measureCode || item.measurePeriod }}</span>
-                <strong>{{ STATUS_LABEL[item.status ?? ''] ?? item.status ?? '-' }}</strong>
+                <strong>{{ measureStatusLabel(item.status) || '-' }}</strong>
               </div>
               <div v-if="!recentMeasures.length" class="subcontract-measure-empty">暂无计量</div>
             </div>

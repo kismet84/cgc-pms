@@ -27,6 +27,7 @@ import {
 } from '@/types/costTarget'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -46,6 +47,25 @@ function onResize() {
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
 const approvalStatusOptions = [APPROVAL_DRAFT, APPROVAL_APPROVING, APPROVAL_APPROVED, APPROVAL_REJECTED]
+const APPROVAL_STATUS_DICT = 'approval_status'
+const TARGET_STATUS_DICT = 'cost_target_status'
+
+function approvalStatusLabel(status: string | undefined): string {
+  return getDictLabelSync(APPROVAL_STATUS_DICT, status ?? '', APPROVAL_STATUS_LABEL)
+}
+
+function approvalStatusColor(status: string | undefined): string {
+  return getDictTagColorSync(APPROVAL_STATUS_DICT, status ?? '', APPROVAL_STATUS_COLOR)
+}
+
+function targetStatusLabel(status: string | undefined): string {
+  return getDictLabelSync(TARGET_STATUS_DICT, status ?? '', TARGET_STATUS_LABEL)
+}
+
+function targetStatusColor(status: string | undefined): string {
+  return getDictTagColorSync(TARGET_STATUS_DICT, status ?? '', TARGET_STATUS_COLOR)
+}
+
 const activeStatusOptions = [
   { label: '当前启用', value: 1 },
   { label: '未启用', value: 0 },
@@ -250,13 +270,13 @@ const targetStatusSummary = computed(() => [
 const targetVersionSummary = computed(() => {
   const cancelled = tableData.value.filter((item) => item.status === 'CANCELLED').length
   return [
-    { label: '已生效', count: targetStats.value.active, color: '#52c41a' },
+    { label: targetStatusLabel('ACTIVE'), count: targetStats.value.active, color: '#52c41a' },
     {
       label: '未生效',
       count: Math.max(0, tableData.value.length - targetStats.value.active - cancelled),
       color: '#1677ff',
     },
-    { label: '已作废', count: cancelled, color: '#ff4d4f' },
+    { label: targetStatusLabel('CANCELLED'), count: cancelled, color: '#ff4d4f' },
   ]
 })
 
@@ -269,6 +289,8 @@ function targetPercent(value: number): number {
 
 onMounted(() => {
   window.addEventListener('resize', onResize)
+  fetchDictData(APPROVAL_STATUS_DICT)
+  fetchDictData(TARGET_STATUS_DICT)
   referenceStore.fetchProjects()
   fetchData()
 })
@@ -337,7 +359,7 @@ onUnmounted(() => {
           @change="handleSearch"
         >
           <a-select-option v-for="item in approvalStatusOptions" :key="item" :value="item">
-            {{ APPROVAL_STATUS_LABEL[item] ?? item }}
+            {{ approvalStatusLabel(item) }}
           </a-select-option>
         </a-select>
         <a-select
@@ -439,7 +461,7 @@ onUnmounted(() => {
                 </div>
                 <div class="ct-mobile-card-meta">成本目标：{{ fmtAmount(row.totalTargetAmount) }} 万元</div>
                 <div class="ct-mobile-card-meta">
-                  审批状态：{{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus || '-' }}
+                  审批状态：{{ approvalStatusLabel(row.approvalStatus) || '-' }}
                 </div>
                 <a-button type="link" class="ct-mobile-card-link" @click="handleView(row)">
                   查看详情
@@ -461,13 +483,13 @@ onUnmounted(() => {
                 <span class="ct-money">{{ fmtAmount(row.totalTargetAmount) }}</span>
               </template>
               <template #approvalStatus="{ row }">
-                <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'">
-                  {{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus }}
+                <a-tag :color="approvalStatusColor(row.approvalStatus)">
+                  {{ approvalStatusLabel(row.approvalStatus) }}
                 </a-tag>
               </template>
               <template #status="{ row }">
-                <a-tag :color="TARGET_STATUS_COLOR[row.status] || 'default'">
-                  {{ TARGET_STATUS_LABEL[row.status] || row.status }}
+                <a-tag :color="targetStatusColor(row.status)">
+                  {{ targetStatusLabel(row.status) }}
                 </a-tag>
               </template>
               <template #isActive="{ row }">

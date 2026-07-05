@@ -236,6 +236,7 @@ class VarOrderServiceTest {
         item1.setQuantity(new BigDecimal("10"));
         item1.setUnitPrice(new BigDecimal("200.00"));
         item1.setAmount(new BigDecimal("2000.00"));
+        item1.setCostSubjectId(90001L);
 
         VarOrderItem item2 = new VarOrderItem();
         item2.setVarOrderId(id);
@@ -244,6 +245,7 @@ class VarOrderServiceTest {
         item2.setQuantity(new BigDecimal("50"));
         item2.setUnitPrice(new BigDecimal("60.00"));
         item2.setAmount(new BigDecimal("3000.00"));
+        item2.setCostSubjectId(90002L);
 
         varOrderService.saveItems(id, java.util.List.of(item1, item2));
 
@@ -251,6 +253,92 @@ class VarOrderServiceTest {
         assertNotNull(updated.getReportedAmount(), "金额应被聚合");
         assertEquals(0, new BigDecimal("5000.00").compareTo(updated.getReportedAmount()),
                 "聚合金额应为 2000+3000=5000");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("GREEN-4B: create requires contract and varType")
+    void testCreateRequiresContractAndVarType() {
+        VarOrder missingContract = new VarOrder();
+        missingContract.setProjectId(PROJECT_ID);
+        missingContract.setVarName("缺合同");
+        missingContract.setVarType("现场签证");
+        missingContract.setDirection("COST");
+
+        BusinessException missingContractEx = assertThrows(BusinessException.class, () ->
+                varOrderService.create(missingContract));
+        assertEquals("VAR_ORDER_CONTRACT_REQUIRED", missingContractEx.getCode());
+
+        VarOrder missingType = new VarOrder();
+        missingType.setProjectId(PROJECT_ID);
+        missingType.setContractId(CONTRACT_ID);
+        missingType.setVarName("缺类型");
+        missingType.setDirection("COST");
+
+        BusinessException missingTypeEx = assertThrows(BusinessException.class, () ->
+                varOrderService.create(missingType));
+        assertEquals("VAR_ORDER_TYPE_REQUIRED", missingTypeEx.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("GREEN-4C: saveItems rejects empty or invalid draft items")
+    void testSaveItemsRejectsEmptyOrInvalidItems() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("变更单测-无效明细");
+        order.setVarType("现场签证");
+        order.setDirection("COST");
+        Long id = varOrderService.create(order);
+
+        BusinessException emptyItemsEx = assertThrows(BusinessException.class, () ->
+                varOrderService.saveItems(id, java.util.List.of()));
+        assertEquals("VAR_ORDER_ITEMS_REQUIRED", emptyItemsEx.getCode());
+
+        VarOrderItem invalidItem = new VarOrderItem();
+        invalidItem.setItemName("缺成本科目");
+        invalidItem.setQuantity(new BigDecimal("1"));
+        invalidItem.setUnitPrice(new BigDecimal("100.00"));
+        invalidItem.setAmount(new BigDecimal("100.00"));
+
+        BusinessException missingCostSubjectEx = assertThrows(BusinessException.class, () ->
+                varOrderService.saveItems(id, java.util.List.of(invalidItem)));
+        assertEquals("VAR_ORDER_ITEM_COST_SUBJECT_REQUIRED", missingCostSubjectEx.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("GREEN-4D: create plus saveItems can be queried by list and detail")
+    void testCreatedDraftCanBeQueried() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("变更单测-可查询草稿");
+        order.setVarType("现场签证");
+        order.setDirection("COST");
+        Long id = varOrderService.create(order);
+
+        VarOrderItem item = new VarOrderItem();
+        item.setItemName("条目C");
+        item.setUnit("项");
+        item.setQuantity(new BigDecimal("2"));
+        item.setUnitPrice(new BigDecimal("800.00"));
+        item.setAmount(new BigDecimal("1600.00"));
+        item.setCostSubjectId(90001L);
+        varOrderService.saveItems(id, java.util.List.of(item));
+
+        var detail = varOrderService.getById(id);
+        assertEquals("变更单测-可查询草稿", detail.getVarName());
+        assertEquals("DRAFT", detail.getApprovalStatus());
+        assertNotNull(detail.getItems());
+        assertEquals(1, detail.getItems().size());
+
+        var page = varOrderService.getPage(1, 20, PROJECT_ID, CONTRACT_ID, PARTNER_ID, null, null, null);
+        assertTrue(page.getRecords().stream().anyMatch(record -> id.toString().equals(record.getId())),
+                "分页列表应能查到新建草稿");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -273,8 +361,11 @@ class VarOrderServiceTest {
         Long id = varOrderService.create(order);
         assertNotNull(id);
 
-        // Submit first
-        varOrderService.submitForApproval(id);
+        // Narrow the test to update protection and avoid coupling to workflow approver fixtures.
+        VarOrder approving = new VarOrder();
+        approving.setId(id);
+        approving.setApprovalStatus("APPROVING");
+        varOrderMapper.updateById(approving);
 
         // Verify status is no longer DRAFT
         VarOrder after = varOrderMapper.selectById(id);
@@ -300,11 +391,11 @@ class VarOrderServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("SAFE-1: getPage with null contractId/partnerId should not NPE")
-    void testGetPageWithNullRelationIds() {
+    @DisplayName("SAFE-1: getPage with null partnerId should not NPE")
+    void testGetPageWithNullPartnerId() {
         VarOrder order = new VarOrder();
         order.setProjectId(PROJECT_ID);
-        order.setContractId(null);
+        order.setContractId(CONTRACT_ID);
         order.setPartnerId(null);
         order.setVarName("null-relation 单测");
         order.setVarType("DESIGN_CHANGE");
@@ -323,7 +414,8 @@ class VarOrderServiceTest {
         assertEquals("null-relation 单测", vo.getVarName());
         assertNotNull(vo.getProjectName(), "projectName 应填充");
         assertEquals("变更单测专用项目", vo.getProjectName());
-        assertNull(vo.getContractName(), "contractName 应为 null");
+        assertNotNull(vo.getContractName(), "contractName 应填充");
+        assertEquals("变更单测合同", vo.getContractName());
         assertNull(vo.getPartnerName(), "partnerName 应为 null");
     }
 

@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v4.1.8 D:/projects-test/cgc-pms/frontend-admin
+
+
+ Test Files  54 passed (54)
+      Tests  266 passed (266)
+   Start at  21:23:16
+   Duration  39.07s (transform 15.34s, setup 0ms, import 187.45s, tests 6.02s, environment 264.03s)
+

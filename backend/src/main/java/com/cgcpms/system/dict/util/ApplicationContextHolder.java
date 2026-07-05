@@ -33,7 +33,11 @@ public class ApplicationContextHolder implements ApplicationContextAware {
         if (context == null) {
             return null;
         }
-        return context.getBean(clazz);
+        try {
+            return context.getBean(clazz);
+        } catch (BeansException e) {
+            return null;
+        }
     }
 
     /**
@@ -43,6 +47,10 @@ public class ApplicationContextHolder implements ApplicationContextAware {
         if (context == null) {
             return null;
         }
-        return context.getBean(name, clazz);
+        try {
+            return context.getBean(name, clazz);
+        } catch (BeansException e) {
+            return null;
+        }
     }
 }

@@ -20,6 +20,8 @@ import java.time.LocalDate;
 @TableName("mat_purchase_order")
 public class MatPurchaseOrder extends BaseEntity {
 
+    public interface UpdateValidation {}
+
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
@@ -34,7 +36,7 @@ public class MatPurchaseOrder extends BaseEntity {
 
     private Long partnerId;
 
-    @NotBlank
+    @NotBlank(groups = UpdateValidation.class)
     private String orderCode;
 
     private String orderType;

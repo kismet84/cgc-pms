@@ -9,9 +9,21 @@ import PermissionModal from './PermissionModal.vue'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { normalizeArray } from '@/utils/normalizeArray'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量
 const STATUS_ENABLE = 'ENABLE'
+const COMMON_STATUS_DICT = 'common_status'
+const STATUS_LABEL: Record<string, string> = { ENABLE: '启用', DISABLE: '禁用' }
+const STATUS_COLOR: Record<string, string> = { ENABLE: 'success', DISABLE: 'error' }
+
+function statusLabel(status: string | undefined): string {
+  return getDictLabelSync(COMMON_STATUS_DICT, status ?? '', STATUS_LABEL)
+}
+
+function statusColor(status: string | undefined): string {
+  return getDictTagColorSync(COMMON_STATUS_DICT, status ?? '', STATUS_COLOR)
+}
 
 const loading = ref(false)
 const allRoles = ref<SysRoleVO[]>([])
@@ -112,7 +124,10 @@ function handlePageChange(page: number) {
   pageNo.value = page
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  fetchDictData(COMMON_STATUS_DICT)
+  fetchData()
+})
 </script>
 
 <template>
@@ -175,8 +190,8 @@ onMounted(fetchData)
             size="small"
           >
             <template #status="{ row }">
-              <a-tag :color="row.status === STATUS_ENABLE ? 'success' : 'error'">
-                {{ row.status === STATUS_ENABLE ? '启用' : '禁用' }}
+              <a-tag :color="statusColor(row.status)">
+                {{ statusLabel(row.status) }}
               </a-tag>
             </template>
             <template #action="{ row }">

@@ -16,10 +16,22 @@ import type { SysUserVO } from '@/types/user'
 import type { SysRoleVO } from '@/types/system'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量
 const STATUS_ENABLE = 'ENABLE'
 const STATUS_DISABLE = 'DISABLE'
+const COMMON_STATUS_DICT = 'common_status'
+const STATUS_LABEL: Record<string, string> = { ENABLE: '启用', DISABLE: '禁用' }
+const STATUS_COLOR: Record<string, string> = { ENABLE: 'success', DISABLE: 'error' }
+
+function statusLabel(status: string | undefined): string {
+  return getDictLabelSync(COMMON_STATUS_DICT, status ?? '', STATUS_LABEL)
+}
+
+function statusColor(status: string | undefined): string {
+  return getDictTagColorSync(COMMON_STATUS_DICT, status ?? '', STATUS_COLOR)
+}
 
 const loading = ref(false)
 const tableData = ref<SysUserVO[]>([])
@@ -195,7 +207,7 @@ async function handleModalOk() {
 
 function handleToggleStatus(record: SysUserVO) {
   const newStatus = record.status === STATUS_ENABLE ? STATUS_DISABLE : STATUS_ENABLE
-  const action = newStatus === STATUS_ENABLE ? '启用' : '禁用'
+  const action = statusLabel(newStatus)
   Modal.confirm({
     title: `确认${action}`,
     content: `确定要${action}用户"${record.username}"吗？`,
@@ -248,6 +260,7 @@ function handlePageChange(page: number) {
 }
 
 onMounted(() => {
+  fetchDictData(COMMON_STATUS_DICT)
   fetchData()
   fetchRoles()
 })
@@ -318,8 +331,8 @@ onMounted(() => {
               <span v-else class="lg-muted-text">-</span>
             </template>
             <template #status="{ row }">
-              <a-tag :color="row.status === STATUS_ENABLE ? 'success' : 'error'">
-                {{ row.status === STATUS_ENABLE ? '启用' : '禁用' }}
+              <a-tag :color="statusColor(row.status)">
+                {{ statusLabel(row.status) }}
               </a-tag>
             </template>
             <template #action="{ row }">
@@ -337,7 +350,7 @@ onMounted(() => {
                   <a-menu>
                     <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                     <a-menu-item :danger="row.status === STATUS_ENABLE" @click="handleToggleStatus(row)">
-                      {{ row.status === STATUS_ENABLE ? '禁用' : '启用' }}
+                      {{ row.status === STATUS_ENABLE ? statusLabel(STATUS_DISABLE) : statusLabel(STATUS_ENABLE) }}
                     </a-menu-item>
                     <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
                   </a-menu>

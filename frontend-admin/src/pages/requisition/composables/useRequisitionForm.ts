@@ -123,7 +123,9 @@ export function useRequisitionForm(fetchData: () => Promise<void>) {
       return
     }
     const validItems = itemList.value.filter(
-      (item) => parseFloat(item.quantity || '0') > 0 && (item.materialName || '').trim() !== '',
+      (item) =>
+        parseFloat(item.quantity || '0') > 0 &&
+        (item.materialId != null || (item.materialName || '').trim() !== ''),
     )
     if (validItems.length === 0) {
       message.warning('请至少添加一条领料明细（材料名称不能为空且数量须大于0）')

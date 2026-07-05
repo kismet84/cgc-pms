@@ -59,32 +59,51 @@ describe('reference store cache isolation', () => {
       { id: 'c2', contractName: '合同B', projectId: 'p2', contractType: 'SUB' },
     ]
     const filteredContracts = [
-      { id: 'c1', contractName: '合同A', projectId: 'p1', contractType: 'GC' },
+      {
+        id: 'c1',
+        contractName: '合同A',
+        projectId: 'p1',
+        contractType: 'PURCHASE',
+        contractStatus: 'PERFORMING',
+        approvalStatus: 'APPROVED',
+      },
     ]
 
-    it('filtered fetchContracts should NOT pollute base cache — contracts ref stays untouched', async () => {
-      // First, populate the base cache with unfiltered data
+    it('filtered fetchContracts updates contracts ref for pages that read dropdown options from the store', async () => {
       mockedGetContracts.mockResolvedValueOnce({ records: allContracts })
       await store.fetchContracts({})
       expect(store.contracts).toEqual(allContracts)
 
-      // Then do a filtered query — it should return filtered data but NOT overwrite contracts ref
       mockedGetContracts.mockResolvedValueOnce({ records: filteredContracts })
-      const filtered = await store.fetchContracts({ projectId: 'p1' })
-      expect(filtered).toEqual(filteredContracts)
+      const filtered = await store.fetchContracts({
+        projectId: 'p1',
+        contractType: 'PURCHASE',
+        contractStatus: 'PERFORMING',
+        approvalStatus: 'APPROVED',
+      })
 
-      // The key fix: contracts ref should still contain the full base set
-      expect(store.contracts).toEqual(allContracts)
+      expect(filtered).toEqual(filteredContracts)
+      expect(store.contracts).toEqual(filteredContracts)
     })
 
-    it('filtered query no longer writes filtered results to contracts ref', async () => {
-      // Filtered query should return data but not touch the shared contracts ref
+    it('filtered fetchContracts forwards contract status filters to contract ledger API', async () => {
       mockedGetContracts.mockResolvedValueOnce({ records: filteredContracts })
-      const filtered = await store.fetchContracts({ projectId: 'p1' })
+      const filtered = await store.fetchContracts({
+        projectId: 'p1',
+        contractType: 'PURCHASE',
+        contractStatus: 'PERFORMING',
+        approvalStatus: 'APPROVED',
+      })
 
       expect(filtered).toEqual(filteredContracts)
-      // contracts ref should remain null (not polluted with filtered subset)
-      expect(store.contracts).toBeNull()
+      expect(mockedGetContracts).toHaveBeenCalledWith({
+        pageNo: 1,
+        pageSize: 50,
+        projectId: 'p1',
+        contractType: 'PURCHASE',
+        contractStatus: 'PERFORMING',
+        approvalStatus: 'APPROVED',
+      })
     })
 
     it('base unfiltered query populates and uses cache correctly', async () => {

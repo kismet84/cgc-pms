@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -46,6 +48,8 @@ class MatPurchaseOrderControllerTest {
     private static final long PROJECT_ID = 10001L;
     private static final long CONTRACT_ID = 30001L;
     private static final long PARTNER_ID = 20002L;
+    private static final Pattern DATA_ID_PATTERN = Pattern.compile("\"data\":\"(\\d+)\"");
+    private static final Pattern ORDER_CODE_PATTERN = Pattern.compile("\"orderCode\":\"([^\"]+)\"");
 
     private Long orderId;
 
@@ -142,6 +146,60 @@ class MatPurchaseOrderControllerTest {
 
     @Test
     @Order(4)
+    @DisplayName("POST /purchase-orders without orderCode -> 200 auto-generates DRAFT order")
+    void testCreate_WithoutOrderCode() throws Exception {
+        String body = """
+                {
+                    "projectId": %d,
+                    "contractId": %d,
+                    "partnerId": %d,
+                    "orderType": "PURCHASE",
+                    "orderDate": "%s",
+                    "totalAmount": 100000.00
+                }
+                """.formatted(PROJECT_ID, CONTRACT_ID, PARTNER_ID, LocalDate.now().toString());
+
+        String response = mockMvc.perform(postWithApi("/purchase-orders")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isString())
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher idMatcher = DATA_ID_PATTERN.matcher(response);
+        Assertions.assertTrue(idMatcher.find(), "响应中应包含 data id");
+        Long createdId = Long.parseLong(idMatcher.group(1));
+
+        String detailResponse = mockMvc.perform(getWithApi("/purchase-orders/" + createdId)
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.orderCode").value(org.hamcrest.Matchers.startsWith("PO-")))
+                .andExpect(jsonPath("$.data.approvalStatus").value("DRAFT"))
+                .andExpect(jsonPath("$.data.orderStatus").value("DRAFT"))
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher orderCodeMatcher = ORDER_CODE_PATTERN.matcher(detailResponse);
+        Assertions.assertTrue(orderCodeMatcher.find(), "详情响应中应包含 orderCode");
+        String generatedOrderCode = orderCodeMatcher.group(1);
+
+        mockMvc.perform(getWithApi("/purchase-orders")
+                        .cookie(adminCookie())
+                        .param("pageNum", "1")
+                        .param("pageSize", "20")
+                        .param("orderCode", generatedOrderCode))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.records[0].id").value(createdId.toString()))
+                .andExpect(jsonPath("$.data.records[0].orderCode").value(generatedOrderCode))
+                .andExpect(jsonPath("$.data.records[0].approvalStatus").value("DRAFT"))
+                .andExpect(jsonPath("$.data.records[0].orderStatus").value("DRAFT"));
+    }
+
+    @Test
+    @Order(5)
     @DisplayName("POST /purchase-orders with missing required field -> 400")
     void testCreate_MissingRequired() throws Exception {
         mockMvc.perform(postWithApi("/purchase-orders")
@@ -156,7 +214,7 @@ class MatPurchaseOrderControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(5)
+    @Order(6)
     @DisplayName("GET /purchase-orders/{id} -> 200 with order data")
     void testGetById() throws Exception {
         Assertions.assertNotNull(orderId, "Prerequisite: orderId must be created");
@@ -170,7 +228,7 @@ class MatPurchaseOrderControllerTest {
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     @DisplayName("GET /purchase-orders/{id} for non-existent -> 400")
     void testGetById_NotFound() throws Exception {
         mockMvc.perform(getWithApi("/purchase-orders/999999")
@@ -183,7 +241,7 @@ class MatPurchaseOrderControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(7)
+    @Order(8)
     @DisplayName("PUT /purchase-orders/{id} -> 200 updates order")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(orderId, "Prerequisite: orderId must be created");
@@ -210,7 +268,7 @@ class MatPurchaseOrderControllerTest {
     }
 
     @Test
-    @Order(8)
+    @Order(9)
     @DisplayName("PUT /purchase-orders/{id} for non-existent -> 400")
     void testUpdate_NotFound() throws Exception {
         String body = """
@@ -238,7 +296,7 @@ class MatPurchaseOrderControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(8)
+    @Order(10)
     @DisplayName("GET /purchase-orders/{id}/items -> 200 with items array")
     void testGetItems() throws Exception {
         Assertions.assertNotNull(orderId, "Prerequisite: orderId must be created");
@@ -255,7 +313,7 @@ class MatPurchaseOrderControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(9)
+    @Order(11)
     @DisplayName("POST /purchase-orders/{id}/items/batch -> 200 saves items")
     void testSaveItemsBatch() throws Exception {
         Assertions.assertNotNull(orderId, "Prerequisite: orderId must be created");
@@ -286,7 +344,7 @@ class MatPurchaseOrderControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(10)
+    @Order(12)
     @DisplayName("DELETE /purchase-orders/{id} -> 200 deletes order")
     void testDelete() throws Exception {
         Assertions.assertNotNull(orderId, "Prerequisite: orderId must be created");
@@ -307,7 +365,7 @@ class MatPurchaseOrderControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(11)
+    @Order(13)
     @DisplayName("POST /purchase-orders (re-create) -> 200 after delete")
     void testRecreate() throws Exception {
         String body = """
@@ -338,7 +396,7 @@ class MatPurchaseOrderControllerTest {
     }
 
     @Test
-    @Order(12)
+    @Order(14)
     @DisplayName("POST /purchase-orders/{id}/submit -> 200 submits for approval")
     void testSubmitForApproval() throws Exception {
         Assertions.assertNotNull(orderId, "Prerequisite: orderId must be created");

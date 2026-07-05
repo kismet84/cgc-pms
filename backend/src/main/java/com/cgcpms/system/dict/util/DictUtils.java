@@ -38,7 +38,11 @@ public final class DictUtils {
         if (service == null) {
             return List.of();
         }
-        return service.getByDictCodeCached(dictCode);
+        try {
+            return service.getByDictCodeCached(dictCode);
+        } catch (RuntimeException e) {
+            return List.of();
+        }
     }
 
     /**

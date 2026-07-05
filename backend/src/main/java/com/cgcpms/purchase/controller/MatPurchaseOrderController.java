@@ -10,8 +10,10 @@ import com.cgcpms.purchase.vo.MatPurchaseOrderItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
+import jakarta.validation.groups.Default;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -54,7 +56,9 @@ public class MatPurchaseOrderController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:edit')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MatPurchaseOrder order) {
+    public ApiResponse<Void> update(@PathVariable Long id,
+                                    @Validated({Default.class, MatPurchaseOrder.UpdateValidation.class})
+                                    @RequestBody MatPurchaseOrder order) {
         order.setId(id);
         matPurchaseOrderService.update(order);
         return ApiResponse.success();

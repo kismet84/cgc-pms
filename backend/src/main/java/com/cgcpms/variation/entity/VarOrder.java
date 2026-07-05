@@ -7,6 +7,7 @@ import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -28,6 +29,7 @@ public class VarOrder extends BaseEntity {
     @NotNull
     private Long projectId;
 
+    @NotNull
     private Long contractId;
 
     private Long partnerId;
@@ -36,6 +38,7 @@ public class VarOrder extends BaseEntity {
 
     private String varName;
 
+    @NotBlank
     private String varType;
 
     private String direction;

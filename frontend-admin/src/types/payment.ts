@@ -57,19 +57,21 @@ export interface PayApplicationVO {
   createdAt?: string
   updatedAt?: string
   remark?: string
+  basis?: PayApplicationBasisVO[]
 }
 
 /** Payment application basis view object */
 export interface PayApplicationBasisVO {
-  id: string
-  applicationId: string
-  sourceType: string
-  sourceId: string
-  sourceItemId?: string
-  sourceName?: string
-  amount: string
+  id?: string
+  tenantId?: string
+  payApplicationId?: string
+  basisType?: string
+  basisId?: string
+  basisAmount?: string
   createdBy?: string
   createdAt?: string
+  updatedAt?: string
+  remark?: string
 }
 
 /** Payment record view object */

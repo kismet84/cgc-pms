@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.cgcpms.org.mapper.OrgPositionMapper;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
+import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,8 @@ class ApproverResolverTest {
     @Mock
     private SysUserRoleMapper sysUserRoleMapper;
     @Mock
+    private SysRoleMapper sysRoleMapper;
+    @Mock
     private OrgPositionMapper orgPositionMapper;
     @Mock
     private PmProjectMemberMapper pmProjectMemberMapper;
@@ -46,6 +49,7 @@ class ApproverResolverTest {
         ApproverResolver resolver = new ApproverResolver(
                 sysUserMapper,
                 sysUserRoleMapper,
+                sysRoleMapper,
                 orgPositionMapper,
                 pmProjectMemberMapper,
                 new ObjectMapper());

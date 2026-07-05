@@ -122,6 +122,7 @@ class SubMeasureWorkflowHandlerTest {
 
         SubMeasure updated = subMeasureMapper.selectById(measure.getId());
         assertEquals("REJECTED", updated.getApprovalStatus(), "审批状态应变为 REJECTED");
+        assertEquals("REJECTED", updated.getStatus(), "业务状态应同步变为 REJECTED");
     }
 
     @Test
@@ -147,5 +148,6 @@ class SubMeasureWorkflowHandlerTest {
 
         SubMeasure updated = subMeasureMapper.selectById(measure.getId());
         assertEquals("DRAFT", updated.getApprovalStatus(), "撤回后审批状态应变为 DRAFT");
+        assertEquals("DRAFT", updated.getStatus(), "撤回后业务状态应同步恢复为 DRAFT");
     }
 }

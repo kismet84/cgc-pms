@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -87,6 +88,7 @@ public class CostTargetService {
 
         // 保留审批状态（禁止通过 update 接口覆盖）
         target.setApprovalStatus(existing.getApprovalStatus());
+        validateExistingItemsTotal(target.getId(), target.getTotalTargetAmount());
 
         costTargetMapper.updateById(target);
     }
@@ -195,6 +197,8 @@ public class CostTargetService {
             throw new BusinessException("COST_TARGET_IN_APPROVAL", "目标成本审批中，不可编辑");
         }
 
+        validateItemsTotal(target.getTotalTargetAmount(), items);
+
         // 删除目标下现有明细
         LambdaQueryWrapper<CostTargetItem> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(CostTargetItem::getTargetId, targetId)
@@ -212,6 +216,29 @@ public class CostTargetService {
         }
 
         log.info("Batch saved {} items for cost target {}", items != null ? items.size() : 0, targetId);
+    }
+
+    private void validateExistingItemsTotal(Long targetId, BigDecimal totalTargetAmount) {
+        List<CostTargetItem> existingItems = getItems(targetId);
+        if (existingItems.isEmpty()) {
+            return;
+        }
+        validateItemsTotal(totalTargetAmount, existingItems);
+    }
+
+    private void validateItemsTotal(BigDecimal totalTargetAmount, List<CostTargetItem> items) {
+        BigDecimal targetTotal = totalTargetAmount == null ? BigDecimal.ZERO : totalTargetAmount;
+        BigDecimal itemsTotal = items == null
+                ? BigDecimal.ZERO
+                : items.stream()
+                .map(CostTargetItem::getTargetAmount)
+                .filter(amount -> amount != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (itemsTotal.compareTo(targetTotal) != 0) {
+            throw new BusinessException(
+                    "COST_TARGET_AMOUNT_MISMATCH",
+                    "成本目标总额与科目明细合计不一致");
+        }
     }
 
     // ── Submit ──

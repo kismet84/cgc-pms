@@ -10,7 +10,7 @@ describe('PaymentPage applyCode form chain', () => {
   it('keeps applyCode in form state for create and edit flows', () => {
     expect(paymentSource).toMatch(/const\s+formData\s*=\s*reactive<Partial<PayApplicationVO>>\(\{[\s\S]*?applyCode:\s*''/)
     expect(paymentSource).toMatch(/Object\.assign\(formData,\s*\{[\s\S]*?applyCode:\s*''/)
-    expect(paymentSource).toMatch(/Object\.assign\(formData,\s*\{[\s\S]*?applyCode:\s*record\.applyCode/)
+    expect(paymentSource).toMatch(/Object\.assign\(formData,\s*\{[\s\S]*?applyCode:\s*detail\.applyCode/)
   })
 
   it('renders applyCode input in create\/edit modal', () => {

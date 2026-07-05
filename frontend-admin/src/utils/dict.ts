@@ -7,6 +7,11 @@ import type { DictDataVO } from '@/types/dict'
  */
 const dictCache = new Map<string, { data: DictDataVO[]; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 分钟
+const tagColorMap: Record<string, string> = {
+  primary: 'processing',
+  info: 'blue',
+  danger: 'error',
+}
 
 /**
  * 根据字典编码获取字典数据列表（带缓存）
@@ -52,14 +57,36 @@ export async function getDictMap(dictCode: string): Promise<Map<string, string>>
 /**
  * 同步获取字典标签（仅在缓存命中时有效）
  */
-export function getDictLabelSync(dictCode: string, dictValue: string): string {
+export function getDictLabelSync(
+  dictCode: string,
+  dictValue: string,
+  fallback: Partial<Record<string, string>> = {},
+): string {
   if (!dictValue) return dictValue
   const cached = dictCache.get(dictCode)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     const item = cached.data.find((d) => d.dictValue === dictValue)
-    return item?.dictLabel ?? dictValue
+    return item?.dictLabel ?? fallback[dictValue] ?? dictValue
   }
-  return dictValue
+  return fallback[dictValue] ?? dictValue
+}
+
+export function getDictTagColorSync(
+  dictCode: string,
+  dictValue: string,
+  fallback: Partial<Record<string, string>> = {},
+): string {
+  if (!dictValue) return 'default'
+  const cached = dictCache.get(dictCode)
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    const item = cached.data.find((d) => d.dictValue === dictValue)
+    return normalizeTagColor(item?.listClass || fallback[dictValue] || 'default')
+  }
+  return normalizeTagColor(fallback[dictValue] || 'default')
+}
+
+function normalizeTagColor(color: string): string {
+  return tagColorMap[color] ?? color
 }
 
 /**

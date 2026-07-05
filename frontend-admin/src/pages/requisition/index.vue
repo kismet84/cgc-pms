@@ -5,6 +5,7 @@ import { useReferenceStore } from '@/stores/reference'
 import { getUserList } from '@/api/modules/user'
 import type { SysUserVO } from '@/types/user'
 import type { SelectOption } from '@/types/ui'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 import { useRequisitionList, fmtAmount } from './composables/useRequisitionList'
 import { useRequisitionForm } from './composables/useRequisitionForm'
@@ -18,6 +19,19 @@ const APPROVAL_DRAFT = 'DRAFT'
 const APPROVAL_APPROVING = 'APPROVING'
 const APPROVAL_APPROVED = 'APPROVED'
 const APPROVAL_REJECTED = 'REJECTED'
+const APPROVAL_STATUS_DICT = 'approval_status'
+const APPROVAL_STATUS_LABEL: Record<string, string> = {
+  [APPROVAL_DRAFT]: '草稿',
+  [APPROVAL_APPROVING]: '审批中',
+  [APPROVAL_APPROVED]: '已通过',
+  [APPROVAL_REJECTED]: '已驳回',
+}
+const APPROVAL_STATUS_COLOR: Record<string, string> = {
+  [APPROVAL_DRAFT]: '#94a3b8',
+  [APPROVAL_APPROVING]: '#1677ff',
+  [APPROVAL_APPROVED]: '#52c41a',
+  [APPROVAL_REJECTED]: '#ff4d4f',
+}
 
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
@@ -77,6 +91,14 @@ async function handleView(row: Parameters<typeof handleEdit>[0]) {
   modalTitle.value = '查看领料申请'
 }
 
+function approvalStatusLabel(status: string) {
+  return getDictLabelSync(APPROVAL_STATUS_DICT, status, APPROVAL_STATUS_LABEL)
+}
+
+function approvalStatusColor(status: string) {
+  return getDictTagColorSync(APPROVAL_STATUS_DICT, status, APPROVAL_STATUS_COLOR)
+}
+
 const requisitionStatusSummary = computed(() => [
   {
     label: '已出库',
@@ -105,24 +127,24 @@ const pendingApprovalCount = computed(
 )
 const approvalSummary = computed(() => [
   {
-    label: '草稿',
+    label: approvalStatusLabel(APPROVAL_DRAFT),
     count: tableData.value.filter((item) => item.approvalStatus === APPROVAL_DRAFT).length,
-    color: '#94a3b8',
+    color: approvalStatusColor(APPROVAL_DRAFT),
   },
   {
-    label: '审批中',
+    label: approvalStatusLabel(APPROVAL_APPROVING),
     count: tableData.value.filter((item) => item.approvalStatus === APPROVAL_APPROVING).length,
-    color: '#1677ff',
+    color: approvalStatusColor(APPROVAL_APPROVING),
   },
   {
-    label: '已通过',
+    label: approvalStatusLabel(APPROVAL_APPROVED),
     count: tableData.value.filter((item) => item.approvalStatus === APPROVAL_APPROVED).length,
-    color: '#52c41a',
+    color: approvalStatusColor(APPROVAL_APPROVED),
   },
   {
-    label: '已驳回',
+    label: approvalStatusLabel(APPROVAL_REJECTED),
     count: tableData.value.filter((item) => item.approvalStatus === APPROVAL_REJECTED).length,
-    color: '#ff4d4f',
+    color: approvalStatusColor(APPROVAL_REJECTED),
   },
 ])
 const recentRequisitions = computed(() => tableData.value.slice(0, 4))
@@ -144,6 +166,7 @@ async function fetchUsers() {
 }
 
 onMounted(() => {
+  fetchDictData(APPROVAL_STATUS_DICT)
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({ contractType: 'PURCHASE' })
   fetchUsers()

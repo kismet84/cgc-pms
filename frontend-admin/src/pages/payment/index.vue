@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons-vue'
 import {
   getApplicationList,
+  getApplicationDetail,
   createApplication,
   updateApplication,
   deleteApplication,
@@ -24,10 +25,11 @@ import {
   doWriteback,
 } from '@/api/modules/payment'
 import { useReferenceStore } from '@/stores/reference'
-import { getReceiptList } from '@/api/modules/receipt'
-import { getMeasureList } from '@/api/modules/subcontract'
+import { getReceiptItems, getReceiptList } from '@/api/modules/receipt'
+import { getMeasureItems, getMeasureList } from '@/api/modules/subcontract'
 import type { PayApplicationVO, PayApplicationBasisVO } from '@/types/payment'
 import { PAY_TYPE_LABEL, PAY_TYPE_COLOR, PAY_STATUS_LABEL, PAY_STATUS_COLOR } from '@/types/payment'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -59,8 +61,13 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 const referenceStore = useReferenceStore()
 const { projects, contracts } = storeToRefs(referenceStore)
+type BasisType = 'MAT_RECEIPT' | 'SUB_MEASURE'
+type BasisSourceOption = { id: string; label: string; type: BasisType; amount?: string }
+
 const receiptList = ref<MatReceiptVO[]>([])
 const measureList = ref<SubMeasureVO[]>([])
+const receiptItemOptions = ref<BasisSourceOption[]>([])
+const measureItemOptions = ref<BasisSourceOption[]>([])
 const modalVisible = ref(false)
 const modalTitle = ref('新建付款申请')
 const editingId = ref<string | null>(null)
@@ -109,6 +116,24 @@ const APPROVAL_STATUS_COLOR: Record<string, string> = {
   APPROVED: 'success',
   REJECTED: 'error',
 }
+const PAY_STATUS_DICT = 'pay_status'
+const APPROVAL_STATUS_DICT = 'approval_status'
+
+function payStatusLabel(status: string | undefined): string {
+  return getDictLabelSync(PAY_STATUS_DICT, status ?? '', PAY_STATUS_LABEL)
+}
+
+function payStatusColor(status: string | undefined): string {
+  return getDictTagColorSync(PAY_STATUS_DICT, status ?? '', PAY_STATUS_COLOR)
+}
+
+function approvalStatusLabel(status: string | undefined): string {
+  return getDictLabelSync(APPROVAL_STATUS_DICT, status ?? '', APPROVAL_STATUS_LABEL)
+}
+
+function approvalStatusColor(status: string | undefined): string {
+  return getDictTagColorSync(APPROVAL_STATUS_DICT, status ?? '', APPROVAL_STATUS_COLOR)
+}
 
 async function fetchData() {
   loading.value = true
@@ -138,16 +163,42 @@ async function fetchReceipts() {
   try {
     const res = await getReceiptList({ pageNum: 1, pageSize: 50 })
     receiptList.value = res.records
+    const items = await Promise.all(
+      receiptList.value.map(async (receipt) => {
+        const rows = await getReceiptItems(receipt.id)
+        return rows.map((item) => ({
+          id: item.id,
+          type: 'MAT_RECEIPT' as const,
+          amount: item.amount,
+          label: `${receipt.receiptCode ?? receipt.id} / ${item.materialName ?? item.id}`,
+        }))
+      }),
+    )
+    receiptItemOptions.value = items.flat()
   } catch {
     receiptList.value = []
+    receiptItemOptions.value = []
   }
 }
 async function fetchMeasures() {
   try {
     const res = await getMeasureList({ pageNum: 1, pageSize: 50 })
     measureList.value = res.records
+    const items = await Promise.all(
+      measureList.value.map(async (measure) => {
+        const rows = await getMeasureItems(measure.id)
+        return rows.map((item) => ({
+          id: item.id,
+          type: 'SUB_MEASURE' as const,
+          amount: item.amount,
+          label: `${measure.measureCode ?? measure.id} / ${item.itemName ?? item.id}`,
+        }))
+      }),
+    )
+    measureItemOptions.value = items.flat()
   } catch {
     measureList.value = []
+    measureItemOptions.value = []
   }
 }
 
@@ -194,17 +245,19 @@ function handleAdd() {
 async function handleEdit(record: PayApplicationVO) {
   modalTitle.value = '编辑付款申请'
   editingId.value = record.id
-  Object.assign(formData, {
-    applyCode: record.applyCode,
-    projectId: record.projectId,
-    contractId: record.contractId,
-    partnerId: record.partnerId,
-    payType: record.payType,
-    applyAmount: record.applyAmount,
-    applyReason: record.applyReason ?? '',
-  })
   try {
-    const data = await getBasisList(record.id)
+    const detail = await getApplicationDetail(record.id)
+    if (detail.projectId) await referenceStore.fetchContracts({ projectId: detail.projectId })
+    Object.assign(formData, {
+      applyCode: detail.applyCode,
+      projectId: detail.projectId,
+      contractId: detail.contractId,
+      partnerId: detail.partnerId,
+      payType: detail.payType,
+      applyAmount: detail.applyAmount,
+      applyReason: detail.applyReason ?? '',
+    })
+    const data = detail.basis?.length ? detail.basis : (await getBasisList(record.id))
     basisList.value = data.map((it, idx) => ({ ...it, key: idx }))
     basisKeyCounter = basisList.value.length
   } catch {
@@ -228,14 +281,16 @@ async function handleDelete(record: PayApplicationVO) {
 
 async function handleSubmit() {
   const id = editingId.value
+  if (!validateForm()) return
+  const basisPayload = buildBasisPayload()
   try {
     if (id) {
       await updateApplication(id, formData)
-      await saveBasis(id, basisList.value)
+      await saveBasis(id, basisPayload)
       message.success('更新成功')
     } else {
       const id = await createApplication(formData)
-      await saveBasis(id, basisList.value)
+      await saveBasis(id, basisPayload)
       message.success('创建成功')
     }
     modalVisible.value = false
@@ -279,23 +334,65 @@ function handleWritebackCancel() {
 function handleAddBasis() {
   basisList.value.push({
     key: basisKeyCounter++,
-    sourceType: undefined,
-    sourceId: undefined,
-    amount: undefined,
+    basisType: undefined,
+    basisId: undefined,
+    basisAmount: undefined,
   })
 }
 function handleRemoveBasis(idx: number) {
   basisList.value.splice(idx, 1)
 }
-function getSourceOptions(sourceType: string): { id: string; label: string }[] {
-  if (sourceType === 'RECEIPT')
-    return receiptList.value.map((r) => ({ id: r.id, label: r.receiptCode ?? r.id }))
-  if (sourceType === 'MEASURE')
-    return measureList.value.map((m) => ({ id: m.id, label: m.measureCode ?? m.id }))
+function getSourceOptions(sourceType?: string): BasisSourceOption[] {
+  if (sourceType === 'MAT_RECEIPT') return receiptItemOptions.value
+  if (sourceType === 'SUB_MEASURE') return measureItemOptions.value
   return []
 }
 function handleSourceChange(idx: number) {
-  basisList.value[idx].sourceId = undefined
+  basisList.value[idx].basisId = undefined
+}
+
+function toCents(value: unknown): number {
+  return Math.round((Number(value) || 0) * 100)
+}
+
+function buildBasisPayload(): PayApplicationBasisVO[] {
+  return basisList.value.map((item) => ({
+    id: item.id,
+    payApplicationId: item.payApplicationId,
+    basisType: item.basisType,
+    basisId: item.basisId,
+    basisAmount: item.basisAmount,
+    remark: item.remark,
+  }))
+}
+
+function validateForm(): boolean {
+  if (!formData.projectId || !formData.contractId || !formData.payType) {
+    message.warning('请选择项目、合同和付款类型')
+    return false
+  }
+  if (!formData.applyCode?.trim()) {
+    message.warning('请填写申请编号')
+    return false
+  }
+  if (toCents(formData.applyAmount) <= 0) {
+    message.warning('申请金额必须大于 0')
+    return false
+  }
+  if (!formData.applyReason?.trim()) {
+    message.warning('请填写申请原因')
+    return false
+  }
+  if (basisList.value.some((item) => !item.basisType || !item.basisId || toCents(item.basisAmount) <= 0)) {
+    message.warning('请完整填写付款依据行')
+    return false
+  }
+  const basisTotal = basisList.value.reduce((sum, item) => sum + toCents(item.basisAmount), 0)
+  if (basisTotal !== toCents(formData.applyAmount)) {
+    message.warning('申请金额与付款依据金额合计不一致')
+    return false
+  }
+  return true
 }
 
 function fmtWan(val: string | undefined): string {
@@ -331,7 +428,7 @@ const statusBreakdown = computed(() => {
   const max = Math.max(total.value, tableData.value.length, 1)
   return Object.entries(m).map(([k, v]) => ({
     key: k,
-    label: PAY_STATUS_LABEL[k] ?? k,
+    label: payStatusLabel(k),
     count: v,
     percent: kpiPct(v, max),
     color: k === PAY_STATUS_PAID ? '#31c48d' : k === PAY_STATUS_PARTIAL ? '#f59e0b' : '#94a3b8',
@@ -352,7 +449,7 @@ const approvalBreakdown = computed(() => {
   }
   return Object.entries(m).map(([k, v]) => ({
     key: k,
-    label: APPROVAL_STATUS_LABEL[k] ?? k,
+    label: approvalStatusLabel(k),
     count: v,
     percent: kpiPct(v, max),
     color: colors[k] ?? '#94a3b8',
@@ -426,6 +523,8 @@ const {
 } = useColumnSettings('payment_list_cols', gridColumns)
 
 onMounted(() => {
+  fetchDictData(PAY_STATUS_DICT)
+  fetchDictData(APPROVAL_STATUS_DICT)
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({})
   referenceStore.fetchPartners()
@@ -501,8 +600,8 @@ onMounted(() => {
           size="large"
           @change="handleSearch"
         >
-          <a-select-option v-for="(label, key) in PAY_STATUS_LABEL" :key="key" :value="key">
-            {{ label }}
+          <a-select-option v-for="(_, key) in PAY_STATUS_LABEL" :key="key" :value="key">
+            {{ payStatusLabel(String(key)) }}
           </a-select-option>
         </a-select>
       </div>
@@ -611,15 +710,15 @@ onMounted(() => {
                 }}</a-tag>
               </template>
               <template #payStatus="{ row }">
-                <a-tag :color="PAY_STATUS_COLOR[row.payStatus] || 'default'" size="small">{{
-                  PAY_STATUS_LABEL[row.payStatus] ?? row.payStatus
+                <a-tag :color="payStatusColor(row.payStatus)" size="small">{{
+                  payStatusLabel(row.payStatus)
                 }}</a-tag>
               </template>
               <template #approvalStatus="{ row }">
                 <a-tag
-                  :color="APPROVAL_STATUS_COLOR[row.approvalStatus] || 'default'"
+                  :color="approvalStatusColor(row.approvalStatus)"
                   size="small"
-                  >{{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}</a-tag
+                  >{{ approvalStatusLabel(row.approvalStatus) }}</a-tag
                 >
               </template>
               <template #action="{ row }">
@@ -826,25 +925,25 @@ onMounted(() => {
           <a-table-column title="来源类型" width="100"
             ><template #default="{ record: item, index }"
               ><a-select
-                v-model:value="item.sourceType"
+                v-model:value="item.basisType"
                 size="small"
                 style="width: 100%"
                 @change="handleSourceChange(index)"
-                ><a-select-option value="RECEIPT">材料验收</a-select-option
-                ><a-select-option value="MEASURE">分包计量</a-select-option></a-select
+                ><a-select-option value="MAT_RECEIPT">材料验收</a-select-option
+                ><a-select-option value="SUB_MEASURE">分包计量</a-select-option></a-select
               ></template
             ></a-table-column
           >
           <a-table-column title="来源单据" width="240"
             ><template #default="{ record: item }"
               ><a-select
-                v-model:value="item.sourceId"
+                v-model:value="item.basisId"
                 size="small"
-                placeholder="选择单据"
+                placeholder="选择明细"
                 allow-clear
                 style="width: 100%"
                 ><a-select-option
-                  v-for="opt in getSourceOptions(item.sourceType || 'RECEIPT')"
+                  v-for="opt in getSourceOptions(item.basisType)"
                   :key="opt.id"
                   :value="opt.id"
                   >{{ opt.label }}</a-select-option
@@ -855,7 +954,7 @@ onMounted(() => {
           <a-table-column title="金额" width="160"
             ><template #default="{ record: item }"
               ><a-input-number
-                v-model:value="item.amount"
+                v-model:value="item.basisAmount"
                 :min="0"
                 :precision="2"
                 size="small"

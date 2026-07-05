@@ -31,6 +31,7 @@ public class MatRequisitionItem extends BaseEntity {
     @NotNull
     private Long requisitionId;
 
+    @NotNull(message = "物料不能为空")
     private Long materialId;
 
     @JsonSerialize(using = ToStringSerializer.class)

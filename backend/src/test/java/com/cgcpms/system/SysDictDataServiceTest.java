@@ -556,6 +556,28 @@ class SysDictDataServiceTest {
     @Test
     @Order(21)
     @Transactional
+    @DisplayName("通过dictCode获取数据 — 无UserContext时回退系统租户")
+    void testGetByDictCode_NoUserContextUsesSystemTenant() {
+        SysDictType savedType = dictTypeMapper.selectById(dictTypeId);
+        String dictCode = savedType.getDictCode();
+
+        SysDictData data = new SysDictData();
+        data.setDictTypeId(dictTypeId);
+        data.setDictLabel("系统租户项");
+        data.setDictValue("system_tenant_value");
+        data.setStatus("ENABLE");
+        dictDataService.create(data);
+
+        UserContext.clear();
+
+        List<SysDictDataVO> list = dictDataService.getByDictCode(dictCode);
+        assertTrue(list.stream().anyMatch(item -> "system_tenant_value".equals(item.getDictValue())),
+                "无UserContext时应按系统租户查询字典，避免公共字典接口被空租户阻塞");
+    }
+
+    @Test
+    @Order(22)
+    @Transactional
     @DisplayName("通过dictCode获取数据 — 不存在的dictCode返回空列表")
     void testGetByDictCode_NotFound() {
         List<SysDictDataVO> list = dictDataService.getByDictCode("NONEXISTENT_CODE");
@@ -566,7 +588,7 @@ class SysDictDataServiceTest {
     }
 
     @Test
-    @Order(22)
+    @Order(23)
     @Transactional
     @DisplayName("通过dictCode获取数据 — 租户隔离")
     void testGetByDictCode_CrossTenantEmpty() {
@@ -594,7 +616,7 @@ class SysDictDataServiceTest {
     }
 
     @Test
-    @Order(23)
+    @Order(24)
     @Transactional
     @DisplayName("通过dictCode获取数据 — 按orderNum升序")
     void testGetByDictCode_OrderedByOrderNum() {

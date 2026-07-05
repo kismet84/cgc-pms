@@ -55,7 +55,8 @@ public class SubMeasureWorkflowHandler implements WorkflowBusinessHandler {
 
         subMeasureMapper.update(null, new LambdaUpdateWrapper<SubMeasure>()
                 .eq(SubMeasure::getId, measureId)
-                .set(SubMeasure::getApprovalStatus, "REJECTED"));
+                .set(SubMeasure::getApprovalStatus, "REJECTED")
+                .set(SubMeasure::getStatus, "REJECTED"));
     }
 
     @Override
@@ -65,7 +66,8 @@ public class SubMeasureWorkflowHandler implements WorkflowBusinessHandler {
 
         subMeasureMapper.update(null, new LambdaUpdateWrapper<SubMeasure>()
                 .eq(SubMeasure::getId, measureId)
-                .set(SubMeasure::getApprovalStatus, "DRAFT"));
+                .set(SubMeasure::getApprovalStatus, "DRAFT")
+                .set(SubMeasure::getStatus, "DRAFT"));
     }
 
     private Long resolveMeasureId(WfInstance instance) {

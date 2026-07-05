@@ -267,12 +267,31 @@ class CostTargetControllerTest {
                 .andExpect(jsonPath("$.data[0].costSubjectId").value(201));
     }
 
+    @Test
+    @Order(9)
+    @DisplayName("T6b: POST /cost-targets/{id}/items → 400 when item sum mismatches target total")
+    void testBatchSaveItems_TotalMismatch() throws Exception {
+        Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
+        String items = """
+                [
+                    {"costSubjectId":301,"targetAmount":"100000.00"},
+                    {"costSubjectId":302,"targetAmount":"200000.00"}
+                ]
+                """;
+        mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(items))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COST_TARGET_AMOUNT_MISMATCH"));
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // T7: POST submit
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(9)
+    @Order(10)
     @DisplayName("T7: POST /cost-targets/{id}/submit → 200 submit for approval")
     void testSubmitForApproval() throws Exception {
         ensureDraftTargetExists();
@@ -287,7 +306,7 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(10)
+    @Order(11)
     @DisplayName("T8: POST /cost-targets/{id}/submit again → 400 (already submitted)")
     void testSubmitForApproval_Duplicate() throws Exception {
         ensureSubmittedTargetExists();
@@ -302,7 +321,7 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(11)
+    @Order(12)
     @DisplayName("T9: GET /cost-targets/999999/items → 400 (not found)")
     void testGetItems_NotFound() throws Exception {
         mockMvc.perform(getWithApiContext("/cost-targets/999999/items")
@@ -312,7 +331,7 @@ class CostTargetControllerTest {
     }
 
     @Test
-    @Order(12)
+    @Order(13)
     @DisplayName("T10: DELETE /cost-targets/{id} succeeds with id returned from list")
     void testDeleteCostTarget_UsesStringIdFromList() throws Exception {
         String versionNo = "V1.0-DELETE-" + System.nanoTime();

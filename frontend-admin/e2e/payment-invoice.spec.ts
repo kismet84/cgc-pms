@@ -45,6 +45,8 @@ type PaymentSeed = {
   partnerId: string
   projectName: string
   contractName: string
+  warehouseId: string
+  materialId: string
 }
 
 type PayApplicationDetail = {
@@ -55,6 +57,12 @@ type PayApplicationDetail = {
   applyAmount: string
   payStatus: string
   approvalStatus: string
+  basis?: Array<{
+    id?: string
+    basisType?: string
+    basisId?: string
+    basisAmount?: string
+  }>
 }
 
 function screenshotPath(name: string) {
@@ -205,18 +213,57 @@ async function seedPaymentCreateContext() {
     }),
   )
 
+  const warehouseId = String(
+    await apiPost<string>('/api/inventory/warehouses', {
+      warehouseCode: runId('WH'),
+      warehouseName: `E2E付款仓库-${sampleId}`,
+      projectId,
+    }),
+  )
+
+  const materialId = String(
+    await apiPost<string>('/api/materials', {
+      materialCode: runId('MAT'),
+      materialName: `E2E付款物料-${sampleId}`,
+      unit: '项',
+    }),
+  )
+
   return {
     projectId,
     contractId,
     partnerId: partyBId,
     projectName,
     contractName,
+    warehouseId,
+    materialId,
   } satisfies PaymentSeed
 }
 
 async function createPaymentApplication(seed: PaymentSeed) {
   const applyCode = runId('PAYAPP')
   const applyReason = `真实回读-${runId('PAYREAD')}`
+  const receiptId = String(
+    await apiPost<string>('/api/receipts', {
+      projectId: seed.projectId,
+      contractId: seed.contractId,
+      partnerId: seed.partnerId,
+      warehouseId: seed.warehouseId,
+      receiptDate: '2025-12-01',
+      qualityStatus: 'ACCEPTED',
+      totalAmount: '100000',
+    }),
+  )
+  await apiPost<void>(`/api/receipts/${receiptId}/items/batch`, [
+    {
+      receiptId,
+      materialId: seed.materialId,
+      actualQuantity: '1',
+      qualifiedQuantity: '1',
+      unitPrice: '100000',
+      amount: '100000',
+    },
+  ])
   const createdId = await apiPost<string>('/api/pay-applications', {
     projectId: seed.projectId,
     contractId: seed.contractId,
@@ -226,6 +273,15 @@ async function createPaymentApplication(seed: PaymentSeed) {
     applyAmount: '100000',
     applyReason,
   })
+  const receiptItems = await apiGet<Array<{ id: string; amount?: string }>>(`/api/receipts/${receiptId}/items`)
+  expect(receiptItems.length, '验收单应至少返回 1 条明细').toBeGreaterThan(0)
+  await apiPost<void>(`/api/pay-applications/${createdId}/basis/batch`, [
+    {
+      basisType: 'MAT_RECEIPT',
+      basisId: receiptItems[0].id,
+      basisAmount: '100000',
+    },
+  ])
   return { createdId, applyCode, applyReason }
 }
 
@@ -320,6 +376,7 @@ test.describe('Payment: Application list and detail', () => {
     expect(created.applyCode, '创建后应返回申请编号').toBeTruthy()
     expect(created.payStatus, '创建后应返回支付状态').toBeTruthy()
     expect(created.approvalStatus, '创建后应返回审批状态').toBeTruthy()
+    expect(created.basis?.length ?? 0, '创建后的付款申请应带回付款依据').toBeGreaterThan(0)
 
     await waitForPaymentList(sharedPage)
     const searchProjectSelect = sharedPage.locator('.payment-search-select').first()

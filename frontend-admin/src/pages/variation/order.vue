@@ -28,6 +28,7 @@ import type { VarOrderVO, VarOrderItemVO } from '@/types/variation'
 import type { ContractItem } from '@/types/contract'
 import type { CostSubjectTreeNode } from '@/types/costSubject'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -134,6 +135,15 @@ const APPROVAL_STATUS_COLOR: Record<string, string> = {
   APPROVING: 'warning',
   APPROVED: 'success',
   REJECTED: 'error',
+}
+const APPROVAL_STATUS_DICT = 'approval_status'
+
+function approvalStatusLabel(status: string | undefined): string {
+  return getDictLabelSync(APPROVAL_STATUS_DICT, status ?? '', APPROVAL_STATUS_LABEL)
+}
+
+function approvalStatusColor(status: string | undefined): string {
+  return getDictTagColorSync(APPROVAL_STATUS_DICT, status ?? '', APPROVAL_STATUS_COLOR)
 }
 
 function calcCodeColumnWidth(values: Array<string | undefined>, title = '变更编号') {
@@ -335,16 +345,51 @@ async function handleDelete(record: VarOrderVO) {
 
 async function handleSubmit() {
   if (modalReadonly.value) return
+  if (!formData.projectId) {
+    message.warning('请选择项目')
+    return
+  }
+  if (!formData.contractId) {
+    message.warning('请选择合同')
+    return
+  }
+  if (!formData.varType) {
+    message.warning('请选择变更类型')
+    return
+  }
+
   const id = editingId.value
-  const effectiveItems = itemList.value.filter((item) => toNumber(item.quantity) > 0)
+  const activeItems = itemList.value.filter((item) => toNumber(item.quantity) > 0)
+  if (!activeItems.length) {
+    message.warning('请至少保留一条有效明细')
+    return
+  }
+
+  const missingName = activeItems.some((item) => !item.itemName?.trim())
+  if (missingName) {
+    message.warning('请填写明细名称')
+    return
+  }
+  const missingCostSubject = activeItems.some((item) => !item.costSubjectId)
+  if (missingCostSubject) {
+    message.warning('请选择成本科目')
+    return
+  }
+  const effectiveItems = activeItems
+
   try {
     if (id) {
       await updateVarOrder(id, formData)
       await saveVarOrderItems(id, effectiveItems)
       message.success('更新成功')
     } else {
-      const id = await createVarOrder(formData)
-      await saveVarOrderItems(id, effectiveItems)
+      const newId = await createVarOrder(formData)
+      try {
+        await saveVarOrderItems(newId, effectiveItems)
+      } catch (e) {
+        await deleteVarOrder(newId).catch(() => undefined)
+        throw e
+      }
       message.success('创建成功')
     }
     modalVisible.value = false
@@ -464,11 +509,11 @@ const approvalStatusSummary = computed(() => {
     APPROVED: '已通过',
     REJECTED: '已驳回',
   }
-  return Object.entries(labels).map(([key, label]) => {
+  return Object.keys(labels).map((key) => {
     const count = tableData.value.filter((item) => item.approvalStatus === key).length
     return {
       key,
-      label,
+      label: approvalStatusLabel(key),
       count,
       percent: calcPercent(count),
     }
@@ -490,6 +535,7 @@ function onResize() {
 onMounted(() => {
   onResize()
   window.addEventListener('resize', onResize)
+  fetchDictData(APPROVAL_STATUS_DICT)
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({})
   referenceStore.fetchPartners()
@@ -633,8 +679,8 @@ onUnmounted(() => {
                   <a-button class="vo-var-link" type="link" @click="handleView(row)">
                     {{ row.varCode || '-' }}
                   </a-button>
-                  <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus]" size="small">
-                    {{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}
+                  <a-tag :color="approvalStatusColor(row.approvalStatus)" size="small">
+                    {{ approvalStatusLabel(row.approvalStatus) }}
                   </a-tag>
                 </div>
                 <div class="vo-mobile-card-title">{{ row.varName || '-' }}</div>
@@ -700,8 +746,8 @@ onUnmounted(() => {
                 <span>{{ fmtWan(row.confirmedAmount) }} 万</span>
               </template>
               <template #approvalStatus="{ row }">
-                <a-tag :color="APPROVAL_STATUS_COLOR[row.approvalStatus]" size="small">
-                  {{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}
+                <a-tag :color="approvalStatusColor(row.approvalStatus)" size="small">
+                  {{ approvalStatusLabel(row.approvalStatus) }}
                 </a-tag>
               </template>
               <template #ops="{ row }">
