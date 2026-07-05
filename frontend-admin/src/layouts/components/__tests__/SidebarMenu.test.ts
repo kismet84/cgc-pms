@@ -115,7 +115,7 @@ describe('SidebarMenu', () => {
       '数据中心',
       '系统管理',
     ])
-    expect(wrapper.text()).toContain('目标成本')
+    expect(wrapper.text()).toContain('成本目标')
     expect(wrapper.text()).not.toContain('目标管理')
   })
 
@@ -138,9 +138,9 @@ describe('SidebarMenu', () => {
 
     const cost = renderedMenuItems.find((item) => item.label === '成本管理')
     expect(cost?.children?.map((item) => item.label)).toEqual([
-      '成本台账',
+      '成本列表',
       '成本明细',
-      '目标成本',
+      '成本目标',
     ])
 
     expect(wrapper.find('[data-menu-key="/cost-target/index"]').exists()).toBe(true)

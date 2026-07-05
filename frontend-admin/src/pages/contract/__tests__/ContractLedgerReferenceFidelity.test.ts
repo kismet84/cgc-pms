@@ -40,7 +40,7 @@ describe('ContractLedger reference fidelity', () => {
     expect(composableSource).toMatch(/typePercent|statusBars|kpiPct/)
     // KPI strip component references
     expect(kpiSource).toMatch(/kpiStrip|kpiPct|kpi-strip/)
-    expect(ledgerSource).not.toContain('目标成本管理')
+    expect(ledgerSource).not.toContain('成本目标管理')
   })
 
   it('loads project options only for the project filter', () => {

@@ -218,7 +218,7 @@ export function costBarOption(subs: SubjectBreakdown[]) {
     subs.map((s) => s.costSubjectName),
     [
       compactBar(
-        '目标成本',
+        '成本目标',
         subs.map((s) => toNum(s.targetCost)),
         '#3b82f6',
       ),

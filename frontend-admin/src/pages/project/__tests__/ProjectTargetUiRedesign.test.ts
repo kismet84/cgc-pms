@@ -37,6 +37,6 @@ describe('Project and target UI redesign source markers', () => {
       allText.includes('项目') || allText.includes('目标') || allText.includes('lg-')
     expect(hasContent).toBe(true)
 
-    expect(combinedSource).not.toContain('目标成本管理')
+    expect(combinedSource).not.toContain('成本目标管理')
   })
 })

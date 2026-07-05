@@ -190,7 +190,7 @@ function toggleFullscreen() {
       <template v-if="drillSubject">
         <div class="drill-summary">
           <span
-            >目标成本：<b>{{ fmtWan(drillSubject.targetCost) }}</b> 万元</span
+            >成本目标：<b>{{ fmtWan(drillSubject.targetCost) }}</b> 万元</span
           >
           <span
             >实际成本：<b>{{ fmtWan(drillSubject.actualCost) }}</b> 万元</span

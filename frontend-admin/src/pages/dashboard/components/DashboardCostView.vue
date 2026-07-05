@@ -136,7 +136,7 @@ const currentPage = ref(1)
 
 const kpiCards = computed(() => [
   {
-    title: '目标成本（含税）',
+    title: '成本目标（含税）',
     value: amountText(props.data.targetCost),
     unit: '万元',
     accent: '#1677ff',
@@ -311,7 +311,7 @@ const costTrendOption = computed(() => ({
     itemHeight: 6,
     textStyle: { color: '#536176', fontSize: 11 },
     data: [
-      `目标成本（${trendLabel.value}）`,
+      `成本目标（${trendLabel.value}）`,
       `动态成本（${trendLabel.value}）`,
       `成本偏差（${trendLabel.value}）`,
     ],
@@ -340,7 +340,7 @@ const costTrendOption = computed(() => ({
   ],
   series: [
     {
-      name: `目标成本（${trendLabel.value}）`,
+      name: `成本目标（${trendLabel.value}）`,
       type: 'line',
       data: displayedTrendPoints.value.map((item) => toNum(item.targetCost) / 10000),
       smooth: true,
@@ -412,7 +412,7 @@ function exportLedgerCsv() {
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
-  link.download = '成本台账.csv'
+  link.download = '成本列表.csv'
   document.body.appendChild(link)
   link.click()
   link.remove()
@@ -602,7 +602,7 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
     <section class="cost-reference-panel cost-ledger-reference">
       <div class="cost-ledger-tabs">
         <a :class="{ active: activeLedgerTab === 'cost' }" @click="activeLedgerTab = 'cost'"
-          >成本台账</a
+          >成本列表</a
         >
         <a :class="{ active: activeLedgerTab === 'contract' }" @click="activeLedgerTab = 'contract'"
           >合同执行</a

@@ -35,9 +35,9 @@ export const navigationItems: NavigationItem[] = [
     icon: 'DollarOutlined',
     matchPrefixes: ['/cost/ledger', '/cost/summary', '/cost-target'],
     children: [
-      { key: '/cost/ledger', label: '成本台账' },
+      { key: '/cost/ledger', label: '成本列表' },
       { key: '/cost/summary', label: '成本明细' },
-      { key: '/cost-target/index', label: '目标成本' },
+      { key: '/cost-target/index', label: '成本目标' },
     ],
   },
   {

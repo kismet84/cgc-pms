@@ -59,7 +59,7 @@ export const mgmtRankCols = [
 
 export const drillCols = [
   { title: '科目名称', dataIndex: 'costSubjectName', width: 200 },
-  { title: '目标成本(万元)', dataIndex: 'targetCost', width: 130, align: 'right' as const },
+  { title: '成本目标(万元)', dataIndex: 'targetCost', width: 130, align: 'right' as const },
   { title: '实际成本(万元)', dataIndex: 'actualCost', width: 130, align: 'right' as const },
   { title: '成本偏差(万元)', dataIndex: 'costDeviation', width: 140, align: 'right' as const },
 ]

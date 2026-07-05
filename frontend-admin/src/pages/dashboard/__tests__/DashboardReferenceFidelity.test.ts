@@ -137,7 +137,7 @@ describe('Dashboard reference fidelity', () => {
     expect(chiefViewSource).not.toContain('成本总览')
     expect(chiefViewSource).not.toContain('风险总览')
 
-    expect(allSource).not.toContain('目标成本管理')
+    expect(allSource).not.toContain('成本目标管理')
   })
 
   it('does not keep local mock data arrays in the cost manager dashboard', () => {

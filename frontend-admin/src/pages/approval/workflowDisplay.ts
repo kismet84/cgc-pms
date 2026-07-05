@@ -59,7 +59,7 @@ export const workflowBusinessTypeLabels: Record<string, string> = {
   VAR_ORDER: '签证变更',
   CT_CHANGE: '合同变更',
   SETTLEMENT: '结算审批',
-  COST_TARGET: '目标成本',
+  COST_TARGET: '成本目标',
   CONTRACT_REVENUE: '合同收入',
   TECH_ITEM: '技术事项',
 }

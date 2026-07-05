@@ -102,7 +102,7 @@ describe('router lazy loading', () => {
     const costTargetRoute = rootRoute?.children?.find((c) => c.path === 'cost-target')
     const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')
 
-    expect(costTargetRoute?.meta?.title).toBe('目标成本')
+    expect(costTargetRoute?.meta?.title).toBe('成本目标')
     expect(approvalRoute?.meta?.title).toBe('审批中心')
   })
 

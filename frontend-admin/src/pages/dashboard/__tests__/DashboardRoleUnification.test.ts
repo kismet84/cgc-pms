@@ -101,7 +101,7 @@ describe('Dashboard role UI unification', () => {
     expect(chiefViewSource).toContain('ownerName')
     expect(chiefViewSource).toContain('overdueDays')
 
-    expect(fullSource).not.toContain('目标成本管理')
+    expect(fullSource).not.toContain('成本目标管理')
   })
 
   it('removes table header helper copy from the role pages that are being closed out', () => {
