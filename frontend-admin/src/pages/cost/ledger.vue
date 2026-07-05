@@ -30,16 +30,20 @@ import { ColumnSettingsButton } from '@/components/list-page'
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
 const route = useRoute()
+const pageTitle = '成本列表'
+const pageSubtitle = '统一核对项目成本来源、金额与确认状态'
 function onResize() {
   isMobile.value = window.innerWidth < MOBILE_BP
 }
 
 // ---- Reference store ----
 const referenceStore = useReferenceStore()
-const { projects: projectList } = storeToRefs(referenceStore)
+const { projects: projectList, contracts: contractList, partners: partnerList } =
+  storeToRefs(referenceStore)
 
 // ---- Dropdown data ----
 const subjectTree = ref<TreeSelectProps['treeData']>([])
+const contractOptions = ref(contractList.value ?? [])
 
 // ---- Filter state ----
 const filter = reactive({
@@ -50,7 +54,7 @@ const filter = reactive({
   costType: undefined as string | undefined,
   sourceType: undefined as string | undefined,
   costStatus: undefined as string | undefined,
-  dateRange: [] as string[],
+  dateRange: null as string[] | null,
   keyword: '',
 })
 
@@ -58,7 +62,7 @@ const filter = reactive({
 const loading = ref(false)
 const tableData = ref<CostLedgerVO[]>([])
 const total = ref(0)
-const pageNum = ref(1)
+const pageNo = ref(1)
 const pageSize = ref(20)
 
 // ---- KPI state ----
@@ -96,6 +100,20 @@ function normalizeSummary(
 const detailVisible = ref(false)
 const detailItem = ref<CostLedgerVO | null>(null)
 
+async function loadContractOptions(projectId?: string) {
+  try {
+    if (!projectId) {
+      contractOptions.value = await referenceStore.fetchContracts()
+      return
+    }
+    const contracts = await referenceStore.fetchContracts({ projectId })
+    contractOptions.value = contracts
+  } catch (e: unknown) {
+    console.error(e)
+    contractOptions.value = []
+  }
+}
+
 async function fetchSubjectTree() {
   try {
     const data = await getCostSubjectTree()
@@ -121,13 +139,14 @@ function convertToTreeData(nodes: unknown): TreeSelectProps['treeData'] {
   }))
 }
 
-function onProjectChange(val: string | undefined) {
+async function onProjectChange(val: string | undefined) {
   filter.contractId = undefined
-  if (val) referenceStore.fetchContracts({ projectId: val })
+  filter.partnerId = undefined
+  await loadContractOptions(val)
 }
 
-function handleProjectFilterChange(val: string | undefined) {
-  onProjectChange(val)
+async function handleProjectFilterChange(val: string | undefined) {
+  await onProjectChange(val)
   handleSearch()
 }
 
@@ -135,7 +154,7 @@ function handleProjectFilterChange(val: string | undefined) {
 async function fetchData() {
   loading.value = true
   const params: CostLedgerQueryParams = {
-    pageNum: pageNum.value,
+    pageNo: pageNo.value,
     pageSize: pageSize.value,
     projectId: filter.projectId,
     contractId: filter.contractId,
@@ -144,8 +163,8 @@ async function fetchData() {
     costType: filter.costType,
     sourceType: filter.sourceType,
     costStatus: filter.costStatus,
-    startDate: filter.dateRange[0],
-    endDate: filter.dateRange[1],
+    startDate: filter.dateRange?.[0],
+    endDate: filter.dateRange?.[1],
     keyword: filter.keyword || undefined,
   }
   try {
@@ -156,7 +175,7 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('加载成本台账失败，请稍后重试')
+    message.error('加载成本列表失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -173,8 +192,8 @@ async function fetchSummary() {
         costType: filter.costType,
         sourceType: filter.sourceType,
         costStatus: filter.costStatus,
-        startDate: filter.dateRange[0],
-        endDate: filter.dateRange[1],
+        startDate: filter.dateRange?.[0],
+        endDate: filter.dateRange?.[1],
         keyword: filter.keyword || undefined,
       }),
     )
@@ -186,7 +205,7 @@ async function fetchSummary() {
 }
 
 function handleSearch() {
-  pageNum.value = 1
+  pageNo.value = 1
   fetchData()
   fetchSummary()
 }
@@ -199,21 +218,21 @@ function handleReset() {
   filter.costType = undefined
   filter.sourceType = undefined
   filter.costStatus = undefined
-  filter.dateRange = []
+  filter.dateRange = null
   filter.keyword = ''
-  referenceStore.invalidateContracts()
-  pageNum.value = 1
+  contractOptions.value = contractList.value ?? []
+  pageNo.value = 1
   handleSearch()
 }
 
 function handlePageChange(page: number) {
-  pageNum.value = page
+  pageNo.value = page
   fetchData()
 }
 
 function handleShowSizeChange(_current: number, size: number) {
   pageSize.value = size
-  pageNum.value = 1
+  pageNo.value = 1
   fetchData()
 }
 
@@ -253,7 +272,7 @@ function fmtAmountYuan(val: string | undefined): string {
 const COST_TYPE_LABEL: Record<string, string> = {
   CONTRACT_LOCKED: '合同锁定成本',
   ACTUAL_COST: '实际成本',
-  TARGET_COST: '目标成本',
+  TARGET_COST: '成本目标',
   PAID_AMOUNT: '已付款',
   DYNAMIC_COST: '动态成本',
   CT_CONTRACT: '合同锁定成本',
@@ -359,11 +378,12 @@ const {
 } = useColumnSettings('cost_ledger_cols', gridColumns)
 
 // ---- Init ----
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('resize', onResize)
   applyRouteQuery()
   referenceStore.fetchProjects()
   referenceStore.fetchPartners()
+  void loadContractOptions(filter.projectId)
   fetchSubjectTree()
   fetchData()
   fetchSummary()
@@ -373,18 +393,25 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
 <template>
   <div class="lg-list-page lg-page app-page cost-ledger-page">
-    <!-- Page head -->
     <div class="lg-page-head cost-ledger-page-head">
-      <div class="cost-ledger-meta-row">
+      <div class="cost-ledger-head-main">
         <a-breadcrumb class="cl-breadcrumb">
           <a-breadcrumb-item>成本管理</a-breadcrumb-item>
-          <a-breadcrumb-item>成本台账</a-breadcrumb-item>
+          <a-breadcrumb-item>成本列表</a-breadcrumb-item>
         </a-breadcrumb>
-        <span class="cost-ledger-subtitle">统一核对项目成本来源、金额与确认状态</span>
+        <div class="cost-ledger-meta-row">
+          <h1 class="cost-ledger-page-title">{{ pageTitle }}</h1>
+          <span class="cost-ledger-subtitle">{{ pageSubtitle }}</span>
+        </div>
+      </div>
+      <div class="cost-ledger-head-actions">
+        <a-button aria-label="刷新成本列表" title="刷新成本列表" @click="handleSearch">
+          <template #icon><ReloadOutlined /></template>
+          刷新
+        </a-button>
       </div>
     </div>
 
-    <!-- 搜索栏 -->
     <div class="lg-search-bar cost-ledger-query-panel">
       <div class="cost-ledger-query-primary">
         <a-input
@@ -409,6 +436,30 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             {{ p.projectName }}
           </a-select-option>
         </a-select>
+        <a-select
+          v-model:value="filter.contractId"
+          placeholder="合同"
+          allow-clear
+          class="cost-ledger-query-select"
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="contract in contractOptions" :key="contract.id" :value="contract.id">
+            {{ contract.contractName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.partnerId"
+          placeholder="合作方"
+          allow-clear
+          class="cost-ledger-query-select"
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="partner in partnerList ?? []" :key="partner.id" :value="partner.id">
+            {{ partner.partnerName }}
+          </a-select-option>
+        </a-select>
         <a-tree-select
           v-model:value="filter.costSubjectId"
           class="cost-ledger-query-select"
@@ -419,6 +470,18 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           size="large"
           @change="handleSearch"
         />
+        <a-select
+          v-model:value="filter.costType"
+          placeholder="成本类型"
+          allow-clear
+          class="cost-ledger-query-select"
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="(label, value) in COST_TYPE_LABEL" :key="value" :value="value">
+            {{ label }}
+          </a-select-option>
+        </a-select>
         <a-select
           v-model:value="filter.sourceType"
           placeholder="来源类型"
@@ -442,6 +505,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <a-select-option value="CONFIRMED">已确认</a-select-option>
           <a-select-option value="PENDING">待确认</a-select-option>
         </a-select>
+        <a-range-picker
+          v-model:value="filter.dateRange"
+          class="cost-ledger-query-range"
+          size="large"
+          value-format="YYYY-MM-DD"
+          @change="handleSearch"
+        />
       </div>
       <div class="cost-ledger-query-actions">
         <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
@@ -452,11 +522,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
     </div>
 
-    <div class="lg-grid">
-      <!-- 左列 -->
-      <div class="lg-left">
-        <!-- KPI strip -->
-        <div v-if="!isMobile" class="cost-ledger-kpi-summary" aria-label="成本关键指标">
+    <div class="lg-grid cost-ledger-grid">
+      <div class="lg-left cost-ledger-main">
+        <section v-if="!isMobile" class="lg-kpi-strip cost-ledger-kpi-summary" aria-label="成本关键指标">
           <div class="cost-ledger-kpi-item">
             <span class="cost-ledger-kpi-icon is-total"><DollarOutlined /></span>
             <span class="cost-ledger-kpi-label">成本总额</span>
@@ -498,9 +566,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               {{ fmtWan(String(kpiStats.deviation)) }} <small>万元</small>
             </span>
           </div>
-        </div>
-
-        <!-- KPI 移动端 -->
+        </section>
         <div v-else class="lg-kpi-single">
           <div
             class="lg-kpi-single-row"
@@ -547,28 +613,49 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         </div>
 
         <main class="lg-list-table-panel cost-ledger-table-panel">
-          <!-- 工具栏 -->
           <div class="lg-toolbar cost-toolbar">
             <div class="lg-toolbar-left">
               <span class="cost-ledger-table-title">成本记录</span>
               <span class="cost-ledger-table-count">共 {{ total }} 条</span>
               <ColumnSettingsButton
+                v-if="!isMobile"
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
               />
-              <a-button aria-label="刷新成本台账" title="刷新成本台账" @click="handleSearch">
-                <template #icon><ReloadOutlined /></template>
-                刷新
-              </a-button>
             </div>
             <div class="lg-toolbar-right">
               <span class="cost-ledger-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
             </div>
           </div>
 
-          <!-- 表格 -->
-          <div class="lg-table-wrap cost-ledger-table-wrap">
+          <div v-if="isMobile" class="cost-ledger-mobile-list">
+            <div v-if="loading" class="cost-ledger-mobile-state">
+              <a-spin />
+            </div>
+            <div v-else-if="!tableData.length" class="cost-ledger-mobile-state">
+              <a-empty description="暂无成本记录" />
+            </div>
+            <template v-else>
+              <button
+                v-for="row in tableData"
+                :key="row.id"
+                type="button"
+                class="cost-ledger-mobile-card"
+                @click="showDetail(row)"
+              >
+                <div class="cost-ledger-mobile-card-head">
+                  <span class="cost-ledger-mobile-subject">{{ row.costSubjectName || '-' }}</span>
+                  <span class="cost-ledger-mobile-amount">{{ fmtAmountYuan(row.amount) }}</span>
+                </div>
+                <div class="cost-ledger-mobile-meta">项目：{{ row.projectName || '-' }}</div>
+                <div class="cost-ledger-mobile-meta">合同：{{ row.contractName || '-' }}</div>
+                <div class="cost-ledger-mobile-meta">来源：{{ SOURCE_TYPE_LABEL[row.sourceType as SourceType] || row.sourceType || '-' }}</div>
+                <div class="cost-ledger-mobile-meta">状态：{{ row.costStatus === 'CONFIRMED' ? '已确认' : row.costStatus === 'PENDING' ? '待确认' : row.costStatus || '-' }}</div>
+              </button>
+            </template>
+          </div>
+          <div v-else class="lg-table-wrap cost-ledger-table-wrap">
             <vxe-grid
               :data="tableData"
               :columns="visibleGridColumns"
@@ -624,11 +711,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             </vxe-grid>
           </div>
 
-          <!-- 分页 -->
           <div class="lg-pagination">
             <span class="lg-total">共 {{ total }} 条</span>
             <a-pagination
-              v-model:current="pageNum"
+              v-model:current="pageNo"
               v-model:page-size="pageSize"
               :total="total"
               :page-size-options="['10', '20', '50', '100']"
@@ -641,7 +727,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         </main>
       </div>
 
-      <!-- 右侧分析面板 -->
       <aside class="lg-analysis-rail cost-ledger-analysis-rail" aria-label="成本辅助分析">
         <div class="cost-ledger-analysis-panel">
           <header class="cost-ledger-analysis-head">
@@ -774,13 +859,22 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   justify-content: space-between;
   min-height: 0;
   padding: 0;
+  gap: 16px;
+}
+
+.cost-ledger-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .cost-ledger-meta-row {
   display: flex;
   align-items: center;
-  gap: 5em;
+  gap: 14px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .cl-breadcrumb {
@@ -788,11 +882,25 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   line-height: 20px;
 }
 
+.cost-ledger-page-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 34px;
+}
+
 .cost-ledger-subtitle {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
-  white-space: nowrap;
+}
+
+.cost-ledger-head-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .cost-ledger-query-panel {
@@ -827,6 +935,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   width: 132px;
 }
 
+.cost-ledger-query-range {
+  width: 260px;
+}
+
 .cost-ledger-query-actions {
   display: flex;
   flex: 0 0 auto;
@@ -835,11 +947,16 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cost-ledger-table-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
+  min-height: 0;
 }
 
 .cost-toolbar {
+  flex: 0 0 auto;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -856,7 +973,69 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cost-ledger-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
   min-height: 520px;
+}
+
+.cost-ledger-table-panel > .lg-pagination {
+  flex: 0 0 auto;
+}
+
+.cost-ledger-mobile-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 320px;
+  padding: 12px;
+  background: var(--surface-subtle);
+}
+
+.cost-ledger-mobile-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.cost-ledger-mobile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  color: var(--text);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.cost-ledger-mobile-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cost-ledger-mobile-subject,
+.cost-ledger-mobile-amount {
+  font-weight: 700;
+}
+
+.cost-ledger-mobile-amount {
+  color: var(--primary);
+}
+
+.cost-ledger-mobile-meta {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .cost-ledger-table-wrap :deep(.vxe-header--column .vxe-cell) {
@@ -1046,6 +1225,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   white-space: nowrap;
 }
 
+.cost-ledger-analysis-section .lg-warning-empty {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
 @media (max-width: 1200px) {
   .cost-ledger-page-head,
   .cost-ledger-query-panel,
@@ -1060,7 +1245,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
   .cost-ledger-keyword-search,
   .cost-ledger-query-select,
-  .cost-ledger-status-select {
+  .cost-ledger-status-select,
+  .cost-ledger-query-range {
     width: 100%;
     min-width: 0;
   }
@@ -1075,6 +1261,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
   .cost-ledger-analysis-rail {
     width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .cost-ledger-head-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

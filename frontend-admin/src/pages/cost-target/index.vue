@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   ClockCircleOutlined,
   PlusOutlined,
@@ -27,9 +28,22 @@ import {
 import { ColumnSettingsButton } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
+const MOBILE_BP = 768
+const isMobile = ref(window.innerWidth < MOBILE_BP)
+const router = useRouter()
+
+function onResize() {
+  isMobile.value = window.innerWidth < MOBILE_BP
+}
+
 // ---- Dropdown data ----
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
+const approvalStatusOptions = ['DRAFT', 'APPROVING', 'APPROVED', 'REJECTED']
+const activeStatusOptions = [
+  { label: '当前启用', value: 1 },
+  { label: '未启用', value: 0 },
+]
 
 // ---- Filter state ----
 const filter = reactive({
@@ -47,8 +61,14 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
 const targetModalVisible = ref(false)
-const targetModalMode = ref<'create' | 'edit'>('create')
+const targetModalMode = ref<'create' | 'edit' | 'view'>('create')
 const targetModalId = ref('')
+const targetModalTitle = computed(() => {
+  if (targetModalMode.value === 'view') return '成本目标详情'
+  return targetModalMode.value === 'edit' ? '编辑成本目标' : '新建成本目标'
+})
+const pageTitle = '成本目标'
+const pageSubtitle = '统一管理成本目标版本、审批状态与当前生效版本'
 
 // ---- Fetch data ----
 async function fetchData() {
@@ -70,7 +90,7 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('加载目标成本版本列表失败')
+    message.error('加载成本目标版本列表失败')
   } finally {
     loading.value = false
   }
@@ -103,13 +123,17 @@ function handlePageSizeChange(_cur: number, size: number) {
 
 // ---- Actions ----
 function handleCreate() {
-  targetModalMode.value = 'create'
-  targetModalId.value = ''
-  targetModalVisible.value = true
+  router.push('/cost-target/create')
 }
 
 function handleEdit(row: CostTargetVO) {
   targetModalMode.value = 'edit'
+  targetModalId.value = String(row.id)
+  targetModalVisible.value = true
+}
+
+function handleView(row: CostTargetVO) {
+  targetModalMode.value = 'view'
   targetModalId.value = String(row.id)
   targetModalVisible.value = true
 }
@@ -180,7 +204,7 @@ const columns = computed(() => [
   { field: 'projectName', title: '所属项目', width: 150 },
   {
     field: 'totalTargetAmount',
-    title: '目标成本',
+    title: '成本目标',
     width: 150,
     align: 'right' as const,
     slots: { default: 'amount' },
@@ -241,20 +265,38 @@ function targetPercent(value: number): number {
 }
 
 onMounted(() => {
+  window.addEventListener('resize', onResize)
   referenceStore.fetchProjects()
   fetchData()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
 })
 </script>
 
 <template>
   <div class="lg-list-page lg-page app-page ct-page">
     <div class="lg-page-head ct-page-head">
-      <div class="ct-page-meta-row">
+      <div class="ct-page-head-main">
         <a-breadcrumb class="ct-breadcrumb">
           <a-breadcrumb-item>成本管理</a-breadcrumb-item>
-          <a-breadcrumb-item>目标成本</a-breadcrumb-item>
+          <a-breadcrumb-item>成本目标</a-breadcrumb-item>
         </a-breadcrumb>
-        <span class="ct-page-subtitle">统一管理目标成本版本、审批状态与当前生效版本</span>
+        <div class="ct-page-meta-row">
+          <h1 class="ct-page-title">{{ pageTitle }}</h1>
+          <span class="ct-page-subtitle">{{ pageSubtitle }}</span>
+        </div>
+      </div>
+      <div class="ct-page-head-actions">
+        <a-button aria-label="刷新成本目标" title="刷新成本目标" @click="fetchData">
+          <template #icon><ReloadOutlined /></template>
+          刷新
+        </a-button>
+        <a-button type="primary" @click="handleCreate">
+          <template #icon><PlusOutlined /></template>
+          新建成本目标
+        </a-button>
       </div>
     </div>
 
@@ -287,6 +329,34 @@ onMounted(() => {
             p.projectName
           }}</a-select-option>
         </a-select>
+        <a-select
+          v-model:value="filter.approvalStatus"
+          class="ct-search-select"
+          placeholder="审批状态"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option v-for="item in approvalStatusOptions" :key="item" :value="item">
+            {{ APPROVAL_STATUS_LABEL[item] ?? item }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.isActive"
+          class="ct-search-select"
+          placeholder="启用状态"
+          allow-clear
+          size="large"
+          @change="handleSearch"
+        >
+          <a-select-option
+            v-for="item in activeStatusOptions"
+            :key="item.value"
+            :value="item.value"
+          >
+            {{ item.label }}
+          </a-select-option>
+        </a-select>
       </div>
       <div class="ct-search-actions">
         <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
@@ -299,7 +369,7 @@ onMounted(() => {
 
     <div class="lg-grid ct-content-grid">
       <main class="ct-main-column">
-        <div class="ct-kpi-summary" aria-label="目标成本关键指标">
+        <section class="lg-kpi-strip ct-kpi-summary" aria-label="成本目标关键指标">
           <div class="ct-kpi-item">
             <span class="ct-kpi-icon is-total"><FileTextOutlined /></span>
             <span class="ct-kpi-label">版本总数</span>
@@ -331,33 +401,54 @@ onMounted(() => {
             <span class="ct-kpi-label">草稿版本</span>
             <span class="ct-kpi-value">{{ targetStats.draft }} <small>个</small></span>
           </div>
-        </div>
+        </section>
 
-        <section class="lg-list-table-panel ct-table-panel">
+        <main class="lg-list-table-panel ct-table-panel">
           <div class="lg-toolbar ct-table-toolbar">
             <div class="lg-toolbar-left">
-              <span class="ct-table-title">目标成本版本</span>
+              <span class="ct-table-title">成本目标版本</span>
               <span class="ct-table-count">共 {{ total }} 条</span>
               <ColumnSettingsButton
+                v-if="!isMobile"
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
               />
-              <a-button aria-label="刷新目标成本" title="刷新目标成本" @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
-                刷新
-              </a-button>
-              <a-button type="primary" @click="handleCreate">
-                <template #icon><PlusOutlined /></template>
-                新建目标成本
-              </a-button>
             </div>
             <div class="lg-toolbar-right">
               <span class="ct-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
             </div>
           </div>
 
-          <div class="lg-table-wrap ct-table-wrap">
+          <div v-if="isMobile" class="ct-mobile-list">
+            <div v-if="loading" class="ct-mobile-state">
+              <a-spin />
+            </div>
+            <div v-else-if="!tableData.length" class="ct-mobile-state">
+              <a-empty description="暂无成本目标版本" />
+            </div>
+            <template v-else>
+              <article v-for="row in tableData" :key="row.id" class="ct-mobile-card">
+                <div class="ct-mobile-card-head">
+                  <div>
+                    <strong>{{ row.versionNo || '-' }}</strong>
+                    <div class="ct-mobile-card-name">{{ row.versionName || '-' }}</div>
+                  </div>
+                  <a-tag :color="row.isActive === 1 ? 'green' : 'default'">
+                    {{ row.isActive === 1 ? '当前启用' : '未启用' }}
+                  </a-tag>
+                </div>
+                <div class="ct-mobile-card-meta">成本目标：{{ fmtAmount(row.totalTargetAmount) }} 万元</div>
+                <div class="ct-mobile-card-meta">
+                  审批状态：{{ APPROVAL_STATUS_LABEL[row.approvalStatus] || row.approvalStatus || '-' }}
+                </div>
+                <a-button type="link" class="ct-mobile-card-link" @click="handleView(row)">
+                  查看详情
+                </a-button>
+              </article>
+            </template>
+          </div>
+          <div v-else class="lg-table-wrap ct-table-wrap">
             <vxe-grid
               :data="tableData"
               :columns="visibleGridColumns"
@@ -391,6 +482,7 @@ onMounted(() => {
                   </a-button>
                   <template #overlay>
                     <a-menu>
+                      <a-menu-item @click="handleView(row)">查看详情</a-menu-item>
                       <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                       <a-menu-item
                         v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
@@ -426,14 +518,14 @@ onMounted(() => {
               @show-size-change="handlePageSizeChange"
             />
           </div>
-        </section>
+        </main>
       </main>
 
-      <aside class="lg-analysis-rail ct-analysis-rail" aria-label="目标成本辅助分析">
+      <aside class="lg-analysis-rail ct-analysis-rail" aria-label="成本目标辅助分析">
         <div class="ct-analysis-panel">
           <header class="ct-analysis-head">
             <div>
-              <div class="ct-analysis-title">目标成本分析</div>
+              <div class="ct-analysis-title">成本目标分析</div>
               <div class="ct-analysis-subtitle">审批、版本与近期记录</div>
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
@@ -478,7 +570,7 @@ onMounted(() => {
               <span class="ct-status-label">{{ item.versionName }}</span>
               <strong>{{ item.versionNo }}</strong>
             </div>
-            <div v-if="!recentTargets.length" class="ct-empty-state">暂无目标成本版本</div>
+            <div v-if="!recentTargets.length" class="ct-empty-state">暂无成本目标版本</div>
           </section>
         </div>
       </aside>
@@ -486,7 +578,7 @@ onMounted(() => {
 
     <a-modal
       v-model:open="targetModalVisible"
-      :title="targetModalMode === 'edit' ? '编辑目标成本' : '新建目标成本'"
+      :title="targetModalTitle"
       :width="800"
       :destroy-on-close="true"
       :footer="null"
@@ -544,28 +636,53 @@ onMounted(() => {
   justify-content: space-between;
   min-height: 0;
   padding: 0;
+  gap: 16px;
+}
+.ct-page-head-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 .ct-page-meta-row {
   display: flex;
   align-items: center;
-  gap: 5em;
+  gap: 14px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 .ct-breadcrumb {
   font-size: 13px;
   line-height: 20px;
 }
+.ct-page-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 34px;
+}
 .ct-page-subtitle {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
-  white-space: nowrap;
+}
+.ct-page-head-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
 }
 .ct-content-grid {
   align-items: stretch;
   min-height: 0;
 }
 .ct-main-column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
   min-width: 0;
 }
 .ct-kpi-summary {
@@ -739,10 +856,15 @@ onMounted(() => {
   gap: 8px;
 }
 .ct-table-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
+  min-height: 0;
 }
 .ct-table-toolbar {
+  flex: 0 0 auto;
   border-bottom: 1px solid var(--border-subtle);
 }
 .ct-table-title {
@@ -756,7 +878,55 @@ onMounted(() => {
   font-size: 13px;
 }
 .ct-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ct-table-wrap :deep(.vxe-grid) {
+  height: 100%;
+}
+.ct-table-panel > .lg-pagination {
+  flex: 0 0 auto;
+}
+.ct-table-wrap {
   min-height: 520px;
+}
+.ct-mobile-list {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+.ct-mobile-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.ct-mobile-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.ct-mobile-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ct-mobile-card-name,
+.ct-mobile-card-meta {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+.ct-mobile-card-link {
+  justify-self: flex-start;
+  padding-left: 0;
 }
 .ct-table-wrap :deep(.vxe-header--column .vxe-cell) {
   justify-content: center;
@@ -827,6 +997,11 @@ onMounted(() => {
     width: 100%;
     flex: 1 1 100%;
     min-width: 0;
+  }
+
+  .ct-page-head-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .ct-search-actions {

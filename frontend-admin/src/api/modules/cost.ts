@@ -2,7 +2,7 @@ import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
 import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO } from '@/types/cost'
 
-/** 成本台账分页查询 */
+/** 成本列表分页查询 */
 export function getCostLedger(params: CostLedgerQueryParams) {
   return request<PageResult<CostLedgerVO>>({
     url: '/cost-ledger',
@@ -11,7 +11,7 @@ export function getCostLedger(params: CostLedgerQueryParams) {
   })
 }
 
-/** 成本台账汇总统计 */
+/** 成本列表汇总统计 */
 export function getCostLedgerSummary(params: Partial<CostLedgerQueryParams>) {
   return request<CostLedgerSummaryVO>({
     url: '/cost-ledger/summary',
@@ -20,7 +20,7 @@ export function getCostLedgerSummary(params: Partial<CostLedgerQueryParams>) {
   })
 }
 
-/** 成本台账详情 */
+/** 成本列表详情 */
 export function getCostLedgerDetail(id: string) {
   return request<CostLedgerVO>({
     url: `/cost-ledger/${id}`,

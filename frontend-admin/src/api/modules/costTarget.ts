@@ -2,7 +2,7 @@ import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
 import type { CostTargetVO, CostTargetItemVO, CostTargetQueryParams } from '@/types/costTarget'
 
-/** 目标成本版本分页列表 */
+/** 成本目标版本分页列表 */
 export function getCostTargetList(params: CostTargetQueryParams) {
   return request<PageResult<CostTargetVO>>({
     url: '/cost-targets',
@@ -11,7 +11,7 @@ export function getCostTargetList(params: CostTargetQueryParams) {
   })
 }
 
-/** 目标成本版本详情 */
+/** 成本目标版本详情 */
 export function getCostTargetDetail(id: string) {
   return request<CostTargetVO>({
     url: `/cost-targets/${id}`,
@@ -19,7 +19,7 @@ export function getCostTargetDetail(id: string) {
   })
 }
 
-/** 新建目标成本版本 */
+/** 新建成本目标版本 */
 export function createCostTarget(data: Partial<CostTargetVO>) {
   return request<string>({
     url: '/cost-targets',
@@ -28,7 +28,7 @@ export function createCostTarget(data: Partial<CostTargetVO>) {
   })
 }
 
-/** 更新目标成本版本 */
+/** 更新成本目标版本 */
 export function updateCostTarget(id: string, data: Partial<CostTargetVO>) {
   return request<void>({
     url: `/cost-targets/${id}`,
@@ -37,7 +37,7 @@ export function updateCostTarget(id: string, data: Partial<CostTargetVO>) {
   })
 }
 
-/** 删除目标成本版本 */
+/** 删除成本目标版本 */
 export function deleteCostTarget(id: string) {
   return request<void>({
     url: `/cost-targets/${id}`,
@@ -45,7 +45,7 @@ export function deleteCostTarget(id: string) {
   })
 }
 
-/** 激活目标成本版本（版本切换） */
+/** 激活成本目标版本（版本切换） */
 export function activateCostTarget(id: string) {
   return request<void>({
     url: `/cost-targets/${id}/activate`,
@@ -53,7 +53,7 @@ export function activateCostTarget(id: string) {
   })
 }
 
-/** 获取目标成本明细项列表 */
+/** 获取成本目标明细项列表 */
 export function getCostTargetItems(targetId: string) {
   return request<CostTargetItemVO[]>({
     url: `/cost-targets/${targetId}/items`,
@@ -61,7 +61,7 @@ export function getCostTargetItems(targetId: string) {
   })
 }
 
-/** 批量保存目标成本明细项 */
+/** 批量保存成本目标明细项 */
 export function saveCostTargetItems(targetId: string, items: Partial<CostTargetItemVO>[]) {
   return request<void>({
     url: `/cost-targets/${targetId}/items`,

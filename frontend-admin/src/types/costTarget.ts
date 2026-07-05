@@ -1,4 +1,4 @@
-/** 目标成本版本视图对象 */
+/** 成本目标版本视图对象 */
 export interface CostTargetVO {
   id: string
   projectId: string
@@ -19,7 +19,7 @@ export interface CostTargetVO {
   createdBy?: string
 }
 
-/** 目标成本明细项 */
+/** 成本目标明细项 */
 export interface CostTargetItemVO {
   id?: string
   targetId?: string
@@ -32,7 +32,7 @@ export interface CostTargetItemVO {
   remark?: string
 }
 
-/** 目标成本查询参数 */
+/** 成本目标查询参数 */
 export interface CostTargetQueryParams {
   pageNo: number
   pageSize: number
