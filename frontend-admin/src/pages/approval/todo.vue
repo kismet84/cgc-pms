@@ -31,7 +31,25 @@ import {
   getWorkflowBusinessTypeLabel,
   getWorkflowInstanceStatusMeta,
   instanceStatusOptions,
+  WF_INSTANCE_RUNNING,
+  WF_INSTANCE_APPROVED,
+  WF_INSTANCE_REJECTED,
+  WF_INSTANCE_WITHDRAWN,
+  WF_INSTANCE_VOIDED,
 } from './workflowDisplay'
+
+// 字典常量 - 工作流节点状态
+const WF_NODE_WAITING = 'WAITING'
+const WF_NODE_ACTIVE = 'ACTIVE'
+const WF_NODE_COMPLETED = 'COMPLETED'
+const WF_NODE_REJECTED = 'REJECTED'
+const WF_NODE_SKIPPED = 'SKIPPED'
+
+// 字典常量 - 工作流任务状态
+const WF_TASK_PENDING = 'PENDING'
+const WF_TASK_APPROVED = 'APPROVED'
+const WF_TASK_REJECTED = 'REJECTED'
+const WF_TASK_CANCELLED = 'CANCELLED'
 
 const router = useRouter()
 const route = useRoute()
@@ -243,12 +261,12 @@ const detailRecords = computed(() =>
   Array.isArray(detail.value?.records) ? detail.value.records : [],
 )
 const completedNodeCount = computed(
-  () => detailNodes.value.filter((node) => node.nodeStatus === 'COMPLETED').length,
+  () => detailNodes.value.filter((node) => node.nodeStatus === WF_NODE_COMPLETED).length,
 )
 const availableActions = computed(() =>
   Array.isArray(detail.value?.availableActions) ? detail.value.availableActions : [],
 )
-const isDetailRunning = computed(() => detail.value?.instanceStatus === 'RUNNING')
+const isDetailRunning = computed(() => detail.value?.instanceStatus === WF_INSTANCE_RUNNING)
 const fullDetailOnlyActions = computed(() =>
   availableActions.value.filter((action) => action === 'transfer' || action === 'addSign'),
 )
@@ -262,9 +280,9 @@ function canShowInitiatorActions() {
 }
 
 function findMyPendingTask() {
-  const activeNode = detailNodes.value.find((node) => node.nodeStatus === 'ACTIVE')
+  const activeNode = detailNodes.value.find((node) => node.nodeStatus === WF_NODE_ACTIVE)
   const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
-  return tasks.find((task) => task.taskStatus === 'PENDING')
+  return tasks.find((task) => task.taskStatus === WF_TASK_PENDING)
 }
 
 function openApproveModal() {

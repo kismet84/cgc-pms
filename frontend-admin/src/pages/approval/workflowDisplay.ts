@@ -1,3 +1,10 @@
+// 字典常量 - 工作流实例状态
+export const WF_INSTANCE_RUNNING = 'RUNNING'
+export const WF_INSTANCE_APPROVED = 'APPROVED'
+export const WF_INSTANCE_REJECTED = 'REJECTED'
+export const WF_INSTANCE_WITHDRAWN = 'WITHDRAWN'
+export const WF_INSTANCE_VOIDED = 'VOIDED'
+
 export interface WorkflowBusinessEntryRegistryItem {
   businessType: string
   displayName: string
@@ -69,18 +76,18 @@ export const coreBusinessTypeOptions = workflowBusinessEntryRegistry
   .map((entry) => ({ label: entry.displayName, value: entry.businessType }))
 
 export const instanceStatusOptions = [
-  { label: '审批中', value: 'RUNNING' },
-  { label: '已通过', value: 'APPROVED' },
-  { label: '已驳回', value: 'REJECTED' },
-  { label: '已撤回', value: 'WITHDRAWN' },
+  { label: '审批中', value: WF_INSTANCE_RUNNING },
+  { label: '已通过', value: WF_INSTANCE_APPROVED },
+  { label: '已驳回', value: WF_INSTANCE_REJECTED },
+  { label: '已撤回', value: WF_INSTANCE_WITHDRAWN },
 ]
 
 const instanceStatusMap: Record<string, { text: string; color: string }> = {
-  RUNNING: { text: '审批中', color: 'processing' },
-  APPROVED: { text: '已通过', color: 'success' },
-  REJECTED: { text: '已驳回', color: 'error' },
-  WITHDRAWN: { text: '已撤回', color: 'default' },
-  VOIDED: { text: '已作废', color: 'default' },
+  [WF_INSTANCE_RUNNING]: { text: '审批中', color: 'processing' },
+  [WF_INSTANCE_APPROVED]: { text: '已通过', color: 'success' },
+  [WF_INSTANCE_REJECTED]: { text: '已驳回', color: 'error' },
+  [WF_INSTANCE_WITHDRAWN]: { text: '已撤回', color: 'default' },
+  [WF_INSTANCE_VOIDED]: { text: '已作废', color: 'default' },
 }
 
 export function getWorkflowBusinessTypeLabel(value: unknown): string {

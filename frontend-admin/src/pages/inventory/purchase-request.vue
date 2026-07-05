@@ -28,6 +28,13 @@ import type { PurchaseRequestVO, PurchaseRequestItemVO } from '@/types/inventory
 import { getContractLedger } from '@/api/modules/contract'
 import type { ContractVO } from '@/types/contract'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
+
+// 字典常量 - 审批状态
+const APPROVAL_DRAFT = 'DRAFT'
+const APPROVAL_APPROVING = 'APPROVING'
+
+// 字典常量 - 业务状态
+const STATUS_DRAFT = 'DRAFT'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 
@@ -436,14 +443,14 @@ function getPopupContainer() {
 const kpiReqTotal = computed(() => tableData.value.length)
 const kpiReqPending = computed(
   () =>
-    tableData.value.filter((r) => r.approvalStatus === 'DRAFT' || r.approvalStatus === 'APPROVING')
+    tableData.value.filter((r) => r.approvalStatus === APPROVAL_DRAFT || r.approvalStatus === APPROVAL_APPROVING)
       .length,
 )
 const kpiReqConverted = computed(
   () => tableData.value.filter((r) => r.status === 'CONVERTED').length,
 )
 const recentRequests = computed(() => tableData.value.slice(0, 4))
-const kpiReqDraft = computed(() => tableData.value.filter((r) => r.status === 'DRAFT').length)
+const kpiReqDraft = computed(() => tableData.value.filter((r) => r.status === STATUS_DRAFT).length)
 const kpiMax = computed(() => ({
   totalCount: Math.max(total.value, tableData.value.length, 1),
 }))
@@ -454,7 +461,7 @@ function kpiPct(value: number, max: number): number {
 const statusBreakdown = computed(() => {
   const m: Record<string, number> = {}
   tableData.value.forEach((r) => {
-    const key = r.status || 'DRAFT'
+    const key = r.status || STATUS_DRAFT
     m[key] = (m[key] || 0) + 1
   })
   return Object.entries(m).map(([key, count]) => ({
@@ -468,7 +475,7 @@ const statusBreakdown = computed(() => {
 const approvalBreakdown = computed(() => {
   const m: Record<string, number> = {}
   tableData.value.forEach((r) => {
-    const key = r.approvalStatus || 'DRAFT'
+    const key = r.approvalStatus || APPROVAL_DRAFT
     m[key] = (m[key] || 0) + 1
   })
   const labels: Record<string, string> = {
@@ -669,7 +676,7 @@ onMounted(() => {
                   <template #overlay>
                     <a-menu>
                       <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                      <a-menu-item v-if="row.approvalStatus === 'DRAFT'" @click="handleSubmit(row)">
+                      <a-menu-item v-if="row.approvalStatus === APPROVAL_DRAFT" @click="handleSubmit(row)">
                         提交审批
                       </a-menu-item>
                       <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>

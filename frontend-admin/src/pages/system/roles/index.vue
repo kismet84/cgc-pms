@@ -10,6 +10,9 @@ import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { normalizeArray } from '@/utils/normalizeArray'
 
+// 字典常量
+const STATUS_ENABLE = 'ENABLE'
+
 const loading = ref(false)
 const allRoles = ref<SysRoleVO[]>([])
 const pageNo = ref(1)
@@ -56,12 +59,12 @@ const tableData = computed(() => {
 const roleStatusSummary = computed(() => [
   {
     label: '启用角色',
-    count: filteredRoles.value.filter((r) => r.status === 'ENABLE').length,
+    count: filteredRoles.value.filter((r) => r.status === STATUS_ENABLE).length,
     tone: 'success',
   },
   {
     label: '禁用角色',
-    count: filteredRoles.value.filter((r) => r.status !== 'ENABLE').length,
+    count: filteredRoles.value.filter((r) => r.status !== STATUS_ENABLE).length,
     tone: 'danger',
   },
 ])
@@ -172,8 +175,8 @@ onMounted(fetchData)
             size="small"
           >
             <template #status="{ row }">
-              <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
-                {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+              <a-tag :color="row.status === STATUS_ENABLE ? 'success' : 'error'">
+                {{ row.status === STATUS_ENABLE ? '启用' : '禁用' }}
               </a-tag>
             </template>
             <template #action="{ row }">

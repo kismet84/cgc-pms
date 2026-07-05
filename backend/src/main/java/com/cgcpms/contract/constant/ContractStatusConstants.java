@@ -1,5 +1,7 @@
 package com.cgcpms.contract.constant;
 
+import com.cgcpms.system.dict.util.DictUtils;
+
 public final class ContractStatusConstants {
 
     private ContractStatusConstants() {
@@ -20,4 +22,20 @@ public final class ContractStatusConstants {
 
     // ── 审批业务类型 ──
     public static final String BUSINESS_TYPE_CONTRACT_APPROVAL = "CONTRACT_APPROVAL";
+
+    // ── 字典查询方法 ──
+
+    /**
+     * 获取审批状态标签
+     */
+    public static String getApprovalStatusLabel(String value) {
+        return DictUtils.getLabelByValue("approval_status", value);
+    }
+
+    /**
+     * 获取合同状态标签
+     */
+    public static String getContractStatusLabel(String value) {
+        return DictUtils.getLabelByValue("contract_status", value);
+    }
 }

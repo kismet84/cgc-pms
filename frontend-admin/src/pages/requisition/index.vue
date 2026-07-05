@@ -13,6 +13,12 @@ import RequisitionFormModal from './components/RequisitionFormModal.vue'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
+// 字典常量 - 审批状态
+const APPROVAL_DRAFT = 'DRAFT'
+const APPROVAL_APPROVING = 'APPROVING'
+const APPROVAL_APPROVED = 'APPROVED'
+const APPROVAL_REJECTED = 'REJECTED'
+
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
@@ -94,28 +100,28 @@ const unstockedCount = computed(
 )
 const pendingApprovalCount = computed(
   () =>
-    tableData.value.filter((item) => ['DRAFT', 'APPROVING'].includes(item.approvalStatus ?? ''))
+    tableData.value.filter((item) => [APPROVAL_DRAFT, APPROVAL_APPROVING].includes(item.approvalStatus ?? ''))
       .length,
 )
 const approvalSummary = computed(() => [
   {
     label: '草稿',
-    count: tableData.value.filter((item) => item.approvalStatus === 'DRAFT').length,
+    count: tableData.value.filter((item) => item.approvalStatus === APPROVAL_DRAFT).length,
     color: '#94a3b8',
   },
   {
     label: '审批中',
-    count: tableData.value.filter((item) => item.approvalStatus === 'APPROVING').length,
+    count: tableData.value.filter((item) => item.approvalStatus === APPROVAL_APPROVING).length,
     color: '#1677ff',
   },
   {
     label: '已通过',
-    count: tableData.value.filter((item) => item.approvalStatus === 'APPROVED').length,
+    count: tableData.value.filter((item) => item.approvalStatus === APPROVAL_APPROVED).length,
     color: '#52c41a',
   },
   {
     label: '已驳回',
-    count: tableData.value.filter((item) => item.approvalStatus === 'REJECTED').length,
+    count: tableData.value.filter((item) => item.approvalStatus === APPROVAL_REJECTED).length,
     color: '#ff4d4f',
   },
 ])
@@ -297,7 +303,7 @@ onMounted(() => {
                       <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                       <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
                       <a-menu-item
-                        v-if="row.approvalStatus === 'DRAFT'"
+                        v-if="row.approvalStatus === APPROVAL_DRAFT"
                         @click="handleSubmitApproval(row)"
                       >
                         提交审批

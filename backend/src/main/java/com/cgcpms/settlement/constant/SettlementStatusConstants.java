@@ -1,5 +1,7 @@
 package com.cgcpms.settlement.constant;
 
+import com.cgcpms.system.dict.util.DictUtils;
+
 /**
  * 结算模块状态常量 — 统一管理 settlement lifecycle/approval/settlement 三个状态维度的枚举值。
  * <p>
@@ -53,4 +55,27 @@ public final class SettlementStatusConstants {
 
     /** 结算审批工作流业务类型 */
     public static final String BUSINESS_TYPE_SETTLEMENT = "SETTLEMENT";
+
+    // ── 字典查询方法 ──
+
+    /**
+     * 获取结算生命周期状态标签
+     */
+    public static String getSettlementStatusLabel(String value) {
+        return DictUtils.getLabelByValue("settlement_status", value);
+    }
+
+    /**
+     * 获取结算定案状态标签
+     */
+    public static String getSettlementFinalStatusLabel(String value) {
+        return DictUtils.getLabelByValue("settlement_final_status", value);
+    }
+
+    /**
+     * 获取审批状态标签
+     */
+    public static String getApprovalStatusLabel(String value) {
+        return DictUtils.getLabelByValue("approval_status", value);
+    }
 }

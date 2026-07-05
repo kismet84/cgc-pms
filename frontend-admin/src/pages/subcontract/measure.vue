@@ -28,6 +28,15 @@ import {
 import { getContractItems } from '@/api/modules/contract'
 import { useReferenceStore } from '@/stores/reference'
 import type { SubMeasureVO, SubMeasureItemVO, SubTaskVO } from '@/types/subcontract'
+
+// 字典常量 - 审批状态
+const APPROVAL_DRAFT = 'DRAFT'
+const APPROVAL_APPROVING = 'APPROVING'
+
+// 字典常量 - 业务状态
+const STATUS_DRAFT = 'DRAFT'
+const STATUS_CONFIRMED = 'CONFIRMED'
+const STATUS_COMPLETED = 'COMPLETED'
 import type { SelectOption } from '@/types/ui'
 import type { ContractItem } from '@/types/contract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
@@ -452,11 +461,11 @@ const kpiMeasureTotal = computed(() =>
 )
 const kpiApproved = computed(() =>
   tableData.value
-    .filter((r) => r.status === 'CONFIRMED' || r.status === 'COMPLETED')
+    .filter((r) => r.status === STATUS_CONFIRMED || r.status === STATUS_COMPLETED)
     .reduce((s, r) => s + (parseFloat(r.approvedAmount) || 0), 0),
 )
 const kpiMeasurePending = computed(
-  () => tableData.value.filter((r) => r.status === 'DRAFT' || r.status === 'APPROVING').length,
+  () => tableData.value.filter((r) => r.status === STATUS_DRAFT || r.status === APPROVAL_APPROVING).length,
 )
 const approvedRate = computed(() =>
   kpiMeasureTotal.value ? Math.round((kpiApproved.value / kpiMeasureTotal.value) * 100) : 0,
@@ -470,15 +479,15 @@ const measureStatusSummary = computed(() => [
   },
   {
     label: '已确认',
-    count: tableData.value.filter((r) => r.status === 'CONFIRMED').length,
+    count: tableData.value.filter((r) => r.status === STATUS_CONFIRMED).length,
     color: '#1890ff',
-    pct: statusPct(tableData.value.filter((r) => r.status === 'CONFIRMED').length),
+    pct: statusPct(tableData.value.filter((r) => r.status === STATUS_CONFIRMED).length),
   },
   {
     label: '已完成',
-    count: tableData.value.filter((r) => r.status === 'COMPLETED').length,
+    count: tableData.value.filter((r) => r.status === STATUS_COMPLETED).length,
     color: '#52c41a',
-    pct: statusPct(tableData.value.filter((r) => r.status === 'COMPLETED').length),
+    pct: statusPct(tableData.value.filter((r) => r.status === STATUS_COMPLETED).length),
   },
 ])
 const recentMeasures = computed(() => tableData.value.slice(0, 4))
@@ -709,7 +718,7 @@ onMounted(() => {
                       <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                       <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
                       <a-menu-item
-                        v-if="row.approvalStatus === 'DRAFT'"
+                        v-if="row.approvalStatus === APPROVAL_DRAFT"
                         @click="handleSubmitApproval(row)"
                       >
                         提交审批

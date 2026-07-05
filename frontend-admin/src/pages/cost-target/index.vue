@@ -28,6 +28,12 @@ import {
 import { ColumnSettingsButton } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
+// 字典常量 - 审批状态
+const APPROVAL_DRAFT = 'DRAFT'
+const APPROVAL_APPROVING = 'APPROVING'
+const APPROVAL_APPROVED = 'APPROVED'
+const APPROVAL_REJECTED = 'REJECTED'
+
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
 const router = useRouter()
@@ -39,7 +45,7 @@ function onResize() {
 // ---- Dropdown data ----
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
-const approvalStatusOptions = ['DRAFT', 'APPROVING', 'APPROVED', 'REJECTED']
+const approvalStatusOptions = [APPROVAL_DRAFT, APPROVAL_APPROVING, APPROVAL_APPROVED, APPROVAL_REJECTED]
 const activeStatusOptions = [
   { label: '当前启用', value: 1 },
   { label: '未启用', value: 0 },
@@ -223,9 +229,9 @@ const {
 const targetStats = computed(() => ({
   total: total.value,
   active: tableData.value.filter((item) => item.isActive === 1).length,
-  approved: tableData.value.filter((item) => item.approvalStatus === 'APPROVED').length,
-  approving: tableData.value.filter((item) => item.approvalStatus === 'APPROVING').length,
-  draft: tableData.value.filter((item) => item.approvalStatus === 'DRAFT').length,
+  approved: tableData.value.filter((item) => item.approvalStatus === APPROVAL_APPROVED).length,
+  approving: tableData.value.filter((item) => item.approvalStatus === APPROVAL_APPROVING).length,
+  draft: tableData.value.filter((item) => item.approvalStatus === APPROVAL_DRAFT).length,
 }))
 
 const targetStatusSummary = computed(() => [
@@ -478,14 +484,14 @@ onUnmounted(() => {
                       <a-menu-item @click="handleView(row)">查看详情</a-menu-item>
                       <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                       <a-menu-item
-                        v-if="row.isActive !== 1 && row.approvalStatus === 'APPROVED'"
+                        v-if="row.isActive !== 1 && row.approvalStatus === APPROVAL_APPROVED"
                         :disabled="activating"
                         @click="handleActivate(row)"
                       >
                         <CheckCircleOutlined style="margin-right: 4px" />切换版本
                       </a-menu-item>
                       <a-menu-item
-                        v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+                        v-if="row.approvalStatus === APPROVAL_DRAFT || row.approvalStatus === APPROVAL_REJECTED"
                         danger
                         @click="handleDelete(row)"
                       >

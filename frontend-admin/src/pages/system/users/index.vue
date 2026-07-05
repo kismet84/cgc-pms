@@ -17,6 +17,10 @@ import type { SysRoleVO } from '@/types/system'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 
+// 字典常量
+const STATUS_ENABLE = 'ENABLE'
+const STATUS_DISABLE = 'DISABLE'
+
 const loading = ref(false)
 const tableData = ref<SysUserVO[]>([])
 const total = ref(0)
@@ -70,12 +74,12 @@ const {
 const userStatusSummary = computed(() => [
   {
     label: '启用用户',
-    count: tableData.value.filter((r) => r.status === 'ENABLE').length,
+    count: tableData.value.filter((r) => r.status === STATUS_ENABLE).length,
     tone: 'success',
   },
   {
     label: '禁用用户',
-    count: tableData.value.filter((r) => r.status !== 'ENABLE').length,
+    count: tableData.value.filter((r) => r.status !== STATUS_ENABLE).length,
     tone: 'danger',
   },
 ])
@@ -190,8 +194,8 @@ async function handleModalOk() {
 }
 
 function handleToggleStatus(record: SysUserVO) {
-  const newStatus = record.status === 'ENABLE' ? 'DISABLE' : 'ENABLE'
-  const action = newStatus === 'ENABLE' ? '启用' : '禁用'
+  const newStatus = record.status === STATUS_ENABLE ? STATUS_DISABLE : STATUS_ENABLE
+  const action = newStatus === STATUS_ENABLE ? '启用' : '禁用'
   Modal.confirm({
     title: `确认${action}`,
     content: `确定要${action}用户"${record.username}"吗？`,
@@ -314,8 +318,8 @@ onMounted(() => {
               <span v-else class="lg-muted-text">-</span>
             </template>
             <template #status="{ row }">
-              <a-tag :color="row.status === 'ENABLE' ? 'success' : 'error'">
-                {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+              <a-tag :color="row.status === STATUS_ENABLE ? 'success' : 'error'">
+                {{ row.status === STATUS_ENABLE ? '启用' : '禁用' }}
               </a-tag>
             </template>
             <template #action="{ row }">
@@ -332,8 +336,8 @@ onMounted(() => {
                 <template #overlay>
                   <a-menu>
                     <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                    <a-menu-item :danger="row.status === 'ENABLE'" @click="handleToggleStatus(row)">
-                      {{ row.status === 'ENABLE' ? '禁用' : '启用' }}
+                    <a-menu-item :danger="row.status === STATUS_ENABLE" @click="handleToggleStatus(row)">
+                      {{ row.status === STATUS_ENABLE ? '禁用' : '启用' }}
                     </a-menu-item>
                     <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
                   </a-menu>

@@ -27,6 +27,16 @@ import type { SelectOption } from '@/types/ui'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 
+// 字典常量 - 审批状态
+const APPROVAL_DRAFT = 'DRAFT'
+const APPROVAL_APPROVING = 'APPROVING'
+
+// 字典常量 - 订单状态
+const ORDER_STATUS_DRAFT = 'DRAFT'
+const ORDER_STATUS_APPROVING = 'APPROVING'
+const ORDER_STATUS_COMPLETED = 'COMPLETED'
+const ORDER_STATUS_CANCELLED = 'CANCELLED'
+
 const filter = reactive({
   projectId: undefined as string | undefined,
   contractId: undefined as string | undefined,
@@ -377,14 +387,14 @@ function handleModalCancel() {
 
 const kpiOrderTotal = computed(() => tableData.value.length)
 const kpiOrderPending = computed(
-  () => tableData.value.filter((r) => r.orderStatus === 'DRAFT').length,
+  () => tableData.value.filter((r) => r.orderStatus === ORDER_STATUS_DRAFT).length,
 )
 const kpiOrderedAmount = computed(() =>
   tableData.value.reduce((s, r) => s + (parseFloat(r.totalAmount) || 0), 0),
 )
 const kpiUnreceived = computed(() =>
   tableData.value
-    .filter((r) => r.orderStatus !== 'COMPLETED' && r.orderStatus !== 'CANCELLED')
+    .filter((r) => r.orderStatus !== ORDER_STATUS_COMPLETED && r.orderStatus !== ORDER_STATUS_CANCELLED)
     .reduce((s, r) => s + (parseFloat(r.totalAmount) || 0), 0),
 )
 function fmtWan(value: number): string {
@@ -404,7 +414,7 @@ const kpiMax = computed(() => ({
 const orderStatusBreakdown = computed(() => {
   const m: Record<string, number> = {}
   tableData.value.forEach((r) => {
-    const key = r.orderStatus || 'DRAFT'
+    const key = r.orderStatus || ORDER_STATUS_DRAFT
     m[key] = (m[key] || 0) + 1
   })
   return Object.entries(m).map(([key, count]) => ({
@@ -413,11 +423,11 @@ const orderStatusBreakdown = computed(() => {
     count,
     pct: kpiPct(count, kpiMax.value.totalCount),
     color:
-      key === 'COMPLETED'
+      key === ORDER_STATUS_COMPLETED
         ? '#31c48d'
-        : key === 'CANCELLED'
+        : key === ORDER_STATUS_CANCELLED
           ? '#ef4444'
-          : key === 'APPROVING'
+          : key === ORDER_STATUS_APPROVING
             ? '#2563eb'
             : '#f59e0b',
   }))
@@ -445,7 +455,7 @@ const orderTypeBreakdown = computed(() => {
 })
 const pendingOrders = computed(() =>
   tableData.value
-    .filter((row) => row.orderStatus !== 'COMPLETED' && row.orderStatus !== 'CANCELLED')
+    .filter((row) => row.orderStatus !== ORDER_STATUS_COMPLETED && row.orderStatus !== ORDER_STATUS_CANCELLED)
     .map((row) => ({
       id: row.id,
       project: row.projectName || '-',
@@ -579,7 +589,7 @@ onMounted(() => {
             <span class="purchase-order-kpi-icon is-done"><FileDoneOutlined /></span>
             <span class="purchase-order-kpi-label">已完成订单</span>
             <span class="purchase-order-kpi-value">
-              {{ tableData.filter((r) => r.orderStatus === 'COMPLETED').length }} <small>单</small>
+              {{ tableData.filter((r) => r.orderStatus === ORDER_STATUS_COMPLETED).length }} <small>单</small>
             </span>
           </div>
         </div>
@@ -654,7 +664,7 @@ onMounted(() => {
                       <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                       <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
                       <a-menu-item
-                        v-if="row.approvalStatus === 'DRAFT'"
+                        v-if="row.approvalStatus === APPROVAL_DRAFT"
                         @click="handleSubmitApproval(row)"
                       >
                         提交审批

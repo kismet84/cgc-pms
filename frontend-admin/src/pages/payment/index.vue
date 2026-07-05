@@ -28,6 +28,16 @@ import { getReceiptList } from '@/api/modules/receipt'
 import { getMeasureList } from '@/api/modules/subcontract'
 import type { PayApplicationVO, PayApplicationBasisVO } from '@/types/payment'
 import { PAY_TYPE_LABEL, PAY_TYPE_COLOR, PAY_STATUS_LABEL, PAY_STATUS_COLOR } from '@/types/payment'
+
+// 字典常量 - 审批状态
+const APPROVAL_DRAFT = 'DRAFT'
+const APPROVAL_APPROVED = 'APPROVED'
+
+// 字典常量 - 付款状态
+const PAY_STATUS_PENDING = 'PENDING'
+const PAY_STATUS_UNPAID = 'UNPAID'
+const PAY_STATUS_PARTIAL = 'PARTIAL'
+const PAY_STATUS_PAID = 'PAID'
 import type { MatReceiptVO } from '@/types/receipt'
 import type { SubMeasureVO } from '@/types/subcontract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
@@ -301,14 +311,14 @@ const kpiActualPaid = computed(() =>
 )
 const kpiUnpaid = computed(() =>
   tableData.value
-    .filter((r) => r.payStatus === 'UNPAID' || r.payStatus === 'PARTIAL')
+    .filter((r) => r.payStatus === PAY_STATUS_UNPAID || r.payStatus === PAY_STATUS_PARTIAL)
     .reduce((s, r) => s + (parseFloat(r.applyAmount) || 0), 0),
 )
 const kpiApprovedUnpaid = computed(() =>
   tableData.value
     .filter(
       (r) =>
-        r.approvalStatus === 'APPROVED' && (r.payStatus === 'UNPAID' || r.payStatus === 'PARTIAL'),
+        r.approvalStatus === APPROVAL_APPROVED && (r.payStatus === PAY_STATUS_UNPAID || r.payStatus === PAY_STATUS_PARTIAL),
     )
     .reduce((s, r) => s + (parseFloat(r.approvedAmount) || 0), 0),
 )
@@ -324,14 +334,14 @@ const statusBreakdown = computed(() => {
     label: PAY_STATUS_LABEL[k] ?? k,
     count: v,
     percent: kpiPct(v, max),
-    color: k === 'PAID' ? '#31c48d' : k === 'PARTIAL' ? '#f59e0b' : '#94a3b8',
+    color: k === PAY_STATUS_PAID ? '#31c48d' : k === PAY_STATUS_PARTIAL ? '#f59e0b' : '#94a3b8',
   }))
 })
 
 const approvalBreakdown = computed(() => {
   const m: Record<string, number> = {}
   tableData.value.forEach((r) => {
-    m[r.approvalStatus || 'DRAFT'] = (m[r.approvalStatus || 'DRAFT'] || 0) + 1
+    m[r.approvalStatus || APPROVAL_DRAFT] = (m[r.approvalStatus || APPROVAL_DRAFT] || 0) + 1
   })
   const max = Math.max(total.value, tableData.value.length, 1)
   const colors: Record<string, string> = {
@@ -351,7 +361,7 @@ const approvalBreakdown = computed(() => {
 
 const pendingPayments = computed(() =>
   tableData.value
-    .filter((r) => r.approvalStatus === 'APPROVED' && r.payStatus !== 'PAID')
+    .filter((r) => r.approvalStatus === APPROVAL_APPROVED && r.payStatus !== PAY_STATUS_PAID)
     .map((row) => ({
       id: row.id,
       project: row.projectName || '-',
@@ -621,13 +631,13 @@ onMounted(() => {
                     <a-menu>
                       <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                       <a-menu-item
-                        v-if="row.approvalStatus === 'DRAFT'"
+                        v-if="row.approvalStatus === APPROVAL_DRAFT"
                         @click="handleApproval(row)"
                       >
                         提交审批
                       </a-menu-item>
                       <a-menu-item
-                        v-if="row.approvalStatus === 'APPROVED' && row.payStatus !== 'PAID'"
+                        v-if="row.approvalStatus === APPROVAL_APPROVED && row.payStatus !== PAY_STATUS_PAID"
                         @click="openWriteback(row)"
                       >
                         付款回写

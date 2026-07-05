@@ -28,6 +28,10 @@ import type { VarOrderVO, VarOrderItemVO } from '@/types/variation'
 import type { ContractItem } from '@/types/contract'
 import type { CostSubjectTreeNode } from '@/types/costSubject'
 import { ColumnSettingsButton } from '@/components/list-page'
+
+// 字典常量 - 审批状态
+const APPROVAL_DRAFT = 'DRAFT'
+const APPROVAL_APPROVED = 'APPROVED'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const filter = reactive({
@@ -431,8 +435,8 @@ const itemsTotalAmount = computed(() =>
 
 const variationStats = computed(() => ({
   total: total.value,
-  draft: tableData.value.filter((item) => item.approvalStatus === 'DRAFT').length,
-  approved: tableData.value.filter((item) => item.approvalStatus === 'APPROVED').length,
+  draft: tableData.value.filter((item) => item.approvalStatus === APPROVAL_DRAFT).length,
+  approved: tableData.value.filter((item) => item.approvalStatus === APPROVAL_APPROVED).length,
   cost: tableData.value.filter((item) => item.direction === 'COST').length,
 }))
 
@@ -644,7 +648,7 @@ onUnmounted(() => {
                   <a-button type="link" size="small" @click="handleView(row)">查看</a-button>
                   <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>
                   <a-button
-                    v-if="row.approvalStatus === 'DRAFT'"
+                    v-if="row.approvalStatus === APPROVAL_DRAFT"
                     type="link"
                     size="small"
                     @click="handleSubmitApproval(row)"
@@ -708,7 +712,7 @@ onUnmounted(() => {
                   <template #overlay>
                     <a-menu>
                       <a-menu-item
-                        v-if="row.approvalStatus === 'DRAFT'"
+                        v-if="row.approvalStatus === APPROVAL_DRAFT"
                         @click="handleSubmitApproval(row)"
                       >
                         提交审批

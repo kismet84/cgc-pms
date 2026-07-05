@@ -18,7 +18,25 @@ import {
   getWorkflowBusinessEntryPath,
   getWorkflowBusinessTypeLabel,
   getWorkflowInstanceStatusMeta,
+  WF_INSTANCE_RUNNING,
+  WF_INSTANCE_APPROVED,
+  WF_INSTANCE_REJECTED,
+  WF_INSTANCE_WITHDRAWN,
+  WF_INSTANCE_VOIDED,
 } from './workflowDisplay'
+
+// 字典常量 - 工作流节点状态
+const WF_NODE_WAITING = 'WAITING'
+const WF_NODE_ACTIVE = 'ACTIVE'
+const WF_NODE_COMPLETED = 'COMPLETED'
+const WF_NODE_REJECTED = 'REJECTED'
+const WF_NODE_SKIPPED = 'SKIPPED'
+
+// 字典常量 - 工作流任务状态
+const WF_TASK_PENDING = 'PENDING'
+const WF_TASK_APPROVED = 'APPROVED'
+const WF_TASK_REJECTED = 'REJECTED'
+const WF_TASK_CANCELLED = 'CANCELLED'
 
 const route = useRoute()
 const router = useRouter()
@@ -74,7 +92,7 @@ const availableActions = computed(() =>
 const nodes = computed(() => (Array.isArray(detail.value?.nodes) ? detail.value.nodes : []))
 const records = computed(() => (Array.isArray(detail.value?.records) ? detail.value.records : []))
 const completedNodeCount = computed(
-  () => nodes.value.filter((node) => node.nodeStatus === 'COMPLETED').length,
+  () => nodes.value.filter((node) => node.nodeStatus === WF_NODE_COMPLETED).length,
 )
 
 function displayText(value: unknown): string {
@@ -155,9 +173,9 @@ function handleAction(action: string) {
 async function handleApprove() {
   actionLoading.value = true
   try {
-    const activeNode = nodes.value.find((n) => n.nodeStatus === 'ACTIVE')
+    const activeNode = nodes.value.find((n) => n.nodeStatus === WF_NODE_ACTIVE)
     const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
-    const myTask = tasks.find((t) => t.taskStatus === 'PENDING')
+    const myTask = tasks.find((t) => t.taskStatus === WF_TASK_PENDING)
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -186,9 +204,9 @@ async function handleReject() {
   }
   actionLoading.value = true
   try {
-    const activeNode = nodes.value.find((n) => n.nodeStatus === 'ACTIVE')
+    const activeNode = nodes.value.find((n) => n.nodeStatus === WF_NODE_ACTIVE)
     const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
-    const myTask = tasks.find((t) => t.taskStatus === 'PENDING')
+    const myTask = tasks.find((t) => t.taskStatus === WF_TASK_PENDING)
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -217,9 +235,9 @@ async function handleTransfer() {
   }
   actionLoading.value = true
   try {
-    const activeNode = nodes.value.find((n) => n.nodeStatus === 'ACTIVE')
+    const activeNode = nodes.value.find((n) => n.nodeStatus === WF_NODE_ACTIVE)
     const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
-    const myTask = tasks.find((t) => t.taskStatus === 'PENDING')
+    const myTask = tasks.find((t) => t.taskStatus === WF_TASK_PENDING)
     if (!myTask) {
       message.error('未找到待处理任务')
       return
@@ -248,9 +266,9 @@ async function handleAddSign() {
   }
   actionLoading.value = true
   try {
-    const activeNode = nodes.value.find((n) => n.nodeStatus === 'ACTIVE')
+    const activeNode = nodes.value.find((n) => n.nodeStatus === WF_NODE_ACTIVE)
     const tasks = Array.isArray(activeNode?.tasks) ? activeNode.tasks : []
-    const myTask = tasks.find((t) => t.taskStatus === 'PENDING')
+    const myTask = tasks.find((t) => t.taskStatus === WF_TASK_PENDING)
     if (!myTask) {
       message.error('未找到待处理任务')
       return

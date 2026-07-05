@@ -1,5 +1,7 @@
 package com.cgcpms.workflow;
 
+import com.cgcpms.system.dict.util.DictUtils;
+
 /**
  * Workflow constants.
  */
@@ -57,4 +59,34 @@ public final class WorkflowConstants {
 
     // Idempotency expiry (hours)
     public static final int IDEMPOTENCY_EXPIRE_HOURS = 24;
+
+    // ── 字典查询方法 ──
+
+    /**
+     * 获取工作流实例状态标签
+     */
+    public static String getInstanceStatusLabel(String value) {
+        return DictUtils.getLabelByValue("wf_instance_status", value);
+    }
+
+    /**
+     * 获取工作流任务状态标签
+     */
+    public static String getTaskStatusLabel(String value) {
+        return DictUtils.getLabelByValue("wf_task_status", value);
+    }
+
+    /**
+     * 获取工作流节点状态标签
+     */
+    public static String getNodeStatusLabel(String value) {
+        return DictUtils.getLabelByValue("wf_node_status", value);
+    }
+
+    /**
+     * 获取审批模式标签
+     */
+    public static String getApproveModeLabel(String value) {
+        return DictUtils.getLabelByValue("approve_mode", value);
+    }
 }

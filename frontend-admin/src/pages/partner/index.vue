@@ -26,6 +26,10 @@ import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { normalizeArray } from '@/utils/normalizeArray'
 
+// 字典常量
+const STATUS_ENABLE = 'ENABLE'
+const STATUS_DISABLE = 'DISABLE'
+
 const filter = reactive({
   partnerCode: '',
   partnerName: '',
@@ -59,7 +63,7 @@ const formData = reactive<Partial<PartnerVO>>({
   qualificationLevel: '',
   blacklistFlag: false,
   riskLevel: undefined as string | undefined,
-  status: 'ENABLE',
+  status: STATUS_ENABLE,
 })
 
 const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([
@@ -142,7 +146,7 @@ const partnerStats = computed(() => ({
   total: total.value,
   partyA: tableData.value.filter((item) => item.partnerType === 'PARTY_A').length,
   partyB: tableData.value.filter((item) => item.partnerType === 'PARTY_B').length,
-  enabled: tableData.value.filter((item) => item.status === 'ENABLE').length,
+  enabled: tableData.value.filter((item) => item.status === STATUS_ENABLE).length,
   risk: tableData.value.filter((item) => item.riskLevel === 'HIGH' || item.blacklistFlag).length,
 }))
 
@@ -159,15 +163,15 @@ const recentPartners = computed(() => tableData.value.slice(0, 4))
 
 const partnerStatusSummary = computed(() => [
   {
-    key: 'ENABLE',
+    key: STATUS_ENABLE,
     label: '启用',
-    count: tableData.value.filter((item) => item.status === 'ENABLE').length,
+    count: tableData.value.filter((item) => item.status === STATUS_ENABLE).length,
     color: '#31c48d',
   },
   {
-    key: 'DISABLE',
+    key: STATUS_DISABLE,
     label: '禁用',
-    count: tableData.value.filter((item) => item.status === 'DISABLE').length,
+    count: tableData.value.filter((item) => item.status === STATUS_DISABLE).length,
     color: '#94a3b8',
   },
 ])
@@ -241,7 +245,7 @@ function handleAdd() {
     qualificationLevel: '',
     blacklistFlag: false,
     riskLevel: undefined,
-    status: 'ENABLE',
+    status: STATUS_ENABLE,
   })
   modalVisible.value = true
 }
@@ -276,7 +280,7 @@ function handleEdit(record: PartnerVO) {
     qualificationLevel: record.qualificationLevel || '',
     blacklistFlag: record.blacklistFlag,
     riskLevel: record.riskLevel || undefined,
-    status: record.status || 'ENABLE',
+    status: record.status || STATUS_ENABLE,
   })
   modalVisible.value = true
 }
@@ -455,8 +459,8 @@ onMounted(() => {
                 </a-tag>
               </template>
               <template #status="{ row }">
-                <a-tag :color="row.status === 'ENABLE' ? 'success' : 'default'">
-                  {{ row.status === 'ENABLE' ? '启用' : '禁用' }}
+                <a-tag :color="row.status === STATUS_ENABLE ? 'success' : 'default'">
+                  {{ row.status === STATUS_ENABLE ? '启用' : '禁用' }}
                 </a-tag>
               </template>
               <template #ops="{ row }">
@@ -645,8 +649,8 @@ onMounted(() => {
             </a-tag>
           </a-descriptions-item>
           <a-descriptions-item label="状态">
-            <a-tag :color="detailPartner.status === 'ENABLE' ? 'success' : 'default'">
-              {{ detailPartner.status === 'ENABLE' ? '启用' : '禁用' }}
+            <a-tag :color="detailPartner.status === STATUS_ENABLE ? 'success' : 'default'">
+              {{ detailPartner.status === STATUS_ENABLE ? '启用' : '禁用' }}
             </a-tag>
           </a-descriptions-item>
           <a-descriptions-item label="统一信用代码">
