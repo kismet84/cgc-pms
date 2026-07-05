@@ -3,6 +3,7 @@ package com.cgcpms.alert.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.alert.dto.AlertBatchReadRequest;
 import com.cgcpms.alert.dto.AlertBatchStatusUpdateRequest;
+import com.cgcpms.alert.dto.AlertOperationResponse;
 import com.cgcpms.alert.dto.AlertStatusUpdateRequest;
 import com.cgcpms.alert.dto.AlertSubscriptionUpdateRequest;
 import com.cgcpms.alert.entity.AlertLog;
@@ -19,7 +20,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -54,13 +54,10 @@ public class AlertController {
     @PutMapping("/{id}/read")
     @AuditedOperation(type = "UPDATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String, Object>> markRead(@PathVariable Long id) {
+    public ApiResponse<AlertOperationResponse> markRead(@PathVariable Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
         boolean ok = alertEvaluationService.markRead(tenantId, id);
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", ok);
-        result.put("alertId", id);
-        return ApiResponse.success(result);
+        return ApiResponse.success(new AlertOperationResponse(ok, id));
     }
 
     @PutMapping("/batch/read")
@@ -75,17 +72,13 @@ public class AlertController {
     @PutMapping("/{id}/status")
     @AuditedOperation(type = "UPDATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String, Object>> updateStatus(
+    public ApiResponse<AlertOperationResponse> updateStatus(
             @PathVariable Long id,
             @Valid @RequestBody AlertStatusUpdateRequest request) {
         Long tenantId = UserContext.getCurrentTenantId();
         boolean ok = alertEvaluationService.updateStatus(tenantId, id,
                 request.getProcessStatus(), request.getStatusRemark());
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", ok);
-        result.put("alertId", id);
-        result.put("processStatus", request.getProcessStatus());
-        return ApiResponse.success(result);
+        return ApiResponse.success(new AlertOperationResponse(ok, id, request.getProcessStatus()));
     }
 
     @PutMapping("/batch/status")
@@ -112,11 +105,11 @@ public class AlertController {
     @AuditedOperation(type = "UPDATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> updateSubscription(
-            @RequestBody Map<String, Object> request) {
+            @RequestBody AlertSubscriptionUpdateRequest request) {
         Long tenantId = UserContext.getCurrentTenantId();
         Long userId = UserContext.getCurrentUserId();
         return ApiResponse.success(alertSubscriptionService.updateCurrentUserSubscription(
-                tenantId, userId, UserContext.getCurrentRoles(), request));
+                tenantId, userId, UserContext.getCurrentRoles(), request.getSubscription()));
     }
 
     @PostMapping("/batch-evaluate")
@@ -125,9 +118,6 @@ public class AlertController {
     public ApiResponse<Map<String, Object>> batchEvaluate() {
         Long tenantId = UserContext.getCurrentTenantId();
         int count = alertEvaluationService.batchEvaluate(tenantId);
-        Map<String, Object> result = new HashMap<>();
-        result.put("alertsGenerated", count);
-        result.put("tenantId", tenantId);
-        return ApiResponse.success(result);
+        return ApiResponse.success(Map.of("alertsGenerated", count, "tenantId", tenantId));
     }
 }
