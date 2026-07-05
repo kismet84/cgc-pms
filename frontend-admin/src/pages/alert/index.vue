@@ -1313,7 +1313,11 @@ onMounted(async () => {
 }
 
 .alert-pagination {
-  padding: 16px 18px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 18px;
 }
 
 .alert-link,

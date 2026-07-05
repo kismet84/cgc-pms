@@ -61,9 +61,15 @@ import BasicLayout from '@/layouts/BasicLayoutAsync.vue'
 // ── Custom stubs for Ant Design components that need click handling ──
 const ADropdownStub = defineComponent({
   name: 'ADropdownStub',
-  setup(_, { slots }) {
+  props: {
+    trigger: {
+      type: Array,
+      default: () => [],
+    },
+  },
+  setup(props, { slots }) {
     return () =>
-      h('div', { class: 'stub-dropdown' }, [
+      h('div', { class: 'stub-dropdown', 'data-trigger': props.trigger.join(',') }, [
         h('div', { class: 'stub-dropdown-default' }, slots.default?.()),
         h('div', { class: 'stub-dropdown-overlay' }, slots.overlay?.()),
       ])
@@ -169,5 +175,11 @@ describe('BasicLayout click handlers', () => {
     logoutItem!.trigger('click')
 
     expect(mockPush).toHaveBeenCalledWith('/login')
+  })
+
+  it('uses click trigger for the sidebar user dropdown', () => {
+    const wrapper = createWrapper()
+
+    expect(wrapper.find('.stub-dropdown').attributes('data-trigger')).toBe('click')
   })
 })

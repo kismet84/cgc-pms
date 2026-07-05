@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { defineComponent, h, type PropType } from 'vue'
+import { defineComponent, h, useAttrs, useSlots, type PropType } from 'vue'
 import SidebarMenu from '@/layouts/components/SidebarMenu.vue'
 
 type MenuItem = {
@@ -12,7 +12,6 @@ type MenuItem = {
 const mockPush = vi.fn()
 const mockRoles = vi.hoisted(() => ({ value: ['ADMIN'] as string[] }))
 const mockPath = vi.hoisted(() => ({ value: '/dashboard' }))
-let renderedMenuItems: MenuItem[] = []
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -37,32 +36,13 @@ vi.mock('@/stores/user', () => ({
 const AMenuStub = defineComponent({
   name: 'AMenuStub',
   props: {
-    items: {
-      type: Array as PropType<MenuItem[]>,
-      default: () => [],
-    },
     openKeys: {
       type: Array as PropType<string[]>,
       default: () => [],
     },
   },
   emits: ['click'],
-  setup(props, { emit }) {
-    renderedMenuItems = props.items as MenuItem[]
-    const renderItems = (items: MenuItem[]) =>
-      items.flatMap((item) => [
-        h(
-          'button',
-          {
-            type: 'button',
-            'data-menu-key': item.key,
-            onClick: () => emit('click', { key: item.key }),
-          },
-          item.label,
-        ),
-        ...(item.children ? renderItems(item.children) : []),
-      ])
-
+  setup(props, { emit, slots }) {
     return () =>
       h(
         'nav',
@@ -70,8 +50,40 @@ const AMenuStub = defineComponent({
           class: 'menu-stub',
           'data-open-keys': props.openKeys.join(','),
         },
-        renderItems(props.items),
+        h(
+          'div',
+          {
+            onClick: (event: Event) => {
+              const target = event.target as HTMLElement | null
+              const key = target?.closest('[data-menu-key]')?.getAttribute('data-menu-key')
+              if (key) emit('click', { key })
+            },
+          },
+          slots.default?.(),
+        ),
       )
+  },
+})
+
+const ASubMenuStub = defineComponent({
+  name: 'ASubMenuStub',
+  setup() {
+    const attrs = useAttrs()
+    const slots = useSlots()
+    return () =>
+      h('section', { class: 'submenu-stub', ...attrs }, [
+        h('div', { class: 'submenu-title-stub' }, slots.title?.()),
+        h('div', { class: 'submenu-content-stub' }, slots.default?.()),
+      ])
+  },
+})
+
+const AMenuItemStub = defineComponent({
+  name: 'AMenuItemStub',
+  setup() {
+    const attrs = useAttrs()
+    const slots = useSlots()
+    return () => h('div', { class: 'menu-item-stub', ...attrs }, slots.default?.())
   },
 })
 
@@ -80,16 +92,24 @@ function mountMenu() {
     global: {
       stubs: {
         'a-menu': AMenuStub,
+        'a-sub-menu': ASubMenuStub,
+        'a-menu-item': AMenuItemStub,
       },
     },
   })
+}
+
+function findSubmenuLabels(wrapper: ReturnType<typeof mount>, key: string) {
+  return wrapper
+    .find(`[data-submenu-key="${key}"]`)
+    .findAll('[data-menu-key]')
+    .map((node) => node.text())
 }
 
 describe('SidebarMenu', () => {
   beforeEach(() => {
     mockRoles.value = ['ADMIN']
     mockPath.value = '/dashboard'
-    renderedMenuItems = []
     mockPush.mockClear()
   })
 
@@ -106,7 +126,7 @@ describe('SidebarMenu', () => {
   it('groups root menu items by business domains', () => {
     const wrapper = mountMenu()
 
-    expect(renderedMenuItems.map((item) => item.label)).toEqual([
+    expect(wrapper.findAll('[data-menu-title-key]').map((node) => node.text().trim())).toEqual([
       '工作台',
       '项目经营',
       '采购库存',
@@ -134,16 +154,14 @@ describe('SidebarMenu', () => {
   it('places cost subject and target cost under the new domains', () => {
     const wrapper = mountMenu()
 
-    const masterData = renderedMenuItems.find((item) => item.label === '基础资料')
-    expect(masterData?.children?.map((item) => item.label)).toEqual([
+    expect(findSubmenuLabels(wrapper, '/master-data')).toEqual([
       '合作方管理',
       '组织架构',
       '材料字典',
       '成本科目',
     ])
 
-    const projectOperations = renderedMenuItems.find((item) => item.label === '项目经营')
-    expect(projectOperations?.children?.map((item) => item.label)).toEqual([
+    expect(findSubmenuLabels(wrapper, '/project-operations')).toEqual([
       '项目列表',
       '合同台账',
       '签证变更',
@@ -157,20 +175,15 @@ describe('SidebarMenu', () => {
   })
 
   it('places payment, invoice and workflow menus under the approved domains', () => {
-    mountMenu()
+    const wrapper = mountMenu()
 
-    const settlement = renderedMenuItems.find((item) => item.label === '结算收付')
-    expect(settlement?.children?.map((item) => item.label)).toEqual([
+    expect(findSubmenuLabels(wrapper, '/settlement-domain')).toEqual([
       '结算台账',
       '付款申请',
       '发票管理',
     ])
 
-    const workflow = renderedMenuItems.find((item) => item.label === '流程与系统')
-    expect(workflow?.children?.map((item) => item.label)).toEqual([
-      '我的已办',
-      '抄送我的',
-      '我发起',
+    expect(findSubmenuLabels(wrapper, '/workflow-system')).toEqual([
       '审批流程',
       '用户管理',
       '角色管理',
@@ -178,6 +191,15 @@ describe('SidebarMenu', () => {
       '字典管理',
       '数据管理',
     ])
+  })
+
+  it('navigates to the first visible child when a root section title is clicked', async () => {
+    const wrapper = mountMenu()
+
+    await wrapper.find('[data-menu-title-key="/workflow-system"]').trigger('click')
+
+    expect(mockPush).toHaveBeenCalledTimes(1)
+    expect(mockPush).toHaveBeenCalledWith('/approval/process')
   })
 
   it('shows workflow admin menus only to administrators', () => {

@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
               >通知中心</span
             >
           </span>
-          <a-dropdown>
+          <a-dropdown :trigger="['click']">
             <div class="sidebar-user" :class="{ 'sidebar-user--collapsed': collapsed }">
               <a-avatar :size="32" class="user-avatar">
                 {{ userInfo?.realName?.[0] || '●' }}

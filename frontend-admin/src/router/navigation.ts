@@ -94,9 +94,6 @@ export const navigationItems: NavigationItem[] = [
       '/system',
     ],
     children: [
-      { key: '/approval/done', label: '我的已办' },
-      { key: '/approval/cc', label: '抄送我的' },
-      { key: '/approval/mine', label: '我发起' },
       { key: '/approval/process', label: '审批流程', adminOnly: true },
       { key: '/system/users', label: '用户管理', adminOnly: true },
       { key: '/system/roles', label: '角色管理', adminOnly: true },
