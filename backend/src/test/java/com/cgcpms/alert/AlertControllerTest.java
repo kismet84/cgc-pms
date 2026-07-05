@@ -154,11 +154,13 @@ class AlertControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "enabled": true,
-                                  "channels": ["IN_APP", "EMAIL"],
-                                  "domains": ["CONTRACT", "PURCHASE"],
-                                  "minSeverity": "HIGH",
-                                  "notifyOnStatusChanged": false
+                                  "subscription": {
+                                    "enabled": true,
+                                    "channels": ["IN_APP", "EMAIL"],
+                                    "domains": ["CONTRACT", "PURCHASE"],
+                                    "minSeverity": "HIGH",
+                                    "notifyOnStatusChanged": false
+                                  }
                                 }
                                 """))
                 .andExpect(status().isOk())

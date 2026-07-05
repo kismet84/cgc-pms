@@ -330,6 +330,8 @@ public class CtContractService {
             contract.setPaidAmount(existing.getPaidAmount());
             contract.setCreatedBy(existing.getCreatedBy());
             contract.setCreatedAt(existing.getCreatedAt());
+            // @Version 不会在 selectById 时自动填充，需手动复制以确保 MyBatis-Plus
+            // 在 UPDATE WHERE 中携带正确版本号实现乐观锁
             contract.setVersion(existing.getVersion());
             ctContractMapper.updateById(contract);
         }
