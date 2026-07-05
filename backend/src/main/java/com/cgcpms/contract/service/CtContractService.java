@@ -191,10 +191,24 @@ public class CtContractService {
 
         validateContractParties(contract);
 
+        // 校验合同状态：仅允许在有效状态集合内修改
+        if (contract.getContractStatus() != null
+                && !Set.of(ContractStatusConstants.STATUS_DRAFT,
+                           ContractStatusConstants.STATUS_PERFORMING,
+                           ContractStatusConstants.STATUS_SETTLED,
+                           ContractStatusConstants.STATUS_TERMINATED)
+                        .contains(contract.getContractStatus())) {
+            throw new BusinessException("CONTRACT_STATUS_INVALID", "合同状态不合法");
+        }
+
+        // 乐观锁：携带现有版本号，更新时自动校验
+        contract.setVersion(existing.getVersion());
+
         // 使用字段白名单更新，禁止通过 update 接口覆盖受保护字段
         ctContractMapper.update(null,
                 new LambdaUpdateWrapper<CtContract>()
                         .eq(CtContract::getId, contract.getId())
+                        .eq(CtContract::getVersion, existing.getVersion())
                         .set(CtContract::getContractName, contract.getContractName())
                         .set(CtContract::getContractType, contract.getContractType())
                         .set(CtContract::getProjectId, contract.getProjectId())
@@ -213,6 +227,7 @@ public class CtContractService {
                         .set(CtContract::getSettlementMethod, contract.getSettlementMethod())
                         .set(CtContract::getContractStatus, contract.getContractStatus())
                         .set(CtContract::getRemark, contract.getRemark())
+                        .set(CtContract::getVersion, existing.getVersion() + 1)
         );
     }
 
@@ -233,10 +248,12 @@ public class CtContractService {
         if (contract.getContractCode() == null || contract.getContractCode().isBlank())
             throw new BusinessException("CONTRACT_NO_CODE", "合同编号不能为空，无法提交审批");
 
-        // 更新审批状态为审批中
+        // 更新审批状态为审批中（携带版本号乐观锁）
         LambdaUpdateWrapper<CtContract> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(CtContract::getId, contractId)
-                .set(CtContract::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING);
+                .eq(CtContract::getVersion, contract.getVersion())
+                .set(CtContract::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING)
+                .set(CtContract::getVersion, contract.getVersion() + 1);
         ctContractMapper.update(null, updateWrapper);
 
         // 调用审批引擎
@@ -313,6 +330,7 @@ public class CtContractService {
             contract.setPaidAmount(existing.getPaidAmount());
             contract.setCreatedBy(existing.getCreatedBy());
             contract.setCreatedAt(existing.getCreatedAt());
+            contract.setVersion(existing.getVersion());
             ctContractMapper.updateById(contract);
         }
 

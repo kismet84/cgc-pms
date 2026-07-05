@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UserInfo } from '@/types/user'
 import { logout as authLogout } from '@/api/modules/auth'
+import { useReferenceStore } from './reference'
 
 const USER_INFO_KEY = 'cgc_pms_userinfo'
 type PersistedUserInfo = Pick<UserInfo, 'userId' | 'username' | 'roles' | 'permissions' | 'roleName'>
@@ -26,6 +27,16 @@ export const useUserStore = defineStore('user', () => {
     authLogout() // fire-and-forget — always clear local state regardless of API result
     userInfo.value = null
     clearUserInfo()
+    // 清除参考数据localStorage缓存，防止登出后残留
+    try {
+      const referenceStore = useReferenceStore()
+      referenceStore.invalidateProjects()
+      referenceStore.invalidateContracts()
+      referenceStore.invalidatePartners()
+      referenceStore.invalidateMaterials()
+    } catch {
+      // reference store may not be initialized
+    }
   }
 
   return {

@@ -51,6 +51,6 @@ describe('CostLedger production guards', () => {
   })
 
   it('keeps contract option loading non-blocking for main data requests', () => {
-    expect(source).toMatch(/onMounted\(async \(\) => \{[\s\S]*void loadContractOptions\(filter\.projectId\)[\s\S]*fetchSubjectTree\(\)[\s\S]*fetchData\(\)[\s\S]*fetchSummary\(\)/)
+    expect(source).toMatch(/onMounted\(async \(\) => \{[\s\S]*void loadContractOptions\(filter\.projectId\)[\s\S]*void loadCostSubjectOptions\(\)[\s\S]*fetchData\(\)[\s\S]*fetchSummary\(\)/)
   })
 })

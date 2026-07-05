@@ -116,13 +116,13 @@ class MatStockControllerTest {
 
     @Test
     @Order(3)
-    @DisplayName("RED-3: GET /inventory/stock/ledger without materialId → 500 (MissingServletRequestParameterException)")
+    @DisplayName("RED-3: GET /inventory/stock/ledger without materialId → 400 (MissingServletRequestParameterException)")
     void testGetLedgerWithoutMaterialIdFails() throws Exception {
         mockMvc.perform(getWithApi("/inventory/stock/ledger")
                         .cookie(adminCookie())
                         .param("warehouseId", String.valueOf(WAREHOUSE_ID)))
-                .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("$.code").value("SYSTEM_ERROR"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     // ═══════════════════════════════════════════════════════════════

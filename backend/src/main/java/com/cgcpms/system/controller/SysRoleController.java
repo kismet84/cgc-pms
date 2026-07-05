@@ -1,6 +1,7 @@
 package com.cgcpms.system.controller;
 
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.system.dto.RoleMenuAssignRequest;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.service.SysRoleService;
 import com.cgcpms.system.vo.SysRoleVO;
@@ -10,7 +11,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/system/roles")
@@ -54,8 +54,9 @@ public class SysRoleController {
 
     @PutMapping("/{id}/menus")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:role:assign')")
-    public ApiResponse<Void> assignMenus(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
-        sysRoleService.assignMenus(id, body.get("menuIds"));
+    public ApiResponse<Void> assignMenus(@PathVariable Long id,
+                                         @Valid @RequestBody RoleMenuAssignRequest body) {
+        sysRoleService.assignMenus(id, body.getMenuIds());
         return ApiResponse.success();
     }
 }

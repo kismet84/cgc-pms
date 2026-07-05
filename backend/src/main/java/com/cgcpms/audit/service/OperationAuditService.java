@@ -27,7 +27,7 @@ public class OperationAuditService {
     }
 
     @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     @EventListener
     public void handleAuditEvent(OperationAuditEvent event) {
         try {

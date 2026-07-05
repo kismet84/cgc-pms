@@ -15,6 +15,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
+
+import java.util.Set;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -71,6 +73,15 @@ public class DevAuthController {
         throw new BusinessException("DEV_LOGIN_USER_REQUIRED", "缺少 dev login 用户名");
     }
 
+    private static final Set<String> ALLOWED_REDIRECT_PREFIXES = Set.of(
+            "/", "/dashboard", "/project", "/contract", "/cost", "/cost-target",
+            "/payment", "/settlement", "/partner", "/material", "/workflow",
+            "/system", "/approval", "/inventory", "/subcontract", "/variation",
+            "/receipt", "/invoice", "/revenue", "/overhead", "/accounting",
+            "/bid", "/notification", "/alert", "/profile", "/purchase",
+            "/org", "/ledger"
+    );
+
     private String normalizeRedirect(String redirect) {
         if (!StringUtils.hasText(redirect)) {
             return null;
@@ -79,7 +90,17 @@ public class DevAuthController {
         if (!target.startsWith("/") || target.startsWith("//")) {
             return "/";
         }
-        return target;
+        // 防止路径遍历
+        if (target.contains("..")) {
+            return "/";
+        }
+        // 白名单校验：路径必须匹配已注册的前端路由前缀
+        for (String prefix : ALLOWED_REDIRECT_PREFIXES) {
+            if (target.equals(prefix) || target.startsWith(prefix + "/") || target.startsWith(prefix + "?")) {
+                return target;
+            }
+        }
+        return "/";
     }
 
     private void setTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {

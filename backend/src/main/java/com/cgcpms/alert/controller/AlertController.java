@@ -1,21 +1,25 @@
 package com.cgcpms.alert.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cgcpms.alert.dto.AlertBatchReadRequest;
+import com.cgcpms.alert.dto.AlertBatchStatusUpdateRequest;
+import com.cgcpms.alert.dto.AlertStatusUpdateRequest;
+import com.cgcpms.alert.dto.AlertSubscriptionUpdateRequest;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.service.AlertEvaluationService;
 import com.cgcpms.alert.service.AlertSubscriptionService;
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -26,9 +30,6 @@ public class AlertController {
     private final AlertEvaluationService alertEvaluationService;
     private final AlertSubscriptionService alertSubscriptionService;
 
-    /**
-     * List alerts for the current tenant with backend pagination and filters.
-     */
     @GetMapping
     @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PageResult<AlertLog>> list(
@@ -50,10 +51,8 @@ public class AlertController {
         return ApiResponse.success(PageResult.of(page));
     }
 
-    /**
-     * Mark a single alert as read.
-     */
     @PutMapping("/{id}/read")
+    @AuditedOperation(type = "UPDATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> markRead(@PathVariable Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
@@ -65,35 +64,39 @@ public class AlertController {
     }
 
     @PutMapping("/batch/read")
+    @AuditedOperation(type = "UPDATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String, Object>> batchMarkRead(@RequestBody Map<String, Object> request) {
+    public ApiResponse<Map<String, Object>> batchMarkRead(
+            @Valid @RequestBody AlertBatchReadRequest request) {
         Long tenantId = UserContext.getCurrentTenantId();
-        return ApiResponse.success(alertEvaluationService.batchMarkRead(tenantId, alertIds(request)));
+        return ApiResponse.success(alertEvaluationService.batchMarkRead(tenantId, request.getAlertIds()));
     }
 
     @PutMapping("/{id}/status")
+    @AuditedOperation(type = "UPDATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String, Object>> updateStatus(@PathVariable Long id,
-                                                         @RequestBody Map<String, String> request) {
+    public ApiResponse<Map<String, Object>> updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody AlertStatusUpdateRequest request) {
         Long tenantId = UserContext.getCurrentTenantId();
-        String processStatus = request.get("processStatus");
-        String statusRemark = request.get("statusRemark");
-        boolean ok = alertEvaluationService.updateStatus(tenantId, id, processStatus, statusRemark);
+        boolean ok = alertEvaluationService.updateStatus(tenantId, id,
+                request.getProcessStatus(), request.getStatusRemark());
         Map<String, Object> result = new HashMap<>();
         result.put("success", ok);
         result.put("alertId", id);
-        result.put("processStatus", processStatus);
+        result.put("processStatus", request.getProcessStatus());
         return ApiResponse.success(result);
     }
 
     @PutMapping("/batch/status")
+    @AuditedOperation(type = "UPDATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String, Object>> batchUpdateStatus(@RequestBody Map<String, Object> request) {
+    public ApiResponse<Map<String, Object>> batchUpdateStatus(
+            @Valid @RequestBody AlertBatchStatusUpdateRequest request) {
         Long tenantId = UserContext.getCurrentTenantId();
-        String processStatus = stringValue(request.get("processStatus"));
-        String statusRemark = stringValue(request.get("statusRemark"));
         return ApiResponse.success(alertEvaluationService.batchUpdateStatus(
-                tenantId, alertIds(request), processStatus, statusRemark));
+                tenantId, request.getAlertIds(),
+                request.getProcessStatus(), request.getStatusRemark()));
     }
 
     @GetMapping("/subscription")
@@ -106,18 +109,18 @@ public class AlertController {
     }
 
     @PutMapping("/subscription")
+    @AuditedOperation(type = "UPDATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String, Object>> updateSubscription(@RequestBody Map<String, Object> request) {
+    public ApiResponse<Map<String, Object>> updateSubscription(
+            @RequestBody Map<String, Object> request) {
         Long tenantId = UserContext.getCurrentTenantId();
         Long userId = UserContext.getCurrentUserId();
         return ApiResponse.success(alertSubscriptionService.updateCurrentUserSubscription(
                 tenantId, userId, UserContext.getCurrentRoles(), request));
     }
 
-    /**
-     * Manually trigger batch evaluation for all active projects in the current tenant.
-     */
     @PostMapping("/batch-evaluate")
+    @AuditedOperation(type = "CREATE", businessType = "ALERT")
     @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> batchEvaluate() {
         Long tenantId = UserContext.getCurrentTenantId();
@@ -126,37 +129,5 @@ public class AlertController {
         result.put("alertsGenerated", count);
         result.put("tenantId", tenantId);
         return ApiResponse.success(result);
-    }
-
-    private List<Long> alertIds(Map<String, Object> request) {
-        Object value = request.get("alertIds");
-        if (value == null) {
-            value = request.get("ids");
-        }
-        if (!(value instanceof List<?> rawIds)) {
-            return List.of();
-        }
-        List<Long> ids = new ArrayList<>();
-        for (Object rawId : rawIds) {
-            Long id = toLong(rawId);
-            if (id != null) {
-                ids.add(id);
-            }
-        }
-        return ids;
-    }
-
-    private Long toLong(Object value) {
-        if (value instanceof Number number) {
-            return number.longValue();
-        }
-        if (value instanceof String text && !text.isBlank()) {
-            return Long.parseLong(text);
-        }
-        return null;
-    }
-
-    private String stringValue(Object value) {
-        return value == null ? null : String.valueOf(value);
     }
 }

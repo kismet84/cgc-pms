@@ -13,7 +13,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -99,13 +99,12 @@ public class OperationAuditAspect {
             return null;
         }
         try {
-            StandardEvaluationContext ctx = new StandardEvaluationContext();
+            SimpleEvaluationContext ctx = SimpleEvaluationContext.forReadOnlyDataBinding().build();
             Parameter[] params = method.getParameters();
             Object[] args = joinPoint.getArgs();
             for (int i = 0; i < params.length; i++) {
                 ctx.setVariable(params[i].getName(), args[i]);
             }
-            // Also expose all args by index
             ctx.setVariable("args", args);
             Object value = spelParser.parseExpression(expr).getValue(ctx);
             return value != null ? value.toString() : null;

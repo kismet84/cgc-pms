@@ -67,9 +67,6 @@ const targetModalTitle = computed(() => {
   if (targetModalMode.value === 'view') return '成本目标详情'
   return targetModalMode.value === 'edit' ? '编辑成本目标' : '新建成本目标'
 })
-const pageTitle = '成本目标'
-const pageSubtitle = '统一管理成本目标版本、审批状态与当前生效版本'
-
 // ---- Fetch data ----
 async function fetchData() {
   loading.value = true
@@ -283,10 +280,6 @@ onUnmounted(() => {
           <a-breadcrumb-item>成本管理</a-breadcrumb-item>
           <a-breadcrumb-item>成本目标</a-breadcrumb-item>
         </a-breadcrumb>
-        <div class="ct-page-meta-row">
-          <h1 class="ct-page-title">{{ pageTitle }}</h1>
-          <span class="ct-page-subtitle">{{ pageSubtitle }}</span>
-        </div>
       </div>
       <div class="ct-page-head-actions">
         <a-button aria-label="刷新成本目标" title="刷新成本目标" @click="fetchData">
@@ -644,26 +637,7 @@ onUnmounted(() => {
   gap: 6px;
   min-width: 0;
 }
-.ct-page-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
 .ct-breadcrumb {
-  font-size: 13px;
-  line-height: 20px;
-}
-.ct-page-title {
-  margin: 0;
-  color: var(--text);
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 34px;
-}
-.ct-page-subtitle {
-  color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
 }

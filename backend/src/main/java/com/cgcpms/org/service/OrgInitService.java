@@ -98,7 +98,7 @@ public class OrgInitService {
 
     // ── per-tenant backfill ───────────────────────────────────────
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void backfillTenant(Long tenantId) {
         OrgCompany rootCompany = getOrCreateRootCompany(tenantId);
         getOrCreateRootDepartment(tenantId, rootCompany.getId());

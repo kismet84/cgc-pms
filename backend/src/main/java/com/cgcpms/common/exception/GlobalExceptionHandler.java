@@ -12,10 +12,15 @@ import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -112,11 +117,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleConstraintViolation(ConstraintViolationException e) {
-        String message = e.getConstraintViolations().stream()
+        String detail = e.getConstraintViolations().stream()
                 .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
                 .collect(Collectors.joining("; "));
-        log.warn("参数校验失败: {}", message);
-        return ApiResponse.fail(VALIDATION_ERROR_CODE, "参数校验失败: " + message);
+        log.warn("参数校验失败: {}", detail);
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "参数校验失败");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -124,5 +129,40 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleDataIntegrity(DataIntegrityViolationException e) {
         log.error("数据完整性冲突", e);
         return ApiResponse.fail("DATA_CONFLICT", "数据冲突，请刷新后重试");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
+    public ApiResponse<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        log.warn("Method not supported: {}", e.getMessage());
+        return ApiResponse.fail("METHOD_NOT_ALLOWED", "请求方法不支持");
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleMissingServletRequestPart(MissingServletRequestPartException e) {
+        log.warn("Missing request part: {}", e.getMessage());
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "缺少必需的请求部分: " + e.getRequestPartName());
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleMissingParameter(MissingServletRequestParameterException e) {
+        log.warn("Missing parameter: {}", e.getMessage());
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "缺少必需的请求参数: " + e.getParameterName());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        log.warn("Type mismatch: {}", e.getMessage());
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "参数类型错误: " + e.getName());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        log.warn("Upload size exceeded: {}", e.getMessage());
+        return ApiResponse.fail("FILE_TOO_LARGE", "上传文件大小超出限制");
     }
 }

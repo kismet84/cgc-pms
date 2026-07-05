@@ -3,6 +3,7 @@ package com.cgcpms.contract.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -91,4 +92,7 @@ public class CtContract extends BaseEntity {
     private BigDecimal settlementAmount;
 
     private Integer costGeneratedFlag;
+
+    @Version
+    private Integer version;
 }

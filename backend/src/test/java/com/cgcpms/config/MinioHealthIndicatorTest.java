@@ -30,7 +30,7 @@ class MinioHealthIndicatorTest {
         Health health = indicator.health();
 
         assertEquals("UP", health.getStatus().getCode());
-        assertEquals("cgc-pms", health.getDetails().get("bucket"));
+        assertFalse(health.getDetails().containsKey("bucket"));
         verify(client).bucketExists(any(BucketExistsArgs.class));
     }
 
@@ -47,7 +47,7 @@ class MinioHealthIndicatorTest {
         Health health = indicator.health();
 
         assertEquals("DOWN", health.getStatus().getCode());
-        assertEquals("missing-bucket", health.getDetails().get("bucket"));
+        assertFalse(health.getDetails().containsKey("bucket"));
         assertEquals("Configured bucket does not exist", health.getDetails().get("reason"));
     }
 
@@ -78,7 +78,7 @@ class MinioHealthIndicatorTest {
         Health health = indicator.health();
 
         assertEquals("DOWN", health.getStatus().getCode());
-        assertEquals("RuntimeException: boom", health.getDetails().get("error"));
+        assertEquals("MinIO connection failed", health.getDetails().get("error"));
     }
 
     private ObjectProvider<MinioClient> provider(MinioClient client) {

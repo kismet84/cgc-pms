@@ -3,6 +3,7 @@ package com.cgcpms.invoice.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
@@ -77,9 +78,14 @@ public class InvoiceController {
         return ApiResponse.success(invoiceService.register(invoice));
     }
 
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
     @PostMapping("/recognize")
     @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<InvoiceRecognizeResultVO> recognize(@RequestParam MultipartFile file) {
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new BusinessException("FILE_TOO_LARGE", "发票文件大小不能超过10MB");
+        }
         return ApiResponse.success(invoiceService.recognize(file));
     }
 }

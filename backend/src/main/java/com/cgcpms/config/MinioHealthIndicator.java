@@ -43,17 +43,14 @@ public class MinioHealthIndicator implements HealthIndicator {
             boolean exists = client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
             if (!exists) {
                 return Health.down()
-                        .withDetail("bucket", bucket)
                         .withDetail("reason", "Configured bucket does not exist")
                         .build();
             }
-            return Health.up()
-                    .withDetail("bucket", bucket)
-                    .build();
+            return Health.up().build();
         } catch (Exception e) {
             log.warn("MinIO health check failed: {}", e.getMessage());
             return Health.down()
-                    .withDetail("error", e.getClass().getSimpleName() + ": " + e.getMessage())
+                    .withDetail("error", "MinIO connection failed")
                     .build();
         }
     }

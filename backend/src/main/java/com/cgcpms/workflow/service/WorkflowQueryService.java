@@ -77,14 +77,22 @@ public class WorkflowQueryService {
             return emptyPage(pageNo, pageSize);
         }
 
+        // 查询运行中的实例 ID（兼容 H2 和 MySQL）
+        Set<Long> runningInstanceIds = wfInstanceMapper.selectList(
+                new LambdaQueryWrapper<WfInstance>()
+                        .select(WfInstance::getId)
+                        .eq(WfInstance::getTenantId, tenantId)
+                        .eq(WfInstance::getInstanceStatus, WorkflowConstants.INSTANCE_RUNNING))
+                .stream().map(WfInstance::getId).collect(Collectors.toSet());
+        if (runningInstanceIds.isEmpty()) {
+            return emptyPage(pageNo, pageSize);
+        }
+
         LambdaQueryWrapper<WfTask> wrapper = new LambdaQueryWrapper<WfTask>()
                 .eq(WfTask::getTenantId, tenantId)
                 .eq(WfTask::getApproverId, userId)
                 .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
-                .inSql(WfTask::getInstanceId,
-                        "SELECT id FROM wf_instance WHERE deleted_flag = 0"
-                                + " AND tenant_id = " + tenantId
-                                + " AND instance_status = '" + WorkflowConstants.INSTANCE_RUNNING + "'");
+                .in(WfTask::getInstanceId, runningInstanceIds);
         if (normalizedBusinessType != null) {
             wrapper.eq(WfTask::getBusinessType, normalizedBusinessType);
         }

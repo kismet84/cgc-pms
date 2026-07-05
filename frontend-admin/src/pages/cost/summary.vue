@@ -23,8 +23,6 @@ type CheckStatus = 'overrun' | 'saving' | 'balanced'
 
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
-const pageTitle = '项目成本明细核对'
-const pageSubtitle = '按项目核对目标、合同锁定、实际、付款与动态成本来源'
 function onResize() {
   isMobile.value = window.innerWidth < MOBILE_BP
 }
@@ -309,10 +307,6 @@ onUnmounted(() => {
           <a-breadcrumb-item>成本管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目成本明细核对</a-breadcrumb-item>
         </a-breadcrumb>
-        <div class="cost-summary-meta-row">
-          <h1 class="cost-summary-page-title">{{ pageTitle }}</h1>
-          <span class="cost-summary-subtitle">{{ pageSubtitle }}</span>
-        </div>
       </div>
       <div class="cost-summary-head-actions">
         <a-button :disabled="!selectedProjectId" @click="handleRefresh" aria-label="重新计算动态成本">
@@ -619,28 +613,6 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-}
-
-.cost-summary-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.cost-summary-page-title {
-  margin: 0;
-  color: var(--text);
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 34px;
-}
-
-.cost-summary-subtitle {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  line-height: 20px;
 }
 
 .cost-summary-head-actions {

@@ -1,6 +1,7 @@
 package com.cgcpms.alert.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.alert.auth.AlertAccessScopeResolver;
@@ -193,14 +194,16 @@ public class AlertEvaluationService {
         // Rule 9: 采购交期逾期
         alerts.addAll(evaluatePurchaseDeliveryOverdue(tenantId, projectId, ruleConfigs));
 
-        // Persist
-        for (AlertLog alert : alerts) {
-            alertLogMapper.insert(alert);
-            try {
-                createAlertNotification(tenantId, projectId, alert);
-            } catch (Exception e) {
-                log.warn("Failed to create notification for alert id={}, ruleType={}: {}",
-                        alert.getId(), alert.getRuleType(), e.getMessage());
+        // Persist — 批量插入减少数据库往返
+        if (!alerts.isEmpty()) {
+            com.baomidou.mybatisplus.extension.toolkit.Db.saveBatch(alerts, 50);
+            for (AlertLog alert : alerts) {
+                try {
+                    createAlertNotification(tenantId, projectId, alert);
+                } catch (Exception e) {
+                    log.warn("Failed to create notification for alert id={}, ruleType={}: {}",
+                            alert.getId(), alert.getRuleType(), e.getMessage());
+                }
             }
         }
         if (!alerts.isEmpty()) {
@@ -889,7 +892,44 @@ public class AlertEvaluationService {
     }
 
     public Map<String, Object> batchMarkRead(Long tenantId, List<Long> alertIds) {
-        return batch(alertIds, alertId -> markRead(tenantId, alertId));
+        List<Long> ids = alertIds == null ? List.of() : alertIds;
+        if (ids.isEmpty()) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("total", 0);
+            result.put("success", 0);
+            result.put("failed", 0);
+            result.put("successIds", List.of());
+            result.put("failures", List.of());
+            return result;
+        }
+        // 批量查询后逐条校验租户归属 + 访问权限范围
+        List<AlertLog> alerts = alertLogMapper.selectBatchIds(ids);
+        Map<Long, AlertLog> alertMap = alerts.stream()
+                .collect(java.util.stream.Collectors.toMap(AlertLog::getId, a -> a));
+        List<Long> successIds = new ArrayList<>();
+        List<Map<String, Object>> failures = new ArrayList<>();
+        for (Long id : ids) {
+            AlertLog alert = alertMap.get(id);
+            if (alert == null || !Objects.equals(alert.getTenantId(), tenantId)) {
+                failures.add(batchFailure(id, "预警不存在或不属于当前租户"));
+                continue;
+            }
+            try {
+                accessScopeResolver.assertAlertAccess(tenantId, alert);
+                alert.setIsRead(1);
+                alertLogMapper.updateById(alert);
+                successIds.add(id);
+            } catch (BusinessException e) {
+                failures.add(batchFailure(id, e.getMessage()));
+            }
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", ids.size());
+        result.put("success", successIds.size());
+        result.put("failed", failures.size());
+        result.put("successIds", successIds);
+        result.put("failures", failures);
+        return result;
     }
 
     public boolean updateStatus(Long tenantId, Long alertId, String processStatus, String statusRemark) {

@@ -12,9 +12,8 @@ import {
   SearchOutlined,
   AlertOutlined,
 } from '@ant-design/icons-vue'
-import type { TreeSelectProps } from 'ant-design-vue'
 import { getCostLedger, getCostLedgerSummary, getCostLedgerDetail } from '@/api/modules/cost'
-import { getCostSubjectTree } from '@/api/modules/costSubject'
+import { getCostSubjectList } from '@/api/modules/costSubject'
 import type {
   CostLedgerVO,
   CostLedgerQueryParams,
@@ -30,8 +29,6 @@ import { ColumnSettingsButton } from '@/components/list-page'
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
 const route = useRoute()
-const pageTitle = '成本列表'
-const pageSubtitle = '统一核对项目成本来源、金额与确认状态'
 function onResize() {
   isMobile.value = window.innerWidth < MOBILE_BP
 }
@@ -42,8 +39,16 @@ const { projects: projectList, contracts: contractList, partners: partnerList } 
   storeToRefs(referenceStore)
 
 // ---- Dropdown data ----
-const subjectTree = ref<TreeSelectProps['treeData']>([])
 const contractOptions = ref(contractList.value ?? [])
+const costSubjectOptions = ref<{ id: string; subjectName: string }[]>([])
+
+async function loadCostSubjectOptions() {
+  try {
+    costSubjectOptions.value = await getCostSubjectList()
+  } catch {
+    costSubjectOptions.value = []
+  }
+}
 
 // ---- Filter state ----
 const filter = reactive({
@@ -112,31 +117,6 @@ async function loadContractOptions(projectId?: string) {
     console.error(e)
     contractOptions.value = []
   }
-}
-
-async function fetchSubjectTree() {
-  try {
-    const data = await getCostSubjectTree()
-    subjectTree.value = convertToTreeData(data)
-  } catch (e: unknown) {
-    console.error(e)
-    subjectTree.value = []
-  }
-}
-
-interface TreeNode {
-  id: string
-  subjectCode: string
-  subjectName: string
-  children?: TreeNode[]
-}
-
-function convertToTreeData(nodes: unknown): TreeSelectProps['treeData'] {
-  return (Array.isArray(nodes) ? (nodes as TreeNode[]) : []).map((node) => ({
-    value: node.id,
-    title: `${node.subjectCode} ${node.subjectName}`,
-    children: node.children ? convertToTreeData(node.children) : undefined,
-  }))
 }
 
 async function onProjectChange(val: string | undefined) {
@@ -214,9 +194,6 @@ function handleReset() {
   filter.projectId = undefined
   filter.contractId = undefined
   filter.partnerId = undefined
-  filter.costSubjectId = undefined
-  filter.costType = undefined
-  filter.sourceType = undefined
   filter.costStatus = undefined
   filter.dateRange = null
   filter.keyword = ''
@@ -238,9 +215,7 @@ function handleShowSizeChange(_current: number, size: number) {
 
 function applyRouteQuery() {
   const projectId = route.query.projectId
-  const costSubjectId = route.query.costSubjectId
   filter.projectId = typeof projectId === 'string' ? projectId : undefined
-  filter.costSubjectId = typeof costSubjectId === 'string' ? costSubjectId : undefined
 }
 
 async function showDetail(record: CostLedgerVO) {
@@ -384,7 +359,7 @@ onMounted(async () => {
   referenceStore.fetchProjects()
   referenceStore.fetchPartners()
   void loadContractOptions(filter.projectId)
-  fetchSubjectTree()
+  void loadCostSubjectOptions()
   fetchData()
   fetchSummary()
 })
@@ -399,10 +374,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <a-breadcrumb-item>成本管理</a-breadcrumb-item>
           <a-breadcrumb-item>成本列表</a-breadcrumb-item>
         </a-breadcrumb>
-        <div class="cost-ledger-meta-row">
-          <h1 class="cost-ledger-page-title">{{ pageTitle }}</h1>
-          <span class="cost-ledger-subtitle">{{ pageSubtitle }}</span>
-        </div>
       </div>
       <div class="cost-ledger-head-actions">
         <a-button aria-label="刷新成本列表" title="刷新成本列表" @click="handleSearch">
@@ -460,16 +431,18 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             {{ partner.partnerName }}
           </a-select-option>
         </a-select>
-        <a-tree-select
+        <a-select
           v-model:value="filter.costSubjectId"
-          class="cost-ledger-query-select"
-          :tree-data="subjectTree"
           placeholder="成本科目"
           allow-clear
-          tree-default-expand-all
+          class="cost-ledger-query-select"
           size="large"
           @change="handleSearch"
-        />
+        >
+          <a-select-option v-for="subject in costSubjectOptions" :key="subject.id" :value="subject.id">
+            {{ subject.subjectName }}
+          </a-select-option>
+        </a-select>
         <a-select
           v-model:value="filter.costType"
           placeholder="成本类型"
@@ -478,9 +451,11 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           size="large"
           @change="handleSearch"
         >
-          <a-select-option v-for="(label, value) in COST_TYPE_LABEL" :key="value" :value="value">
-            {{ label }}
-          </a-select-option>
+          <a-select-option value="MATERIAL">材料费</a-select-option>
+          <a-select-option value="LABOR">人工费</a-select-option>
+          <a-select-option value="MACHINERY">机械费</a-select-option>
+          <a-select-option value="SUBCONTRACT">分包费</a-select-option>
+          <a-select-option value="OTHER">其他</a-select-option>
         </a-select>
         <a-select
           v-model:value="filter.sourceType"
@@ -490,9 +465,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           size="large"
           @change="handleSearch"
         >
-          <a-select-option v-for="(label, value) in SOURCE_TYPE_LABEL" :key="value" :value="value">
-            {{ label }}
-          </a-select-option>
+          <a-select-option value="PURCHASE_ORDER">采购单</a-select-option>
+          <a-select-option value="SUB_MEASURE">分包计量</a-select-option>
+          <a-select-option value="SETTLEMENT">结算单</a-select-option>
+          <a-select-option value="MANUAL">手工录入</a-select-option>
         </a-select>
         <a-select
           v-model:value="filter.costStatus"
@@ -869,29 +845,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   min-width: 0;
 }
 
-.cost-ledger-meta-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
 .cl-breadcrumb {
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.cost-ledger-page-title {
-  margin: 0;
-  color: var(--text);
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 34px;
-}
-
-.cost-ledger-subtitle {
-  color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
 }
@@ -946,6 +900,20 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   gap: 8px;
 }
 
+.cost-ledger-grid {
+  align-items: stretch;
+  min-height: 0;
+  height: calc(100vh - 174px);
+}
+
+.cost-ledger-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
 .cost-ledger-table-panel {
   display: flex;
   flex: 1;
@@ -975,11 +943,14 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .cost-ledger-table-wrap {
   flex: 1 1 auto;
   min-height: 0;
-  min-height: 520px;
 }
 
 .cost-ledger-table-panel > .lg-pagination {
   flex: 0 0 auto;
+}
+
+.cost-ledger-table-wrap :deep(.vxe-grid) {
+  height: 100%;
 }
 
 .cost-ledger-mobile-list {
@@ -1153,12 +1124,14 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
 .cost-ledger-analysis-rail {
   width: 336px;
+  min-height: 0;
 }
 
 .cost-ledger-analysis-panel {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-height: 0;
   height: 100%;
   padding: 18px;
   background: var(--surface);

@@ -2,6 +2,7 @@ package com.cgcpms.workflow.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.workflow.dto.WorkflowActionRequest;
@@ -35,6 +36,7 @@ public class WorkflowController {
     private final WorkflowQueryService workflowQueryService;
 
     @PostMapping("/submit")
+    @AuditedOperation(type = "CREATE", businessType = "WORKFLOW")
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<String> submit(@Valid @RequestBody WorkflowSubmitRequest request) {
         workflowEngine.checkSubmitPermission(request.getBusinessType());
@@ -51,6 +53,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/approve")
+    @AuditedOperation(type = "APPROVE", businessType = "WORKFLOW")
     @PreAuthorize("hasAuthority('workflow:approve') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> approve(@PathVariable Long taskId,
                                       @Valid @RequestBody WorkflowActionRequest request) {
@@ -62,6 +65,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/reject")
+    @AuditedOperation(type = "REJECT", businessType = "WORKFLOW")
     @PreAuthorize("hasAuthority('workflow:reject') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> reject(@PathVariable Long taskId,
                                      @Valid @RequestBody WorkflowActionRequest request) {
@@ -73,6 +77,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/instances/{instanceId}/withdraw")
+    @AuditedOperation(type = "WITHDRAW", businessType = "WORKFLOW")
     @PreAuthorize("hasAuthority('workflow:withdraw') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> withdraw(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
@@ -82,6 +87,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/instances/{instanceId}/resubmit")
+    @AuditedOperation(type = "RESUBMIT", businessType = "WORKFLOW")
     @PreAuthorize("hasAuthority('workflow:resubmit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> resubmit(@PathVariable Long instanceId) {
         Long userId = UserContext.getCurrentUserId();
@@ -91,6 +97,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/transfer")
+    @AuditedOperation(type = "TRANSFER", businessType = "WORKFLOW")
     @PreAuthorize("hasAuthority('workflow:transfer') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> transfer(@PathVariable Long taskId,
                                        @Valid @RequestBody WorkflowTransferRequest request) {
@@ -102,6 +109,7 @@ public class WorkflowController {
     }
 
     @PostMapping("/tasks/{taskId}/add-sign")
+    @AuditedOperation(type = "ADD_SIGN", businessType = "WORKFLOW")
     @PreAuthorize("hasAuthority('workflow:add-sign') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> addSign(@PathVariable Long taskId,
                                       @Valid @RequestBody WorkflowAddSignRequest request) {

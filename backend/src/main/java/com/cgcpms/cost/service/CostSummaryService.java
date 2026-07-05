@@ -96,7 +96,7 @@ public class CostSummaryService {
      * @param projectId project ID
      * @return refreshed project summary
      */
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional(isolation = Isolation.REPEATABLE_READ, rollbackFor = Exception.class)
     public CostProjectSummaryVO refreshSummary(Long tenantId, Long projectId) {
         // Serialize concurrent refresh for the same project
         ReentrantLock lock = refreshLocks.computeIfAbsent(projectId, k -> new ReentrantLock());
