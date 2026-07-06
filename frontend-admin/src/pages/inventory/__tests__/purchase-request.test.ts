@@ -36,6 +36,19 @@ describe('purchase request modal filters', () => {
     expect(source).toMatch(/onMounted\([\s\S]*?openBusinessIdFromQuery\(\)/)
   })
 
+  it('uses explicit view mode so 查看态 is read-only and hides save entry', () => {
+    expect(source).toMatch(/type ModalMode = 'create' \| 'edit' \| 'view'/)
+    expect(source).toMatch(/const modalMode = ref<ModalMode>\('create'\)/)
+    expect(source).toMatch(/const isViewMode = computed\(\(\) => modalMode\.value === 'view'\)/)
+    expect(source).toMatch(/async function handleView\(record: PurchaseRequestVO\)[\s\S]*?modalMode\.value = 'view'/)
+    expect(source).toMatch(/<a-modal[\s\S]*?:ok-button-props="isViewMode \? \{ style: \{ display: 'none' \} \} : undefined"/)
+    expect(source).toMatch(/<a-modal[\s\S]*?:cancel-text="isViewMode \? '关闭' : '取消'"/)
+    expect(source).toMatch(/v-if="!isViewMode"[\s\S]*?\+ 添加物料/)
+    expect(source).toMatch(/v-else-if="column\.key === 'action'">[\s\S]*?v-if="!isViewMode"/)
+    expect(source).toContain(':disabled="isViewMode"')
+    expect(source).toMatch(/async function handleModalOk\(\) \{[\s\S]*?if \(isViewMode\.value \|\| submitting\.value\) return/)
+  })
+
   it('does not silently swallow cleanup failures when create flow rolls back', () => {
     expect(source).not.toContain('catch {')
     expect(source).toContain("console.error('采购申请创建回滚失败', cleanupError)")

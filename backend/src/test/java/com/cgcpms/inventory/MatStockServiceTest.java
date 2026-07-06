@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
@@ -382,6 +383,40 @@ class MatStockServiceTest {
                 "库存应 ≤ 100（两个50累加，H2严格锁下可能只有一个成功）");
     }
 
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 活动库存唯一约束拒绝同租户同仓库同物料重复活动行")
+    void testActiveStockUniqueConstraintRejectsDuplicateRows() {
+        long whId = 919L;
+        long matId = 9919L;
+
+        jdbcTemplate.update("""
+                INSERT INTO mat_stock
+                    (id, tenant_id, warehouse_id, material_id, available_qty, version, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, 0, 0)
+                """, 919001L, TENANT_ID, whId, matId, new BigDecimal("10.0000"));
+
+        assertThrows(DuplicateKeyException.class, () -> jdbcTemplate.update("""
+                INSERT INTO mat_stock
+                    (id, tenant_id, warehouse_id, material_id, available_qty, version, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, 0, 0)
+                """, 919002L, TENANT_ID, whId, matId, new BigDecimal("20.0000")),
+                "同租户同仓库同物料只能存在一条活动库存行");
+
+        jdbcTemplate.update("""
+                UPDATE mat_stock
+                SET deleted_flag = 1, deleted_token = id
+                WHERE id = ?
+                """, 919001L);
+
+        assertDoesNotThrow(() -> jdbcTemplate.update("""
+                INSERT INTO mat_stock
+                    (id, tenant_id, warehouse_id, material_id, available_qty, version, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, 0, 0)
+                """, 919003L, TENANT_ID, whId, matId, new BigDecimal("30.0000")),
+                "软删除后应允许重新创建活动库存行");
+    }
+
     // ═══════════════════════════════════════════════════════════
     // RED → GREEN: 跨租户隔离 — 不同租户独立库存
     // 使用不同仓库ID以适配 V35 UNIQUE(warehouse_id, material_id) 约束
@@ -484,6 +519,13 @@ class MatStockServiceTest {
         assertTrue(finalQty.compareTo(new BigDecimal("100.0001")) < 0,
                 "库存应 ≤ 100（两个50累加，H2严格锁下可能只有一个成功）");
 
+        Integer activeRows = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM mat_stock
+                WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? AND deleted_flag = 0
+                """, Integer.class, TENANT_ID, whId, matId);
+        assertEquals(1, activeRows, "并发首次入库后只能保留一条活动库存行");
+
         // At least 1 IN transaction
         assertTrue(ledger.getTxns().getTotal() >= 1, "应至少有1条 IN 流水");
     }
@@ -575,6 +617,7 @@ class MatStockServiceTest {
     void testGetKpiWithData() {
         // 仓库已存在（db/migration-h2 初始化脚本中包含），STATUS='ENABLE'
         long whId = 100L;
+        insertWarehouse(whId, 10001L, "WH-KPI-DATA");
 
         // 入库 2 种物料
         stockService.stockIn(whId, 1001L, new BigDecimal("100.0000"));
@@ -604,6 +647,8 @@ class MatStockServiceTest {
     void testGetKpiFilterByWarehouseId() {
         long whA = 100L;
         long whB = 200L;
+        insertWarehouse(whA, 10001L, "WH-KPI-A");
+        insertWarehouse(whB, 10002L, "WH-KPI-B");
 
         stockService.stockIn(whA, 1001L, new BigDecimal("100.0000"));
         stockService.stockIn(whB, 1001L, new BigDecimal("50.0000"));
@@ -625,6 +670,7 @@ class MatStockServiceTest {
     @DisplayName("RED→GREEN: getKpi 低库存识别（availableQty 介于 0 和 10 之间）")
     void testGetKpiLowStockDetection() {
         long whId = 100L;
+        insertWarehouse(whId, 10001L, "WH-KPI-LOW");
 
         // 创建低库存：数量为 5
         stockService.stockIn(whId, 1001L, new BigDecimal("5.0000"));
@@ -771,6 +817,7 @@ class MatStockServiceTest {
         // 仓库 100 的 projectId 已在 H2 migration 初始化中设置
         long existingWh = 100L;
         long existingProjectId = 10001L;
+        insertWarehouse(existingWh, existingProjectId, "WH-KPI-PROJECT");
 
         // 在仓库 100 中入库
         stockService.stockIn(existingWh, 1001L, new BigDecimal("100.0000"));
@@ -781,6 +828,110 @@ class MatStockServiceTest {
         // 用不存在的 projectId 过滤
         var kpiNone = stockService.getKpi(null, 99999L);
         assertEquals(0, kpiNone.getWarehouseCount(), "不存在的项目应无仓库");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: projectId 按仓库项目过滤库存台账和 KPI")
+    void testProjectIdFiltersLedgerAndKpiByWarehouseProject() {
+        long projectA = 92001L;
+        long projectB = 92002L;
+        long warehouseA = 920001L;
+        long warehouseB = 920002L;
+        long materialId = 1001L;
+        insertWarehouse(warehouseA, projectA, "WH-PROJECT-A");
+        insertWarehouse(warehouseB, projectB, "WH-PROJECT-B");
+
+        stockService.stockIn(warehouseA, materialId, new BigDecimal("5.0000"));
+        stockService.stockIn(warehouseB, materialId, new BigDecimal("20.0000"));
+        stockService.stockOut(warehouseB, materialId, new BigDecimal("3.0000"));
+
+        MatStockLedgerVO matchedLedger = stockService.getLedger(
+                warehouseA, materialId, projectA, null, null, null, 1, 20);
+        assertNotNull(matchedLedger.getStock(), "匹配项目应返回库存余额");
+        assertEquals(1, matchedLedger.getTxns().getTotal(), "匹配项目只返回本仓库流水");
+
+        MatStockLedgerVO mismatchedLedger = stockService.getLedger(
+                warehouseA, materialId, projectB, null, null, null, 1, 20);
+        assertNull(mismatchedLedger.getStock(), "项目不匹配时不应返回库存余额");
+        assertEquals(0, mismatchedLedger.getTxns().getTotal(), "项目不匹配时不应返回流水");
+
+        var projectAKpi = stockService.getKpi(null, projectA);
+        assertEquals(1, projectAKpi.getWarehouseCount(), "项目A只统计自己的仓库");
+        assertEquals(1, projectAKpi.getMaterialTypeCount(), "项目A只统计自己的库存物料");
+        assertEquals(1, projectAKpi.getLowStockCount(), "项目A只统计自己的低库存");
+        assertEquals(1, projectAKpi.getTxnInCount(), "项目A只统计自己的入库流水");
+        assertEquals(0, projectAKpi.getTxnOutCount(), "项目A不应串入项目B出库流水");
+
+        var allKpi = stockService.getKpi(null, null);
+        assertTrue(allKpi.getMaterialTypeCount() >= 2, "无 projectId 时保持全量库存统计");
+        assertTrue(allKpi.getTxnInCount() >= 2, "无 projectId 时保持全量入库统计");
+        assertTrue(allKpi.getTxnOutCount() >= 1, "无 projectId 时保持全量出库统计");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: getKpi 仅 warehouseId 时所有指标使用同一仓库口径")
+    void testKpiWithOnlyWarehouseIdUsesSameWarehouseScope() {
+        long projectA = 92101L;
+        long projectB = 92102L;
+        long warehouseA = 921001L;
+        long warehouseB = 921002L;
+        long materialId = 1001L;
+        insertWarehouse(warehouseA, projectA, "WH-ONLY-A");
+        insertWarehouse(warehouseB, projectB, "WH-ONLY-B");
+
+        stockService.stockIn(warehouseA, materialId, new BigDecimal("5.0000"));
+        stockService.stockOut(warehouseA, materialId, new BigDecimal("2.0000"));
+        stockService.stockIn(warehouseB, materialId, new BigDecimal("20.0000"));
+
+        var kpi = stockService.getKpi(warehouseA, null);
+        assertEquals(1, kpi.getWarehouseCount(), "仅 warehouseId 时 warehouseCount 应只统计该仓库");
+        assertEquals(1, kpi.getMaterialTypeCount(), "仅 warehouseId 时物料种类应只统计该仓库");
+        assertEquals(1, kpi.getLowStockCount(), "仅 warehouseId 时低库存应只统计该仓库");
+        assertEquals(1, kpi.getTxnInCount(), "仅 warehouseId 时入库次数应只统计该仓库");
+        assertEquals(1, kpi.getTxnOutCount(), "仅 warehouseId 时出库次数应只统计该仓库");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 停用仓库不进入项目 KPI 和项目台账范围")
+    void testDisabledWarehouseExcludedFromProjectKpiAndLedger() {
+        long projectId = 92201L;
+        long enabledWarehouse = 922001L;
+        long disabledWarehouse = 922002L;
+        long materialId = 1001L;
+        insertWarehouse(enabledWarehouse, projectId, "WH-ENABLED");
+        insertWarehouse(disabledWarehouse, projectId, "WH-DISABLED", "DISABLE");
+
+        stockService.stockIn(enabledWarehouse, materialId, new BigDecimal("20.0000"));
+        stockService.stockIn(disabledWarehouse, materialId, new BigDecimal("5.0000"));
+        stockService.stockOut(disabledWarehouse, materialId, new BigDecimal("1.0000"));
+
+        var kpi = stockService.getKpi(null, projectId);
+        assertEquals(1, kpi.getWarehouseCount(), "项目 KPI 只统计启用仓库");
+        assertEquals(1, kpi.getMaterialTypeCount(), "停用仓库库存不进入物料种类");
+        assertEquals(0, kpi.getLowStockCount(), "停用仓库低库存不进入 KPI");
+        assertEquals(1, kpi.getTxnInCount(), "停用仓库入库流水不进入 KPI");
+        assertEquals(0, kpi.getTxnOutCount(), "停用仓库出库流水不进入 KPI");
+
+        MatStockLedgerVO disabledLedger = stockService.getLedger(
+                disabledWarehouse, materialId, projectId, null, null, null, 1, 20);
+        assertNull(disabledLedger.getStock(), "停用仓库不应被视为项目有效台账范围");
+        assertEquals(0, disabledLedger.getTxns().getTotal(), "停用仓库项目台账不返回流水");
+    }
+
+    private void insertWarehouse(long warehouseId, long projectId, String code) {
+        insertWarehouse(warehouseId, projectId, code, "ENABLE");
+    }
+
+    private void insertWarehouse(long warehouseId, long projectId, String code, String status) {
+        jdbcTemplate.update("DELETE FROM mat_warehouse WHERE id = ?", warehouseId);
+        jdbcTemplate.update("""
+                INSERT INTO mat_warehouse
+                    (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
+                """, warehouseId, TENANT_ID, projectId, code, code, status);
     }
 
     // ═══════════════════════════════════════════════════════════════

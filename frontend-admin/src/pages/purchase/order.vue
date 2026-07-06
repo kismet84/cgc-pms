@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
   ClockCircleOutlined,
@@ -15,6 +16,7 @@ import {
 import { useReferenceStore } from '@/stores/reference'
 import {
   getOrderList,
+  getOrderDetail,
   createOrder,
   updateOrder,
   deleteOrder,
@@ -37,6 +39,8 @@ const ORDER_STATUS_DRAFT = 'DRAFT'
 const ORDER_STATUS_APPROVING = 'APPROVING'
 const ORDER_STATUS_COMPLETED = 'COMPLETED'
 const ORDER_STATUS_CANCELLED = 'CANCELLED'
+const route = useRoute()
+const router = useRouter()
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -58,10 +62,14 @@ const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 const materialList = computed(() => referenceStore.materials ?? [])
+const supplierList = ref<{ id: string; partnerName?: string }[]>([])
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建采购订单')
 const editingId = ref<string | null>(null)
+type ModalMode = 'create' | 'edit' | 'view'
+const modalMode = ref<ModalMode>('create')
+const isViewMode = computed(() => modalMode.value === 'view')
 const formData = reactive<Partial<MatPurchaseOrderVO>>({
   projectId: undefined,
   contractId: undefined,
@@ -210,6 +218,7 @@ function handlePageSizeChange(_cur: number, size: number) {
 }
 
 function handleAdd() {
+  modalMode.value = 'create'
   modalTitle.value = '新建采购订单'
   editingId.value = null
   Object.assign(formData, {
@@ -227,6 +236,7 @@ function handleAdd() {
 }
 
 async function handleEdit(record: MatPurchaseOrderVO) {
+  modalMode.value = 'edit'
   modalTitle.value = '编辑采购订单'
   editingId.value = record.id
   Object.assign(formData, {
@@ -258,7 +268,26 @@ async function handleEdit(record: MatPurchaseOrderVO) {
 
 async function handleView(record: MatPurchaseOrderVO) {
   await handleEdit(record)
+  modalMode.value = 'view'
   modalTitle.value = '查看采购订单'
+}
+
+async function openBusinessIdFromQuery() {
+  const value = route.query.businessId
+  const businessId = Array.isArray(value) ? value[0] : value
+  if (!businessId) return
+
+  try {
+    const record = await getOrderDetail(String(businessId))
+    await handleView(record)
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('业务单据加载失败，请稍后重试')
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.businessId
+    await router.replace({ path: route.path, query: nextQuery })
+  }
 }
 
 function handleDelete(record: MatPurchaseOrderVO) {
@@ -301,6 +330,7 @@ function handleSubmitApproval(record: MatPurchaseOrderVO) {
 
 // --- Line items management ---
 function handleAddItem() {
+  if (isViewMode.value) return
   itemList.value.push({
     key: itemKeyCounter++,
     materialId: undefined,
@@ -314,10 +344,12 @@ function handleAddItem() {
 }
 
 function handleRemoveItem(index: number) {
+  if (isViewMode.value) return
   itemList.value.splice(index, 1)
 }
 
 function handleMaterialChange(index: number, materialId: string | undefined) {
+  if (isViewMode.value) return
   if (!materialId) {
     const item = itemList.value[index]
     item.materialName = ''
@@ -358,6 +390,7 @@ const itemsTotalAmount = computed(() => {
 })
 
 async function handleModalOk() {
+  if (isViewMode.value) return
   if (!formData.projectId) {
     message.warning('请选择项目')
     return
@@ -478,6 +511,7 @@ const pendingOrders = computed(() =>
 
 function onFilterProjectChange(v: string | undefined) {
   filter.contractId = undefined
+  filter.partnerId = undefined
   if (v) {
     referenceStore.fetchContracts({
       projectId: v,
@@ -485,8 +519,23 @@ function onFilterProjectChange(v: string | undefined) {
       contractStatus: 'PERFORMING',
       approvalStatus: 'APPROVED',
     })
+  } else {
+    referenceStore.fetchContracts({
+      contractType: 'PURCHASE',
+      contractStatus: 'PERFORMING',
+      approvalStatus: 'APPROVED',
+    })
   }
   handleSearch()
+}
+
+async function loadSuppliers() {
+  try {
+    supplierList.value = await referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })
+  } catch (e: unknown) {
+    console.error(e)
+    supplierList.value = []
+  }
 }
 
 onMounted(() => {
@@ -497,9 +546,10 @@ onMounted(() => {
     contractStatus: 'PERFORMING',
     approvalStatus: 'APPROVED',
   })
-  referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })
+  loadSuppliers()
   referenceStore.fetchMaterials({ status: 'ENABLE' })
   fetchData()
+  openBusinessIdFromQuery()
 })
 </script>
 
@@ -538,6 +588,40 @@ onMounted(() => {
         >
           <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
             {{ p.projectName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.contractId"
+          class="purchase-order-search-select"
+          placeholder="全部合同"
+          allow-clear
+          show-search
+          size="large"
+          :filter-option="
+            (input: string, option: SelectOption) =>
+              option.label?.toLowerCase().includes(input.toLowerCase())
+          "
+          @change="handleSearch"
+        >
+          <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+            {{ c.contractName }}
+          </a-select-option>
+        </a-select>
+        <a-select
+          v-model:value="filter.partnerId"
+          class="purchase-order-search-select"
+          placeholder="全部供应商"
+          allow-clear
+          show-search
+          size="large"
+          :filter-option="
+            (input: string, option: SelectOption) =>
+              option.label?.toLowerCase().includes(input.toLowerCase())
+          "
+          @change="handleSearch"
+        >
+          <a-select-option v-for="p in supplierList" :key="p.id" :value="p.id">
+            {{ p.partnerName }}
           </a-select-option>
         </a-select>
         <a-select
@@ -783,6 +867,8 @@ onMounted(() => {
       v-model:open="modalVisible"
       :title="modalTitle"
       :width="800"
+      :ok-button-props="isViewMode ? { style: { display: 'none' } } : undefined"
+      :cancel-text="isViewMode ? '关闭' : '取消'"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
     >
@@ -791,6 +877,7 @@ onMounted(() => {
         <a-form-item label="项目" required>
           <a-select
             v-model:value="formData.projectId"
+            :disabled="isViewMode"
             placeholder="请选择项目"
             show-search
             @change="
@@ -818,6 +905,7 @@ onMounted(() => {
         <a-form-item label="采购合同">
           <a-select
             v-model:value="formData.contractId"
+            :disabled="isViewMode"
             placeholder="请选择合同"
             allow-clear
             show-search
@@ -836,7 +924,12 @@ onMounted(() => {
           <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
         </a-form-item>
         <a-form-item label="订单类型">
-          <a-select v-model:value="formData.orderType" placeholder="请选择类型" allow-clear>
+          <a-select
+            v-model:value="formData.orderType"
+            :disabled="isViewMode"
+            placeholder="请选择类型"
+            allow-clear
+          >
             <a-select-option value="MATERIAL">材料采购</a-select-option>
             <a-select-option value="EQUIPMENT">设备采购</a-select-option>
             <a-select-option value="SERVICE">服务采购</a-select-option>
@@ -846,6 +939,7 @@ onMounted(() => {
         <a-form-item label="订单日期">
           <a-date-picker
             v-model:value="formData.orderDate"
+            :disabled="isViewMode"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
@@ -853,12 +947,18 @@ onMounted(() => {
         <a-form-item label="交货日期">
           <a-date-picker
             v-model:value="formData.deliveryDate"
+            :disabled="isViewMode"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
         <a-form-item label="备注">
-          <a-textarea v-model:value="formData.remark" :rows="2" placeholder="请输入备注" />
+          <a-textarea
+            v-model:value="formData.remark"
+            :disabled="isViewMode"
+            :rows="2"
+            placeholder="请输入备注"
+          />
         </a-form-item>
       </a-form>
 
@@ -873,7 +973,9 @@ onMounted(() => {
           "
         >
           <span style="font-weight: 600; font-size: 14px">订单明细</span>
-          <a-button type="dashed" size="small" @click="handleAddItem">+ 添加明细</a-button>
+          <a-button v-if="!isViewMode" type="dashed" size="small" @click="handleAddItem">
+            + 添加明细
+          </a-button>
         </div>
 
         <a-table
@@ -887,6 +989,7 @@ onMounted(() => {
             <template #default="{ record: item, index }">
               <a-select
                 :value="item.materialId"
+                :disabled="isViewMode"
                 placeholder="请选择材料"
                 allow-clear
                 style="width: 100%"
@@ -917,6 +1020,7 @@ onMounted(() => {
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.quantity"
+                :disabled="isViewMode"
                 :min="0"
                 :precision="2"
                 style="width: 100%"
@@ -928,6 +1032,7 @@ onMounted(() => {
             <template #default="{ record: item, index }">
               <a-input-number
                 v-model:value="item.unitPrice"
+                :disabled="isViewMode"
                 :min="0"
                 :precision="2"
                 style="width: 100%"
@@ -944,7 +1049,7 @@ onMounted(() => {
           </a-table-column>
           <a-table-column title="操作" width="76">
             <template #default="{ index }">
-              <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
+              <a-button v-if="!isViewMode" type="link" size="small" danger @click="handleRemoveItem(index)"
                 >删除</a-button
               >
             </template>

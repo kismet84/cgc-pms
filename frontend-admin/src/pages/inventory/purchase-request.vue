@@ -66,6 +66,9 @@ const modalTitle = ref('新建采购申请')
 const editingId = ref<string | null>(null)
 const submitting = ref(false)
 const modalDirty = ref(false)
+type ModalMode = 'create' | 'edit' | 'view'
+const modalMode = ref<ModalMode>('create')
+const isViewMode = computed(() => modalMode.value === 'view')
 const formData = reactive<Partial<PurchaseRequestVO>>({
   projectId: undefined,
   contractId: undefined,
@@ -189,6 +192,7 @@ function handlePageSizeChange(_cur: number, size: number) {
 }
 
 function handleAdd() {
+  modalMode.value = 'create'
   modalTitle.value = '新建采购申请'
   editingId.value = null
   Object.assign(formData, {
@@ -204,6 +208,7 @@ function handleAdd() {
 }
 
 async function handleEdit(record: PurchaseRequestVO) {
+  modalMode.value = 'edit'
   modalTitle.value = '编辑采购申请'
   editingId.value = record.id
   Object.assign(formData, {
@@ -232,6 +237,7 @@ async function handleEdit(record: PurchaseRequestVO) {
 
 async function handleView(record: PurchaseRequestVO) {
   await handleEdit(record)
+  modalMode.value = 'view'
   modalTitle.value = '查看采购申请'
 }
 
@@ -273,6 +279,7 @@ async function loadContractsByProject(projectId?: string) {
 }
 
 async function handleProjectChange(projectId?: string) {
+  if (isViewMode.value) return
   formData.projectId = projectId
   formData.contractId = undefined
   modalDirty.value = true
@@ -319,6 +326,7 @@ function handleSubmit(record: PurchaseRequestVO) {
 
 // --- Line items management ---
 function handleAddItem() {
+  if (isViewMode.value) return
   modalDirty.value = true
   itemList.value.push({
     key: keySeq.value++,
@@ -332,6 +340,7 @@ function handleAddItem() {
 }
 
 function handleRemoveItem(key: number) {
+  if (isViewMode.value) return
   modalDirty.value = true
   const idx = itemList.value.findIndex((i) => i.key === key)
   if (idx !== -1) {
@@ -340,6 +349,7 @@ function handleRemoveItem(key: number) {
 }
 
 function handleMaterialClear(key: number) {
+  if (isViewMode.value) return
   modalDirty.value = true
   const item = itemList.value.find((i) => i.key === key)
   if (!item) return
@@ -349,6 +359,7 @@ function handleMaterialClear(key: number) {
 }
 
 function handleMaterialChange(key: number, materialId: string | undefined) {
+  if (isViewMode.value) return
   modalDirty.value = true
   const item = itemList.value.find((i) => i.key === key)
   if (!item) return
@@ -369,7 +380,7 @@ function handleMaterialChange(key: number, materialId: string | undefined) {
 const itemsCount = computed(() => itemList.value.length)
 
 async function handleModalOk() {
-  if (submitting.value) return
+  if (isViewMode.value || submitting.value) return
 
   // --- validation ---
   if (!formData.projectId) {
@@ -782,7 +793,9 @@ onMounted(() => {
       v-model:open="modalVisible"
       :title="modalTitle"
       :width="800"
-      :confirm-loading="submitting"
+      :confirm-loading="isViewMode ? false : submitting"
+      :ok-button-props="isViewMode ? { style: { display: 'none' } } : undefined"
+      :cancel-text="isViewMode ? '关闭' : '取消'"
       destroy-on-close
       @ok="handleModalOk"
       @cancel="handleModalCancel"
@@ -792,6 +805,7 @@ onMounted(() => {
         <a-form-item label="项目" required>
           <a-select
             v-model:value="formData.projectId"
+            :disabled="isViewMode"
             placeholder="请选择项目"
             @change="handleProjectChange"
           >
@@ -803,6 +817,7 @@ onMounted(() => {
         <a-form-item label="关联合同">
           <a-select
             v-model:value="formData.contractId"
+            :disabled="isViewMode"
             placeholder="选择采购合同"
             allow-clear
             show-search
@@ -817,6 +832,7 @@ onMounted(() => {
         <a-form-item label="备注">
           <a-textarea
             v-model:value="formData.remark"
+            :disabled="isViewMode"
             :rows="2"
             placeholder="请输入备注"
             @change="modalDirty = true"
@@ -831,7 +847,9 @@ onMounted(() => {
             申请明细
             <span class="pr-items-count"> {{ itemsCount }} 项 </span>
           </span>
-          <a-button type="dashed" size="small" @click="handleAddItem">+ 添加物料</a-button>
+          <a-button v-if="!isViewMode" type="dashed" size="small" @click="handleAddItem">
+            + 添加物料
+          </a-button>
         </div>
 
         <a-table
@@ -848,6 +866,7 @@ onMounted(() => {
               <div style="display: flex; gap: 4px">
                 <a-select
                   :value="item.materialId"
+                  :disabled="isViewMode"
                   placeholder="选择已有物料"
                   allow-clear
                   :style="{ width: item.materialId ? '100%' : '50%', flexShrink: 0 }"
@@ -863,6 +882,7 @@ onMounted(() => {
                 <a-input
                   v-if="!item.materialId"
                   v-model:value="item.materialName"
+                  :disabled="isViewMode"
                   placeholder="自定义物料"
                   size="small"
                   style="flex: 1"
@@ -873,6 +893,7 @@ onMounted(() => {
             <template v-else-if="column.key === 'unit'">
               <a-input
                 v-model:value="item.unit"
+                :disabled="isViewMode"
                 placeholder="单位"
                 size="small"
                 style="width: 100%"
@@ -882,6 +903,7 @@ onMounted(() => {
             <template v-else-if="column.key === 'quantity'">
               <a-input-number
                 v-model:value="item.quantity"
+                :disabled="isViewMode"
                 :min="0"
                 :precision="4"
                 style="width: 100%"
@@ -891,6 +913,7 @@ onMounted(() => {
             <template v-else-if="column.key === 'plannedDate'">
               <a-date-picker
                 v-model:value="item.plannedDate"
+                :disabled="isViewMode"
                 value-format="YYYY-MM-DD"
                 style="width: 100%"
                 size="small"
@@ -901,13 +924,20 @@ onMounted(() => {
             <template v-else-if="column.key === 'remark'">
               <a-input
                 v-model:value="item.remark"
+                :disabled="isViewMode"
                 placeholder="备注"
                 size="small"
                 @change="modalDirty = true"
               />
             </template>
             <template v-else-if="column.key === 'action'">
-              <a-button type="link" size="small" danger @click="handleRemoveItem(item.key)">
+              <a-button
+                v-if="!isViewMode"
+                type="link"
+                size="small"
+                danger
+                @click="handleRemoveItem(item.key)"
+              >
                 删除
               </a-button>
             </template>

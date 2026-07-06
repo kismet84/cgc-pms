@@ -192,6 +192,7 @@ export function useStockLedger() {
   function handleSearch() {
     txnPageNo.value = 1
     fetchData()
+    fetchKpi()
   }
 
   function handleReset() {
@@ -212,6 +213,7 @@ export function useStockLedger() {
     } else {
       fetchWarehouses()
     }
+    fetchKpi()
   }
 
   function handleTxnPageChange(page: number) {

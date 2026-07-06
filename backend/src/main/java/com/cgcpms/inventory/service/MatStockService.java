@@ -230,6 +230,12 @@ public class MatStockService {
                                        String sortField, String sortOrder,
                                        long pageNo, long pageSize) {
         Long tenantId = UserContext.getCurrentTenantId();
+        if (projectId != null && findEnabledWarehouseIds(tenantId, warehouseId, projectId).isEmpty()) {
+            MatStockLedgerVO ledger = new MatStockLedgerVO();
+            ledger.setStock(null);
+            ledger.setTxns(new PageResult<>(pageNo, pageSize, 0, List.of()));
+            return ledger;
+        }
 
         // 1. 当前库存余额
         MatStock stock = findStock(tenantId, warehouseId, materialId);
@@ -284,30 +290,23 @@ public class MatStockService {
 
         StockKpiVO kpi = new StockKpiVO();
 
-        // 仓库总数（ENABLE 状态）
-        LambdaQueryWrapper<MatWarehouse> whWrapper = new LambdaQueryWrapper<>();
-        whWrapper.eq(MatWarehouse::getTenantId, tenantId);
-        whWrapper.eq(MatWarehouse::getStatus, "ENABLE");
-        if (projectId != null) {
-            whWrapper.eq(MatWarehouse::getProjectId, projectId);
+        List<Long> warehouseIds = findEnabledWarehouseIds(tenantId, warehouseId, projectId);
+        kpi.setWarehouseCount(warehouseIds.size());
+        if (warehouseIds.isEmpty()) {
+            return kpi;
         }
-        kpi.setWarehouseCount(matWarehouseMapper.selectCount(whWrapper));
 
         // 有库存的物料种类数
         LambdaQueryWrapper<MatStock> stockWrapper = new LambdaQueryWrapper<>();
         stockWrapper.eq(MatStock::getTenantId, tenantId);
-        if (warehouseId != null) {
-            stockWrapper.eq(MatStock::getWarehouseId, warehouseId);
-        }
+        stockWrapper.in(MatStock::getWarehouseId, warehouseIds);
         stockWrapper.gt(MatStock::getAvailableQty, BigDecimal.ZERO);
         kpi.setMaterialTypeCount(matStockMapper.selectCount(stockWrapper));
 
         // 低库存物料数（可用量 > 0 且 < 10）
         LambdaQueryWrapper<MatStock> lowStockWrapper = new LambdaQueryWrapper<>();
         lowStockWrapper.eq(MatStock::getTenantId, tenantId);
-        if (warehouseId != null) {
-            lowStockWrapper.eq(MatStock::getWarehouseId, warehouseId);
-        }
+        lowStockWrapper.in(MatStock::getWarehouseId, warehouseIds);
         lowStockWrapper.gt(MatStock::getAvailableQty, BigDecimal.ZERO);
         lowStockWrapper.lt(MatStock::getAvailableQty, new BigDecimal("10"));
         kpi.setLowStockCount(matStockMapper.selectCount(lowStockWrapper));
@@ -315,9 +314,7 @@ public class MatStockService {
         // 出入库次数
         LambdaQueryWrapper<MatStockTxn> txnWrapper = new LambdaQueryWrapper<>();
         txnWrapper.eq(MatStockTxn::getTenantId, tenantId);
-        if (warehouseId != null) {
-            txnWrapper.eq(MatStockTxn::getWarehouseId, warehouseId);
-        }
+        txnWrapper.in(MatStockTxn::getWarehouseId, warehouseIds);
         txnWrapper.select(MatStockTxn::getTxnType);
         List<MatStockTxn> allTxns = matStockTxnMapper.selectList(txnWrapper);
         long inCount = allTxns.stream().filter(t -> "IN".equals(t.getTxnType())).count();
@@ -337,8 +334,7 @@ public class MatStockService {
 
     /**
      * 按租户+仓库+物料查询库存记录，返回 null 表示不存在。
-     * 使用 selectList + LIMIT 1 代替 selectOne，因为 V88 的
-     * UNIQUE(deleted_token) 设计允许活动记录(NULL=NULL)共存。
+     * 活动库存由后置 migration 保证唯一；LIMIT 1 作为历史异常数据的防御。
      */
     private MatStock findStock(Long tenantId, Long warehouseId, Long materialId) {
         LambdaQueryWrapper<MatStock> wrapper = new LambdaQueryWrapper<>();
@@ -348,6 +344,22 @@ public class MatStockService {
         wrapper.last("LIMIT 1"); // SQL-SAFETY: fixed-sql-fragment
         List<MatStock> results = matStockMapper.selectList(wrapper);
         return results.isEmpty() ? null : results.get(0);
+    }
+
+    private List<Long> findEnabledWarehouseIds(Long tenantId, Long warehouseId, Long projectId) {
+        LambdaQueryWrapper<MatWarehouse> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(MatWarehouse::getTenantId, tenantId);
+        wrapper.eq(MatWarehouse::getStatus, "ENABLE");
+        if (warehouseId != null) {
+            wrapper.eq(MatWarehouse::getId, warehouseId);
+        }
+        if (projectId != null) {
+            wrapper.eq(MatWarehouse::getProjectId, projectId);
+        }
+        wrapper.select(MatWarehouse::getId);
+        return matWarehouseMapper.selectList(wrapper).stream()
+                .map(MatWarehouse::getId)
+                .collect(Collectors.toList());
     }
 
     /**

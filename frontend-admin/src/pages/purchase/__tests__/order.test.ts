@@ -51,6 +51,49 @@ describe('PurchaseOrderPage submit-approval button', () => {
     expect(source).toContain('formData.contractId = undefined')
     expect(source).toContain('formData.partnerId = undefined')
   })
+
+  it('keeps supplier filter when fetching partner options', () => {
+    expect(source).toContain('const supplierList = ref<{ id: string; partnerName?: string }[]>([])')
+    expect(source).toContain('async function loadSuppliers()')
+    expect(source).toContain("supplierList.value = await referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })")
+    expect(source).toMatch(/onMounted\([\s\S]*?loadSuppliers\(\)/)
+    expect(source).toMatch(/v-for="p in supplierList"/)
+    expect(source).not.toMatch(/v-for="p in partnerList"/)
+  })
+
+  it('exposes contractId and partnerId filters in the search bar', () => {
+    expect(source).toMatch(/v-model:value="filter\.contractId"/)
+    expect(source).toMatch(/v-model:value="filter\.partnerId"/)
+    expect(source).toMatch(/placeholder="全部合同"/)
+    expect(source).toMatch(/placeholder="全部供应商"/)
+  })
+
+  it('opens businessId deeplink through order detail API and clears query', () => {
+    expect(source).toContain("import { useRoute, useRouter } from 'vue-router'")
+    expect(source).toContain('getOrderDetail')
+    expect(source).toContain('const route = useRoute()')
+    expect(source).toContain('const router = useRouter()')
+    expect(source).toContain('async function openBusinessIdFromQuery()')
+    expect(source).toContain('route.query.businessId')
+    expect(source).toContain('await getOrderDetail(String(businessId))')
+    expect(source).toContain('await handleView(record)')
+    expect(source).toContain('delete nextQuery.businessId')
+    expect(source).toContain('await router.replace({ path: route.path, query: nextQuery })')
+    expect(source).toMatch(/onMounted\([\s\S]*?openBusinessIdFromQuery\(\)/)
+  })
+
+  it('uses explicit view mode so 查看态 cannot save or edit', () => {
+    expect(source).toMatch(/type ModalMode = 'create' \| 'edit' \| 'view'/)
+    expect(source).toMatch(/const modalMode = ref<ModalMode>\('create'\)/)
+    expect(source).toMatch(/const isViewMode = computed\(\(\) => modalMode\.value === 'view'\)/)
+    expect(source).toMatch(/async function handleView\(record: MatPurchaseOrderVO\)[\s\S]*?modalMode\.value = 'view'/)
+    expect(source).toMatch(/<a-modal[\s\S]*?:ok-button-props="isViewMode \? \{ style: \{ display: 'none' \} \} : undefined"/)
+    expect(source).toMatch(/<a-modal[\s\S]*?:cancel-text="isViewMode \? '关闭' : '取消'"/)
+    expect(source).toMatch(/v-if="!isViewMode"[\s\S]*?\+ 添加明细/)
+    expect(source).toMatch(/<a-table-column title="操作" width="76">[\s\S]*?v-if="!isViewMode"/)
+    expect(source).toContain(':disabled="isViewMode"')
+    expect(source).toMatch(/async function handleModalOk\(\) \{[\s\S]*?if \(isViewMode\.value\) return/)
+  })
 })
 
 describe('purchase order page quality guardrails', () => {
