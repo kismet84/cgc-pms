@@ -251,6 +251,7 @@ async function handleEdit(record: MatPurchaseOrderVO) {
     console.error(e)
     message.error('加载明细失败')
     itemList.value = []
+    return
   }
   modalVisible.value = true
 }

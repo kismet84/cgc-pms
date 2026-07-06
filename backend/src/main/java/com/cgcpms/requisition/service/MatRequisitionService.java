@@ -17,6 +17,7 @@ import com.cgcpms.requisition.vo.MatRequisitionVO;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,6 +37,8 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class MatRequisitionService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final MatRequisitionMapper requisitionMapper;
     private final MatRequisitionItemMapper requisitionItemMapper;
@@ -102,6 +105,23 @@ public class MatRequisitionService {
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String prefix = "REQ-" + today + "-";
 
+        requisition.setApprovalStatus("DRAFT");
+        requisition.setTenantId(UserContext.getCurrentTenantId());
+
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            requisition.setRequisitionCode(nextRequisitionCode(prefix, attempt));
+            try {
+                requisitionMapper.insert(requisition);
+                return requisition.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("领料申请编号冲突，重试生成 requisitionCode={}", requisition.getRequisitionCode());
+            }
+        }
+
+        throw new BusinessException("REQUISITION_CODE_CONFLICT", "领料申请编号生成冲突，请重试");
+    }
+
+    private String nextRequisitionCode(String prefix, int offset) {
         LambdaQueryWrapper<MatRequisition> wrapper = new LambdaQueryWrapper<>();
         wrapper.likeRight(MatRequisition::getRequisitionCode, prefix)
                 .eq(MatRequisition::getTenantId, UserContext.getCurrentTenantId())
@@ -119,12 +139,7 @@ public class MatRequisitionService {
                 log.warn("Failed to parse sequence number: {}", last.getRequisitionCode(), e);
             }
         }
-        requisition.setRequisitionCode(prefix + String.format("%03d", seq));
-        requisition.setApprovalStatus("DRAFT");
-        requisition.setTenantId(UserContext.getCurrentTenantId());
-
-        requisitionMapper.insert(requisition);
-        return requisition.getId();
+        return prefix + String.format("%03d", seq + offset);
     }
 
     // ================================================================

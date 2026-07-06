@@ -172,6 +172,7 @@ async function fetchReceipts() {
     console.error('付款依据装载失败: 验收单', e)
     receiptList.value = []
     receiptItemOptions.value = []
+    message.warning('验收单依据加载失败，可稍后重试')
   }
 }
 async function fetchMeasures() {
@@ -194,6 +195,7 @@ async function fetchMeasures() {
     console.error('付款依据装载失败: 分包计量', e)
     measureList.value = []
     measureItemOptions.value = []
+    message.warning('分包计量依据加载失败，可稍后重试')
   }
 }
 

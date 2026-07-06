@@ -24,6 +24,7 @@ import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -41,6 +42,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class MatPurchaseOrderService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final MatPurchaseOrderMapper matPurchaseOrderMapper;
     private final MatPurchaseOrderItemMapper matPurchaseOrderItemMapper;
@@ -134,26 +137,7 @@ public class MatPurchaseOrderService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatPurchaseOrder order) {
         // Auto-generate order code: PO-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "PO-" + today + "-";
-
-        LambdaQueryWrapper<MatPurchaseOrder> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(MatPurchaseOrder::getOrderCode, prefix)
-                .eq(MatPurchaseOrder::getTenantId, UserContext.getCurrentTenantId())
-                .orderByDesc(MatPurchaseOrder::getOrderCode);
-        Page<MatPurchaseOrder> page = new Page<>(0, 1);
-        Page<MatPurchaseOrder> result = matPurchaseOrderMapper.selectPage(page, wrapper);
-        MatPurchaseOrder last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1;
-        if (last != null && last.getOrderCode() != null && last.getOrderCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getOrderCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getOrderCode(), e);
-            }
-        }
-        order.setOrderCode(prefix + String.format("%03d", seq));
+        String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         order.setOrderStatus("DRAFT");
         order.setApprovalStatus("DRAFT");
 
@@ -166,8 +150,36 @@ public class MatPurchaseOrderService {
                 throw new BusinessException("CONTRACT_NOT_PERFORMING", "关联合同非执行中状态，无法创建采购订单");
         }
 
-        matPurchaseOrderMapper.insert(order);
-        return order.getId();
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            order.setOrderCode(nextOrderCode(prefix, attempt));
+            try {
+                matPurchaseOrderMapper.insert(order);
+                return order.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("采购订单编号冲突，重试生成 orderCode={}", order.getOrderCode());
+            }
+        }
+        throw new BusinessException("PURCHASE_ORDER_CODE_CONFLICT", "采购订单编号生成冲突，请重试");
+    }
+
+    private String nextOrderCode(String prefix, int offset) {
+        LambdaQueryWrapper<MatPurchaseOrder> wrapper = new LambdaQueryWrapper<>();
+        wrapper.likeRight(MatPurchaseOrder::getOrderCode, prefix)
+                .eq(MatPurchaseOrder::getTenantId, UserContext.getCurrentTenantId())
+                .orderByDesc(MatPurchaseOrder::getOrderCode);
+        Page<MatPurchaseOrder> page = new Page<>(0, 1);
+        Page<MatPurchaseOrder> result = matPurchaseOrderMapper.selectPage(page, wrapper);
+        MatPurchaseOrder last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
+
+        int seq = 1 + offset;
+        if (last != null && last.getOrderCode() != null && last.getOrderCode().length() == prefix.length() + 3) {
+            try {
+                seq = Integer.parseInt(last.getOrderCode().substring(prefix.length())) + 1 + offset;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getOrderCode(), e);
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

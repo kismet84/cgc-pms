@@ -30,6 +30,7 @@ import { SETTLEMENT_STATUS_LABEL, SETTLEMENT_STATUS_COLOR } from '@/types/settle
 import type { PageResult } from '@/types/api'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { SETTLEMENT_GRID_COLUMNS, SETTLEMENT_STATUS_COLOR_MAP } from './pageConfig'
 
 const router = useRouter()
 const referenceStore = useReferenceStore()
@@ -131,6 +132,7 @@ async function fetchKpi() {
       draftCount: 0,
       finalizedCount: 0,
     }
+    message.warning('结算统计加载失败，已显示空摘要')
   }
 }
 
@@ -222,31 +224,7 @@ function kpiPct(value: number, max: number): number {
 }
 
 // ---- VxeGrid columns ----
-const gridColumns = computed(() => [
-  {
-    field: 'settlementCode',
-    title: '结算编号',
-    minWidth: 160,
-    slots: { default: 'settlementCode' },
-  },
-  { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
-  { field: 'contractName', title: '合同', minWidth: 150, ellipsis: true },
-  {
-    field: 'settlementAmount',
-    title: '结算金额(万)',
-    width: 140,
-    align: 'right' as const,
-    slots: { default: 'settlementAmount' },
-  },
-  {
-    field: 'settlementStatus',
-    title: '状态',
-    width: 100,
-    slots: { default: 'settlementStatus' },
-  },
-  { field: 'createdAt', title: '创建时间', width: 160 },
-  { title: '操作', width: 76, slots: { default: 'ops' } },
-])
+const gridColumns = computed(() => SETTLEMENT_GRID_COLUMNS)
 
 const {
   visibleColumns: visibleGridColumns,
@@ -289,11 +267,7 @@ const statusBreakdown = computed(() => {
   }))
 })
 
-const colorMap: Record<string, string> = {
-  DRAFT: '#f59e0b',
-  FINALIZED: '#31c48d',
-  CANCELLED: '#ef4444',
-}
+const colorMap = SETTLEMENT_STATUS_COLOR_MAP
 
 const amountBreakdown = computed(() => {
   const finalAmount = parseFloat(kpi.value.totalFinalAmount) || 0

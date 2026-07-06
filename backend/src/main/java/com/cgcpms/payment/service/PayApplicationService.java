@@ -33,6 +33,7 @@ import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +55,8 @@ import java.util.stream.Collectors;
 @Service
 // TODO: 拆分超大文件 (667行) — 拆分为 PayApplicationQueryService + PayApplicationWriteService + PayApplicationAssembler
 public class PayApplicationService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final PayApplicationMapper payApplicationMapper;
     private final PayApplicationBasisMapper payApplicationBasisMapper;
@@ -181,28 +184,8 @@ public class PayApplicationService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(PayApplication app) {
-        if (!StringUtils.hasText(app.getApplyCode())) {
-            // Auto-generate apply code: PAY-yyyyMMdd-XXX
-            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-            String prefix = "PAY-" + today + "-";
-
-            LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
-            wrapper.likeRight(PayApplication::getApplyCode, prefix)
-                    .orderByDesc(PayApplication::getApplyCode);
-            Page<PayApplication> page = new Page<>(0, 1);
-            Page<PayApplication> result = payApplicationMapper.selectPage(page, wrapper);
-            PayApplication last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-            int seq = 1;
-            if (last != null && last.getApplyCode() != null && last.getApplyCode().startsWith(prefix)) {
-                try {
-                    seq = Integer.parseInt(last.getApplyCode().substring(last.getApplyCode().lastIndexOf('-') + 1)) + 1;
-                } catch (NumberFormatException e) {
-                    log.warn("Failed to parse sequence number: {}", last.getApplyCode(), e);
-                }
-            }
-            app.setApplyCode(prefix + String.format("%03d", seq));
-        }
+        boolean autoGenerateCode = !StringUtils.hasText(app.getApplyCode());
+        String prefix = "PAY-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
         // Default statuses
         if (app.getPayStatus() == null || app.getPayStatus().isBlank()) {
@@ -213,8 +196,41 @@ public class PayApplicationService {
         }
 
         app.setTenantId(UserContext.getCurrentTenantId());
-        payApplicationMapper.insert(app);
-        return app.getId();
+        if (!autoGenerateCode) {
+            payApplicationMapper.insert(app);
+            return app.getId();
+        }
+
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            app.setApplyCode(nextApplyCode(prefix, attempt));
+            try {
+                payApplicationMapper.insert(app);
+                return app.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("付款申请编号冲突，重试生成 applyCode={}", app.getApplyCode());
+            }
+        }
+        throw new BusinessException("PAY_APPLICATION_CODE_CONFLICT", "付款申请编号生成冲突，请重试");
+    }
+
+    private String nextApplyCode(String prefix, int offset) {
+        LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PayApplication::getTenantId, UserContext.getCurrentTenantId())
+                .likeRight(PayApplication::getApplyCode, prefix)
+                .orderByDesc(PayApplication::getApplyCode);
+        Page<PayApplication> page = new Page<>(0, 1);
+        Page<PayApplication> result = payApplicationMapper.selectPage(page, wrapper);
+        PayApplication last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
+
+        int seq = 1 + offset;
+        if (last != null && last.getApplyCode() != null && last.getApplyCode().startsWith(prefix)) {
+            try {
+                seq = Integer.parseInt(last.getApplyCode().substring(last.getApplyCode().lastIndexOf('-') + 1)) + 1 + offset;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getApplyCode(), e);
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

@@ -87,6 +87,15 @@ public class CodeGenerationService {
                                String prefix,
                                Long tenantId,
                                boolean includeDeleted) {
+        return nextCode(mapper, codeGetter, prefix, tenantId, includeDeleted, 0);
+    }
+
+    public <T> String nextCode(BaseMapper<T> mapper,
+                               SFunction<T, String> codeGetter,
+                               String prefix,
+                               Long tenantId,
+                               boolean includeDeleted,
+                               int offset) {
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String fullPrefix = prefix + today + "-";
 
@@ -98,7 +107,7 @@ public class CodeGenerationService {
                 .likeRight(extractColumnName(codeGetter), fullPrefix)
                 .orderByDesc(extractColumnName(codeGetter));
 
-        return generateNextCodeStr(mapper, wrapper, fullPrefix, tenantId, includeDeleted, codeGetter);
+        return generateNextCodeStr(mapper, wrapper, fullPrefix, tenantId, includeDeleted, codeGetter, offset);
     }
 
     // ---------------------------------------------------------------------
@@ -142,6 +151,16 @@ public class CodeGenerationService {
                                String prefix,
                                Long tenantId,
                                boolean includeDeleted) {
+        return nextCode(mapper, codeColumn, codeGetter, prefix, tenantId, includeDeleted, 0);
+    }
+
+    public <T> String nextCode(BaseMapper<T> mapper,
+                               String codeColumn,
+                               SFunction<T, String> codeGetter,
+                               String prefix,
+                               Long tenantId,
+                               boolean includeDeleted,
+                               int offset) {
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
         String fullPrefix = prefix + today + "-";
 
@@ -151,7 +170,7 @@ public class CodeGenerationService {
                 .likeRight(codeColumn, fullPrefix)
                 .orderByDesc(codeColumn);
 
-        return generateNextCodeStr(mapper, wrapper, fullPrefix, tenantId, includeDeleted, codeGetter);
+        return generateNextCodeStr(mapper, wrapper, fullPrefix, tenantId, includeDeleted, codeGetter, offset);
     }
 
     // ---------------------------------------------------------------------
@@ -186,14 +205,15 @@ public class CodeGenerationService {
                                            String fullPrefix,
                                            Long tenantId,
                                            boolean includeDeleted,
-                                           SFunction<T, String> codeGetter) {
+                                           SFunction<T, String> codeGetter,
+                                           int offset) {
         if (includeDeleted) {
-            return generateWithDeletedStr(mapper, wrapper, fullPrefix, tenantId, codeGetter);
+            return generateWithDeletedStr(mapper, wrapper, fullPrefix, tenantId, codeGetter, offset);
         }
 
         Page<T> page = new Page<>(0, 1);
         Page<T> result = mapper.selectPage(page, wrapper);
-        return parseSeq(result.getRecords(), fullPrefix, codeGetter);
+        return parseSeq(result.getRecords(), fullPrefix, codeGetter, offset);
     }
 
     /**
@@ -226,7 +246,8 @@ public class CodeGenerationService {
                                               QueryWrapper<T> wrapper,
                                               String fullPrefix,
                                               Long tenantId,
-                                              SFunction<T, String> codeGetter) {
+                                              SFunction<T, String> codeGetter,
+                                              int offset) {
         String lastCode = null;
         if (mapper instanceof DeletedCodeSource codeProvider) {
             lastCode = codeProvider.selectLastCodeByPrefix(fullPrefix, tenantId);
@@ -234,10 +255,26 @@ public class CodeGenerationService {
             log.warn("includeDeleted=true 需通过 Mapper 额外声明查询能力，当前 mapper 不支持（将回退到默认路径）");
             Page<T> page = new Page<>(0, 1);
             Page<T> result = mapper.selectPage(page, wrapper);
-            return parseSeq(result.getRecords(), fullPrefix, codeGetter);
+            return parseSeq(result.getRecords(), fullPrefix, codeGetter, offset);
         }
 
-        return parseSeqFromLastCode(lastCode, fullPrefix);
+        return parseSeqFromLastCode(lastCode, fullPrefix, offset);
+    }
+
+    private String parseSeqFromLastCode(String lastCode, String fullPrefix, int offset) {
+        if (lastCode == null) {
+            return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", 1 + offset);
+        }
+
+        int seq = 1 + offset;
+        if (lastCode.length() == fullPrefix.length() + SEQ_LENGTH) {
+            try {
+                seq = Integer.parseInt(lastCode.substring(fullPrefix.length())) + 1 + offset;
+            } catch (NumberFormatException e) {
+                log.warn("解析编码序列号失败: {}", lastCode, e);
+            }
+        }
+        return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", seq);
     }
 
     private String parseSeqFromLastCode(String lastCode, String fullPrefix) {
@@ -258,20 +295,27 @@ public class CodeGenerationService {
 
     private <T> String parseSeq(List<T> records,
                                 String fullPrefix,
-                                SFunction<T, String> codeGetter) {
-        int seq = 1;
+                                SFunction<T, String> codeGetter,
+                                int offset) {
+        int seq = 1 + offset;
         if (!records.isEmpty()) {
             T last = records.get(0);
             String lastCode = codeGetter.apply(last);
             if (lastCode != null && lastCode.length() == fullPrefix.length() + SEQ_LENGTH) {
                 try {
-                    seq = Integer.parseInt(lastCode.substring(fullPrefix.length())) + 1;
+                    seq = Integer.parseInt(lastCode.substring(fullPrefix.length())) + 1 + offset;
                 } catch (NumberFormatException e) {
                     log.warn("解析编码序列号失败: {}", lastCode, e);
                 }
             }
         }
         return fullPrefix + String.format("%0" + SEQ_LENGTH + "d", seq);
+    }
+
+    private <T> String parseSeq(List<T> records,
+                                String fullPrefix,
+                                SFunction<T, String> codeGetter) {
+        return parseSeq(records, fullPrefix, codeGetter, 0);
     }
 
     // ---------------------------------------------------------------------

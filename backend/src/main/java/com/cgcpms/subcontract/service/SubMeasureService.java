@@ -26,6 +26,7 @@ import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -42,6 +43,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SubMeasureService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final SubMeasureMapper subMeasureMapper;
     private final SubMeasureItemMapper subMeasureItemMapper;
@@ -122,25 +125,7 @@ public class SubMeasureService {
         validateSubTaskBelongsToSameContext(measure);
 
         // Auto-generate measure code: SM-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "SM-" + today + "-";
-
-        LambdaQueryWrapper<SubMeasure> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(SubMeasure::getMeasureCode, prefix)
-                .orderByDesc(SubMeasure::getMeasureCode);
-        Page<SubMeasure> page = new Page<>(0, 1);
-        Page<SubMeasure> result = subMeasureMapper.selectPage(page, wrapper);
-        SubMeasure last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1;
-        if (last != null && last.getMeasureCode() != null && last.getMeasureCode().startsWith(prefix)) {
-            try {
-                seq = Integer.parseInt(last.getMeasureCode().substring(last.getMeasureCode().lastIndexOf('-') + 1)) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getMeasureCode(), e);
-            }
-        }
-        measure.setMeasureCode(prefix + String.format("%03d", seq));
+        String prefix = "SM-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
         // Auto-calculate net amount
         calcNetAmount(measure);
@@ -151,8 +136,36 @@ public class SubMeasureService {
         }
 
         measure.setTenantId(UserContext.getCurrentTenantId());
-        subMeasureMapper.insert(measure);
-        return measure.getId();
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            measure.setMeasureCode(nextMeasureCode(prefix, attempt));
+            try {
+                subMeasureMapper.insert(measure);
+                return measure.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("分包计量编号冲突，重试生成 measureCode={}", measure.getMeasureCode());
+            }
+        }
+        throw new BusinessException("SUB_MEASURE_CODE_CONFLICT", "分包计量编号生成冲突，请重试");
+    }
+
+    private String nextMeasureCode(String prefix, int offset) {
+        LambdaQueryWrapper<SubMeasure> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SubMeasure::getTenantId, UserContext.getCurrentTenantId())
+                .likeRight(SubMeasure::getMeasureCode, prefix)
+                .orderByDesc(SubMeasure::getMeasureCode);
+        Page<SubMeasure> page = new Page<>(0, 1);
+        Page<SubMeasure> result = subMeasureMapper.selectPage(page, wrapper);
+        SubMeasure last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
+
+        int seq = 1 + offset;
+        if (last != null && last.getMeasureCode() != null && last.getMeasureCode().startsWith(prefix)) {
+            try {
+                seq = Integer.parseInt(last.getMeasureCode().substring(last.getMeasureCode().lastIndexOf('-') + 1)) + 1 + offset;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getMeasureCode(), e);
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

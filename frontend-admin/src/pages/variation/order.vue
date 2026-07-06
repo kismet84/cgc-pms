@@ -29,11 +29,20 @@ import type { ContractItem } from '@/types/contract'
 import type { CostSubjectTreeNode } from '@/types/costSubject'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import {
+  APPROVAL_STATUS_COLOR,
+  APPROVAL_STATUS_LABEL,
+  DIRECTION_OPTIONS,
+  VAR_TYPE_COLOR,
+  VAR_TYPE_LABEL,
+  VAR_TYPE_OPTIONS,
+  buildVariationGridColumns,
+} from './pageConfig'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
 const APPROVAL_APPROVED = 'APPROVED'
-import { useColumnSettings } from '@/composables/useColumnSettings'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -100,42 +109,6 @@ let itemKeyCounter = 0
 const contractItemsLoading = ref(false)
 const costSubjectOptions = ref<{ value: string; label: string }[]>([])
 
-const VAR_TYPE_OPTIONS = [
-  { label: '设计变更', value: '设计变更' },
-  { label: '现场签证', value: '现场签证' },
-  { label: '索赔', value: '索赔' },
-  { label: '洽商', value: '洽商' },
-]
-
-const DIRECTION_OPTIONS = [
-  { label: '成本', value: 'COST' },
-  { label: '收入', value: 'REVENUE', disabled: true },
-]
-
-const VAR_TYPE_LABEL: Record<string, string> = {
-  设计变更: '设计变更',
-  现场签证: '现场签证',
-  索赔: '索赔',
-  洽商: '洽商',
-}
-const VAR_TYPE_COLOR: Record<string, string> = {
-  设计变更: 'blue',
-  现场签证: 'orange',
-  索赔: 'purple',
-  洽商: 'cyan',
-}
-const APPROVAL_STATUS_LABEL: Record<string, string> = {
-  DRAFT: '草稿',
-  APPROVING: '审批中',
-  APPROVED: '已通过',
-  REJECTED: '已驳回',
-}
-const APPROVAL_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'processing',
-  APPROVING: 'warning',
-  APPROVED: 'success',
-  REJECTED: 'error',
-}
 const APPROVAL_STATUS_DICT = 'approval_status'
 
 function approvalStatusLabel(status: string | undefined): string {
@@ -152,50 +125,9 @@ function calcCodeColumnWidth(values: Array<string | undefined>, title = '变更�
 }
 
 // ---- VxeGrid columns ----
-const gridColumns = computed(() => [
-  {
-    field: 'varCode',
-    title: '变更编号',
-    width: calcCodeColumnWidth(tableData.value.map((item) => item.varCode)),
-    minWidth: 128,
-    showOverflow: false,
-    slots: { default: 'varCode' },
-  },
-  { field: 'varName', title: '变更名称', minWidth: 150, ellipsis: true },
-  { field: 'varType', title: '变更类型', width: 108, slots: { default: 'varType' } },
-  { field: 'direction', title: '方向', width: 70, slots: { default: 'direction' } },
-  { field: 'projectName', title: '项目名称', minWidth: 150, ellipsis: true },
-  { field: 'contractName', title: '合同名称', minWidth: 150, ellipsis: true },
-  { field: 'partnerName', title: '合作方', minWidth: 140, ellipsis: true },
-  {
-    field: 'reportedAmount',
-    title: '上报金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'reportedAmount' },
-  },
-  {
-    field: 'approvedAmount',
-    title: '审定金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'approvedAmount' },
-  },
-  {
-    field: 'confirmedAmount',
-    title: '确认金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'confirmedAmount' },
-  },
-  {
-    field: 'approvalStatus',
-    title: '审批状态',
-    width: 108,
-    slots: { default: 'approvalStatus' },
-  },
-  { key: 'ops', title: '操作', width: 76, align: 'center' as const, headerAlign: 'center' as const, slots: { default: 'ops' } },
-])
+const gridColumns = computed(() =>
+  buildVariationGridColumns(calcCodeColumnWidth(tableData.value.map((item) => item.varCode))),
+)
 const {
   visibleColumns: visibleGridColumns,
   columnSettings,

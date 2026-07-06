@@ -29,6 +29,7 @@ import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.vo.PmProjectVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cgcpms.auth.context.UserContext;
@@ -44,6 +45,8 @@ import com.cgcpms.common.util.DateTimeUtils;
 @Service
 @RequiredArgsConstructor
 public class PmProjectService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final PmProjectMapper pmProjectMapper;
     private final CtContractMapper ctContractMapper;
@@ -143,6 +146,22 @@ public class PmProjectService {
             tenantId = 0L;
         }
 
+        project.setStatus("DRAFT");
+        project.setTenantId(tenantId);
+
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            project.setProjectCode(nextProjectCode(tenantId, prefix, attempt));
+            try {
+                pmProjectMapper.insert(project);
+                return project.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("项目编号冲突，重试生成 projectCode={}", project.getProjectCode());
+            }
+        }
+        throw new BusinessException("PROJECT_CODE_CONFLICT", "项目编号生成冲突，请重试");
+    }
+
+    private String nextProjectCode(Long tenantId, String prefix, int offset) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PmProject::getTenantId, tenantId)
                 .likeRight(PmProject::getProjectCode, prefix)
@@ -151,24 +170,19 @@ public class PmProjectService {
         Page<PmProject> result = pmProjectMapper.selectPage(page, wrapper);
         List<PmProject> list = result.getRecords();
 
-        int seq = 1;
+        int seq = 1 + offset;
         if (!list.isEmpty()) {
             PmProject last = list.get(0);
             if (last.getProjectCode() != null
                     && last.getProjectCode().length() == prefix.length() + 3) {
                 try {
-                    seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1;
+                    seq = Integer.parseInt(last.getProjectCode().substring(prefix.length())) + 1 + offset;
                 } catch (NumberFormatException ex) {
                     log.warn("Failed to parse sequence number: {}", last.getProjectCode(), ex);
                 }
             }
         }
-        project.setProjectCode(prefix + String.format("%03d", seq));
-        project.setStatus("DRAFT");
-        project.setTenantId(tenantId);
-
-        pmProjectMapper.insert(project);
-        return project.getId();
+        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

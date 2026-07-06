@@ -41,6 +41,8 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class StlSettlementWriteService {
 
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
+
     private static final BigDecimal DEFAULT_WARRANTY_RATE = new BigDecimal("0.05");
 
     private final StlSettlementMapper stlSettlementMapper;
@@ -71,24 +73,7 @@ public class StlSettlementWriteService {
         }
 
         // Auto-generate settlement code: STL-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "STL-" + today + "-";
-        LambdaQueryWrapper<StlSettlement> codeWrapper = new LambdaQueryWrapper<>();
-        codeWrapper.eq(StlSettlement::getTenantId, tenantId)
-                .likeRight(StlSettlement::getSettlementCode, prefix)
-                .orderByDesc(StlSettlement::getSettlementCode);
-        Page<StlSettlement> page = new Page<>(0, 1);
-        Page<StlSettlement> result = stlSettlementMapper.selectPage(page, codeWrapper);
-        StlSettlement last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-        int seq = 1;
-        if (last != null && last.getSettlementCode() != null && last.getSettlementCode().startsWith(prefix)) {
-            try {
-                seq = Integer.parseInt(last.getSettlementCode().substring(last.getSettlementCode().lastIndexOf('-') + 1)) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getSettlementCode(), e);
-            }
-        }
-        settlement.setSettlementCode(prefix + String.format("%03d", seq));
+        String prefix = "STL-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
         // Default statuses
         if (settlement.getApprovalStatus() == null || settlement.getApprovalStatus().isBlank()) {
@@ -104,14 +89,43 @@ public class StlSettlementWriteService {
         // Auto-compute amounts
         autoFillAmounts(settlement, contract);
 
-        // Database-level UNIQUE constraint as safety net against TOCTOU race
-        try {
-            stlSettlementMapper.insert(settlement);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("STL_DUPLICATE_SETTLEMENT",
-                    "该合同已存在结算单，不允许重复创建");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            settlement.setSettlementCode(nextSettlementCode(tenantId, prefix, attempt));
+            try {
+                stlSettlementMapper.insert(settlement);
+                return settlement.getId();
+            } catch (DuplicateKeyException e) {
+                Long duplicateContractCount = stlSettlementMapper.selectCount(
+                        new LambdaQueryWrapper<StlSettlement>()
+                                .eq(StlSettlement::getTenantId, tenantId)
+                                .eq(StlSettlement::getContractId, settlement.getContractId()));
+                if (duplicateContractCount > 0) {
+                    throw new BusinessException("STL_DUPLICATE_SETTLEMENT",
+                            "该合同已存在结算单，不允许重复创建");
+                }
+                log.warn("结算单编号冲突，重试生成 settlementCode={}", settlement.getSettlementCode());
+            }
         }
-        return settlement.getId();
+        throw new BusinessException("STL_CODE_CONFLICT", "结算单编号生成冲突，请重试");
+    }
+
+    private String nextSettlementCode(Long tenantId, String prefix, int offset) {
+        LambdaQueryWrapper<StlSettlement> codeWrapper = new LambdaQueryWrapper<>();
+        codeWrapper.eq(StlSettlement::getTenantId, tenantId)
+                .likeRight(StlSettlement::getSettlementCode, prefix)
+                .orderByDesc(StlSettlement::getSettlementCode);
+        Page<StlSettlement> page = new Page<>(0, 1);
+        Page<StlSettlement> result = stlSettlementMapper.selectPage(page, codeWrapper);
+        StlSettlement last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
+        int seq = 1 + offset;
+        if (last != null && last.getSettlementCode() != null && last.getSettlementCode().startsWith(prefix)) {
+            try {
+                seq = Integer.parseInt(last.getSettlementCode().substring(last.getSettlementCode().lastIndexOf('-') + 1)) + 1 + offset;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getSettlementCode(), e);
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     // ================================================================

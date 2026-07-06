@@ -16,6 +16,7 @@ import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.vo.SubTaskVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,6 +32,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SubTaskService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final SubTaskMapper subTaskMapper;
     private final PmProjectMapper pmProjectMapper;
@@ -91,33 +94,43 @@ public class SubTaskService {
         // Force tenantId from authenticated context, ignore client-supplied value
         task.setTenantId(UserContext.getCurrentTenantId());
         // Auto-generate task code: SUB-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "SUB-" + today + "-";
-
-        LambdaQueryWrapper<SubTask> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(SubTask::getTaskCode, prefix)
-                .orderByDesc(SubTask::getTaskCode);
-        Page<SubTask> page = new Page<>(0, 1);
-        Page<SubTask> result = subTaskMapper.selectPage(page, wrapper);
-        SubTask last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1;
-        if (last != null && last.getTaskCode() != null && last.getTaskCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getTaskCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getTaskCode(), e);
-            }
-        }
-        task.setTaskCode(prefix + String.format("%03d", seq));
+        String prefix = "SUB-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
         // Default status
         if (task.getStatus() == null || task.getStatus().isBlank()) {
             task.setStatus("NOT_STARTED");
         }
 
-        subTaskMapper.insert(task);
-        return task.getId();
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            task.setTaskCode(nextTaskCode(prefix, attempt));
+            try {
+                subTaskMapper.insert(task);
+                return task.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("分包任务编号冲突，重试生成 taskCode={}", task.getTaskCode());
+            }
+        }
+        throw new BusinessException("SUB_TASK_CODE_CONFLICT", "分包任务编号生成冲突，请重试");
+    }
+
+    private String nextTaskCode(String prefix, int offset) {
+        LambdaQueryWrapper<SubTask> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SubTask::getTenantId, UserContext.getCurrentTenantId())
+                .likeRight(SubTask::getTaskCode, prefix)
+                .orderByDesc(SubTask::getTaskCode);
+        Page<SubTask> page = new Page<>(0, 1);
+        Page<SubTask> result = subTaskMapper.selectPage(page, wrapper);
+        SubTask last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
+
+        int seq = 1 + offset;
+        if (last != null && last.getTaskCode() != null && last.getTaskCode().length() == prefix.length() + 3) {
+            try {
+                seq = Integer.parseInt(last.getTaskCode().substring(prefix.length())) + 1 + offset;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getTaskCode(), e);
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

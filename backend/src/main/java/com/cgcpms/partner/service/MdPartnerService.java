@@ -12,6 +12,7 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.partner.vo.MdPartnerVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -25,6 +26,8 @@ import com.cgcpms.common.util.DateTimeUtils;
 @Service
 @RequiredArgsConstructor
 public class MdPartnerService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final MdPartnerMapper mdPartnerMapper;
     private final CtContractMapper ctContractMapper;
@@ -61,30 +64,12 @@ public class MdPartnerService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(MdPartner partner) {
         // Auto-generate partner code: PTN-yyyyMMdd-NNN
-        if (!StringUtils.hasText(partner.getPartnerCode())) {
+        boolean autoGenerateCode = !StringUtils.hasText(partner.getPartnerCode());
+        String prefix = null;
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (autoGenerateCode) {
             String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-            String prefix = "PTN-" + today + "-";
-            Long tenantId = UserContext.getCurrentTenantId();
-            LambdaQueryWrapper<MdPartner> codeWrapper = new LambdaQueryWrapper<>();
-            codeWrapper.eq(MdPartner::getTenantId, tenantId)
-                    .likeRight(MdPartner::getPartnerCode, prefix)
-                    .orderByDesc(MdPartner::getPartnerCode);
-            Page<MdPartner> page = new Page<>(0, 1);
-            Page<MdPartner> result = mdPartnerMapper.selectPage(page, codeWrapper);
-            List<MdPartner> list = result.getRecords();
-            int seq = 1;
-            if (!list.isEmpty()) {
-                MdPartner last = list.get(0);
-                if (last.getPartnerCode() != null
-                        && last.getPartnerCode().length() == prefix.length() + 3) {
-                    try {
-                        seq = Integer.parseInt(last.getPartnerCode().substring(prefix.length())) + 1;
-                    } catch (NumberFormatException ex) {
-                        log.warn("Failed to parse partner code sequence: {}", last.getPartnerCode(), ex);
-                    }
-                }
-            }
-            partner.setPartnerCode(prefix + String.format("%03d", seq));
+            prefix = "PTN-" + today + "-";
         }
 
         if (StringUtils.hasText(partner.getPartnerCode()) &&
@@ -94,9 +79,46 @@ public class MdPartnerService {
             throw new BusinessException("PARTNER_CODE_EXISTS", "合作伙伴编码已存在");
         }
         if (partner.getStatus() == null) partner.setStatus("ENABLE");
-        mdPartnerMapper.insert(partner);
-        log.info("Creating partner: {}", partner.getPartnerName());
-        return partner.getId();
+        if (!autoGenerateCode) {
+            mdPartnerMapper.insert(partner);
+            log.info("Creating partner: {}", partner.getPartnerName());
+            return partner.getId();
+        }
+
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            partner.setPartnerCode(nextPartnerCode(tenantId, prefix, attempt));
+            try {
+                mdPartnerMapper.insert(partner);
+                log.info("Creating partner: {}", partner.getPartnerName());
+                return partner.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("合作方编号冲突，重试生成 partnerCode={}", partner.getPartnerCode());
+            }
+        }
+        throw new BusinessException("PARTNER_CODE_CONFLICT", "合作方编号生成冲突，请重试");
+    }
+
+    private String nextPartnerCode(Long tenantId, String prefix, int offset) {
+        LambdaQueryWrapper<MdPartner> codeWrapper = new LambdaQueryWrapper<>();
+        codeWrapper.eq(MdPartner::getTenantId, tenantId)
+                .likeRight(MdPartner::getPartnerCode, prefix)
+                .orderByDesc(MdPartner::getPartnerCode);
+        Page<MdPartner> page = new Page<>(0, 1);
+        Page<MdPartner> result = mdPartnerMapper.selectPage(page, codeWrapper);
+        List<MdPartner> list = result.getRecords();
+        int seq = 1 + offset;
+        if (!list.isEmpty()) {
+            MdPartner last = list.get(0);
+            if (last.getPartnerCode() != null
+                    && last.getPartnerCode().length() == prefix.length() + 3) {
+                try {
+                    seq = Integer.parseInt(last.getPartnerCode().substring(prefix.length())) + 1 + offset;
+                } catch (NumberFormatException ex) {
+                    log.warn("Failed to parse partner code sequence: {}", last.getPartnerCode(), ex);
+                }
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

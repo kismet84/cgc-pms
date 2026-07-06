@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const orderSource = readFileSync(resolve(currentDir, '../order.vue'), 'utf-8')
+const configSource = readFileSync(resolve(currentDir, '../pageConfig.ts'), 'utf-8')
 
 describe('VariationOrderPage save chain integrity', () => {
   describe('createVarOrder returns string (not {id}) — Bug FE-01 fix', () => {
@@ -53,7 +54,8 @@ describe('VariationOrderPage save chain integrity', () => {
     it('rolls back the newly created draft if saveVarOrderItems fails', () => {
       expect(orderSource).toMatch(/const\s+newId\s+=\s+await\s+createVarOrder\(formData\)/)
       expect(orderSource).toMatch(/await\s+saveVarOrderItems\(newId,\s*effectiveItems\)/)
-      expect(orderSource).toMatch(/await\s+deleteVarOrder\(newId\)\.catch\(\(\)\s*=>\s*undefined\)/)
+      expect(orderSource).toMatch(/await\s+deleteVarOrder\(newId\)\.catch\(\(cleanupError: unknown\)\s*=>\s*\{/)
+      expect(orderSource).toContain('console.error(cleanupError)')
     })
   })
 
@@ -72,6 +74,15 @@ describe('VariationOrderPage save chain integrity', () => {
       if (handleEditFn) {
         expect(handleEditFn[0]).not.toMatch(/catch[\s\S]*?itemList\.value\s*=\s*\[\]/)
       }
+    })
+  })
+
+  describe('giant component minimum split', () => {
+    it('extracts static variation config out of the page component', () => {
+      expect(orderSource).toContain("from './pageConfig'")
+      expect(configSource).toContain('export const VAR_TYPE_OPTIONS')
+      expect(configSource).toContain('export const APPROVAL_STATUS_LABEL')
+      expect(configSource).toContain('export function buildVariationGridColumns')
     })
   })
 })

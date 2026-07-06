@@ -52,3 +52,9 @@ describe('PurchaseOrderPage submit-approval button', () => {
     expect(source).toContain('formData.partnerId = undefined')
   })
 })
+
+describe('purchase order page quality guardrails', () => {
+  it('does not open the modal after detail loading fails', () => {
+    expect(source).toMatch(/catch[\s\S]*?message\.error\('加载明细失败'\)[\s\S]*?return/)
+  })
+})

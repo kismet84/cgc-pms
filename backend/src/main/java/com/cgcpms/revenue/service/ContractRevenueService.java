@@ -24,6 +24,7 @@ import com.cgcpms.common.annotation.RateLimit;
 import org.springframework.context.annotation.Lazy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -47,6 +48,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ContractRevenueService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private static final String SOURCE_TYPE_CT_REVENUE = "CT_REVENUE";
     private static final String COST_TYPE_REVENUE_CONFIRMED = "REVENUE_CONFIRMED";
@@ -129,16 +132,26 @@ public class ContractRevenueService {
     public Long create(ContractRevenue revenue) {
         revenue.setTenantId(UserContext.getCurrentTenantId());
         revenue.setApprovalStatus("DRAFT");
-        if (!StringUtils.hasText(revenue.getRevenueCode())) {
-            revenue.setRevenueCode(codeGenerationService.nextCode(
-                mapper, ContractRevenue::getRevenueCode, "RV-", revenue.getTenantId()));
-        }
+        boolean autoGenerateCode = !StringUtils.hasText(revenue.getRevenueCode());
         // 计算含税金额
         if (revenue.getRevenueAmount() != null && revenue.getRevenueTax() != null) {
             revenue.setRevenueAmountWithTax(revenue.getRevenueAmount().add(revenue.getRevenueTax()));
         }
-        mapper.insert(revenue);
-        return revenue.getId();
+        if (!autoGenerateCode) {
+            mapper.insert(revenue);
+            return revenue.getId();
+        }
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            revenue.setRevenueCode(codeGenerationService.nextCode(
+                    mapper, ContractRevenue::getRevenueCode, "RV-", revenue.getTenantId(), false, attempt));
+            try {
+                mapper.insert(revenue);
+                return revenue.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("收入确认编号冲突，重试生成 revenueCode={}", revenue.getRevenueCode());
+            }
+        }
+        throw new BusinessException("REVENUE_CODE_CONFLICT", "收入确认编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)

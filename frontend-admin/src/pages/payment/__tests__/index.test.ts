@@ -11,6 +11,8 @@ describe('payment page quality guardrails', () => {
   it('avoids silent catch blocks in critical payment actions', () => {
     expect(source).not.toContain('catch {')
     expect(source).not.toMatch(/catch\s*\(e\)\s*\{/)
+    expect(source).toContain("message.warning('验收单依据加载失败，可稍后重试')")
+    expect(source).toContain("message.warning('分包计量依据加载失败，可稍后重试')")
     expect(source).toContain("getErrorMessage(e, '删除失败，请稍后重试')")
     expect(source).toContain("getErrorMessage(e, '操作失败，请稍后重试')")
     expect(source).toContain("getErrorMessage(e, '提交审批失败，请稍后重试')")

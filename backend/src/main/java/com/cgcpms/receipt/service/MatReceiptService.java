@@ -20,6 +20,7 @@ import com.cgcpms.receipt.vo.MatReceiptVO;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -33,6 +34,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class MatReceiptService {
 
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
     private static final int ORDER_ITEM_UPDATE_MAX_RETRIES = 3;
 
     private final MatReceiptMapper matReceiptMapper;
@@ -114,26 +116,7 @@ public class MatReceiptService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatReceipt receipt) {
         // Auto-generate receipt code: MR-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "MR-" + today + "-";
-
-        LambdaQueryWrapper<MatReceipt> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(MatReceipt::getReceiptCode, prefix)
-                .eq(MatReceipt::getTenantId, UserContext.getCurrentTenantId())
-                .orderByDesc(MatReceipt::getReceiptCode);
-        Page<MatReceipt> page = new Page<>(0, 1);
-        Page<MatReceipt> result = matReceiptMapper.selectPage(page, wrapper);
-        MatReceipt last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1;
-        if (last != null && last.getReceiptCode() != null && last.getReceiptCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getReceiptCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getReceiptCode(), e);
-            }
-        }
-        receipt.setReceiptCode(prefix + String.format("%03d", seq));
+        String prefix = "MR-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         receipt.setApprovalStatus("DRAFT");
         receipt.setCostGeneratedFlag(0);
 
@@ -147,8 +130,36 @@ public class MatReceiptService {
             if (receipt.getPartnerId() == null) receipt.setPartnerId(order.getPartnerId());
         }
 
-        matReceiptMapper.insert(receipt);
-        return receipt.getId();
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            receipt.setReceiptCode(nextReceiptCode(prefix, attempt));
+            try {
+                matReceiptMapper.insert(receipt);
+                return receipt.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("收货单编号冲突，重试生成 receiptCode={}", receipt.getReceiptCode());
+            }
+        }
+        throw new BusinessException("RECEIPT_CODE_CONFLICT", "收货单编号生成冲突，请重试");
+    }
+
+    private String nextReceiptCode(String prefix, int offset) {
+        LambdaQueryWrapper<MatReceipt> wrapper = new LambdaQueryWrapper<>();
+        wrapper.likeRight(MatReceipt::getReceiptCode, prefix)
+                .eq(MatReceipt::getTenantId, UserContext.getCurrentTenantId())
+                .orderByDesc(MatReceipt::getReceiptCode);
+        Page<MatReceipt> page = new Page<>(0, 1);
+        Page<MatReceipt> result = matReceiptMapper.selectPage(page, wrapper);
+        MatReceipt last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
+
+        int seq = 1 + offset;
+        if (last != null && last.getReceiptCode() != null && last.getReceiptCode().length() == prefix.length() + 3) {
+            try {
+                seq = Integer.parseInt(last.getReceiptCode().substring(prefix.length())) + 1 + offset;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getReceiptCode(), e);
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     @Transactional(rollbackFor = Exception.class)

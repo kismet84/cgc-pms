@@ -26,6 +26,7 @@ import com.cgcpms.workflow.mapper.WfRecordMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -43,6 +44,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CtContractService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final CtContractMapper ctContractMapper;
     private final PmProjectMapper pmProjectMapper;
@@ -163,20 +166,20 @@ public class CtContractService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(CtContract contract) {
         validateContractParties(contract);
-        String code = codeGenerationService.nextCode(
-                ctContractMapper,
-                CtContract::getContractCode,
-                "CT-",
-                UserContext.getCurrentTenantId(),
-                true  // includeDeleted 避免软删除 UK 冲突
-        );
-        contract.setContractCode(code);
         contract.setContractStatus("DRAFT");
         contract.setApprovalStatus("DRAFT");
         contract.setTenantId(UserContext.getCurrentTenantId());
 
-        ctContractMapper.insert(contract);
-        return contract.getId();
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            contract.setContractCode(nextContractCode(attempt));
+            try {
+                ctContractMapper.insert(contract);
+                return contract.getId();
+            } catch (DuplicateKeyException e) {
+                log.warn("合同编号冲突，重试生成 contractCode={}", contract.getContractCode());
+            }
+        }
+        throw new BusinessException("CONTRACT_CODE_CONFLICT", "合同编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -301,19 +304,22 @@ public class CtContractService {
 
         if (contract.getId() == null) {
             // ── 新建 ──
-            String code = codeGenerationService.nextCode(
-                    ctContractMapper,
-                    CtContract::getContractCode,
-                    "CT-",
-                    UserContext.getCurrentTenantId(),
-                    true  // includeDeleted 避免软删除 UK 冲突
-            );
-            contract.setContractCode(code);
             contract.setContractStatus("DRAFT");
             contract.setApprovalStatus("DRAFT");
             contract.setTenantId(UserContext.getCurrentTenantId());
 
-            ctContractMapper.insert(contract);
+            for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+                contract.setContractCode(nextContractCode(attempt));
+                try {
+                    ctContractMapper.insert(contract);
+                    break;
+                } catch (DuplicateKeyException e) {
+                    log.warn("合同编号冲突，重试生成 contractCode={}", contract.getContractCode());
+                    if (attempt == CODE_GENERATION_MAX_RETRIES - 1) {
+                        throw new BusinessException("CONTRACT_CODE_CONFLICT", "合同编号生成冲突，请重试");
+                    }
+                }
+            }
         } else {
             // ── 更新 ──
             CtContract existing = ctContractMapper.selectById(contract.getId());
@@ -351,6 +357,17 @@ public class CtContractService {
         }
 
         return contractId;
+    }
+
+    private String nextContractCode(int offset) {
+        return codeGenerationService.nextCode(
+                ctContractMapper,
+                CtContract::getContractCode,
+                "CT-",
+                UserContext.getCurrentTenantId(),
+                true,  // includeDeleted 避免软删除 UK 冲突
+                offset
+        );
     }
 
     /**
