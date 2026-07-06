@@ -101,12 +101,12 @@ const emit = defineEmits<{
       <div class="receipt-items-section">
         <div class="receipt-items-head">
           <span>验收明细</span>
-          <em>选择采购订单后自动加载订单明细</em>
+          <em>选择采购订单后自动加载验收明细</em>
         </div>
 
         <a-alert
           v-if="hasWarning"
-          message="部分验收数量超过采购订单剩余数量，核实后可继续保存"
+          message="部分验收数量超过采购订单剩余数量，请核实后再保存"
           type="warning"
           show-icon
           :closable="false"

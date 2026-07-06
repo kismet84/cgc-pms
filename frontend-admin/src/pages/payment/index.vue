@@ -582,7 +582,7 @@ onMounted(() => {
         </a-select>
       </div>
       <div class="payment-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
         <a-button size="large" @click="handleReset">
           <template #icon><ReloadOutlined /></template>
           重置
@@ -593,20 +593,20 @@ onMounted(() => {
     <div class="lg-grid payment-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div class="payment-kpi-summary" aria-label="付款关键指标">
-          <div class="payment-kpi-item">
+        <div class="lg-kpi-strip payment-kpi-summary" aria-label="付款关键指标">
+          <div class="lg-kpi-card payment-kpi-item">
             <span class="payment-kpi-icon is-total"><PayCircleOutlined /></span>
             <span class="payment-kpi-label">申请总数</span>
             <span class="payment-kpi-value">{{ total }} <small>单</small></span>
           </div>
-          <div class="payment-kpi-item is-wide">
+          <div class="lg-kpi-card payment-kpi-item is-wide">
             <span class="payment-kpi-icon is-amount"><DollarOutlined /></span>
             <span class="payment-kpi-label">申请金额</span>
             <span class="payment-kpi-value"
               >{{ fmtAmountText(kpiTotalApply) }} <small>万元</small></span
             >
           </div>
-          <div class="payment-kpi-item is-progress">
+          <div class="lg-kpi-card payment-kpi-item is-progress">
             <span class="payment-kpi-icon is-paid"><CheckCircleOutlined /></span>
             <span class="payment-kpi-label">已付金额</span>
             <span class="payment-kpi-value"
@@ -616,7 +616,7 @@ onMounted(() => {
               ><span :style="{ width: paidPct + '%' }"></span
             ></span>
           </div>
-          <div class="payment-kpi-item is-progress is-unpaid">
+          <div class="lg-kpi-card payment-kpi-item is-progress is-unpaid">
             <span class="payment-kpi-icon is-unpaid"><WalletOutlined /></span>
             <span class="payment-kpi-label">待付款金额</span>
             <span class="payment-kpi-value"
@@ -626,7 +626,7 @@ onMounted(() => {
               <span :style="{ width: kpiPct(kpiUnpaid, kpiMax.unpaid) + '%' }"></span>
             </span>
           </div>
-          <div class="payment-kpi-item">
+          <div class="lg-kpi-card payment-kpi-item">
             <span class="payment-kpi-icon is-pending"><ClockCircleOutlined /></span>
             <span class="payment-kpi-label">已批未付</span>
             <span class="payment-kpi-value"
@@ -656,7 +656,7 @@ onMounted(() => {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <span class="payment-toolbar-hint">固定表头 / 状态标签 / 行操作展开</span>
+              <span class="payment-toolbar-hint">申请编号进入单据，行末查看更多操作</span>
             </div>
           </div>
 
@@ -747,7 +747,7 @@ onMounted(() => {
         <div class="payment-analysis-panel">
           <header class="payment-analysis-head">
             <div>
-              <div class="payment-analysis-title">付款分析</div>
+              <div class="payment-analysis-title">辅助分析</div>
               <div class="payment-analysis-subtitle">支付状态、审批状态与待付款</div>
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
@@ -1067,6 +1067,10 @@ onMounted(() => {
   box-shadow: var(--shadow-soft);
 }
 
+.payment-page .lg-left > .payment-kpi-summary {
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+}
+
 .payment-kpi-item {
   position: relative;
   display: grid;
@@ -1252,6 +1256,10 @@ onMounted(() => {
 
 @media (max-width: 1200px) {
   .payment-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .payment-page .lg-left > .payment-kpi-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

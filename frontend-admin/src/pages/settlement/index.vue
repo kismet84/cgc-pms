@@ -360,7 +360,7 @@ function rowSettlementAmount(row: SettlementVO): string {
         </a-select>
       </div>
       <div class="settlement-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
         <a-button size="large" @click="handleReset">
           <template #icon><ReloadOutlined /></template>
           重置
@@ -371,20 +371,20 @@ function rowSettlementAmount(row: SettlementVO): string {
     <div class="lg-grid settlement-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div v-if="!isMobile" class="settlement-kpi-summary" aria-label="结算关键指标">
-          <div class="settlement-kpi-item">
+        <div v-if="!isMobile" class="lg-kpi-strip settlement-kpi-summary" aria-label="结算关键指标">
+          <div class="lg-kpi-card settlement-kpi-item">
             <span class="settlement-kpi-icon is-total"><FileDoneOutlined /></span>
             <span class="settlement-kpi-label">结算总数</span>
             <span class="settlement-kpi-value">{{ kpi.totalCount }} <small>单</small></span>
           </div>
-          <div class="settlement-kpi-item is-wide">
+          <div class="lg-kpi-card settlement-kpi-item is-wide">
             <span class="settlement-kpi-icon is-amount"><DollarOutlined /></span>
             <span class="settlement-kpi-label">合同金额</span>
             <span class="settlement-kpi-value"
               >{{ fmtWan(kpi.totalContractAmount) }} <small>万元</small></span
             >
           </div>
-          <div class="settlement-kpi-item is-progress">
+          <div class="lg-kpi-card settlement-kpi-item is-progress">
             <span class="settlement-kpi-icon is-final"><CheckCircleOutlined /></span>
             <span class="settlement-kpi-label">定案金额</span>
             <span class="settlement-kpi-value"
@@ -398,7 +398,7 @@ function rowSettlementAmount(row: SettlementVO): string {
               ></span
             ></span>
           </div>
-          <div class="settlement-kpi-item is-progress is-paid">
+          <div class="lg-kpi-card settlement-kpi-item is-progress is-paid">
             <span class="settlement-kpi-icon is-paid"><WalletOutlined /></span>
             <span class="settlement-kpi-label">已付金额</span>
             <span class="settlement-kpi-value"
@@ -412,7 +412,7 @@ function rowSettlementAmount(row: SettlementVO): string {
               ></span
             ></span>
           </div>
-          <div class="settlement-kpi-item is-unpaid">
+          <div class="lg-kpi-card settlement-kpi-item is-unpaid">
             <span class="settlement-kpi-icon is-unpaid"><WalletOutlined /></span>
             <span class="settlement-kpi-label">未付金额</span>
             <span class="settlement-kpi-value"
@@ -442,7 +442,7 @@ function rowSettlementAmount(row: SettlementVO): string {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <span class="settlement-toolbar-hint">固定表头 / 金额核对 / 行操作展开</span>
+              <span class="settlement-toolbar-hint">结算编号进入单据，行末查看更多操作</span>
             </div>
           </div>
 
@@ -517,7 +517,7 @@ function rowSettlementAmount(row: SettlementVO): string {
         <div class="settlement-analysis-panel">
           <header class="settlement-analysis-head">
             <div>
-              <div class="settlement-analysis-title">结算分析</div>
+              <div class="settlement-analysis-title">辅助分析</div>
               <div class="settlement-analysis-subtitle">状态、金额结构与付款提醒</div>
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
@@ -709,6 +709,10 @@ function rowSettlementAmount(row: SettlementVO): string {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+}
+
+.settlement-page .lg-left > .settlement-kpi-summary {
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
 }
 
 .settlement-kpi-item {
@@ -904,6 +908,10 @@ function rowSettlementAmount(row: SettlementVO): string {
 
 @media (max-width: 1200px) {
   .settlement-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settlement-page .lg-left > .settlement-kpi-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

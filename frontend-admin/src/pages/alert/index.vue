@@ -420,18 +420,18 @@ const kpiCards = computed(() => [
   {
     key: 'open',
     titleCn: '待处理',
-    titleEn: 'OPEN',
+    titleEn: '',
     value: kpi.value.open,
-    hint: `较昨日 ${Math.max(kpi.value.high - kpi.value.today, 0)}`,
+    hint: '当前待处理',
     icon: BellOutlined,
     tone: 'danger',
   },
   {
     key: 'high',
     titleCn: '高危',
-    titleEn: 'HIGH',
+    titleEn: '',
     value: kpi.value.high,
-    hint: `较昨日 ${Math.max(kpi.value.open - kpi.value.archived, 0)}`,
+    hint: '需优先跟进',
     icon: WarningOutlined,
     tone: 'warning',
   },
@@ -440,16 +440,16 @@ const kpiCards = computed(() => [
     titleCn: '今日触发',
     titleEn: '',
     value: kpi.value.today,
-    hint: `当前页 ${alerts.value.length}`,
+    hint: `当前页 ${alerts.value.length} 条`,
     icon: ThunderboltOutlined,
     tone: 'primary',
   },
   {
     key: 'archived',
     titleCn: '已归档',
-    titleEn: 'ARCHIVED',
+    titleEn: '',
     value: kpi.value.archived,
-    hint: `总计 ${total.value}`,
+    hint: `总计 ${total.value} 条`,
     icon: InboxOutlined,
     tone: 'success',
   },
@@ -531,8 +531,14 @@ function formatDateTime(value: unknown): string {
   return text || '-'
 }
 
-function formatSeverityText(value: string) {
-  return value === 'HIGH' ? 'HIGH' : value === 'MEDIUM' ? 'MEDIUM' : 'LOW'
+function formatSeverityText(value: unknown) {
+  const text = String(value ?? '').trim()
+  const severityMap: Record<string, string> = {
+    HIGH: '高危',
+    MEDIUM: '中危',
+    LOW: '低危',
+  }
+  return severityMap[text] ?? (text || '-')
 }
 
 function buildAlertBusinessPath(record: AlertLogVO): string {
@@ -680,7 +686,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="lg-page app-page alert-page">
+  <div class="lg-list-page lg-page app-page alert-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="lg-page-head-breadcrumb">
@@ -690,13 +696,13 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="alert-shell">
-      <div class="alert-main">
-        <section class="alert-kpi-grid">
+    <div class="lg-grid alert-shell">
+      <div class="lg-left alert-main">
+        <section class="lg-kpi-strip alert-kpi-grid">
           <article
             v-for="card in kpiCards"
             :key="card.key"
-            class="alert-kpi-card"
+            class="lg-kpi-card alert-kpi-card"
             :class="`is-${card.tone}`"
           >
             <div class="alert-kpi-content">
@@ -713,7 +719,7 @@ onMounted(async () => {
           </article>
         </section>
 
-        <section class="alert-panel alert-filter-panel">
+        <section class="lg-search-bar alert-filter-panel">
           <div class="alert-filter-grid">
             <div class="alert-filter-item">
               <label>项目</label>
@@ -790,20 +796,22 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="alert-panel alert-table-panel">
-          <div class="alert-toolbar">
-            <div class="alert-toolbar-left">
+        <section class="lg-list-table-panel alert-table-panel">
+          <div class="lg-toolbar alert-toolbar">
+            <div class="lg-toolbar-left alert-toolbar-left">
               <a-button type="primary" :disabled="selectedCount === 0" @click="handleBatchStatus('PROCESSED')">批量处理</a-button>
               <a-button :disabled="selectedCount === 0" @click="handleBatchMarkRead">标记已读</a-button>
               <a-button :disabled="selectedCount === 0" @click="handleBatchStatus('ARCHIVED')">归档</a-button>
               <a-button @click="exportCurrentView">导出</a-button>
               <span class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>
             </div>
-            <ColumnSettingsButton
-              :columns="columnSettings"
-              :visible="colVisible"
-              @toggle="toggleCol"
-            />
+            <div class="lg-toolbar-right alert-toolbar-right">
+              <ColumnSettingsButton
+                :columns="columnSettings"
+                :visible="colVisible"
+                @toggle="toggleCol"
+              />
+            </div>
           </div>
 
           <div class="lg-table-wrap alert-grid-wrap">
@@ -856,7 +864,7 @@ onMounted(async () => {
               </template>
               <template #processStatus="{ row }">
                 <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(row.processStatus ?? 'OPEN')] ?? 'default'" class="alert-tag">
-                  {{ String(row.processStatus ?? 'OPEN') }}
+                  {{ getProcessStatusLabel(row) }}
                 </a-tag>
               </template>
               <template #isRead="{ row }">
@@ -914,7 +922,7 @@ onMounted(async () => {
         </section>
       </div>
 
-      <aside class="alert-detail-panel">
+      <aside class="lg-analysis-rail lg-panel alert-detail-panel">
         <div class="alert-detail-head">
           <div class="alert-detail-title">告警详情</div>
         </div>
@@ -934,7 +942,7 @@ onMounted(async () => {
               <div class="alert-detail-item">
                 <span>处理状态</span>
                 <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(activeRecord.processStatus ?? 'OPEN')] ?? 'default'">
-                  {{ String(activeRecord.processStatus ?? 'OPEN') }}
+                  {{ getProcessStatusLabel(activeRecord) }}
                 </a-tag>
               </div>
               <div class="alert-detail-item">
@@ -1015,7 +1023,7 @@ onMounted(async () => {
               <div v-for="item in subscriptionRows" :key="item.channel" class="alert-subscription-line">
                 <span>{{ item.label }}</span>
                 <a-switch :checked="item.enabled" disabled size="small" />
-                <span>{{ item.minSeverity }}</span>
+                <span>{{ formatSeverityText(item.minSeverity) }}</span>
               </div>
             </div>
           </section>

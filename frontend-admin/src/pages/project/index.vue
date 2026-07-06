@@ -502,7 +502,7 @@ const {
         </a-select-option>
       </a-select>
       <div class="project-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
         <a-button size="large" @click="handleReset">
           <template #icon><ReloadOutlined /></template>
           重置
@@ -668,13 +668,13 @@ const {
 
     <div class="lg-grid project-workspace">
       <div class="lg-left project-main-column">
-        <div class="project-kpi-summary" aria-label="项目关键指标">
-          <div class="project-kpi-item">
+        <div class="lg-kpi-strip project-kpi-summary" aria-label="项目关键指标">
+          <div class="lg-kpi-card project-kpi-item">
             <span class="project-kpi-icon is-total"><FileTextOutlined /></span>
             <span class="project-kpi-label">项目总数</span>
             <span class="project-kpi-value">{{ projectStats.total || 0 }} <small>个</small></span>
           </div>
-          <div class="project-kpi-item">
+          <div class="lg-kpi-card project-kpi-item">
             <span class="project-kpi-icon is-amount"><DollarOutlined /></span>
             <span class="project-kpi-label">合同总金额</span>
             <span class="project-kpi-value">
@@ -689,19 +689,19 @@ const {
               <small>万元</small>
             </span>
           </div>
-          <div class="project-kpi-item">
+          <div class="lg-kpi-card project-kpi-item">
             <span class="project-kpi-icon is-ongoing"><SafetyCertificateOutlined /></span>
             <span class="project-kpi-label">在建项目</span>
             <span class="project-kpi-value">{{ projectStats.ongoing || 0 }} <small>个</small></span>
           </div>
-          <div class="project-kpi-item">
+          <div class="lg-kpi-card project-kpi-item">
             <span class="project-kpi-icon is-completed"><FlagOutlined /></span>
             <span class="project-kpi-label">已竣工项目</span>
             <span class="project-kpi-value"
               >{{ projectStats.completed || 0 }} <small>个</small></span
             >
           </div>
-          <div class="project-kpi-item is-warn">
+          <div class="lg-kpi-card project-kpi-item is-warn">
             <span class="project-kpi-icon is-risk"><WarningOutlined /></span>
             <span class="project-kpi-label">风险项目</span>
             <span class="project-kpi-value">{{ projectStats.risk || 0 }} <small>个</small></span>
@@ -717,7 +717,7 @@ const {
               </div>
             </div>
             <div class="lg-toolbar-right project-table-toolbar-right">
-              <span class="project-toolbar-hint">编号可进入总览，更多操作收在行末菜单</span>
+              <span class="project-toolbar-hint">编号进入总览，行末查看更多操作</span>
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -884,7 +884,7 @@ const {
         <div class="project-analysis-panel">
           <header class="project-analysis-head">
             <div>
-              <div class="project-analysis-title">项目分析</div>
+              <div class="project-analysis-title">辅助分析</div>
               <div class="project-analysis-subtitle">类型、状态与近期记录</div>
             </div>
           </header>

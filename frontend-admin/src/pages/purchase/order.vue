@@ -322,7 +322,7 @@ function handleSubmitApproval(record: MatPurchaseOrderVO) {
         fetchData()
       } catch (e: unknown) {
         console.error(e)
-        message.error('提交审批失败')
+        message.error('提交审批失败，请稍后重试')
       }
     },
   })
@@ -650,7 +650,7 @@ onMounted(() => {
         </a-select>
       </div>
       <div class="purchase-order-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+        <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
         <a-button size="large" @click="handleReset">
           <template #icon><ReloadOutlined /></template>
           重置
@@ -661,20 +661,20 @@ onMounted(() => {
     <div class="lg-grid purchase-order-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div class="purchase-order-kpi-summary" aria-label="采购订单关键指标">
-          <div class="purchase-order-kpi-item">
+        <div class="lg-kpi-strip purchase-order-kpi-summary" aria-label="采购订单关键指标">
+          <div class="lg-kpi-card purchase-order-kpi-item">
             <span class="purchase-order-kpi-icon is-total"><ShoppingCartOutlined /></span>
             <span class="purchase-order-kpi-label">采购订单数</span>
             <span class="purchase-order-kpi-value">{{ kpiOrderTotal }} <small>单</small></span>
           </div>
-          <div class="purchase-order-kpi-item is-wide">
+          <div class="lg-kpi-card purchase-order-kpi-item is-wide">
             <span class="purchase-order-kpi-icon is-amount"><DollarOutlined /></span>
             <span class="purchase-order-kpi-label">已下单金额</span>
             <span class="purchase-order-kpi-value"
               >{{ fmtWan(kpiOrderedAmount) }} <small>万元</small></span
             >
           </div>
-          <div class="purchase-order-kpi-item is-progress">
+          <div class="lg-kpi-card purchase-order-kpi-item is-progress">
             <span class="purchase-order-kpi-icon is-pending"><ClockCircleOutlined /></span>
             <span class="purchase-order-kpi-label">待审批</span>
             <span class="purchase-order-kpi-value">{{ kpiOrderPending }} <small>单</small></span>
@@ -682,7 +682,7 @@ onMounted(() => {
               <span :style="{ width: kpiPct(kpiOrderPending, kpiMax.totalCount) + '%' }"></span>
             </span>
           </div>
-          <div class="purchase-order-kpi-item is-progress is-unreceived">
+          <div class="lg-kpi-card purchase-order-kpi-item is-progress is-unreceived">
             <span class="purchase-order-kpi-icon is-unreceived"><WalletOutlined /></span>
             <span class="purchase-order-kpi-label">未入库金额</span>
             <span class="purchase-order-kpi-value"
@@ -692,7 +692,7 @@ onMounted(() => {
               <span :style="{ width: kpiPct(kpiUnreceived, kpiMax.totalAmount) + '%' }"></span>
             </span>
           </div>
-          <div class="purchase-order-kpi-item">
+          <div class="lg-kpi-card purchase-order-kpi-item">
             <span class="purchase-order-kpi-icon is-done"><FileDoneOutlined /></span>
             <span class="purchase-order-kpi-label">已完成订单</span>
             <span class="purchase-order-kpi-value">
@@ -722,7 +722,7 @@ onMounted(() => {
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <span class="purchase-order-toolbar-hint">固定表头 / 审批状态 / 行操作展开</span>
+              <span class="purchase-order-toolbar-hint">订单编号进入单据，行末查看更多操作</span>
             </div>
           </div>
 
@@ -805,7 +805,7 @@ onMounted(() => {
         <div class="purchase-order-analysis-panel">
           <header class="purchase-order-analysis-head">
             <div>
-              <div class="purchase-order-analysis-title">订单分析</div>
+              <div class="purchase-order-analysis-title">辅助分析</div>
               <div class="purchase-order-analysis-subtitle">状态、类型与待履约金额</div>
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
@@ -1158,6 +1158,10 @@ onMounted(() => {
   box-shadow: var(--shadow-soft);
 }
 
+.purchase-order-page .lg-left > .purchase-order-kpi-summary {
+  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+}
+
 .purchase-order-kpi-item {
   position: relative;
   display: grid;
@@ -1347,6 +1351,10 @@ onMounted(() => {
 
 @media (max-width: 1200px) {
   .purchase-order-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .purchase-order-page .lg-left > .purchase-order-kpi-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

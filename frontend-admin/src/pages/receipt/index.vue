@@ -197,7 +197,7 @@ onMounted(() => {
         <a-select-option value="UNQUALIFIED">不合格</a-select-option>
         <a-select-option value="PENDING">待检验</a-select-option>
       </a-select>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+      <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
       <a-button size="large" @click="handleReset">
         <template #icon><ReloadOutlined /></template>
         重置
@@ -218,7 +218,7 @@ onMounted(() => {
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
               <div class="receipt-table-title">
-                <strong>验收明细</strong>
+                <strong>材料验收</strong>
                 <span>共 {{ total }} 条</span>
               </div>
               <ColumnSettingsButton
@@ -234,6 +234,9 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
                 刷新
               </a-button>
+            </div>
+            <div class="lg-toolbar-right">
+              <span class="receipt-toolbar-hint">验收单号进入单据，行末查看更多操作</span>
             </div>
           </div>
 
@@ -309,6 +312,13 @@ onMounted(() => {
 
       <aside class="lg-analysis-rail receipt-analysis-rail" aria-label="材料验收辅助分析">
         <div class="receipt-analysis-panel">
+          <header class="receipt-analysis-head">
+            <div>
+              <div class="receipt-analysis-title">辅助分析</div>
+              <div class="receipt-analysis-subtitle">质量状态、验收风险与近期单据</div>
+            </div>
+            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
+          </header>
           <section class="receipt-analysis-section">
             <div class="receipt-section-head">
               <strong>质量状态分布</strong>
@@ -448,6 +458,11 @@ onMounted(() => {
   color: #64748b;
 }
 
+.receipt-toolbar-hint {
+  color: #64748b;
+  font-size: 12px;
+}
+
 .receipt-analysis-rail {
   width: 336px;
 }
@@ -461,6 +476,29 @@ onMounted(() => {
   border-radius: 8px;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
   overflow: hidden;
+}
+
+.receipt-analysis-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.receipt-analysis-title {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+.receipt-analysis-subtitle {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .receipt-analysis-section {

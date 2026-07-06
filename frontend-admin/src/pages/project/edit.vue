@@ -95,6 +95,8 @@ function handleCancel() {
           </a-breadcrumb-item>
           <a-breadcrumb-item>编辑项目</a-breadcrumb-item>
         </a-breadcrumb>
+        <div class="pt-page-title">编辑项目</div>
+        <div class="pj-page-subtitle">维护项目基础资料、周期和合同金额</div>
       </div>
       <div class="pt-head-actions">
         <a-button @click="handleCancel">取消</a-button>
@@ -193,6 +195,16 @@ function handleCancel() {
 </template>
 
 <style scoped>
+.pj-page {
+  background: var(--bg);
+}
+
+.pj-page-subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .pj-form-panel {
   max-width: 920px;
   margin-bottom: 10px;

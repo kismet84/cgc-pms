@@ -115,14 +115,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
+  <div class="lg-list-page lg-page app-page transaction-page">
     <!-- 页面头部 -->
-    <div class="lg-page-head">
-      <div>
-        <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+    <div class="lg-page-head transaction-page-head">
+      <div class="transaction-page-meta">
+        <a-breadcrumb class="transaction-breadcrumb">
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
-          <a-breadcrumb-item>库存交易</a-breadcrumb-item>
+          <a-breadcrumb-item>出入库记录</a-breadcrumb-item>
         </a-breadcrumb>
+        <div class="transaction-page-title">出入库记录</div>
+        <span class="transaction-page-subtitle">按仓库和物料快速登记入库、出库业务</span>
       </div>
     </div>
 
@@ -130,175 +132,358 @@ onMounted(() => {
     <div class="lg-kpi-strip">
       <div class="lg-kpi-card">
         <span class="lg-kpi-card-label">入库操作</span>
-        <span class="lg-kpi-card-value" style="color: #22c55e">快捷</span>
-        <span class="lg-kpi-card-bar"><span style="width: 100%; background: #22c55e"></span></span>
+        <span class="lg-kpi-card-value" style="color: #22c55e">登记</span>
+        <span class="lg-kpi-card-hint">库存数量增加</span>
       </div>
       <div class="lg-kpi-card is-warn">
         <span class="lg-kpi-card-label">出库操作</span>
-        <span class="lg-kpi-card-value" style="color: #ef4444">快捷</span>
-        <span class="lg-kpi-card-bar"><span style="width: 100%; background: #ef4444"></span></span>
+        <span class="lg-kpi-card-value" style="color: #ef4444">登记</span>
+        <span class="lg-kpi-card-hint">库存数量扣减</span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">可用仓库</span>
+        <span class="lg-kpi-card-value">{{ warehouseList.length }} <small>个</small></span>
+        <span class="lg-kpi-card-hint">仅展示启用仓库</span>
+      </div>
+      <div class="lg-kpi-card">
+        <span class="lg-kpi-card-label">物料范围</span>
+        <span class="lg-kpi-card-value">{{ materialList.length }} <small>项</small></span>
+        <span class="lg-kpi-card-hint">来自基础资料</span>
       </div>
     </div>
 
-    <div class="lg-toolbar" style="margin-bottom: 0">
-      <a-tabs v-model:activeKey="activeTab">
-        <a-tab-pane key="in" tab="入库" />
-        <a-tab-pane key="out" tab="出库" />
-      </a-tabs>
-    </div>
+    <div class="lg-grid transaction-workspace">
+      <div class="lg-left">
+        <main class="lg-list-table-panel transaction-form-panel">
+          <div class="lg-toolbar">
+            <div class="lg-toolbar-left">
+              <span class="transaction-section-title">库存变动登记</span>
+              <span class="transaction-section-hint">选择业务类型后提交对应库存变动</span>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-tabs v-model:activeKey="activeTab" class="transaction-tabs">
+                <a-tab-pane key="in" tab="入库" />
+                <a-tab-pane key="out" tab="出库" />
+              </a-tabs>
+            </div>
+          </div>
 
-    <div class="lg-panel" style="padding: 24px 28px">
-      <!-- Stock In Form -->
-      <div v-if="activeTab === 'in'">
-        <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
-          <a-form-item label="仓库" required>
-            <a-select
-              v-model:value="inForm.warehouseId"
-              placeholder="请选择仓库"
-              style="width: 300px"
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-            >
-              <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-                {{ w.warehouseName }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item label="物料" required>
-            <a-select
-              v-model:value="inForm.materialId"
-              placeholder="请选择物料"
-              style="width: 300px"
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-            >
-              <a-select-option
-                v-for="m in materialList"
-                :key="m.id"
-                :value="m.id"
-                :label="m.materialName"
-              >
-                <div>
-                  <span>{{ m.materialName }}</span>
-                  <span style="color: var(--muted); font-size: 12px; margin-left: 8px">{{
-                    m.materialCode
-                  }}</span>
-                </div>
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item label="入库数量" required>
-            <a-input-number
-              v-model:value="inForm.quantity"
-              :min="0.0001"
-              :precision="4"
-              style="width: 200px"
-              placeholder="请输入数量"
-              addon-after=""
-            >
-              <template #addonAfter>
-                <span style="min-width: 30px; display: inline-block">
-                  {{ getMaterialInfo(inForm.materialId ?? '')?.unit ?? '' }}
-                </span>
-              </template>
-            </a-input-number>
-          </a-form-item>
-          <a-form-item :wrapper-col="{ offset: 4 }">
-            <a-button
-              v-if="canSubmitTransaction"
-              type="primary"
-              :loading="inSubmitting"
-              @click="handleStockIn"
-              style="width: 120px"
-            >
-              确认入库
-            </a-button>
-          </a-form-item>
-        </a-form>
+          <div class="transaction-form-body">
+            <!-- Stock In Form -->
+            <div v-if="activeTab === 'in'">
+              <a-form layout="vertical" class="transaction-form">
+                <a-form-item label="仓库" required>
+                  <a-select
+                    v-model:value="inForm.warehouseId"
+                    placeholder="请选择仓库"
+                    show-search
+                    :filter-option="
+                      (input: string, option: SelectOption) =>
+                        option.label?.toLowerCase().includes(input.toLowerCase())
+                    "
+                  >
+                    <a-select-option
+                      v-for="w in warehouseList"
+                      :key="w.id"
+                      :value="w.id"
+                      :label="w.warehouseName"
+                    >
+                      {{ w.warehouseName }}
+                    </a-select-option>
+                  </a-select>
+                </a-form-item>
+                <a-form-item label="物料" required>
+                  <a-select
+                    v-model:value="inForm.materialId"
+                    placeholder="请选择物料"
+                    show-search
+                    :filter-option="
+                      (input: string, option: SelectOption) =>
+                        option.label?.toLowerCase().includes(input.toLowerCase())
+                    "
+                  >
+                    <a-select-option
+                      v-for="m in materialList"
+                      :key="m.id"
+                      :value="m.id"
+                      :label="`${m.materialName} ${m.materialCode ?? ''}`"
+                    >
+                      <div>
+                        <span>{{ m.materialName }}</span>
+                        <span class="transaction-option-code">{{ m.materialCode }}</span>
+                      </div>
+                    </a-select-option>
+                  </a-select>
+                </a-form-item>
+                <a-form-item label="入库数量" required>
+                  <a-input-number
+                    v-model:value="inForm.quantity"
+                    :min="0.0001"
+                    :precision="4"
+                    class="transaction-quantity"
+                    placeholder="请输入数量"
+                    addon-after=""
+                  >
+                    <template #addonAfter>
+                      <span class="transaction-unit">
+                        {{ getMaterialInfo(inForm.materialId ?? '')?.unit ?? '' }}
+                      </span>
+                    </template>
+                  </a-input-number>
+                </a-form-item>
+                <a-form-item>
+                  <a-button
+                    v-if="canSubmitTransaction"
+                    type="primary"
+                    :loading="inSubmitting"
+                    @click="handleStockIn"
+                  >
+                    确认入库
+                  </a-button>
+                </a-form-item>
+              </a-form>
+            </div>
+
+            <!-- Stock Out Form -->
+            <div v-else>
+              <a-form layout="vertical" class="transaction-form">
+                <a-form-item label="仓库" required>
+                  <a-select
+                    v-model:value="outForm.warehouseId"
+                    placeholder="请选择仓库"
+                    show-search
+                    :filter-option="
+                      (input: string, option: SelectOption) =>
+                        option.label?.toLowerCase().includes(input.toLowerCase())
+                    "
+                  >
+                    <a-select-option
+                      v-for="w in warehouseList"
+                      :key="w.id"
+                      :value="w.id"
+                      :label="w.warehouseName"
+                    >
+                      {{ w.warehouseName }}
+                    </a-select-option>
+                  </a-select>
+                </a-form-item>
+                <a-form-item label="物料" required>
+                  <a-select
+                    v-model:value="outForm.materialId"
+                    placeholder="请选择物料"
+                    show-search
+                    :filter-option="
+                      (input: string, option: SelectOption) =>
+                        option.label?.toLowerCase().includes(input.toLowerCase())
+                    "
+                  >
+                    <a-select-option
+                      v-for="m in materialList"
+                      :key="m.id"
+                      :value="m.id"
+                      :label="`${m.materialName} ${m.materialCode ?? ''}`"
+                    >
+                      <div>
+                        <span>{{ m.materialName }}</span>
+                        <span class="transaction-option-code">{{ m.materialCode }}</span>
+                      </div>
+                    </a-select-option>
+                  </a-select>
+                </a-form-item>
+                <a-form-item label="出库数量" required>
+                  <a-input-number
+                    v-model:value="outForm.quantity"
+                    :min="0.0001"
+                    :precision="4"
+                    class="transaction-quantity"
+                    placeholder="请输入数量"
+                  >
+                    <template #addonAfter>
+                      <span class="transaction-unit">
+                        {{ getMaterialInfo(outForm.materialId ?? '')?.unit ?? '' }}
+                      </span>
+                    </template>
+                  </a-input-number>
+                </a-form-item>
+                <a-form-item>
+                  <a-button
+                    v-if="canSubmitTransaction"
+                    type="primary"
+                    danger
+                    :loading="outSubmitting"
+                    @click="handleStockOut"
+                  >
+                    确认出库
+                  </a-button>
+                </a-form-item>
+              </a-form>
+            </div>
+          </div>
+        </main>
       </div>
 
-      <!-- Stock Out Form -->
-      <div v-else>
-        <a-form :label-col="{ span: 4 }" :wrapper-col="{ span: 14 }">
-          <a-form-item label="仓库" required>
-            <a-select
-              v-model:value="outForm.warehouseId"
-              placeholder="请选择仓库"
-              style="width: 300px"
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-            >
-              <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-                {{ w.warehouseName }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item label="物料" required>
-            <a-select
-              v-model:value="outForm.materialId"
-              placeholder="请选择物料"
-              style="width: 300px"
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-            >
-              <a-select-option
-                v-for="m in materialList"
-                :key="m.id"
-                :value="m.id"
-                :label="m.materialName"
-              >
-                <div>
-                  <span>{{ m.materialName }}</span>
-                  <span style="color: var(--muted); font-size: 12px; margin-left: 8px">{{
-                    m.materialCode
-                  }}</span>
-                </div>
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item label="出库数量" required>
-            <a-input-number
-              v-model:value="outForm.quantity"
-              :min="0.0001"
-              :precision="4"
-              style="width: 200px"
-              placeholder="请输入数量"
-            >
-              <template #addonAfter>
-                <span style="min-width: 30px; display: inline-block">
-                  {{ getMaterialInfo(outForm.materialId ?? '')?.unit ?? '' }}
-                </span>
-              </template>
-            </a-input-number>
-          </a-form-item>
-          <a-form-item :wrapper-col="{ offset: 4 }">
-            <a-button
-              v-if="canSubmitTransaction"
-              type="primary"
-              danger
-              :loading="outSubmitting"
-              @click="handleStockOut"
-              style="width: 120px"
-            >
-              确认出库
-            </a-button>
-          </a-form-item>
-        </a-form>
-      </div>
+      <aside class="lg-analysis-rail transaction-rail">
+        <section class="lg-panel transaction-rail-card">
+          <div class="transaction-rail-title">操作提示</div>
+          <ul class="transaction-rail-list">
+            <li><span>入库</span><b>增加可用库存</b></li>
+            <li><span>出库</span><b>扣减可用库存</b></li>
+            <li>
+              <span>权限</span><b>{{ canSubmitTransaction ? '可提交' : '仅查看' }}</b>
+            </li>
+          </ul>
+        </section>
+        <section class="lg-panel transaction-rail-card">
+          <div class="transaction-rail-title">库存域入口</div>
+          <div class="transaction-rail-text">
+            登记完成后可返回库存台账，按仓库、物料或来源单据搜索流水。
+          </div>
+        </section>
+      </aside>
     </div>
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.transaction-page-head {
+  min-height: 0;
+  padding: 0;
+}
+
+.transaction-page-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.transaction-breadcrumb {
+  font-size: 13px;
+}
+
+.transaction-page-title {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 30px;
+}
+
+.transaction-page-subtitle,
+.transaction-section-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.transaction-workspace {
+  margin-top: 0;
+}
+
+.transaction-form-panel {
+  min-height: 360px;
+}
+
+.transaction-section-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.transaction-tabs {
+  margin-bottom: -16px;
+}
+
+.transaction-tabs :deep(.ant-tabs-nav) {
+  margin: 0;
+}
+
+.transaction-form-body {
+  padding: 20px;
+}
+
+.transaction-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto;
+  gap: 12px 16px;
+  align-items: end;
+}
+
+.transaction-form :deep(.ant-form-item) {
+  margin-bottom: 0;
+}
+
+.transaction-quantity {
+  width: 100%;
+}
+
+.transaction-option-code,
+.transaction-unit {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.transaction-option-code {
+  margin-left: 8px;
+}
+
+.transaction-unit {
+  display: inline-block;
+  min-width: 30px;
+}
+
+.transaction-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transaction-rail-card {
+  padding: 16px;
+}
+
+.transaction-rail-title {
+  margin-bottom: 12px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.transaction-rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.transaction-rail-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.transaction-rail-list b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.transaction-rail-text {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+@media (max-width: 1100px) {
+  .transaction-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .transaction-form {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

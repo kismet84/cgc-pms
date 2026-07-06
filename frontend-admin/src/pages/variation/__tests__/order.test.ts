@@ -24,7 +24,7 @@ describe('VariationOrderPage submit-approval button', () => {
   })
 
   it('renders 提交审批 button only when approvalStatus is DRAFT', () => {
-    expect(source).toMatch(/approvalStatus\s*===\s*'DRAFT'/)
+    expect(source).toMatch(/approvalStatus\s*===\s*APPROVAL_DRAFT/)
   })
 
   it('wires 提交审批 button to handleSubmitApproval handler', () => {

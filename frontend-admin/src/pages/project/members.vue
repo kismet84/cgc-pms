@@ -182,6 +182,7 @@ const {
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目成员</a-breadcrumb-item>
         </a-breadcrumb>
+        <div class="pt-page-title">项目成员</div>
         <div v-if="store.currentProject" class="pm-title-project">
           {{ store.currentProject.projectName }}
         </div>
@@ -361,6 +362,10 @@ const {
 </template>
 
 <style scoped>
+.pm-page {
+  background: var(--bg);
+}
+
 .pm-title-project {
   margin-top: 4px;
   font-size: 13px;

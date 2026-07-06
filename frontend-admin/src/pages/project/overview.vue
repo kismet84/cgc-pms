@@ -136,6 +136,8 @@ onMounted(() => {
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
           <a-breadcrumb-item>项目总览</a-breadcrumb-item>
         </a-breadcrumb>
+        <div class="pt-page-title">项目总览</div>
+        <div class="overview-page-subtitle">汇总项目经营、成员和关键风险信息</div>
       </div>
     </div>
 
@@ -287,6 +289,12 @@ onMounted(() => {
 <style scoped>
 .overview {
   min-height: 100%;
+  background: var(--bg);
+}
+.overview-page-subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
 }
 .overview-summary {
   display: flex;

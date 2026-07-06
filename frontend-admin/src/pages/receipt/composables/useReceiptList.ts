@@ -184,7 +184,7 @@ export function useReceiptList() {
           fetchData()
         } catch (e: unknown) {
           console.error(e)
-          message.error('提交审批失败')
+          message.error('提交审批失败，请稍后重试')
         }
       },
     })

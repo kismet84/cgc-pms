@@ -45,7 +45,12 @@ const emit = defineEmits<{
       "
       @update:value="(v: string | undefined) => emit('update:warehouseId', v)"
     >
-      <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
+      <a-select-option
+        v-for="w in warehouseList"
+        :key="w.id"
+        :value="w.id"
+        :label="w.warehouseName"
+      >
         {{ w.warehouseName }}
       </a-select-option>
     </a-select>
@@ -62,11 +67,16 @@ const emit = defineEmits<{
       "
       @update:value="(v: string | undefined) => emit('update:materialId', v)"
     >
-      <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
+      <a-select-option
+        v-for="m in materialList"
+        :key="m.id"
+        :value="m.id"
+        :label="`${m.materialName} ${m.materialCode ?? ''}`"
+      >
         {{ m.materialName }} <span style="color: var(--muted)">({{ m.materialCode }})</span>
       </a-select-option>
     </a-select>
-    <a-button type="primary" size="large" @click="emit('search')">查询</a-button>
+    <a-button type="primary" size="large" @click="emit('search')">搜索</a-button>
     <a-button size="large" @click="emit('reset')">
       <template #icon><ReloadOutlined /></template>
       重置

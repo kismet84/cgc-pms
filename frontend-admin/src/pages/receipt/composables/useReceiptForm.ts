@@ -77,7 +77,7 @@ export function useReceiptForm(
       }))
     } catch (e: unknown) {
       console.error(e)
-      message.error('加载验收明细失败')
+      message.error('加载验收明细失败，请稍后重试')
       itemList.value = []
     }
     modalVisible.value = true
@@ -107,7 +107,7 @@ export function useReceiptForm(
       }))
     } catch (e: unknown) {
       console.error(e)
-      message.error('加载采购订单明细失败')
+      message.error('加载采购订单明细失败，请稍后重试')
       itemList.value = []
     }
   }
@@ -178,7 +178,7 @@ export function useReceiptForm(
       } else {
         const result = await createReceipt(formData)
         receiptId = result
-        message.success('创建成功')
+        message.success('保存成功')
       }
 
       // Save line items

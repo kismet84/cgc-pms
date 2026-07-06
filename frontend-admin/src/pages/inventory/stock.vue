@@ -82,6 +82,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>库存台账</a-breadcrumb-item>
         </a-breadcrumb>
+        <div class="stock-page-title">库存台账</div>
         <span class="stock-page-subtitle"
           >按仓库和物料核对库存余额，追踪出入库流水与低库存风险</span
         >
@@ -144,6 +145,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <div class="lg-toolbar-left">
               <span class="stock-table-title">出入库流水</span>
               <span class="stock-table-count">共 {{ txnTotal }} 条</span>
+              <span class="stock-toolbar-hint">按筛选条件展示库存变动明细</span>
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
@@ -299,6 +301,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   line-height: 20px;
 }
 
+.stock-page-title {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 30px;
+}
+
 .stock-page-subtitle {
   color: var(--text-secondary);
   font-size: 13px;
@@ -324,5 +333,10 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .stock-table-count {
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.stock-toolbar-hint {
+  color: var(--muted);
+  font-size: 12px;
 }
 </style>

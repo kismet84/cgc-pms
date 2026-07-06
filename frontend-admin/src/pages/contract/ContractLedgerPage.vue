@@ -63,7 +63,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       <div class="cl-page-meta-row">
         <a-breadcrumb class="cl-breadcrumb">
           <a-breadcrumb-item>合同管理</a-breadcrumb-item>
-          <a-breadcrumb-item>合同列表</a-breadcrumb-item>
+          <a-breadcrumb-item>合同台账</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
     </div>
@@ -153,7 +153,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </div>
             </div>
             <div class="lg-toolbar-right cl-table-toolbar-right">
-              <span class="cl-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
+              <span class="cl-toolbar-hint">编号进入详情，行末查看更多操作</span>
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
@@ -204,7 +204,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 <ContractStatusTag :status="row.contractStatus as ContractStatus" />
               </template>
               <template #ops="{ row }">
-                <a-dropdown :trigger="['click']">
+                <a-dropdown class="cl-row-actions" :trigger="['click']">
                   <a-button
                     class="lg-row-action-trigger"
                     size="small"
@@ -238,7 +238,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           />
 
           <div class="lg-pagination cl-pagination">
-            <span class="lg-total">第 {{ pageNo }} 页</span>
+            <span class="lg-total">共 {{ total }} 条</span>
             <a-pagination
               v-model:current="pageNo"
               v-model:page-size="pageSize"

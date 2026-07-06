@@ -30,7 +30,7 @@ describe('readonly permission governance page', () => {
     expect(routerSource).toContain("path: 'permissions'")
     expect(routerSource).toContain("name: 'SystemPermissions'")
     expect(routerSource).toContain("@/pages/system/permissions/index.vue")
-    expect(navigationSource).toContain("{ key: '/system/permissions', label: '权限清单' }")
+    expect(navigationSource).toContain("{ key: '/system/permissions', label: '权限清单', adminOnly: true }")
   })
 
   it('keeps menu permission code in the front-end menu tree type', () => {
