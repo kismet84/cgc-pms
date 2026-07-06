@@ -2,6 +2,7 @@ package com.cgcpms.config;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -30,6 +31,9 @@ class AsyncConfigTest {
 
     @Autowired
     private AsyncConfigurer asyncConfigurer;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @Test
     @DisplayName("默认异步执行器应为统一 ThreadPoolTaskExecutor")
@@ -63,5 +67,16 @@ class AsyncConfigTest {
     void asyncUncaughtExceptionHandlerShouldExist() {
         AsyncUncaughtExceptionHandler handler = asyncConfigurer.getAsyncUncaughtExceptionHandler();
         assertNotNull(handler);
+    }
+
+    @Test
+    @DisplayName("异步线程池应注册 Micrometer executor 指标")
+    void shouldRegisterThreadPoolExecutorMetrics() {
+        applicationContext.getBean("taskExecutor", Executor.class);
+
+        assertNotNull(meterRegistry.find("executor.completed")
+                .tag("name", "cgc.pms.async")
+                .tag("executor", "taskExecutor")
+                .functionCounter());
     }
 }

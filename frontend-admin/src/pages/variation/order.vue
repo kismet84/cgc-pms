@@ -304,7 +304,8 @@ async function openVarOrderModal(record: VarOrderVO, readonly: boolean) {
     const detail = await getVarOrderDetail(record.id)
     itemList.value = (detail.items ?? []).map((it, idx) => ({ ...it, key: idx }))
     itemKeyCounter = itemList.value.length
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     message.error('加载变更明细失败，请稍后重试')
     return
   }
@@ -386,8 +387,10 @@ async function handleSubmit() {
       const newId = await createVarOrder(formData)
       try {
         await saveVarOrderItems(newId, effectiveItems)
-      } catch (e) {
-        await deleteVarOrder(newId).catch(() => undefined)
+      } catch (e: unknown) {
+        await deleteVarOrder(newId).catch((cleanupError: unknown) => {
+          console.error(cleanupError)
+        })
         throw e
       }
       message.success('创建成功')
@@ -396,6 +399,7 @@ async function handleSubmit() {
     fetchData()
   } catch (e: unknown) {
     console.error(e)
+    message.error('保存签证失败')
   }
 }
 

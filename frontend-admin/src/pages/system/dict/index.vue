@@ -13,6 +13,7 @@ import {
   deleteDictData,
 } from '@/api/modules/dict'
 import type { DictTypeVO, DictDataVO } from '@/types/dict'
+import { DICT_DATA_GRID_COLUMNS, DICT_STATUS_LABEL } from './dictPageConfig'
 
 /* ========== 字典类型列表（左侧） ========== */
 
@@ -180,22 +181,7 @@ const dataForm = reactive({
   status: 'ENABLED',
 })
 
-const STATUS_LABEL: Record<string, string> = {
-  ENABLE: '启用',
-  ENABLED: '启用',
-  DISABLE: '禁用',
-  DISABLED: '禁用',
-}
-
-const dataGridColumns = computed(() => [
-  { field: 'dictLabel', title: '字典标签', minWidth: 140 },
-  { field: 'dictValue', title: '字典键值', width: 140 },
-  { field: 'orderNum', title: '排序', width: 80, align: 'right' as const },
-  { field: 'cssClass', title: '样式类名', width: 120 },
-  { field: 'statusLabel', title: '状态', width: 88 },
-  { field: 'createdAt', title: '创建时间', width: 170 },
-  { title: '操作', width: 76, slots: { default: 'ops' } },
-])
+const dataGridColumns = computed(() => [...DICT_DATA_GRID_COLUMNS])
 
 async function fetchDataList() {
   if (!selectedTypeId.value) {
@@ -215,7 +201,7 @@ async function fetchDataList() {
     const records = Array.isArray(res?.records) ? res.records : Array.isArray(res) ? res : []
     dataTableData.value = records.map((item) => ({
       ...item,
-      statusLabel: STATUS_LABEL[item.status] ?? item.status,
+      statusLabel: DICT_STATUS_LABEL[item.status] ?? item.status,
     }))
     dataTotal.value = Number(res?.total ?? records.length)
   } catch (e: unknown) {

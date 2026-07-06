@@ -1,6 +1,7 @@
 package com.cgcpms.cost.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
@@ -70,54 +71,42 @@ public class CostLedgerService {
     public CostLedgerSummaryVO getSummary(Long projectId, Long contractId, Long partnerId, Long costSubjectId,
                                            String costType, String sourceType, String costStatus,
                                            LocalDate startDate, LocalDate endDate, String keyword) {
-        LambdaQueryWrapper<CostItem> wrapper = buildFilterWrapper(
+        QueryWrapper<CostItem> totalWrapper = buildSummaryFilterWrapper(
                 projectId, contractId, partnerId, costSubjectId,
-                costType, sourceType, costStatus,
-                startDate, endDate, keyword);
+                costType, sourceType, costStatus, startDate, endDate, keyword);
+        totalWrapper.select("COALESCE(SUM(amount), 0) AS total_amount",
+                "COALESCE(SUM(tax_amount), 0) AS total_tax_amount");
+        Map<String, Object> totalRow = firstMap(costItemMapper.selectMaps(totalWrapper));
 
-        List<CostItem> items = costItemMapper.selectList(wrapper);
+        Map<String, BigDecimal> bySourceType = selectGroupedAmounts(
+                "COALESCE(source_type, 'UNKNOWN')", projectId, contractId, partnerId, costSubjectId,
+                costType, sourceType, costStatus, startDate, endDate, keyword);
+        Map<String, BigDecimal> byProjectId = selectGroupedAmounts(
+                "project_id", projectId, contractId, partnerId, costSubjectId,
+                costType, sourceType, costStatus, startDate, endDate, keyword);
+        Map<String, BigDecimal> byCostType = selectGroupedAmounts(
+                "COALESCE(cost_type, 'UNKNOWN')", projectId, contractId, partnerId, costSubjectId,
+                costType, sourceType, costStatus, startDate, endDate, keyword);
 
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        BigDecimal totalTaxAmount = BigDecimal.ZERO;
-        Map<String, BigDecimal> bySourceType = new LinkedHashMap<>();
-        Map<String, BigDecimal> byProjectRaw = new LinkedHashMap<>();
-        Map<String, BigDecimal> byCostType = new LinkedHashMap<>();
-
-        // Batch resolve project names for display
-        Set<Long> projectIds = items.stream()
-                .map(CostItem::getProjectId)
+        Set<Long> projectIds = byProjectId.keySet().stream()
+                .map(this::parseLong)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
                 : pmProjectMapper.selectBatchIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
-
-        for (CostItem item : items) {
-            BigDecimal amount = item.getAmount() != null ? item.getAmount() : BigDecimal.ZERO;
-            BigDecimal taxAmount = item.getTaxAmount() != null ? item.getTaxAmount() : BigDecimal.ZERO;
-
-            totalAmount = totalAmount.add(amount);
-            totalTaxAmount = totalTaxAmount.add(taxAmount);
-
-            // By source type
-            String st = item.getSourceType() != null ? item.getSourceType() : "UNKNOWN";
-            bySourceType.merge(st, amount, BigDecimal::add);
-
-            // By project (use project name if available, else projectId)
-            String projKey = projectNames.getOrDefault(item.getProjectId(),
-                    item.getProjectId() != null ? item.getProjectId().toString() : "UNKNOWN");
-            byProjectRaw.merge(projKey, amount, BigDecimal::add);
-
-            // By cost type
-            String ct = item.getCostType() != null ? item.getCostType() : "UNKNOWN";
-            byCostType.merge(ct, amount, BigDecimal::add);
-        }
+        Map<String, BigDecimal> byProject = new LinkedHashMap<>();
+        byProjectId.forEach((id, amount) -> {
+            Long parsed = parseLong(id);
+            String key = parsed == null ? "UNKNOWN" : projectNames.getOrDefault(parsed, id);
+            byProject.merge(key, amount, BigDecimal::add);
+        });
 
         CostLedgerSummaryVO summary = new CostLedgerSummaryVO();
-        summary.setTotalAmount(totalAmount.toPlainString());
-        summary.setTotalTaxAmount(totalTaxAmount.toPlainString());
+        summary.setTotalAmount(toBigDecimal(totalRow, "totalAmount", "total_amount").toPlainString());
+        summary.setTotalTaxAmount(toBigDecimal(totalRow, "totalTaxAmount", "total_tax_amount").toPlainString());
         summary.setBySourceType(convertToStringMap(bySourceType));
-        summary.setByProject(convertToStringMap(byProjectRaw));
+        summary.setByProject(convertToStringMap(byProject));
         summary.setByCostType(convertToStringMap(byCostType));
         return summary;
     }
@@ -182,6 +171,84 @@ public class CostLedgerService {
         }
         wrapper.orderByDesc(CostItem::getCostDate, CostItem::getCreatedAt);
         return wrapper;
+    }
+
+    private QueryWrapper<CostItem> buildSummaryFilterWrapper(
+            Long projectId, Long contractId, Long partnerId, Long costSubjectId,
+            String costType, String sourceType, String costStatus,
+            LocalDate startDate, LocalDate endDate, String keyword) {
+        QueryWrapper<CostItem> wrapper = new QueryWrapper<>();
+        wrapper.eq("tenant_id", UserContext.getCurrentTenantId());
+        if (projectId != null) wrapper.eq("project_id", projectId);
+        if (contractId != null) wrapper.eq("contract_id", contractId);
+        if (partnerId != null) wrapper.eq("partner_id", partnerId);
+        if (costSubjectId != null) wrapper.eq("cost_subject_id", costSubjectId);
+        if (StringUtils.hasText(costType)) wrapper.eq("cost_type", costType);
+        if (StringUtils.hasText(sourceType)) wrapper.eq("source_type", sourceType);
+        if (StringUtils.hasText(costStatus)) wrapper.eq("cost_status", costStatus);
+        if (startDate != null) wrapper.ge("cost_date", startDate);
+        if (endDate != null) wrapper.le("cost_date", endDate);
+        if (StringUtils.hasText(keyword)) {
+            String trimmedKeyword = keyword.trim();
+            Long idMatch = parseLong(trimmedKeyword);
+            String like = "%" + escapeLikeParameter(trimmedKeyword) + "%";
+            wrapper.and(w -> {
+                if (idMatch != null) {
+                    w.eq("id", idMatch).or();
+                }
+                w.apply("cost_item.cost_type LIKE {0} ESCAPE '!'", like)
+                        .or().apply("cost_item.source_type LIKE {0} ESCAPE '!'", like)
+                        .or().apply("cost_item.cost_status LIKE {0} ESCAPE '!'", like)
+                        .or().apply("cost_item.remark LIKE {0} ESCAPE '!'", like)
+                        .or().apply("EXISTS (SELECT 1 FROM pm_project p WHERE p.id = cost_item.project_id AND p.project_name LIKE {0} ESCAPE '!')", like)
+                        .or().apply("EXISTS (SELECT 1 FROM ct_contract c WHERE c.id = cost_item.contract_id AND (c.contract_name LIKE {0} ESCAPE '!' OR c.contract_code LIKE {0} ESCAPE '!'))", like)
+                        .or().apply("EXISTS (SELECT 1 FROM md_partner mp WHERE mp.id = cost_item.partner_id AND mp.partner_name LIKE {0} ESCAPE '!')", like)
+                        .or().apply("EXISTS (SELECT 1 FROM cost_subject cs WHERE cs.id = cost_item.cost_subject_id AND cs.subject_name LIKE {0} ESCAPE '!')", like);
+            });
+        }
+        return wrapper;
+    }
+
+    private Map<String, BigDecimal> selectGroupedAmounts(
+            String groupExpression, Long projectId, Long contractId, Long partnerId, Long costSubjectId,
+            String costType, String sourceType, String costStatus,
+            LocalDate startDate, LocalDate endDate, String keyword) {
+        QueryWrapper<CostItem> wrapper = buildSummaryFilterWrapper(
+                projectId, contractId, partnerId, costSubjectId,
+                costType, sourceType, costStatus, startDate, endDate, keyword);
+        wrapper.select(groupExpression + " AS group_key", "COALESCE(SUM(amount), 0) AS total_amount")
+                .groupBy(groupExpression);
+        Map<String, BigDecimal> result = new LinkedHashMap<>();
+        for (Map<String, Object> row : costItemMapper.selectMaps(wrapper)) {
+            Object key = value(row, "groupKey", "group_key");
+            result.put(key == null ? "UNKNOWN" : key.toString(), toBigDecimal(row, "totalAmount", "total_amount"));
+        }
+        return result;
+    }
+
+    private Map<String, Object> firstMap(List<Map<String, Object>> rows) {
+        return rows.isEmpty() ? Map.of() : rows.get(0);
+    }
+
+    private BigDecimal toBigDecimal(Map<String, Object> row, String... keys) {
+        Object value = value(row, keys);
+        if (value == null) return BigDecimal.ZERO;
+        if (value instanceof BigDecimal decimal) return decimal;
+        return new BigDecimal(value.toString());
+    }
+
+    private Object value(Map<String, Object> row, String... keys) {
+        for (String key : keys) {
+            if (row.containsKey(key)) {
+                return row.get(key);
+            }
+            for (Map.Entry<String, Object> entry : row.entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(key)) {
+                    return entry.getValue();
+                }
+            }
+        }
+        return null;
     }
 
     private Map<Long, String> batchResolveProjectNames(List<CostItem> items) {

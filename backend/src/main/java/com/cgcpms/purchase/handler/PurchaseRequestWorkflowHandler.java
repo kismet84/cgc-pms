@@ -2,14 +2,9 @@ package com.cgcpms.purchase.handler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.purchase.entity.MatPurchaseOrder;
-import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
-import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
-import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
-import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
+import com.cgcpms.purchase.service.PurchaseRequestConversionService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -18,11 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import com.cgcpms.common.util.DateTimeUtils;
-import java.util.List;
 
 /**
  * Business handler for purchase request approval workflows.
@@ -35,9 +25,7 @@ import java.util.List;
 public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
 
     private final MatPurchaseRequestMapper requestMapper;
-    private final MatPurchaseRequestItemMapper requestItemMapper;
-    private final MatPurchaseOrderMapper orderMapper;
-    private final MatPurchaseOrderItemMapper orderItemMapper;
+    private final PurchaseRequestConversionService conversionService;
 
     @Override
     public String supportBusinessType() {
@@ -66,8 +54,8 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
                 .set(MatPurchaseRequest::getApprovalStatus, "APPROVED")
                 .set(MatPurchaseRequest::getStatus, "APPROVED"));
 
-        // Convert to purchase order
-        convertToPurchaseOrder(request);
+        request.setStatus("APPROVED");
+        conversionService.convertApprovedRequest(request);
     }
 
     @Override
@@ -99,79 +87,4 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
         return requestId;
     }
 
-    /**
-     * Convert approved purchase request to a purchase order.
-     * Generates PO code by replacing PR- prefix with PO- prefix,
-     * copies request items to purchase order items.
-     */
-    private void convertToPurchaseOrder(MatPurchaseRequest request) {
-        Long requestId = request.getId();
-        Long tenantId = request.getTenantId();
-
-        // Check if already converted
-        if ("CONVERTED".equals(request.getStatus())) {
-            log.info("采购申请已转换，跳过 requestId={}", requestId);
-            return;
-        }
-
-        // Load request items
-        List<MatPurchaseRequestItem> requestItems = requestItemMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseRequestItem>()
-                        .eq(MatPurchaseRequestItem::getRequestId, requestId)
-                        .eq(MatPurchaseRequestItem::getTenantId, tenantId));
-
-        // Generate PO code: replace PR- prefix with PO-
-        String poCode = request.getRequestCode();
-        if (poCode != null && poCode.startsWith("PR-")) {
-            poCode = "PO-" + poCode.substring(3);
-        }
-
-        // Auto-generate PO code with date sequence if needed
-        if (poCode == null || poCode.isBlank()) {
-            String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-            poCode = "PO-" + today + "-001";
-        }
-
-        // Create purchase order
-        MatPurchaseOrder order = new MatPurchaseOrder();
-        order.setTenantId(tenantId);
-        order.setProjectId(request.getProjectId());
-        order.setRequestId(requestId);
-        order.setOrderCode(poCode);
-        order.setOrderType("PURCHASE");
-        order.setOrderDate(LocalDate.now());
-        order.setApprovalStatus("APPROVED");
-        order.setOrderStatus("APPROVED");
-        order.setContractId(request.getContractId());
-
-        // totalAmount set to null — no unit price on request items; will be populated when order items are finalized
-        order.setTotalAmount(null);
-
-        orderMapper.insert(order);
-
-        // Create purchase order items from request items
-        for (MatPurchaseRequestItem reqItem : requestItems) {
-            MatPurchaseOrderItem orderItem = new MatPurchaseOrderItem();
-            orderItem.setTenantId(tenantId);
-            orderItem.setOrderId(order.getId());
-            orderItem.setProjectId(request.getProjectId());
-            orderItem.setMaterialId(reqItem.getMaterialId());
-            orderItem.setUnit(reqItem.getUnit());
-            orderItem.setQuantity(reqItem.getQuantity());
-            orderItem.setReceivedQuantity(BigDecimal.ZERO);
-            orderItemMapper.insert(orderItem);
-        }
-
-        // Mark request as CONVERTED with atomic CAS: only update if status is NOT already CONVERTED
-        int rows = requestMapper.update(null, new LambdaUpdateWrapper<MatPurchaseRequest>()
-                .eq(MatPurchaseRequest::getId, requestId)
-                .ne(MatPurchaseRequest::getStatus, "CONVERTED")
-                .set(MatPurchaseRequest::getStatus, "CONVERTED"));
-        if (rows == 0) {
-            log.info("采购申请 CONVERTED CAS 未更新（已被其他事务转换），requestId={}", requestId);
-        }
-
-        log.info("采购申请转换采购订单完成 requestId={} -> orderId={} poCode={}",
-                requestId, order.getId(), poCode);
-    }
 }

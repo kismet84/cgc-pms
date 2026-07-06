@@ -1,6 +1,7 @@
 package com.cgcpms.invoice.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.common.exception.BusinessException;
@@ -42,12 +43,14 @@ public class InvoiceController {
     }
 
     @PostMapping
+    @AuditedOperation(type = "CREATE", businessType = "INVOICE", businessIdExpression = "#invoice.id")
     @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> create(@Valid @RequestBody PayInvoice invoice) {
         return ApiResponse.success(invoiceService.create(invoice));
     }
 
     @PutMapping("/{id}")
+    @AuditedOperation(type = "UPDATE", businessType = "INVOICE", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('invoice:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody PayInvoice invoice) {
         invoice.setId(id);
@@ -56,13 +59,15 @@ public class InvoiceController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditedOperation(type = "DELETE", businessType = "INVOICE", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('invoice:delete') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         invoiceService.delete(id);
         return ApiResponse.success();
     }
 
-    @PutMapping("/{id}/verify")
+    @RequestMapping(value = "/{id}/verify", method = {RequestMethod.PUT, RequestMethod.POST})
+    @AuditedOperation(type = "VERIFY", businessType = "INVOICE", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('invoice:verify') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> verify(@PathVariable Long id, @Valid @RequestBody InvoiceVerifyRequest request) {
         invoiceService.verify(id, request.getVerifyStatus());
@@ -70,6 +75,7 @@ public class InvoiceController {
     }
 
     @PostMapping("/register")
+    @AuditedOperation(type = "REGISTER", businessType = "INVOICE", businessIdExpression = "#invoice.id")
     @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> register(@Valid @RequestBody PayInvoice invoice) {
         return ApiResponse.success(invoiceService.register(invoice));
@@ -78,6 +84,7 @@ public class InvoiceController {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     @PostMapping("/recognize")
+    @AuditedOperation(type = "RECOGNIZE", businessType = "INVOICE")
     @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<InvoiceRecognizeResultVO> recognize(@RequestParam MultipartFile file) {
         if (file.getSize() > MAX_FILE_SIZE) {

@@ -16,6 +16,7 @@ import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,13 +41,12 @@ import java.util.concurrent.TimeUnit;
 public class FileService {
 
     private static final int PRESIGNED_URL_EXPIRE_MINUTES = 5;
-    private static final int PUT_OBJECT_MAX_ATTEMPTS = 3;
-    private static final long PUT_OBJECT_RETRY_BACKOFF_MS = 50L;
 
     private final SysFileMapper sysFileMapper;
     private final MinioClient minioClient;
     private final MinioConfig minioConfig;
     private final com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer;
+    private final RetryTemplate minioRetryTemplate;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     /**
@@ -239,34 +239,15 @@ public class FileService {
 
     private void putObjectWithRetry(String bucketName, String storagePath, String contentType, byte[] content)
             throws Exception {
-        Exception lastException = null;
-        for (int attempt = 1; attempt <= PUT_OBJECT_MAX_ATTEMPTS; attempt++) {
-            try {
-                minioClient.putObject(PutObjectArgs.builder()
-                        .bucket(bucketName)
-                        .object(storagePath)
-                        .stream(new java.io.ByteArrayInputStream(content), content.length, -1)
-                        .contentType(contentType)
-                        .build());
-                return;
-            } catch (Exception e) {
-                lastException = e;
-                if (attempt == PUT_OBJECT_MAX_ATTEMPTS) {
-                    throw e;
-                }
-                try {
-                    sleepBeforePutObjectRetry();
-                } catch (InterruptedException interruptedException) {
-                    Thread.currentThread().interrupt();
-                    throw interruptedException;
-                }
-            }
-        }
-        throw lastException;
-    }
-
-    void sleepBeforePutObjectRetry() throws InterruptedException {
-        Thread.sleep(PUT_OBJECT_RETRY_BACKOFF_MS);
+        minioRetryTemplate.execute(context -> {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(storagePath)
+                    .stream(new java.io.ByteArrayInputStream(content), content.length, -1)
+                    .contentType(contentType)
+                    .build());
+            return null;
+        });
     }
 
     private String genPresignedUrl(String bucket, String object) {

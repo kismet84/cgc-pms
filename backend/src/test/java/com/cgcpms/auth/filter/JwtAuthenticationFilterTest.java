@@ -3,6 +3,7 @@ package com.cgcpms.auth.filter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -29,7 +30,7 @@ class JwtAuthenticationFilterTest {
 
     private static class ExposedJwtAuthenticationFilter extends JwtAuthenticationFilter {
         ExposedJwtAuthenticationFilter() {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, new MockEnvironment());
         }
 
         boolean shouldSkip(HttpServletRequest request) {

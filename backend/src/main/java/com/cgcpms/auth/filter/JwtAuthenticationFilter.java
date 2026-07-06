@@ -20,6 +20,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -49,24 +51,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CookieUtils cookieUtils;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider;
+    private final Environment environment;
+    private final boolean devLoginEnabled;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public JwtAuthenticationFilter(JwtUtils jwtUtils,
                                    JwtProperties jwtProperties,
                                    CookieUtils cookieUtils,
                                    ObjectMapper objectMapper,
-                                   ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider) {
+                                   ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider,
+                                   Environment environment) {
         this.jwtUtils = jwtUtils;
         this.jwtProperties = jwtProperties;
         this.cookieUtils = cookieUtils;
         this.objectMapper = objectMapper;
         this.tokenBlacklistServiceProvider = tokenBlacklistServiceProvider;
+        this.environment = environment;
+        this.devLoginEnabled = Boolean.parseBoolean(environment.getProperty("auth.dev-login.enabled", "false"));
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        return SKIP_PATHS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path));
+        return SKIP_PATHS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path))
+                || shouldSkipDevLogin(path);
     }
 
     @Override
@@ -170,5 +178,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         ApiResponse<Void> body = ApiResponse.fail("AUTH_TOKEN_INVALID", "Token无效");
         response.getWriter().write(objectMapper.writeValueAsString(body));
+    }
+
+    private boolean shouldSkipDevLogin(String path) {
+        return SecurityConfig.DEV_LOGIN_PATH.equals(path)
+                && devLoginEnabled
+                && environment.acceptsProfiles(Profiles.of("dev", "local"));
     }
 }

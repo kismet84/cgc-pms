@@ -23,8 +23,8 @@ const passwordForm = reactive({
 const profileLoading = ref(false)
 const passwordLoading = ref(false)
 const passwordFormRef = ref<FormInstance>()
-const PASSWORD_RULE_TEXT = '新密码至少 8 位，且同时包含字母和数字'
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
+const PASSWORD_RULE_TEXT = '新密码至少 10 位，且同时包含大小写字母、数字和特殊字符'
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{10,}$/
 const passwordRules: Record<string, Rule[]> = {
   oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [

@@ -3,6 +3,7 @@ package com.cgcpms.purchase.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -25,6 +26,7 @@ public class MatPurchaseRequest extends BaseEntity {
 
     private Long tenantId;
 
+    @NotNull(message = "项目不能为空")
     private Long projectId;
 
     /** 关联采购合同 */

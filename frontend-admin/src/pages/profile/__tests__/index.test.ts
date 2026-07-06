@@ -213,15 +213,39 @@ describe('Profile page', () => {
     expect(pwdCalls.length).toBe(0)
   })
 
-  it('submits password change when password meets strength rule', async () => {
+  it('shows warning when new password misses special character in stronger rule', async () => {
     const wrapper = mountProfile()
 
     const passwordInputs = wrapper.findAll('.stub-input-password')
     expect(passwordInputs.length).toBeGreaterThanOrEqual(3)
 
     await passwordInputs.at(0)!.setValue('old123456')
-    await passwordInputs.at(1)!.setValue('abc12345')
-    await passwordInputs.at(2)!.setValue('abc12345')
+    await passwordInputs.at(1)!.setValue('Abc1234567')
+    await passwordInputs.at(2)!.setValue('Abc1234567')
+    await nextTick()
+
+    const forms = wrapper.findAll('.stub-form')
+    const passwordForm = forms.at(1)
+    expect(passwordForm).toBeTruthy()
+    await passwordForm!.trigger('submit')
+    await nextTick()
+
+    expect(mockMessage.warning).toHaveBeenCalled()
+    const pwdCalls = mockRequest.mock.calls.filter(
+      (call: unknown[]) => (call[0] as Record<string, unknown>)?.url === '/profile/password',
+    )
+    expect(pwdCalls.length).toBe(0)
+  })
+
+  it('submits password change when password meets stronger rule', async () => {
+    const wrapper = mountProfile()
+
+    const passwordInputs = wrapper.findAll('.stub-input-password')
+    expect(passwordInputs.length).toBeGreaterThanOrEqual(3)
+
+    await passwordInputs.at(0)!.setValue('old123456')
+    await passwordInputs.at(1)!.setValue('Abc12345!!')
+    await passwordInputs.at(2)!.setValue('Abc12345!!')
     await nextTick()
 
     const forms = wrapper.findAll('.stub-form')
@@ -237,7 +261,7 @@ describe('Profile page', () => {
     expect((pwdCalls[0][0] as Record<string, unknown>).method).toBe('put')
     expect((pwdCalls[0][0] as Record<string, unknown>).data).toEqual({
       oldPassword: 'old123456',
-      newPassword: 'abc12345',
+      newPassword: 'Abc12345!!',
     })
   })
 })

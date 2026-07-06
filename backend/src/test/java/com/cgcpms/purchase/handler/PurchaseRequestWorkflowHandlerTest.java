@@ -3,7 +3,9 @@ package com.cgcpms.purchase.handler;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
+import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
@@ -36,6 +38,9 @@ class PurchaseRequestWorkflowHandlerTest {
 
     @Autowired
     private MatPurchaseOrderMapper orderMapper;
+
+    @Autowired
+    private MatPurchaseRequestItemMapper requestItemMapper;
 
     @BeforeEach
     void setupContext() {
@@ -77,6 +82,14 @@ class PurchaseRequestWorkflowHandlerTest {
         req.setTenantId(0L);
         requestMapper.insert(req);
 
+        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
+        item.setTenantId(0L);
+        item.setRequestId(req.getId());
+        item.setMaterialId(1L);
+        item.setQuantity(new BigDecimal("5.00"));
+        item.setUnit("m");
+        requestItemMapper.insert(item);
+
         WfInstance instance = new WfInstance();
         instance.setBusinessId(req.getId());
         instance.setId(2000001L);
@@ -89,6 +102,8 @@ class PurchaseRequestWorkflowHandlerTest {
         assertNotNull(updated, "采购申请应仍然存在");
         assertEquals("APPROVED", updated.getApprovalStatus(), "审批状态应变为 APPROVED");
         assertEquals("CONVERTED", updated.getStatus(), "业务状态应变为 CONVERTED");
+        assertEquals(1L, orderMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.cgcpms.purchase.entity.MatPurchaseOrder>()
+                .eq(com.cgcpms.purchase.entity.MatPurchaseOrder::getRequestId, req.getId())));
     }
 
     @Test

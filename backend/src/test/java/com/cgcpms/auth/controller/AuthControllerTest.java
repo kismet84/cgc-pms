@@ -70,6 +70,17 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("GET /auth/userinfo 未认证响应也下发 XSRF-TOKEN cookie")
+    void testUnauthenticatedGetIssuesCsrfCookie() throws Exception {
+        mockMvc.perform(get("/api/auth/userinfo")
+                        .servletPath("/auth/userinfo")
+                        .contextPath("/api"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().stringValues("Set-Cookie",
+                        org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("XSRF-TOKEN="))));
+    }
+
+    @Test
     @DisplayName("POST /auth/login 无效凭据 → 400(AUTH_FAILED)")
     void testLoginFail() throws Exception {
         when(authService.login(any(LoginRequest.class)))
@@ -196,9 +207,12 @@ class AuthControllerTest {
     @DisplayName("dev-login controller 仅声明在 dev/local profile 下启用")
     void testDevLoginControllerProfileScope() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/cgcpms/auth/controller/DevAuthController.java"));
+        String securityConfigSource = Files.readString(Path.of("src/main/java/com/cgcpms/auth/config/SecurityConfig.java"));
         org.junit.jupiter.api.Assertions.assertTrue(source.contains("@Profile({\"dev\", \"local\"})"));
         org.junit.jupiter.api.Assertions.assertTrue(source.contains("@ConditionalOnProperty"));
         org.junit.jupiter.api.Assertions.assertTrue(source.contains("auth.dev-login.enabled"));
         org.junit.jupiter.api.Assertions.assertFalse(source.contains("@RateLimit"));
+        org.junit.jupiter.api.Assertions.assertTrue(securityConfigSource.contains("environment.acceptsProfiles(Profiles.of(\"dev\", \"local\"))"));
+        org.junit.jupiter.api.Assertions.assertTrue(securityConfigSource.contains("auth.dev-login.enabled:false"));
     }
 }

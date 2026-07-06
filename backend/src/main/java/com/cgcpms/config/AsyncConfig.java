@@ -1,7 +1,11 @@
 package com.cgcpms.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +24,8 @@ public class AsyncConfig implements AsyncConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(AsyncConfig.class);
 
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
+
     @Value("${app.async.core-pool-size:4}")
     private int corePoolSize;
 
@@ -32,6 +38,10 @@ public class AsyncConfig implements AsyncConfigurer {
     @Value("${app.async.thread-name-prefix:cgc-pms-async-}")
     private String threadNamePrefix;
 
+    public AsyncConfig(ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        this.meterRegistryProvider = meterRegistryProvider;
+    }
+
     @Bean(name = "taskExecutor")
     public ThreadPoolTaskExecutor taskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -41,6 +51,11 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setThreadNamePrefix(threadNamePrefix);
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
+        meterRegistryProvider.ifAvailable(meterRegistry -> ExecutorServiceMetrics.monitor(
+                meterRegistry,
+                executor.getThreadPoolExecutor(),
+                "cgc.pms.async",
+                Tags.of("executor", "taskExecutor")));
         return executor;
     }
 

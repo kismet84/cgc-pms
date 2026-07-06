@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * System-level management endpoints. Restricted to SUPER_ADMIN only.
@@ -23,6 +24,7 @@ public class SystemController {
 
     private final JdbcTemplate jdbcTemplate;
     static final String CLEAR_DATABASE_CONFIRMATION = "CLEAR_NON_PROD_DATABASE";
+    private static final Pattern MYSQL_IDENTIFIER = Pattern.compile("[A-Za-z0-9_]+");
 
     /** Tables to KEEP (not cleared): system tables and Flyway history */
     private static final List<String> PROTECTED_TABLES = List.of(
@@ -64,7 +66,7 @@ public class SystemController {
                     continue;
                 }
                 try {
-                    jdbcTemplate.execute("TRUNCATE TABLE `" + table + "`");
+                    jdbcTemplate.execute("TRUNCATE TABLE " + quoteIdentifier(table));
                     cleared++;
                     log.info("Truncated table: {}", table);
                 } catch (Exception e) {
@@ -78,5 +80,12 @@ public class SystemController {
         String msg = "已清空 " + cleared + " 张业务数据表，系统表已保留";
         log.info(msg);
         return ApiResponse.success(msg);
+    }
+
+    private String quoteIdentifier(String table) {
+        if (table == null || !MYSQL_IDENTIFIER.matcher(table).matches()) {
+            throw new BusinessException("INVALID_TABLE_NAME", "数据库表名非法");
+        }
+        return "`" + table + "`";
     }
 }

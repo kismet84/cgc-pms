@@ -28,7 +28,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // expose to Docker network (required for HMR + dev container)
-    allowedHosts: ['localhost', 'www.hgmsg.cn'],
+    allowedHosts: ['localhost', '127.0.0.1'],
     proxy: {
       '/api': {
         target: process.env.VITE_API_TARGET || 'http://localhost:8080',

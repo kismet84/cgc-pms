@@ -68,6 +68,11 @@ class ProfileControllerTest {
                     "$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2",
                     "系统管理员", "13800000000", "admin@cgc-pms.com",
                     "ENABLE", 1, ADMIN_ID, "测试种子数据");
+        } else {
+            jdbcTemplate.update(
+                    "UPDATE sys_user SET password = ?, real_name = ?, phone = ?, email = ?, status = ?, is_admin = ? WHERE id = ?",
+                    "$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2",
+                    "系统管理员", "13800000000", "admin@cgc-pms.com", "ENABLE", 1, ADMIN_ID);
         }
         // Also seed the SUPER_ADMIN role and user-role mapping (needed by ProfileService.buildUserInfo)
         Integer roleCount = jdbcTemplate.queryForObject(
@@ -95,6 +100,8 @@ class ProfileControllerTest {
     @DisplayName("RED-1: PUT /api/profile without JWT → 401")
     void testUnauthorized_ProfileUpdate() throws Exception {
         mockMvc.perform(putWithApiContext("/profile")
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"realName":"Test","phone":"13800000001"}"""))
@@ -105,6 +112,8 @@ class ProfileControllerTest {
     @DisplayName("RED-1b: PUT /api/profile/password without JWT → 401")
     void testUnauthorized_PasswordChange() throws Exception {
         mockMvc.perform(putWithApiContext("/profile/password")
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"oldPassword":"admin123","newPassword":"newPass123"}"""))
@@ -120,6 +129,8 @@ class ProfileControllerTest {
     void testUpdateProfile_Success() throws Exception {
         mockMvc.perform(putWithApiContext("/profile")
                         .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -145,6 +156,8 @@ class ProfileControllerTest {
     void testUpdateProfile_IgnoresRestrictedFields() throws Exception {
         mockMvc.perform(putWithApiContext("/profile")
                         .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -170,11 +183,24 @@ class ProfileControllerTest {
     void testChangePassword_Success() throws Exception {
         mockMvc.perform(putWithApiContext("/profile/password")
                         .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"oldPassword":"admin123","newPassword":"newSecure123"}"""))
+                                {"oldPassword":"admin123","newPassword":"NewSecure1!"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @DisplayName("Cookie JWT 写请求缺少 CSRF token → 403")
+    void testCookieAuthenticatedWriteWithoutCsrfForbidden() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"realName":"csrf-blocked"}"""))
+                .andExpect(status().isForbidden());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -186,9 +212,11 @@ class ProfileControllerTest {
     void testChangePassword_WrongOldPassword() throws Exception {
         mockMvc.perform(putWithApiContext("/profile/password")
                         .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"oldPassword":"wrongPassword","newPassword":"newSecure123"}"""))
+                                {"oldPassword":"wrongPassword","newPassword":"NewSecure1!"}"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("PASSWORD_OLD_INVALID"))
                 .andExpect(jsonPath("$.message").value("旧密码不正确"));
@@ -203,6 +231,8 @@ class ProfileControllerTest {
     void testChangePassword_ShortNewPassword() throws Exception {
         mockMvc.perform(putWithApiContext("/profile/password")
                         .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"oldPassword":"admin123","newPassword":"1234567"}"""))
@@ -215,6 +245,8 @@ class ProfileControllerTest {
     void testChangePassword_PasswordWithoutDigit() throws Exception {
         mockMvc.perform(putWithApiContext("/profile/password")
                         .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"oldPassword":"admin123","newPassword":"abcdefgh"}"""))
@@ -227,9 +259,53 @@ class ProfileControllerTest {
     void testChangePassword_PasswordWithoutLetter() throws Exception {
         mockMvc.perform(putWithApiContext("/profile/password")
                         .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"oldPassword":"admin123","newPassword":"12345678"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("RED-9: PUT /api/profile/password without uppercase → 400")
+    void testChangePassword_PasswordWithoutUppercase() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile/password")
+                        .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"oldPassword":"admin123","newPassword":"newsecure1!"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("RED-10: PUT /api/profile/password without lowercase → 400")
+    void testChangePassword_PasswordWithoutLowercase() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile/password")
+                        .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"oldPassword":"admin123","newPassword":"NEWSECURE1!"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("RED-11: PUT /api/profile/password without special char → 400")
+    void testChangePassword_PasswordWithoutSpecialChar() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile/password")
+                        .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"oldPassword":"admin123","newPassword":"Newsecure12"}"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
@@ -238,5 +314,9 @@ class ProfileControllerTest {
 
     private MockHttpServletRequestBuilder putWithApiContext(String pathWithinContext) {
         return put("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private Cookie csrfCookie() {
+        return new Cookie("XSRF-TOKEN", "test-csrf-token");
     }
 }

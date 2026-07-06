@@ -63,6 +63,7 @@ public class PayApplicationController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditedOperation(type = "DELETE", businessType = "PAYMENT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('payment:app:delete') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         payApplicationService.delete(id);
@@ -76,6 +77,7 @@ public class PayApplicationController {
     }
 
     @PostMapping("/{id}/basis/batch")
+    @AuditedOperation(type = "UPDATE_BASIS", businessType = "PAYMENT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('payment:app:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> batchSaveBasis(@PathVariable Long id,
                                             @Valid @Size(max = 200, message = "批量依据不能超过200条")

@@ -4,6 +4,7 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.service.CtContractPaymentTermService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +34,7 @@ public class CtContractPaymentTermController {
     @PostMapping("/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:term:add')")
     public ApiResponse<Void> batchSave(@PathVariable Long contractId,
-                                       @RequestBody @Valid List<@Valid CtContractPaymentTerm> terms) {
+                                       @RequestBody @Valid @Size(max = 200) List<@Valid CtContractPaymentTerm> terms) {
         ctContractPaymentTermService.batchSave(contractId, terms);
         return ApiResponse.success();
     }

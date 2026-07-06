@@ -9,7 +9,7 @@ spring:
       minimum-idle: 10
       maximum-pool-size: 50
       idle-timeout: 600000
-      max-lifetime: 1800000
+      max-lifetime: ${DB_HIKARI_MAX_LIFETIME:1740000}
       connection-timeout: 30000
 
   data:
@@ -59,6 +59,10 @@ springdoc:
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:https://your-production-domain.com}
+
+auth:
+  dev-login:
+    enabled: false
 
 # Actuator health checks
 # DB (DataSourceHealthIndicator) and Redis (RedisHealthIndicator) are auto-configured by default

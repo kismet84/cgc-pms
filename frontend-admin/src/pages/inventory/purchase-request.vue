@@ -419,8 +419,8 @@ async function handleModalOk() {
     if (!editingId.value && requestId) {
       try {
         await deletePurchaseRequest(requestId)
-      } catch {
-        // best-effort cleanup
+      } catch (cleanupError: unknown) {
+        console.error('采购申请创建回滚失败', cleanupError)
       }
     }
     message.error('操作失败，请稍后重试')

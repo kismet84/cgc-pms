@@ -7,6 +7,9 @@ import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.purchase.service.MatPurchaseRequestService;
@@ -17,6 +20,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,10 +49,20 @@ class PurchaseRequestServiceTest {
     private MatPurchaseRequestItemMapper requestItemMapper;
 
     @Autowired
+    private MatPurchaseOrderMapper orderMapper;
+
+    @Autowired
+    private MatPurchaseOrderItemMapper orderItemMapper;
+
+    @Autowired
     private MdMaterialMapper mdMaterialMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setupContext() {
+        seedWorkflowApprover();
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
@@ -59,6 +73,24 @@ class PurchaseRequestServiceTest {
     @AfterEach
     void clearContext() {
         UserContext.clear();
+    }
+
+    private void seedWorkflowApprover() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, USER_ADMIN);
+        if (count != null && count == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    USER_ADMIN, TENANT_ID, "admin",
+                    "$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2",
+                    "系统管理员", "13800000000", "admin@cgc-pms.com",
+                    "ENABLE", 1, USER_ADMIN, "采购审批测试种子数据");
+        } else {
+            jdbcTemplate.update(
+                    "UPDATE sys_user SET tenant_id = ?, status = ?, deleted_flag = 0 WHERE id = ?",
+                    TENANT_ID, "ENABLE", USER_ADMIN);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -82,6 +114,19 @@ class PurchaseRequestServiceTest {
         assertEquals("DRAFT", vo.getStatus());
         assertEquals(String.valueOf(PROJECT_ID), vo.getProjectId());
         assertEquals(String.valueOf(TENANT_ID), vo.getTenantId());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("RED→GREEN: 创建采购申请时合同必须属于同一项目")
+    void createRejectsContractFromDifferentProject() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(200L);
+        request.setContractId(30001L);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> requestService.create(request));
+        assertEquals("CONTRACT_PROJECT_MISMATCH", ex.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -467,11 +512,18 @@ class PurchaseRequestServiceTest {
         item.setUnit("m³");
         requestService.saveItemsBatch(requestId, java.util.List.of(item));
 
-        // 手动转换尚未实现，应抛出 NOT_IMPLEMENTED
-        BusinessException ex = assertThrows(BusinessException.class, () -> {
-            requestService.convertToPurchaseOrder(requestId);
-        }, "手动转换应抛 NOT_IMPLEMENTED");
-        assertEquals("NOT_IMPLEMENTED", ex.getCode());
+        requestService.convertToPurchaseOrder(requestId);
+
+        MatPurchaseRequest converted = requestMapper.selectById(requestId);
+        assertEquals("CONVERTED", converted.getStatus());
+
+        MatPurchaseOrder order = orderMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrder>()
+                .eq(MatPurchaseOrder::getRequestId, requestId)
+                .eq(MatPurchaseOrder::getTenantId, TENANT_ID));
+        assertNotNull(order, "转换后应生成采购订单");
+        assertEquals(PROJECT_ID, order.getProjectId());
+        assertEquals(1L, orderItemMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.cgcpms.purchase.entity.MatPurchaseOrderItem>()
+                .eq(com.cgcpms.purchase.entity.MatPurchaseOrderItem::getOrderId, order.getId())));
     }
 
     // ═══════════════════════════════════════════════════════════

@@ -35,7 +35,7 @@ springdoc:
 logging:
   level:
     root: INFO
-    com.cgcpms: DEBUG
+    com.cgcpms: INFO
 
 app:
   async:

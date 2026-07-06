@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { login } from '@/api/modules/auth'
 import LoginPage from '../index.vue'
 
-const validPassword = 'secret123'
+const validPassword = 'admin123'
 
 // ── Mock router ──
 const mockPush = vi.fn()
@@ -125,6 +125,17 @@ describe('login/index.vue', () => {
 
     expect(mockPush).not.toHaveBeenCalled()
     expect(mockUserStore.setUserInfo).not.toHaveBeenCalled()
+  })
+
+  it('登录页只校验非空，不额外拦截弱口令格式', async () => {
+    const wrapper = mount(LoginPage)
+
+    wrapper.vm.formState.username = 'admin'
+    wrapper.vm.formState.password = '123456'
+    await wrapper.vm.handleSubmit()
+
+    expect(mockUserStore.setUserInfo).toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith('/')
   })
 
   it('登录成功且无 redirect 时回到首页', async () => {

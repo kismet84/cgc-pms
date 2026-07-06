@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { InternalAxiosRequestConfig } from 'axios'
 
 const { mockLogout, mockMessageError } = vi.hoisted(() => ({
   mockLogout: vi.fn(),
@@ -42,6 +43,7 @@ afterEach(() => {
   vi.unstubAllEnvs()
   mockLogout.mockReset()
   mockMessageError.mockReset()
+  document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
   window.history.pushState({}, '', '/')
   delete (window as Window & { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }).__APP_RUNTIME_CONFIG__
 })
@@ -69,5 +71,91 @@ describe('api request base URL resolution', () => {
 
     expect(requestModule.default.defaults.baseURL).toBe('/runtime-api')
     expect(requestModule.refreshClient.defaults.baseURL).toBe('/runtime-api')
+  })
+})
+
+describe('api request csrf header injection', () => {
+  it('adds csrf header for POST requests on service and refreshClient', async () => {
+    const requestModule = await loadRequestModule({
+      dev: false,
+    })
+
+    document.cookie = 'XSRF-TOKEN=csrf%20token'
+    const capture = vi.fn(
+      async (config: InternalAxiosRequestConfig) =>
+        ({
+          data: { ok: true },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        }) as const,
+    )
+
+    await requestModule.request({
+      url: '/csrf-check',
+      method: 'post',
+      adapter: capture,
+    })
+    await requestModule.refreshClient.post('/auth/refresh', undefined, {
+      adapter: capture,
+    })
+
+    expect(capture).toHaveBeenCalledTimes(2)
+    expect(capture.mock.calls[0]?.[0].headers.get('X-XSRF-TOKEN')).toBe('csrf token')
+    expect(capture.mock.calls[1]?.[0].headers.get('X-XSRF-TOKEN')).toBe('csrf token')
+  })
+
+  it('does not add csrf header for GET requests', async () => {
+    const requestModule = await loadRequestModule({
+      dev: false,
+    })
+
+    document.cookie = 'XSRF-TOKEN=csrf-token'
+    const capture = vi.fn(
+      async (config: InternalAxiosRequestConfig) =>
+        ({
+          data: { ok: true },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        }) as const,
+    )
+
+    await requestModule.request({
+      url: '/csrf-check',
+      method: 'get',
+      adapter: capture,
+    })
+
+    expect(capture).toHaveBeenCalledTimes(1)
+    expect(capture.mock.calls[0]?.[0].headers.get('X-XSRF-TOKEN')).toBeUndefined()
+  })
+
+  it('does not add csrf header when cookie is missing', async () => {
+    const requestModule = await loadRequestModule({
+      dev: false,
+    })
+
+    const capture = vi.fn(
+      async (config: InternalAxiosRequestConfig) =>
+        ({
+          data: { ok: true },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        }) as const,
+    )
+
+    await requestModule.request({
+      url: '/csrf-check',
+      method: 'post',
+      adapter: capture,
+    })
+
+    expect(capture).toHaveBeenCalledTimes(1)
+    expect(capture.mock.calls[0]?.[0].headers.get('X-XSRF-TOKEN')).toBeUndefined()
   })
 })

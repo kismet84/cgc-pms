@@ -67,16 +67,6 @@ type ApprovalSample = {
 
 async function createAuthenticatedPage(browser: Browser) {
   const context = await browser.newContext({ storageState: 'e2e/.auth/admin.json' })
-  await context.addInitScript((userInfo) => {
-    window.sessionStorage.setItem('cgc_pms_userinfo', JSON.stringify(userInfo))
-  }, {
-    userId: '1',
-    username: 'admin',
-    roles: ['SUPER_ADMIN'],
-    permissions: ['*'],
-    roleName: 'SUPER_ADMIN',
-  })
-
   const page = await context.newPage()
   return { context, page }
 }

@@ -119,7 +119,8 @@ async function fetchData() {
 async function fetchKpi() {
   try {
     kpi.value = { ...kpi.value, ...(await getSettlementKpi()) }
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     kpi.value = {
       totalCount: 0,
       totalContractAmount: '0',
@@ -195,8 +196,9 @@ async function handleCreate() {
     createModalVisible.value = false
     fetchData()
     fetchKpi()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error(e)
+    message.error('创建结算单失败')
   } finally {
     createLoading.value = false
   }

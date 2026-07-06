@@ -35,4 +35,9 @@ describe('purchase request modal filters', () => {
     expect(source).toContain('await router.replace({ path: route.path, query: nextQuery })')
     expect(source).toMatch(/onMounted\([\s\S]*?openBusinessIdFromQuery\(\)/)
   })
+
+  it('does not silently swallow cleanup failures when create flow rolls back', () => {
+    expect(source).not.toContain('catch {')
+    expect(source).toContain("console.error('采购申请创建回滚失败', cleanupError)")
+  })
 })

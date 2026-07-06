@@ -18,6 +18,38 @@ const runtimeApiBaseUrl = (window as unknown as { __APP_RUNTIME_CONFIG__?: { api
 const devQueryApiBaseUrl = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('apiBaseUrl') : null
 
 const API_BASE_URL = devQueryApiBaseUrl || runtimeApiBaseUrl || import.meta.env.VITE_API_BASE_URL || '/api'
+const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
+const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
+const CSRF_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+function getCsrfTokenFromCookie(): string | null {
+  const cookie = document.cookie
+    .split(';')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${CSRF_COOKIE_NAME}=`))
+
+  if (!cookie) {
+    return null
+  }
+
+  const rawValue = cookie.slice(CSRF_COOKIE_NAME.length + 1)
+  return rawValue ? decodeURIComponent(rawValue) : null
+}
+
+function attachCsrfHeader(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
+  const method = (config.method ?? 'get').toUpperCase()
+  if (CSRF_SAFE_METHODS.has(method)) {
+    return config
+  }
+
+  const csrfToken = getCsrfTokenFromCookie()
+  if (!csrfToken) {
+    return config
+  }
+
+  config.headers.set(CSRF_HEADER_NAME, csrfToken)
+  return config
+}
 
 /** Axios instance for normal API calls — carries the 401 interceptor. */
 const service: AxiosInstance = axios.create({
@@ -38,7 +70,12 @@ export const refreshClient: AxiosInstance = axios.create({
 
 // ── Normal request interceptor ──
 service.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => config,
+  attachCsrfHeader,
+  (error) => Promise.reject(error),
+)
+
+refreshClient.interceptors.request.use(
+  attachCsrfHeader,
   (error) => Promise.reject(error),
 )
 

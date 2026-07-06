@@ -3,10 +3,12 @@ package com.cgcpms.purchase.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.entity.PmProject;
@@ -20,9 +22,9 @@ import com.cgcpms.purchase.vo.MatPurchaseRequestVO;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
-import com.cgcpms.common.util.DateTimeUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,6 +32,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -44,6 +47,7 @@ public class MatPurchaseRequestService {
     private final MdMaterialMapper mdMaterialMapper;
     private final CtContractMapper ctContractMapper;
     private final WorkflowEngine workflowEngine;
+    private final PurchaseRequestConversionService conversionService;
 
     // ================================================================
     // 分页查询
@@ -118,33 +122,25 @@ public class MatPurchaseRequestService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatPurchaseRequest request) {
-        // Auto-generate request code: PR-yyyyMMdd-XXX
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "PR-" + today + "-";
+        validateProjectRequired(request.getProjectId());
+        validateContractProject(request.getContractId(), request.getProjectId());
 
-        LambdaQueryWrapper<MatPurchaseRequest> wrapper = new LambdaQueryWrapper<>();
-        wrapper.likeRight(MatPurchaseRequest::getRequestCode, prefix)
-                .eq(MatPurchaseRequest::getTenantId, UserContext.getCurrentTenantId())
-                .orderByDesc(MatPurchaseRequest::getRequestCode);
-        Page<MatPurchaseRequest> page = new Page<>(0, 1);
-        Page<MatPurchaseRequest> result = requestMapper.selectPage(page, wrapper);
-        MatPurchaseRequest last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
-
-        int seq = 1;
-        if (last != null && last.getRequestCode() != null && last.getRequestCode().length() == prefix.length() + 3) {
-            try {
-                seq = Integer.parseInt(last.getRequestCode().substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", last.getRequestCode(), e);
-            }
-        }
-        request.setRequestCode(prefix + String.format("%03d", seq));
+        Long tenantId = UserContext.getCurrentTenantId();
         request.setApprovalStatus("DRAFT");
         request.setStatus("DRAFT");
-        request.setTenantId(UserContext.getCurrentTenantId());
+        request.setTenantId(tenantId);
 
-        requestMapper.insert(request);
-        return request.getId();
+        for (int attempt = 0; attempt < 3; attempt++) {
+            request.setRequestCode(nextRequestCode(tenantId, attempt));
+            try {
+                requestMapper.insert(request);
+                return request.getId();
+            } catch (DuplicateKeyException e) {
+                request.setId(null);
+                log.warn("采购申请编号冲突，重试生成 requestCode={}", request.getRequestCode());
+            }
+        }
+        throw new BusinessException("REQUEST_CODE_CONFLICT", "采购申请编号生成冲突，请重试");
     }
 
     // ================================================================
@@ -164,6 +160,9 @@ public class MatPurchaseRequestService {
         // Prevent overwriting approval status via update
         request.setApprovalStatus(existing.getApprovalStatus());
         request.setStatus(existing.getStatus());
+        Long projectId = request.getProjectId() != null ? request.getProjectId() : existing.getProjectId();
+        validateProjectRequired(projectId);
+        validateContractProject(request.getContractId(), projectId);
 
         requestMapper.updateById(request);
     }
@@ -255,15 +254,18 @@ public class MatPurchaseRequestService {
                 .eq(MatPurchaseRequestItem::getTenantId, UserContext.getCurrentTenantId());
         requestItemMapper.delete(deleteWrapper);
 
-        // Insert new items
         Long tenantId = UserContext.getCurrentTenantId();
         for (MatPurchaseRequestItem item : items) {
-            item.setId(null);
+            item.setId(IdWorker.getId());
             item.setRequestId(requestId);
             item.setTenantId(tenantId);
             // Auto-create material if name provided but no existing materialId
             resolveMaterial(item, tenantId);
-            requestItemMapper.insert(item);
+            item.setCreatedBy(UserContext.getCurrentUserId());
+            item.setUpdatedBy(UserContext.getCurrentUserId());
+        }
+        if (!items.isEmpty()) {
+            requestItemMapper.insertBatch(items);
         }
     }
 
@@ -312,7 +314,49 @@ public class MatPurchaseRequestService {
         if ("CONVERTED".equals(request.getStatus()))
             throw new BusinessException("REQUEST_ALREADY_CONVERTED", "采购申请已转换，不可重复转换");
 
-        throw new BusinessException("NOT_IMPLEMENTED", "手动转换请通过审批流程自动触发");
+        conversionService.convertApprovedRequest(request);
+    }
+
+    private void validateProjectRequired(Long projectId) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_REQUIRED", "项目不能为空");
+        }
+    }
+
+    private void validateContractProject(Long contractId, Long projectId) {
+        if (contractId == null) {
+            return;
+        }
+        CtContract contract = ctContractMapper.selectById(contractId);
+        if (contract == null || !Objects.equals(contract.getTenantId(), UserContext.getCurrentTenantId())) {
+            throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
+        }
+        if (!Objects.equals(contract.getProjectId(), projectId)) {
+            throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "关联合同不属于当前项目");
+        }
+    }
+
+    private String nextRequestCode(Long tenantId, int offset) {
+        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
+        String prefix = "PR-" + today + "-";
+
+        LambdaQueryWrapper<MatPurchaseRequest> wrapper = new LambdaQueryWrapper<>();
+        wrapper.likeRight(MatPurchaseRequest::getRequestCode, prefix)
+                .eq(MatPurchaseRequest::getTenantId, tenantId)
+                .orderByDesc(MatPurchaseRequest::getRequestCode);
+        Page<MatPurchaseRequest> page = new Page<>(0, 1);
+        Page<MatPurchaseRequest> result = requestMapper.selectPage(page, wrapper);
+        MatPurchaseRequest last = result.getRecords().isEmpty() ? null : result.getRecords().get(0);
+
+        int seq = 1 + offset;
+        if (last != null && last.getRequestCode() != null && last.getRequestCode().length() == prefix.length() + 3) {
+            try {
+                seq = Integer.parseInt(last.getRequestCode().substring(prefix.length())) + 1 + offset;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", last.getRequestCode(), e);
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     // ================================================================

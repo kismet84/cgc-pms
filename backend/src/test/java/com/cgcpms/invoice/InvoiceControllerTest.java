@@ -55,6 +55,7 @@ class InvoiceControllerTest {
     private static final long PROJECT_ID = 10001L;
     private static final long CONTRACT_ID = 30001L;
     private static final long PARTNER_ID = 20002L;
+    private static final String CSRF_TOKEN = "test-csrf-token";
 
     private Long payRecordId;
     private Long invoiceId;
@@ -133,7 +134,7 @@ class InvoiceControllerTest {
     @Order(1)
     @DisplayName("POST /invoices without JWT -> 401")
     void testCreate_Unauthorized() throws Exception {
-        mockMvc.perform(postWithApi("/invoices")
+        mockMvc.perform(withCsrf(postWithApi("/invoices"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"invoiceNo\":\"INV001\",\"invoiceAmount\":1000,\"invoiceDate\":\"2026-06-22\"}"))
                 .andExpect(status().isUnauthorized());
@@ -143,7 +144,7 @@ class InvoiceControllerTest {
     @Order(1)
     @DisplayName("POST /invoices/register without JWT -> 401")
     void testRegister_Unauthorized() throws Exception {
-        mockMvc.perform(postWithApi("/invoices/register")
+        mockMvc.perform(withCsrf(postWithApi("/invoices/register"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"invoiceNo\":\"INV001\",\"invoiceAmount\":1000,\"invoiceDate\":\"2026-06-22\"}"))
                 .andExpect(status().isUnauthorized());
@@ -187,6 +188,8 @@ class InvoiceControllerTest {
 
         String response = mockMvc.perform(postWithApi("/invoices")
                         .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", CSRF_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -205,7 +208,7 @@ class InvoiceControllerTest {
     @Order(4)
     @DisplayName("POST /invoices with missing required field -> 400")
     void testCreate_MissingRequired() throws Exception {
-        mockMvc.perform(postWithApi("/invoices")
+        mockMvc.perform(withCsrf(postWithApi("/invoices"))
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
@@ -216,7 +219,7 @@ class InvoiceControllerTest {
     @Order(4)
     @DisplayName("POST /invoices malformed JSON -> 400 with fixed validation message")
     void testCreate_MalformedJson_UsesFixedMessage() throws Exception {
-        mockMvc.perform(postWithApi("/invoices")
+        mockMvc.perform(withCsrf(postWithApi("/invoices"))
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"invoiceNo\":"))
@@ -273,7 +276,7 @@ class InvoiceControllerTest {
                 }
                 """.formatted(System.nanoTime());
 
-        mockMvc.perform(putWithApi("/invoices/" + invoiceId)
+        mockMvc.perform(withCsrf(putWithApi("/invoices/" + invoiceId))
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -291,7 +294,21 @@ class InvoiceControllerTest {
     void testVerify_InvalidStatus() throws Exception {
         Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");
 
-        mockMvc.perform(putWithApi("/invoices/" + invoiceId + "/verify")
+        mockMvc.perform(withCsrf(putWithApi("/invoices/" + invoiceId + "/verify"))
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verifyStatus\":\"APPROVED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("POST /invoices/{id}/verify invalid status -> 400")
+    void testVerify_PostInvalidStatus() throws Exception {
+        Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");
+
+        mockMvc.perform(withCsrf(postWithApi("/invoices/" + invoiceId + "/verify"))
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"verifyStatus\":\"APPROVED\"}"))
@@ -305,7 +322,7 @@ class InvoiceControllerTest {
     void testVerify() throws Exception {
         Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");
 
-        mockMvc.perform(putWithApi("/invoices/" + invoiceId + "/verify")
+        mockMvc.perform(withCsrf(putWithApi("/invoices/" + invoiceId + "/verify"))
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"verifyStatus\":\"VERIFIED\"}"))
@@ -333,7 +350,7 @@ class InvoiceControllerTest {
                 }
                 """.formatted(payRecordId, System.nanoTime());
 
-        mockMvc.perform(postWithApi("/invoices/register")
+        mockMvc.perform(withCsrf(postWithApi("/invoices/register"))
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -352,7 +369,7 @@ class InvoiceControllerTest {
     void testDelete() throws Exception {
         Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");
 
-        mockMvc.perform(deleteWithApi("/invoices/" + invoiceId)
+        mockMvc.perform(withCsrf(deleteWithApi("/invoices/" + invoiceId))
                         .cookie(adminCookie()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
@@ -380,5 +397,14 @@ class InvoiceControllerTest {
 
     private MockHttpServletRequestBuilder deleteWithApi(String pathWithinContext) {
         return delete("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder withCsrf(MockHttpServletRequestBuilder request) {
+        return request.cookie(csrfCookie())
+                .header("X-XSRF-TOKEN", CSRF_TOKEN);
+    }
+
+    private Cookie csrfCookie() {
+        return new Cookie("XSRF-TOKEN", CSRF_TOKEN);
     }
 }

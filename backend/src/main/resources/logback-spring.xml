@@ -24,6 +24,35 @@
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <includeMdc>true</includeMdc>
                 <customFields>{"app":"cgc-pms-backend"}</customFields>
+                <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                    <defaultMask>***MASKED***</defaultMask>
+                    <path>password</path>
+                    <path>token</path>
+                    <path>refreshToken</path>
+                    <path>secret</path>
+                    <path>authorization</path>
+                    <path>cookie</path>
+                    <path>set-cookie</path>
+                    <path>phone</path>
+                    <path>email</path>
+                    <path>bankAccount</path>
+                    <path>creditCode</path>
+                    <path>contactPhone</path>
+                    <path>mobile</path>
+                    <path>idCard</path>
+                    <valueMask>
+                        <value>(?i)((password|token|secret|authorization|cookie|set-cookie|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard|身份证|手机号|银行卡|密码|令牌)\s*[:=]\s*)[^\s,;&amp;]+</value>
+                        <mask>$1***MASKED***</mask>
+                    </valueMask>
+                    <valueMask>
+                        <value>(?&lt;!\d)(1[3-9]\d)(\d{4})(\d{4})(?!\d)</value>
+                        <mask>$1****$3</mask>
+                    </valueMask>
+                    <valueMask>
+                        <value>(?&lt;!\d)(\d{4})(\d{8,11})(\d{4})(?!\d)</value>
+                        <mask>$1********$3</mask>
+                    </valueMask>
+                </jsonGeneratorDecorator>
             </encoder>
         </appender>
 
@@ -39,6 +68,35 @@
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <includeMdc>true</includeMdc>
                 <customFields>{"app":"cgc-pms-backend"}</customFields>
+                <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
+                    <defaultMask>***MASKED***</defaultMask>
+                    <path>password</path>
+                    <path>token</path>
+                    <path>refreshToken</path>
+                    <path>secret</path>
+                    <path>authorization</path>
+                    <path>cookie</path>
+                    <path>set-cookie</path>
+                    <path>phone</path>
+                    <path>email</path>
+                    <path>bankAccount</path>
+                    <path>creditCode</path>
+                    <path>contactPhone</path>
+                    <path>mobile</path>
+                    <path>idCard</path>
+                    <valueMask>
+                        <value>(?i)((password|token|secret|authorization|cookie|set-cookie|phone|email|bankAccount|creditCode|contactPhone|mobile|idCard|身份证|手机号|银行卡|密码|令牌)\s*[:=]\s*)[^\s,;&amp;]+</value>
+                        <mask>$1***MASKED***</mask>
+                    </valueMask>
+                    <valueMask>
+                        <value>(?&lt;!\d)(1[3-9]\d)(\d{4})(\d{4})(?!\d)</value>
+                        <mask>$1****$3</mask>
+                    </valueMask>
+                    <valueMask>
+                        <value>(?&lt;!\d)(\d{4})(\d{8,11})(\d{4})(?!\d)</value>
+                        <mask>$1********$3</mask>
+                    </valueMask>
+                </jsonGeneratorDecorator>
             </encoder>
         </appender>
 

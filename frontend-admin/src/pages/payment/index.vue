@@ -30,6 +30,7 @@ import { getMeasureItems, getMeasureList } from '@/api/modules/subcontract'
 import type { PayApplicationVO, PayApplicationBasisVO } from '@/types/payment'
 import { PAY_TYPE_LABEL, PAY_TYPE_COLOR, PAY_STATUS_LABEL, PAY_STATUS_COLOR } from '@/types/payment'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
+import { APPROVAL_STATUS_COLOR, APPROVAL_STATUS_LABEL, PAYMENT_GRID_COLUMNS } from './pageConfig'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -104,18 +105,6 @@ const writebackForm = reactive({
   voucherNo: '',
 })
 
-const APPROVAL_STATUS_LABEL: Record<string, string> = {
-  DRAFT: '草稿',
-  APPROVING: '审批中',
-  APPROVED: '已通过',
-  REJECTED: '已驳回',
-}
-const APPROVAL_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'default',
-  APPROVING: 'processing',
-  APPROVED: 'success',
-  REJECTED: 'error',
-}
 const PAY_STATUS_DICT = 'pay_status'
 const APPROVAL_STATUS_DICT = 'approval_status'
 
@@ -135,6 +124,10 @@ function approvalStatusColor(status: string | undefined): string {
   return getDictTagColorSync(APPROVAL_STATUS_DICT, status ?? '', APPROVAL_STATUS_COLOR)
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -150,7 +143,7 @@ async function fetchData() {
     })
     tableData.value = res.records
     total.value = Number(res.total ?? 0)
-  } catch (e) {
+  } catch (e: unknown) {
     console.error(e)
     tableData.value = []
     total.value = 0
@@ -175,7 +168,8 @@ async function fetchReceipts() {
       }),
     )
     receiptItemOptions.value = items.flat()
-  } catch {
+  } catch (e: unknown) {
+    console.error('付款依据装载失败: 验收单', e)
     receiptList.value = []
     receiptItemOptions.value = []
   }
@@ -196,7 +190,8 @@ async function fetchMeasures() {
       }),
     )
     measureItemOptions.value = items.flat()
-  } catch {
+  } catch (e: unknown) {
+    console.error('付款依据装载失败: 分包计量', e)
     measureList.value = []
     measureItemOptions.value = []
   }
@@ -260,8 +255,9 @@ async function handleEdit(record: PayApplicationVO) {
     const data = detail.basis?.length ? detail.basis : (await getBasisList(record.id))
     basisList.value = data.map((it, idx) => ({ ...it, key: idx }))
     basisKeyCounter = basisList.value.length
-  } catch {
-    message.error('加载付款依据失败，请稍后重试')
+  } catch (e: unknown) {
+    console.error(e)
+    message.error(getErrorMessage(e, '加载付款依据失败，请稍后重试'))
     return
   }
   modalVisible.value = true
@@ -272,9 +268,14 @@ async function handleDelete(record: PayApplicationVO) {
     content: `确定删除付款申请 ${record.applyCode}？`,
     okType: 'danger',
     onOk: async () => {
-      await deleteApplication(record.id)
-      message.success('已删除')
-      fetchData()
+      try {
+        await deleteApplication(record.id)
+        message.success('已删除')
+        fetchData()
+      } catch (e: unknown) {
+        console.error(e)
+        message.error(getErrorMessage(e, '删除失败，请稍后重试'))
+      }
     },
   })
 }
@@ -295,8 +296,9 @@ async function handleSubmit() {
     }
     modalVisible.value = false
     fetchData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error(e)
+    message.error(getErrorMessage(e, '操作失败，请稍后重试'))
   }
 }
 
@@ -305,8 +307,9 @@ async function handleApproval(record: PayApplicationVO) {
     await submitForApproval(record.id)
     message.success('已提交审批')
     fetchData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error(e)
+    message.error(getErrorMessage(e, '提交审批失败，请稍后重试'))
   }
 }
 function openWriteback(record: PayApplicationVO) {
@@ -323,8 +326,9 @@ async function handleWritebackOk() {
     message.success('回写成功')
     writebackVisible.value = false
     fetchData()
-  } catch (e) {
+  } catch (e: unknown) {
     console.error(e)
+    message.error(getErrorMessage(e, '回写失败，请稍后重试'))
   }
 }
 function handleWritebackCancel() {
@@ -483,37 +487,7 @@ function kpiPct(value: number, max: number): number {
 }
 
 // vxe-grid columns
-const gridColumns = computed(() => [
-  { field: 'applyCode', title: '申请编号', minWidth: 150, ellipsis: true },
-  { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
-  { field: 'contractName', title: '合同', minWidth: 150, ellipsis: true },
-  { field: 'partnerName', title: '合作方', minWidth: 140, ellipsis: true },
-  {
-    field: 'applyAmount',
-    title: '申请金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'applyAmount' },
-  },
-  {
-    field: 'approvedAmount',
-    title: '审批金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'approvedAmount' },
-  },
-  {
-    field: 'actualPayAmount',
-    title: '实付金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'actualPayAmount' },
-  },
-  { field: 'payType', title: '付款类型', width: 108, slots: { default: 'payType' } },
-  { field: 'payStatus', title: '支付状态', width: 108, slots: { default: 'payStatus' } },
-  { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
-  { title: '操作', width: 76, slots: { default: 'action' } },
-])
+const gridColumns = computed(() => [...PAYMENT_GRID_COLUMNS])
 
 const {
   visibleColumns: visibleGridColumns,

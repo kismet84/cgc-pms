@@ -64,6 +64,11 @@ const formData = reactive<Partial<SubTaskVO>>({
 const formPartnerName = computed(
   () => contractList.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
 )
+
+function filterSelectOption(input: string, option: SelectOption) {
+  return option.label?.toLowerCase().includes(input.toLowerCase()) ?? false
+}
+
 function onContractChange(contractId: string) {
   const c = contractList.value?.find((ct) => ct.id === contractId)
   formData.partnerId = c?.partyBId
@@ -348,10 +353,7 @@ onMounted(() => {
         allow-clear
         size="large"
         show-search
-        :filter-option="
-          (input: string, option: SelectOption) =>
-            option.label?.toLowerCase().includes(input.toLowerCase())
-        "
+        :filter-option="filterSelectOption"
         @change="handleSearch"
       >
         <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -589,10 +591,7 @@ onMounted(() => {
                   referenceStore.fetchContracts({ projectId: v })
                 }
               "
-              :filter-option="
-                (input: string, option: any) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
+              :filter-option="filterSelectOption"
             >
               <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
                 {{ p.projectName }}
@@ -605,10 +604,7 @@ onMounted(() => {
               placeholder="请选择合同"
               allow-clear
               show-search
-              :filter-option="
-                (input: string, option: any) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
+              :filter-option="filterSelectOption"
               @change="onContractChange"
             >
               <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">

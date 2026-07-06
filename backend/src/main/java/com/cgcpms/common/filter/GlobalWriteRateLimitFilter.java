@@ -13,6 +13,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -37,14 +39,19 @@ public class GlobalWriteRateLimitFilter extends OncePerRequestFilter {
     private final RateLimitCounterStore counterStore;
     private final GlobalWriteRateLimitProperties properties;
     private final ObjectMapper objectMapper;
+    private final Environment environment;
+    private final boolean devLoginEnabled;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public GlobalWriteRateLimitFilter(RateLimitCounterStore counterStore,
                                       GlobalWriteRateLimitProperties properties,
-                                      ObjectMapper objectMapper) {
+                                      ObjectMapper objectMapper,
+                                      Environment environment) {
         this.counterStore = counterStore;
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.environment = environment;
+        this.devLoginEnabled = Boolean.parseBoolean(environment.getProperty("auth.dev-login.enabled", "false"));
     }
 
     @Override
@@ -59,7 +66,8 @@ public class GlobalWriteRateLimitFilter extends OncePerRequestFilter {
             return true;
         }
         String path = request.getServletPath();
-        return SKIP_PATHS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path));
+        return SKIP_PATHS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path))
+                || shouldSkipDevLogin(path);
     }
 
     @Override
@@ -104,5 +112,11 @@ public class GlobalWriteRateLimitFilter extends OncePerRequestFilter {
                 "RATE_LIMIT_EXCEEDED",
                 String.format("请求过于频繁，请在 %d 秒后重试", properties.getWindowSeconds()));
         response.getWriter().write(objectMapper.writeValueAsString(body));
+    }
+
+    private boolean shouldSkipDevLogin(String path) {
+        return SecurityConfig.DEV_LOGIN_PATH.equals(path)
+                && devLoginEnabled
+                && environment.acceptsProfiles(Profiles.of("dev", "local"));
     }
 }
