@@ -67,6 +67,8 @@ describe('Profile page', () => {
     return mount(ProfilePage, {
       global: {
         stubs: {
+          'a-breadcrumb': { template: '<div class="stub-breadcrumb"><slot /></div>' },
+          'a-breadcrumb-item': { template: '<div class="stub-breadcrumb-item"><slot /></div>' },
           'a-avatar': { template: '<div class="stub-avatar"><slot /></div>' },
           'a-card': { template: '<div class="stub-card"><slot /><slot name="title" /></div>' },
           'a-form': {
@@ -209,5 +211,33 @@ describe('Profile page', () => {
       (call: unknown[]) => (call[0] as Record<string, unknown>)?.url === '/profile/password',
     )
     expect(pwdCalls.length).toBe(0)
+  })
+
+  it('submits password change when password meets strength rule', async () => {
+    const wrapper = mountProfile()
+
+    const passwordInputs = wrapper.findAll('.stub-input-password')
+    expect(passwordInputs.length).toBeGreaterThanOrEqual(3)
+
+    await passwordInputs.at(0)!.setValue('old123456')
+    await passwordInputs.at(1)!.setValue('abc12345')
+    await passwordInputs.at(2)!.setValue('abc12345')
+    await nextTick()
+
+    const forms = wrapper.findAll('.stub-form')
+    const passwordForm = forms.at(1)
+    expect(passwordForm).toBeTruthy()
+    await passwordForm!.trigger('submit')
+    await nextTick()
+
+    const pwdCalls = mockRequest.mock.calls.filter(
+      (call: unknown[]) => (call[0] as Record<string, unknown>)?.url === '/profile/password',
+    )
+    expect(pwdCalls.length).toBe(1)
+    expect((pwdCalls[0][0] as Record<string, unknown>).method).toBe('put')
+    expect((pwdCalls[0][0] as Record<string, unknown>).data).toEqual({
+      oldPassword: 'old123456',
+      newPassword: 'abc12345',
+    })
   })
 })

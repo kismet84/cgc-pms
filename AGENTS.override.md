@@ -135,6 +135,7 @@ D:\projects-test\cgc-pms
 - 用户要求写计划书时，默认写入 `docs\plans`。
 - 计划书文件命名默认参照既有主线格式：`第N条主线-<主题>任务计划书.md`；阶段性计划可使用 `第N条主线-Mx-<主题>任务计划书-YYYY-MM-DD.md`。
 - 计划书第一段必须包含 `**Goal:**` 和 `**Architecture:**` 两项信息：`Goal` 说明计划目标与验收方向，`Architecture` 说明技术架构、复用边界、禁止扩展范围和最小可行方案原则。
+- `D:\projects-test\cgc-pms\docs\未来开发计划.md` 用于增量记录所有未处理的问题。
 
 输出风格：
 - 结论优先。

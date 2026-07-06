@@ -47,31 +47,32 @@ function storageKey(key: CacheKey) {
 
 function loadCache<T>(key: CacheKey): CachePayload<T> | null {
   try {
-    const raw = localStorage.getItem(storageKey(key))
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<CachePayload<T>>
-    if (!Array.isArray(parsed.items) || typeof parsed.savedAt !== 'number') return null
-    if (Date.now() - parsed.savedAt > CACHE_TTL) return null
-    return { savedAt: parsed.savedAt, items: parsed.items }
-  } catch {
-    return null
+    localStorage.removeItem(storageKey(key))
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('reference cache cleanup failed:', key, error)
+    }
   }
+  return null
 }
 
-function persistCache<T>(key: CacheKey, items: T[], savedAt = Date.now()) {
+function persistCache<T>(key: CacheKey, _items: T[], _savedAt = Date.now()) {
   try {
-    const payload: CachePayload<T> = { savedAt, items }
-    localStorage.setItem(storageKey(key), JSON.stringify(payload))
-  } catch {
-    // ignore storage failures — in-memory refs still work
+    localStorage.removeItem(storageKey(key))
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('reference cache cleanup failed:', key, error)
+    }
   }
 }
 
 function clearCache(key: CacheKey) {
   try {
     localStorage.removeItem(storageKey(key))
-  } catch {
-    // ignore
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('reference cache cleanup failed:', key, error)
+    }
   }
 }
 

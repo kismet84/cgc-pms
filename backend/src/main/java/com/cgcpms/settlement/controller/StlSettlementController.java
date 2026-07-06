@@ -17,6 +17,7 @@ import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
 import com.cgcpms.variation.vo.VarOrderVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -101,7 +102,9 @@ public class StlSettlementController {
 
     @PostMapping("/{id}/items/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:edit')")
-    public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @Valid @RequestBody List<StlSettlementItem> items) {
+    public ApiResponse<Void> batchSaveItems(@PathVariable Long id,
+                                            @Valid @Size(max = 200, message = "批量明细不能超过200条")
+                                            @RequestBody List<StlSettlementItem> items) {
         writeService.saveItems(id, items);
         return ApiResponse.success();
     }

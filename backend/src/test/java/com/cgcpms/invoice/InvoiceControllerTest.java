@@ -287,6 +287,20 @@ class InvoiceControllerTest {
 
     @Test
     @Order(8)
+    @DisplayName("PUT /invoices/{id}/verify invalid status -> 400")
+    void testVerify_InvalidStatus() throws Exception {
+        Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");
+
+        mockMvc.perform(putWithApi("/invoices/" + invoiceId + "/verify")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verifyStatus\":\"APPROVED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @Order(9)
     @DisplayName("PUT /invoices/{id}/verify -> 200 verifies invoice")
     void testVerify() throws Exception {
         Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");
@@ -304,7 +318,7 @@ class InvoiceControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(9)
+    @Order(10)
     @DisplayName("POST /invoices/register -> 200 registers invoice linked to pay record")
     void testRegister() throws Exception {
         Assertions.assertNotNull(payRecordId, "Prerequisite: payRecordId must be created");
@@ -333,7 +347,7 @@ class InvoiceControllerTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @Order(10)
+    @Order(11)
     @DisplayName("DELETE /invoices/{id} -> 200 deletes invoice")
     void testDelete() throws Exception {
         Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");

@@ -4,18 +4,16 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.invoice.dto.InvoiceVerifyRequest;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/invoices")
@@ -66,9 +64,8 @@ public class InvoiceController {
 
     @PutMapping("/{id}/verify")
     @PreAuthorize("hasAuthority('invoice:verify') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> verify(@PathVariable Long id, @Valid @NotEmpty @RequestBody Map<String, String> body) {
-        String targetStatus = body.get("verifyStatus");
-        invoiceService.verify(id, targetStatus);
+    public ApiResponse<Void> verify(@PathVariable Long id, @Valid @RequestBody InvoiceVerifyRequest request) {
+        invoiceService.verify(id, request.getVerifyStatus());
         return ApiResponse.success();
     }
 

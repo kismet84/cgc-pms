@@ -541,6 +541,23 @@ class PayApplicationServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("checkContractBalance -- 忽略其他租户 SUCCESS 付款记录")
+    void testCheckContractBalance_IgnoresOtherTenantPayRecords() {
+        PayRecord otherTenantRecord = new PayRecord();
+        otherTenantRecord.setPayApplicationId(testAppId);
+        otherTenantRecord.setContractId(testApp.getContractId());
+        otherTenantRecord.setPayAmount(new BigDecimal("60000000.00"));
+        otherTenantRecord.setPayDate(LocalDate.now());
+        otherTenantRecord.setPayStatus("SUCCESS");
+        otherTenantRecord.setTenantId(999L);
+        payRecordMapper.insert(otherTenantRecord);
+
+        assertDoesNotThrow(() ->
+                payApplicationService.checkContractBalance(testApp, new BigDecimal("100000.00")));
+    }
+
+    @Test
+    @Transactional
     @DisplayName("checkContractBalance -- 总额超合同余额时抛异常")
     void testCheckContractBalance_ExceedsBalance() {
         // contract 30001 currentAmount = 50,000,000

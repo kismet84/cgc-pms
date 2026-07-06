@@ -11,6 +11,7 @@ import com.cgcpms.receipt.vo.MatReceiptItemVO;
 import com.cgcpms.receipt.vo.MatReceiptVO;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -88,7 +89,8 @@ public class MatReceiptController {
     @PostMapping("/{id}/items/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('receipt:edit')")
     public ApiResponse<Void> saveItemsBatch(@PathVariable Long id,
-                                             @Valid @RequestBody List<MatReceiptItem> items) {
+                                             @Valid @Size(max = 200, message = "批量明细不能超过200条")
+                                             @RequestBody List<MatReceiptItem> items) {
         for (int i = 0; i < items.size(); i++) {
             var violations = validator.validate(items.get(i));
             if (!violations.isEmpty()) {

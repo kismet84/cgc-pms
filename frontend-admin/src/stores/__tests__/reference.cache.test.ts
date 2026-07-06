@@ -40,7 +40,7 @@ describe('reference store cache isolation', () => {
     localStorage.clear()
   })
 
-  it('hydrates cached reference data from localStorage', async () => {
+  it('clears legacy cached reference data from localStorage on init', async () => {
     localStorage.setItem(
       'cgc_pms_reference_cache:projects',
       JSON.stringify({ savedAt: Date.now(), items: [{ id: 'p1', projectName: '项目A' }] }),
@@ -50,7 +50,8 @@ describe('reference store cache isolation', () => {
     const { useReferenceStore: freshUseReferenceStore } = await import('@/stores/reference')
     setActivePinia(createPinia())
     store = freshUseReferenceStore()
-    expect(store.projects).toEqual([{ id: 'p1', projectName: '项目A' }])
+    expect(store.projects).toBeNull()
+    expect(localStorage.getItem('cgc_pms_reference_cache:projects')).toBeNull()
   })
 
   describe('fetchContracts', () => {

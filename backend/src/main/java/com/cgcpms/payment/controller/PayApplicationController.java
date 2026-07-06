@@ -10,6 +10,7 @@ import com.cgcpms.payment.service.PayApplicationService;
 import com.cgcpms.payment.vo.PayApplicationBasisVO;
 import com.cgcpms.payment.vo.PayApplicationVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -76,7 +77,9 @@ public class PayApplicationController {
 
     @PostMapping("/{id}/basis/batch")
     @PreAuthorize("hasAuthority('payment:app:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> batchSaveBasis(@PathVariable Long id, @Valid @RequestBody List<PayApplicationBasis> basisList) {
+    public ApiResponse<Void> batchSaveBasis(@PathVariable Long id,
+                                            @Valid @Size(max = 200, message = "批量依据不能超过200条")
+                                            @RequestBody List<PayApplicationBasis> basisList) {
         payApplicationService.saveBasis(id, basisList);
         return ApiResponse.success();
     }

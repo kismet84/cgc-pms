@@ -260,15 +260,17 @@ public class PayApplicationService {
         Long contractId = app.getContractId();
         if (contractId == null) return;
 
-        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId, UserContext.getCurrentTenantId());
+        Long tenantId = UserContext.getCurrentTenantId();
+        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId, tenantId);
 
         BigDecimal currentAmount = contract.getCurrentAmount() != null
                 ? contract.getCurrentAmount() : BigDecimal.ZERO;
 
-        // Sum all SUCCESS pay records across ALL applications for this contract
+        // Sum all SUCCESS pay records for this tenant and contract.
         List<PayRecord> allPaid = payRecordMapper.selectList(
                 new LambdaQueryWrapper<PayRecord>()
                         .eq(PayRecord::getContractId, contractId)
+                        .eq(PayRecord::getTenantId, tenantId)
                         .eq(PayRecord::getPayStatus, "SUCCESS"));
         BigDecimal totalPaid = allPaid.stream()
                 .map(r -> r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO)
@@ -378,7 +380,7 @@ public class PayApplicationService {
      * </ol>
      * 两个方法共同构成双层防线：submit 时预判可支付余额，writeback 时以实付口径二次确认。
      */
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional(isolation = Isolation.REPEATABLE_READ, rollbackFor = Exception.class)
     public void submitForApproval(Long id) {
         PayApplication payApp = payApplicationMapper.selectById(id);
         if (payApp == null || !payApp.getTenantId().equals(UserContext.getCurrentTenantId()))

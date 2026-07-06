@@ -9,6 +9,7 @@ import com.cgcpms.cost.service.CostTargetService;
 import com.cgcpms.cost.vo.CostTargetItemVO;
 import com.cgcpms.cost.vo.CostTargetVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -92,7 +93,8 @@ public class CostTargetController {
     @PostMapping("/{targetId}/items")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:edit')")
     public ApiResponse<Void> batchSaveItems(@PathVariable Long targetId,
-                                            @Valid @RequestBody List<@Valid CostTargetItem> items) {
+                                            @Valid @Size(max = 200, message = "批量明细不能超过200条")
+                                            @RequestBody List<@Valid CostTargetItem> items) {
         log.info("POST /cost-targets/{}/items — batch save {} items", targetId, items != null ? items.size() : 0);
         costTargetService.batchSaveItems(targetId, items);
         return ApiResponse.success();

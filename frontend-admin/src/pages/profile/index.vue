@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import { useUserStore } from '@/stores/user'
 import { updateProfile, changePassword } from '@/api/modules/auth'
 
@@ -21,8 +22,32 @@ const passwordForm = reactive({
 
 const profileLoading = ref(false)
 const passwordLoading = ref(false)
+const passwordFormRef = ref<FormInstance>()
 const PASSWORD_RULE_TEXT = '新密码至少 8 位，且同时包含字母和数字'
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
+const passwordRules: Record<string, Rule[]> = {
+  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    {
+      pattern: PASSWORD_PATTERN,
+      message: PASSWORD_RULE_TEXT,
+      trigger: ['blur', 'change'],
+    },
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    {
+      validator: async (_rule, value: string) => {
+        if (!value || value === passwordForm.newPassword) {
+          return
+        }
+        throw new Error('两次输入的新密码不一致')
+      },
+      trigger: ['blur', 'change'],
+    },
+  ],
+}
 
 watch(
   () => userStore.userInfo,
@@ -59,6 +84,9 @@ async function handleProfileSave() {
 }
 
 async function handlePasswordChange() {
+  if (typeof passwordFormRef.value?.validate === 'function') {
+    await passwordFormRef.value.validate()
+  }
   if (!passwordForm.oldPassword) {
     message.warning('请输入原密码')
     return
@@ -184,7 +212,13 @@ async function handlePasswordChange() {
             <h2 class="lg-section-title">修改密码</h2>
           </div>
           <div class="lg-section-body">
-            <a-form :model="passwordForm" layout="vertical" @finish="handlePasswordChange">
+            <a-form
+              ref="passwordFormRef"
+              :model="passwordForm"
+              :rules="passwordRules"
+              layout="vertical"
+              @finish="handlePasswordChange"
+            >
               <!-- hidden username field for password manager context -->
               <input
                 type="text"

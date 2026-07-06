@@ -5,7 +5,6 @@ import { logout as authLogout } from '@/api/modules/auth'
 import { useReferenceStore } from './reference'
 
 const USER_INFO_KEY = 'cgc_pms_userinfo'
-type PersistedUserInfo = Pick<UserInfo, 'userId' | 'username' | 'roles' | 'permissions' | 'roleName'>
 
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(loadUserInfo())
@@ -16,7 +15,7 @@ export const useUserStore = defineStore('user', () => {
 
   function setUserInfo(info: UserInfo) {
     userInfo.value = info
-    persistUserInfo(info)
+    clearUserInfo()
   }
 
   function hasPermission(code: string): boolean {
@@ -34,8 +33,10 @@ export const useUserStore = defineStore('user', () => {
       referenceStore.invalidateContracts()
       referenceStore.invalidatePartners()
       referenceStore.invalidateMaterials()
-    } catch {
-      // reference store may not be initialized
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('reference cache cleanup failed during logout', error)
+      }
     }
   }
 
@@ -51,45 +52,16 @@ export const useUserStore = defineStore('user', () => {
 })
 
 function loadUserInfo(): UserInfo | null {
-  try {
-    const raw = sessionStorage.getItem(USER_INFO_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as UserInfo
-  } catch {
-    if (import.meta.env.DEV) {
-      console.warn('sessionStorage operation failed:', 'loadUserInfo')
-    }
-    return null
-  }
-}
-
-function persistUserInfo(info: UserInfo) {
-  try {
-    sessionStorage.setItem(USER_INFO_KEY, JSON.stringify(toPersistedUserInfo(info)))
-  } catch {
-    if (import.meta.env.DEV) {
-      console.warn('sessionStorage operation failed:', 'persistUserInfo')
-    }
-    // sessionStorage full or unavailable — userInfo lives only in memory
-  }
-}
-
-function toPersistedUserInfo(info: UserInfo): PersistedUserInfo {
-  return {
-    userId: info.userId,
-    username: info.username,
-    roles: info.roles,
-    permissions: info.permissions,
-    roleName: info.roleName,
-  }
+  clearUserInfo()
+  return null
 }
 
 function clearUserInfo() {
   try {
     sessionStorage.removeItem(USER_INFO_KEY)
-  } catch {
+  } catch (error) {
     if (import.meta.env.DEV) {
-      console.warn('sessionStorage operation failed:', 'clearUserInfo')
+      console.warn('sessionStorage operation failed:', 'clearUserInfo', error)
     }
     // ignore
   }

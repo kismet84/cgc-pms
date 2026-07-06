@@ -32,7 +32,7 @@ jobs:
     env:
       CI_MYSQL_DATABASE: cgc_pms_test
       CI_MYSQL_USER: cgc_test
-      CI_MYSQL_PASSWORD: cgc_test_pw_2026
+      CI_MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD || format('ci-mysql-{0}', github.run_id) }}
       CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
     services:
       mysql:
@@ -150,7 +150,7 @@ jobs:
     env:
       CI_MYSQL_DATABASE: cgc_pms_test
       CI_MYSQL_USER: cgc_test
-      CI_MYSQL_PASSWORD: cgc_test_pw_2026
+      CI_MYSQL_PASSWORD: ${{ secrets.CI_MYSQL_PASSWORD || format('ci-mysql-{0}', github.run_id) }}
       CI_MYSQL_ROOT_PASSWORD: ${{ secrets.CI_MYSQL_ROOT_PASSWORD || format('ci-root-{0}', github.run_id) }}
     services:
       mysql:

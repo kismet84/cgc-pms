@@ -9,6 +9,7 @@ import com.cgcpms.subcontract.service.SubMeasureService;
 import com.cgcpms.subcontract.vo.SubMeasureItemVO;
 import com.cgcpms.subcontract.vo.SubMeasureVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -73,7 +74,9 @@ public class SubMeasureController {
 
     @PostMapping("/{id}/items/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('subcontract:measure:edit')")
-    public ApiResponse<Void> batchSaveItems(@PathVariable Long id, @Valid @RequestBody List<SubMeasureItem> items) {
+    public ApiResponse<Void> batchSaveItems(@PathVariable Long id,
+                                            @Valid @Size(max = 200, message = "批量明细不能超过200条")
+                                            @RequestBody List<SubMeasureItem> items) {
         subMeasureService.saveItems(id, items);
         return ApiResponse.success();
     }

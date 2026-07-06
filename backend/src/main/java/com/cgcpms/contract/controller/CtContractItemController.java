@@ -4,6 +4,7 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.service.CtContractItemService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -33,7 +34,8 @@ public class CtContractItemController {
     @PostMapping("/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:item:add')")
     public ApiResponse<Void> batchSave(@PathVariable Long contractId,
-                                       @RequestBody @Valid List<@Valid CtContractItem> items) {
+                                       @Valid @Size(max = 200, message = "批量明细不能超过200条")
+                                       @RequestBody List<@Valid CtContractItem> items) {
         ctContractItemService.batchSave(contractId, items);
         return ApiResponse.success();
     }

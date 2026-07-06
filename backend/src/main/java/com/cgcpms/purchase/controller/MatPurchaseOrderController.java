@@ -10,6 +10,7 @@ import com.cgcpms.purchase.vo.MatPurchaseOrderItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.groups.Default;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -87,7 +88,8 @@ public class MatPurchaseOrderController {
     @PostMapping("/{id}/items/batch")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:edit')")
     public ApiResponse<Void> saveItemsBatch(@PathVariable Long id,
-                                             @Valid @RequestBody List<MatPurchaseOrderItem> items) {
+                                             @Valid @Size(max = 200, message = "批量明细不能超过200条")
+                                             @RequestBody List<MatPurchaseOrderItem> items) {
         for (int i = 0; i < items.size(); i++) {
             var violations = validator.validate(items.get(i));
             if (!violations.isEmpty()) {

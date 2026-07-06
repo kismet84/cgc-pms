@@ -1,14 +1,12 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { chromium } from '@playwright/test'
 
 const authStateFile = 'e2e/.auth/admin.json'
-const authUserInfoFile = 'e2e/.auth/admin-user.json'
 const BASE_URL = 'http://localhost:5173'
-const USER_INFO_KEY = 'cgc_pms_userinfo'
 
 export default async function globalAuthSetup() {
-  if (existsSync(authStateFile) && existsSync(authUserInfoFile)) {
+  if (existsSync(authStateFile)) {
     return
   }
 
@@ -38,13 +36,7 @@ export default async function globalAuthSetup() {
     .first()
     .waitFor({ state: 'visible', timeout: 20000 })
 
-  const persistedUserInfo = await page.evaluate((storageKey) => window.sessionStorage.getItem(storageKey), USER_INFO_KEY)
-  if (!persistedUserInfo) {
-    throw new Error('global auth setup failed: sessionStorage userInfo missing after login')
-  }
-
   await page.context().storageState({ path: authStateFile })
-  writeFileSync(authUserInfoFile, persistedUserInfo, 'utf-8')
 
   await browser.close()
 }

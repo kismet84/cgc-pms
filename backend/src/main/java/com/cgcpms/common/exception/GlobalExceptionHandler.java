@@ -12,15 +12,19 @@ import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -124,6 +128,13 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail(VALIDATION_ERROR_CODE, "参数校验失败");
     }
 
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleHandlerMethodValidation(HandlerMethodValidationException e) {
+        log.warn("Method validation failed: {}", e.getMessage());
+        return ApiResponse.fail(VALIDATION_ERROR_CODE, "参数校验失败");
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ApiResponse<Void> handleDataIntegrity(DataIntegrityViolationException e) {
@@ -136,6 +147,20 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
         log.warn("Method not supported: {}", e.getMessage());
         return ApiResponse.fail("METHOD_NOT_ALLOWED", "请求方法不支持");
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+    public ApiResponse<Void> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
+        log.warn("Media type not supported: {}", e.getMessage());
+        return ApiResponse.fail("UNSUPPORTED_MEDIA_TYPE", "请求内容类型不支持");
+    }
+
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Void> handleNotFound(Exception e) {
+        log.warn("Resource not found: {}", e.getMessage());
+        return ApiResponse.fail("NOT_FOUND", "资源不存在");
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)

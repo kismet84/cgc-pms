@@ -16,7 +16,7 @@ public class SysRoleMenuAuditService {
 
     private final SysRoleMenuAuditSnapshotMapper mapper;
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void record(Long tenantId, Long operatorId, Long roleId,
                        List<Long> beforeMenuIds, List<Long> afterMenuIds,
                        boolean success, String errorSummary) {
