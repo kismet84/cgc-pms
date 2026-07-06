@@ -10,6 +10,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  SettingOutlined,
   WalletOutlined,
 } from '@ant-design/icons-vue'
 import {
@@ -52,6 +53,16 @@ const filter = reactive({
   direction: undefined as string | undefined,
   varCode: '',
 })
+const filterVisibility = reactive({
+  projectId: true,
+  varType: true,
+  direction: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'varType', label: '变更类型' },
+  { key: 'direction', label: '方向' },
+] as const
 
 const loading = ref(false)
 const tableData = ref<VarOrderVO[]>([])
@@ -193,6 +204,9 @@ function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
   fetchData()
+}
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
 }
 
 async function handleAdd() {
@@ -494,64 +508,6 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <section class="lg-search-bar vo-query-panel" aria-label="变更签证查询条件">
-      <div class="vo-query-primary">
-        <a-input
-          v-model:value="filter.varCode"
-          class="vo-keyword-search"
-          placeholder="搜索变更编号、名称"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix><SearchOutlined class="vo-search-prefix-icon" /></template>
-        </a-input>
-        <a-select
-          v-model:value="filter.projectId"
-          class="vo-query-select"
-          placeholder="全部项目"
-          allow-clear
-          size="large"
-          @change="handleProjectChange"
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.varType"
-          class="vo-query-select"
-          placeholder="变更类型"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">
-            {{ o.label }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.direction"
-          class="vo-query-select"
-          placeholder="方向"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="o in DIRECTION_OPTIONS" :key="o.value" :value="o.value">
-            {{ o.label }}
-          </a-select-option>
-        </a-select>
-      </div>
-      <div class="vo-query-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
-    </section>
-
     <div class="lg-grid vo-workspace">
       <div class="lg-left vo-main-column">
         <div class="vo-kpi-summary" aria-label="变更签证关键指标">
@@ -577,6 +533,88 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <section class="lg-search-bar vo-query-panel" aria-label="变更签证查询条件">
+          <div class="vo-query-primary">
+            <a-select
+              v-if="filterVisibility.projectId"
+              v-model:value="filter.projectId"
+              class="vo-query-select"
+              placeholder="全部项目"
+              allow-clear
+              size="large"
+              @change="handleProjectChange"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.varType"
+              v-model:value="filter.varType"
+              class="vo-query-select"
+              placeholder="变更类型"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">
+                {{ o.label }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.direction"
+              v-model:value="filter.direction"
+              class="vo-query-select"
+              placeholder="方向"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="o in DIRECTION_OPTIONS" :key="o.value" :value="o.value">
+                {{ o.label }}
+              </a-select-option>
+            </a-select>
+          </div>
+          <div class="vo-query-keyword-row">
+            <a-input
+              v-model:value="filter.varCode"
+              class="vo-keyword-search"
+              placeholder="搜索变更编号、名称"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined class="vo-search-prefix-icon" /></template>
+            </a-input>
+            <div class="vo-query-actions">
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
+          </div>
+        </section>
+
         <main class="lg-list-table-panel vo-table-panel">
           <div class="lg-toolbar vo-table-toolbar">
             <div class="lg-toolbar-left">
@@ -586,7 +624,6 @@ onUnmounted(() => {
               </div>
             </div>
             <div class="lg-toolbar-right vo-table-toolbar-right">
-              <span class="vo-toolbar-hint">当前页结果 / 金额单位万元 / 编号可查看详情</span>
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
@@ -729,7 +766,6 @@ onUnmounted(() => {
           <header class="vo-analysis-head">
             <div>
               <div class="vo-analysis-title">签证分析</div>
-              <div class="vo-analysis-subtitle">类型、状态与近期记录</div>
             </div>
           </header>
 
@@ -966,6 +1002,7 @@ onUnmounted(() => {
 <style scoped>
 .variation-page {
   gap: 14px;
+  background: var(--surface-subtle);
 }
 
 .vo-page-head {
@@ -988,15 +1025,27 @@ onUnmounted(() => {
 }
 
 .vo-query-panel {
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  flex-direction: column;
   gap: 12px;
+  margin: 0;
   min-height: 74px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .vo-query-primary {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vo-query-keyword-row {
+  display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -1027,7 +1076,7 @@ onUnmounted(() => {
 .vo-workspace {
   align-items: stretch;
   min-height: 0;
-  height: calc(100vh - 174px);
+  height: calc(100vh - 74px);
 }
 
 .vo-main-column {
@@ -1042,6 +1091,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
+  margin-bottom: 0;
   overflow: hidden;
   min-height: 84px;
   background: var(--surface);
@@ -1124,8 +1174,13 @@ onUnmounted(() => {
   display: flex;
   flex: 1;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
+  background: var(--surface);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
   min-height: 0;
 }
 
@@ -1147,8 +1202,6 @@ onUnmounted(() => {
 }
 
 .vo-table-count,
-.vo-toolbar-hint,
-.vo-analysis-subtitle,
 .vo-warning-count {
   color: var(--text-secondary);
   font-size: 13px;
@@ -1243,9 +1296,9 @@ onUnmounted(() => {
 .vo-analysis-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
   height: 100%;
-  padding: 18px;
+  padding: 0 0 12px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1260,19 +1313,29 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.vo-analysis-head {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .vo-analysis-title {
   color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 22px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
 }
 
 .vo-analysis-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
-  padding-top: 16px;
+  padding: 10px 16px 0;
+}
+
+.vo-analysis-section + .vo-analysis-section {
+  margin-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -1303,6 +1366,7 @@ onUnmounted(() => {
 @media (max-width: 1200px) {
   .vo-page-head,
   .vo-query-panel,
+  .vo-query-keyword-row,
   .vo-query-primary {
     align-items: stretch;
     flex-direction: column;
@@ -1349,10 +1413,6 @@ onUnmounted(() => {
   .vo-table-toolbar .lg-toolbar-right {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .vo-toolbar-hint {
-    white-space: normal;
   }
 }
 </style>

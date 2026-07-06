@@ -515,15 +515,38 @@ onMounted(() => {
     <!-- 页面头部 -->
     <div class="lg-page-head payment-page-head">
       <div class="payment-page-meta-row">
-        <a-breadcrumb class="payment-breadcrumb">
-          <a-breadcrumb-item>付款管理</a-breadcrumb-item>
-          <a-breadcrumb-item>付款申请</a-breadcrumb-item>
-        </a-breadcrumb>
-        <span class="payment-page-subtitle">按合同跟踪申请金额、审批状态与支付回写。</span>
+        <div>
+          <a-breadcrumb class="payment-breadcrumb">
+            <a-breadcrumb-item>付款管理</a-breadcrumb-item>
+            <a-breadcrumb-item>付款申请</a-breadcrumb-item>
+          </a-breadcrumb>
+          <div class="payment-page-title-row">
+            <h1>付款申请台账</h1>
+            <span>待付、已审未付、实际支付回写集中跟踪</span>
+          </div>
+        </div>
+        <div class="payment-head-digest">
+          <div>
+            <span>待付金额</span>
+            <strong>{{ fmtAmountText(kpiUnpaid) }}万</strong>
+          </div>
+          <div>
+            <span>已审未付</span>
+            <strong>{{ fmtAmountText(kpiApprovedUnpaid) }}万</strong>
+          </div>
+          <div>
+            <span>支付完成率</span>
+            <strong>{{ paidPct }}%</strong>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="lg-search-bar payment-search-bar">
+      <div class="payment-search-title">
+        <strong>查询条件</strong>
+        <span>项目 / 合同 / 类型 / 状态</span>
+      </div>
       <div class="payment-search-fields">
         <a-select
           v-model:value="filter.projectId"
@@ -639,8 +662,10 @@ onMounted(() => {
           <!-- 工具栏 -->
           <div class="lg-toolbar payment-toolbar">
             <div class="lg-toolbar-left">
-              <span class="payment-table-title">付款申请</span>
-              <span class="payment-table-count">共 {{ total }} 条</span>
+              <div class="payment-table-heading">
+                <span class="payment-table-title">付款申请明细</span>
+                <span class="payment-table-count">共 {{ total }} 条，表格为主操作区</span>
+              </div>
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -752,6 +777,12 @@ onMounted(() => {
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
+
+          <section class="payment-analysis-focus">
+            <span>本页重点</span>
+            <strong>{{ fmtAmountText(kpiApprovedUnpaid) }} 万</strong>
+            <em>已审批但尚未完成支付，优先核对付款回写。</em>
+          </section>
 
           <section class="payment-analysis-section">
             <div class="payment-section-title">付款状态统计</div>
@@ -996,33 +1027,97 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   min-height: 0;
-  padding: 0;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .payment-page-meta-row {
   display: flex;
   align-items: center;
-  gap: 5em;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
   min-width: 0;
 }
 
 .payment-breadcrumb {
+  margin-bottom: 6px;
   font-size: 13px;
   line-height: 20px;
 }
 
-.payment-page-subtitle {
+.payment-page-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.payment-page-title-row h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 32px;
+}
+
+.payment-page-title-row span,
+.payment-head-digest span,
+.payment-search-title span {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
-  white-space: nowrap;
+}
+
+.payment-head-digest {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  gap: 10px;
+  min-width: 360px;
+}
+
+.payment-head-digest > div {
+  padding: 10px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.payment-head-digest strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 22px;
 }
 
 .payment-search-bar {
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   justify-content: space-between;
   gap: 12px;
-  min-height: 91px;
+  min-height: 0;
+  padding: 16px;
+  border-left: 4px solid var(--primary-soft);
+}
+
+.payment-search-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  grid-column: 1 / -1;
+}
+
+.payment-search-title strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .payment-search-fields {
@@ -1164,10 +1259,19 @@ onMounted(() => {
 
 .payment-table-panel {
   min-height: 754px;
+  border-top: 3px solid var(--primary);
 }
 
 .payment-toolbar {
   align-items: center;
+  min-height: 58px;
+  background: linear-gradient(180deg, #fff, var(--surface-subtle));
+}
+
+.payment-table-heading {
+  display: grid;
+  gap: 2px;
+  margin-right: 4px;
 }
 
 .payment-table-title {
@@ -1196,6 +1300,29 @@ onMounted(() => {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+}
+
+.payment-analysis-focus {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  background: var(--error-soft);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: var(--radius-md);
+}
+
+.payment-analysis-focus span,
+.payment-analysis-focus em {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.payment-analysis-focus strong {
+  color: var(--error);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 30px;
 }
 
 .payment-analysis-head,
@@ -1282,6 +1409,12 @@ onMounted(() => {
 
   .payment-page-subtitle {
     white-space: normal;
+  }
+
+  .payment-head-digest {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr;
   }
 
   .payment-search-select,

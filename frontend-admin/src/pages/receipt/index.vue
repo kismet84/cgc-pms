@@ -125,83 +125,32 @@ onMounted(() => {
 <template>
   <div class="lg-list-page lg-page app-page receipt-page">
     <div class="lg-page-head receipt-page-head">
-      <div class="receipt-title-block">
-        <a-breadcrumb class="lg-breadcrumb">
-          <a-breadcrumb-item>采购管理</a-breadcrumb-item>
-          <a-breadcrumb-item>材料验收</a-breadcrumb-item>
-        </a-breadcrumb>
-        <div class="receipt-title-row">
-          <h1>材料验收</h1>
-          <span>核对采购到货、质量状态、验收金额与审批进度。</span>
+      <div class="receipt-page-meta-row">
+        <div class="receipt-title-block">
+          <a-breadcrumb class="lg-breadcrumb">
+            <a-breadcrumb-item>采购管理</a-breadcrumb-item>
+            <a-breadcrumb-item>材料验收</a-breadcrumb-item>
+          </a-breadcrumb>
+          <div class="receipt-title-row">
+            <h1>材料验收台账</h1>
+            <span>验收结果、订单关联、质量风险集中核对</span>
+          </div>
+        </div>
+        <div class="receipt-head-digest">
+          <div>
+            <span>验收金额</span>
+            <strong>{{ fmtAmount(kpiTotalAmount) }}万</strong>
+          </div>
+          <div>
+            <span>合格批次</span>
+            <strong>{{ kpiQualifiedCount }}单</strong>
+          </div>
+          <div>
+            <span>异常批次</span>
+            <strong>{{ kpiUnqualifiedCount }}单</strong>
+          </div>
         </div>
       </div>
-    </div>
-
-    <div class="lg-search-bar receipt-search-bar">
-      <a-input
-        v-model:value="filter.receiptCode"
-        placeholder="搜索验收单号…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部项目"
-        allow-clear
-        size="large"
-        show-search
-        :filter-option="
-          (input: string, option: SelectOption) =>
-            option.label?.toLowerCase().includes(input.toLowerCase())
-        "
-        @change="
-          (v: string | undefined) => {
-            filter.contractId = undefined
-            if (v) referenceStore.fetchContracts({ projectId: v })
-            handleSearch()
-          }
-        "
-      >
-        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.orderId"
-        placeholder="全部订单"
-        allow-clear
-        size="large"
-        show-search
-        :filter-option="
-          (input: string, option: SelectOption) =>
-            option.label?.toLowerCase().includes(input.toLowerCase())
-        "
-        @change="handleSearch"
-      >
-        <a-select-option v-for="o in orderList" :key="o.id" :value="o.id">
-          {{ o.orderCode }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.qualityStatus"
-        placeholder="全部质量状态"
-        allow-clear
-        size="large"
-        @change="handleSearch"
-      >
-        <a-select-option value="QUALIFIED">合格</a-select-option>
-        <a-select-option value="PARTIAL">部分合格</a-select-option>
-        <a-select-option value="UNQUALIFIED">不合格</a-select-option>
-        <a-select-option value="PENDING">待检验</a-select-option>
-      </a-select>
-      <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
     </div>
 
     <div class="lg-grid">
@@ -214,11 +163,82 @@ onMounted(() => {
           :fmt-amount="fmtAmount"
         />
 
+        <div class="lg-search-bar receipt-search-bar">
+          <div class="receipt-search-fields">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              size="large"
+              show-search
+              :filter-option="
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+              @change="
+                (v: string | undefined) => {
+                  filter.contractId = undefined
+                  if (v) referenceStore.fetchContracts({ projectId: v })
+                  handleSearch()
+                }
+              "
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.orderId"
+              placeholder="全部订单"
+              allow-clear
+              size="large"
+              show-search
+              :filter-option="
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+              @change="handleSearch"
+            >
+              <a-select-option v-for="o in orderList" :key="o.id" :value="o.id">
+                {{ o.orderCode }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.qualityStatus"
+              placeholder="全部质量状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="QUALIFIED">合格</a-select-option>
+              <a-select-option value="PARTIAL">部分合格</a-select-option>
+              <a-select-option value="UNQUALIFIED">不合格</a-select-option>
+              <a-select-option value="PENDING">待检验</a-select-option>
+            </a-select>
+          </div>
+          <div class="receipt-search-keyword-row">
+            <a-input
+              v-model:value="filter.receiptCode"
+              placeholder="搜索验收单号"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
+            </a-input>
+            <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
+            <a-button size="large" @click="handleReset">
+              <template #icon><ReloadOutlined /></template>
+              重置
+            </a-button>
+          </div>
+        </div>
+
         <main class="lg-list-table-panel receipt-table-panel">
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
               <div class="receipt-table-title">
-                <strong>材料验收</strong>
+                <strong>材料验收明细</strong>
                 <span>共 {{ total }} 条</span>
               </div>
               <ColumnSettingsButton
@@ -234,9 +254,6 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
                 刷新
               </a-button>
-            </div>
-            <div class="lg-toolbar-right">
-              <span class="receipt-toolbar-hint">验收单号进入单据，行末查看更多操作</span>
             </div>
           </div>
 
@@ -319,6 +336,11 @@ onMounted(() => {
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
+          <section class="receipt-analysis-focus">
+            <span>本页重点</span>
+            <strong>{{ qualityRiskCount }} 单</strong>
+            <em>不合格或待闭环批次，优先核对订单关联与整改状态。</em>
+          </section>
           <section class="receipt-analysis-section">
             <div class="receipt-section-head">
               <strong>质量状态分布</strong>
@@ -391,10 +413,26 @@ onMounted(() => {
 <style scoped>
 .receipt-page {
   color: #0f172a;
+  gap: 14px;
 }
 
 .receipt-page-head {
-  margin-bottom: 7px;
+  margin-bottom: 0;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.receipt-page-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
 }
 
 .lg-breadcrumb {
@@ -410,9 +448,9 @@ onMounted(() => {
 
 .receipt-title-row h1 {
   margin: 0;
-  font-size: 22px;
-  line-height: 30px;
-  font-weight: 700;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 800;
   color: #0f172a;
 }
 
@@ -421,13 +459,62 @@ onMounted(() => {
   color: #64748b;
 }
 
+.receipt-head-digest {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  gap: 10px;
+  min-width: 360px;
+}
+
+.receipt-head-digest > div {
+  padding: 10px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.receipt-head-digest span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.receipt-head-digest strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
 .receipt-search-bar {
   min-height: 74px;
-  display: grid;
-  grid-template-columns: minmax(240px, 1.7fr) minmax(180px, 1fr) minmax(170px, 1fr) 150px auto auto;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  align-items: stretch;
+  padding: 16px;
+  margin-bottom: 0;
+  border-left: 4px solid var(--primary-soft);
+}
+
+.receipt-search-fields,
+.receipt-search-keyword-row {
+  display: flex;
   align-items: center;
-  margin-bottom: 16px;
+  gap: 12px;
+  min-width: 0;
+}
+
+.receipt-search-fields > :deep(.ant-select) {
+  flex: 1 1 180px;
+  min-width: 170px;
+}
+
+.receipt-search-keyword-row > :deep(.ant-input-affix-wrapper) {
+  flex: 1 1 auto;
+  min-width: 240px;
 }
 
 .receipt-main-column {
@@ -439,6 +526,12 @@ onMounted(() => {
 
 .receipt-table-panel {
   min-height: 754px;
+  border-top: 3px solid var(--primary);
+}
+
+.receipt-table-panel > .lg-toolbar {
+  min-height: 58px;
+  background: linear-gradient(180deg, #fff, var(--surface-subtle));
 }
 
 .receipt-table-title {
@@ -458,24 +551,41 @@ onMounted(() => {
   color: #64748b;
 }
 
-.receipt-toolbar-hint {
-  color: #64748b;
-  font-size: 12px;
-}
-
 .receipt-analysis-rail {
   width: 336px;
 }
 
 .receipt-analysis-panel {
-  height: 856px;
-  min-height: 856px;
+  height: auto;
+  min-height: 0;
   box-sizing: border-box;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
   overflow: hidden;
+}
+
+.receipt-analysis-focus {
+  display: grid;
+  gap: 4px;
+  padding: 14px 18px;
+  background: var(--error-soft);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.18);
+}
+
+.receipt-analysis-focus span,
+.receipt-analysis-focus em {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.receipt-analysis-focus strong {
+  color: var(--error);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 30px;
 }
 
 .receipt-analysis-head {
@@ -627,8 +737,25 @@ onMounted(() => {
 }
 
 @media (max-width: 1280px) {
+  .receipt-page-meta-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .receipt-head-digest {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+
   .receipt-search-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .receipt-search-fields,
+  .receipt-search-keyword-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .receipt-analysis-rail {

@@ -89,26 +89,28 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <StockSearchBar
-      class="stock-search-bar"
-      :keyword="filter.keyword"
-      :warehouse-id="filter.warehouseId"
-      :material-id="filter.materialId"
-      :warehouse-list="warehouseList"
-      :material-list="materialList"
-      @update:keyword="(v: string) => (filter.keyword = v)"
-      @update:warehouse-id="(v: string | undefined) => (filter.warehouseId = v)"
-      @update:material-id="(v: string | undefined) => (filter.materialId = v)"
-      @search="handleSearch"
-      @reset="handleReset"
-    />
-
     <div class="lg-grid">
       <!-- 左列 -->
       <div class="lg-left">
         <!-- KPI -->
         <StockKpiStrip :kpi="kpi" :kpi-max="kpiMax" :kpi-pct="kpiPct" :is-mobile="isMobile" />
+
+        <StockSearchBar
+          class="stock-search-bar"
+          :keyword="filter.keyword"
+          :project-id="filter.projectId"
+          :warehouse-id="filter.warehouseId"
+          :material-id="filter.materialId"
+          :project-list="projects"
+          :warehouse-list="warehouseList"
+          :material-list="materialList"
+          @update:keyword="(v: string) => (filter.keyword = v)"
+          @update:project-id="onProjectChange"
+          @update:warehouse-id="(v: string | undefined) => (filter.warehouseId = v)"
+          @update:material-id="(v: string | undefined) => (filter.materialId = v)"
+          @search="handleSearch"
+          @reset="handleReset"
+        />
 
         <!-- Stock Balance Card -->
         <div v-if="stock" class="lg-panel" style="margin-bottom: 12px">
@@ -145,7 +147,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <div class="lg-toolbar-left">
               <span class="stock-table-title">出入库流水</span>
               <span class="stock-table-count">共 {{ txnTotal }} 条</span>
-              <span class="stock-toolbar-hint">按筛选条件展示库存变动明细</span>
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
@@ -158,18 +159,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </a-button>
             </div>
             <div class="lg-toolbar-right">
-              <a-select
-                v-model:value="filter.projectId"
-                placeholder="全部项目"
-                allow-clear
-                style="width: 160px"
-                size="small"
-                @change="onProjectChange"
-              >
-                <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-                  {{ p.projectName }}
-                </a-select-option>
-              </a-select>
             </div>
           </div>
 
@@ -285,8 +274,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   align-items: center;
   justify-content: space-between;
   min-height: 0;
-  margin-bottom: 7px;
-  padding: 0;
+  margin-bottom: 0;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .stock-page-meta-row {
@@ -316,12 +310,20 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .stock-search-bar {
-  margin-top: 21px;
   min-height: 74px;
 }
 
 .stock-page .lg-grid {
   margin-top: 14px;
+}
+
+.stock-page .lg-list-table-panel {
+  border-top: 3px solid var(--primary);
+}
+
+.stock-page .lg-list-table-panel > .lg-toolbar {
+  min-height: 58px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
 }
 
 .stock-table-title {
@@ -335,8 +337,15 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   font-size: 13px;
 }
 
-.stock-toolbar-hint {
-  color: var(--muted);
-  font-size: 12px;
+@media (max-width: 900px) {
+  .stock-page-meta-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .stock-page-subtitle {
+    white-space: normal;
+  }
 }
 </style>

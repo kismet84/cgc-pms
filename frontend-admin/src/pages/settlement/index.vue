@@ -314,16 +314,39 @@ function rowSettlementAmount(row: SettlementVO): string {
     <!-- 页面头部 -->
     <div class="lg-page-head settlement-page-head">
       <div class="settlement-page-meta-row">
-        <a-breadcrumb class="settlement-breadcrumb">
-          <a-breadcrumb-item>结算管理</a-breadcrumb-item>
-          <a-breadcrumb-item>结算列表</a-breadcrumb-item>
-        </a-breadcrumb>
-        <span class="settlement-page-subtitle">按合同核对结算金额、定案状态与付款缺口。</span>
+        <div>
+          <a-breadcrumb class="settlement-breadcrumb">
+            <a-breadcrumb-item>结算管理</a-breadcrumb-item>
+            <a-breadcrumb-item>结算列表</a-breadcrumb-item>
+          </a-breadcrumb>
+          <div class="settlement-page-title-row">
+            <h1>结算审定台账</h1>
+            <span>送审、审定、差额与付款缺口集中核对</span>
+          </div>
+        </div>
+        <div class="settlement-head-digest">
+          <div>
+            <span>定案金额</span>
+            <strong>{{ fmtWan(kpi.totalFinalAmount) }}万</strong>
+          </div>
+          <div>
+            <span>变更差额</span>
+            <strong>{{ fmtWan(kpi.totalChangeAmount) }}万</strong>
+          </div>
+          <div>
+            <span>未付金额</span>
+            <strong>{{ fmtWan(kpi.totalUnpaidAmount) }}万</strong>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- 搜索栏 -->
     <div class="lg-search-bar settlement-search-bar">
+      <div class="settlement-search-title">
+        <strong>查询条件</strong>
+        <span>编号 / 项目 / 状态</span>
+      </div>
       <div class="settlement-search-fields">
         <a-input
           v-model:value="filter.keyword"
@@ -425,8 +448,10 @@ function rowSettlementAmount(row: SettlementVO): string {
           <!-- 工具栏 -->
           <div class="lg-toolbar settlement-toolbar">
             <div class="lg-toolbar-left">
-              <span class="settlement-table-title">结算记录</span>
-              <span class="settlement-table-count">共 {{ total }} 条</span>
+              <div class="settlement-table-heading">
+                <span class="settlement-table-title">结算记录明细</span>
+                <span class="settlement-table-count">共 {{ total }} 条，表格为主操作区</span>
+              </div>
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -522,6 +547,12 @@ function rowSettlementAmount(row: SettlementVO): string {
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
+
+          <section class="settlement-analysis-focus">
+            <span>本页重点</span>
+            <strong>{{ fmtWan(kpi.totalUnpaidAmount) }} 万</strong>
+            <em>审定后仍未支付金额，优先核对付款计划与合同差额。</em>
+          </section>
 
           <section class="settlement-analysis-section">
             <div class="settlement-section-title">结算状态分布</div>
@@ -630,33 +661,97 @@ function rowSettlementAmount(row: SettlementVO): string {
   align-items: center;
   justify-content: space-between;
   min-height: 0;
-  padding: 0;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .settlement-page-meta-row {
   display: flex;
   align-items: center;
-  gap: 5em;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
   min-width: 0;
 }
 
 .settlement-breadcrumb {
+  margin-bottom: 6px;
   font-size: 13px;
   line-height: 20px;
 }
 
-.settlement-page-subtitle {
+.settlement-page-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.settlement-page-title-row h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 32px;
+}
+
+.settlement-page-title-row span,
+.settlement-head-digest span,
+.settlement-search-title span {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
-  white-space: nowrap;
+}
+
+.settlement-head-digest {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  gap: 10px;
+  min-width: 360px;
+}
+
+.settlement-head-digest > div {
+  padding: 10px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.settlement-head-digest strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 22px;
 }
 
 .settlement-search-bar {
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   justify-content: space-between;
   gap: 12px;
-  min-height: 74px;
+  min-height: 0;
+  padding: 16px;
+  border-left: 4px solid var(--primary-soft);
+}
+
+.settlement-search-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  grid-column: 1 / -1;
+}
+
+.settlement-search-title strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
 }
 
 .settlement-search-fields {
@@ -808,10 +903,19 @@ function rowSettlementAmount(row: SettlementVO): string {
 
 .settlement-table-panel {
   min-height: 754px;
+  border-top: 3px solid var(--primary);
 }
 
 .settlement-toolbar {
   align-items: center;
+  min-height: 58px;
+  background: linear-gradient(180deg, #fff, var(--surface-subtle));
+}
+
+.settlement-table-heading {
+  display: grid;
+  gap: 2px;
+  margin-right: 4px;
 }
 
 .settlement-table-title {
@@ -840,6 +944,29 @@ function rowSettlementAmount(row: SettlementVO): string {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+}
+
+.settlement-analysis-focus {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  background: var(--error-soft);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: var(--radius-md);
+}
+
+.settlement-analysis-focus span,
+.settlement-analysis-focus em {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.settlement-analysis-focus strong {
+  color: var(--error);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 30px;
 }
 
 .settlement-analysis-head,
@@ -934,6 +1061,12 @@ function rowSettlementAmount(row: SettlementVO): string {
 
   .settlement-page-subtitle {
     white-space: normal;
+  }
+
+  .settlement-head-digest {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr;
   }
 
   .settlement-search-input,

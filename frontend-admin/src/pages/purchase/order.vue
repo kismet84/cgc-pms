@@ -557,104 +557,30 @@ onMounted(() => {
   <div class="lg-list-page lg-page app-page purchase-order-page">
     <div class="lg-page-head purchase-order-page-head">
       <div class="purchase-order-page-meta-row">
-        <a-breadcrumb class="purchase-order-breadcrumb">
-          <a-breadcrumb-item>采购管理</a-breadcrumb-item>
-          <a-breadcrumb-item>采购订单</a-breadcrumb-item>
-        </a-breadcrumb>
-        <span class="purchase-order-page-subtitle">按项目跟踪采购订单、履约状态与未入库金额。</span>
-      </div>
-    </div>
-
-    <!-- 搜索栏 -->
-    <div class="lg-search-bar purchase-order-search-bar">
-      <div class="purchase-order-search-fields">
-        <a-input
-          v-model:value="filter.keyword"
-          class="purchase-order-search-input"
-          placeholder="搜索订单编号、名称"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix><SearchOutlined class="purchase-order-search-prefix-icon" /></template>
-        </a-input>
-        <a-select
-          v-model:value="filter.projectId"
-          class="purchase-order-search-select"
-          placeholder="全部项目"
-          allow-clear
-          size="large"
-          @change="onFilterProjectChange"
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.contractId"
-          class="purchase-order-search-select"
-          placeholder="全部合同"
-          allow-clear
-          show-search
-          size="large"
-          :filter-option="
-            (input: string, option: SelectOption) =>
-              option.label?.toLowerCase().includes(input.toLowerCase())
-          "
-          @change="handleSearch"
-        >
-          <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-            {{ c.contractName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.partnerId"
-          class="purchase-order-search-select"
-          placeholder="全部供应商"
-          allow-clear
-          show-search
-          size="large"
-          :filter-option="
-            (input: string, option: SelectOption) =>
-              option.label?.toLowerCase().includes(input.toLowerCase())
-          "
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in supplierList" :key="p.id" :value="p.id">
-            {{ p.partnerName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.orderType"
-          class="purchase-order-search-select is-compact"
-          placeholder="类型"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="(label, key) in ORDER_TYPE_LABEL" :key="key" :value="key">
-            {{ label }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.orderStatus"
-          class="purchase-order-search-select is-compact"
-          placeholder="状态"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="(_, key) in ORDER_STATUS_LABEL" :key="key" :value="key">
-            {{ orderStatusLabel(String(key)) }}
-          </a-select-option>
-        </a-select>
-      </div>
-      <div class="purchase-order-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
+        <div>
+          <a-breadcrumb class="purchase-order-breadcrumb">
+            <a-breadcrumb-item>采购管理</a-breadcrumb-item>
+            <a-breadcrumb-item>采购订单</a-breadcrumb-item>
+          </a-breadcrumb>
+          <div class="purchase-order-page-title-row">
+            <h1>采购订单履约台账</h1>
+            <span>供应商、到货节奏、未验收金额集中跟踪</span>
+          </div>
+        </div>
+        <div class="purchase-order-head-digest">
+          <div>
+            <span>供应商筛选</span>
+            <strong>{{ supplierList.length }}家</strong>
+          </div>
+          <div>
+            <span>未验收金额</span>
+            <strong>{{ fmtWan(kpiUnreceived) }}万</strong>
+          </div>
+          <div>
+            <span>待处理订单</span>
+            <strong>{{ pendingOrders.length }}项</strong>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -701,12 +627,108 @@ onMounted(() => {
           </div>
         </div>
 
+        <div class="lg-search-bar purchase-order-search-bar">
+          <div class="purchase-order-search-fields">
+            <a-select
+              v-model:value="filter.projectId"
+              class="purchase-order-search-select"
+              placeholder="全部项目"
+              allow-clear
+              size="large"
+              @change="onFilterProjectChange"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.contractId"
+              class="purchase-order-search-select"
+              placeholder="全部合同"
+              allow-clear
+              show-search
+              size="large"
+              :filter-option="
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+              @change="handleSearch"
+            >
+              <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
+                {{ c.contractName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.partnerId"
+              class="purchase-order-search-select"
+              placeholder="全部供应商"
+              allow-clear
+              show-search
+              size="large"
+              :filter-option="
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in supplierList" :key="p.id" :value="p.id">
+                {{ p.partnerName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.orderType"
+              class="purchase-order-search-select is-compact"
+              placeholder="类型"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="(label, key) in ORDER_TYPE_LABEL" :key="key" :value="key">
+                {{ label }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.orderStatus"
+              class="purchase-order-search-select is-compact"
+              placeholder="状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="(_, key) in ORDER_STATUS_LABEL" :key="key" :value="key">
+                {{ orderStatusLabel(String(key)) }}
+              </a-select-option>
+            </a-select>
+          </div>
+          <div class="purchase-order-search-keyword-row">
+            <a-input
+              v-model:value="filter.keyword"
+              class="purchase-order-search-input"
+              placeholder="搜索订单编号、名称"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined class="purchase-order-search-prefix-icon" /></template>
+            </a-input>
+            <div class="purchase-order-search-actions">
+              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </div>
+          </div>
+        </div>
+
         <main class="lg-list-table-panel purchase-order-table-panel">
           <!-- 工具栏 -->
           <div class="lg-toolbar purchase-order-toolbar">
             <div class="lg-toolbar-left">
-              <span class="purchase-order-table-title">采购订单</span>
-              <span class="purchase-order-table-count">共 {{ total }} 条</span>
+              <div class="purchase-order-table-heading">
+                <span class="purchase-order-table-title">采购订单明细</span>
+                <span class="purchase-order-table-count">共 {{ total }} 条</span>
+              </div>
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -720,9 +742,6 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
                 刷新
               </a-button>
-            </div>
-            <div class="lg-toolbar-right">
-              <span class="purchase-order-toolbar-hint">订单编号进入单据，行末查看更多操作</span>
             </div>
           </div>
 
@@ -810,6 +829,12 @@ onMounted(() => {
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
+
+          <section class="purchase-order-analysis-focus">
+            <span>本页重点</span>
+            <strong>{{ fmtWan(kpiUnreceived) }} 万</strong>
+            <em>尚未完成到货或验收的采购金额，优先跟踪供应商履约。</em>
+          </section>
 
           <section class="purchase-order-analysis-section">
             <div class="purchase-order-section-title">订单状态分布</div>
@@ -1077,47 +1102,102 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   min-height: 0;
-  padding: 0;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .purchase-order-page-meta-row {
   display: flex;
   align-items: center;
-  gap: 5em;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
   min-width: 0;
 }
 
 .purchase-order-breadcrumb {
+  margin-bottom: 6px;
   font-size: 13px;
   line-height: 20px;
 }
 
-.purchase-order-page-subtitle {
+.purchase-order-page-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.purchase-order-page-title-row h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 32px;
+}
+
+.purchase-order-page-title-row span,
+.purchase-order-head-digest span {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 20px;
-  white-space: nowrap;
+}
+
+.purchase-order-head-digest {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  gap: 10px;
+  min-width: 360px;
+}
+
+.purchase-order-head-digest > div {
+  padding: 10px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.purchase-order-head-digest strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 22px;
 }
 
 .purchase-order-search-bar {
-  align-items: center;
-  justify-content: space-between;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 12px;
-  min-height: 74px;
+  min-height: 0;
+  padding: 16px;
+  border-left: 4px solid var(--primary-soft);
 }
 
 .purchase-order-search-fields {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.purchase-order-search-keyword-row {
+  display: flex;
   gap: 12px;
   align-items: center;
   min-width: 0;
 }
 
 .purchase-order-search-input {
-  width: min(520px, 31vw);
-  min-width: 320px;
   flex: 1 1 auto;
+  min-width: 320px;
 }
 
 .purchase-order-search-prefix-icon {
@@ -1259,10 +1339,19 @@ onMounted(() => {
 
 .purchase-order-table-panel {
   min-height: 754px;
+  border-top: 3px solid var(--primary);
 }
 
 .purchase-order-toolbar {
   align-items: center;
+  min-height: 58px;
+  background: linear-gradient(180deg, #fff, var(--surface-subtle));
+}
+
+.purchase-order-table-heading {
+  display: grid;
+  gap: 2px;
+  margin-right: 4px;
 }
 
 .purchase-order-table-title {
@@ -1271,8 +1360,7 @@ onMounted(() => {
   font-weight: 800;
 }
 
-.purchase-order-table-count,
-.purchase-order-toolbar-hint {
+.purchase-order-table-count {
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -1284,13 +1372,36 @@ onMounted(() => {
 .purchase-order-analysis-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   height: 100%;
-  padding: 18px;
+  padding: 16px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+}
+
+.purchase-order-analysis-focus {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  background: var(--error-soft);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: var(--radius-md);
+}
+
+.purchase-order-analysis-focus span,
+.purchase-order-analysis-focus em {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.purchase-order-analysis-focus strong {
+  color: var(--error);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 30px;
 }
 
 .purchase-order-analysis-head,
@@ -1370,13 +1481,20 @@ onMounted(() => {
 @media (max-width: 768px) {
   .purchase-order-page-meta-row,
   .purchase-order-search-bar,
-  .purchase-order-search-fields {
+  .purchase-order-search-fields,
+  .purchase-order-search-keyword-row {
     align-items: stretch;
     flex-direction: column;
   }
 
   .purchase-order-page-subtitle {
     white-space: normal;
+  }
+
+  .purchase-order-head-digest {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr;
   }
 
   .purchase-order-search-input,

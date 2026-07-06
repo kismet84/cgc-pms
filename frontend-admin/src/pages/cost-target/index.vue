@@ -10,6 +10,7 @@ import {
   SafetyCertificateOutlined,
   SearchOutlined,
   MoreOutlined,
+  SettingOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -78,6 +79,16 @@ const filter = reactive({
   approvalStatus: undefined as string | undefined,
   isActive: undefined as number | undefined,
 })
+const filterVisibility = reactive({
+  projectId: true,
+  approvalStatus: true,
+  isActive: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'approvalStatus', label: '审批状态' },
+  { key: 'isActive', label: '启用状态' },
+] as const
 
 // ---- Table state ----
 const loading = ref(false)
@@ -142,6 +153,9 @@ function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
   fetchData()
+}
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
 }
 
 // ---- Actions ----
@@ -309,83 +323,6 @@ onUnmounted(() => {
           <a-breadcrumb-item>成本目标</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
-      <div class="ct-page-head-actions">
-        <a-button aria-label="刷新成本目标" title="刷新成本目标" @click="fetchData">
-          <template #icon><ReloadOutlined /></template>
-          刷新
-        </a-button>
-        <a-button type="primary" @click="handleCreate">
-          <template #icon><PlusOutlined /></template>
-          新建成本目标
-        </a-button>
-      </div>
-    </div>
-
-    <div class="lg-search-bar ct-search-bar">
-      <div class="ct-search-fields">
-        <a-input
-          v-model:value="filter.versionNo"
-          class="ct-search-input"
-          placeholder="搜索版本号…"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix><SearchOutlined class="ct-search-prefix-icon" /></template>
-        </a-input>
-        <a-select
-          v-model:value="filter.projectId"
-          class="ct-search-select"
-          placeholder="全部项目"
-          allow-clear
-          show-search
-          size="large"
-          :filter-option="
-            (input: string, option: SelectOption) =>
-              option.label?.toLowerCase().includes(input.toLowerCase())
-          "
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
-            p.projectName
-          }}</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.approvalStatus"
-          class="ct-search-select"
-          placeholder="审批状态"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="item in approvalStatusOptions" :key="item" :value="item">
-            {{ approvalStatusLabel(item) }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.isActive"
-          class="ct-search-select"
-          placeholder="启用状态"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option
-            v-for="item in activeStatusOptions"
-            :key="item.value"
-            :value="item.value"
-          >
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
-      </div>
-      <div class="ct-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
     </div>
 
     <div class="lg-grid ct-content-grid">
@@ -424,20 +361,120 @@ onUnmounted(() => {
           </div>
         </section>
 
+        <div class="lg-search-bar ct-search-bar">
+          <div class="ct-search-fields">
+            <a-select
+              v-if="filterVisibility.projectId"
+              v-model:value="filter.projectId"
+              class="ct-search-select"
+              placeholder="全部项目"
+              allow-clear
+              show-search
+              size="large"
+              :filter-option="
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">{{
+                p.projectName
+              }}</a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.approvalStatus"
+              v-model:value="filter.approvalStatus"
+              class="ct-search-select"
+              placeholder="审批状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="item in approvalStatusOptions" :key="item" :value="item">
+                {{ approvalStatusLabel(item) }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.isActive"
+              v-model:value="filter.isActive"
+              class="ct-search-select"
+              placeholder="启用状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option
+                v-for="item in activeStatusOptions"
+                :key="item.value"
+                :value="item.value"
+              >
+                {{ item.label }}
+              </a-select-option>
+            </a-select>
+          </div>
+          <div class="ct-search-keyword-row">
+            <a-input
+              v-model:value="filter.versionNo"
+              class="ct-search-input"
+              placeholder="搜索版本号…"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined class="ct-search-prefix-icon" /></template>
+            </a-input>
+            <div class="ct-search-actions">
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
+          </div>
+        </div>
+
         <main class="lg-list-table-panel ct-table-panel">
           <div class="lg-toolbar ct-table-toolbar">
             <div class="lg-toolbar-left">
-              <span class="ct-table-title">成本目标版本</span>
-              <span class="ct-table-count">共 {{ total }} 条</span>
+              <div class="ct-table-heading">
+                <span class="ct-table-title">成本目标版本</span>
+                <span class="ct-table-count">共 {{ total }} 条</span>
+              </div>
+            </div>
+            <div class="lg-toolbar-right ct-table-toolbar-right">
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
               />
-            </div>
-            <div class="lg-toolbar-right">
-              <span class="ct-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
+              <a-button aria-label="刷新成本目标" title="刷新成本目标" @click="fetchData">
+                <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
+              <a-button type="primary" @click="handleCreate">
+                <template #icon><PlusOutlined /></template>
+                新建成本目标
+              </a-button>
             </div>
           </div>
 
@@ -547,7 +584,6 @@ onUnmounted(() => {
           <header class="ct-analysis-head">
             <div>
               <div class="ct-analysis-title">成本目标分析</div>
-              <div class="ct-analysis-subtitle">审批、版本与近期记录</div>
             </div>
             <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
@@ -651,6 +687,7 @@ onUnmounted(() => {
 }
 .ct-page {
   gap: 14px;
+  background: var(--surface-subtle);
 }
 .ct-page-head {
   align-items: center;
@@ -678,6 +715,7 @@ onUnmounted(() => {
 .ct-content-grid {
   align-items: stretch;
   min-height: 0;
+  height: calc(100vh - 74px);
 }
 .ct-main-column {
   display: flex;
@@ -691,9 +729,9 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
   gap: 0;
+  margin-bottom: 0;
   overflow: hidden;
   min-height: 84px;
-  margin-bottom: 16px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -788,9 +826,9 @@ onUnmounted(() => {
 .ct-analysis-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
   height: 100%;
-  padding: 18px;
+  padding: 0 0 12px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -802,22 +840,27 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 10px;
 }
+
+.ct-analysis-head {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
 .ct-analysis-title {
   color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 22px;
-}
-.ct-analysis-subtitle {
-  color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
 }
 .ct-analysis-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
-  padding-top: 16px;
+  padding: 10px 16px 0;
+}
+.ct-analysis-section + .ct-analysis-section {
+  margin-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
 }
 .ct-section-title {
@@ -827,22 +870,32 @@ onUnmounted(() => {
   line-height: 20px;
 }
 .ct-search-bar {
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  flex-direction: column;
   gap: 12px;
+  margin: 0;
   min-height: 74px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 .ct-search-fields {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+.ct-search-keyword-row {
+  display: flex;
   gap: 12px;
   align-items: center;
   min-width: 0;
 }
 .ct-search-input {
-  width: min(560px, 34vw);
-  min-width: 360px;
   flex: 1 1 auto;
+  min-width: 320px;
 }
 .ct-search-prefix-icon {
   color: var(--text-secondary);
@@ -861,8 +914,13 @@ onUnmounted(() => {
   display: flex;
   flex: 1;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
+  background: var(--surface);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
   min-height: 0;
 }
 .ct-table-toolbar {
@@ -874,8 +932,13 @@ onUnmounted(() => {
   font-size: 15px;
   font-weight: 700;
 }
-.ct-table-count,
-.ct-toolbar-hint {
+.ct-table-heading,
+.ct-table-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ct-table-count {
   color: var(--text-secondary);
   font-size: 13px;
 }
@@ -993,6 +1056,7 @@ onUnmounted(() => {
   .ct-page-head,
   .ct-search-bar,
   .ct-search-fields,
+  .ct-search-keyword-row,
   .ct-search-input,
   .ct-search-select {
     align-items: stretch;

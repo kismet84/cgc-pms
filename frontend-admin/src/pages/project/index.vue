@@ -11,6 +11,7 @@ import {
   ReloadOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
+  SettingOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
 import {
@@ -30,6 +31,14 @@ const filter = reactive({
   projectType: undefined as string | undefined,
   status: undefined as string | undefined,
 })
+const filterVisibility = reactive({
+  projectType: true,
+  status: true,
+})
+const filterSettingItems = [
+  { key: 'projectType', label: '项目类型' },
+  { key: 'status', label: '状态' },
+] as const
 
 const loading = ref(false)
 const tableData = ref<ProjectVO[]>([])
@@ -228,6 +237,9 @@ function handleReset() {
   filter.status = undefined
   pageNo.value = 1
   fetchData()
+}
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
 }
 function handlePageChange(page: number) {
   pageNo.value = page
@@ -466,50 +478,6 @@ const {
       </div>
     </div>
 
-    <section class="lg-search-bar project-query-panel" aria-label="项目查询条件">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索项目编号、名称、类型、建设单位"
-        allow-clear
-        size="large"
-        class="project-search-input"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined class="project-search-icon" /></template>
-      </a-input>
-      <a-select
-        v-model:value="filter.projectType"
-        placeholder="项目类型"
-        allow-clear
-        size="large"
-        class="project-search-select"
-        @change="handleSearch"
-      >
-        <a-select-option v-for="item in PROJECT_TYPE_OPTIONS" :key="item" :value="item">
-          {{ item }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.status"
-        placeholder="项目状态"
-        allow-clear
-        size="large"
-        class="project-search-select"
-        @change="handleSearch"
-      >
-        <a-select-option v-for="item in PROJECT_STATUS_OPTIONS" :key="item" :value="item">
-          {{ STATUS_LABEL[item] ?? item }}
-        </a-select-option>
-      </a-select>
-      <div class="project-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
-    </section>
-
     <!-- Create Modal -->
     <a-modal
       v-model:open="createVisible"
@@ -668,45 +636,125 @@ const {
 
     <div class="lg-grid project-workspace">
       <div class="lg-left project-main-column">
-        <div class="lg-kpi-strip project-kpi-summary" aria-label="项目关键指标">
-          <div class="lg-kpi-card project-kpi-item">
+        <section class="lg-kpi-strip project-kpi-summary" aria-label="项目关键指标">
+          <div class="project-kpi-item">
+            <div class="project-kpi-content">
+              <span class="project-kpi-label">项目总数</span>
+              <span class="project-kpi-value">{{ projectStats.total || 0 }} <small>个</small></span>
+            </div>
             <span class="project-kpi-icon is-total"><FileTextOutlined /></span>
-            <span class="project-kpi-label">项目总数</span>
-            <span class="project-kpi-value">{{ projectStats.total || 0 }} <small>个</small></span>
           </div>
-          <div class="lg-kpi-card project-kpi-item">
+          <div class="project-kpi-item">
+            <div class="project-kpi-content">
+              <span class="project-kpi-label">合同总金额</span>
+              <span class="project-kpi-value">
+                {{
+                  totalContractAmount
+                    ? (totalContractAmount / 10000).toLocaleString('zh-CN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })
+                    : '0.00'
+                }}
+                <small>万元</small>
+              </span>
+            </div>
             <span class="project-kpi-icon is-amount"><DollarOutlined /></span>
-            <span class="project-kpi-label">合同总金额</span>
-            <span class="project-kpi-value">
-              {{
-                totalContractAmount
-                  ? (totalContractAmount / 10000).toLocaleString('zh-CN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })
-                  : '0.00'
-              }}
-              <small>万元</small>
-            </span>
           </div>
-          <div class="lg-kpi-card project-kpi-item">
+          <div class="project-kpi-item">
+            <div class="project-kpi-content">
+              <span class="project-kpi-label">在建项目</span>
+              <span class="project-kpi-value">{{ projectStats.ongoing || 0 }} <small>个</small></span>
+            </div>
             <span class="project-kpi-icon is-ongoing"><SafetyCertificateOutlined /></span>
-            <span class="project-kpi-label">在建项目</span>
-            <span class="project-kpi-value">{{ projectStats.ongoing || 0 }} <small>个</small></span>
           </div>
-          <div class="lg-kpi-card project-kpi-item">
+          <div class="project-kpi-item">
+            <div class="project-kpi-content">
+              <span class="project-kpi-label">已竣工项目</span>
+              <span class="project-kpi-value">{{ projectStats.completed || 0 }} <small>个</small></span>
+            </div>
             <span class="project-kpi-icon is-completed"><FlagOutlined /></span>
-            <span class="project-kpi-label">已竣工项目</span>
-            <span class="project-kpi-value"
-              >{{ projectStats.completed || 0 }} <small>个</small></span
-            >
           </div>
-          <div class="lg-kpi-card project-kpi-item is-warn">
+          <div class="project-kpi-item">
+            <div class="project-kpi-content">
+              <span class="project-kpi-label">风险项目</span>
+              <span class="project-kpi-value">{{ projectStats.risk || 0 }} <small>个</small></span>
+            </div>
             <span class="project-kpi-icon is-risk"><WarningOutlined /></span>
-            <span class="project-kpi-label">风险项目</span>
-            <span class="project-kpi-value">{{ projectStats.risk || 0 }} <small>个</small></span>
           </div>
-        </div>
+        </section>
+
+        <section class="project-query-panel" aria-label="项目查询条件">
+          <div class="project-filter-grid">
+            <div v-if="filterVisibility.projectType" class="project-filter-item">
+              <label>项目类型</label>
+              <a-select
+                v-model:value="filter.projectType"
+                placeholder="全部类型"
+                allow-clear
+                class="project-search-select"
+                @change="handleSearch"
+              >
+                <a-select-option v-for="item in PROJECT_TYPE_OPTIONS" :key="item" :value="item">
+                  {{ item }}
+                </a-select-option>
+              </a-select>
+            </div>
+            <div v-if="filterVisibility.status" class="project-filter-item">
+              <label>项目状态</label>
+              <a-select
+                v-model:value="filter.status"
+                placeholder="全部状态"
+                allow-clear
+                class="project-search-select"
+                @change="handleSearch"
+              >
+                <a-select-option v-for="item in PROJECT_STATUS_OPTIONS" :key="item" :value="item">
+                  {{ STATUS_LABEL[item] ?? item }}
+                </a-select-option>
+              </a-select>
+            </div>
+          </div>
+          <div class="project-filter-foot">
+            <div class="project-filter-item project-filter-item-keyword">
+              <a-input
+                v-model:value="filter.keyword"
+                placeholder="搜索项目编号、名称、类型、建设单位"
+                allow-clear
+                class="project-search-input"
+                @press-enter="handleSearch"
+              >
+                <template #prefix><SearchOutlined class="project-search-icon" /></template>
+              </a-input>
+            </div>
+            <div class="project-search-actions">
+              <a-button type="primary" @click="handleSearch">搜索</a-button>
+              <a-button @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+              <a-dropdown trigger="click">
+                <a-button>
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
+          </div>
+        </section>
 
         <main class="lg-list-table-panel project-table-panel">
           <div class="lg-toolbar project-table-toolbar">
@@ -717,7 +765,6 @@ const {
               </div>
             </div>
             <div class="lg-toolbar-right project-table-toolbar-right">
-              <span class="project-toolbar-hint">编号进入总览，行末查看更多操作</span>
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -885,9 +932,37 @@ const {
           <header class="project-analysis-head">
             <div>
               <div class="project-analysis-title">辅助分析</div>
-              <div class="project-analysis-subtitle">类型、状态与近期记录</div>
+              <div class="project-analysis-subtitle">项目概览与重点分组</div>
             </div>
           </header>
+
+          <section class="project-analysis-section">
+            <div class="project-section-title">基本盘</div>
+            <div class="project-overview-list">
+              <div class="project-overview-row">
+                <span>项目总数</span>
+                <strong>{{ projectStats.total || 0 }} 个</strong>
+              </div>
+              <div class="project-overview-row">
+                <span>合同总金额</span>
+                <strong>
+                  {{
+                    totalContractAmount
+                      ? (totalContractAmount / 10000).toLocaleString('zh-CN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })
+                      : '0.00'
+                  }}
+                  万元
+                </strong>
+              </div>
+              <div class="project-overview-row">
+                <span>在建 / 已竣工</span>
+                <strong>{{ projectStats.ongoing || 0 }} / {{ projectStats.completed || 0 }}</strong>
+              </div>
+            </div>
+          </section>
 
           <section class="project-analysis-section">
             <div class="project-section-title">项目类型分布</div>
@@ -942,7 +1017,10 @@ const {
 
 <style scoped>
 .project-list-page {
+  --project-panel-gap: 12px;
+  --project-summary-height: 108px;
   gap: 14px;
+  background: var(--surface-subtle);
 }
 
 .project-page-head {
@@ -965,24 +1043,62 @@ const {
 }
 
 .project-query-panel {
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  min-height: var(--project-summary-height);
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
-.project-search-input {
-  flex: 1 1 auto;
+.project-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  column-gap: var(--project-panel-gap);
+  row-gap: 10px;
+}
+
+.project-filter-item {
   min-width: 0;
-  max-width: 640px;
+}
+
+.project-filter-item label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.project-filter-item :deep(.ant-select),
+.project-filter-item :deep(.ant-input-affix-wrapper) {
+  width: 100%;
 }
 
 .project-search-select {
-  width: 180px;
+  width: 100%;
 }
 
 .project-search-icon {
   color: var(--text-secondary);
+}
+
+.project-filter-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.project-filter-item-keyword {
+  flex: 1 1 auto;
+}
+
+.project-search-input {
+  min-width: 0;
 }
 
 .project-search-actions {
@@ -990,28 +1106,31 @@ const {
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
 }
 
 .project-workspace {
   align-items: stretch;
   min-height: 0;
-  height: calc(100vh - 174px);
+  height: calc(100vh - 74px);
+  min-height: 720px;
 }
 
 .project-main-column {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: 12px;
+  gap: var(--project-panel-gap);
   min-height: 0;
 }
 
 .project-kpi-summary {
   display: grid;
-  grid-template-columns: 0.95fr 1.2fr 0.95fr 0.95fr 0.95fr;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
+  margin-bottom: 0;
   overflow: hidden;
-  min-height: 84px;
+  min-height: var(--project-summary-height);
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1019,18 +1138,21 @@ const {
 }
 
 .project-kpi-item {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-rows: 19px 27px;
-  column-gap: 10px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  column-gap: 10px;
+  gap: 10px;
   min-width: 0;
-  padding: 16px 18px;
-  border-right: 1px solid var(--border-subtle);
+  padding: 10px 18px;
 }
 
-.project-kpi-item:last-child {
-  border-right: 0;
+.project-kpi-item + .project-kpi-item {
+  border-left: 1px solid var(--border-subtle);
+}
+
+.project-kpi-content {
+  min-width: 0;
 }
 
 .project-kpi-icon {
@@ -1039,10 +1161,11 @@ const {
   justify-content: center;
   width: 34px;
   height: 34px;
+  font-size: 18px;
   color: var(--primary);
   background: var(--primary-soft);
-  border-radius: var(--radius-sm);
-  grid-row: 1 / span 2;
+  border-radius: 10px;
+  flex: 0 0 auto;
 }
 
 .project-kpi-icon.is-amount {
@@ -1062,23 +1185,20 @@ const {
 }
 
 .project-kpi-label {
-  overflow: hidden;
+  display: block;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .project-kpi-value {
-  overflow: hidden;
+  display: block;
+  margin-top: 4px;
   color: var(--text);
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 28px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .project-kpi-value small {
@@ -1092,8 +1212,13 @@ const {
   display: flex;
   flex: 1;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
+  background: var(--surface);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
   min-height: 0;
 }
 
@@ -1213,23 +1338,34 @@ const {
 }
 
 .project-analysis-rail {
-  width: 336px;
+  display: flex;
+  width: 360px;
+  align-self: stretch;
   min-height: 0;
 }
 
 .project-analysis-panel {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 18px;
-  height: 100%;
-  padding: 18px;
+  gap: 0;
+  min-height: 100%;
+  max-height: 100%;
+  padding: 0 0 12px;
+  overflow: auto;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+  position: sticky;
+  top: 0;
 }
 
-.project-analysis-head,
+.project-analysis-head {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .project-warning-head {
   display: flex;
   align-items: center;
@@ -1239,17 +1375,22 @@ const {
 
 .project-analysis-title {
   color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 22px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
 }
 
 .project-analysis-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
-  padding-top: 16px;
+  padding: 10px 16px 0;
+}
+
+.project-analysis-section + .project-analysis-section {
+  margin-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -1257,12 +1398,58 @@ const {
   color: var(--text);
   font-size: 14px;
   font-weight: 700;
-  line-height: 20px;
+  line-height: 18px;
+}
+
+.project-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-overview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.project-overview-row strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .project-analysis-section :deep(.lg-type-row),
 .project-analysis-section .lg-type-row {
-  grid-template-columns: 9px minmax(60px, 1fr) 28px 38px;
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 0;
+  padding: 0;
+}
+
+.project-analysis-section :deep(.lg-type-label),
+.project-analysis-section .lg-type-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-analysis-section :deep(.lg-type-num),
+.project-analysis-section .lg-type-num,
+.project-analysis-section :deep(.lg-type-pct),
+.project-analysis-section .lg-type-pct {
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
 }
 
 .project-dot-primary {
@@ -1279,7 +1466,8 @@ const {
 
 .project-risk-status {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 18px;
   white-space: nowrap;
 }
 
@@ -1288,17 +1476,12 @@ const {
 }
 
 @media (max-width: 1200px) {
-  .project-page-head,
-  .project-query-panel {
-    align-items: stretch;
-    flex-direction: column;
+  .project-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .project-search-input,
-  .project-search-select,
   .project-analysis-rail {
     width: 100%;
-    max-width: none;
   }
 
   .project-table-toolbar-right {
@@ -1311,17 +1494,34 @@ const {
 }
 
 @media (max-width: 768px) {
+  .project-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-filter-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .project-search-actions {
+    width: 100%;
+  }
+
+  .project-search-actions :deep(.ant-btn) {
+    flex: 1;
+  }
+
   .project-kpi-summary {
     grid-template-columns: 1fr;
   }
 
-  .project-kpi-item {
-    border-right: 0;
-    border-bottom: 1px solid var(--border-subtle);
+  .project-kpi-item + .project-kpi-item {
+    border-left: 0;
+    border-top: 1px solid var(--border-subtle);
   }
 
-  .project-kpi-item:last-child {
-    border-bottom: 0;
+  .project-analysis-panel {
+    position: static;
   }
 }
 </style>

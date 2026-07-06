@@ -250,36 +250,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <div class="lg-search-bar warehouse-search-bar">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索仓库编号、名称…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部项目"
-        allow-clear
-        style="min-width: 220px"
-        size="large"
-        @change="handleSearch"
-      >
-        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
-    </div>
-
     <div class="lg-grid">
       <div class="lg-left">
         <!-- KPI strip -->
@@ -308,6 +278,50 @@ onMounted(() => {
             <span class="warehouse-kpi-icon is-purple"><ClockCircleOutlined /></span>
             <span class="warehouse-kpi-label">本页记录</span>
             <strong>{{ tableData.length }} <small>条</small></strong>
+          </div>
+        </div>
+
+        <div class="lg-search-bar warehouse-search-bar">
+          <div class="warehouse-search-fields">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.status"
+              placeholder="全部状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="ENABLE">启用</a-select-option>
+              <a-select-option value="DISABLE">停用</a-select-option>
+            </a-select>
+          </div>
+          <div class="warehouse-search-keyword-row">
+            <a-input
+              v-model:value="filter.keyword"
+              placeholder="搜索仓库编号、名称"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
+            </a-input>
+            <div class="warehouse-search-actions">
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </div>
           </div>
         </div>
 
@@ -389,6 +403,7 @@ onMounted(() => {
               <div class="warehouse-analysis-title">仓库分析</div>
               <div class="warehouse-analysis-subtitle">状态、项目与近期维护</div>
             </div>
+            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
           <section class="warehouse-analysis-section">
             <div class="warehouse-section-title">仓库状态分布</div>
@@ -484,8 +499,13 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   min-height: 0;
-  margin-bottom: 7px;
-  padding: 0;
+  margin-bottom: 0;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .warehouse-page-meta-row {
@@ -508,8 +528,36 @@ onMounted(() => {
 }
 
 .warehouse-search-bar {
-  margin-top: 21px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
   min-height: 74px;
+  padding: 16px;
+  border-left: 4px solid var(--primary-soft);
+}
+
+.warehouse-search-fields,
+.warehouse-search-keyword-row,
+.warehouse-search-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.warehouse-search-keyword-row > :deep(.ant-input-affix-wrapper) {
+  min-width: 320px;
+  flex: 1 1 auto;
+}
+
+.warehouse-search-fields > :deep(.ant-select) {
+  min-width: 160px;
+  flex: 1 1 190px;
+}
+
+.warehouse-search-actions {
+  flex: 0 0 auto;
 }
 
 .warehouse-page .lg-grid {
@@ -527,6 +575,15 @@ onMounted(() => {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+}
+
+.warehouse-page .lg-list-table-panel {
+  border-top: 3px solid var(--primary);
+}
+
+.warehouse-page .lg-list-table-panel > .lg-toolbar {
+  min-height: 58px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
 }
 
 .warehouse-kpi-item {
@@ -630,6 +687,13 @@ onMounted(() => {
   line-height: 22px;
 }
 
+.warehouse-analysis-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .warehouse-analysis-section {
   display: flex;
   flex-direction: column;
@@ -637,6 +701,16 @@ onMounted(() => {
   min-width: 0;
   padding-top: 16px;
   border-top: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 900px) {
+  .warehouse-search-bar,
+  .warehouse-search-fields,
+  .warehouse-search-actions {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 .warehouse-section-title {

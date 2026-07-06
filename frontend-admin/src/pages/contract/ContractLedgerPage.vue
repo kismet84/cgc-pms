@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import {
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  SettingOutlined,
+} from '@ant-design/icons-vue'
 import ContractFormPage from './ContractFormPage.vue'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import ContractKpiStrip from './components/ContractKpiStrip.vue'
@@ -50,8 +56,23 @@ const {
 // ---- Mobile detection ----
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
+const filterVisibility = reactive({
+  projectId: true,
+  contractType: true,
+  contractStatus: true,
+  dateRange: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'contractType', label: '合同类型' },
+  { key: 'contractStatus', label: '合同状态' },
+  { key: 'dateRange', label: '签订日期' },
+] as const
 function onResize() {
   isMobile.value = window.innerWidth < MOBILE_BP
+}
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
 }
 onMounted(() => window.addEventListener('resize', onResize))
 onUnmounted(() => window.removeEventListener('resize', onResize))
@@ -68,72 +89,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
     </div>
 
-    <section class="lg-search-bar cl-query-panel" aria-label="合同台账查询条件">
-      <div class="cl-query-primary">
-        <a-input
-          v-model:value="filter.keyword"
-          class="cl-keyword-search"
-          placeholder="搜索合同编号、名称、甲方、乙方…"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix><SearchOutlined class="cl-search-prefix-icon" /></template>
-        </a-input>
-        <a-select
-          v-model:value="filter.projectId"
-          placeholder="全部项目"
-          allow-clear
-          class="cl-query-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.contractType"
-          placeholder="合同类型"
-          allow-clear
-          class="cl-query-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="(label, value) in TYPE_LABEL" :key="value" :value="value">
-            {{ label }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.contractStatus"
-          placeholder="合同状态"
-          allow-clear
-          class="cl-query-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option value="DRAFT">草稿</a-select-option>
-          <a-select-option value="PERFORMING">履约中</a-select-option>
-          <a-select-option value="SETTLED">已完成</a-select-option>
-          <a-select-option value="TERMINATED">已终止</a-select-option>
-        </a-select>
-        <a-range-picker
-          v-model:value="filter.dateRange"
-          class="cl-date-filter"
-          value-format="YYYY-MM-DD"
-          size="large"
-          @change="handleSearch"
-        />
-      </div>
-      <div class="cl-query-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
-    </section>
-
     <div class="lg-grid cl-workspace">
       <div class="lg-left cl-main-column">
         <ContractKpiStrip
@@ -144,6 +99,97 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           :kpi-pct="kpiPct"
         />
 
+        <section class="lg-search-bar cl-query-panel" aria-label="合同台账查询条件">
+          <div class="cl-query-primary">
+            <a-select
+              v-if="filterVisibility.projectId"
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              class="cl-query-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.contractType"
+              v-model:value="filter.contractType"
+              placeholder="合同类型"
+              allow-clear
+              class="cl-query-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="(label, value) in TYPE_LABEL" :key="value" :value="value">
+                {{ label }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.contractStatus"
+              v-model:value="filter.contractStatus"
+              placeholder="合同状态"
+              allow-clear
+              class="cl-query-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="PERFORMING">履约中</a-select-option>
+              <a-select-option value="SETTLED">已完成</a-select-option>
+              <a-select-option value="TERMINATED">已终止</a-select-option>
+            </a-select>
+            <a-range-picker
+              v-if="filterVisibility.dateRange"
+              v-model:value="filter.dateRange"
+              class="cl-date-filter"
+              value-format="YYYY-MM-DD"
+              size="large"
+              @change="handleSearch"
+            />
+          </div>
+          <div class="cl-query-keyword-row">
+            <a-input
+              v-model:value="filter.keyword"
+              class="cl-keyword-search"
+              placeholder="搜索合同编号、名称、甲方、乙方…"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined class="cl-search-prefix-icon" /></template>
+            </a-input>
+            <div class="cl-query-actions">
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
+          </div>
+        </section>
+
         <main class="lg-list-table-panel cl-table-panel">
           <div class="lg-toolbar cl-table-toolbar">
             <div class="lg-toolbar-left">
@@ -153,7 +199,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </div>
             </div>
             <div class="lg-toolbar-right cl-table-toolbar-right">
-              <span class="cl-toolbar-hint">编号进入详情，行末查看更多操作</span>
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
@@ -306,6 +351,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
 .cl-redesign-page {
   gap: 14px;
+  background: var(--surface-subtle);
 }
 
 .cl-page-head {
@@ -328,23 +374,35 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cl-query-panel {
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  flex-direction: column;
   gap: 12px;
+  margin: 0;
   min-height: 74px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .cl-query-primary {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cl-query-keyword-row {
+  display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
 
 .cl-keyword-search {
-  width: min(640px, 34vw);
-  min-width: 420px;
+  flex: 1 1 auto;
+  min-width: 320px;
 }
 
 .cl-search-prefix-icon {
@@ -369,7 +427,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .cl-workspace {
   align-items: stretch;
   min-height: 0;
-  height: calc(100vh - 174px);
+  height: calc(100vh - 74px);
 }
 
 .cl-main-column {
@@ -384,8 +442,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   display: flex;
   flex: 1;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
+  background: var(--surface);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
   min-height: 0;
 }
 
@@ -406,8 +469,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   gap: 10px;
 }
 
-.cl-table-count,
-.cl-toolbar-hint {
+.cl-table-count {
   color: var(--text-secondary);
   font-size: 13px;
 }
@@ -447,6 +509,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 @media (max-width: 1200px) {
   .cl-page-head,
   .cl-query-panel,
+  .cl-query-keyword-row,
   .cl-query-primary {
     align-items: stretch;
     flex-direction: column;

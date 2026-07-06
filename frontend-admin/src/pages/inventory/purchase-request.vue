@@ -543,67 +543,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 搜索栏 -->
-    <div class="lg-search-bar purchase-request-search-bar">
-      <div class="purchase-request-search-fields">
-        <a-input
-          v-model:value="filter.keyword"
-          class="purchase-request-search-input"
-          placeholder="搜索申请编号"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix
-            ><SearchOutlined class="purchase-request-search-prefix-icon"
-          /></template>
-        </a-input>
-        <a-select
-          v-model:value="filter.projectId"
-          class="purchase-request-search-select"
-          placeholder="全部项目"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.approvalStatus"
-          class="purchase-request-search-select is-compact"
-          placeholder="审批状态"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option value="DRAFT">草稿</a-select-option>
-          <a-select-option value="APPROVING">审批中</a-select-option>
-          <a-select-option value="APPROVED">已通过</a-select-option>
-          <a-select-option value="REJECTED">已驳回</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.status"
-          class="purchase-request-search-select is-compact"
-          placeholder="业务状态"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option value="DRAFT">草稿</a-select-option>
-          <a-select-option value="CONVERTED">已转PO</a-select-option>
-        </a-select>
-      </div>
-      <div class="purchase-request-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
-    </div>
-
     <div class="lg-grid purchase-request-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
@@ -643,6 +582,68 @@ onMounted(() => {
           </div>
         </div>
 
+        <div class="lg-search-bar purchase-request-search-bar">
+          <div class="purchase-request-search-fields">
+            <a-select
+              v-model:value="filter.projectId"
+              class="purchase-request-search-select"
+              placeholder="全部项目"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.approvalStatus"
+              class="purchase-request-search-select is-compact"
+              placeholder="审批状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="APPROVING">审批中</a-select-option>
+              <a-select-option value="APPROVED">已通过</a-select-option>
+              <a-select-option value="REJECTED">已驳回</a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.status"
+              class="purchase-request-search-select is-compact"
+              placeholder="业务状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="CONVERTED">已转PO</a-select-option>
+            </a-select>
+          </div>
+          <div class="purchase-request-search-keyword-row">
+            <a-input
+              v-model:value="filter.keyword"
+              class="purchase-request-search-input"
+              placeholder="搜索申请编号"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix>
+                <SearchOutlined class="purchase-request-search-prefix-icon" />
+              </template>
+            </a-input>
+            <div class="purchase-request-search-actions">
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </div>
+          </div>
+        </div>
+
         <main class="lg-list-table-panel purchase-request-table-panel">
           <!-- 工具栏 -->
           <div class="lg-toolbar purchase-request-toolbar">
@@ -662,9 +663,6 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
                 刷新
               </a-button>
-            </div>
-            <div class="lg-toolbar-right">
-              <span class="purchase-request-toolbar-hint">固定表头 / 审批状态 / 行操作展开</span>
             </div>
           </div>
 
@@ -957,7 +955,12 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   min-height: 0;
-  padding: 0;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .purchase-request-page-meta-row {
@@ -980,24 +983,33 @@ onMounted(() => {
 }
 
 .purchase-request-search-bar {
-  align-items: center;
-  justify-content: space-between;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 12px;
   min-height: 74px;
+  padding: 16px;
+  border-left: 4px solid var(--primary-soft);
 }
 
 .purchase-request-search-fields {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.purchase-request-search-keyword-row {
+  display: flex;
   gap: 12px;
   align-items: center;
   min-width: 0;
 }
 
 .purchase-request-search-input {
-  width: min(520px, 31vw);
-  min-width: 320px;
   flex: 1 1 auto;
+  min-width: 320px;
 }
 
 .purchase-request-search-prefix-icon {
@@ -1131,10 +1143,13 @@ onMounted(() => {
 
 .purchase-request-table-panel {
   min-height: 754px;
+  border-top: 3px solid var(--primary);
 }
 
 .purchase-request-toolbar {
   align-items: center;
+  min-height: 58px;
+  background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
 }
 
 .purchase-request-table-title {
@@ -1143,8 +1158,7 @@ onMounted(() => {
   font-weight: 800;
 }
 
-.purchase-request-table-count,
-.purchase-request-toolbar-hint {
+.purchase-request-table-count {
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -1156,9 +1170,9 @@ onMounted(() => {
 .purchase-request-analysis-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   height: 100%;
-  padding: 18px;
+  padding: 16px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1269,7 +1283,8 @@ onMounted(() => {
 @media (max-width: 768px) {
   .purchase-request-page-meta-row,
   .purchase-request-search-bar,
-  .purchase-request-search-fields {
+  .purchase-request-search-fields,
+  .purchase-request-search-keyword-row {
     align-items: stretch;
     flex-direction: column;
   }

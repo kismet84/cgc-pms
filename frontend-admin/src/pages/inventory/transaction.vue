@@ -123,42 +123,50 @@ onMounted(() => {
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>出入库记录</a-breadcrumb-item>
         </a-breadcrumb>
-        <div class="transaction-page-title">出入库记录</div>
-        <span class="transaction-page-subtitle">按仓库和物料快速登记入库、出库业务</span>
+        <div class="transaction-page-title">出入库操作录入</div>
+        <span class="transaction-page-subtitle">只负责入库、出库登记；流水查询与详情在库存台账查看。</span>
       </div>
-    </div>
-
-    <!-- KPI 横条 -->
-    <div class="lg-kpi-strip">
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">入库操作</span>
-        <span class="lg-kpi-card-value" style="color: #22c55e">登记</span>
-        <span class="lg-kpi-card-hint">库存数量增加</span>
-      </div>
-      <div class="lg-kpi-card is-warn">
-        <span class="lg-kpi-card-label">出库操作</span>
-        <span class="lg-kpi-card-value" style="color: #ef4444">登记</span>
-        <span class="lg-kpi-card-hint">库存数量扣减</span>
-      </div>
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">可用仓库</span>
-        <span class="lg-kpi-card-value">{{ warehouseList.length }} <small>个</small></span>
-        <span class="lg-kpi-card-hint">仅展示启用仓库</span>
-      </div>
-      <div class="lg-kpi-card">
-        <span class="lg-kpi-card-label">物料范围</span>
-        <span class="lg-kpi-card-value">{{ materialList.length }} <small>项</small></span>
-        <span class="lg-kpi-card-hint">来自基础资料</span>
+      <div class="transaction-head-digest">
+        <div>
+          <span>可用仓库</span>
+          <strong>{{ warehouseList.length }}个</strong>
+        </div>
+        <div>
+          <span>物料范围</span>
+          <strong>{{ materialList.length }}项</strong>
+        </div>
+        <div>
+          <span>操作权限</span>
+          <strong>{{ canSubmitTransaction ? '可提交' : '仅查看' }}</strong>
+        </div>
       </div>
     </div>
 
     <div class="lg-grid transaction-workspace">
       <div class="lg-left">
+        <div class="lg-kpi-strip">
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">入库操作</span>
+            <span class="lg-kpi-card-value" style="color: #22c55e">登记</span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="lg-kpi-card-label">出库操作</span>
+            <span class="lg-kpi-card-value" style="color: #ef4444">登记</span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">可用仓库</span>
+            <span class="lg-kpi-card-value">{{ warehouseList.length }} <small>个</small></span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="lg-kpi-card-label">物料范围</span>
+            <span class="lg-kpi-card-value">{{ materialList.length }} <small>项</small></span>
+          </div>
+        </div>
+
         <main class="lg-list-table-panel transaction-form-panel">
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
               <span class="transaction-section-title">库存变动登记</span>
-              <span class="transaction-section-hint">选择业务类型后提交对应库存变动</span>
             </div>
             <div class="lg-toolbar-right">
               <a-tabs v-model:activeKey="activeTab" class="transaction-tabs">
@@ -323,8 +331,13 @@ onMounted(() => {
       </div>
 
       <aside class="lg-analysis-rail transaction-rail">
-        <section class="lg-panel transaction-rail-card">
-          <div class="transaction-rail-title">操作提示</div>
+        <section class="transaction-analysis-panel transaction-rail-card">
+          <header class="transaction-analysis-head">
+            <div>
+              <div class="transaction-rail-title">操作提示</div>
+              <div class="transaction-analysis-subtitle">入库、出库与权限状态</div>
+            </div>
+          </header>
           <ul class="transaction-rail-list">
             <li><span>入库</span><b>增加可用库存</b></li>
             <li><span>出库</span><b>扣减可用库存</b></li>
@@ -333,7 +346,7 @@ onMounted(() => {
             </li>
           </ul>
         </section>
-        <section class="lg-panel transaction-rail-card">
+        <section class="transaction-analysis-panel transaction-rail-card">
           <div class="transaction-rail-title">库存域入口</div>
           <div class="transaction-rail-text">
             登记完成后可返回库存台账，按仓库、物料或来源单据搜索流水。
@@ -346,8 +359,16 @@ onMounted(() => {
 
 <style scoped>
 .transaction-page-head {
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
   min-height: 0;
-  padding: 0;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .transaction-page-meta {
@@ -362,23 +383,51 @@ onMounted(() => {
 
 .transaction-page-title {
   color: var(--text);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 30px;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 32px;
 }
 
-.transaction-page-subtitle,
-.transaction-section-hint {
-  color: var(--muted);
+.transaction-page-subtitle {
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
+.transaction-head-digest {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(88px, 1fr));
+  gap: 10px;
+  min-width: 360px;
+}
+
+.transaction-head-digest > div {
+  padding: 10px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.transaction-head-digest span {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.transaction-head-digest strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
 .transaction-workspace {
-  margin-top: 0;
+  margin-top: 14px;
 }
 
 .transaction-form-panel {
   min-height: 360px;
+  border-top: 3px solid var(--primary);
 }
 
 .transaction-section-title {
@@ -397,6 +446,7 @@ onMounted(() => {
 
 .transaction-form-body {
   padding: 20px;
+  background: var(--surface);
 }
 
 .transaction-form {
@@ -439,11 +489,27 @@ onMounted(() => {
   padding: 16px;
 }
 
-.transaction-rail-title {
+.transaction-analysis-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.transaction-analysis-head {
   margin-bottom: 12px;
+}
+
+.transaction-rail-title {
   color: var(--text);
   font-size: 15px;
   font-weight: 800;
+}
+
+.transaction-analysis-subtitle {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .transaction-rail-list {
@@ -476,6 +542,17 @@ onMounted(() => {
 }
 
 @media (max-width: 1100px) {
+  .transaction-page-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .transaction-head-digest {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+
   .transaction-form {
     grid-template-columns: 1fr 1fr;
   }

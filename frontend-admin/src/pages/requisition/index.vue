@@ -177,78 +177,32 @@ onMounted(() => {
 <template>
   <div class="lg-list-page lg-page app-page requisition-page">
     <div class="lg-page-head requisition-page-head">
-      <div class="requisition-title-block">
-        <a-breadcrumb class="lg-breadcrumb">
-          <a-breadcrumb-item>库存管理</a-breadcrumb-item>
-          <a-breadcrumb-item>领料申请</a-breadcrumb-item>
-        </a-breadcrumb>
-        <div class="requisition-title-row">
-          <h1>领料申请</h1>
-          <span>统一查看项目领料、出库状态、审批进度与金额汇总。</span>
+      <div class="requisition-page-meta-row">
+        <div class="requisition-title-block">
+          <a-breadcrumb class="lg-breadcrumb">
+            <a-breadcrumb-item>库存管理</a-breadcrumb-item>
+            <a-breadcrumb-item>领料申请</a-breadcrumb-item>
+          </a-breadcrumb>
+          <div class="requisition-title-row">
+            <h1>领料申请台账</h1>
+            <span>项目领料、出库状态、审批进度与金额汇总。</span>
+          </div>
+        </div>
+        <div class="requisition-head-digest">
+          <div>
+            <span>领料金额</span>
+            <strong>{{ fmtAmount(kpiTotalAmount) }}万</strong>
+          </div>
+          <div>
+            <span>未出库</span>
+            <strong>{{ unstockedCount }}单</strong>
+          </div>
+          <div>
+            <span>待审批</span>
+            <strong>{{ pendingApprovalCount }}单</strong>
+          </div>
         </div>
       </div>
-    </div>
-
-    <div class="lg-search-bar requisition-search-bar">
-      <a-input
-        v-model:value="filter.requisitionCode"
-        placeholder="搜索领料单号…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部项目"
-        allow-clear
-        size="large"
-        show-search
-        :filter-option="
-          (input: string, option: SelectOption) =>
-            option.label?.toLowerCase().includes(input.toLowerCase())
-        "
-        @change="
-          (v: string | undefined) => {
-            filter.contractId = undefined
-            if (v) referenceStore.fetchContracts({ projectId: v })
-            handleSearch()
-          }
-        "
-      >
-        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.warehouseId"
-        placeholder="全部仓库"
-        allow-clear
-        size="large"
-        @change="handleSearch"
-      >
-        <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
-          {{ w.warehouseName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.approvalStatus"
-        placeholder="全部审批状态"
-        allow-clear
-        size="large"
-        @change="handleSearch"
-      >
-        <a-select-option value="DRAFT">草稿</a-select-option>
-        <a-select-option value="APPROVING">审批中</a-select-option>
-        <a-select-option value="APPROVED">已通过</a-select-option>
-        <a-select-option value="REJECTED">已驳回</a-select-option>
-      </a-select>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
     </div>
 
     <div class="lg-grid">
@@ -261,6 +215,72 @@ onMounted(() => {
           :pending-count="pendingApprovalCount"
           :fmt-amount="fmtAmount"
         />
+
+        <div class="lg-search-bar requisition-search-bar">
+          <div class="requisition-search-fields">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              size="large"
+              show-search
+              :filter-option="
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
+              "
+              @change="
+                (v: string | undefined) => {
+                  filter.contractId = undefined
+                  if (v) referenceStore.fetchContracts({ projectId: v })
+                  handleSearch()
+                }
+              "
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.warehouseId"
+              placeholder="全部仓库"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option v-for="w in warehouseList" :key="w.id" :value="w.id">
+                {{ w.warehouseName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.approvalStatus"
+              placeholder="全部审批状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="APPROVING">审批中</a-select-option>
+              <a-select-option value="APPROVED">已通过</a-select-option>
+              <a-select-option value="REJECTED">已驳回</a-select-option>
+            </a-select>
+          </div>
+          <div class="requisition-search-keyword-row">
+            <a-input
+              v-model:value="filter.requisitionCode"
+              placeholder="搜索领料单号"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
+            </a-input>
+            <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+            <a-button size="large" @click="handleReset">
+              <template #icon><ReloadOutlined /></template>
+              重置
+            </a-button>
+          </div>
+        </div>
 
         <main class="lg-list-table-panel requisition-table-panel">
           <div class="lg-toolbar">
@@ -357,6 +377,18 @@ onMounted(() => {
 
       <aside class="lg-analysis-rail requisition-analysis-rail" aria-label="领料申请辅助分析">
         <div class="requisition-analysis-panel">
+          <header class="requisition-analysis-head">
+            <div>
+              <div class="requisition-analysis-title">辅助分析</div>
+              <div class="requisition-analysis-subtitle">出库、审批与近期单据</div>
+            </div>
+            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
+          </header>
+          <section class="requisition-analysis-focus">
+            <span>本页重点</span>
+            <strong>{{ unstockedCount }} 单</strong>
+            <em>已申请但未完成出库的领料单，优先跟踪仓库处理。</em>
+          </section>
           <section class="requisition-analysis-section">
             <div class="requisition-section-head">
               <strong>出库状态分布</strong>
@@ -438,11 +470,27 @@ onMounted(() => {
 
 <style scoped>
 .requisition-page {
-  color: #0f172a;
+  color: var(--text);
+  gap: 14px;
 }
 
 .requisition-page-head {
-  margin-bottom: 7px;
+  margin-bottom: 0;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.requisition-page-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
 }
 
 .lg-breadcrumb {
@@ -458,26 +506,73 @@ onMounted(() => {
 
 .requisition-title-row h1 {
   margin: 0;
-  font-size: 22px;
-  line-height: 30px;
-  font-weight: 700;
-  color: #0f172a;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 32px;
 }
 
 .requisition-title-row span {
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
+}
+
+.requisition-head-digest {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  gap: 10px;
+  min-width: 360px;
+}
+
+.requisition-head-digest > div {
+  padding: 10px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.requisition-head-digest span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.requisition-head-digest strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 22px;
 }
 
 .requisition-search-bar {
   min-height: 74px;
-  display: grid;
-  grid-template-columns:
-    minmax(240px, 1.7fr) minmax(180px, 1fr) minmax(160px, 0.9fr)
-    150px auto auto;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  align-items: stretch;
+  padding: 16px;
+  margin-bottom: 0;
+  border-left: 4px solid var(--primary-soft);
+}
+
+.requisition-search-fields,
+.requisition-search-keyword-row {
+  display: flex;
   align-items: center;
-  margin-bottom: 16px;
+  gap: 12px;
+  min-width: 0;
+}
+
+.requisition-search-fields > :deep(.ant-select) {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.requisition-search-keyword-row > :deep(.ant-input-affix-wrapper) {
+  flex: 1 1 auto;
+  min-width: 240px;
 }
 
 .requisition-main-column {
@@ -500,12 +595,12 @@ onMounted(() => {
 
 .requisition-table-title strong {
   font-size: 15px;
-  color: #0f172a;
+  color: var(--text);
 }
 
 .requisition-table-title span {
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .requisition-analysis-rail {
@@ -513,19 +608,64 @@ onMounted(() => {
 }
 
 .requisition-analysis-panel {
-  height: 856px;
-  min-height: 856px;
+  height: auto;
+  min-height: 0;
   box-sizing: border-box;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
+}
+
+.requisition-analysis-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.requisition-analysis-title {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.requisition-analysis-subtitle {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.requisition-analysis-focus {
+  display: grid;
+  gap: 4px;
+  padding: 14px 18px;
+  background: var(--warning-soft);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.requisition-analysis-focus span,
+.requisition-analysis-focus em {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.requisition-analysis-focus strong {
+  color: var(--warning);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 30px;
 }
 
 .requisition-analysis-section {
   padding: 18px;
-  border-bottom: 1px solid #edf1f5;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .requisition-analysis-section:last-child {
@@ -542,12 +682,12 @@ onMounted(() => {
 
 .requisition-section-head strong {
   font-size: 15px;
-  color: #0f172a;
+  color: var(--text);
 }
 
 .requisition-section-head span {
   font-size: 12px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .requisition-bar-list,
@@ -572,7 +712,7 @@ onMounted(() => {
   align-items: center;
   min-width: 0;
   gap: 8px;
-  color: #334155;
+  color: var(--text);
 }
 
 .requisition-bar-meta i {
@@ -584,7 +724,7 @@ onMounted(() => {
 
 .requisition-bar-meta strong,
 .requisition-recent-item strong {
-  color: #0f172a;
+  color: var(--text);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -593,7 +733,7 @@ onMounted(() => {
   margin-top: 7px;
   height: 6px;
   border-radius: 999px;
-  background: #f1f5f9;
+  background: var(--surface-subtle);
   overflow: hidden;
 }
 
@@ -620,7 +760,7 @@ onMounted(() => {
 
 .requisition-recent-item {
   padding: 10px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .requisition-recent-item:last-child {
@@ -630,21 +770,38 @@ onMounted(() => {
 .requisition-recent-item span {
   min-width: 0;
   overflow: hidden;
-  color: #334155;
+  color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .requisition-empty {
   padding: 18px 0;
-  color: #94a3b8;
+  color: var(--text-secondary);
   text-align: center;
   font-size: 13px;
 }
 
 @media (max-width: 1280px) {
+  .requisition-page-meta-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .requisition-head-digest {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr;
+  }
+
   .requisition-search-bar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .requisition-search-fields,
+  .requisition-search-keyword-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .requisition-analysis-rail {

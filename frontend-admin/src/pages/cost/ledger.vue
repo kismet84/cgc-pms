@@ -11,6 +11,7 @@ import {
   ReloadOutlined,
   SearchOutlined,
   AlertOutlined,
+  SettingOutlined,
 } from '@ant-design/icons-vue'
 import { getCostLedger, getCostLedgerSummary, getCostLedgerDetail } from '@/api/modules/cost'
 import { getCostSubjectList } from '@/api/modules/costSubject'
@@ -62,6 +63,26 @@ const filter = reactive({
   dateRange: null as string[] | null,
   keyword: '',
 })
+const filterVisibility = reactive({
+  projectId: true,
+  contractId: true,
+  partnerId: true,
+  costSubjectId: true,
+  costType: true,
+  sourceType: true,
+  costStatus: true,
+  dateRange: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'contractId', label: '合同' },
+  { key: 'partnerId', label: '合作方' },
+  { key: 'costSubjectId', label: '成本科目' },
+  { key: 'costType', label: '成本类型' },
+  { key: 'sourceType', label: '来源类型' },
+  { key: 'costStatus', label: '成本状态' },
+  { key: 'dateRange', label: '成本日期' },
+] as const
 
 // ---- Table state ----
 const loading = ref(false)
@@ -194,12 +215,18 @@ function handleReset() {
   filter.projectId = undefined
   filter.contractId = undefined
   filter.partnerId = undefined
+  filter.costSubjectId = undefined
+  filter.costType = undefined
+  filter.sourceType = undefined
   filter.costStatus = undefined
   filter.dateRange = null
   filter.keyword = ''
   contractOptions.value = contractList.value ?? []
   pageNo.value = 1
   handleSearch()
+}
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
 }
 
 function handlePageChange(page: number) {
@@ -375,127 +402,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <a-breadcrumb-item>成本列表</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
-      <div class="cost-ledger-head-actions">
-        <a-button aria-label="刷新成本列表" title="刷新成本列表" @click="handleSearch">
-          <template #icon><ReloadOutlined /></template>
-          刷新
-        </a-button>
-      </div>
-    </div>
-
-    <div class="lg-search-bar cost-ledger-query-panel">
-      <div class="cost-ledger-query-primary">
-        <a-input
-          v-model:value="filter.keyword"
-          class="cost-ledger-keyword-search"
-          placeholder="搜索编号、科目名、类型、项目、合同…"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix><SearchOutlined class="cost-ledger-search-prefix-icon" /></template>
-        </a-input>
-        <a-select
-          v-model:value="filter.projectId"
-          placeholder="全部项目"
-          allow-clear
-          class="cost-ledger-query-select"
-          size="large"
-          @change="handleProjectFilterChange"
-        >
-          <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.contractId"
-          placeholder="合同"
-          allow-clear
-          class="cost-ledger-query-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="contract in contractOptions" :key="contract.id" :value="contract.id">
-            {{ contract.contractName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.partnerId"
-          placeholder="合作方"
-          allow-clear
-          class="cost-ledger-query-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="partner in partnerList ?? []" :key="partner.id" :value="partner.id">
-            {{ partner.partnerName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.costSubjectId"
-          placeholder="成本科目"
-          allow-clear
-          class="cost-ledger-query-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="subject in costSubjectOptions" :key="subject.id" :value="subject.id">
-            {{ subject.subjectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.costType"
-          placeholder="成本类型"
-          allow-clear
-          class="cost-ledger-query-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option value="MATERIAL">材料费</a-select-option>
-          <a-select-option value="LABOR">人工费</a-select-option>
-          <a-select-option value="MACHINERY">机械费</a-select-option>
-          <a-select-option value="SUBCONTRACT">分包费</a-select-option>
-          <a-select-option value="OTHER">其他</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.sourceType"
-          placeholder="来源类型"
-          allow-clear
-          class="cost-ledger-query-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option value="PURCHASE_ORDER">采购单</a-select-option>
-          <a-select-option value="SUB_MEASURE">分包计量</a-select-option>
-          <a-select-option value="SETTLEMENT">结算单</a-select-option>
-          <a-select-option value="MANUAL">手工录入</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.costStatus"
-          placeholder="成本状态"
-          allow-clear
-          class="cost-ledger-status-select"
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option value="CONFIRMED">已确认</a-select-option>
-          <a-select-option value="PENDING">待确认</a-select-option>
-        </a-select>
-        <a-range-picker
-          v-model:value="filter.dateRange"
-          class="cost-ledger-query-range"
-          size="large"
-          value-format="YYYY-MM-DD"
-          @change="handleSearch"
-        />
-      </div>
-      <div class="cost-ledger-query-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
     </div>
 
     <div class="lg-grid cost-ledger-grid">
@@ -588,20 +494,181 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
         </div>
 
+        <div class="lg-search-bar cost-ledger-query-panel">
+          <div class="cost-ledger-query-primary">
+            <a-select
+              v-if="filterVisibility.projectId"
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              class="cost-ledger-query-select"
+              size="large"
+              @change="handleProjectFilterChange"
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.contractId"
+              v-model:value="filter.contractId"
+              placeholder="合同"
+              allow-clear
+              class="cost-ledger-query-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option
+                v-for="contract in contractOptions"
+                :key="contract.id"
+                :value="contract.id"
+              >
+                {{ contract.contractName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.partnerId"
+              v-model:value="filter.partnerId"
+              placeholder="合作方"
+              allow-clear
+              class="cost-ledger-query-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option
+                v-for="partner in partnerList ?? []"
+                :key="partner.id"
+                :value="partner.id"
+              >
+                {{ partner.partnerName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.costSubjectId"
+              v-model:value="filter.costSubjectId"
+              placeholder="成本科目"
+              allow-clear
+              class="cost-ledger-query-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option
+                v-for="subject in costSubjectOptions"
+                :key="subject.id"
+                :value="subject.id"
+              >
+                {{ subject.subjectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.costType"
+              v-model:value="filter.costType"
+              placeholder="成本类型"
+              allow-clear
+              class="cost-ledger-query-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="MATERIAL">材料费</a-select-option>
+              <a-select-option value="LABOR">人工费</a-select-option>
+              <a-select-option value="MACHINERY">机械费</a-select-option>
+              <a-select-option value="SUBCONTRACT">分包费</a-select-option>
+              <a-select-option value="OTHER">其他</a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.sourceType"
+              v-model:value="filter.sourceType"
+              placeholder="来源类型"
+              allow-clear
+              class="cost-ledger-query-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="PURCHASE_ORDER">采购单</a-select-option>
+              <a-select-option value="SUB_MEASURE">分包计量</a-select-option>
+              <a-select-option value="SETTLEMENT">结算单</a-select-option>
+              <a-select-option value="MANUAL">手工录入</a-select-option>
+            </a-select>
+            <a-select
+              v-if="filterVisibility.costStatus"
+              v-model:value="filter.costStatus"
+              placeholder="成本状态"
+              allow-clear
+              class="cost-ledger-status-select"
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="CONFIRMED">已确认</a-select-option>
+              <a-select-option value="PENDING">待确认</a-select-option>
+            </a-select>
+            <a-range-picker
+              v-if="filterVisibility.dateRange"
+              v-model:value="filter.dateRange"
+              class="cost-ledger-query-range"
+              size="large"
+              value-format="YYYY-MM-DD"
+              @change="handleSearch"
+            />
+          </div>
+          <div class="cost-ledger-query-keyword-row">
+            <a-input
+              v-model:value="filter.keyword"
+              class="cost-ledger-keyword-search"
+              placeholder="搜索编号、科目名、类型、项目、合同…"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined class="cost-ledger-search-prefix-icon" /></template>
+            </a-input>
+            <div class="cost-ledger-query-actions">
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
+          </div>
+        </div>
+
         <main class="lg-list-table-panel cost-ledger-table-panel">
           <div class="lg-toolbar cost-toolbar">
             <div class="lg-toolbar-left">
-              <span class="cost-ledger-table-title">成本记录</span>
-              <span class="cost-ledger-table-count">共 {{ total }} 条</span>
+              <div class="cost-ledger-table-heading">
+                <span class="cost-ledger-table-title">成本记录</span>
+                <span class="cost-ledger-table-count">共 {{ total }} 条</span>
+              </div>
+            </div>
+            <div class="lg-toolbar-right cost-toolbar-right">
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
               />
-            </div>
-            <div class="lg-toolbar-right">
-              <span class="cost-ledger-toolbar-hint">固定表头 / 金额右对齐 / 行操作可展开</span>
+              <a-button aria-label="刷新成本列表" title="刷新成本列表" @click="handleSearch">
+                <template #icon><ReloadOutlined /></template>
+                刷新
+              </a-button>
             </div>
           </div>
 
@@ -708,7 +775,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <header class="cost-ledger-analysis-head">
             <div>
               <div class="cost-ledger-analysis-title">成本分析</div>
-              <div class="cost-ledger-analysis-subtitle">科目、来源与超预算风险</div>
             </div>
             <a-button type="link" size="small" @click="handleSearch">刷新</a-button>
           </header>
@@ -777,10 +843,27 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       title="成本明细"
       placement="right"
       :width="800"
+      class="cost-ledger-detail-drawer"
       @close="detailVisible = false"
     >
       <template v-if="detailItem">
-        <a-descriptions :column="2" size="small" bordered>
+        <div class="cost-ledger-detail-summary">
+          <div>
+            <span>成本科目</span>
+            <strong>{{ detailItem.costSubjectName || '-' }}</strong>
+          </div>
+          <div>
+            <span>金额含税</span>
+            <strong>{{ fmtAmountYuan(detailItem.amount) }}</strong>
+          </div>
+          <div>
+            <span>来源类型</span>
+            <a-tag :color="SOURCE_TYPE_COLOR[detailItem.sourceType as SourceType] || 'default'">
+              {{ SOURCE_TYPE_LABEL[detailItem.sourceType as SourceType] || detailItem.sourceType }}
+            </a-tag>
+          </div>
+        </div>
+        <a-descriptions class="cost-ledger-detail-descriptions" :column="2" size="small" bordered>
           <a-descriptions-item label="成本科目">{{
             detailItem.costSubjectName || '-'
           }}</a-descriptions-item>
@@ -828,6 +911,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 <style scoped>
 .cost-ledger-page {
   gap: 14px;
+  background: var(--surface-subtle);
 }
 
 .cost-ledger-page-head {
@@ -858,23 +942,35 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cost-ledger-query-panel {
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  flex-direction: column;
   gap: 12px;
+  margin: 0;
   min-height: 74px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .cost-ledger-query-primary {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cost-ledger-query-keyword-row {
+  display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
 
 .cost-ledger-keyword-search {
-  width: min(560px, 30vw);
-  min-width: 360px;
+  flex: 1 1 auto;
+  min-width: 320px;
 }
 
 .cost-ledger-search-prefix-icon {
@@ -903,7 +999,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .cost-ledger-grid {
   align-items: stretch;
   min-height: 0;
-  height: calc(100vh - 174px);
+  height: calc(100vh - 74px);
 }
 
 .cost-ledger-main {
@@ -918,8 +1014,13 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   display: flex;
   flex: 1;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
+  background: var(--surface);
   border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
   min-height: 0;
 }
 
@@ -934,8 +1035,14 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   font-weight: 700;
 }
 
-.cost-ledger-table-count,
-.cost-ledger-toolbar-hint {
+.cost-ledger-table-heading,
+.cost-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cost-ledger-table-count {
   color: var(--text-secondary);
   font-size: 13px;
 }
@@ -1018,9 +1125,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   display: grid;
   grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
   gap: 0;
+  margin-bottom: 0;
   overflow: hidden;
   min-height: 84px;
-  margin-bottom: 16px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1130,14 +1237,63 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .cost-ledger-analysis-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
   min-height: 0;
   height: 100%;
-  padding: 18px;
+  padding: 0 0 12px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+}
+
+.cost-ledger-detail-drawer :deep(.ant-drawer-body) {
+  background: var(--surface-subtle);
+}
+
+.cost-ledger-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.cost-ledger-detail-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.cost-ledger-detail-summary > div:last-child {
+  border-right: 0;
+}
+
+.cost-ledger-detail-summary span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cost-ledger-detail-summary strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cost-ledger-detail-descriptions {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
 }
 
 .cost-ledger-analysis-head,
@@ -1148,14 +1304,18 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   gap: 10px;
 }
 
-.cost-ledger-analysis-title {
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 22px;
+.cost-ledger-analysis-head {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.cost-ledger-analysis-subtitle,
+.cost-ledger-analysis-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
 .cost-ledger-warning-count {
   color: var(--text-secondary);
   font-size: 12px;
@@ -1164,9 +1324,14 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .cost-ledger-analysis-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
-  padding-top: 16px;
+  padding: 10px 16px 0;
+}
+
+.cost-ledger-analysis-section + .cost-ledger-analysis-section {
+  margin-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -1207,6 +1372,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 @media (max-width: 1200px) {
   .cost-ledger-page-head,
   .cost-ledger-query-panel,
+  .cost-ledger-query-keyword-row,
   .cost-ledger-query-primary {
     align-items: stretch;
     flex-direction: column;
