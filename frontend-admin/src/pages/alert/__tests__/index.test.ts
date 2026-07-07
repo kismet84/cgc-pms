@@ -197,5 +197,8 @@ describe('alert/index.vue', () => {
     expect(pageSource).toContain("field: 'triggeredAt'")
     expect(pageSource).toContain("slots: { default: 'triggeredAt' }")
     expect(pageSource).toContain('<button')
+    expect(pageSource).toContain('@media (max-width: 1200px)')
+    expect(pageSource).not.toContain('@media (max-width: 1440px)')
+    expect(pageSource).toContain('grid-template-columns: minmax(0, 1fr) 360px')
   })
 })

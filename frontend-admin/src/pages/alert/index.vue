@@ -1601,7 +1601,7 @@ onMounted(async () => {
   min-height: 0;
 }
 
-@media (max-width: 1440px) {
+@media (max-width: 1200px) {
   .alert-shell {
     grid-template-columns: 1fr;
   }
