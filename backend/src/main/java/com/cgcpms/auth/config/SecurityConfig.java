@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -59,24 +60,32 @@ public class SecurityConfig {
     private final GlobalWriteRateLimitFilter globalWriteRateLimitFilter;
     private final Environment environment;
     private final boolean devLoginEnabled;
+    private final boolean csrfEnabled;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           GlobalWriteRateLimitFilter globalWriteRateLimitFilter,
                           Environment environment,
-                          @Value("${auth.dev-login.enabled:false}") boolean devLoginEnabled) {
+                          @Value("${auth.dev-login.enabled:false}") boolean devLoginEnabled,
+                          @Value("${auth.csrf.enabled:true}") boolean csrfEnabled) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.globalWriteRateLimitFilter = globalWriteRateLimitFilter;
         this.environment = environment;
         this.devLoginEnabled = devLoginEnabled;
+        this.csrfEnabled = csrfEnabled;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(csrf -> csrf
+        if (csrfEnabled) {
+            http.csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                        .ignoringRequestMatchers(new AntPathRequestMatcher("/auth/login", "POST")))
+                        .ignoringRequestMatchers(new AntPathRequestMatcher("/auth/login", "POST")));
+        } else {
+            http.csrf(AbstractHttpConfigurer::disable);
+        }
+
+        http
                 .cors(Customizer.withDefaults())
                 .headers(headers -> headers
                         .xssProtection(xss -> xss.disable()))

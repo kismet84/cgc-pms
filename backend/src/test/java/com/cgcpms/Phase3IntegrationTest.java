@@ -541,8 +541,8 @@ class Phase3IntegrationTest {
             assertNotNull(alert.getSeverity(), "预警严重程度不应为空");
             assertNotNull(alert.getMessage(), "预警消息不应为空");
             assertNotNull(alert.getTriggeredAt(), "触发时间不应为空");
-            assertEquals(0, alert.getIsRead(), "初始isRead应为0（未读）");
             if ("CONTRACT_EXPIRING".equals(alert.getRuleType())) {
+                assertEquals(0, alert.getIsRead(), "本轮生成的CONTRACT_EXPIRING初始isRead应为0（未读）");
                 hasExpiringAlert = true;
             }
         }
@@ -607,6 +607,7 @@ class Phase3IntegrationTest {
         varItem.setQuantity(new BigDecimal("1000.00"));
         varItem.setUnitPrice(new BigDecimal("200.00"));
         varItem.setAmount(new BigDecimal("200000.00"));
+        varItem.setCostSubjectId(900057L);
         varOrderService.saveItems(varOrderId, List.of(varItem));
 
         // 提交签证审批

@@ -24,7 +24,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TDD RED phase — tests for self-service profile update and password change APIs.
  * Tests MUST fail initially since ProfileController and ProfileService do not exist yet.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "auth.csrf.enabled=true"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("ProfileController — self-service profile & password management")

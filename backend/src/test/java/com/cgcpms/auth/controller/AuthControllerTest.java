@@ -34,7 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.main.allow-circular-references=true",
         "auth.dev-login.enabled=true",
-        "auth.dev-login.default-username=demo_dev_super_admin"
+        "auth.dev-login.default-username=demo_dev_super_admin",
+        "auth.csrf.enabled=true"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")

@@ -81,6 +81,7 @@ class VarOrderControllerMockMvcTest {
             order.setProjectId(PROJECT_ID);
             order.setContractId(CONTRACT_ID);
             order.setVarName("Test Variation Order");
+            order.setVarType("FIELD");
             orderId = varOrderService.create(order);
         } finally {
             clearUserContext();
