@@ -350,7 +350,7 @@ class AlertRuleEvaluator {
                         .lt(MatPurchaseOrder::getDeliveryDate, LocalDate.now())
                         .notIn(MatPurchaseOrder::getOrderStatus, List.of("COMPLETED", "CANCELLED"))
                         .orderByAsc(MatPurchaseOrder::getDeliveryDate)
-                        .last("LIMIT 1"));
+                        .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment
         if (order == null) {
             return Collections.emptyList();
         }

@@ -285,7 +285,7 @@ public class SubMeasureService {
                 .eq(WfInstance::getBusinessType, "SUB_MEASURE")
                 .eq(WfInstance::getBusinessId, measureId)
                 .orderByDesc(WfInstance::getCreatedAt)
-                .last("LIMIT 1"));
+                .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment
         if (existingInstance != null) {
             String instanceStatus = existingInstance.getInstanceStatus();
             if (WorkflowConstants.INSTANCE_REJECTED.equals(instanceStatus)

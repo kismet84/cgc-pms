@@ -196,14 +196,14 @@ public class CostLedgerService {
                 if (idMatch != null) {
                     w.eq("id", idMatch).or();
                 }
-                w.apply("cost_item.cost_type LIKE {0} ESCAPE '!'", like)
-                        .or().apply("cost_item.source_type LIKE {0} ESCAPE '!'", like)
-                        .or().apply("cost_item.cost_status LIKE {0} ESCAPE '!'", like)
-                        .or().apply("cost_item.remark LIKE {0} ESCAPE '!'", like)
-                        .or().apply("EXISTS (SELECT 1 FROM pm_project p WHERE p.id = cost_item.project_id AND p.project_name LIKE {0} ESCAPE '!')", like)
-                        .or().apply("EXISTS (SELECT 1 FROM ct_contract c WHERE c.id = cost_item.contract_id AND (c.contract_name LIKE {0} ESCAPE '!' OR c.contract_code LIKE {0} ESCAPE '!'))", like)
-                        .or().apply("EXISTS (SELECT 1 FROM md_partner mp WHERE mp.id = cost_item.partner_id AND mp.partner_name LIKE {0} ESCAPE '!')", like)
-                        .or().apply("EXISTS (SELECT 1 FROM cost_subject cs WHERE cs.id = cost_item.cost_subject_id AND cs.subject_name LIKE {0} ESCAPE '!')", like);
+                w.apply("cost_item.cost_type LIKE {0} ESCAPE '!'", like) // SQL-SAFETY: parameterized-like
+                        .or().apply("cost_item.source_type LIKE {0} ESCAPE '!'", like) // SQL-SAFETY: parameterized-like
+                        .or().apply("cost_item.cost_status LIKE {0} ESCAPE '!'", like) // SQL-SAFETY: parameterized-like
+                        .or().apply("cost_item.remark LIKE {0} ESCAPE '!'", like) // SQL-SAFETY: parameterized-like
+                        .or().apply("EXISTS (SELECT 1 FROM pm_project p WHERE p.id = cost_item.project_id AND p.project_name LIKE {0} ESCAPE '!')", like) // SQL-SAFETY: parameterized-exists
+                        .or().apply("EXISTS (SELECT 1 FROM ct_contract c WHERE c.id = cost_item.contract_id AND (c.contract_name LIKE {0} ESCAPE '!' OR c.contract_code LIKE {0} ESCAPE '!'))", like) // SQL-SAFETY: parameterized-exists
+                        .or().apply("EXISTS (SELECT 1 FROM md_partner mp WHERE mp.id = cost_item.partner_id AND mp.partner_name LIKE {0} ESCAPE '!')", like) // SQL-SAFETY: parameterized-exists
+                        .or().apply("EXISTS (SELECT 1 FROM cost_subject cs WHERE cs.id = cost_item.cost_subject_id AND cs.subject_name LIKE {0} ESCAPE '!')", like); // SQL-SAFETY: parameterized-exists
             });
         }
         return wrapper;

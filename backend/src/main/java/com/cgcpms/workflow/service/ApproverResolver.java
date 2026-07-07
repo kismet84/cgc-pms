@@ -169,7 +169,7 @@ public class ApproverResolver {
                 .eq(tenantId != null, SysRole::getTenantId, tenantId)
                 .eq(SysRole::getRoleCode, roleCode)
                 .eq(SysRole::getStatus, "ENABLE")
-                .last("LIMIT 1"));
+                .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment
         if (role == null) {
             return Collections.emptyList();
         }

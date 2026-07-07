@@ -143,7 +143,7 @@ public class DashboardCostService extends DashboardSharedSupport {
                 .in(AlertLog::getRuleType, Set.of("DYNAMIC_COST_EXCEEDS_TARGET", "MATERIAL_EXCEEDS_BUDGET"));
         applyMonthDateTimeRange(alertQuery, selectedMonth, AlertLog::getTriggeredAt);
         List<AlertLog> overBudgetAlerts = alertLogMapper.selectList(
-                alertQuery.orderByDesc(AlertLog::getTriggeredAt).last("limit 5"));
+                alertQuery.orderByDesc(AlertLog::getTriggeredAt).last("limit 5")); // SQL-SAFETY: fixed-sql-fragment
         vo.setOverBudgetAlerts(overBudgetAlerts.stream().map(alert -> {
             DashboardAlertItemVO item = toAlertItem(alert);
             item.setProjectName(project.getProjectName());
@@ -289,7 +289,7 @@ public class DashboardCostService extends DashboardSharedSupport {
                 .in(AlertLog::getRuleType, Set.of("DYNAMIC_COST_EXCEEDS_TARGET", "MATERIAL_EXCEEDS_BUDGET"));
         applyMonthDateTimeRange(alertQuery, selectedMonth, AlertLog::getTriggeredAt);
         List<AlertLog> overBudgetAlerts = alertLogMapper.selectList(
-                alertQuery.orderByDesc(AlertLog::getTriggeredAt).last("limit 5"));
+                alertQuery.orderByDesc(AlertLog::getTriggeredAt).last("limit 5")); // SQL-SAFETY: fixed-sql-fragment
         Map<Long, String> activeProjectNames = activeProjects.stream()
                 .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         vo.setOverBudgetAlerts(overBudgetAlerts.stream().map(alert -> {
@@ -433,7 +433,7 @@ public class DashboardCostService extends DashboardSharedSupport {
             query.le(CostSummary::getSummaryDate, selectedMonth.atEndOfMonth());
         }
         return costSummaryMapper.selectList(
-                query.orderByDesc(CostSummary::getSummaryDate).last("limit 1"))
+                query.orderByDesc(CostSummary::getSummaryDate).last("limit 1")) // SQL-SAFETY: fixed-sql-fragment
                 .stream()
                 .findFirst()
                 .orElse(null);
