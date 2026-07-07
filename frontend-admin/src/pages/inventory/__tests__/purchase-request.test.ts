@@ -83,4 +83,9 @@ describe('purchase request modal filters', () => {
     expect(source).not.toContain('catch {')
     expect(source).toContain("console.error('采购申请创建回滚失败', cleanupError)")
   })
+
+  it('covers APPROVED business status in fallback label and filter options', () => {
+    expect(source).toContain("APPROVED: '已通过'")
+    expect(searchBarSource).toContain('<a-select-option value="APPROVED">已通过</a-select-option>')
+  })
 })

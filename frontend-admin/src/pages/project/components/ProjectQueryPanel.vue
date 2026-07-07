@@ -16,6 +16,7 @@ defineProps<{
     label: string
   }>
   projectTypeOptions: string[]
+  projectTypeLabel: (value?: string) => string
   projectStatusOptions: string[]
   statusLabel: Record<string, string>
 }>()
@@ -41,7 +42,7 @@ const emit = defineEmits<{
           @change="emit('search')"
         >
           <a-select-option v-for="item in projectTypeOptions" :key="item" :value="item">
-            {{ item }}
+            {{ projectTypeLabel(item) }}
           </a-select-option>
         </a-select>
       </div>

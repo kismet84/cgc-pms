@@ -17,7 +17,8 @@ defineProps<{
   statusColor: Record<string, string>
   approvalStatusLabel: Record<string, string>
   approvalStatusColor: Record<string, string>
-  projectTypeColor: Record<string, string>
+  projectTypeLabel: (value?: string) => string
+  projectTypeColor: (value?: string) => string
   fmtAmount: (val: string) => string
 }>()
 
@@ -77,8 +78,8 @@ const emit = defineEmits<{
               </div>
               <div class="project-mobile-card-meta">
                 <span class="project-mobile-card-code">{{ row.projectCode || '-' }}</span>
-                <a-tag :color="projectTypeColor[row.projectType]" size="small">
-                  {{ row.projectType || '未分类' }}
+                <a-tag :color="projectTypeColor(row.projectType)" size="small">
+                  {{ projectTypeLabel(row.projectType) }}
                 </a-tag>
               </div>
               <div class="project-mobile-card-row">
@@ -136,8 +137,8 @@ const emit = defineEmits<{
           <span class="project-name-text">{{ row.projectName }}</span>
         </template>
         <template #projectType="{ row }">
-          <a-tag :color="projectTypeColor[row.projectType]" size="small">
-            {{ row.projectType || '未分类' }}
+          <a-tag :color="projectTypeColor(row.projectType)" size="small">
+            {{ projectTypeLabel(row.projectType) }}
           </a-tag>
         </template>
         <template #contractAmount="{ row }">

@@ -78,6 +78,7 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
         @change="emit('search')"
       >
         <a-select-option value="DRAFT">草稿</a-select-option>
+        <a-select-option value="APPROVED">已通过</a-select-option>
         <a-select-option value="CONVERTED">已转PO</a-select-option>
       </a-select>
     </div>

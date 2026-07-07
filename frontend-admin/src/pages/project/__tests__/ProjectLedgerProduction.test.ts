@@ -59,4 +59,16 @@ describe('ProjectLedgerProduction source guards', () => {
     expect(source).toContain("emit('edit', row)")
     expect(source).toContain("emit('delete', row)")
   })
+
+  it('uses projectTypeLabel fallback instead of directly rendering raw projectType', () => {
+    const source = readProjectSource()
+    const queryPanelSource = readProjectComponentSource('ProjectQueryPanel')
+    const tablePanelSource = readProjectComponentSource('ProjectTablePanel')
+    expect(source).toContain("const PROJECT_TYPE_DICT = 'project_type'")
+    expect(source).toContain('const PROJECT_TYPE_LABEL: Record<string, string>')
+    expect(source).toContain('function projectTypeLabel(value: string | undefined)')
+    expect(queryPanelSource).toContain('{{ projectTypeLabel(item) }}')
+    expect(tablePanelSource).toContain('{{ projectTypeLabel(row.projectType) }}')
+    expect(tablePanelSource).not.toContain("{{ row.projectType || '未分类' }}")
+  })
 })

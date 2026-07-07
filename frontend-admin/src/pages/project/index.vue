@@ -12,6 +12,7 @@ import {
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
+import { fetchDictData, getDictLabelSync } from '@/utils/dict'
 import ProjectAnalysisRail from './components/ProjectAnalysisRail.vue'
 import ProjectKpiSummary from './components/ProjectKpiSummary.vue'
 import ProjectQueryPanel from './components/ProjectQueryPanel.vue'
@@ -243,6 +244,9 @@ function handlePageSizeChange(_cur: number, size: number) {
 }
 
 onMounted(fetchData)
+onMounted(() => {
+  void fetchDictData(PROJECT_TYPE_DICT)
+})
 
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
@@ -315,8 +319,48 @@ const PROJECT_TYPE_COLOR: Record<string, string> = {
   材料采购: 'purple',
 }
 
-const PROJECT_TYPE_OPTIONS = Object.keys(PROJECT_TYPE_COLOR)
+const PROJECT_TYPE_DICT = 'project_type'
+const PROJECT_TYPE_LABEL: Record<string, string> = {
+  施工总承包: '施工总承包',
+  专业分包: '专业分包',
+  劳务分包: '劳务分包',
+  材料采购: '材料采购',
+  MAIN: '施工总承包',
+  SUB: '专业分包',
+  PURCHASE: '材料采购',
+  MATERIAL: '材料采购',
+  MATERIAL_PURCHASE: '材料采购',
+  LABOR: '劳务分包',
+  LABOR_SUB: '劳务分包',
+  LABOR_SUBCONTRACT: '劳务分包',
+  PROFESSIONAL_SUB: '专业分包',
+  PROFESSIONAL_SUBCONTRACT: '专业分包',
+  GENERAL: '施工总承包',
+  GENERAL_CONTRACT: '施工总承包',
+}
+
+const PROJECT_TYPE_BASE_OPTIONS = Object.keys(PROJECT_TYPE_COLOR)
 const PROJECT_STATUS_OPTIONS = ['DRAFT', 'ACTIVE', 'ONGOING', 'COMPLETED', 'SUSPENDED', 'CLOSED']
+
+function projectTypeLabel(value: string | undefined) {
+  const label = getDictLabelSync(PROJECT_TYPE_DICT, value ?? '', PROJECT_TYPE_LABEL)
+  return label || value || '未分类'
+}
+
+function projectTypeColor(value: string | undefined) {
+  return PROJECT_TYPE_COLOR[projectTypeLabel(value)] ?? 'default'
+}
+
+const projectTypeOptions = computed(() => {
+  const options = new Set<string>(PROJECT_TYPE_BASE_OPTIONS)
+  tableData.value.forEach((item) => {
+    if (item.projectType) options.add(item.projectType)
+  })
+  if (filter.projectType) options.add(filter.projectType)
+  if (createForm.projectType) options.add(createForm.projectType)
+  if (editForm.projectType) options.add(editForm.projectType)
+  return Array.from(options)
+})
 
 function calcCodeColumnWidth(values: Array<string | undefined>, title = '项目编号') {
   const longest = Math.max(title.length, ...values.map((value) => String(value ?? '').length))
@@ -355,7 +399,7 @@ const statusDistribution = computed(() => {
 const typeDistribution = computed(() => {
   const rows = tableData.value
   const counts = rows.reduce<Record<string, number>>((acc, item) => {
-    const key = item.projectType || '未分类'
+    const key = projectTypeLabel(item.projectType)
     acc[key] = (acc[key] || 0) + 1
     return acc
   }, {})
@@ -501,10 +545,9 @@ const {
           :rules="[{ required: true, message: '请选择项目类型' }]"
         >
           <a-select v-model:value="createForm.projectType" placeholder="请选择项目类型">
-            <a-select-option value="施工总承包">施工总承包</a-select-option>
-            <a-select-option value="专业分包">专业分包</a-select-option>
-            <a-select-option value="劳务分包">劳务分包</a-select-option>
-            <a-select-option value="材料采购">材料采购</a-select-option>
+            <a-select-option v-for="item in projectTypeOptions" :key="item" :value="item">
+              {{ projectTypeLabel(item) }}
+            </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="项目地址" name="projectAddress">
@@ -579,10 +622,9 @@ const {
           :rules="[{ required: true, message: '请选择项目类型' }]"
         >
           <a-select v-model:value="editForm.projectType" placeholder="请选择项目类型">
-            <a-select-option value="施工总承包">施工总承包</a-select-option>
-            <a-select-option value="专业分包">专业分包</a-select-option>
-            <a-select-option value="劳务分包">劳务分包</a-select-option>
-            <a-select-option value="材料采购">材料采购</a-select-option>
+            <a-select-option v-for="item in projectTypeOptions" :key="item" :value="item">
+              {{ projectTypeLabel(item) }}
+            </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="项目地址" name="projectAddress">
@@ -636,7 +678,8 @@ const {
           :filter="filter"
           :filter-visibility="filterVisibility"
           :filter-setting-items="filterSettingItems"
-          :project-type-options="PROJECT_TYPE_OPTIONS"
+          :project-type-options="projectTypeOptions"
+          :project-type-label="projectTypeLabel"
           :project-status-options="PROJECT_STATUS_OPTIONS"
           :status-label="STATUS_LABEL"
           @search="handleSearch"
@@ -658,7 +701,8 @@ const {
           :status-color="STATUS_COLOR"
           :approval-status-label="APPROVAL_STATUS_LABEL"
           :approval-status-color="APPROVAL_STATUS_COLOR"
-          :project-type-color="PROJECT_TYPE_COLOR"
+          :project-type-label="projectTypeLabel"
+          :project-type-color="projectTypeColor"
           :fmt-amount="fmtAmount"
           @toggle-col="toggleCol"
           @refresh="fetchData"

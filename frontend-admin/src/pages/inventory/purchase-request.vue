@@ -83,10 +83,12 @@ const keySeq = ref(0)
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
+  APPROVED: '已通过',
   CONVERTED: '已转PO',
 }
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',
+  APPROVED: 'success',
   CONVERTED: 'cyan',
 }
 const STATUS_DICT = 'purchase_request_status'
@@ -493,7 +495,7 @@ const statusBreakdown = computed(() => {
     label: businessStatusLabel(key),
     count,
     pct: kpiPct(count, kpiMax.value.totalCount),
-    color: key === 'CONVERTED' ? '#31c48d' : '#f59e0b',
+    color: key === 'CONVERTED' ? '#31c48d' : key === 'APPROVED' ? '#16a34a' : '#f59e0b',
   }))
 })
 const approvalBreakdown = computed(() => {
