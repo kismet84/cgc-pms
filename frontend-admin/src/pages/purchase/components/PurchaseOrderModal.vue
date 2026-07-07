@@ -91,6 +91,7 @@ function handleCancel() {
           placeholder="请选择类型"
           allow-clear
         >
+          <a-select-option value="PURCHASE">采购订单</a-select-option>
           <a-select-option value="MATERIAL">材料采购</a-select-option>
           <a-select-option value="EQUIPMENT">设备采购</a-select-option>
           <a-select-option value="SERVICE">服务采购</a-select-option>

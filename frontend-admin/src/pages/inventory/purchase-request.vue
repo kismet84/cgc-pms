@@ -84,11 +84,13 @@ const keySeq = ref(0)
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
   APPROVED: '已通过',
+  REJECTED: '已驳回',
   CONVERTED: '已转PO',
 }
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',
   APPROVED: 'success',
+  REJECTED: 'error',
   CONVERTED: 'cyan',
 }
 const STATUS_DICT = 'purchase_request_status'

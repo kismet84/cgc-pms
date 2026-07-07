@@ -44,8 +44,11 @@ describe('PurchaseOrderPage submit-approval button', () => {
   })
 
   it('maps contract purchase order type to Chinese display text', () => {
+    expect(source).toMatch(/PURCHASE:\s*'采购订单'/)
     expect(source).toMatch(/CONTRACT:\s*'合同采购'/)
     expect(source).toMatch(/ORDER_TYPE_LABEL\[row\.orderType\]\s*\?\?\s*row\.orderType/)
+    expect(source).toMatch(/label:\s*ORDER_TYPE_LABEL\[key\]\s*\?\?\s*key/)
+    expect(modalSource).toContain('<a-select-option value="PURCHASE">采购订单</a-select-option>')
   })
 
   it('loads only approved performing purchase contracts on mount', () => {

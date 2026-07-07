@@ -91,12 +91,16 @@ let itemKeyCounter = 0
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
   APPROVING: '审批中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
   CONFIRMED: '已确认',
   COMPLETED: '已完成',
 }
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',
   APPROVING: 'processing',
+  APPROVED: 'success',
+  REJECTED: 'error',
   CONFIRMED: 'blue',
   COMPLETED: 'success',
 }

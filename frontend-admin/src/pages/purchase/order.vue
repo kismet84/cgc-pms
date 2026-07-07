@@ -112,6 +112,7 @@ const itemList = ref<(Partial<MatPurchaseOrderItemVO> & { key: number })[]>([])
 let itemKeyCounter = 0
 
 const ORDER_TYPE_LABEL: Record<string, string> = {
+  PURCHASE: '采购订单',
   CONTRACT: '合同采购',
   MATERIAL: '材料采购',
   EQUIPMENT: '设备采购',
@@ -119,6 +120,7 @@ const ORDER_TYPE_LABEL: Record<string, string> = {
   OTHER: '其他',
 }
 const ORDER_TYPE_COLOR: Record<string, string> = {
+  PURCHASE: 'blue',
   CONTRACT: 'blue',
   MATERIAL: 'blue',
   EQUIPMENT: 'cyan',
@@ -128,6 +130,9 @@ const ORDER_TYPE_COLOR: Record<string, string> = {
 const ORDER_STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
   APPROVING: '审批中',
+  APPROVED: '已审批',
+  PARTIAL: '部分入库',
+  IN_TRANSIT: '运输中',
   PERFORMING: '履行中',
   COMPLETED: '已完成',
   CANCELLED: '已取消',
@@ -135,6 +140,9 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
 const ORDER_STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',
   APPROVING: 'processing',
+  APPROVED: 'success',
+  PARTIAL: 'warning',
+  IN_TRANSIT: 'blue',
   PERFORMING: 'blue',
   COMPLETED: 'success',
   CANCELLED: 'error',

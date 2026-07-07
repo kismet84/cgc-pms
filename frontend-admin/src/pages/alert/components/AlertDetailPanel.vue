@@ -77,7 +77,7 @@ const statusRemarkModel = computed({
                 'default'
               "
             >
-              {{ String(activeRecord.processStatus ?? 'OPEN') }}
+              {{ getProcessStatusLabel(activeRecord) }}
             </a-tag>
           </div>
           <div class="alert-detail-item">
@@ -158,7 +158,7 @@ const statusRemarkModel = computed({
           <div v-for="item in subscriptionRows" :key="item.channel" class="alert-subscription-line">
             <span>{{ item.label }}</span>
             <a-switch :checked="item.enabled" disabled size="small" />
-            <span>{{ item.minSeverity }}</span>
+            <span>{{ formatSeverityText(item.minSeverity) }}</span>
           </div>
         </div>
       </section>

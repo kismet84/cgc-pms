@@ -26,6 +26,7 @@ defineProps<{
   getProjectName: (projectId: string | number) => string
   getAlertDomainLabel: (record: AlertLogVO) => string
   getAlertTagLabel: (record: AlertLogVO) => string
+  getProcessStatusLabel: (record: AlertLogVO) => string
   formatSeverityText: (value: string) => string
   formatDateTime: (value: unknown) => string
   getAlertMessageText: (value: unknown) => string
@@ -115,7 +116,7 @@ defineProps<{
             :color="ALERT_PROCESS_STATUS_COLOR[String(row.processStatus ?? 'OPEN')] ?? 'default'"
             class="alert-tag"
           >
-            {{ String(row.processStatus ?? 'OPEN') }}
+            {{ getProcessStatusLabel(row) }}
           </a-tag>
         </template>
         <template #isRead="{ row }">

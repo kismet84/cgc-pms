@@ -429,7 +429,7 @@ const kpiCards = computed(() => [
   {
     key: 'open',
     titleCn: '待处理',
-    titleEn: 'OPEN',
+    titleEn: '',
     value: kpi.value.open,
     hint: `较昨日 ${Math.max(kpi.value.high - kpi.value.today, 0)}`,
     icon: BellOutlined,
@@ -438,7 +438,7 @@ const kpiCards = computed(() => [
   {
     key: 'high',
     titleCn: '高危',
-    titleEn: 'HIGH',
+    titleEn: '',
     value: kpi.value.high,
     hint: `较昨日 ${Math.max(kpi.value.open - kpi.value.archived, 0)}`,
     icon: WarningOutlined,
@@ -456,7 +456,7 @@ const kpiCards = computed(() => [
   {
     key: 'archived',
     titleCn: '已归档',
-    titleEn: 'ARCHIVED',
+    titleEn: '',
     value: kpi.value.archived,
     hint: `总计 ${total.value}`,
     icon: InboxOutlined,
@@ -551,7 +551,7 @@ function formatDateTime(value: unknown): string {
 }
 
 function formatSeverityText(value: string) {
-  return value === 'HIGH' ? 'HIGH' : value === 'MEDIUM' ? 'MEDIUM' : 'LOW'
+  return value === 'HIGH' ? '高' : value === 'MEDIUM' ? '中' : value === 'LOW' ? '低' : value
 }
 
 function buildAlertBusinessPath(record: AlertLogVO): string {
@@ -777,6 +777,7 @@ onMounted(async () => {
           :get-project-name="getProjectName"
           :get-alert-domain-label="getAlertDomainLabel"
           :get-alert-tag-label="getAlertTagLabel"
+          :get-process-status-label="getProcessStatusLabel"
           :format-severity-text="formatSeverityText"
           :format-date-time="formatDateTime"
           :get-alert-message-text="getAlertMessageText"

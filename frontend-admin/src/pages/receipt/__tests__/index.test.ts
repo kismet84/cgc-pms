@@ -36,4 +36,9 @@ describe('ReceiptIndexPage submit-approval button', () => {
   it('wires 提交审批 button to handleSubmitApproval handler in index.vue', () => {
     expect(indexSource).toMatch(/handleSubmitApproval\(row\)/)
   })
+
+  it('maps ACCEPTED quality status to a Chinese label and tag color in useReceiptList', () => {
+    expect(useReceiptListSource).toMatch(/ACCEPTED:\s*'让步接收'/)
+    expect(useReceiptListSource).toMatch(/ACCEPTED:\s*'warning'/)
+  })
 })

@@ -8,12 +8,14 @@ import type { MatPurchaseOrderVO } from '@/types/purchase'
 import type { WarehouseVO } from '@/types/inventory'
 
 export const QUALITY_STATUS_LABEL: Record<string, string> = {
+  ACCEPTED: '让步接收',
   QUALIFIED: '合格',
   PARTIAL: '部分合格',
   UNQUALIFIED: '不合格',
   PENDING: '待检验',
 }
 export const QUALITY_STATUS_COLOR: Record<string, string> = {
+  ACCEPTED: 'warning',
   QUALIFIED: 'success',
   PARTIAL: 'warning',
   UNQUALIFIED: 'error',
