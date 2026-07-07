@@ -326,7 +326,7 @@ onUnmounted(() => {
     </div>
 
     <div class="lg-grid ct-content-grid">
-      <main class="ct-main-column">
+      <main class="lg-left ct-main-column">
         <section class="lg-kpi-strip ct-kpi-summary" aria-label="成本目标关键指标">
           <div class="ct-kpi-item">
             <span class="ct-kpi-icon is-total"><FileTextOutlined /></span>
@@ -580,7 +580,7 @@ onUnmounted(() => {
       </main>
 
       <aside class="lg-analysis-rail ct-analysis-rail" aria-label="成本目标辅助分析">
-        <div class="ct-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card ct-analysis-panel">
           <header class="ct-analysis-head">
             <div>
               <div class="ct-analysis-title">成本目标分析</div>
@@ -686,7 +686,6 @@ onUnmounted(() => {
   font-size: 13px;
 }
 .ct-page {
-  gap: 14px;
   background: var(--surface-subtle);
 }
 .ct-page-head {
@@ -713,15 +712,11 @@ onUnmounted(() => {
   gap: 8px;
 }
 .ct-content-grid {
-  align-items: stretch;
-  min-height: 0;
-  height: calc(100vh - 74px);
 }
 .ct-main-column {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 16px;
   min-height: 0;
   min-width: 0;
 }
@@ -731,7 +726,6 @@ onUnmounted(() => {
   gap: 0;
   margin-bottom: 0;
   overflow: hidden;
-  min-height: 84px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -820,19 +814,13 @@ onUnmounted(() => {
   background: var(--kpi-unpaid);
 }
 .ct-analysis-rail {
-  width: 336px;
   padding-top: 0;
 }
 .ct-analysis-panel {
   display: flex;
   flex-direction: column;
   gap: 0;
-  height: 100%;
   padding: 0 0 12px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 .ct-analysis-head {
   display: flex;
@@ -874,11 +862,6 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 12px;
   margin: 0;
-  min-height: 74px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 .ct-search-fields {
   display: flex;

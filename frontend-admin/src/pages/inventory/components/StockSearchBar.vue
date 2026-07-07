@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { reactive } from 'vue'
+import { SearchOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import type { WarehouseVO } from '@/types/inventory'
 import type { SelectOption } from '@/types/ui'
 
@@ -21,12 +22,28 @@ const emit = defineEmits<{
   search: []
   reset: []
 }>()
+
+const filterVisibility = reactive({
+  projectId: true,
+  warehouseId: true,
+  materialId: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'warehouseId', label: '仓库' },
+  { key: 'materialId', label: '物料' },
+] as const
+
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
+}
 </script>
 
 <template>
   <div class="lg-search-bar">
     <div class="stock-search-fields">
       <a-select
+        v-if="filterVisibility.projectId"
         :value="projectId"
         placeholder="全部项目"
         allow-clear
@@ -48,6 +65,7 @@ const emit = defineEmits<{
         </a-select-option>
       </a-select>
       <a-select
+        v-if="filterVisibility.warehouseId"
         :value="warehouseId"
         placeholder="全部仓库"
         allow-clear
@@ -69,6 +87,7 @@ const emit = defineEmits<{
         </a-select-option>
       </a-select>
       <a-select
+        v-if="filterVisibility.materialId"
         :value="materialId"
         placeholder="全部物料"
         allow-clear
@@ -107,6 +126,25 @@ const emit = defineEmits<{
           <template #icon><ReloadOutlined /></template>
           重置
         </a-button>
+        <a-dropdown trigger="click">
+          <a-button size="large">
+            <template #icon><SettingOutlined /></template>
+            筛选栏设置
+          </a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item
+                v-for="item in filterSettingItems"
+                :key="item.key"
+                @click="toggleFilterVisibility(item.key)"
+              >
+                <a-checkbox :checked="filterVisibility[item.key]">
+                  {{ item.label }}
+                </a-checkbox>
+              </a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
       </div>
     </div>
   </div>
@@ -115,11 +153,13 @@ const emit = defineEmits<{
 <style scoped>
 .lg-search-bar {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
+  justify-content: flex-start;
   gap: 12px;
-  padding: 16px;
-  border-left: 4px solid var(--primary-soft);
+  margin: 0;
+  height: auto;
 }
 
 .stock-search-fields,
@@ -127,22 +167,31 @@ const emit = defineEmits<{
 .stock-search-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   min-width: 0;
 }
 
+.stock-search-fields,
+.stock-search-keyword-row {
+  width: 100%;
+}
+
 .stock-search-keyword-row > :deep(.ant-input-affix-wrapper) {
-  min-width: 260px;
-  flex: 1 1 360px;
+  min-width: 320px;
+  flex: 1 1 320px;
 }
 
 .stock-search-fields > :deep(.ant-select) {
   min-width: 180px;
-  flex: 1 1 200px;
+  flex: 1 1 180px;
 }
 
 .stock-search-actions {
   flex: 0 0 auto;
+  flex-wrap: wrap;
+  margin-left: auto;
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
@@ -153,6 +202,15 @@ const emit = defineEmits<{
     display: flex;
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .stock-search-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .stock-search-actions :deep(.ant-btn) {
+    flex: 1;
   }
 }
 </style>

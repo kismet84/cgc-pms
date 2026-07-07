@@ -45,7 +45,7 @@ const pendingPct = computed(() => {
 </script>
 
 <template>
-  <div class="receipt-kpi-summary" aria-label="材料验收关键指标">
+  <div class="lg-kpi-strip receipt-kpi-summary" aria-label="材料验收关键指标">
     <div class="receipt-kpi-item">
       <span class="receipt-kpi-icon is-blue"><FileDoneOutlined /></span>
       <div>
@@ -93,8 +93,6 @@ const pendingPct = computed(() => {
 .receipt-kpi-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  height: 88px;
-  min-height: 88px;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;

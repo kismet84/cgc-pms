@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
-import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { onMounted, computed, reactive, ref } from 'vue'
+import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { getUserList } from '@/api/modules/user'
 import type { SysUserVO } from '@/types/user'
@@ -38,6 +38,16 @@ const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 
 const userList = ref<SysUserVO[]>([])
+const filterVisibility = reactive({
+  projectId: true,
+  warehouseId: true,
+  approvalStatus: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'warehouseId', label: '仓库' },
+  { key: 'approvalStatus', label: '审批状态' },
+] as const
 
 const {
   filter,
@@ -155,6 +165,10 @@ function statusPct(count: number) {
   return Math.round((count / base) * 100)
 }
 
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
+}
+
 async function fetchUsers() {
   try {
     const res = await getUserList({ pageNo: 1, pageSize: 200 })
@@ -178,30 +192,10 @@ onMounted(() => {
   <div class="lg-list-page lg-page app-page requisition-page">
     <div class="lg-page-head requisition-page-head">
       <div class="requisition-page-meta-row">
-        <div class="requisition-title-block">
-          <a-breadcrumb class="lg-breadcrumb">
-            <a-breadcrumb-item>库存管理</a-breadcrumb-item>
-            <a-breadcrumb-item>领料申请</a-breadcrumb-item>
-          </a-breadcrumb>
-          <div class="requisition-title-row">
-            <h1>领料申请台账</h1>
-            <span>项目领料、出库状态、审批进度与金额汇总。</span>
-          </div>
-        </div>
-        <div class="requisition-head-digest">
-          <div>
-            <span>领料金额</span>
-            <strong>{{ fmtAmount(kpiTotalAmount) }}万</strong>
-          </div>
-          <div>
-            <span>未出库</span>
-            <strong>{{ unstockedCount }}单</strong>
-          </div>
-          <div>
-            <span>待审批</span>
-            <strong>{{ pendingApprovalCount }}单</strong>
-          </div>
-        </div>
+        <a-breadcrumb class="lg-breadcrumb">
+          <a-breadcrumb-item>库存管理</a-breadcrumb-item>
+          <a-breadcrumb-item>领料申请</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
@@ -219,6 +213,7 @@ onMounted(() => {
         <div class="lg-search-bar requisition-search-bar">
           <div class="requisition-search-fields">
             <a-select
+              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
@@ -241,6 +236,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.warehouseId"
               v-model:value="filter.warehouseId"
               placeholder="全部仓库"
               allow-clear
@@ -252,6 +248,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.approvalStatus"
               v-model:value="filter.approvalStatus"
               placeholder="全部审批状态"
               allow-clear
@@ -274,11 +271,32 @@ onMounted(() => {
             >
               <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
             </a-input>
-            <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-            <a-button size="large" @click="handleReset">
-              <template #icon><ReloadOutlined /></template>
-              重置
-            </a-button>
+            <div class="requisition-search-actions">
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
           </div>
         </div>
 
@@ -289,6 +307,8 @@ onMounted(() => {
                 <strong>领料明细</strong>
                 <span>共 {{ total }} 条</span>
               </div>
+            </div>
+            <div class="lg-toolbar-right">
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -376,7 +396,7 @@ onMounted(() => {
       </div>
 
       <aside class="lg-analysis-rail requisition-analysis-rail" aria-label="领料申请辅助分析">
-        <div class="requisition-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card requisition-analysis-panel">
           <header class="requisition-analysis-head">
             <div>
               <div class="requisition-analysis-title">辅助分析</div>
@@ -471,97 +491,56 @@ onMounted(() => {
 <style scoped>
 .requisition-page {
   color: var(--text);
-  gap: 14px;
 }
 
 .requisition-page-head {
-  margin-bottom: 0;
-  padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .requisition-page-meta-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
   width: 100%;
   min-width: 0;
 }
 
 .lg-breadcrumb {
-  margin-bottom: 5px;
+  margin-bottom: 0;
   font-size: 13px;
-}
-
-.requisition-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.requisition-title-row h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 32px;
-}
-
-.requisition-title-row span {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.requisition-head-digest {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
-  gap: 10px;
-  min-width: 360px;
-}
-
-.requisition-head-digest > div {
-  padding: 10px 12px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.requisition-head-digest span {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.requisition-head-digest strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 22px;
 }
 
 .requisition-search-bar {
-  min-height: 74px;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
+  justify-content: flex-start;
   gap: 12px;
+  height: auto;
   align-items: stretch;
-  padding: 16px;
-  margin-bottom: 0;
-  border-left: 4px solid var(--primary-soft);
+  margin: 0;
 }
 
 .requisition-search-fields,
 .requisition-search-keyword-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.requisition-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
   min-width: 0;
 }
 
@@ -578,12 +557,28 @@ onMounted(() => {
 .requisition-main-column {
   min-width: 0;
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 16px;
+  min-height: 0;
+}
+
+.requisition-main-column > .requisition-search-bar {
+  flex: 0 0 auto;
+  align-self: auto;
 }
 
 .requisition-table-panel {
-  min-height: 754px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .requisition-table-title {
@@ -603,19 +598,26 @@ onMounted(() => {
   color: var(--text-secondary);
 }
 
+.requisition-table-panel > .lg-toolbar {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.requisition-table-panel .lg-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
 .requisition-analysis-rail {
-  width: 336px;
+  display: flex;
+  min-height: 0;
 }
 
 .requisition-analysis-panel {
-  height: auto;
-  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   box-sizing: border-box;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  overflow: hidden;
+  overflow: auto;
 }
 
 .requisition-analysis-head {
@@ -782,18 +784,13 @@ onMounted(() => {
   font-size: 13px;
 }
 
-@media (max-width: 1280px) {
-  .requisition-page-meta-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .requisition-head-digest {
+@media (max-width: 1200px) {
+  .requisition-analysis-rail {
     width: 100%;
-    min-width: 0;
-    grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 768px) {
   .requisition-search-bar {
     align-items: stretch;
   }
@@ -804,8 +801,28 @@ onMounted(() => {
     align-items: stretch;
   }
 
-  .requisition-analysis-rail {
+  .requisition-search-actions {
     width: 100%;
+    margin-left: 0;
+  }
+
+  .requisition-search-actions :deep(.ant-btn) {
+    flex: 1;
+  }
+}
+
+@media (min-width: 769px) {
+  .requisition-search-keyword-row {
+    flex-wrap: nowrap;
+  }
+
+  .requisition-search-keyword-row > :deep(.ant-input-affix-wrapper) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .requisition-search-actions {
+    flex-wrap: nowrap;
   }
 }
 </style>

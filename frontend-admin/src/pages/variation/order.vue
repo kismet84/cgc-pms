@@ -510,7 +510,7 @@ onUnmounted(() => {
 
     <div class="lg-grid vo-workspace">
       <div class="lg-left vo-main-column">
-        <div class="vo-kpi-summary" aria-label="变更签证关键指标">
+        <div class="lg-kpi-strip vo-kpi-summary" aria-label="变更签证关键指标">
           <div class="vo-kpi-item">
             <span class="vo-kpi-icon is-total"><FileTextOutlined /></span>
             <span class="vo-kpi-label">签证总数</span>
@@ -762,7 +762,7 @@ onUnmounted(() => {
       </div>
 
       <aside class="lg-analysis-rail vo-analysis-rail" aria-label="变更签证辅助分析">
-        <div class="vo-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card vo-analysis-panel">
           <header class="vo-analysis-head">
             <div>
               <div class="vo-analysis-title">签证分析</div>
@@ -1001,7 +1001,6 @@ onUnmounted(() => {
 
 <style scoped>
 .variation-page {
-  gap: 14px;
   background: var(--surface-subtle);
 }
 
@@ -1029,11 +1028,6 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 12px;
   margin: 0;
-  min-height: 74px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 
 .vo-query-primary {
@@ -1074,16 +1068,12 @@ onUnmounted(() => {
 }
 
 .vo-workspace {
-  align-items: stretch;
-  min-height: 0;
-  height: calc(100vh - 74px);
 }
 
 .vo-main-column {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
   min-height: 0;
 }
 
@@ -1093,7 +1083,6 @@ onUnmounted(() => {
   gap: 0;
   margin-bottom: 0;
   overflow: hidden;
-  min-height: 84px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1289,20 +1278,13 @@ onUnmounted(() => {
 }
 
 .vo-analysis-rail {
-  width: 336px;
-  min-height: 0;
 }
 
 .vo-analysis-panel {
   display: flex;
   flex-direction: column;
   gap: 0;
-  height: 100%;
   padding: 0 0 12px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 
 .vo-analysis-head,

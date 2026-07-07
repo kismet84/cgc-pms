@@ -684,7 +684,7 @@ const {
           </div>
         </section>
 
-        <section class="project-query-panel" aria-label="项目查询条件">
+        <section class="lg-search-bar project-query-panel" aria-label="项目查询条件">
           <div class="project-filter-grid">
             <div v-if="filterVisibility.projectType" class="project-filter-item">
               <label>项目类型</label>
@@ -693,6 +693,7 @@ const {
                 placeholder="全部类型"
                 allow-clear
                 class="project-search-select"
+                size="large"
                 @change="handleSearch"
               >
                 <a-select-option v-for="item in PROJECT_TYPE_OPTIONS" :key="item" :value="item">
@@ -707,6 +708,7 @@ const {
                 placeholder="全部状态"
                 allow-clear
                 class="project-search-select"
+                size="large"
                 @change="handleSearch"
               >
                 <a-select-option v-for="item in PROJECT_STATUS_OPTIONS" :key="item" :value="item">
@@ -722,19 +724,20 @@ const {
                 placeholder="搜索项目编号、名称、类型、建设单位"
                 allow-clear
                 class="project-search-input"
+                size="large"
                 @press-enter="handleSearch"
               >
                 <template #prefix><SearchOutlined class="project-search-icon" /></template>
               </a-input>
             </div>
             <div class="project-search-actions">
-              <a-button type="primary" @click="handleSearch">搜索</a-button>
-              <a-button @click="handleReset">
+              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
+              <a-button size="large" @click="handleReset">
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
               <a-dropdown trigger="click">
-                <a-button>
+                <a-button size="large">
                   <template #icon><SettingOutlined /></template>
                   筛选栏设置
                 </a-button>
@@ -928,7 +931,7 @@ const {
       </div>
 
       <aside class="lg-analysis-rail project-analysis-rail" aria-label="项目辅助分析">
-        <div class="project-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card project-analysis-panel">
           <header class="project-analysis-head">
             <div>
               <div class="project-analysis-title">辅助分析</div>
@@ -1017,9 +1020,6 @@ const {
 
 <style scoped>
 .project-list-page {
-  --project-panel-gap: 12px;
-  --project-summary-height: 108px;
-  gap: 14px;
   background: var(--surface-subtle);
 }
 
@@ -1043,34 +1043,28 @@ const {
 }
 
 .project-query-panel {
-  display: flex;
-  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: wrap;
+  width: 100%;
   margin: 0;
-  min-height: var(--project-summary-height);
-  padding: 14px 18px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 
 .project-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 220px));
-  column-gap: var(--project-panel-gap);
-  row-gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1 0 100%;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
 }
 
 .project-filter-item {
+  flex: 1 1 180px;
   min-width: 0;
 }
 
 .project-filter-item label {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  display: none;
 }
 
 .project-filter-item :deep(.ant-select),
@@ -1088,13 +1082,17 @@ const {
 
 .project-filter-foot {
   display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 0;
+  width: 100%;
+  min-width: 0;
 }
 
 .project-filter-item-keyword {
-  flex: 1 1 auto;
+  flex: 1 1 320px;
 }
 
 .project-search-input {
@@ -1110,17 +1108,12 @@ const {
 }
 
 .project-workspace {
-  align-items: stretch;
-  min-height: 0;
-  height: calc(100vh - 74px);
-  min-height: 720px;
 }
 
 .project-main-column {
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: var(--project-panel-gap);
   min-height: 0;
 }
 
@@ -1130,7 +1123,6 @@ const {
   gap: 0;
   margin-bottom: 0;
   overflow: hidden;
-  min-height: var(--project-summary-height);
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1338,10 +1330,6 @@ const {
 }
 
 .project-analysis-rail {
-  display: flex;
-  width: 360px;
-  align-self: stretch;
-  min-height: 0;
 }
 
 .project-analysis-panel {
@@ -1349,14 +1337,8 @@ const {
   flex: 1;
   flex-direction: column;
   gap: 0;
-  min-height: 100%;
-  max-height: 100%;
   padding: 0 0 12px;
   overflow: auto;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
   position: sticky;
   top: 0;
 }

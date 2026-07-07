@@ -9,6 +9,7 @@ import {
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SettingOutlined,
   SearchOutlined,
   ShoppingCartOutlined,
   WalletOutlined,
@@ -51,6 +52,20 @@ const filter = reactive({
   keyword: '',
   orderCode: '',
 })
+const filterVisibility = reactive({
+  projectId: true,
+  contractId: true,
+  partnerId: true,
+  orderType: true,
+  orderStatus: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'contractId', label: '合同' },
+  { key: 'partnerId', label: '供应商' },
+  { key: 'orderType', label: '订单类型' },
+  { key: 'orderStatus', label: '订单状态' },
+] as const
 
 const loading = ref(false)
 const tableData = ref<MatPurchaseOrderVO[]>([])
@@ -215,6 +230,10 @@ function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
   fetchData()
+}
+
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
 }
 
 function handleAdd() {
@@ -557,30 +576,10 @@ onMounted(() => {
   <div class="lg-list-page lg-page app-page purchase-order-page">
     <div class="lg-page-head purchase-order-page-head">
       <div class="purchase-order-page-meta-row">
-        <div>
-          <a-breadcrumb class="purchase-order-breadcrumb">
-            <a-breadcrumb-item>采购管理</a-breadcrumb-item>
-            <a-breadcrumb-item>采购订单</a-breadcrumb-item>
-          </a-breadcrumb>
-          <div class="purchase-order-page-title-row">
-            <h1>采购订单履约台账</h1>
-            <span>供应商、到货节奏、未验收金额集中跟踪</span>
-          </div>
-        </div>
-        <div class="purchase-order-head-digest">
-          <div>
-            <span>供应商筛选</span>
-            <strong>{{ supplierList.length }}家</strong>
-          </div>
-          <div>
-            <span>未验收金额</span>
-            <strong>{{ fmtWan(kpiUnreceived) }}万</strong>
-          </div>
-          <div>
-            <span>待处理订单</span>
-            <strong>{{ pendingOrders.length }}项</strong>
-          </div>
-        </div>
+        <a-breadcrumb class="purchase-order-breadcrumb">
+          <a-breadcrumb-item>采购管理</a-breadcrumb-item>
+          <a-breadcrumb-item>采购订单</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
@@ -588,41 +587,51 @@ onMounted(() => {
       <div class="lg-left">
         <!-- KPI 横条 -->
         <div class="lg-kpi-strip purchase-order-kpi-summary" aria-label="采购订单关键指标">
-          <div class="lg-kpi-card purchase-order-kpi-item">
+          <div class="purchase-order-kpi-item">
             <span class="purchase-order-kpi-icon is-total"><ShoppingCartOutlined /></span>
-            <span class="purchase-order-kpi-label">采购订单数</span>
-            <span class="purchase-order-kpi-value">{{ kpiOrderTotal }} <small>单</small></span>
+            <span class="purchase-order-kpi-content">
+              <span class="purchase-order-kpi-label">采购订单数</span>
+              <span class="purchase-order-kpi-value">{{ kpiOrderTotal }} <small>单</small></span>
+            </span>
           </div>
-          <div class="lg-kpi-card purchase-order-kpi-item is-wide">
+          <div class="purchase-order-kpi-item is-wide">
             <span class="purchase-order-kpi-icon is-amount"><DollarOutlined /></span>
-            <span class="purchase-order-kpi-label">已下单金额</span>
-            <span class="purchase-order-kpi-value"
-              >{{ fmtWan(kpiOrderedAmount) }} <small>万元</small></span
-            >
+            <span class="purchase-order-kpi-content">
+              <span class="purchase-order-kpi-label">已下单金额</span>
+              <span class="purchase-order-kpi-value"
+                >{{ fmtWan(kpiOrderedAmount) }} <small>万元</small></span
+              >
+            </span>
           </div>
-          <div class="lg-kpi-card purchase-order-kpi-item is-progress">
+          <div class="purchase-order-kpi-item is-progress">
             <span class="purchase-order-kpi-icon is-pending"><ClockCircleOutlined /></span>
-            <span class="purchase-order-kpi-label">待审批</span>
-            <span class="purchase-order-kpi-value">{{ kpiOrderPending }} <small>单</small></span>
-            <span class="purchase-order-kpi-progress">
-              <span :style="{ width: kpiPct(kpiOrderPending, kpiMax.totalCount) + '%' }"></span>
+            <span class="purchase-order-kpi-content">
+              <span class="purchase-order-kpi-label">待审批</span>
+              <span class="purchase-order-kpi-value">{{ kpiOrderPending }} <small>单</small></span>
+              <span class="purchase-order-kpi-progress">
+                <span :style="{ width: kpiPct(kpiOrderPending, kpiMax.totalCount) + '%' }"></span>
+              </span>
             </span>
           </div>
-          <div class="lg-kpi-card purchase-order-kpi-item is-progress is-unreceived">
+          <div class="purchase-order-kpi-item is-progress is-unreceived">
             <span class="purchase-order-kpi-icon is-unreceived"><WalletOutlined /></span>
-            <span class="purchase-order-kpi-label">未入库金额</span>
-            <span class="purchase-order-kpi-value"
-              >{{ fmtWan(kpiUnreceived) }} <small>万元</small></span
-            >
-            <span class="purchase-order-kpi-progress">
-              <span :style="{ width: kpiPct(kpiUnreceived, kpiMax.totalAmount) + '%' }"></span>
+            <span class="purchase-order-kpi-content">
+              <span class="purchase-order-kpi-label">未入库金额</span>
+              <span class="purchase-order-kpi-value"
+                >{{ fmtWan(kpiUnreceived) }} <small>万元</small></span
+              >
+              <span class="purchase-order-kpi-progress">
+                <span :style="{ width: kpiPct(kpiUnreceived, kpiMax.totalAmount) + '%' }"></span>
+              </span>
             </span>
           </div>
-          <div class="lg-kpi-card purchase-order-kpi-item">
+          <div class="purchase-order-kpi-item">
             <span class="purchase-order-kpi-icon is-done"><FileDoneOutlined /></span>
-            <span class="purchase-order-kpi-label">已完成订单</span>
-            <span class="purchase-order-kpi-value">
-              {{ tableData.filter((r) => r.orderStatus === ORDER_STATUS_COMPLETED).length }} <small>单</small>
+            <span class="purchase-order-kpi-content">
+              <span class="purchase-order-kpi-label">已完成订单</span>
+              <span class="purchase-order-kpi-value">
+                {{ tableData.filter((r) => r.orderStatus === ORDER_STATUS_COMPLETED).length }} <small>单</small>
+              </span>
             </span>
           </div>
         </div>
@@ -630,6 +639,7 @@ onMounted(() => {
         <div class="lg-search-bar purchase-order-search-bar">
           <div class="purchase-order-search-fields">
             <a-select
+              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               class="purchase-order-search-select"
               placeholder="全部项目"
@@ -642,6 +652,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.contractId"
               v-model:value="filter.contractId"
               class="purchase-order-search-select"
               placeholder="全部合同"
@@ -659,6 +670,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.partnerId"
               v-model:value="filter.partnerId"
               class="purchase-order-search-select"
               placeholder="全部供应商"
@@ -676,6 +688,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.orderType"
               v-model:value="filter.orderType"
               class="purchase-order-search-select is-compact"
               placeholder="类型"
@@ -688,6 +701,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.orderStatus"
               v-model:value="filter.orderStatus"
               class="purchase-order-search-select is-compact"
               placeholder="状态"
@@ -717,6 +731,25 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </div>
           </div>
         </div>
@@ -729,6 +762,8 @@ onMounted(() => {
                 <span class="purchase-order-table-title">采购订单明细</span>
                 <span class="purchase-order-table-count">共 {{ total }} 条</span>
               </div>
+            </div>
+            <div class="lg-toolbar-right">
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -821,7 +856,7 @@ onMounted(() => {
 
       <!-- 右侧分析面板 -->
       <aside class="lg-analysis-rail purchase-order-analysis-rail" aria-label="采购订单辅助分析">
-        <div class="purchase-order-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card purchase-order-analysis-panel">
           <header class="purchase-order-analysis-head">
             <div>
               <div class="purchase-order-analysis-title">辅助分析</div>
@@ -1095,108 +1130,61 @@ onMounted(() => {
 
 <style scoped>
 .purchase-order-page {
-  gap: 14px;
 }
 
 .purchase-order-page-head {
-  align-items: center;
-  justify-content: space-between;
   min-height: 0;
-  padding: 18px 20px;
-  background: #fff;
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .purchase-order-page-meta-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
   width: 100%;
   min-width: 0;
 }
 
 .purchase-order-breadcrumb {
-  margin-bottom: 6px;
+  margin-bottom: 0;
   font-size: 13px;
   line-height: 20px;
-}
-
-.purchase-order-page-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  min-width: 0;
-}
-
-.purchase-order-page-title-row h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 32px;
-}
-
-.purchase-order-page-title-row span,
-.purchase-order-head-digest span {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.purchase-order-head-digest {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
-  gap: 10px;
-  min-width: 360px;
-}
-
-.purchase-order-head-digest > div {
-  padding: 10px 12px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.purchase-order-head-digest strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 22px;
 }
 
 .purchase-order-search-bar {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
+  justify-content: flex-start;
   gap: 12px;
-  min-height: 0;
-  padding: 16px;
-  border-left: 4px solid var(--primary-soft);
+  margin: 0;
 }
 
 .purchase-order-search-fields {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   min-width: 0;
+  width: 100%;
 }
 
 .purchase-order-search-keyword-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   min-width: 0;
+  width: 100%;
 }
 
 .purchase-order-search-input {
-  flex: 1 1 auto;
+  flex: 1 1 320px;
   min-width: 320px;
 }
 
@@ -1205,56 +1193,65 @@ onMounted(() => {
 }
 
 .purchase-order-search-select {
-  width: 180px;
-  flex: 0 0 180px;
+  width: 100%;
+  min-width: 180px;
+  flex: 1 1 180px;
 }
 
 .purchase-order-search-select.is-compact {
-  width: 150px;
-  flex-basis: 150px;
+  min-width: 150px;
 }
 
 .purchase-order-search-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  margin-left: auto;
+  min-width: 0;
 }
 
 .purchase-order-workspace {
-  align-items: stretch;
+}
+
+.purchase-order-page .lg-left {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-height: 0;
 }
 
-.purchase-order-kpi-summary {
+.purchase-order-page .purchase-order-kpi-summary {
   display: grid;
-  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
+  margin: 0;
   overflow: hidden;
-  min-height: 84px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 }
 
+.purchase-order-page .lg-left > .purchase-order-search-bar,
 .purchase-order-page .lg-left > .purchase-order-kpi-summary {
-  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  flex: 0 0 auto;
+  align-self: auto;
 }
 
-.purchase-order-kpi-item {
-  position: relative;
+.purchase-order-page .purchase-order-kpi-item {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-rows: 19px 27px 8px;
-  column-gap: 10px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  column-gap: 6px;
   align-items: center;
   min-width: 0;
-  padding: 16px 18px;
-  border-right: 1px solid var(--border-subtle);
+  padding: 16px 12px;
+  border-right: 1px solid #edf1f5;
 }
 
-.purchase-order-kpi-item:last-child {
+.purchase-order-page .purchase-order-kpi-item:last-child {
   border-right: 0;
 }
 
@@ -1262,12 +1259,25 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
   color: var(--primary);
   background: var(--primary-soft);
   border-radius: var(--radius-sm);
-  grid-row: 1 / span 2;
+}
+
+.purchase-order-kpi-content {
+  display: grid;
+  grid-template-rows: 18px 28px 4px;
+  align-content: center;
+  row-gap: 4px;
+  min-width: 0;
+}
+
+.purchase-order-kpi-item:not(.is-progress) .purchase-order-kpi-content::after {
+  content: '';
+  display: block;
 }
 
 .purchase-order-kpi-icon.is-amount {
@@ -1291,27 +1301,33 @@ onMounted(() => {
 }
 
 .purchase-order-kpi-label {
-  overflow: hidden;
+  display: block;
+  min-width: 0;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .purchase-order-kpi-value {
-  overflow: hidden;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
   color: var(--text);
   font-size: 24px;
+  font-variant-numeric: tabular-nums;
   font-weight: 800;
   line-height: 28px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.purchase-order-page .purchase-order-kpi-item.is-wide .purchase-order-kpi-value,
+.purchase-order-page .purchase-order-kpi-item.is-unreceived .purchase-order-kpi-value {
+  font-size: 22px;
 }
 
 .purchase-order-kpi-value small {
-  margin-left: 4px;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
@@ -1320,10 +1336,10 @@ onMounted(() => {
 .purchase-order-kpi-progress {
   display: block;
   overflow: hidden;
+  width: 100%;
   height: 4px;
   background: var(--surface-subtle);
   border-radius: var(--radius-sm);
-  grid-column: 2;
 }
 
 .purchase-order-kpi-progress > span {
@@ -1338,14 +1354,22 @@ onMounted(() => {
 }
 
 .purchase-order-table-panel {
-  min-height: 754px;
-  border-top: 3px solid var(--primary);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .purchase-order-toolbar {
   align-items: center;
-  min-height: 58px;
-  background: linear-gradient(180deg, #fff, var(--surface-subtle));
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .purchase-order-table-heading {
@@ -1365,20 +1389,23 @@ onMounted(() => {
   font-size: 12px;
 }
 
+.purchase-order-table-panel .lg-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
 .purchase-order-analysis-rail {
-  width: 336px;
+  display: flex;
+  min-height: 0;
 }
 
 .purchase-order-analysis-panel {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 14px;
-  height: 100%;
+  overflow: auto;
   padding: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 
 .purchase-order-analysis-focus {
@@ -1461,16 +1488,20 @@ onMounted(() => {
 }
 
 @media (max-width: 1200px) {
-  .purchase-order-kpi-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .purchase-order-page .purchase-order-kpi-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .purchase-order-page .lg-left > .purchase-order-kpi-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .purchase-order-page .purchase-order-kpi-item {
+    border-bottom: 1px solid #edf1f5;
   }
 
-  .purchase-order-kpi-item {
-    border-bottom: 1px solid var(--border-subtle);
+  .purchase-order-page .purchase-order-kpi-summary > .purchase-order-kpi-item:nth-child(3n) {
+    border-right: 0;
+  }
+
+  .purchase-order-page .purchase-order-kpi-summary > .purchase-order-kpi-item:nth-last-child(-n + 2) {
+    border-bottom: 0;
   }
 
   .purchase-order-analysis-rail {
@@ -1479,7 +1510,20 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .purchase-order-page-meta-row,
+  .purchase-order-page .purchase-order-kpi-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .purchase-order-page .purchase-order-kpi-item {
+    min-height: 88px;
+    border-right: 0;
+    border-bottom: 1px solid #edf1f5;
+  }
+
+  .purchase-order-page .purchase-order-kpi-summary > .purchase-order-kpi-item:last-child {
+    border-bottom: 0;
+  }
+
   .purchase-order-search-bar,
   .purchase-order-search-fields,
   .purchase-order-search-keyword-row {
@@ -1487,14 +1531,9 @@ onMounted(() => {
     flex-direction: column;
   }
 
-  .purchase-order-page-subtitle {
-    white-space: normal;
-  }
-
-  .purchase-order-head-digest {
+  .purchase-order-search-actions {
     width: 100%;
-    min-width: 0;
-    grid-template-columns: 1fr;
+    margin-left: 0;
   }
 
   .purchase-order-search-input,
@@ -1503,6 +1542,10 @@ onMounted(() => {
     width: 100%;
     min-width: 0;
     flex-basis: auto;
+  }
+
+  .purchase-order-search-actions :deep(.ant-btn) {
+    flex: 1;
   }
 }
 </style>

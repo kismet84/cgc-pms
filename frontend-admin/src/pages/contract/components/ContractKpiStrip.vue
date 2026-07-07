@@ -58,7 +58,7 @@ const mobileItems = computed(() => [
 
 <template>
   <!-- KPI 桌面/平板 -->
-  <div v-if="!isMobile" class="cl-kpi-summary" aria-label="合同关键指标">
+  <div v-if="!isMobile" class="lg-kpi-strip cl-kpi-summary" aria-label="合同关键指标">
     <div class="cl-kpi-item">
       <span class="cl-kpi-icon is-total"><FileTextOutlined /></span>
       <span class="cl-kpi-label">合同总数</span>
@@ -116,7 +116,6 @@ const mobileItems = computed(() => [
   grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
   gap: 0;
   overflow: hidden;
-  min-height: 84px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);

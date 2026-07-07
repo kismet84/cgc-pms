@@ -1,6 +1,6 @@
 # 前端 Docker 与 UI 测试规则
 
-适用范围：`frontend-admin` 页面重构、UI 对齐、交互修复、Playwright 验收。
+适用范围：`frontend-admin` 页面重构、UI 对齐、交互修复、Codex 内置浏览器验收和 Playwright 回归。
 
 ## 基准环境
 
@@ -10,9 +10,9 @@
 
 ## 默认视口
 
-- 桌面端 UI 验收默认窗口尺寸：`1920x1080`。
-- Playwright 截图、DOM 验收、桌面端交互检查默认使用 `1920x1080`。
-- 只有用户明确指定其他尺寸时，才切换视口。
+- Codex 内置浏览器桌面端默认验收口径：Docker 前端 + Codex 内置浏览器，缩放比例 `67%`，实测 viewport 约 `1714x964`。
+- 严格 `1920x1080` 仅用于外部 Playwright/Chrome 验收，或用户明确要求严格桌面尺寸的场景；不作为 Codex 内置浏览器默认验收尺寸。
+- 若浏览器缩放、窗口大小或宿主窗口状态发生变化，先读取并记录 `window.innerWidth` / `window.innerHeight`，再按实际尺寸验收。
 
 ## 前端改动后的服务刷新
 
@@ -39,9 +39,11 @@ VITE v6.x.x ready
 Local: http://localhost:5173/
 ```
 
-## Playwright 验收规则
+## UI 验收规则
 
-- UI 验收优先使用 Playwright，不依赖内置浏览器截图。
+- UI 视觉验收默认使用 Codex 内置浏览器，运行态以 Docker 前端 `http://localhost:5173/` 为准。
+- Playwright 用于 E2E、自动化回归、DOM 批量断言或用户明确要求的场景。
+- 需要严格对齐尺寸时，先记录当前 `window.innerWidth` / `window.innerHeight`；仅在外部 Playwright/Chrome 或用户明确要求时使用严格 `1920x1080`。
 - 默认登录账号：`admin / admin123`。
 - 避免滥用 `networkidle`，部分页面存在持续请求，可能导致等待超时。
 - 推荐使用：
@@ -56,9 +58,9 @@ Local: http://localhost:5173/
 → 重启 Docker frontend
 → 等待 `180秒`
 → 查看日志确认 Vite ready
-→ Playwright 以 1920x1080 登录
+→ Codex 内置浏览器打开目标页面
 → 打开目标页面
-→ 验证 DOM、截图和关键交互
+→ 验证视觉、DOM 尺寸和关键交互
 ```
 
 ## 常见误判排查
@@ -67,7 +69,7 @@ Local: http://localhost:5173/
 
 - Docker 前端服务是否已经重启。
 - 是否等待了 `180秒`。
-- 浏览器或 Playwright 是否访问 `http://localhost:5173/`。
+- Codex 内置浏览器是否访问 `http://localhost:5173/`。
 - 是否命中隐藏文本、旧 DOM 或多个同名元素。
 - Playwright strict mode 是否因为多个匹配元素而点击失败。
 - 当前页面是否仍由缓存、旧标签页或未刷新状态展示。

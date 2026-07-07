@@ -350,7 +350,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cl-redesign-page {
-  gap: 14px;
   background: var(--surface-subtle);
 }
 
@@ -378,11 +377,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   flex-direction: column;
   gap: 12px;
   margin: 0;
-  min-height: 74px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 
 .cl-query-primary {
@@ -425,16 +419,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cl-workspace {
-  align-items: stretch;
-  min-height: 0;
-  height: calc(100vh - 74px);
 }
 
 .cl-main-column {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
   min-height: 0;
 }
 

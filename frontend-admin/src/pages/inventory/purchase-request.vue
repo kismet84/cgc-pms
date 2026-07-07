@@ -10,6 +10,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  SettingOutlined,
   ShoppingCartOutlined,
   WalletOutlined,
 } from '@ant-design/icons-vue'
@@ -49,6 +50,16 @@ const filter = reactive({
   requestCode: '',
   keyword: '',
 })
+const filterVisibility = reactive({
+  projectId: true,
+  approvalStatus: true,
+  status: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'approvalStatus', label: '审批状态' },
+  { key: 'status', label: '业务状态' },
+] as const
 
 const loading = ref(false)
 const tableData = ref<PurchaseRequestVO[]>([])
@@ -122,14 +133,14 @@ const filterOption = (input: string, option: { label?: string }) =>
   option.label?.toLowerCase().includes(input.toLowerCase())
 
 const gridColumns = computed(() => [
-  { field: 'requestCode', title: '申请编号', minWidth: 150, slots: { default: 'requestCode' } },
-  { field: 'projectName', title: '所属项目', minWidth: 150, ellipsis: true },
-  { field: 'contractName', title: '关联合同', minWidth: 150, ellipsis: true },
-  { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
-  { field: 'status', title: '业务状态', width: 108, slots: { default: 'status' } },
-  { field: 'createdBy', title: '创建人', width: 90 },
-  { field: 'createdTime', title: '创建时间', width: 140 },
-  { title: '操作', width: 76, slots: { default: 'ops' } },
+  { field: 'requestCode', title: '申请编号', minWidth: 120, slots: { default: 'requestCode' } },
+  { field: 'projectName', title: '所属项目', minWidth: 112, ellipsis: true },
+  { field: 'contractName', title: '关联合同', minWidth: 124, ellipsis: true },
+  { field: 'approvalStatus', title: '审批状态', width: 88, slots: { default: 'approvalStatus' } },
+  { field: 'status', title: '业务状态', width: 88, slots: { default: 'status' } },
+  { field: 'createdBy', title: '创建人', width: 76 },
+  { field: 'createdTime', title: '创建时间', width: 116 },
+  { title: '操作', width: 56, slots: { default: 'ops' } },
 ])
 
 const {
@@ -462,6 +473,10 @@ function getPopupContainer() {
   return document.body
 }
 
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
+}
+
 const kpiReqTotal = computed(() => tableData.value.length)
 const kpiReqPending = computed(
   () =>
@@ -539,52 +554,62 @@ onMounted(() => {
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>采购申请</a-breadcrumb-item>
         </a-breadcrumb>
-        <span class="purchase-request-page-subtitle">按项目跟踪采购申请、审批状态与转单进度。</span>
       </div>
     </div>
 
     <div class="lg-grid purchase-request-workspace">
       <div class="lg-left">
         <!-- KPI 横条 -->
-        <div class="purchase-request-kpi-summary" aria-label="采购申请关键指标">
+        <div class="lg-kpi-strip purchase-request-kpi-summary" aria-label="采购申请关键指标">
           <div class="purchase-request-kpi-item">
             <span class="purchase-request-kpi-icon is-total"><ShoppingCartOutlined /></span>
-            <span class="purchase-request-kpi-label">申请总数</span>
-            <span class="purchase-request-kpi-value">{{ kpiReqTotal }} <small>单</small></span>
+            <span class="purchase-request-kpi-content">
+              <span class="purchase-request-kpi-label">申请总数</span>
+              <span class="purchase-request-kpi-value">{{ kpiReqTotal }} <small>单</small></span>
+            </span>
           </div>
           <div class="purchase-request-kpi-item is-wide">
             <span class="purchase-request-kpi-icon is-draft"><FileDoneOutlined /></span>
-            <span class="purchase-request-kpi-label">草稿申请</span>
-            <span class="purchase-request-kpi-value">{{ kpiReqDraft }} <small>单</small></span>
+            <span class="purchase-request-kpi-content">
+              <span class="purchase-request-kpi-label">草稿申请</span>
+              <span class="purchase-request-kpi-value">{{ kpiReqDraft }} <small>单</small></span>
+            </span>
           </div>
           <div class="purchase-request-kpi-item is-progress">
             <span class="purchase-request-kpi-icon is-pending"><ClockCircleOutlined /></span>
-            <span class="purchase-request-kpi-label">待审批</span>
-            <span class="purchase-request-kpi-value">{{ kpiReqPending }} <small>单</small></span>
-            <span class="purchase-request-kpi-progress">
-              <span :style="{ width: kpiPct(kpiReqPending, kpiMax.totalCount) + '%' }"></span>
+            <span class="purchase-request-kpi-content">
+              <span class="purchase-request-kpi-label">待审批</span>
+              <span class="purchase-request-kpi-value">{{ kpiReqPending }} <small>单</small></span>
+              <span class="purchase-request-kpi-progress">
+                <span :style="{ width: kpiPct(kpiReqPending, kpiMax.totalCount) + '%' }"></span>
+              </span>
             </span>
           </div>
           <div class="purchase-request-kpi-item is-progress is-converted">
             <span class="purchase-request-kpi-icon is-converted"><CheckCircleOutlined /></span>
-            <span class="purchase-request-kpi-label">已转PO</span>
-            <span class="purchase-request-kpi-value">{{ kpiReqConverted }} <small>单</small></span>
-            <span class="purchase-request-kpi-progress">
-              <span :style="{ width: kpiPct(kpiReqConverted, kpiMax.totalCount) + '%' }"></span>
+            <span class="purchase-request-kpi-content">
+              <span class="purchase-request-kpi-label">已转PO</span>
+              <span class="purchase-request-kpi-value">{{ kpiReqConverted }} <small>单</small></span>
+              <span class="purchase-request-kpi-progress">
+                <span :style="{ width: kpiPct(kpiReqConverted, kpiMax.totalCount) + '%' }"></span>
+              </span>
             </span>
           </div>
           <div class="purchase-request-kpi-item">
             <span class="purchase-request-kpi-icon is-recent"><WalletOutlined /></span>
-            <span class="purchase-request-kpi-label">近期申请</span>
-            <span class="purchase-request-kpi-value"
-              >{{ recentRequests.length }} <small>单</small></span
-            >
+            <span class="purchase-request-kpi-content">
+              <span class="purchase-request-kpi-label">近期申请</span>
+              <span class="purchase-request-kpi-value"
+                >{{ recentRequests.length }} <small>单</small></span
+              >
+            </span>
           </div>
         </div>
 
         <div class="lg-search-bar purchase-request-search-bar">
           <div class="purchase-request-search-fields">
             <a-select
+              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               class="purchase-request-search-select"
               placeholder="全部项目"
@@ -597,6 +622,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.approvalStatus"
               v-model:value="filter.approvalStatus"
               class="purchase-request-search-select is-compact"
               placeholder="审批状态"
@@ -610,6 +636,7 @@ onMounted(() => {
               <a-select-option value="REJECTED">已驳回</a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.status"
               v-model:value="filter.status"
               class="purchase-request-search-select is-compact"
               placeholder="业务状态"
@@ -640,6 +667,25 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </div>
           </div>
         </div>
@@ -650,6 +696,8 @@ onMounted(() => {
             <div class="lg-toolbar-left">
               <span class="purchase-request-table-title">采购申请</span>
               <span class="purchase-request-table-count">共 {{ total }} 条</span>
+            </div>
+            <div class="lg-toolbar-right">
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -672,7 +720,9 @@ onMounted(() => {
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
-              :column-config="{ resizable: true }"
+              :column-config="{ resizable: true, useKey: true }"
+              show-overflow="title"
+              show-header-overflow="title"
               stripe
               border="inner"
               size="small"
@@ -727,7 +777,7 @@ onMounted(() => {
       </div>
 
       <aside class="lg-analysis-rail purchase-request-analysis-rail" aria-label="采购申请辅助分析">
-        <div class="purchase-request-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card purchase-request-analysis-panel">
           <header class="purchase-request-analysis-head">
             <div>
               <div class="purchase-request-analysis-title">申请分析</div>
@@ -948,19 +998,14 @@ onMounted(() => {
 
 <style scoped>
 .purchase-request-page {
-  gap: 14px;
+  background: var(--surface-subtle);
 }
 
 .purchase-request-page-head {
   align-items: center;
   justify-content: space-between;
   min-height: 0;
-  padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  padding: 0;
 }
 
 .purchase-request-page-meta-row {
@@ -975,75 +1020,82 @@ onMounted(() => {
   line-height: 20px;
 }
 
-.purchase-request-page-subtitle {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
 .purchase-request-search-bar {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
-  min-height: 74px;
-  padding: 16px;
-  border-left: 4px solid var(--primary-soft);
+  margin: 0;
 }
 
 .purchase-request-search-fields {
   display: flex;
-  flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   min-width: 0;
+  width: 100%;
 }
 
 .purchase-request-search-keyword-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   min-width: 0;
+  width: 100%;
 }
 
-.purchase-request-search-input {
-  flex: 1 1 auto;
+.purchase-request-search-keyword-row > :deep(.ant-input-affix-wrapper) {
   min-width: 320px;
+  flex: 1 1 320px;
 }
 
 .purchase-request-search-prefix-icon {
   color: var(--text-secondary);
 }
 
+.purchase-request-search-fields > :deep(.ant-select) {
+  min-width: 150px;
+  flex: 1 1 180px;
+}
+
 .purchase-request-search-select {
-  width: 180px;
-  flex: 0 0 180px;
+  width: 100%;
 }
 
 .purchase-request-search-select.is-compact {
-  width: 150px;
-  flex-basis: 150px;
+  min-width: 150px;
 }
 
 .purchase-request-search-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  margin-left: auto;
+  min-width: 0;
 }
 
 .purchase-request-workspace {
-  align-items: stretch;
+}
+
+.purchase-request-page .lg-left {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-height: 0;
 }
 
 .purchase-request-kpi-summary {
   display: grid;
-  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
+  margin: 0;
   overflow: hidden;
-  min-height: 84px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1054,11 +1106,10 @@ onMounted(() => {
   position: relative;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-rows: 19px 27px 8px;
   column-gap: 10px;
   align-items: center;
   min-width: 0;
-  padding: 16px 18px;
+  padding: 16px;
   border-right: 1px solid var(--border-subtle);
 }
 
@@ -1075,7 +1126,17 @@ onMounted(() => {
   color: var(--primary);
   background: var(--primary-soft);
   border-radius: var(--radius-sm);
-  grid-row: 1 / span 2;
+}
+
+.purchase-request-kpi-content {
+  display: grid;
+  grid-template-rows: auto auto;
+  row-gap: 4px;
+  min-width: 0;
+}
+
+.purchase-request-kpi-item.is-progress .purchase-request-kpi-content {
+  grid-template-rows: auto auto auto;
 }
 
 .purchase-request-kpi-icon.is-draft {
@@ -1095,22 +1156,22 @@ onMounted(() => {
 }
 
 .purchase-request-kpi-label {
-  overflow: hidden;
+  display: block;
+  min-width: 0;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 17px;
 }
 
 .purchase-request-kpi-value {
-  overflow: hidden;
+  display: block;
+  min-width: 0;
   color: var(--text);
-  font-size: 24px;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
   font-weight: 800;
-  line-height: 28px;
-  text-overflow: ellipsis;
+  line-height: 26px;
   white-space: nowrap;
 }
 
@@ -1124,10 +1185,10 @@ onMounted(() => {
 .purchase-request-kpi-progress {
   display: block;
   overflow: hidden;
+  width: 100%;
   height: 4px;
   background: var(--surface-subtle);
   border-radius: var(--radius-sm);
-  grid-column: 2;
 }
 
 .purchase-request-kpi-progress > span {
@@ -1142,41 +1203,70 @@ onMounted(() => {
 }
 
 .purchase-request-table-panel {
-  min-height: 754px;
-  border-top: 3px solid var(--primary);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .purchase-request-toolbar {
-  align-items: center;
-  min-height: 58px;
-  background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .purchase-request-table-title {
   color: var(--text);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .purchase-request-table-count {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
+}
+
+.purchase-request-table-panel .lg-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.purchase-request-code-link {
+  max-width: 100%;
+  padding: 0;
+}
+
+.purchase-request-code-link :deep(span) {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.purchase-request-table-panel .lg-pagination {
+  border-top: 1px solid var(--border-subtle);
 }
 
 .purchase-request-analysis-rail {
-  width: 336px;
+  display: flex;
+  min-height: 0;
 }
 
 .purchase-request-analysis-panel {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 14px;
-  height: 100%;
-  padding: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  gap: 0;
+  padding: 0 0 12px;
+  overflow: auto;
+  position: sticky;
+  top: 0;
 }
 
 .purchase-request-analysis-head,
@@ -1189,23 +1279,33 @@ onMounted(() => {
 
 .purchase-request-analysis-title {
   color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 22px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
 }
 
 .purchase-request-analysis-subtitle,
 .purchase-request-warning-count {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
+}
+
+.purchase-request-analysis-head {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .purchase-request-analysis-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
-  padding-top: 16px;
+  padding: 10px 16px 0;
+}
+
+.purchase-request-analysis-section + .purchase-request-analysis-section {
+  margin-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -1268,7 +1368,7 @@ onMounted(() => {
 
 @media (max-width: 1200px) {
   .purchase-request-kpi-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .purchase-request-kpi-item {
@@ -1281,6 +1381,10 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .purchase-request-kpi-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .purchase-request-page-meta-row,
   .purchase-request-search-bar,
   .purchase-request-search-fields,
@@ -1289,16 +1393,25 @@ onMounted(() => {
     flex-direction: column;
   }
 
-  .purchase-request-page-subtitle {
-    white-space: normal;
-  }
-
   .purchase-request-search-input,
   .purchase-request-search-select,
   .purchase-request-search-select.is-compact {
     width: 100%;
     min-width: 0;
     flex-basis: auto;
+  }
+
+  .purchase-request-search-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .purchase-request-search-actions :deep(.ant-btn) {
+    flex: 1;
+  }
+
+  .purchase-request-analysis-panel {
+    position: static;
   }
 }
 </style>

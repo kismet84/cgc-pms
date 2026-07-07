@@ -12,7 +12,7 @@ defineProps<{
 
 <template>
   <!-- KPI 横条：桌面 -->
-  <div v-if="!isMobile" class="stock-kpi-summary" aria-label="库存关键指标">
+  <div v-if="!isMobile" class="lg-kpi-strip stock-kpi-summary" aria-label="库存关键指标">
     <div class="stock-kpi-item">
       <span class="stock-kpi-icon is-blue"><InboxOutlined /></span>
       <span class="stock-kpi-label">仓库数量</span>
@@ -106,8 +106,6 @@ defineProps<{
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
   overflow: hidden;
-  height: 88px;
-  min-height: 88px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -118,10 +116,10 @@ defineProps<{
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
   grid-template-rows: 20px 30px 8px;
-  column-gap: 10px;
+  column-gap: 8px;
   align-content: center;
   min-width: 0;
-  padding: 16px 18px;
+  padding: 16px 14px;
   border-right: 1px solid var(--border-subtle);
 }
 

@@ -82,10 +82,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>库存台账</a-breadcrumb-item>
         </a-breadcrumb>
-        <div class="stock-page-title">库存台账</div>
-        <span class="stock-page-subtitle"
-          >按仓库和物料核对库存余额，追踪出入库流水与低库存风险</span
-        >
       </div>
     </div>
 
@@ -113,7 +109,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         />
 
         <!-- Stock Balance Card -->
-        <div v-if="stock" class="lg-panel" style="margin-bottom: 12px">
+        <div v-if="stock" class="lg-panel stock-balance-panel">
           <div
             style="display: flex; gap: 40px; align-items: center; flex-wrap: wrap; padding: 4px 0"
           >
@@ -147,6 +143,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             <div class="lg-toolbar-left">
               <span class="stock-table-title">出入库流水</span>
               <span class="stock-table-count">共 {{ txnTotal }} 条</span>
+            </div>
+            <div class="lg-toolbar-right">
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
@@ -157,8 +155,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 <template #icon><ReloadOutlined /></template>
                 刷新
               </a-button>
-            </div>
-            <div class="lg-toolbar-right">
             </div>
           </div>
 
@@ -271,22 +267,17 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
 <style scoped>
 .stock-page-head {
-  align-items: center;
-  justify-content: space-between;
   min-height: 0;
-  margin-bottom: 0;
-  padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .stock-page-meta-row {
   display: flex;
   align-items: center;
-  gap: 5em;
   min-width: 0;
 }
 
@@ -295,35 +286,42 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   line-height: 20px;
 }
 
-.stock-page-title {
-  color: var(--text);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 30px;
-}
-
-.stock-page-subtitle {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
 .stock-search-bar {
-  min-height: 74px;
+  flex: 0 0 auto;
+  align-self: auto;
+  justify-content: flex-start;
+  height: auto;
+  margin: 0;
+  min-height: 0;
 }
 
-.stock-page .lg-grid {
-  margin-top: 14px;
+.stock-page .lg-left {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.stock-balance-panel {
+  margin: 0;
 }
 
 .stock-page .lg-list-table-panel {
-  border-top: 3px solid var(--primary);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .stock-page .lg-list-table-panel > .lg-toolbar {
-  min-height: 58px;
-  background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .stock-table-title {
@@ -337,15 +335,26 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   font-size: 13px;
 }
 
+.stock-page .lg-list-table-panel .lg-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.stock-page :deep(.lg-analysis-rail) {
+  align-self: stretch;
+  min-height: 0;
+}
+
+.stock-page :deep(.stock-analysis-panel) {
+  overflow: auto;
+}
+
 @media (max-width: 900px) {
   .stock-page-meta-row {
     align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
   }
+}
 
-  .stock-page-subtitle {
-    white-space: normal;
-  }
+@media (min-width: 769px) {
 }
 </style>

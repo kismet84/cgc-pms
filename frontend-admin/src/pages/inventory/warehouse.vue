@@ -10,6 +10,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons-vue'
 import {
@@ -30,6 +31,14 @@ const filter = reactive({
   warehouseName: '',
   status: undefined as string | undefined,
 })
+const filterVisibility = reactive({
+  projectId: true,
+  status: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'status', label: '状态' },
+] as const
 
 const loading = ref(false)
 const tableData = ref<WarehouseVO[]>([])
@@ -123,6 +132,10 @@ function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
   fetchData()
+}
+
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
 }
 
 function handleAdd() {
@@ -244,16 +257,13 @@ onMounted(() => {
           <a-breadcrumb-item>库存管理</a-breadcrumb-item>
           <a-breadcrumb-item>仓库</a-breadcrumb-item>
         </a-breadcrumb>
-        <span class="warehouse-page-subtitle"
-          >维护项目仓库基础信息，控制启停状态并支撑库存台账筛选</span
-        >
       </div>
     </div>
 
     <div class="lg-grid">
       <div class="lg-left">
         <!-- KPI strip -->
-        <div class="warehouse-kpi-summary" aria-label="仓库关键指标">
+        <div class="lg-kpi-strip warehouse-kpi-summary" aria-label="仓库关键指标">
           <div class="warehouse-kpi-item">
             <span class="warehouse-kpi-icon is-blue"><DatabaseOutlined /></span>
             <span class="warehouse-kpi-label">仓库总数</span>
@@ -284,6 +294,7 @@ onMounted(() => {
         <div class="lg-search-bar warehouse-search-bar">
           <div class="warehouse-search-fields">
             <a-select
+              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
@@ -295,6 +306,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.status"
               v-model:value="filter.status"
               placeholder="全部状态"
               allow-clear
@@ -321,6 +333,25 @@ onMounted(() => {
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
             </div>
           </div>
         </div>
@@ -331,6 +362,8 @@ onMounted(() => {
             <div class="lg-toolbar-left">
               <span class="warehouse-table-title">仓库列表</span>
               <span class="warehouse-table-count">共 {{ total }} 条</span>
+            </div>
+            <div class="lg-toolbar-right">
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
@@ -397,7 +430,7 @@ onMounted(() => {
       </div>
 
       <aside class="lg-analysis-rail warehouse-analysis-rail" aria-label="仓库辅助分析">
-        <div class="warehouse-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card warehouse-analysis-panel">
           <header class="warehouse-analysis-head">
             <div>
               <div class="warehouse-analysis-title">仓库分析</div>
@@ -496,22 +529,17 @@ onMounted(() => {
 
 <style scoped>
 .warehouse-page-head {
-  align-items: center;
-  justify-content: space-between;
   min-height: 0;
-  margin-bottom: 0;
-  padding: 18px 20px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .warehouse-page-meta-row {
   display: flex;
   align-items: center;
-  gap: 5em;
   min-width: 0;
 }
 
@@ -520,21 +548,15 @@ onMounted(() => {
   line-height: 20px;
 }
 
-.warehouse-page-subtitle {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
 .warehouse-search-bar {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
+  justify-content: flex-start;
   gap: 12px;
-  min-height: 74px;
-  padding: 16px;
-  border-left: 4px solid var(--primary-soft);
+  height: auto;
+  margin: 0;
 }
 
 .warehouse-search-fields,
@@ -542,35 +564,52 @@ onMounted(() => {
 .warehouse-search-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   min-width: 0;
 }
 
+.warehouse-search-fields,
+.warehouse-search-keyword-row {
+  width: 100%;
+}
+
 .warehouse-search-keyword-row > :deep(.ant-input-affix-wrapper) {
   min-width: 320px;
-  flex: 1 1 auto;
+  flex: 1 1 320px;
 }
 
 .warehouse-search-fields > :deep(.ant-select) {
-  min-width: 160px;
-  flex: 1 1 190px;
+  min-width: 180px;
+  flex: 1 1 180px;
 }
 
 .warehouse-search-actions {
   flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 0;
 }
 
-.warehouse-page .lg-grid {
-  margin-top: 14px;
+.warehouse-page .lg-left {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.warehouse-page .lg-left > .warehouse-kpi-summary,
+.warehouse-page .lg-left > .warehouse-search-bar {
+  flex: 0 0 auto;
+  align-self: auto;
 }
 
 .warehouse-kpi-summary {
   display: grid;
+  flex: 0 0 auto;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0;
+  margin: 0;
   overflow: hidden;
-  height: 88px;
-  min-height: 88px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -578,12 +617,21 @@ onMounted(() => {
 }
 
 .warehouse-page .lg-list-table-panel {
-  border-top: 3px solid var(--primary);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .warehouse-page .lg-list-table-panel > .lg-toolbar {
-  min-height: 58px;
-  background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .warehouse-kpi-item {
@@ -662,22 +710,24 @@ onMounted(() => {
   font-weight: 800;
 }
 
+.warehouse-page .lg-list-table-panel .lg-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
 .warehouse-analysis-rail {
-  width: 336px;
+  display: flex;
+  min-height: 0;
 }
 
 .warehouse-analysis-panel {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 18px;
-  height: 856px;
-  min-height: 856px;
   box-sizing: border-box;
   padding: 18px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  overflow: auto;
 }
 
 .warehouse-analysis-title {
@@ -706,11 +756,24 @@ onMounted(() => {
 @media (max-width: 900px) {
   .warehouse-search-bar,
   .warehouse-search-fields,
+  .warehouse-search-keyword-row,
   .warehouse-search-actions {
     display: flex;
     align-items: stretch;
     flex-direction: column;
   }
+
+  .warehouse-search-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .warehouse-search-actions :deep(.ant-btn) {
+    flex: 1;
+  }
+}
+
+@media (min-width: 769px) {
 }
 
 .warehouse-section-title {

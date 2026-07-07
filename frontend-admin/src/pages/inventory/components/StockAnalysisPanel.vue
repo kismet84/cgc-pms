@@ -10,7 +10,7 @@ defineProps<{
 
 <template>
   <aside class="lg-analysis-rail stock-analysis-rail" aria-label="库存辅助分析">
-    <div class="stock-analysis-panel">
+    <div class="lg-analysis-panel lg-fill-card stock-analysis-panel">
       <header class="stock-analysis-head">
         <div>
           <div class="stock-analysis-title">库存分析</div>
@@ -106,21 +106,14 @@ defineProps<{
 
 <style scoped>
 .stock-analysis-rail {
-  width: 336px;
 }
 
 .stock-analysis-panel {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  height: 856px;
-  min-height: 856px;
   box-sizing: border-box;
   padding: 18px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 
 .stock-analysis-title {

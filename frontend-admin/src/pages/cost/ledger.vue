@@ -771,7 +771,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
 
       <aside class="lg-analysis-rail cost-ledger-analysis-rail" aria-label="成本辅助分析">
-        <div class="cost-ledger-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card cost-ledger-analysis-panel">
           <header class="cost-ledger-analysis-head">
             <div>
               <div class="cost-ledger-analysis-title">成本分析</div>
@@ -910,7 +910,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
 <style scoped>
 .cost-ledger-page {
-  gap: 14px;
   background: var(--surface-subtle);
 }
 
@@ -946,11 +945,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   flex-direction: column;
   gap: 12px;
   margin: 0;
-  min-height: 74px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 
 .cost-ledger-query-primary {
@@ -997,16 +991,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cost-ledger-grid {
-  align-items: stretch;
-  min-height: 0;
-  height: calc(100vh - 74px);
 }
 
 .cost-ledger-main {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
   min-height: 0;
 }
 
@@ -1127,7 +1117,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   gap: 0;
   margin-bottom: 0;
   overflow: hidden;
-  min-height: 84px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -1230,8 +1219,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 }
 
 .cost-ledger-analysis-rail {
-  width: 336px;
-  min-height: 0;
 }
 
 .cost-ledger-analysis-panel {
@@ -1239,12 +1226,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
   flex-direction: column;
   gap: 0;
   min-height: 0;
-  height: 100%;
   padding: 0 0 12px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
 }
 
 .cost-ledger-detail-drawer :deep(.ant-drawer-body) {

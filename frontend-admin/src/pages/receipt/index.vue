@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
-import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { onMounted, computed, reactive } from 'vue'
+import {
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  SettingOutlined,
+} from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import type { SelectOption } from '@/types/ui'
 
@@ -21,6 +27,17 @@ const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 const partnerList = computed(() => referenceStore.partners ?? [])
 
+const filterVisibility = reactive({
+  projectId: true,
+  orderId: true,
+  qualityStatus: true,
+})
+const filterSettingItems = [
+  { key: 'projectId', label: '项目' },
+  { key: 'orderId', label: '订单' },
+  { key: 'qualityStatus', label: '质量状态' },
+] as const
+
 const {
   filter,
   loading,
@@ -35,7 +52,6 @@ const {
   kpiQualifiedCount,
   kpiUnqualifiedCount,
   fetchData,
-  fetchWarehouses,
   handleSearch,
   handleReset,
   handlePageChange,
@@ -114,6 +130,10 @@ function statusPct(status: string) {
   return Math.round((count / base) * 100)
 }
 
+function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
+  filterVisibility[key] = !filterVisibility[key]
+}
+
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({ contractType: 'PURCHASE' })
@@ -126,34 +146,14 @@ onMounted(() => {
   <div class="lg-list-page lg-page app-page receipt-page">
     <div class="lg-page-head receipt-page-head">
       <div class="receipt-page-meta-row">
-        <div class="receipt-title-block">
-          <a-breadcrumb class="lg-breadcrumb">
-            <a-breadcrumb-item>采购管理</a-breadcrumb-item>
-            <a-breadcrumb-item>材料验收</a-breadcrumb-item>
-          </a-breadcrumb>
-          <div class="receipt-title-row">
-            <h1>材料验收台账</h1>
-            <span>验收结果、订单关联、质量风险集中核对</span>
-          </div>
-        </div>
-        <div class="receipt-head-digest">
-          <div>
-            <span>验收金额</span>
-            <strong>{{ fmtAmount(kpiTotalAmount) }}万</strong>
-          </div>
-          <div>
-            <span>合格批次</span>
-            <strong>{{ kpiQualifiedCount }}单</strong>
-          </div>
-          <div>
-            <span>异常批次</span>
-            <strong>{{ kpiUnqualifiedCount }}单</strong>
-          </div>
-        </div>
+        <a-breadcrumb class="receipt-breadcrumb">
+          <a-breadcrumb-item>采购管理</a-breadcrumb-item>
+          <a-breadcrumb-item>材料验收</a-breadcrumb-item>
+        </a-breadcrumb>
       </div>
     </div>
 
-    <div class="lg-grid">
+    <div class="lg-grid receipt-workspace">
       <div class="lg-left receipt-main-column">
         <ReceiptKpiStrip
           :total-count="kpiTotalCount"
@@ -166,6 +166,7 @@ onMounted(() => {
         <div class="lg-search-bar receipt-search-bar">
           <div class="receipt-search-fields">
             <a-select
+              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
@@ -188,6 +189,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.orderId"
               v-model:value="filter.orderId"
               placeholder="全部订单"
               allow-clear
@@ -204,6 +206,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
+              v-if="filterVisibility.qualityStatus"
               v-model:value="filter.qualityStatus"
               placeholder="全部质量状态"
               allow-clear
@@ -226,11 +229,32 @@ onMounted(() => {
             >
               <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
             </a-input>
-            <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-            <a-button size="large" @click="handleReset">
-              <template #icon><ReloadOutlined /></template>
-              重置
-            </a-button>
+            <div class="receipt-search-actions">
+              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+              <a-dropdown trigger="click">
+                <a-button size="large">
+                  <template #icon><SettingOutlined /></template>
+                  筛选栏设置
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item
+                      v-for="item in filterSettingItems"
+                      :key="item.key"
+                      @click="toggleFilterVisibility(item.key)"
+                    >
+                      <a-checkbox :checked="filterVisibility[item.key]">
+                        {{ item.label }}
+                      </a-checkbox>
+                    </a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
           </div>
         </div>
 
@@ -328,7 +352,7 @@ onMounted(() => {
       </div>
 
       <aside class="lg-analysis-rail receipt-analysis-rail" aria-label="材料验收辅助分析">
-        <div class="receipt-analysis-panel">
+        <div class="lg-analysis-panel lg-fill-card receipt-analysis-panel">
           <header class="receipt-analysis-head">
             <div>
               <div class="receipt-analysis-title">辅助分析</div>
@@ -413,125 +437,114 @@ onMounted(() => {
 <style scoped>
 .receipt-page {
   color: #0f172a;
-  gap: 14px;
+  background: var(--surface-subtle);
 }
 
 .receipt-page-head {
-  margin-bottom: 0;
-  padding: 18px 20px;
-  background: #fff;
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.receipt-workspace {
+}
+
+.receipt-page .lg-left {
+  flex: 1;
+}
+
+.receipt-main-column {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .receipt-page-meta-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  gap: 5em;
   width: 100%;
   min-width: 0;
 }
 
-.lg-breadcrumb {
-  margin-bottom: 5px;
-  font-size: 13px;
-}
-
-.receipt-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.receipt-title-row h1 {
-  margin: 0;
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.receipt-title-row span {
-  font-size: 13px;
-  color: #64748b;
-}
-
-.receipt-head-digest {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
-  gap: 10px;
-  min-width: 360px;
-}
-
-.receipt-head-digest > div {
-  padding: 10px 12px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.receipt-head-digest span {
-  color: var(--text-secondary);
+.receipt-breadcrumb {
+  margin-bottom: 0;
   font-size: 13px;
   line-height: 20px;
 }
 
-.receipt-head-digest strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 22px;
-}
-
 .receipt-search-bar {
-  min-height: 74px;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 12px;
   align-items: stretch;
-  padding: 16px;
-  margin-bottom: 0;
-  border-left: 4px solid var(--primary-soft);
+  margin: 0;
 }
 
 .receipt-search-fields,
 .receipt-search-keyword-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.receipt-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
   min-width: 0;
 }
 
 .receipt-search-fields > :deep(.ant-select) {
   flex: 1 1 180px;
-  min-width: 170px;
+  min-width: 180px;
 }
 
 .receipt-search-keyword-row > :deep(.ant-input-affix-wrapper) {
-  flex: 1 1 auto;
-  min-width: 240px;
-}
-
-.receipt-main-column {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  flex: 1 1 320px;
+  min-width: 320px;
 }
 
 .receipt-table-panel {
-  min-height: 754px;
-  border-top: 3px solid var(--primary);
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
 }
 
 .receipt-table-panel > .lg-toolbar {
   min-height: 58px;
-  background: linear-gradient(180deg, #fff, var(--surface-subtle));
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.receipt-table-panel > .lg-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.receipt-table-panel > .lg-pagination {
+  border-top: 1px solid var(--border-subtle);
 }
 
 .receipt-table-title {
@@ -552,40 +565,19 @@ onMounted(() => {
 }
 
 .receipt-analysis-rail {
-  width: 336px;
+  display: flex;
+  min-height: 0;
 }
 
 .receipt-analysis-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   height: auto;
-  min-height: 0;
   box-sizing: border-box;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
-  overflow: hidden;
-}
-
-.receipt-analysis-focus {
-  display: grid;
-  gap: 4px;
-  padding: 14px 18px;
-  background: var(--error-soft);
-  border-bottom: 1px solid rgba(239, 68, 68, 0.18);
-}
-
-.receipt-analysis-focus span,
-.receipt-analysis-focus em {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.receipt-analysis-focus strong {
-  color: var(--error);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 30px;
+  overflow: auto;
+  position: sticky;
+  top: 0;
 }
 
 .receipt-analysis-head {
@@ -609,6 +601,28 @@ onMounted(() => {
   color: #64748b;
   font-size: 12px;
   line-height: 18px;
+}
+
+.receipt-analysis-focus {
+  display: grid;
+  gap: 4px;
+  padding: 14px 18px;
+  background: var(--error-soft);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.18);
+}
+
+.receipt-analysis-focus span,
+.receipt-analysis-focus em {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.receipt-analysis-focus strong {
+  color: var(--error);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 30px;
 }
 
 .receipt-analysis-section {
@@ -737,29 +751,28 @@ onMounted(() => {
 }
 
 @media (max-width: 1280px) {
-  .receipt-page-meta-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .receipt-head-digest {
-    width: 100%;
-    min-width: 0;
-    grid-template-columns: 1fr;
-  }
-
-  .receipt-search-bar {
-    align-items: stretch;
+  .receipt-workspace {
+    height: auto;
   }
 
   .receipt-search-fields,
-  .receipt-search-keyword-row {
+  .receipt-search-keyword-row,
+  .receipt-search-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .receipt-search-actions {
+    width: 100%;
+    margin-left: 0;
   }
 
   .receipt-analysis-rail {
     width: 100%;
+  }
+
+  .receipt-analysis-panel {
+    position: static;
   }
 }
 </style>

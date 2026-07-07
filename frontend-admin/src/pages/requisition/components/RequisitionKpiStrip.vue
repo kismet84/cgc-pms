@@ -29,7 +29,7 @@ function percent(value: number) {
 </script>
 
 <template>
-  <div class="requisition-kpi-summary" aria-label="领料申请关键指标">
+  <div class="lg-kpi-strip requisition-kpi-summary" aria-label="领料申请关键指标">
     <div class="requisition-kpi-item">
       <span class="requisition-kpi-icon is-blue"><FileDoneOutlined /></span>
       <div>
@@ -77,8 +77,6 @@ function percent(value: number) {
 .requisition-kpi-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  height: 88px;
-  min-height: 88px;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;

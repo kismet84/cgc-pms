@@ -19,7 +19,7 @@ describe('ContractAnalysisPanel UI consistency', () => {
     expect(source).toContain('class="cl-analysis-panel"')
     expect(source).toContain('class="cl-analysis-section"')
     expect(source).toContain('class="cl-warning-head"')
-    expect(source).toContain('width: 336px')
+    expect(source).toContain('class="lg-analysis-panel lg-fill-card cl-analysis-panel"')
     expect(source).toContain('border: 1px solid var(--border-subtle)')
   })
 })

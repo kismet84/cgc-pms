@@ -7,6 +7,7 @@ import {
   FileSearchOutlined,
   LinkOutlined,
   ReloadOutlined,
+  SearchOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
 import { getCostSummary, refreshCostSummary } from '@/api/modules/cost'
@@ -31,6 +32,7 @@ const router = useRouter()
 
 const projectList = ref<ProjectVO[]>([])
 const selectedProjectId = ref<string | undefined>(undefined)
+const keyword = ref('')
 const loading = ref(false)
 const summary = ref<CostSummaryVO | null>(null)
 
@@ -141,6 +143,18 @@ function go(path: string) {
   router.push(path)
 }
 
+function handleSearch() {
+  if (selectedProjectId.value && !summary.value) {
+    fetchSummary()
+  }
+}
+
+function handleReset() {
+  selectedProjectId.value = undefined
+  keyword.value = ''
+  summary.value = null
+}
+
 const selectedProject = computed(() =>
   projectList.value.find((project) => project.id === selectedProjectId.value),
 )
@@ -148,6 +162,13 @@ const selectedProject = computed(() =>
 const summarySubjects = computed(() =>
   summary.value ? normalizeArray<CostSubjectSummary>(summary.value.subjects) : [],
 )
+const filteredSummarySubjects = computed(() => {
+  const value = keyword.value.trim().toLowerCase()
+  if (!value) return summarySubjects.value
+  return summarySubjects.value.filter((item) =>
+    `${item.costSubjectName ?? ''}`.toLowerCase().includes(value),
+  )
+})
 
 const overBudgetItems = computed(() =>
   summarySubjects.value
@@ -308,106 +329,136 @@ onUnmounted(() => {
 
     <div class="lg-grid cost-summary-grid">
       <div class="lg-left cost-summary-main">
-        <template v-if="summary">
-          <section class="cost-reconcile-overview">
-            <div class="cost-reconcile-project">
-              <span class="cost-reconcile-project-label">当前项目</span>
-              <strong>{{ summary.projectName || selectedProject?.projectName || '-' }}</strong>
-              <span>科目维度核对 · 金额单位：万元</span>
-            </div>
-            <div class="cost-reconcile-badges">
-              <a-tag color="blue">成本目标</a-tag>
-              <a-tag color="cyan">合同锁定</a-tag>
-              <a-tag color="green">实际成本</a-tag>
-              <a-tag color="orange">付款进度</a-tag>
-            </div>
-          </section>
-
-          <div class="lg-kpi-strip cost-reconcile-kpis">
-            <div class="lg-kpi-card">
-              <span class="cost-summary-kpi-icon is-target"><FileSearchOutlined /></span>
-              <span class="lg-kpi-card-label">成本目标</span>
-              <span class="lg-kpi-card-value">
-                {{ fmtAmount(summary.targetCost) }} <small>万元</small>
-              </span>
-            </div>
-            <div class="lg-kpi-card">
-              <span class="cost-summary-kpi-icon is-locked"><LinkOutlined /></span>
-              <span class="lg-kpi-card-label">合同锁定成本</span>
-              <span class="lg-kpi-card-value">
-                {{ fmtAmount(summary.contractLockedCost) }} <small>万元</small>
-              </span>
-            </div>
-            <div class="lg-kpi-card">
-              <span class="cost-summary-kpi-icon is-actual"><CheckCircleOutlined /></span>
-              <span class="lg-kpi-card-label">实际成本</span>
-              <span class="lg-kpi-card-value">
-                {{ fmtAmount(summary.actualCost) }} <small>万元</small>
-              </span>
-            </div>
-            <div class="lg-kpi-card">
-              <span class="cost-summary-kpi-icon is-dynamic"><ReloadOutlined /></span>
-              <span class="lg-kpi-card-label">动态成本</span>
-              <span class="lg-kpi-card-value">
-                {{ fmtAmount(summary.dynamicCost) }} <small>万元</small>
-              </span>
-            </div>
-            <div class="lg-kpi-card is-warn">
-              <span class="cost-summary-kpi-icon is-risk"><WarningOutlined /></span>
-              <span class="lg-kpi-card-label">成本偏差</span>
-              <span
-                class="lg-kpi-card-value"
-                :class="`is-${getDeviationTone(summary.costDeviation)}`"
-              >
-                {{ fmtDeviation(summary.costDeviation) }} <small>万元</small>
-              </span>
-            </div>
+        <div class="lg-kpi-strip cost-reconcile-kpis">
+          <div class="lg-kpi-card">
+            <span class="cost-summary-kpi-icon is-target"><FileSearchOutlined /></span>
+            <span class="lg-kpi-card-label">成本目标</span>
+            <span class="lg-kpi-card-value">
+              {{ summary ? fmtAmount(summary.targetCost) : '--' }}
+              <small v-if="summary">万元</small>
+            </span>
           </div>
-        </template>
+          <div class="lg-kpi-card">
+            <span class="cost-summary-kpi-icon is-locked"><LinkOutlined /></span>
+            <span class="lg-kpi-card-label">合同锁定成本</span>
+            <span class="lg-kpi-card-value">
+              {{ summary ? fmtAmount(summary.contractLockedCost) : '--' }}
+              <small v-if="summary">万元</small>
+            </span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="cost-summary-kpi-icon is-actual"><CheckCircleOutlined /></span>
+            <span class="lg-kpi-card-label">实际成本</span>
+            <span class="lg-kpi-card-value">
+              {{ summary ? fmtAmount(summary.actualCost) : '--' }}
+              <small v-if="summary">万元</small>
+            </span>
+          </div>
+          <div class="lg-kpi-card">
+            <span class="cost-summary-kpi-icon is-dynamic"><ReloadOutlined /></span>
+            <span class="lg-kpi-card-label">动态成本</span>
+            <span class="lg-kpi-card-value">
+              {{ summary ? fmtAmount(summary.dynamicCost) : '--' }}
+              <small v-if="summary">万元</small>
+            </span>
+          </div>
+          <div class="lg-kpi-card is-warn">
+            <span class="cost-summary-kpi-icon is-risk"><WarningOutlined /></span>
+            <span class="lg-kpi-card-label">成本偏差</span>
+            <span
+              class="lg-kpi-card-value"
+              :class="summary ? `is-${getDeviationTone(summary.costDeviation)}` : ''"
+            >
+              {{ summary ? fmtDeviation(summary.costDeviation) : '--' }}
+              <small v-if="summary">万元</small>
+            </span>
+          </div>
+        </div>
 
         <div class="lg-search-bar cost-summary-search">
-          <div class="cost-summary-search-main">
-            <a-select
-              v-model:value="selectedProjectId"
-              placeholder="选择项目进行成本核对"
-              allow-clear
-              class="cost-summary-project-select"
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-              @change="handleProjectChange"
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
+          <div class="cost-summary-search-row cost-summary-search-row--filters">
+            <div class="cost-summary-search-main">
+              <a-select
+                v-model:value="selectedProjectId"
+                placeholder="选择项目进行成本核对"
+                allow-clear
+                class="cost-summary-project-select"
+                size="large"
+                show-search
+                :filter-option="
+                  (input: string, option: SelectOption) =>
+                    option.label?.toLowerCase().includes(input.toLowerCase())
+                "
+                @change="handleProjectChange"
+              >
+                <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                  {{ p.projectName }}
+                </a-select-option>
+              </a-select>
+            </div>
           </div>
-          <div class="cost-summary-search-actions">
-            <a-button type="primary" :disabled="!selectedProjectId" @click="fetchSummary">
-              查询
-            </a-button>
-            <a-button
-              :disabled="!selectedProjectId"
-              @click="handleRefresh"
-              aria-label="重新计算动态成本"
+          <div class="cost-summary-search-row cost-summary-search-row--actions">
+            <a-input
+              v-model:value="keyword"
+              class="cost-summary-keyword"
+              placeholder="按成本科目名称筛选当前表格"
+              allow-clear
+              size="large"
+              @pressEnter="handleSearch"
             >
-              <template #icon><ReloadOutlined /></template>
-              重算动态成本
-            </a-button>
+              <template #prefix>
+                <SearchOutlined />
+              </template>
+            </a-input>
+            <div class="cost-summary-search-actions">
+              <a-button
+                type="primary"
+                size="large"
+                :disabled="!selectedProjectId"
+                @click="handleSearch"
+              >
+                查询
+              </a-button>
+              <a-button size="large" @click="handleReset">重置</a-button>
+            </div>
           </div>
         </div>
 
         <section class="lg-list-table-panel cost-summary-panel">
           <div class="lg-toolbar cost-toolbar">
             <div class="lg-toolbar-left">
-              <strong>科目核对明细</strong>
-              <span class="cost-toolbar-meta">
-                {{ summary ? `共 ${summarySubjects.length} 个科目` : '选择项目后开始核对' }}
-              </span>
+              <div class="cost-toolbar-heading">
+                <strong>科目核对明细</strong>
+                <span class="cost-toolbar-meta">
+                  {{
+                    summary
+                      ? `当前 ${filteredSummarySubjects.length} / ${summarySubjects.length} 个科目`
+                      : '选择项目后开始核对'
+                  }}
+                </span>
+              </div>
+              <div class="cost-toolbar-context">
+                <span class="cost-toolbar-project-label">当前项目</span>
+                <strong>{{ summary?.projectName || selectedProject?.projectName || '-' }}</strong>
+                <span>科目维度核对 · 金额单位：万元</span>
+              </div>
             </div>
             <div class="lg-toolbar-right">
+              <div class="cost-reconcile-badges">
+                <a-tag color="blue">成本目标</a-tag>
+                <a-tag color="cyan">合同锁定</a-tag>
+                <a-tag color="green">实际成本</a-tag>
+                <a-tag color="orange">付款进度</a-tag>
+              </div>
+              <a-button
+                size="large"
+                :disabled="!selectedProjectId"
+                @click="handleRefresh"
+                aria-label="重新计算动态成本"
+              >
+                <template #icon><ReloadOutlined /></template>
+                重算动态成本
+              </a-button>
               <ColumnSettingsButton
                 v-if="!isMobile"
                 :columns="columnSettings"
@@ -422,12 +473,12 @@ onUnmounted(() => {
               <div v-if="loading" class="cost-summary-mobile-state">
                 <a-spin />
               </div>
-              <div v-else-if="!summarySubjects.length" class="cost-summary-mobile-state">
+              <div v-else-if="!filteredSummarySubjects.length" class="cost-summary-mobile-state">
                 <a-empty description="暂无科目明细" />
               </div>
               <template v-else>
                 <article
-                  v-for="row in summarySubjects"
+                  v-for="row in filteredSummarySubjects"
                   :key="row.costSubjectId"
                   class="cost-summary-mobile-card"
                 >
@@ -454,14 +505,14 @@ onUnmounted(() => {
             </div>
             <div v-else class="lg-table-wrap cost-summary-table">
               <vxe-grid
-                :data="summarySubjects"
+                :data="filteredSummarySubjects"
                 :columns="visibleGridColumns"
                 :loading="loading"
                 :column-config="{ resizable: true }"
                 stripe
                 border="inner"
                 size="small"
-                max-height="520"
+                height="100%"
               >
                 <template #checkStatus="{ row }">
                   <a-tag :class="['cost-check-tag', `is-${getCheckStatus(row)}`]">
@@ -507,72 +558,90 @@ onUnmounted(() => {
         </section>
       </div>
 
-      <aside v-if="summary" class="lg-analysis-rail cost-reconcile-rail">
-        <header class="cost-reconcile-rail-head">
-          <div>
-            <div class="cost-reconcile-rail-title">辅助分析</div>
-          </div>
-        </header>
-
-        <section class="lg-panel">
-          <div class="lg-panel-title">核对结论</div>
-          <div class="cost-conclusion-list">
-            <div
-              v-for="item in conclusionItems"
-              :key="item.label"
-              :class="['cost-conclusion-row', `is-${item.tone}`]"
-            >
-              <span>{{ item.label }}</span>
-              <strong>{{ item.value }}</strong>
+      <aside class="lg-analysis-rail cost-reconcile-rail">
+        <div class="lg-analysis-panel lg-fill-card cost-reconcile-rail-body">
+          <header class="cost-reconcile-rail-head">
+            <div>
+              <div class="cost-reconcile-rail-title">辅助分析</div>
             </div>
-          </div>
-        </section>
+          </header>
 
-        <section class="lg-panel">
-          <div class="lg-panel-title">重点差异科目</div>
-          <div class="cost-risk-list">
-            <template v-if="overBudgetItems.length">
-              <div v-for="item in overBudgetItems.slice(0, 5)" :key="item.costSubjectId">
-                <span>
-                  <WarningOutlined />
-                  {{ item.costSubjectName }}
-                </span>
-                <strong>+{{ fmtAmount(item.costDeviation) }} 万</strong>
+          <section class="lg-panel">
+            <div class="lg-panel-title">核对结论</div>
+            <div class="cost-conclusion-list">
+              <div
+                v-for="item in conclusionItems"
+                :key="item.label"
+                :class="['cost-conclusion-row', `is-${item.tone}`]"
+              >
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
               </div>
-            </template>
-            <div v-else class="cost-summary-muted-state">
-              <CheckCircleOutlined />
-              暂无超目标科目
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="lg-panel">
-          <div class="lg-panel-title">数据来源</div>
-          <div class="cost-source-rail-list">
-            <button
-              v-for="card in sourceCards"
-              :key="card.key"
-              type="button"
-              class="cost-source-rail-row"
-              @click="go(card.path)"
-            >
-              <span>{{ card.label }}</span>
-              <strong>{{ fmtAmount(card.value) }} 万</strong>
-              <LinkOutlined />
-            </button>
-          </div>
-        </section>
-
-        <section v-if="highRiskItems.length" class="lg-panel">
-          <div class="lg-panel-title">需优先复核</div>
-          <div class="cost-risk-list">
-            <div v-for="item in highRiskItems" :key="`high-${item.costSubjectId}`">
-              <span>{{ item.costSubjectName }}</span>
-              <strong>{{ fmtPercent(item.costDeviation, item.targetCost) }}</strong>
+          <section class="lg-panel">
+            <div class="lg-panel-title">重点差异科目</div>
+            <div class="cost-risk-list">
+              <template v-if="overBudgetItems.length">
+                <div v-for="item in overBudgetItems.slice(0, 5)" :key="item.costSubjectId">
+                  <span>
+                    <WarningOutlined />
+                    {{ item.costSubjectName }}
+                  </span>
+                  <strong>+{{ fmtAmount(item.costDeviation) }} 万</strong>
+                </div>
+              </template>
+              <div v-else class="cost-summary-muted-state">
+                <CheckCircleOutlined />
+                暂无超目标科目
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section class="lg-panel">
+            <div class="lg-panel-title">成本来源对比</div>
+            <div class="cost-source-rail-list">
+              <button
+                v-for="item in sourceRows"
+                :key="item.key"
+                type="button"
+                class="cost-source-rail-row"
+              >
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+                <span>{{ item.unit }}</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="lg-panel">
+            <div class="lg-panel-title">数据来源</div>
+            <div class="cost-source-rail-list">
+              <button
+                v-for="card in sourceCards"
+                :key="card.key"
+                type="button"
+                class="cost-source-rail-row"
+                @click="go(card.path)"
+              >
+                <span>{{ card.label }}</span>
+                <strong>{{ fmtAmount(card.value) }} 万</strong>
+                <LinkOutlined />
+              </button>
+            </div>
+          </section>
+
+          <section v-if="highRiskItems.length" class="lg-panel">
+            <div class="lg-panel-title">需优先复核</div>
+            <div class="cost-risk-list">
+              <div v-for="item in highRiskItems" :key="`high-${item.costSubjectId}`">
+                <span>{{ item.costSubjectName }}</span>
+                <strong>{{ fmtPercent(item.costDeviation, item.targetCost) }}</strong>
+              </div>
+            </div>
+          </section>
+        </div>
       </aside>
     </div>
   </div>
@@ -586,7 +655,6 @@ onUnmounted(() => {
 }
 
 .cost-summary-page {
-  gap: 14px;
   background: var(--surface-subtle);
 }
 
@@ -614,36 +682,41 @@ onUnmounted(() => {
 }
 
 .cost-summary-search {
-  display: flex;
-  flex-direction: column;
   align-items: stretch;
-  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
   margin: 0;
-  min-height: 74px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
+}
+
+.cost-summary-search-row {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
 }
 
 .cost-summary-grid {
-  align-items: stretch;
-  min-height: 0;
-  height: calc(100vh - 74px);
 }
 
 .cost-summary-main {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--spacing-md);
   min-width: 0;
   min-height: 0;
 }
 
 .cost-summary-search-main {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cost-summary-keyword {
+  flex: 1 1 320px;
   min-width: 0;
 }
 
@@ -652,41 +725,12 @@ onUnmounted(() => {
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .cost-summary-project-select {
   width: 100%;
   min-width: 0;
-}
-
-.cost-reconcile-overview {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-md);
-  padding: 14px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.cost-reconcile-project {
-  display: flex;
-  align-items: baseline;
-  gap: var(--spacing-sm);
-  min-width: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.cost-reconcile-project strong {
-  color: var(--text);
-  font-size: var(--font-size-lg);
-}
-
-.cost-reconcile-project-label {
-  color: var(--muted);
 }
 
 .cost-reconcile-badges {
@@ -712,12 +756,13 @@ onUnmounted(() => {
 .cost-reconcile-kpis .lg-kpi-card {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-rows: 19px 27px;
+  grid-template-rows: auto auto;
   column-gap: 10px;
   align-items: center;
   min-width: 0;
-  min-height: 84px;
-  padding: 16px 18px;
+  row-gap: 4px;
+  min-height: 0;
+  padding: 14px 18px;
   border-right: 1px solid var(--border-subtle);
 }
 
@@ -893,11 +938,40 @@ onUnmounted(() => {
   border-color: var(--border-subtle);
 }
 
+.cost-toolbar-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.cost-toolbar-context {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.cost-toolbar-context strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.cost-toolbar-project-label {
+  color: var(--muted);
+}
+
 .cost-reconcile-rail {
   display: flex;
   flex-direction: column;
   gap: 0;
   min-height: 0;
+}
+
+.cost-reconcile-rail-body {
+  gap: 0;
+  overflow: auto;
 }
 
 .cost-reconcile-rail-head {
@@ -916,11 +990,17 @@ onUnmounted(() => {
 }
 
 .cost-reconcile-rail .lg-panel {
+  flex: 0 0 auto;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
   border-radius: 0;
+}
+
+.cost-reconcile-rail .lg-panel:first-of-type {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .cost-source-rail-list {
@@ -1058,11 +1138,6 @@ onUnmounted(() => {
     border-bottom: 1px solid var(--border-subtle);
   }
 
-  .cost-reconcile-overview {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .cost-reconcile-badges {
     justify-content: flex-start;
   }
@@ -1070,7 +1145,8 @@ onUnmounted(() => {
 
 @media (max-width: 960px) {
   .cost-summary-page-head,
-  .cost-summary-search {
+  .cost-summary-search,
+  .cost-summary-search-row {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1087,6 +1163,17 @@ onUnmounted(() => {
   .cost-summary-search-actions,
   .cost-summary-head-actions {
     justify-content: flex-start;
+  }
+
+  .cost-reconcile-rail {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .cost-reconcile-kpis,
+  .cost-reconcile-rail {
+    display: none;
   }
 }
 </style>
