@@ -3,12 +3,6 @@ import { mount } from '@vue/test-utils'
 import { defineComponent, h, useAttrs, useSlots, type PropType } from 'vue'
 import SidebarMenu from '@/layouts/components/SidebarMenu.vue'
 
-type MenuItem = {
-  key: string
-  label: string
-  children?: MenuItem[]
-}
-
 const mockPush = vi.fn()
 const mockRoles = vi.hoisted(() => ({ value: ['ADMIN'] as string[] }))
 const mockPath = vi.hoisted(() => ({ value: '/dashboard' }))

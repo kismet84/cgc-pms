@@ -269,7 +269,8 @@ onMounted(() => {
                 <a-tab-pane key="out" tab="出库" />
               </a-tabs>
               <a-button
-                v-if="activeTab === 'in' && canSubmitTransaction"
+                v-if="canSubmitTransaction"
+                v-show="activeTab === 'in'"
                 type="primary"
                 :loading="inSubmitting"
                 @click="handleStockIn"
@@ -277,7 +278,8 @@ onMounted(() => {
                 确认入库
               </a-button>
               <a-button
-                v-else-if="canSubmitTransaction"
+                v-if="canSubmitTransaction"
+                v-show="activeTab === 'out'"
                 type="primary"
                 danger
                 :loading="outSubmitting"
@@ -310,7 +312,10 @@ onMounted(() => {
                 </a-form-item>
                 <div class="transaction-form-tip">
                   <span>
-                    仓库：{{ warehouseList.find((w) => w.id === inForm.warehouseId)?.warehouseName || '未选择' }}
+                    仓库：{{
+                      warehouseList.find((w) => w.id === inForm.warehouseId)?.warehouseName ||
+                      '未选择'
+                    }}
                   </span>
                   <span>
                     物料：{{ getMaterialInfo(inForm.materialId ?? '')?.materialName || '未选择' }}
@@ -339,7 +344,10 @@ onMounted(() => {
                 </a-form-item>
                 <div class="transaction-form-tip">
                   <span>
-                    仓库：{{ warehouseList.find((w) => w.id === outForm.warehouseId)?.warehouseName || '未选择' }}
+                    仓库：{{
+                      warehouseList.find((w) => w.id === outForm.warehouseId)?.warehouseName ||
+                      '未选择'
+                    }}
                   </span>
                   <span>
                     物料：{{ getMaterialInfo(outForm.materialId ?? '')?.materialName || '未选择' }}

@@ -116,7 +116,9 @@ describe('router lazy loading', () => {
   it('uses the transaction list authority for the inventory transaction entry', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const inventoryRoute = rootRoute?.children?.find((c) => c.name === 'Inventory')
-    const transactionRoute = inventoryRoute?.children?.find((c) => c.name === 'InventoryTransaction')
+    const transactionRoute = inventoryRoute?.children?.find(
+      (c) => c.name === 'InventoryTransaction',
+    )
 
     expect(transactionRoute?.meta?.permission).toBe('inventory:transaction:list')
   })

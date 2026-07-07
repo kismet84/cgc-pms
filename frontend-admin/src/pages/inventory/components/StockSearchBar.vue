@@ -55,12 +55,7 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
         "
         @update:value="(v: string | undefined) => emit('update:projectId', v)"
       >
-        <a-select-option
-          v-for="p in projectList"
-          :key="p.id"
-          :value="p.id"
-          :label="p.projectName"
-        >
+        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id" :label="p.projectName">
           {{ p.projectName }}
         </a-select-option>
       </a-select>

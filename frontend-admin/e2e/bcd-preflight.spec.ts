@@ -11,7 +11,12 @@ async function loginAsAdmin(page: Page) {
 async function anyVisible(locator: ReturnType<Page['locator']>) {
   const count = await locator.count()
   for (let index = 0; index < count; index += 1) {
-    if (await locator.nth(index).isVisible().catch(() => false)) {
+    if (
+      await locator
+        .nth(index)
+        .isVisible()
+        .catch(() => false)
+    ) {
       return true
     }
   }
@@ -29,8 +34,15 @@ async function classifyRoute(page: Page, path: string, readyText: string) {
     })
     .toBe(true)
   const readyVisible = true
-  const bodyText = (await page.locator('body').innerText({ timeout: 3000 }).catch(() => '')).slice(0, 500)
-  console.log(`PREFLIGHT ${path} url=${finalUrl} stayedOutOfLogin=${stayedOutOfLogin} ready=${readyVisible}`)
+  const bodyText = (
+    await page
+      .locator('body')
+      .innerText({ timeout: 3000 })
+      .catch(() => '')
+  ).slice(0, 500)
+  console.log(
+    `PREFLIGHT ${path} url=${finalUrl} stayedOutOfLogin=${stayedOutOfLogin} ready=${readyVisible}`,
+  )
   console.log(`PREFLIGHT_BODY ${path} ${bodyText.replace(/\s+/g, ' ')}`)
   expect(stayedOutOfLogin, `${path} should not redirect to login`).toBe(true)
   expect(readyVisible, `${path} should show ready marker ${readyText}`).toBe(true)

@@ -259,7 +259,7 @@ services:
       # SSL certificates — place server.crt and server.key here before starting
       - ./ssl:/etc/nginx/ssl:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80/ || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

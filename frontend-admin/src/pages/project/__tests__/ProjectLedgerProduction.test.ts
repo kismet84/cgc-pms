@@ -18,8 +18,12 @@ describe('ProjectLedgerProduction source guards', () => {
     const source = readProjectSource()
     expect(source).toMatch(/import ProjectQueryPanel from '\.\/components\/ProjectQueryPanel\.vue'/)
     expect(source).toMatch(/import ProjectTablePanel from '\.\/components\/ProjectTablePanel\.vue'/)
-    expect(source).toMatch(/import ProjectAnalysisRail from '\.\/components\/ProjectAnalysisRail\.vue'/)
-    expect(source).toMatch(/<ProjectQueryPanel[\s\S]*@search="handleSearch"[\s\S]*@reset="handleReset"/)
+    expect(source).toMatch(
+      /import ProjectAnalysisRail from '\.\/components\/ProjectAnalysisRail\.vue'/,
+    )
+    expect(source).toMatch(
+      /<ProjectQueryPanel[\s\S]*@search="handleSearch"[\s\S]*@reset="handleReset"/,
+    )
     expect(source).toMatch(
       /<ProjectTablePanel[\s\S]*@refresh="fetchData"[\s\S]*@create="handleCreateModalOpen"/,
     )
@@ -38,8 +42,12 @@ describe('ProjectLedgerProduction source guards', () => {
     expect(source).not.toMatch(/projectName:\s*filter\.projectName\s*\|\|\s*undefined/)
     expect(queryPanelSource).not.toMatch(/v-model:value="filter\.projectCode"/)
     expect(queryPanelSource).not.toMatch(/v-model:value="filter\.projectName"/)
-    expect(queryPanelSource).toMatch(/v-model:value="filter\.projectType"[\s\S]*?@change="emit\('search'\)"/)
-    expect(queryPanelSource).toMatch(/v-model:value="filter\.status"[\s\S]*?@change="emit\('search'\)"/)
+    expect(queryPanelSource).toMatch(
+      /v-model:value="filter\.projectType"[\s\S]*?@change="emit\('search'\)"/,
+    )
+    expect(queryPanelSource).toMatch(
+      /v-model:value="filter\.status"[\s\S]*?@change="emit\('search'\)"/,
+    )
   })
 
   it('keeps amount conversion helpers consistent for create and edit', () => {
@@ -47,7 +55,9 @@ describe('ProjectLedgerProduction source guards', () => {
     expect(source).toMatch(/function amountYuanToWan/)
     expect(source).toMatch(/function amountWanToYuan/)
     expect(source).toMatch(/editForm\.contractAmount = amountYuanToWan\(project\.contractAmount\)/)
-    expect(source).toMatch(/contractAmount:\s*amountWanToYuan\((?:createForm|editForm)\.contractAmount\)/)
+    expect(source).toMatch(
+      /contractAmount:\s*amountWanToYuan\((?:createForm|editForm)\.contractAmount\)/,
+    )
   })
 
   it('contains a mobile card branch alongside desktop grid', () => {
@@ -66,9 +76,18 @@ describe('ProjectLedgerProduction source guards', () => {
     const tablePanelSource = readProjectComponentSource('ProjectTablePanel')
     expect(source).toContain("const PROJECT_TYPE_DICT = 'project_type'")
     expect(source).toContain('const PROJECT_TYPE_LABEL: Record<string, string>')
+    expect(source).toContain("BUILDING: '施工总承包'")
     expect(source).toContain('function projectTypeLabel(value: string | undefined)')
     expect(queryPanelSource).toContain('{{ projectTypeLabel(item) }}')
     expect(tablePanelSource).toContain('{{ projectTypeLabel(row.projectType) }}')
     expect(tablePanelSource).not.toContain("{{ row.projectType || '未分类' }}")
+  })
+
+  it('preloads project type dict before the first fetch to avoid raw code flashes', () => {
+    const source = readProjectSource()
+    expect(source).toMatch(
+      /onMounted\(async \(\) => \{\s*await fetchDictData\(PROJECT_TYPE_DICT\)\s*await fetchData\(\)/,
+    )
+    expect(source).not.toContain('onMounted(fetchData)')
   })
 })

@@ -33,7 +33,6 @@ import PurchaseOrderSearchBar from './components/PurchaseOrderSearchBar.vue'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
-const APPROVAL_APPROVING = 'APPROVING'
 
 // 字典常量 - 订单状态
 const ORDER_STATUS_DRAFT = 'DRAFT'
@@ -457,7 +456,9 @@ const kpiOrderedAmount = computed(() =>
 )
 const kpiUnreceived = computed(() =>
   tableData.value
-    .filter((r) => r.orderStatus !== ORDER_STATUS_COMPLETED && r.orderStatus !== ORDER_STATUS_CANCELLED)
+    .filter(
+      (r) => r.orderStatus !== ORDER_STATUS_COMPLETED && r.orderStatus !== ORDER_STATUS_CANCELLED,
+    )
     .reduce((s, r) => s + (parseFloat(r.totalAmount) || 0), 0),
 )
 function fmtWan(value: number): string {
@@ -518,7 +519,10 @@ const orderTypeBreakdown = computed(() => {
 })
 const pendingOrders = computed(() =>
   tableData.value
-    .filter((row) => row.orderStatus !== ORDER_STATUS_COMPLETED && row.orderStatus !== ORDER_STATUS_CANCELLED)
+    .filter(
+      (row) =>
+        row.orderStatus !== ORDER_STATUS_COMPLETED && row.orderStatus !== ORDER_STATUS_CANCELLED,
+    )
     .map((row) => ({
       id: row.id,
       project: row.projectName || '-',
@@ -641,7 +645,8 @@ onMounted(() => {
             <span class="purchase-order-kpi-content">
               <span class="purchase-order-kpi-label">已完成订单</span>
               <span class="purchase-order-kpi-value">
-                {{ tableData.filter((r) => r.orderStatus === ORDER_STATUS_COMPLETED).length }} <small>单</small>
+                {{ tableData.filter((r) => r.orderStatus === ORDER_STATUS_COMPLETED).length }}
+                <small>单</small>
               </span>
             </span>
           </div>
@@ -1020,10 +1025,11 @@ onMounted(() => {
     border-right: 0;
   }
 
-  .purchase-order-page .purchase-order-kpi-summary > .purchase-order-kpi-item:nth-last-child(-n + 2) {
+  .purchase-order-page
+    .purchase-order-kpi-summary
+    > .purchase-order-kpi-item:nth-last-child(-n + 2) {
     border-bottom: 0;
   }
-
 }
 
 @media (max-width: 768px) {
@@ -1040,6 +1046,5 @@ onMounted(() => {
   .purchase-order-page .purchase-order-kpi-summary > .purchase-order-kpi-item:last-child {
     border-bottom: 0;
   }
-
 }
 </style>

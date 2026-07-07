@@ -1,4 +1,9 @@
-import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory,
+  type RouteLocationNormalized,
+  type RouteRecordRaw,
+} from 'vue-router'
 import { getUserInfo } from '@/api/modules/auth'
 import { useUserStore } from '@/stores/user'
 
@@ -531,7 +536,11 @@ export async function handleAuthGuard(to: RouteLocationNormalized) {
   ) {
     return false
   }
-  if (to.meta?.permission !== 'dashboard:view' && to.meta?.permission && !userStore.hasPermission(to.meta.permission)) {
+  if (
+    to.meta?.permission !== 'dashboard:view' &&
+    to.meta?.permission &&
+    !userStore.hasPermission(to.meta.permission)
+  ) {
     return { path: '/dashboard' }
   }
   return true

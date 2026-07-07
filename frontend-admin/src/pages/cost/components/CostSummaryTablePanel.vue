@@ -93,8 +93,12 @@ defineProps<{
                 {{ getCheckStatusText(row) }}
               </a-tag>
             </div>
-            <div class="cost-summary-mobile-card-meta">成本目标：{{ fmtAmount(row.targetCost) }} 万元</div>
-            <div class="cost-summary-mobile-card-meta">动态成本：{{ fmtAmount(row.dynamicCost) }} 万元</div>
+            <div class="cost-summary-mobile-card-meta">
+              成本目标：{{ fmtAmount(row.targetCost) }} 万元
+            </div>
+            <div class="cost-summary-mobile-card-meta">
+              动态成本：{{ fmtAmount(row.dynamicCost) }} 万元
+            </div>
             <div class="cost-summary-mobile-card-meta">
               成本偏差：
               <span :class="`is-${getDeviationTone(row.costDeviation)}`">
@@ -136,7 +140,10 @@ defineProps<{
             <span>{{ fmtAmount(row.dynamicCost) }}</span>
           </template>
           <template #costDeviation="{ row }">
-            <span class="cost-summary-deviation" :class="`is-${getDeviationTone(row.costDeviation)}`">
+            <span
+              class="cost-summary-deviation"
+              :class="`is-${getDeviationTone(row.costDeviation)}`"
+            >
               {{ fmtDeviation(row.costDeviation) }}
             </span>
           </template>
@@ -148,7 +155,9 @@ defineProps<{
       <section class="cost-summary-empty">
         <FileSearchOutlined class="cost-summary-empty-icon" />
         <div class="cost-summary-empty-title">请选择项目开始核对</div>
-        <div class="cost-summary-empty-text">选择项目后查看成本来源、科目明细、成本偏差和核对结论。</div>
+        <div class="cost-summary-empty-text">
+          选择项目后查看成本来源、科目明细、成本偏差和核对结论。
+        </div>
       </section>
     </template>
   </section>

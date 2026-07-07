@@ -36,28 +36,36 @@ const trendOpt = computed(() => mgmtTrendOption(props.data))
         <div class="role-reference-kpi-value">
           {{ fmtNum(data.activeProjectCount) }} <small>个</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><ProjectOutlined /> 在建范围</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><ProjectOutlined /> 在建范围</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #16a34a">
         <div class="role-reference-kpi-title">合同总额</div>
         <div class="role-reference-kpi-value">
           {{ fmtWan(data.totalContractAmount) }} <small>万元</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><DollarOutlined /> 经营盘子</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><DollarOutlined /> 经营盘子</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #f97316">
         <div class="role-reference-kpi-title">动态成本</div>
         <div class="role-reference-kpi-value is-warning">
           {{ fmtWan(data.totalDynamicCost) }} <small>万元</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><LineChartOutlined /> 成本滚动</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><LineChartOutlined /> 成本滚动</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #ef4444">
         <div class="role-reference-kpi-title">风险预警</div>
         <div class="role-reference-kpi-value is-danger">
           {{ fmtNum(data.totalRiskCount) }} <small>项</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><WarningOutlined /> 重点预警</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><WarningOutlined /> 重点预警</span>
+        </div>
       </article>
     </section>
 
@@ -93,7 +101,9 @@ const trendOpt = computed(() => mgmtTrendOption(props.data))
       <aside class="role-reference-side-stack">
         <div class="role-reference-panel role-mini-panel is-red">
           <div class="role-reference-panel-head mini">
-            <strong>重大风险 <b>（{{ data.majorRisks.length }}）</b></strong>
+            <strong
+              >重大风险 <b>（{{ data.majorRisks.length }}）</b></strong
+            >
           </div>
           <a-table
             :columns="alertCols"
@@ -106,7 +116,9 @@ const trendOpt = computed(() => mgmtTrendOption(props.data))
         </div>
         <div class="role-reference-panel role-mini-panel is-orange">
           <div class="role-reference-panel-head mini">
-            <strong>逾期事项 <b>（{{ data.overdueItems.length }}）</b></strong>
+            <strong
+              >逾期事项 <b>（{{ data.overdueItems.length }}）</b></strong
+            >
           </div>
           <a-table
             :columns="pmTaskCols"

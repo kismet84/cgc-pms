@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { onMounted, computed, reactive, ref } from 'vue'
-import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import {
+  MoreOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  SettingOutlined,
+} from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { getUserList } from '@/api/modules/user'
 import type { SysUserVO } from '@/types/user'
@@ -132,8 +138,9 @@ const unstockedCount = computed(
 )
 const pendingApprovalCount = computed(
   () =>
-    tableData.value.filter((item) => [APPROVAL_DRAFT, APPROVAL_APPROVING].includes(item.approvalStatus ?? ''))
-      .length,
+    tableData.value.filter((item) =>
+      [APPROVAL_DRAFT, APPROVAL_APPROVING].includes(item.approvalStatus ?? ''),
+    ).length,
 )
 const approvalSummary = computed(() => [
   {

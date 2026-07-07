@@ -154,7 +154,9 @@ const mobileKpiItems = computed(() => [
         <component :is="item.icon" />
       </div>
       <span class="lg-kpi-single-label">{{ item.label }}</span>
-      <span class="lg-kpi-single-value">{{ item.value }} <small>{{ item.unit }}</small></span>
+      <span class="lg-kpi-single-value"
+        >{{ item.value }} <small>{{ item.unit }}</small></span
+      >
     </div>
   </div>
 
@@ -182,7 +184,11 @@ const mobileKpiItems = computed(() => [
         size="large"
         @change="handleSearch"
       >
-        <a-select-option v-for="contract in contractOptions" :key="contract.id" :value="contract.id">
+        <a-select-option
+          v-for="contract in contractOptions"
+          :key="contract.id"
+          :value="contract.id"
+        >
           {{ contract.contractName }}
         </a-select-option>
       </a-select>
@@ -208,7 +214,11 @@ const mobileKpiItems = computed(() => [
         size="large"
         @change="handleSearch"
       >
-        <a-select-option v-for="subject in costSubjectOptions" :key="subject.id" :value="subject.id">
+        <a-select-option
+          v-for="subject in costSubjectOptions"
+          :key="subject.id"
+          :value="subject.id"
+        >
           {{ subject.subjectName }}
         </a-select-option>
       </a-select>

@@ -66,7 +66,9 @@ const emit = defineEmits<{
               v-model:value="props.formData.contractId"
               placeholder="请选择合同"
               style="width: 100%"
-              :options="(props.contracts ?? []).map((c) => ({ value: c.id, label: c.contractName }))"
+              :options="
+                (props.contracts ?? []).map((c) => ({ value: c.id, label: c.contractName }))
+              "
               @change="props.onContractChange" /></a-form-item
         ></a-col>
       </a-row>
@@ -84,9 +86,12 @@ const emit = defineEmits<{
               v-model:value="props.formData.payType"
               placeholder="请选择付款类型"
               style="width: 100%"
-              ><a-select-option v-for="(label, key) in props.payTypeLabel" :key="key" :value="key">{{
-                label
-              }}</a-select-option></a-select
+              ><a-select-option
+                v-for="(label, key) in props.payTypeLabel"
+                :key="key"
+                :value="key"
+                >{{ label }}</a-select-option
+              ></a-select
             ></a-form-item
           ></a-col
         >
@@ -94,7 +99,9 @@ const emit = defineEmits<{
       <a-row :gutter="16">
         <a-col :span="12"
           ><a-form-item label="申请编号" required
-            ><a-input v-model:value="props.formData.applyCode" placeholder="请输入申请编号" /></a-form-item
+            ><a-input
+              v-model:value="props.formData.applyCode"
+              placeholder="请输入申请编号" /></a-form-item
         ></a-col>
         <a-col :span="12"
           ><a-form-item label="申请金额"
@@ -126,7 +133,13 @@ const emit = defineEmits<{
         <span style="font-weight: 600; font-size: 14px">付款依据</span
         ><a-button size="small" @click="props.onAddBasis">添加依据行</a-button>
       </div>
-      <a-table :data-source="props.basisList" :pagination="false" row-key="key" size="small" :scroll="{ y: 240 }">
+      <a-table
+        :data-source="props.basisList"
+        :pagination="false"
+        row-key="key"
+        size="small"
+        :scroll="{ y: 240 }"
+      >
         <a-table-column title="来源类型" width="100"
           ><template #default="{ record: item, index }"
             ><a-select
@@ -147,9 +160,12 @@ const emit = defineEmits<{
               placeholder="选择明细"
               allow-clear
               style="width: 100%"
-              ><a-select-option v-for="opt in props.getSourceOptions(item.basisType)" :key="opt.id" :value="opt.id">{{
-                opt.label
-              }}</a-select-option></a-select
+              ><a-select-option
+                v-for="opt in props.getSourceOptions(item.basisType)"
+                :key="opt.id"
+                :value="opt.id"
+                >{{ opt.label }}</a-select-option
+              ></a-select
             ></template
           ></a-table-column
         >
@@ -165,7 +181,9 @@ const emit = defineEmits<{
         ></a-table-column>
         <a-table-column title="操作" width="76"
           ><template #default="{ index }"
-            ><a-button type="link" size="small" danger @click="props.onRemoveBasis(index)">删除</a-button></template
+            ><a-button type="link" size="small" danger @click="props.onRemoveBasis(index)"
+              >删除</a-button
+            ></template
           ></a-table-column
         >
       </a-table>

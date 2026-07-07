@@ -490,7 +490,9 @@ const kpiApproved = computed(() =>
     .reduce((s, r) => s + (parseFloat(r.approvedAmount) || 0), 0),
 )
 const kpiMeasurePending = computed(
-  () => tableData.value.filter((r) => r.status === STATUS_DRAFT || r.status === APPROVAL_APPROVING).length,
+  () =>
+    tableData.value.filter((r) => r.status === STATUS_DRAFT || r.status === APPROVAL_APPROVING)
+      .length,
 )
 const approvedRate = computed(() =>
   kpiMeasureTotal.value ? Math.round((kpiApproved.value / kpiMeasureTotal.value) * 100) : 0,
@@ -516,9 +518,6 @@ const measureStatusSummary = computed(() => [
   },
 ])
 const recentMeasures = computed(() => tableData.value.slice(0, 4))
-function fmtAmount(val: number): string {
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-}
 function fmtWan(val: number): string {
   return (val / 10000).toLocaleString('zh-CN', {
     minimumFractionDigits: 2,
@@ -640,7 +639,9 @@ onMounted(() => {
             </div>
           </div>
           <div class="subcontract-measure-kpi-item">
-            <span class="subcontract-measure-kpi-icon is-purple"><SafetyCertificateOutlined /></span>
+            <span class="subcontract-measure-kpi-icon is-purple"
+              ><SafetyCertificateOutlined
+            /></span>
             <div>
               <span class="subcontract-measure-kpi-label">审核比例</span>
               <strong>{{ approvedRate }}%</strong>

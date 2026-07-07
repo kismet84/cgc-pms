@@ -196,13 +196,13 @@ onMounted(() => {
             </template>
             <template #action="{ row }">
               <a-dropdown :trigger="['click']">
-              <a-button
-                class="lg-row-action-trigger"
-                size="small"
-                type="text"
-                title="角色操作"
-                aria-label="角色操作"
-              >
+                <a-button
+                  class="lg-row-action-trigger"
+                  size="small"
+                  type="text"
+                  title="角色操作"
+                  aria-label="角色操作"
+                >
                   <MoreOutlined />
                 </a-button>
                 <template #overlay>

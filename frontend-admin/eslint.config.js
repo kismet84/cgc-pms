@@ -17,6 +17,7 @@ export default [
   {
     rules: {
       'vue/multi-word-component-names': 'off',
+      'vue/no-mutating-props': ['error', { shallowOnly: true }],
     },
   },
 ]

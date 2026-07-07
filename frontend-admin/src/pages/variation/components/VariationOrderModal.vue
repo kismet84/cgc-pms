@@ -287,7 +287,9 @@ defineEmits<{
       </a-table>
       <div style="text-align: right; margin-top: 8px; font-size: 14px">
         合计：<span style="font-weight: 600; color: #1677ff"
-          >¥{{ Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span
+          >¥{{
+            Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+          }}</span
         >
       </div>
     </div>

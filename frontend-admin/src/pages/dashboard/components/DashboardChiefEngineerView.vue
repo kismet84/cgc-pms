@@ -175,8 +175,13 @@ function timelinessText(record: DashboardBusinessItemVO) {
             class="role-reference-table chief-reference-table"
           >
             <template #bodyCell="{ column, text, record }">
-              <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="itemSummary(record as DashboardBusinessItemVO)">
-                <span class="chief-ellipsis">{{ itemSummary(record as DashboardBusinessItemVO) }}</span>
+              <a-tooltip
+                v-if="column.dataIndex === 'itemSummary'"
+                :title="itemSummary(record as DashboardBusinessItemVO)"
+              >
+                <span class="chief-ellipsis">{{
+                  itemSummary(record as DashboardBusinessItemVO)
+                }}</span>
               </a-tooltip>
               <span v-else-if="column.dataIndex === 'ownerName'" class="chief-muted">
                 {{ displayText(text) }}
@@ -210,8 +215,13 @@ function timelinessText(record: DashboardBusinessItemVO) {
             class="role-reference-table chief-reference-table"
           >
             <template #bodyCell="{ column, text, record }">
-              <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="itemSummary(record as DashboardBusinessItemVO)">
-                <span class="chief-ellipsis">{{ itemSummary(record as DashboardBusinessItemVO) }}</span>
+              <a-tooltip
+                v-if="column.dataIndex === 'itemSummary'"
+                :title="itemSummary(record as DashboardBusinessItemVO)"
+              >
+                <span class="chief-ellipsis">{{
+                  itemSummary(record as DashboardBusinessItemVO)
+                }}</span>
               </a-tooltip>
               <span v-else-if="column.dataIndex === 'ownerName'" class="chief-muted">
                 {{ displayText(text) }}
@@ -249,8 +259,13 @@ function timelinessText(record: DashboardBusinessItemVO) {
           class="role-reference-table chief-reference-table"
         >
           <template #bodyCell="{ column, text, record }">
-            <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="itemSummary(record as DashboardBusinessItemVO)">
-              <span class="chief-ellipsis">{{ itemSummary(record as DashboardBusinessItemVO) }}</span>
+            <a-tooltip
+              v-if="column.dataIndex === 'itemSummary'"
+              :title="itemSummary(record as DashboardBusinessItemVO)"
+            >
+              <span class="chief-ellipsis">{{
+                itemSummary(record as DashboardBusinessItemVO)
+              }}</span>
             </a-tooltip>
             <span v-else-if="column.dataIndex === 'ownerName'" class="chief-muted">
               {{ displayText(text) }}
@@ -285,8 +300,13 @@ function timelinessText(record: DashboardBusinessItemVO) {
           class="role-reference-table chief-reference-table"
         >
           <template #bodyCell="{ column, text, record }">
-            <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="itemSummary(record as DashboardBusinessItemVO)">
-              <span class="chief-ellipsis">{{ itemSummary(record as DashboardBusinessItemVO) }}</span>
+            <a-tooltip
+              v-if="column.dataIndex === 'itemSummary'"
+              :title="itemSummary(record as DashboardBusinessItemVO)"
+            >
+              <span class="chief-ellipsis">{{
+                itemSummary(record as DashboardBusinessItemVO)
+              }}</span>
             </a-tooltip>
             <span v-else-if="column.dataIndex === 'ownerName'" class="chief-muted">
               {{ displayText(text) }}

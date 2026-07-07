@@ -33,7 +33,6 @@ const APPROVAL_DRAFT = 'DRAFT'
 const APPROVAL_APPROVED = 'APPROVED'
 
 // 字典常量 - 付款状态
-const PAY_STATUS_PENDING = 'PENDING'
 const PAY_STATUS_UNPAID = 'UNPAID'
 const PAY_STATUS_PARTIAL = 'PARTIAL'
 const PAY_STATUS_PAID = 'PAID'
@@ -268,7 +267,8 @@ async function handleEdit(record: PayApplicationVO) {
       applyAmount: detail.applyAmount,
       applyReason: detail.applyReason ?? '',
     })
-    const data = detail.basis?.length ? detail.basis : (await getBasisList(record.id))
+    // detail.basis?.length ? detail.basis : (await getBasisList(record.id))
+    const data = detail.basis?.length ? detail.basis : await getBasisList(record.id)
     basisList.value = data.map((it, idx) => ({ ...it, key: idx }))
     basisKeyCounter = basisList.value.length
   } catch (e: unknown) {
@@ -410,7 +410,11 @@ function validateForm(): boolean {
     message.warning('请填写申请原因')
     return false
   }
-  if (basisList.value.some((item) => !item.basisType || !item.basisId || toCents(item.basisAmount) <= 0)) {
+  if (
+    basisList.value.some(
+      (item) => !item.basisType || !item.basisId || toCents(item.basisAmount) <= 0,
+    )
+  ) {
     message.warning('请完整填写付款依据行')
     return false
   }
@@ -565,7 +569,11 @@ onMounted(() => {
               <span class="payment-table-title">付款申请明细</span>
               <span class="payment-table-count">共 {{ total }} 条，表格为主操作区</span>
             </div>
-            <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
+            <ColumnSettingsButton
+              :columns="columnSettings"
+              :visible="colVisible"
+              @toggle="toggleCol"
+            />
             <a-button type="primary" @click="handleAdd">
               <template #icon><PlusOutlined /></template>
               新建申请
@@ -622,11 +630,17 @@ onMounted(() => {
                 <template #overlay>
                   <a-menu>
                     <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                    <a-menu-item v-if="row.approvalStatus === APPROVAL_DRAFT" @click="handleApproval(row)">
+                    <a-menu-item
+                      v-if="row.approvalStatus === APPROVAL_DRAFT"
+                      @click="handleApproval(row)"
+                    >
                       提交审批
                     </a-menu-item>
                     <a-menu-item
-                      v-if="row.approvalStatus === APPROVAL_APPROVED && row.payStatus !== PAY_STATUS_PAID"
+                      v-if="
+                        row.approvalStatus === APPROVAL_APPROVED &&
+                        row.payStatus !== PAY_STATUS_PAID
+                      "
                       @click="openWriteback(row)"
                     >
                       付款回写

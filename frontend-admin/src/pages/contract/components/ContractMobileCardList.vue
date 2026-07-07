@@ -2,7 +2,7 @@
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import type { ContractVO, ContractType, ContractStatus } from '@/types/contract'
 
-const props = defineProps<{
+defineProps<{
   data: ContractVO[]
   loading: boolean
   colVisible: Record<string, boolean>

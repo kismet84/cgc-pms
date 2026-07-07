@@ -135,5 +135,4 @@ describe('BasicLayout accessibility', () => {
 
     vi.useRealTimers()
   })
-
 })

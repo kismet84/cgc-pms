@@ -1,4 +1,11 @@
-import { test, expect, type APIRequestContext, type Locator, type Page, type Playwright } from '@playwright/test'
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type Locator,
+  type Page,
+  type Playwright,
+} from '@playwright/test'
 import { createAuthenticatedPage } from './auth-session'
 
 const API_BASE_URL = 'http://localhost:8080'
@@ -133,7 +140,9 @@ async function seedPaymentCreateContext(api: APIRequestContext) {
 async function waitForPaymentList(page: Page) {
   await page.goto('/payment/application')
   await expect(page.locator('.payment-page')).toBeVisible({ timeout: 10000 })
-  await expect(page.locator('.payment-toolbar button').filter({ hasText: '新建申请' })).toBeVisible()
+  await expect(
+    page.locator('.payment-toolbar button').filter({ hasText: '新建申请' }),
+  ).toBeVisible()
 }
 
 async function waitForContractsReload(page: Page) {
@@ -148,7 +157,10 @@ async function waitForContractsReload(page: Page) {
 
 async function selectOptionByText(select: Locator, text: string) {
   await select.click()
-  const dropdown = select.page().locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+  const dropdown = select
+    .page()
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
   await expect(dropdown).toBeVisible({ timeout: 10000 })
   const option = dropdown
     .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
@@ -159,7 +171,10 @@ async function selectOptionByText(select: Locator, text: string) {
   await dropdown.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
 }
 
-test('payment create modal submits applyCode and reads back in list', async ({ browser, playwright }) => {
+test('payment create modal submits applyCode and reads back in list', async ({
+  browser,
+  playwright,
+}) => {
   const auth = await createAuthenticatedPage(browser)
   const api = await loginApi(playwright)
   const seed = await seedPaymentCreateContext(api)
@@ -172,7 +187,11 @@ test('payment create modal submits applyCode and reads back in list', async ({ b
     const modal = auth.page.locator('.ant-modal').filter({ hasText: '新建付款申请' }).last()
     await expect(modal).toBeVisible({ timeout: 5000 })
 
-    const applyCodeInput = modal.locator('.ant-form-item').filter({ hasText: '申请编号' }).locator('input').first()
+    const applyCodeInput = modal
+      .locator('.ant-form-item')
+      .filter({ hasText: '申请编号' })
+      .locator('input')
+      .first()
     await expect(applyCodeInput).toBeVisible()
     await applyCodeInput.fill(applyCode)
 
@@ -204,7 +223,10 @@ test('payment create modal submits applyCode and reads back in list', async ({ b
     expect(createdBody.code).toMatch(/^(0|00000)$/)
     expect(createdBody.data, '创建接口应返回申请单 id').toBeTruthy()
 
-    const created = await apiGet<PayApplicationDetail>(api, `/api/pay-applications/${createdBody.data}`)
+    const created = await apiGet<PayApplicationDetail>(
+      api,
+      `/api/pay-applications/${createdBody.data}`,
+    )
     expect(created.applyCode, '后端应返回非空申请编号').toBeTruthy()
     expect(created.contractName).toContain(seed.contractName)
 
@@ -215,7 +237,10 @@ test('payment create modal submits applyCode and reads back in list', async ({ b
 
     await auth.page.locator('.payment-toolbar button').filter({ hasText: '刷新' }).click()
 
-    const createdRow = auth.page.locator('.vxe-body--row').filter({ hasText: created.applyCode }).first()
+    const createdRow = auth.page
+      .locator('.vxe-body--row')
+      .filter({ hasText: created.applyCode })
+      .first()
     await expect(createdRow).toBeVisible({ timeout: 10000 })
     await expect(createdRow).toContainText(seed.contractName)
     await expect(createdRow).toContainText('进度款')

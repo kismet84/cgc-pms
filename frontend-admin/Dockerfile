@@ -16,7 +16,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # Copy source and configs
 COPY vite.config.ts tsconfig*.json index.html ./
 COPY src/ ./src/
-# COPY public/ ./public/
+COPY public/ ./public/
 
 # Build (includes vue-tsc type-check + vite build)
 RUN pnpm build
@@ -41,6 +41,6 @@ EXPOSE 80
 EXPOSE 443
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:80/ || exit 1
+    CMD wget -q -O /dev/null http://localhost:80/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

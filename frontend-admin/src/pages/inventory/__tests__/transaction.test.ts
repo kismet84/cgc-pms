@@ -14,7 +14,11 @@ describe('inventory transaction permission gate', () => {
   })
 
   it('shows stock in and stock out submit actions only when add permission is present', () => {
-    expect(source).toMatch(/确认入库[\s\S]*v-if=\"canSubmitTransaction\"|v-if=\"canSubmitTransaction\"[\s\S]*确认入库/)
-    expect(source).toMatch(/确认出库[\s\S]*v-if=\"canSubmitTransaction\"|v-if=\"canSubmitTransaction\"[\s\S]*确认出库/)
+    expect(source).toMatch(
+      /确认入库[\s\S]*v-if=\"canSubmitTransaction\"|v-if=\"canSubmitTransaction\"[\s\S]*确认入库/,
+    )
+    expect(source).toMatch(
+      /确认出库[\s\S]*v-if=\"canSubmitTransaction\"|v-if=\"canSubmitTransaction\"[\s\S]*确认出库/,
+    )
   })
 })

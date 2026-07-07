@@ -48,7 +48,12 @@ function onResize() {
 // ---- Dropdown data ----
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
-const approvalStatusOptions = [APPROVAL_DRAFT, APPROVAL_APPROVING, APPROVAL_APPROVED, APPROVAL_REJECTED]
+const approvalStatusOptions = [
+  APPROVAL_DRAFT,
+  APPROVAL_APPROVING,
+  APPROVAL_APPROVED,
+  APPROVAL_REJECTED,
+]
 const APPROVAL_STATUS_DICT = 'approval_status'
 const TARGET_STATUS_DICT = 'cost_target_status'
 
@@ -497,7 +502,9 @@ onUnmounted(() => {
                     {{ row.isActive === 1 ? '当前启用' : '未启用' }}
                   </a-tag>
                 </div>
-                <div class="ct-mobile-card-meta">成本目标：{{ fmtAmount(row.totalTargetAmount) }} 万元</div>
+                <div class="ct-mobile-card-meta">
+                  成本目标：{{ fmtAmount(row.totalTargetAmount) }} 万元
+                </div>
                 <div class="ct-mobile-card-meta">
                   审批状态：{{ approvalStatusLabel(row.approvalStatus) || '-' }}
                 </div>
@@ -551,7 +558,10 @@ onUnmounted(() => {
                         <CheckCircleOutlined style="margin-right: 4px" />切换版本
                       </a-menu-item>
                       <a-menu-item
-                        v-if="row.approvalStatus === APPROVAL_DRAFT || row.approvalStatus === APPROVAL_REJECTED"
+                        v-if="
+                          row.approvalStatus === APPROVAL_DRAFT ||
+                          row.approvalStatus === APPROVAL_REJECTED
+                        "
                         danger
                         @click="handleDelete(row)"
                       >

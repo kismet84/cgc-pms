@@ -13,11 +13,15 @@ const SUCCESS_CODE = '0'
 /** Queue timeout in ms — draining forever-queued requests */
 const REFRESH_QUEUE_TIMEOUT = 15_000
 
-const runtimeApiBaseUrl = (window as unknown as { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } })
-  .__APP_RUNTIME_CONFIG__?.apiBaseUrl
-const devQueryApiBaseUrl = import.meta.env.DEV ? new URLSearchParams(window.location.search).get('apiBaseUrl') : null
+const runtimeApiBaseUrl = (
+  window as unknown as { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }
+).__APP_RUNTIME_CONFIG__?.apiBaseUrl
+const devQueryApiBaseUrl = import.meta.env.DEV
+  ? new URLSearchParams(window.location.search).get('apiBaseUrl')
+  : null
 
-const API_BASE_URL = devQueryApiBaseUrl || runtimeApiBaseUrl || import.meta.env.VITE_API_BASE_URL || '/api'
+const API_BASE_URL =
+  devQueryApiBaseUrl || runtimeApiBaseUrl || import.meta.env.VITE_API_BASE_URL || '/api'
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN'
 const CSRF_HEADER_NAME = 'X-XSRF-TOKEN'
 const CSRF_SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
@@ -69,15 +73,9 @@ export const refreshClient: AxiosInstance = axios.create({
 })
 
 // ── Normal request interceptor ──
-service.interceptors.request.use(
-  attachCsrfHeader,
-  (error) => Promise.reject(error),
-)
+service.interceptors.request.use(attachCsrfHeader, (error) => Promise.reject(error))
 
-refreshClient.interceptors.request.use(
-  attachCsrfHeader,
-  (error) => Promise.reject(error),
-)
+refreshClient.interceptors.request.use(attachCsrfHeader, (error) => Promise.reject(error))
 
 // ── Refresh state ──
 let isRefreshing = false

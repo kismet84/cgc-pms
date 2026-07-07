@@ -33,12 +33,18 @@ test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
     const actionSelects = sharedPage.locator('.dashboard-actions .ant-select')
     await expect(actionSelects).toHaveCount(2)
 
-    const selectedTexts = await actionSelects.locator('.ant-select-selection-item').allTextContents()
+    const selectedTexts = await actionSelects
+      .locator('.ant-select-selection-item')
+      .allTextContents()
     expect(selectedTexts[0]?.trim().length ?? 0).toBeGreaterThan(0)
     expect(selectedTexts[1]?.trim().length ?? 0).toBeGreaterThan(0)
 
-    const tabLabels = (await sharedPage.locator('.role-tabs .ant-tabs-tab').allTextContents()).map((text) => text.trim())
-    expect(tabLabels).toEqual(expect.arrayContaining(['商务经理', '项目经理', '采购经理', '生产经理', '总工程师']))
+    const tabLabels = (await sharedPage.locator('.role-tabs .ant-tabs-tab').allTextContents()).map(
+      (text) => text.trim(),
+    )
+    expect(tabLabels).toEqual(
+      expect.arrayContaining(['商务经理', '项目经理', '采购经理', '生产经理', '总工程师']),
+    )
 
     await sharedPage.screenshot({ path: 'e2e/screenshots/dashboard-structure.png', fullPage: true })
   })
@@ -48,12 +54,17 @@ test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
 
     await expect(sharedPage.getByText('商务成本执行情况')).toBeVisible({ timeout: 5000 })
     await expect(sharedPage.getByText('成本科目排名')).toBeVisible({ timeout: 5000 })
-    await expect(sharedPage.locator('.cost-reference-chart canvas').first()).toBeVisible({ timeout: 8000 })
+    await expect(sharedPage.locator('.cost-reference-chart canvas').first()).toBeVisible({
+      timeout: 8000,
+    })
 
     const canvasCount = await sharedPage.locator('.cost-reference-chart canvas').count()
     expect(canvasCount).toBeGreaterThanOrEqual(1)
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/dashboard-cost-charts.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/dashboard-cost-charts.png',
+      fullPage: true,
+    })
   })
 
   test('should display visible dashboard panel areas', async () => {
@@ -62,9 +73,13 @@ test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
     await expect(sharedPage.getByText('超预算预警').first()).toBeVisible({ timeout: 5000 })
     await expect(sharedPage.getByText('逾期事项').first()).toBeVisible({ timeout: 5000 })
     await expect(sharedPage.getByText('待审批付款').first()).toBeVisible({ timeout: 5000 })
-    await expect(sharedPage.locator('.cost-reference-shell').getByText('成本台账').first()).toBeVisible({ timeout: 5000 })
+    await expect(
+      sharedPage.locator('.cost-reference-shell').getByText('成本台账').first(),
+    ).toBeVisible({ timeout: 5000 })
 
-    const panelCount = await sharedPage.locator('.cost-reference-shell .role-reference-panel, .cost-reference-shell section').count()
+    const panelCount = await sharedPage
+      .locator('.cost-reference-shell .role-reference-panel, .cost-reference-shell section')
+      .count()
     expect(panelCount).toBeGreaterThanOrEqual(3)
 
     await sharedPage.screenshot({ path: 'e2e/screenshots/dashboard-panels.png', fullPage: true })
@@ -89,8 +104,14 @@ test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
   test('should switch between role tabs and verify content changes', async () => {
     await waitForDashboard(sharedPage)
 
-    await sharedPage.locator('.role-tabs .ant-tabs-tab').filter({ hasText: '项目经理' }).first().click()
-    await expect(sharedPage.locator('.role-tabs .ant-tabs-tab-active').filter({ hasText: '项目经理' })).toBeVisible({
+    await sharedPage
+      .locator('.role-tabs .ant-tabs-tab')
+      .filter({ hasText: '项目经理' })
+      .first()
+      .click()
+    await expect(
+      sharedPage.locator('.role-tabs .ant-tabs-tab-active').filter({ hasText: '项目经理' }),
+    ).toBeVisible({
       timeout: 5000,
     })
 
@@ -103,12 +124,21 @@ test.describe('Dashboard: Charts → Data Cards → Role Tabs', () => {
       console.log('需要确认：当前“项目经理”标签可切换，但本环境未返回项目经理内容区数据')
     }
 
-    await sharedPage.locator('.role-tabs .ant-tabs-tab').filter({ hasText: '商务经理' }).first().click()
-    await expect(sharedPage.locator('.role-tabs .ant-tabs-tab-active').filter({ hasText: '商务经理' })).toBeVisible({
+    await sharedPage
+      .locator('.role-tabs .ant-tabs-tab')
+      .filter({ hasText: '商务经理' })
+      .first()
+      .click()
+    await expect(
+      sharedPage.locator('.role-tabs .ant-tabs-tab-active').filter({ hasText: '商务经理' }),
+    ).toBeVisible({
       timeout: 5000,
     })
     await expect(sharedPage.locator('.cost-reference-shell')).toBeVisible({ timeout: 5000 })
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/dashboard-role-switch.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/dashboard-role-switch.png',
+      fullPage: true,
+    })
   })
 })

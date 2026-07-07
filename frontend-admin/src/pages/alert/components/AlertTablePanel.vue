@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import type { AlertLogVO } from '@/types/alert'
 import { ColumnSettingsButton } from '@/components/list-page'
-import {
-  ALERT_PROCESS_STATUS_COLOR,
-  RULE_TYPE_LABELS,
-  SEVERITY_COLOR,
-} from '@/types/alert'
+import { ALERT_PROCESS_STATUS_COLOR, RULE_TYPE_LABELS, SEVERITY_COLOR } from '@/types/alert'
 
 type AlertProcessStatus = 'OPEN' | 'PROCESSED' | 'ARCHIVED' | 'INVALID'
 
@@ -51,17 +47,20 @@ defineProps<{
   <section class="alert-panel alert-table-panel">
     <div class="alert-toolbar">
       <div class="alert-toolbar-left">
-        <a-button type="primary" :disabled="selectedCount === 0" @click="handleBatchStatus('PROCESSED')">批量处理</a-button>
+        <a-button
+          type="primary"
+          :disabled="selectedCount === 0"
+          @click="handleBatchStatus('PROCESSED')"
+          >批量处理</a-button
+        >
         <a-button :disabled="selectedCount === 0" @click="handleBatchMarkRead">标记已读</a-button>
-        <a-button :disabled="selectedCount === 0" @click="handleBatchStatus('ARCHIVED')">归档</a-button>
+        <a-button :disabled="selectedCount === 0" @click="handleBatchStatus('ARCHIVED')"
+          >归档</a-button
+        >
         <a-button @click="exportCurrentView">导出</a-button>
         <span class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>
       </div>
-      <ColumnSettingsButton
-        :columns="columnSettings"
-        :visible="colVisible"
-        @toggle="toggleCol"
-      />
+      <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
     </div>
 
     <div class="lg-table-wrap alert-grid-wrap">
@@ -112,7 +111,10 @@ defineProps<{
           </a-tag>
         </template>
         <template #processStatus="{ row }">
-          <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(row.processStatus ?? 'OPEN')] ?? 'default'" class="alert-tag">
+          <a-tag
+            :color="ALERT_PROCESS_STATUS_COLOR[String(row.processStatus ?? 'OPEN')] ?? 'default'"
+            class="alert-tag"
+          >
             {{ String(row.processStatus ?? 'OPEN') }}
           </a-tag>
         </template>
@@ -132,7 +134,9 @@ defineProps<{
         </template>
         <template #action="{ row }">
           <div class="alert-row-actions">
-            <a-button v-if="row.isRead === 0" type="link" size="small" @click="handleMarkRead(row)">标记已读</a-button>
+            <a-button v-if="row.isRead === 0" type="link" size="small" @click="handleMarkRead(row)"
+              >标记已读</a-button
+            >
             <a-button
               v-if="String(row.processStatus ?? 'OPEN') !== 'PROCESSED'"
               type="link"

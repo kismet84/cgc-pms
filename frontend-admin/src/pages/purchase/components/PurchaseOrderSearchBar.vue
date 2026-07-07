@@ -51,7 +51,8 @@ defineProps<{
         show-search
         size="large"
         :filter-option="
-          (input: string, option: SelectOption) => option.label?.toLowerCase().includes(input.toLowerCase())
+          (input: string, option: SelectOption) =>
+            option.label?.toLowerCase().includes(input.toLowerCase())
         "
         @change="onSearch"
       >
@@ -68,7 +69,8 @@ defineProps<{
         show-search
         size="large"
         :filter-option="
-          (input: string, option: SelectOption) => option.label?.toLowerCase().includes(input.toLowerCase())
+          (input: string, option: SelectOption) =>
+            option.label?.toLowerCase().includes(input.toLowerCase())
         "
         @change="onSearch"
       >

@@ -56,7 +56,8 @@ function loadCache<T>(key: CacheKey): CachePayload<T> | null {
   return null
 }
 
-function persistCache<T>(key: CacheKey, _items: T[], _savedAt = Date.now()) {
+function persistCache<T>(key: CacheKey, _items: T[]) {
+  void _items
   try {
     localStorage.removeItem(storageKey(key))
   } catch (error) {
@@ -149,7 +150,10 @@ export const useReferenceStore = defineStore('reference', () => {
   async function fetchContracts(params?: FetchContractsParams): Promise<ContractVO[]> {
     // Filtered queries should refresh the in-memory list that pages read from,
     // but must not become the base TTL cache for later unfiltered callers.
-    if (params && (params.projectId || params.contractType || params.contractStatus || params.approvalStatus)) {
+    if (
+      params &&
+      (params.projectId || params.contractType || params.contractStatus || params.approvalStatus)
+    ) {
       const res = await getContractLedger({ pageNo: 1, pageSize: 50, ...params })
       const filtered = (res.records ?? res.data ?? res) as ContractVO[]
       contracts.value = filtered

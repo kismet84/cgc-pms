@@ -115,7 +115,10 @@ export function getWorkflowInstanceStatusMeta(status: unknown) {
   }
 }
 
-export function getWorkflowTaskStatusMeta(status: unknown, fallback: Record<string, { text: string; color: string }>) {
+export function getWorkflowTaskStatusMeta(
+  status: unknown,
+  fallback: Record<string, { text: string; color: string }>,
+) {
   const key = String(status ?? '').trim()
   if (!key) return { text: '未知任务状态', color: 'default' }
   return {
@@ -124,7 +127,10 @@ export function getWorkflowTaskStatusMeta(status: unknown, fallback: Record<stri
   }
 }
 
-export function getWorkflowNodeStatusMeta(status: unknown, fallback: Record<string, { text: string; color: string }>) {
+export function getWorkflowNodeStatusMeta(
+  status: unknown,
+  fallback: Record<string, { text: string; color: string }>,
+) {
   const key = String(status ?? '').trim()
   if (!key) return { text: '未知节点状态', color: 'default' }
   return {
@@ -141,25 +147,31 @@ function mapStatusColor(source: Record<string, { text: string; color: string }>)
   return Object.fromEntries(Object.entries(source).map(([key, value]) => [key, value.color]))
 }
 
-export function getWorkflowBusinessEntryPath(record: {
-  businessId?: unknown
-  businessType?: unknown
-} | null) {
+export function getWorkflowBusinessEntryPath(
+  record: {
+    businessId?: unknown
+    businessType?: unknown
+  } | null,
+) {
   const businessId = String(record?.businessId ?? '').trim()
   if (!businessId) return ''
   return getWorkflowBusinessEntry(record)?.targetRoute(businessId) ?? ''
 }
 
-export function getWorkflowBusinessEntry(record: {
-  businessType?: unknown
-} | null) {
+export function getWorkflowBusinessEntry(
+  record: {
+    businessType?: unknown
+  } | null,
+) {
   const key = String(record?.businessType ?? '').trim()
   return workflowBusinessEntryMap.get(key) ?? null
 }
 
-export function getWorkflowBusinessEntryPermission(record: {
-  businessType?: unknown
-} | null) {
+export function getWorkflowBusinessEntryPermission(
+  record: {
+    businessType?: unknown
+  } | null,
+) {
   return getWorkflowBusinessEntry(record)?.permissionCode ?? ''
 }
 

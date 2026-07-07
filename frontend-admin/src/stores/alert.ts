@@ -73,11 +73,12 @@ export const useAlertStore = defineStore('alert', () => {
     result: BatchAlertOperationResult,
     fallbackIds: string[],
   ): BatchAlertOperationResult {
-    const successIds = Array.isArray(result?.successIds) && result.successIds.length
-      ? result.successIds.map((id) => normalizeId(id))
-      : Number(result?.failed ?? 0) === 0
-        ? fallbackIds
-        : []
+    const successIds =
+      Array.isArray(result?.successIds) && result.successIds.length
+        ? result.successIds.map((id) => normalizeId(id))
+        : Number(result?.failed ?? 0) === 0
+          ? fallbackIds
+          : []
     const failures = Array.isArray(result?.failures)
       ? result.failures.map((item) => ({
           alertId: normalizeId(item.alertId),
@@ -157,7 +158,10 @@ export const useAlertStore = defineStore('alert', () => {
     pageSize.value = nextPageSize
   }
 
-  function applyPagedResponse(result: Exclude<AlertListResponse, AlertLogVO[]>, params: AlertListParams) {
+  function applyPagedResponse(
+    result: Exclude<AlertListResponse, AlertLogVO[]>,
+    params: AlertListParams,
+  ) {
     alerts.value = Array.isArray(result?.records) ? result.records : []
     total.value = Number(result?.total ?? alerts.value.length)
     pageNo.value = Number(result?.pageNo ?? params.pageNo ?? params.pageNum ?? 1)
@@ -206,7 +210,10 @@ export const useAlertStore = defineStore('alert', () => {
 
     markBusy(uniqueIds)
     try {
-      const result = normalizeBatchResult(await batchMarkAlertRead({ alertIds: uniqueIds }), uniqueIds)
+      const result = normalizeBatchResult(
+        await batchMarkAlertRead({ alertIds: uniqueIds }),
+        uniqueIds,
+      )
       applyReadState(result.successIds)
       return result
     } finally {

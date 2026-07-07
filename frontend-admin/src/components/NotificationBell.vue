@@ -424,5 +424,4 @@ onUnmounted(() => {
 :deep(.nb-popover .ant-popover-arrow) {
   display: none;
 }
-
 </style>

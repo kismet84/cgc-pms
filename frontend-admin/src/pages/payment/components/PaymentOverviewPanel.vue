@@ -187,7 +187,9 @@ function handleProjectChange(value: string | undefined) {
           <span class="payment-kpi-value"
             >{{ props.fmtAmountText(props.kpiActualPaid) }} <small>万元</small></span
           >
-          <span class="payment-kpi-progress"><span :style="{ width: props.paidPct + '%' }"></span></span>
+          <span class="payment-kpi-progress"
+            ><span :style="{ width: props.paidPct + '%' }"></span
+          ></span>
         </div>
         <div class="lg-kpi-card payment-kpi-item is-progress is-unpaid">
           <span class="payment-kpi-icon is-unpaid"><WalletOutlined /></span>
@@ -233,12 +235,17 @@ function handleProjectChange(value: string | undefined) {
             <span class="lg-type-dot" :style="{ background: it.color }"></span>
             <span class="lg-type-label">{{ it.label }}</span>
             <span class="lg-type-bar-wrap">
-              <span class="lg-type-bar" :style="{ width: it.percent + '%', background: it.color }"></span>
+              <span
+                class="lg-type-bar"
+                :style="{ width: it.percent + '%', background: it.color }"
+              ></span>
             </span>
             <span class="lg-type-num">{{ it.count }}</span>
             <span class="lg-type-pct">{{ it.percent }}%</span>
           </div>
-          <div v-if="!props.statusBreakdown.length" class="payment-analysis-empty">暂无付款状态数据</div>
+          <div v-if="!props.statusBreakdown.length" class="payment-analysis-empty">
+            暂无付款状态数据
+          </div>
         </section>
 
         <section class="payment-analysis-section">
@@ -247,7 +254,10 @@ function handleProjectChange(value: string | undefined) {
             <span class="lg-type-dot" :style="{ background: it.color }"></span>
             <span class="lg-type-label">{{ it.label }}</span>
             <span class="lg-type-bar-wrap">
-              <span class="lg-type-bar" :style="{ width: it.percent + '%', background: it.color }"></span>
+              <span
+                class="lg-type-bar"
+                :style="{ width: it.percent + '%', background: it.color }"
+              ></span>
             </span>
             <span class="lg-type-num">{{ it.count }}</span>
             <span class="lg-type-pct">{{ it.percent }}%</span>

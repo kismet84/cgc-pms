@@ -77,7 +77,10 @@ async function createAuthenticatedPage(browser: Browser) {
 
 async function selectFirstAvailableOption(select: Locator) {
   await select.click()
-  const dropdown = select.page().locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+  const dropdown = select
+    .page()
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
   await expect(dropdown).toBeVisible({ timeout: 5000 })
   const options = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
   const optionCount = await options.count()
@@ -93,9 +96,15 @@ async function selectFirstAvailableOption(select: Locator) {
 
 async function selectOptionByText(select: Locator, text: string) {
   await select.click()
-  const dropdown = select.page().locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+  const dropdown = select
+    .page()
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
   await expect(dropdown).toBeVisible({ timeout: 10000 })
-  const option = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)').filter({ hasText: text }).first()
+  const option = dropdown
+    .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
+    .filter({ hasText: text })
+    .first()
   await expect(option).toBeVisible({ timeout: 10000 })
   await option.click()
   await dropdown.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
@@ -263,7 +272,9 @@ async function createPaymentApplication(seed: PaymentSeed) {
     applyAmount: '100000',
     applyReason,
   })
-  const receiptItems = await apiGet<Array<{ id: string; amount?: string }>>(`/api/receipts/${receiptId}/items`)
+  const receiptItems = await apiGet<Array<{ id: string; amount?: string }>>(
+    `/api/receipts/${receiptId}/items`,
+  )
   expect(receiptItems.length, '验收单应至少返回 1 条明细').toBeGreaterThan(0)
   await apiPost<void>(`/api/pay-applications/${createdId}/basis/batch`, [
     {
@@ -322,11 +333,20 @@ test.describe('Payment: Application list and detail', () => {
     await waitForPaymentList(sharedPage)
 
     await expect(sharedPage.locator('.payment-page-head')).toBeVisible()
-    await expect(sharedPage.locator('.payment-search-actions button').filter({ hasText: '查询' })).toBeVisible()
-    await expect(sharedPage.locator('.payment-search-actions button').filter({ hasText: '重置' })).toBeVisible()
-    await expect(sharedPage.locator('.payment-toolbar button').filter({ hasText: '新建申请' })).toBeVisible()
+    await expect(
+      sharedPage.locator('.payment-search-actions button').filter({ hasText: '查询' }),
+    ).toBeVisible()
+    await expect(
+      sharedPage.locator('.payment-search-actions button').filter({ hasText: '重置' }),
+    ).toBeVisible()
+    await expect(
+      sharedPage.locator('.payment-toolbar button').filter({ hasText: '新建申请' }),
+    ).toBeVisible()
 
-    await sharedPage.screenshot({ path: screenshotPath('payment-application-list'), fullPage: true })
+    await sharedPage.screenshot({
+      path: screenshotPath('payment-application-list'),
+      fullPage: true,
+    })
   })
 
   test('payment application table shows pay type and status tags', async () => {
@@ -350,7 +370,10 @@ test.describe('Payment: Application list and detail', () => {
     if (await payTypeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
       const selected = await selectFirstAvailableOption(payTypeSelect)
       if (selected) {
-        await sharedPage.locator('.payment-search-actions button').filter({ hasText: '查询' }).click()
+        await sharedPage
+          .locator('.payment-search-actions button')
+          .filter({ hasText: '查询' })
+          .click()
         await expect(sharedPage.locator('.vxe-table').first()).toBeVisible({ timeout: 5000 })
       }
     }
@@ -362,7 +385,9 @@ test.describe('Payment: Application list and detail', () => {
     const seed = await seedPaymentCreateContext()
     const createdMeta = await createPaymentApplication(seed)
     await waitForPaymentList(sharedPage)
-    const created = await apiGet<PayApplicationDetail>(`/api/pay-applications/${createdMeta.createdId}`)
+    const created = await apiGet<PayApplicationDetail>(
+      `/api/pay-applications/${createdMeta.createdId}`,
+    )
     expect(created.applyCode, '创建后应返回申请编号').toBeTruthy()
     expect(created.payStatus, '创建后应返回支付状态').toBeTruthy()
     expect(created.approvalStatus, '创建后应返回审批状态').toBeTruthy()
@@ -374,13 +399,13 @@ test.describe('Payment: Application list and detail', () => {
     const searchContractsReload = waitForContractsReload(sharedPage)
     await selectOptionByText(searchProjectSelect, seed.projectName)
     await searchContractsReload
-    await selectOptionByText(
-      searchContractSelect,
-      seed.contractName,
-    )
+    await selectOptionByText(searchContractSelect, seed.contractName)
     await sharedPage.locator('.payment-search-actions button').filter({ hasText: '查询' }).click()
 
-    const createdRow = sharedPage.locator('.vxe-body--row').filter({ hasText: created.applyCode }).first()
+    const createdRow = sharedPage
+      .locator('.vxe-body--row')
+      .filter({ hasText: created.applyCode })
+      .first()
     await expect(createdRow).toBeVisible({ timeout: 10000 })
     await expect(createdRow).toContainText(seed.contractName)
     await expect(createdRow).toContainText('10.00 万')
@@ -390,7 +415,10 @@ test.describe('Payment: Application list and detail', () => {
       APPROVAL_STATUS_LABEL[created.approvalStatus] ?? created.approvalStatus,
     )
 
-    await sharedPage.screenshot({ path: screenshotPath('payment-created-readback'), fullPage: true })
+    await sharedPage.screenshot({
+      path: screenshotPath('payment-created-readback'),
+      fullPage: true,
+    })
   })
 })
 
@@ -399,9 +427,15 @@ test.describe('Invoice: List → Registration', () => {
     await waitForInvoiceList(sharedPage)
 
     await expect(sharedPage.locator('.invoice-page-head')).toBeVisible()
-    await expect(sharedPage.locator('.invoice-search-actions button').filter({ hasText: '查询' })).toBeVisible()
-    await expect(sharedPage.locator('.invoice-search-actions button').filter({ hasText: '重置' })).toBeVisible()
-    await expect(sharedPage.locator('.invoice-toolbar button').filter({ hasText: '新增发票' })).toBeVisible()
+    await expect(
+      sharedPage.locator('.invoice-search-actions button').filter({ hasText: '查询' }),
+    ).toBeVisible()
+    await expect(
+      sharedPage.locator('.invoice-search-actions button').filter({ hasText: '重置' }),
+    ).toBeVisible()
+    await expect(
+      sharedPage.locator('.invoice-toolbar button').filter({ hasText: '新增发票' }),
+    ).toBeVisible()
 
     await sharedPage.screenshot({ path: screenshotPath('invoice-list'), fullPage: true })
   })
@@ -426,7 +460,10 @@ test.describe('Invoice: List → Registration', () => {
     if (await verifySelect.isVisible({ timeout: 3000 }).catch(() => false)) {
       const selected = await selectFirstAvailableOption(verifySelect)
       if (selected) {
-        await sharedPage.locator('.invoice-search-actions button').filter({ hasText: '查询' }).click()
+        await sharedPage
+          .locator('.invoice-search-actions button')
+          .filter({ hasText: '查询' })
+          .click()
         await expect(sharedPage.locator('.vxe-table').first()).toBeVisible({ timeout: 5000 })
       }
     }
@@ -443,7 +480,10 @@ test.describe('Invoice: List → Registration', () => {
 
     if (modalVisible) {
       console.log('Invoice registration modal opened')
-      await sharedPage.screenshot({ path: screenshotPath('invoice-register-modal'), fullPage: true })
+      await sharedPage.screenshot({
+        path: screenshotPath('invoice-register-modal'),
+        fullPage: true,
+      })
       await modal.locator('.ant-modal-close').click()
       await expect(modal).not.toBeVisible({ timeout: 5000 })
     } else {

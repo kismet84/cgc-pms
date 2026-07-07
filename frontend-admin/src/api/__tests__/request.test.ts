@@ -29,9 +29,12 @@ async function loadRequestModule(options: {
   vi.stubEnv('VITE_API_BASE_URL', options.envApiBaseUrl ?? '/env-api')
 
   window.history.pushState({}, '', options.query ?? '/')
-  delete (window as Window & { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }).__APP_RUNTIME_CONFIG__
+  delete (window as Window & { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } })
+    .__APP_RUNTIME_CONFIG__
   if (options.runtimeApiBaseUrl) {
-    ;(window as Window & { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }).__APP_RUNTIME_CONFIG__ = {
+    ;(
+      window as Window & { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }
+    ).__APP_RUNTIME_CONFIG__ = {
       apiBaseUrl: options.runtimeApiBaseUrl,
     }
   }
@@ -45,7 +48,8 @@ afterEach(() => {
   mockMessageError.mockReset()
   document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
   window.history.pushState({}, '', '/')
-  delete (window as Window & { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }).__APP_RUNTIME_CONFIG__
+  delete (window as Window & { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } })
+    .__APP_RUNTIME_CONFIG__
 })
 
 describe('api request base URL resolution', () => {

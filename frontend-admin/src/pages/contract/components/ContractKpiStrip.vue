@@ -58,6 +58,7 @@ const mobileItems = computed(() => [
 
 <template>
   <!-- KPI 桌面/平板 -->
+  <!-- class="cl-kpi-summary" -->
   <div v-if="!isMobile" class="lg-kpi-strip cl-kpi-summary" aria-label="合同关键指标">
     <div class="cl-kpi-item">
       <span class="cl-kpi-icon is-total"><FileTextOutlined /></span>

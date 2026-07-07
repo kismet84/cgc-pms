@@ -326,7 +326,9 @@ onMounted(() => {
           >
             <template #roleNames="{ row }">
               <template v-if="row.roleNames && row.roleNames.length">
-                <a-tag v-for="(r, i) in row.roleNames" :key="i" class="system-tag-gap">{{ r }}</a-tag>
+                <a-tag v-for="(r, i) in row.roleNames" :key="i" class="system-tag-gap">{{
+                  r
+                }}</a-tag>
               </template>
               <span v-else class="lg-muted-text">-</span>
             </template>
@@ -337,20 +339,27 @@ onMounted(() => {
             </template>
             <template #action="{ row }">
               <a-dropdown :trigger="['click']">
-              <a-button
-                class="lg-row-action-trigger"
-                size="small"
-                type="text"
-                title="用户操作"
-                aria-label="用户操作"
-              >
+                <a-button
+                  class="lg-row-action-trigger"
+                  size="small"
+                  type="text"
+                  title="用户操作"
+                  aria-label="用户操作"
+                >
                   <MoreOutlined />
                 </a-button>
                 <template #overlay>
                   <a-menu>
                     <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                    <a-menu-item :danger="row.status === STATUS_ENABLE" @click="handleToggleStatus(row)">
-                      {{ row.status === STATUS_ENABLE ? statusLabel(STATUS_DISABLE) : statusLabel(STATUS_ENABLE) }}
+                    <a-menu-item
+                      :danger="row.status === STATUS_ENABLE"
+                      @click="handleToggleStatus(row)"
+                    >
+                      {{
+                        row.status === STATUS_ENABLE
+                          ? statusLabel(STATUS_DISABLE)
+                          : statusLabel(STATUS_ENABLE)
+                      }}
                     </a-menu-item>
                     <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
                   </a-menu>

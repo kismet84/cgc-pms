@@ -151,22 +151,18 @@ function handleSectionClick(item: MenuItem) {
     aria-label="主导航菜单"
     @click="handleMenuClick"
   >
-    <a-sub-menu
-      v-for="item in menuItems"
-      :key="item.key"
-      :data-submenu-key="item.key"
-    >
+    <a-sub-menu v-for="item in menuItems" :key="item.key" :data-submenu-key="item.key">
       <template #title>
-        <div class="sidebar-submenu-title" :data-menu-title-key="item.key" @click="handleSectionClick(item)">
+        <div
+          class="sidebar-submenu-title"
+          :data-menu-title-key="item.key"
+          @click="handleSectionClick(item)"
+        >
           <component :is="item.icon" v-if="item.icon" class="sidebar-submenu-icon" />
           <span class="sidebar-submenu-text">{{ item.label }}</span>
         </div>
       </template>
-      <a-menu-item
-        v-for="child in item.children"
-        :key="child.key"
-        :data-menu-key="child.key"
-      >
+      <a-menu-item v-for="child in item.children" :key="child.key" :data-menu-key="child.key">
         <span class="sidebar-menu-item-label">{{ child.label }}</span>
       </a-menu-item>
     </a-sub-menu>

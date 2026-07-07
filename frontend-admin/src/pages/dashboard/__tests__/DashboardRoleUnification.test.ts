@@ -70,7 +70,7 @@ describe('Dashboard role UI unification', () => {
     expect(purchaseViewSource).toContain("APPROVED: '已审批'")
     expect(purchaseViewSource).toContain("APPROVING: '审批中'")
     expect(purchaseViewSource).toContain("IN_TRANSIT: '运输中'")
-    expect(purchaseViewSource).toContain('STATUS_LABEL[status] ?? \'-\'')
+    expect(purchaseViewSource).toContain("STATUS_LABEL[status] ?? '-'")
     expect(purchaseViewSource).not.toContain('STATUS_LABEL[status] ?? status')
     expect(purchaseViewSource).toContain('purchase-status')
     expect(purchaseViewSource).toContain('purchase-code')
@@ -113,10 +113,7 @@ describe('Dashboard role UI unification', () => {
       expect(pmViewSource).not.toContain(copy)
     }
 
-    for (const copy of [
-      '验收、领料、库存与分包计量',
-      '生产经理 MVP 仅展示执行协同事项',
-    ]) {
+    for (const copy of ['验收、领料、库存与分包计量', '生产经理 MVP 仅展示执行协同事项']) {
       expect(productionViewSource).not.toContain(copy)
     }
 
@@ -132,7 +129,9 @@ describe('Dashboard role UI unification', () => {
   it('keeps chief engineer bottom tables as independent cards', () => {
     expect(chiefViewSource).not.toContain('role-reference-chart-grid role-reference-chart-grid--2')
     expect(chiefViewSource).toContain('chief-bottom-card-grid')
-    expect(chiefViewSource.match(/role-reference-bottom-panel/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    expect(
+      chiefViewSource.match(/role-reference-bottom-panel/g)?.length ?? 0,
+    ).toBeGreaterThanOrEqual(2)
   })
 
   it('keeps chief engineer bottom tables compact and date-only', () => {
@@ -143,11 +142,13 @@ describe('Dashboard role UI unification', () => {
 
   it('keeps project manager bottom tables as two independent cards', () => {
     expect(pmViewSource).toContain('pm-bottom-card-grid')
-    expect(pmViewSource.match(/role-reference-bottom-panel/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    expect(pmViewSource.match(/role-reference-bottom-panel/g)?.length ?? 0).toBeGreaterThanOrEqual(
+      2,
+    )
   })
 
   it('keeps project manager bottom tables compact in empty states', () => {
-    expect(pmViewSource).toContain(":scroll=\"{ x: 'max-content', y: 248 }\"")
+    expect(pmViewSource).toContain(':scroll="{ x: \'max-content\', y: 248 }"')
     expect(pmViewSource).toContain('pm-bottom-table')
     expect(pmViewSource).toContain('.pm-bottom-table :deep(.ant-empty-image)')
   })
@@ -164,8 +165,12 @@ describe('Dashboard role UI unification', () => {
     expect(purchaseViewSource).toContain('activeBottomTab')
     expect(purchaseViewSource).toContain('purchaseBottomRows')
     expect(purchaseViewSource).toContain(':columns="purchaseRequestCols"')
-    expect(purchaseViewSource).toContain('const purchaseOrders = computed(() => props.data.purchaseOrders ?? [])')
-    expect(purchaseViewSource).not.toContain('const purchaseOrders = computed(() => overdueOrders.value)')
+    expect(purchaseViewSource).toContain(
+      'const purchaseOrders = computed(() => props.data.purchaseOrders ?? [])',
+    )
+    expect(purchaseViewSource).not.toContain(
+      'const purchaseOrders = computed(() => overdueOrders.value)',
+    )
     expect(purchaseViewSource).not.toContain('...pendingReceipts.value')
     expect(purchaseViewSource).not.toContain('uniqueBusinessRows')
   })
@@ -179,12 +184,16 @@ describe('Dashboard role UI unification', () => {
     expect(purchaseViewSource).not.toContain('v-summary-title="displayText(text)"')
     expect(purchaseViewSource).not.toContain('el.title =')
     expect(purchaseViewSource).not.toContain(':ellipsis="{ tooltip: displayText(text) }"')
-    expect(purchaseViewSource).not.toContain('<a-tooltip v-else-if="column.dataIndex === \'title\'"')
+    expect(purchaseViewSource).not.toContain(
+      '<a-tooltip v-else-if="column.dataIndex === \'title\'"',
+    )
   })
 
   it('keeps dashboard summary columns aligned with the local summary rules', () => {
     expect(costViewSource).toContain('cost-alert-summary')
-    expect(costViewSource).not.toContain('overflow: visible;\n  text-overflow: clip;\n  white-space: normal;')
+    expect(costViewSource).not.toContain(
+      'overflow: visible;\n  text-overflow: clip;\n  white-space: normal;',
+    )
 
     expect(purchaseViewSource).toContain("dataIndex: 'itemSummary'")
     expect(purchaseViewSource).toContain('function purchaseSummary')
@@ -225,18 +234,26 @@ describe('Dashboard role UI unification', () => {
     expect(pmViewSource).toContain("{ title: '金额（万元）', dataIndex: 'contractAmount'")
     expect(pmViewSource).toContain('function amountText')
     expect(pmViewSource).toContain('amountText(text)')
-    expect(pmViewSource).not.toContain("column.dataIndex === 'amount'\" class=\"pm-number\">\n                {{ displayText(text) }}")
-    expect(pmViewSource).not.toContain("column.dataIndex === 'contractAmount'\" class=\"pm-number\">\n              {{ displayText(text) }}")
+    expect(pmViewSource).not.toContain(
+      'column.dataIndex === \'amount\'" class="pm-number">\n                {{ displayText(text) }}',
+    )
+    expect(pmViewSource).not.toContain(
+      'column.dataIndex === \'contractAmount\'" class="pm-number">\n              {{ displayText(text) }}',
+    )
 
     expect(purchaseViewSource).toContain("{ title: '金额（万元）', dataIndex: 'amount'")
     expect(purchaseViewSource).toContain('function amountText')
     expect(purchaseViewSource).toContain('amountText(text)')
-    expect(purchaseViewSource).not.toContain("column.dataIndex === 'amount'\" class=\"purchase-amount\">\n            {{ displayText(text) }}")
+    expect(purchaseViewSource).not.toContain(
+      'column.dataIndex === \'amount\'" class="purchase-amount">\n            {{ displayText(text) }}',
+    )
 
     expect(productionViewSource).toContain("{ title: '金额（万元）', dataIndex: 'amount'")
     expect(productionViewSource).toContain('function amountText')
     expect(productionViewSource).toContain('amountText(text)')
-    expect(productionViewSource).not.toContain("column.dataIndex === 'amount'\" class=\"production-number\">\n            {{ displayText(text) }}")
+    expect(productionViewSource).not.toContain(
+      'column.dataIndex === \'amount\'" class="production-number">\n            {{ displayText(text) }}',
+    )
 
     expect(costViewSource).toContain('amountText(item.payAmount)')
     expect(chiefViewSource).not.toContain('fmtWan')
@@ -247,14 +264,14 @@ describe('Dashboard role UI unification', () => {
     expect(pmViewSource).toContain('businessTypeLabel(text)')
     expect(pmViewSource).toContain('PROJECT_STATUS_LABEL')
     expect(pmViewSource).toContain('projectStatusLabel(text)')
-    expect(pmViewSource).toContain('?? \'-\'')
+    expect(pmViewSource).toContain("?? '-'")
 
     expect(productionViewSource).toContain('STATUS_LABEL')
     expect(productionViewSource).toContain('statusLabel(text)')
-    expect(productionViewSource).toContain('?? \'-\'')
+    expect(productionViewSource).toContain("?? '-'")
 
     expect(chiefViewSource).toContain('TECH_STATUS_LABEL')
     expect(chiefViewSource).toContain('techStatusLabel(text)')
-    expect(chiefViewSource).toContain('?? \'-\'')
+    expect(chiefViewSource).toContain("?? '-'")
   })
 })

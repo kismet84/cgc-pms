@@ -103,7 +103,9 @@ export const useContractStore = defineStore('contract', () => {
   async function fetchPaymentTerms(contractId: string) {
     termsLoading.value = true
     try {
-      paymentTerms.value = normalizeArray<ContractPaymentTerm>(await getContractPaymentTerms(contractId))
+      paymentTerms.value = normalizeArray<ContractPaymentTerm>(
+        await getContractPaymentTerms(contractId),
+      )
     } catch (e) {
       if (import.meta.env.DEV) {
         console.error('Contract store error:', e)

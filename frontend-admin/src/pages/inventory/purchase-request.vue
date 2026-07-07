@@ -469,8 +469,9 @@ function getPopupContainer() {
 const kpiReqTotal = computed(() => tableData.value.length)
 const kpiReqPending = computed(
   () =>
-    tableData.value.filter((r) => r.approvalStatus === APPROVAL_DRAFT || r.approvalStatus === APPROVAL_APPROVING)
-      .length,
+    tableData.value.filter(
+      (r) => r.approvalStatus === APPROVAL_DRAFT || r.approvalStatus === APPROVAL_APPROVING,
+    ).length,
 )
 const kpiReqConverted = computed(
   () => tableData.value.filter((r) => r.status === 'CONVERTED').length,
@@ -578,7 +579,9 @@ onMounted(() => {
             <span class="purchase-request-kpi-icon is-converted"><CheckCircleOutlined /></span>
             <span class="purchase-request-kpi-content">
               <span class="purchase-request-kpi-label">已转PO</span>
-              <span class="purchase-request-kpi-value">{{ kpiReqConverted }} <small>单</small></span>
+              <span class="purchase-request-kpi-value"
+                >{{ kpiReqConverted }} <small>单</small></span
+              >
               <span class="purchase-request-kpi-progress">
                 <span :style="{ width: kpiPct(kpiReqConverted, kpiMax.totalCount) + '%' }"></span>
               </span>
@@ -667,7 +670,10 @@ onMounted(() => {
                   <template #overlay>
                     <a-menu>
                       <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                      <a-menu-item v-if="row.approvalStatus === APPROVAL_DRAFT" @click="handleSubmit(row)">
+                      <a-menu-item
+                        v-if="row.approvalStatus === APPROVAL_DRAFT"
+                        @click="handleSubmit(row)"
+                      >
                         提交审批
                       </a-menu-item>
                       <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>

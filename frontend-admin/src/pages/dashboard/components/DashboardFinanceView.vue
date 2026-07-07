@@ -34,28 +34,36 @@ const riskOpt = computed(() => financeRiskOption())
         <div class="role-reference-kpi-value is-danger">
           {{ fmtWan(data.pendingPaymentAmount) }} <small>万元</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><PayCircleOutlined /> 当前待付</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><PayCircleOutlined /> 当前待付</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #f97316">
         <div class="role-reference-kpi-title">待付款笔数</div>
         <div class="role-reference-kpi-value is-warning">
           {{ fmtNum(data.pendingPaymentCount) }} <small>笔</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><ClockCircleOutlined /> 待处理付款</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><ClockCircleOutlined /> 待处理付款</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #2f7cf6">
         <div class="role-reference-kpi-title">已审批未支付</div>
         <div class="role-reference-kpi-value">
           {{ fmtWan(data.approvedUnpaidAmount) }} <small>万元</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><AuditOutlined /> 审批已完成</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><AuditOutlined /> 审批已完成</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #14b8a6">
         <div class="role-reference-kpi-title">质保金到期</div>
         <div class="role-reference-kpi-value is-cyan">
           {{ fmtWan(data.warrantyExpiringAmount) }} <small>万元</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><WarningOutlined /> 临近释放</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><WarningOutlined /> 临近释放</span>
+        </div>
       </article>
     </section>
 
@@ -91,7 +99,9 @@ const riskOpt = computed(() => financeRiskOption())
       <aside class="role-reference-side-stack">
         <div class="role-reference-panel role-mini-panel is-blue">
           <div class="role-reference-panel-head mini">
-            <strong>待付款明细 <b>（{{ data.pendingPayments.length }}）</b></strong>
+            <strong
+              >待付款明细 <b>（{{ data.pendingPayments.length }}）</b></strong
+            >
           </div>
           <a-table
             :columns="financePayCols"
@@ -105,7 +115,9 @@ const riskOpt = computed(() => financeRiskOption())
         </div>
         <div class="role-reference-panel role-mini-panel is-red">
           <div class="role-reference-panel-head mini">
-            <strong>超比例付款 <b>（{{ data.overRatioPayments.length }}）</b></strong>
+            <strong
+              >超比例付款 <b>（{{ data.overRatioPayments.length }}）</b></strong
+            >
           </div>
           <a-table
             :columns="financePayCols"

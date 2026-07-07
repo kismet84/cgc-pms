@@ -17,8 +17,8 @@ const props = defineProps<{
 const warningItems = computed(() =>
   props.sourceBreakdown.filter((item) => parseFloat(item.amount) > 0).slice(0, 5),
 )
-const warningCount = computed(() =>
-  props.sourceBreakdown.filter((item) => parseFloat(item.amount) > 0).length,
+const warningCount = computed(
+  () => props.sourceBreakdown.filter((item) => parseFloat(item.amount) > 0).length,
 )
 const hasWarningItems = computed(() =>
   props.sourceBreakdown.some((item) => parseFloat(item.amount) > 0),

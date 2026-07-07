@@ -9,3 +9,4 @@ dist-ssr
 .tmp
 .pnpm-store
 e2e/.auth/admin-user.json
+e2e/.auth/admin.json

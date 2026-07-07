@@ -471,7 +471,9 @@ const itemColumns = computed(() => [
   { title: '序号', dataIndex: 'index', width: 46, align: 'center' as const },
   { title: '成本科目', dataIndex: 'costSubjectId', minWidth: 180 },
   { title: '目标金额(元)', dataIndex: 'targetAmount', width: 128, align: 'right' as const },
-  ...(isView.value ? [] : [{ title: '操作', dataIndex: 'ops', width: 54, align: 'center' as const }]),
+  ...(isView.value
+    ? []
+    : [{ title: '操作', dataIndex: 'ops', width: 54, align: 'center' as const }]),
 ])
 
 // ---- Helpers ----
@@ -509,7 +511,13 @@ onMounted(() => {
       <div class="pt-head-actions">
         <a-button :disabled="saving" @click="handleCancel">{{ closeText }}</a-button>
         <a-button v-if="!isView" :loading="saving" @click="handleSave">保存</a-button>
-        <a-button v-if="!isView" type="primary" :loading="saving && !submitting" @click="handleSubmit">
+        <!-- <a-button v-if="!isView" type="primary" :loading="saving && !submitting" @click="handleSubmit"> -->
+        <a-button
+          v-if="!isView"
+          type="primary"
+          :loading="saving && !submitting"
+          @click="handleSubmit"
+        >
           提交审批
         </a-button>
       </div>

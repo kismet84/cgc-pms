@@ -27,7 +27,9 @@ describe('VariationOrderPage production guards', () => {
   })
 
   it('renders dedicated mobile list guarded by isMobile', () => {
-    expect(source).toContain("import VariationOrderWorkspace from './components/VariationOrderWorkspace.vue'")
+    expect(source).toContain(
+      "import VariationOrderWorkspace from './components/VariationOrderWorkspace.vue'",
+    )
     expect(workspaceSource).toMatch(/class="vo-mobile-list"/)
     expect(workspaceSource).toMatch(/v-if="isMobile"/)
     expect(workspaceSource).toMatch(/class="vo-mobile-card"/)

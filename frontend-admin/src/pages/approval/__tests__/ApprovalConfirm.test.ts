@@ -93,9 +93,11 @@ describe('Approval confirm dialogs', () => {
     expect(helperSource).toContain('export function getWorkflowBusinessEntryPermission')
     expect(helperSource).toContain('export function canAccessWorkflowBusinessEntry')
     expect(source).toContain('function openBusinessEntry')
-    expect(source).toMatch(/function openBusinessEntry[\s\S]*?if \(!canOpenBusinessEntry\(record\)\) return/)
+    expect(source).toMatch(
+      /function openBusinessEntry[\s\S]*?if \(!canOpenBusinessEntry\(record\)\) return/,
+    )
     expect(source).toContain('router.push(path)')
-    expect(source).toContain("v-if=\"businessEntryPath(detail)\"")
+    expect(source).toContain('v-if="businessEntryPath(detail)"')
     expect(source).toContain('无权访问该业务单据')
     expect(source).toContain(':disabled="!canOpenBusinessEntry(detail)"')
     expect(source).toContain('查看业务单据')

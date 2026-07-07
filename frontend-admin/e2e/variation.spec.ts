@@ -43,7 +43,9 @@ test.describe('Variation E2E', () => {
     await expect(sharedPage.getByText('签证总数')).toBeVisible()
     await expect(sharedPage.locator('.vo-kpi-label').filter({ hasText: '已通过' })).toBeVisible()
     await expect(sharedPage.locator('.vo-kpi-label').filter({ hasText: '成本方向' })).toBeVisible()
-    await expect(sharedPage.locator('.vxe-table, .ant-table').first()).toBeVisible({ timeout: 10000 })
+    await expect(sharedPage.locator('.vxe-table, .ant-table').first()).toBeVisible({
+      timeout: 10000,
+    })
     await expectNoVariationError(sharedPage)
   })
 

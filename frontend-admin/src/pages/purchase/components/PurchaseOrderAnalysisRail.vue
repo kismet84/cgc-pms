@@ -1,8 +1,20 @@
 <script setup lang="ts">
 defineProps<{
   focusAmount: string
-  orderStatusBreakdown: Array<{ key: string; label: string; count: number; pct: number; color: string }>
-  orderTypeBreakdown: Array<{ key: string; label: string; count: number; pct: number; color: string }>
+  orderStatusBreakdown: Array<{
+    key: string
+    label: string
+    count: number
+    pct: number
+    color: string
+  }>
+  orderTypeBreakdown: Array<{
+    key: string
+    label: string
+    count: number
+    pct: number
+    color: string
+  }>
   pendingOrders: Array<{ id: string; project: string; title: string; amount: string }>
   onRefresh: () => void
 }>()
@@ -36,7 +48,9 @@ defineProps<{
           <span class="lg-type-num">{{ it.count }}</span>
           <span class="lg-type-pct">{{ it.pct }}%</span>
         </div>
-        <div v-if="!orderStatusBreakdown.length" class="purchase-order-analysis-empty">暂无订单状态数据</div>
+        <div v-if="!orderStatusBreakdown.length" class="purchase-order-analysis-empty">
+          暂无订单状态数据
+        </div>
       </section>
 
       <section class="purchase-order-analysis-section">

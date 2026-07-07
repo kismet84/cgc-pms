@@ -14,17 +14,6 @@ import {
 
 // ─── 科目类别标签 ──────────────────────────────
 
-const ACCOUNT_CATEGORY_LABEL: Record<string, string> = {
-  COST: '成本',
-  REVENUE: '收入',
-  SETTLEMENT: '结算',
-}
-const ACCOUNT_CATEGORY_COLOR: Record<string, string> = {
-  COST: 'blue',
-  REVENUE: 'success',
-  SETTLEMENT: 'orange',
-}
-
 // ─── Tree state ──────────────────────────────────────────
 
 const treeData = ref<CostSubjectTreeNode[]>([])

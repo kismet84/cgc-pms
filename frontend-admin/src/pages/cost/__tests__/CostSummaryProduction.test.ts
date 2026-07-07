@@ -136,8 +136,7 @@ const AInputStub = defineComponent({
         h('input', {
           class: 'stub-input',
           value: props.value,
-          onInput: (event: Event) =>
-            emit('update:value', (event.target as HTMLInputElement).value),
+          onInput: (event: Event) => emit('update:value', (event.target as HTMLInputElement).value),
           onKeydown: (event: KeyboardEvent) => {
             if (event.key === 'Enter') emit('pressEnter')
           },
@@ -276,8 +275,12 @@ describe('CostSummary production guards', () => {
   })
 
   it('入口页源码挂载本地表格面板和分析栏组件，避免模板重新膨胀', () => {
-    expect(source).toContain("import CostSummaryTablePanel from './components/CostSummaryTablePanel.vue'")
-    expect(source).toContain("import CostSummaryAnalysisRail from './components/CostSummaryAnalysisRail.vue'")
+    expect(source).toContain(
+      "import CostSummaryTablePanel from './components/CostSummaryTablePanel.vue'",
+    )
+    expect(source).toContain(
+      "import CostSummaryAnalysisRail from './components/CostSummaryAnalysisRail.vue'",
+    )
     expect(source).toContain('<CostSummaryTablePanel')
     expect(source).toContain('<CostSummaryAnalysisRail')
     expect(analysisRailSource).toContain('class="cost-source-rail-row"')

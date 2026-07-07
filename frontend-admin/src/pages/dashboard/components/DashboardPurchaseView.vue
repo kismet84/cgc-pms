@@ -2,7 +2,6 @@
 import { computed, reactive, ref } from 'vue'
 import {
   AuditOutlined,
-  ClockCircleOutlined,
   InboxOutlined,
   ShoppingCartOutlined,
   WarningOutlined,
@@ -71,7 +70,12 @@ function statusLabel(status?: string) {
 
 function statusTone(status?: string) {
   if (status === 'APPROVED' || status === 'COMPLETED' || status === 'RECEIVED') return 'success'
-  if (status === 'APPROVING' || status === 'PENDING' || status === 'PARTIAL_RECEIVED' || status === 'IN_TRANSIT') {
+  if (
+    status === 'APPROVING' ||
+    status === 'PENDING' ||
+    status === 'PARTIAL_RECEIVED' ||
+    status === 'IN_TRANSIT'
+  ) {
     return 'warning'
   }
   if (status === 'REJECTED' || status === 'CANCELLED') return 'danger'
@@ -318,7 +322,10 @@ function receiptTimeliness(record: DashboardBusinessItemVO) {
             class="role-reference-table purchase-reference-table"
           >
             <template #bodyCell="{ column, text, record }">
-              <span v-if="column.dataIndex === 'status'" :class="['purchase-status', statusTone(text)]">
+              <span
+                v-if="column.dataIndex === 'status'"
+                :class="['purchase-status', statusTone(text)]"
+              >
                 {{ statusLabel(text) }}
               </span>
               <span v-else-if="column.dataIndex === 'code'" class="purchase-code">
@@ -371,7 +378,10 @@ function receiptTimeliness(record: DashboardBusinessItemVO) {
             class="role-reference-table purchase-reference-table"
           >
             <template #bodyCell="{ column, text, record }">
-              <span v-if="column.dataIndex === 'status'" :class="['purchase-status', statusTone(text)]">
+              <span
+                v-if="column.dataIndex === 'status'"
+                :class="['purchase-status', statusTone(text)]"
+              >
                 {{ statusLabel(text) }}
               </span>
               <span v-else-if="column.dataIndex === 'code'" class="purchase-code">

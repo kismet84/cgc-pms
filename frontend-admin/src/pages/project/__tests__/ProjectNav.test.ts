@@ -9,9 +9,12 @@ describe('ProjectNav — navigation handlers', () => {
   // ── TEST 1: Project name click navigates to project overview ──
   it('wires project name click to router.push /project/:id/overview', () => {
     const pageSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-    const tableSource = readFileSync(resolve(currentDir, '../components/ProjectTablePanel.vue'), 'utf-8')
+    const tableSource = readFileSync(
+      resolve(currentDir, '../components/ProjectTablePanel.vue'),
+      'utf-8',
+    )
     expect(pageSource).toContain('@overview="router.push(`/project/${$event.id}/overview`)"')
-    expect(tableSource).toContain("@click=\"emit('overview', row)\"")
+    expect(tableSource).toContain('@click="emit(\'overview\', row)"')
   })
 
   it('maps ACTIVE project status to Chinese display text', () => {

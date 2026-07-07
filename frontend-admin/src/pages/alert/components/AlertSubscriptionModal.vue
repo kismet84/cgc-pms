@@ -37,7 +37,11 @@ defineEmits<{
         <div class="alert-subscription-row is-block">
           <span class="alert-subscription-label">通知渠道</span>
           <a-checkbox-group v-model:value="form.channels">
-            <a-checkbox v-for="channel in availableSubscriptionChannels" :key="channel" :value="channel">
+            <a-checkbox
+              v-for="channel in availableSubscriptionChannels"
+              :key="channel"
+              :value="channel"
+            >
               {{ ALERT_CHANNEL_LABELS[channel] ?? channel }}
             </a-checkbox>
           </a-checkbox-group>
@@ -45,7 +49,11 @@ defineEmits<{
         <div class="alert-subscription-row is-block">
           <span class="alert-subscription-label">预警域</span>
           <a-checkbox-group v-model:value="form.domains">
-            <a-checkbox v-for="domain in availableSubscriptionDomains" :key="domain" :value="domain">
+            <a-checkbox
+              v-for="domain in availableSubscriptionDomains"
+              :key="domain"
+              :value="domain"
+            >
               {{ RULE_CATEGORY_LABELS[domain] ?? domain }}
             </a-checkbox>
           </a-checkbox-group>
@@ -60,7 +68,10 @@ defineEmits<{
         </div>
         <div class="alert-subscription-row">
           <span class="alert-subscription-label">状态变更通知</span>
-          <a-switch v-model:checked="form.notifyOnStatusChanged" :disabled="!defaultStatusChangeEnabled" />
+          <a-switch
+            v-model:checked="form.notifyOnStatusChanged"
+            :disabled="!defaultStatusChangeEnabled"
+          />
         </div>
       </div>
     </a-spin>

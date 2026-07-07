@@ -30,14 +30,28 @@ describe('CostLedger production guards', () => {
       /<a-range-picker[\s\S]*v-model:value="filter\.dateRange"[\s\S]*value-format="YYYY-MM-DD"/,
     )
     expect(source).toContain('const contractOptions = ref(contractList.value ?? [])')
-    expect(source).toMatch(/async function loadContractOptions\(projectId\?: string\) \{[\s\S]*try \{/)
-    expect(source).toContain('contractOptions.value = await referenceStore.fetchContracts({ projectId })')
+    expect(source).toMatch(
+      /async function loadContractOptions\(projectId\?: string\) \{[\s\S]*try \{/,
+    )
+    expect(source).toContain(
+      'contractOptions.value = await referenceStore.fetchContracts({ projectId })',
+    )
     expect(source).toMatch(/catch \(e: unknown\) \{[\s\S]*contractOptions\.value = \[\]/)
-    expect(source).toMatch(/const params: CostLedgerQueryParams = \{[\s\S]*contractId: filter\.contractId/)
-    expect(source).toMatch(/const params: CostLedgerQueryParams = \{[\s\S]*partnerId: filter\.partnerId/)
-    expect(source).toMatch(/const params: CostLedgerQueryParams = \{[\s\S]*costType: filter\.costType/)
-    expect(source).toMatch(/const params: CostLedgerQueryParams = \{[\s\S]*startDate: filter\.dateRange\?\.\[0\]/)
-    expect(source).toMatch(/const params: CostLedgerQueryParams = \{[\s\S]*endDate: filter\.dateRange\?\.\[1\]/)
+    expect(source).toMatch(
+      /const params: CostLedgerQueryParams = \{[\s\S]*contractId: filter\.contractId/,
+    )
+    expect(source).toMatch(
+      /const params: CostLedgerQueryParams = \{[\s\S]*partnerId: filter\.partnerId/,
+    )
+    expect(source).toMatch(
+      /const params: CostLedgerQueryParams = \{[\s\S]*costType: filter\.costType/,
+    )
+    expect(source).toMatch(
+      /const params: CostLedgerQueryParams = \{[\s\S]*startDate: filter\.dateRange\?\.\[0\]/,
+    )
+    expect(source).toMatch(
+      /const params: CostLedgerQueryParams = \{[\s\S]*endDate: filter\.dateRange\?\.\[1\]/,
+    )
     expect(overviewSource).toContain('v-for="contract in contractOptions"')
     expect(source).not.toContain("message.error('加载合同")
   })
@@ -55,20 +69,30 @@ describe('CostLedger production guards', () => {
     expect(tablePanelSource).toMatch(/v-else-if="!tableData\.length"/)
     expect(tablePanelSource).toMatch(/<template v-else>/)
     expect(tablePanelSource).toMatch(/class="cost-ledger-mobile-card"/)
-    expect(tablePanelSource).toMatch(/class="cost-ledger-mobile-card"[\s\S]*@click="showDetail\(row\)"/)
+    expect(tablePanelSource).toMatch(
+      /class="cost-ledger-mobile-card"[\s\S]*@click="showDetail\(row\)"/,
+    )
     expect(tablePanelSource).toMatch(/ColumnSettingsButton[\s\S]*v-if="!isMobile"/)
     expect(tablePanelSource).toMatch(/<div v-else class="lg-table-wrap cost-ledger-table-wrap">/)
   })
 
   it('keeps contract option loading non-blocking for main data requests', () => {
-    expect(source).toMatch(/onMounted\(async \(\) => \{[\s\S]*void loadContractOptions\(filter\.projectId\)[\s\S]*void loadCostSubjectOptions\(\)[\s\S]*fetchData\(\)[\s\S]*fetchSummary\(\)/)
+    expect(source).toMatch(
+      /onMounted\(async \(\) => \{[\s\S]*void loadContractOptions\(filter\.projectId\)[\s\S]*void loadCostSubjectOptions\(\)[\s\S]*fetchData\(\)[\s\S]*fetchSummary\(\)/,
+    )
   })
 
   it('splits ledger into local visual-baseline components without changing mount points', () => {
     expect(source).toContain("import CostLedgerOverview from './components/CostLedgerOverview.vue'")
-    expect(source).toContain("import CostLedgerTablePanel from './components/CostLedgerTablePanel.vue'")
-    expect(source).toContain("import CostLedgerAnalysisRail from './components/CostLedgerAnalysisRail.vue'")
-    expect(source).toContain("import CostLedgerDetailDrawer from './components/CostLedgerDetailDrawer.vue'")
+    expect(source).toContain(
+      "import CostLedgerTablePanel from './components/CostLedgerTablePanel.vue'",
+    )
+    expect(source).toContain(
+      "import CostLedgerAnalysisRail from './components/CostLedgerAnalysisRail.vue'",
+    )
+    expect(source).toContain(
+      "import CostLedgerDetailDrawer from './components/CostLedgerDetailDrawer.vue'",
+    )
     expect(source).toMatch(/<CostLedgerOverview[\s\S]*\/>/)
     expect(source).toMatch(/<CostLedgerTablePanel[\s\S]*\/>/)
     expect(source).toMatch(/<CostLedgerAnalysisRail[\s\S]*\/>/)

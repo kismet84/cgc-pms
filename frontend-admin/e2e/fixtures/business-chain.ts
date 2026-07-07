@@ -202,7 +202,6 @@ export async function apiCreatePurchaseRequest(
   request: APIRequestContext,
   baseURL: string,
   projectId: string,
-  materialId: string,
 ) {
   const res = await request.post(`${baseURL}/api/purchase-requests`, {
     data: {

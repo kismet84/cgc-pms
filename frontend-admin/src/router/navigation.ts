@@ -23,7 +23,14 @@ export const navigationItems: NavigationItem[] = [
     key: '/project-operations',
     label: '项目经营',
     icon: 'ProjectOutlined',
-    matchPrefixes: ['/project/list', '/contract', '/variation', '/cost/ledger', '/cost/summary', '/cost-target'],
+    matchPrefixes: [
+      '/project/list',
+      '/contract',
+      '/variation',
+      '/cost/ledger',
+      '/cost/summary',
+      '/cost-target',
+    ],
     children: [
       { key: '/project/list', label: '项目列表' },
       { key: '/contract/ledger', label: '合同台账' },

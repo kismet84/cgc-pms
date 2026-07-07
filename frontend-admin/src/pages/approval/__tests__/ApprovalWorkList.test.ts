@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url'
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../todo.vue'), 'utf-8')
 const helperSource = readFileSync(resolve(currentDir, '../workflowDisplay.ts'), 'utf-8')
-const workflowApiSource = readFileSync(resolve(currentDir, '../../../api/modules/workflow.ts'), 'utf-8')
+const workflowApiSource = readFileSync(
+  resolve(currentDir, '../../../api/modules/workflow.ts'),
+  'utf-8',
+)
 const navigationSource = readFileSync(resolve(currentDir, '../../../router/navigation.ts'), 'utf-8')
 
 describe('approval work list route titles', () => {
@@ -27,7 +30,9 @@ describe('approval work list route titles', () => {
     expect(source).toContain('function businessTypeLabel')
     expect(source).toContain('return getWorkflowBusinessTypeLabel(value)')
     expect(source).toContain('businessTypeLabel(row.businessType)')
-    expect(source).not.toMatch(/businessTypeMap\[row\.businessType as string\][\s\S]*row\.businessType as string/)
+    expect(source).not.toMatch(
+      /businessTypeMap\[row\.businessType as string\][\s\S]*row\.businessType as string/,
+    )
   })
 
   it('wires my initiated tab to the mine instance API and tracking columns', () => {
@@ -41,16 +46,14 @@ describe('approval work list route titles', () => {
     expect(source).toContain("field: 'createdAt'")
     expect(source).toContain("field: 'updatedAt'")
     expect(source).toContain("field: 'currentNodeName'")
-    expect(source).toContain("handleDetail(row as { instanceId: string })")
+    expect(source).toContain('handleDetail(row as { instanceId: string })')
   })
 
   it('keeps existing approval work entries alongside my initiated entry', () => {
     expect(source).toContain("{ key: 'todo', label: '我的待办' }")
     expect(source).toContain("{ key: 'done', label: '我的已办' }")
     expect(source).toContain("{ key: 'cc', label: '抄送我的' }")
-    expect(source).toContain(
-      'const params: PageParams = {',
-    )
+    expect(source).toContain('const params: PageParams = {')
     expect(source).toContain('getMyTodos(params)')
     expect(source).toContain('getMyDone(params)')
     expect(source).toContain('getMyCc(params)')
@@ -61,10 +64,10 @@ describe('approval work list route titles', () => {
   it('uses API total as the visible count source for each approval tab', () => {
     expect(source).toContain('const tabTotals = ref')
     expect(source).toContain('syncActiveTotal(res.total)')
-    expect(source).toContain("count: tabTotals.value.todo")
-    expect(source).toContain("count: tabTotals.value.done")
-    expect(source).toContain("count: tabTotals.value.cc")
-    expect(source).toContain("count: tabTotals.value.mine")
+    expect(source).toContain('count: tabTotals.value.todo')
+    expect(source).toContain('count: tabTotals.value.done')
+    expect(source).toContain('count: tabTotals.value.cc')
+    expect(source).toContain('count: tabTotals.value.mine')
     expect(source).toContain("label: '待办任务'")
     expect(source).toContain("label: '已处理记录'")
     expect(source).toContain("label: '抄送记录'")
@@ -91,7 +94,7 @@ describe('approval work list route titles', () => {
       '<div v-if="shouldShowTableEmpty()" class="lg-empty-text">{{ tableEmptyText() }}</div>',
     )
     expect(source).not.toContain('<div class="lg-empty-text">{{ tableEmptyText() }}</div>')
-    expect(source).toContain("handleDetail(row as { instanceId: string })")
+    expect(source).toContain('handleDetail(row as { instanceId: string })')
   })
 
   it('filters approval tabs with server-side query params', () => {
@@ -101,17 +104,27 @@ describe('approval work list route titles', () => {
     expect(source).toContain('const filterTimeRange = ref')
     expect(source).toContain('function buildQueryParams()')
     expect(source).toContain('if (keyword) params.keyword = keyword')
-    expect(source).toContain('if (filterBusinessType.value) params.businessType = filterBusinessType.value')
-    expect(source).toContain('if (filterInstanceStatus.value) params.instanceStatus = filterInstanceStatus.value')
-    expect(source).toContain("params.startTime = filterTimeRange.value[0].startOf('day').format('YYYY-MM-DD HH:mm:ss')")
-    expect(source).toContain("params.endTime = filterTimeRange.value[1].endOf('day').format('YYYY-MM-DD HH:mm:ss')")
+    expect(source).toContain(
+      'if (filterBusinessType.value) params.businessType = filterBusinessType.value',
+    )
+    expect(source).toContain(
+      'if (filterInstanceStatus.value) params.instanceStatus = filterInstanceStatus.value',
+    )
+    expect(source).toContain(
+      "params.startTime = filterTimeRange.value[0].startOf('day').format('YYYY-MM-DD HH:mm:ss')",
+    )
+    expect(source).toContain(
+      "params.endTime = filterTimeRange.value[1].endOf('day').format('YYYY-MM-DD HH:mm:ss')",
+    )
     expect(source).toContain('const params = buildQueryParams()')
     expect(source).toContain('getMyTodos(params)')
     expect(source).toContain('getMyDone(params)')
     expect(source).toContain('getMyCc(params)')
     expect(source).toContain('getMyInitiatedInstances(params)')
     expect(source).toContain('function handleFilterSearch')
-    expect(source).toMatch(/function handleFilterSearch[\s\S]*?pageNo\.value = 1[\s\S]*?fetchData\(\)/)
+    expect(source).toMatch(
+      /function handleFilterSearch[\s\S]*?pageNo\.value = 1[\s\S]*?fetchData\(\)/,
+    )
     expect(source).toContain('function handleFilterReset')
     expect(source).toContain('<a-input')
     expect(source).toContain('<a-range-picker v-model:value="filterTimeRange"')
@@ -119,10 +132,16 @@ describe('approval work list route titles', () => {
   })
 
   it('limits approval filter options to the three core workflow business types', () => {
-    expect(helperSource).toContain('export const coreBusinessTypeOptions = workflowBusinessEntryRegistry')
+    expect(helperSource).toContain(
+      'export const coreBusinessTypeOptions = workflowBusinessEntryRegistry',
+    )
     expect(helperSource).toContain(".filter((entry) => entry.businessType !== 'CONTRACT')")
-    expect(helperSource).toContain('.map((entry) => ({ label: entry.displayName, value: entry.businessType }))')
-    expect(source).toContain('const businessTypeFilterOptions = [{ label: \'全部业务\', value: \'\' }, ...coreBusinessTypeOptions]')
+    expect(helperSource).toContain(
+      '.map((entry) => ({ label: entry.displayName, value: entry.businessType }))',
+    )
+    expect(source).toContain(
+      "const businessTypeFilterOptions = [{ label: '全部业务', value: '' }, ...coreBusinessTypeOptions]",
+    )
     expect(source).toContain('const statusFilterOptions = [')
     expect(source).toContain("{ label: '全部', value: '' }")
     expect(helperSource).toContain("export const WF_INSTANCE_RUNNING = 'RUNNING'")
@@ -145,7 +164,9 @@ describe('approval work list route titles', () => {
     expect(source).toContain('getInstanceStatusMeta(row.instanceStatus)')
     expect(source).not.toContain('{{ row.instanceStatus }}</a-tag>')
     expect(source).toContain('async function handleResubmit()')
-    expect(source).toMatch(/handleResubmit[\s\S]*?resubmitInstance\(instanceId\)[\s\S]*?await refreshDetail\(\)/)
+    expect(source).toMatch(
+      /handleResubmit[\s\S]*?resubmitInstance\(instanceId\)[\s\S]*?await refreshDetail\(\)/,
+    )
     expect(source).toContain(
       "availableActions.includes('resubmit') && canShowInitiatorActions() && !isDetailRunning",
     )
@@ -158,8 +179,12 @@ describe('approval work list route titles', () => {
     expect(source).toContain('function canShowInitiatorActions()')
     expect(source).toContain("return activeTab.value === 'mine'")
     expect(source).toContain('v-if="availableActions.length > 0 && canShowApprovalActions()"')
-    expect(source).toContain("v-if=\"availableActions.includes('withdraw') && canShowInitiatorActions()\"")
-    expect(source).toContain("v-if=\"availableActions.includes('resubmit') && canShowInitiatorActions() && !isDetailRunning\"")
+    expect(source).toContain(
+      'v-if="availableActions.includes(\'withdraw\') && canShowInitiatorActions()"',
+    )
+    expect(source).toContain(
+      'v-if="availableActions.includes(\'resubmit\') && canShowInitiatorActions() && !isDetailRunning"',
+    )
   })
 
   it('shows embedded business document entry only for supported workflow business types', () => {
@@ -196,9 +221,11 @@ describe('approval work list route titles', () => {
     expect(helperSource).toContain('export function canAccessWorkflowBusinessEntry')
     expect(helperSource).toContain("roles.includes('ADMIN') || roles.includes('SUPER_ADMIN')")
     expect(source).toContain('function openBusinessEntry')
-    expect(source).toMatch(/function openBusinessEntry[\s\S]*?if \(!canOpenBusinessEntry\(record\)\) return/)
+    expect(source).toMatch(
+      /function openBusinessEntry[\s\S]*?if \(!canOpenBusinessEntry\(record\)\) return/,
+    )
     expect(source).toContain('router.push(path)')
-    expect(source).toContain("v-if=\"businessEntryPath(detail)\"")
+    expect(source).toContain('v-if="businessEntryPath(detail)"')
     expect(source).toContain('无权访问该业务单据')
     expect(source).toContain(':disabled="!canOpenBusinessEntry(detail)"')
     expect(source).toContain('查看业务单据')

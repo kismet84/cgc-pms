@@ -21,25 +21,14 @@ import {
   getWorkflowNodeStatusMeta,
   getWorkflowTaskStatusMeta,
   preloadWorkflowDisplayDicts,
-  WF_INSTANCE_RUNNING,
-  WF_INSTANCE_APPROVED,
-  WF_INSTANCE_REJECTED,
-  WF_INSTANCE_WITHDRAWN,
-  WF_INSTANCE_VOIDED,
 } from './workflowDisplay'
 
 // 字典常量 - 工作流节点状态
-const WF_NODE_WAITING = 'WAITING'
 const WF_NODE_ACTIVE = 'ACTIVE'
 const WF_NODE_COMPLETED = 'COMPLETED'
-const WF_NODE_REJECTED = 'REJECTED'
-const WF_NODE_SKIPPED = 'SKIPPED'
 
 // 字典常量 - 工作流任务状态
 const WF_TASK_PENDING = 'PENDING'
-const WF_TASK_APPROVED = 'APPROVED'
-const WF_TASK_REJECTED = 'REJECTED'
-const WF_TASK_CANCELLED = 'CANCELLED'
 
 const route = useRoute()
 const router = useRouter()

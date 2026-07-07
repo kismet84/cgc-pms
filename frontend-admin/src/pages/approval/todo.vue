@@ -35,24 +35,14 @@ import {
   instanceStatusOptions,
   preloadWorkflowDisplayDicts,
   WF_INSTANCE_RUNNING,
-  WF_INSTANCE_APPROVED,
-  WF_INSTANCE_REJECTED,
-  WF_INSTANCE_WITHDRAWN,
-  WF_INSTANCE_VOIDED,
 } from './workflowDisplay'
 
 // 字典常量 - 工作流节点状态
-const WF_NODE_WAITING = 'WAITING'
 const WF_NODE_ACTIVE = 'ACTIVE'
 const WF_NODE_COMPLETED = 'COMPLETED'
-const WF_NODE_REJECTED = 'REJECTED'
-const WF_NODE_SKIPPED = 'SKIPPED'
 
 // 字典常量 - 工作流任务状态
 const WF_TASK_PENDING = 'PENDING'
-const WF_TASK_APPROVED = 'APPROVED'
-const WF_TASK_REJECTED = 'REJECTED'
-const WF_TASK_CANCELLED = 'CANCELLED'
 
 const router = useRouter()
 const route = useRoute()
@@ -108,10 +98,7 @@ const taskStatusMap: Record<string, { text: string; color: string }> = {
   TRANSFERRED: { text: '已转办', color: 'warning' },
 }
 
-const statusFilterOptions = [
-  { label: '全部', value: '' },
-  ...instanceStatusOptions,
-]
+const statusFilterOptions = [{ label: '全部', value: '' }, ...instanceStatusOptions]
 
 const businessTypeFilterOptions = [{ label: '全部业务', value: '' }, ...coreBusinessTypeOptions]
 
@@ -216,10 +203,20 @@ const gridColumns = computed(() => {
     return [
       { field: 'businessType', title: '业务类型', width: 120, slots: { default: 'businessType' } },
       { field: 'title', title: '审批标题', ellipsis: true, slots: { default: 'title' } },
-      { field: 'instanceStatus', title: '当前状态', width: 100, slots: { default: 'instanceStatus' } },
+      {
+        field: 'instanceStatus',
+        title: '当前状态',
+        width: 100,
+        slots: { default: 'instanceStatus' },
+      },
       { field: 'createdAt', title: '发起时间', width: 160, slots: { default: 'createdAt' } },
       { field: 'updatedAt', title: '最近更新时间', width: 160, slots: { default: 'updatedAt' } },
-      { field: 'currentNodeName', title: '当前节点', width: 140, slots: { default: 'currentNodeName' } },
+      {
+        field: 'currentNodeName',
+        title: '当前节点',
+        width: 140,
+        slots: { default: 'currentNodeName' },
+      },
       { title: '操作', width: 76, slots: { default: 'action' } },
     ]
   }
@@ -688,7 +685,10 @@ watch(
             </a-tooltip>
           </div>
 
-          <div v-if="availableActions.length > 0 && canShowApprovalActions()" class="approval-actions">
+          <div
+            v-if="availableActions.length > 0 && canShowApprovalActions()"
+            class="approval-actions"
+          >
             <a-button
               v-if="availableActions.includes('approve')"
               type="primary"
@@ -710,12 +710,7 @@ watch(
             v-if="availableActions.includes('withdraw') && canShowInitiatorActions()"
             class="approval-actions"
           >
-            <a-button
-              :loading="actionLoading"
-              @click="handleWithdraw"
-            >
-              撤回
-            </a-button>
+            <a-button :loading="actionLoading" @click="handleWithdraw"> 撤回 </a-button>
           </div>
           <a-alert
             v-if="fullDetailOnlyActions.length > 0 && canShowApprovalActions()"
@@ -728,8 +723,11 @@ watch(
               <a-button type="link" size="small" @click="openFullDetail">打开详情</a-button>
             </template>
           </a-alert>
+          <!-- v-if="availableActions.includes('resubmit') && canShowInitiatorActions() && !isDetailRunning" -->
           <div
-            v-if="availableActions.includes('resubmit') && canShowInitiatorActions() && !isDetailRunning"
+            v-if="
+              availableActions.includes('resubmit') && canShowInitiatorActions() && !isDetailRunning
+            "
             class="approval-actions"
           >
             <a-button type="primary" :loading="actionLoading" @click="handleResubmit">

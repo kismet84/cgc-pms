@@ -5,31 +5,39 @@ import { ALERT_PROCESS_STATUS_COLOR, SEVERITY_COLOR } from '@/types/alert'
 
 type AlertProcessStatus = 'OPEN' | 'PROCESSED' | 'ARCHIVED' | 'INVALID'
 
-const props = withDefaults(defineProps<{
-  activeRecord: AlertLogVO | null
-  statusRemarkDraft: string
-  currentOperator: string
-  subscriptionRows: Array<{ channel: string; label: string; enabled: boolean; minSeverity: string }>
-  subscriptionSummaryText?: string
-  formatSeverityText: (value: string) => string
-  formatDateTime: (value: unknown) => string
-  getAlertDomainLabel: (record: AlertLogVO) => string
-  getProjectName: (projectId: string | number) => string
-  getAlertMessageText: (value: unknown) => string
-  getProcessStatusLabel: (record: AlertLogVO) => string
-  openSubscriptionModal: () => void
-  handleMarkRead: (record: AlertLogVO) => void
-  handleChangeStatus: (
-    record: AlertLogVO,
-    processStatus: AlertProcessStatus,
-    statusRemark?: string,
-  ) => void
-  canOpenBusinessEntry: (record: AlertLogVO) => boolean
-  openBusinessEntry: (record: AlertLogVO) => void
-  handleSaveActiveResult: () => void
-}>(), {
-  subscriptionSummaryText: '',
-})
+const props = withDefaults(
+  defineProps<{
+    activeRecord: AlertLogVO | null
+    statusRemarkDraft: string
+    currentOperator: string
+    subscriptionRows: Array<{
+      channel: string
+      label: string
+      enabled: boolean
+      minSeverity: string
+    }>
+    subscriptionSummaryText?: string
+    formatSeverityText: (value: string) => string
+    formatDateTime: (value: unknown) => string
+    getAlertDomainLabel: (record: AlertLogVO) => string
+    getProjectName: (projectId: string | number) => string
+    getAlertMessageText: (value: unknown) => string
+    getProcessStatusLabel: (record: AlertLogVO) => string
+    openSubscriptionModal: () => void
+    handleMarkRead: (record: AlertLogVO) => void
+    handleChangeStatus: (
+      record: AlertLogVO,
+      processStatus: AlertProcessStatus,
+      statusRemark?: string,
+    ) => void
+    canOpenBusinessEntry: (record: AlertLogVO) => boolean
+    openBusinessEntry: (record: AlertLogVO) => void
+    handleSaveActiveResult: () => void
+  }>(),
+  {
+    subscriptionSummaryText: '',
+  },
+)
 
 const emit = defineEmits<{
   (e: 'update:statusRemarkDraft', value: string): void
@@ -57,11 +65,18 @@ const statusRemarkModel = computed({
           </div>
           <div class="alert-detail-item">
             <span>严重度</span>
-            <a-tag :color="SEVERITY_COLOR[activeRecord.severity] ?? 'default'">{{ formatSeverityText(activeRecord.severity) }}</a-tag>
+            <a-tag :color="SEVERITY_COLOR[activeRecord.severity] ?? 'default'">{{
+              formatSeverityText(activeRecord.severity)
+            }}</a-tag>
           </div>
           <div class="alert-detail-item">
             <span>处理状态</span>
-            <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(activeRecord.processStatus ?? 'OPEN')] ?? 'default'">
+            <a-tag
+              :color="
+                ALERT_PROCESS_STATUS_COLOR[String(activeRecord.processStatus ?? 'OPEN')] ??
+                'default'
+              "
+            >
               {{ String(activeRecord.processStatus ?? 'OPEN') }}
             </a-tag>
           </div>
@@ -149,11 +164,21 @@ const statusRemarkModel = computed({
       </section>
 
       <div class="alert-detail-actions">
-        <a-button v-if="activeRecord.isRead === 0" @click="handleMarkRead(activeRecord)">标记已读</a-button>
-        <a-button v-if="String(activeRecord.processStatus ?? 'OPEN') !== 'ARCHIVED'" @click="handleChangeStatus(activeRecord, 'ARCHIVED', statusRemarkDraft.trim() || undefined)">
+        <a-button v-if="activeRecord.isRead === 0" @click="handleMarkRead(activeRecord)"
+          >标记已读</a-button
+        >
+        <a-button
+          v-if="String(activeRecord.processStatus ?? 'OPEN') !== 'ARCHIVED'"
+          @click="
+            handleChangeStatus(activeRecord, 'ARCHIVED', statusRemarkDraft.trim() || undefined)
+          "
+        >
           归档
         </a-button>
-        <a-button v-if="canOpenBusinessEntry(activeRecord)" @click="openBusinessEntry(activeRecord)">
+        <a-button
+          v-if="canOpenBusinessEntry(activeRecord)"
+          @click="openBusinessEntry(activeRecord)"
+        >
           查看业务单据
         </a-button>
         <a-button type="primary" @click="handleSaveActiveResult">保存处理结果</a-button>

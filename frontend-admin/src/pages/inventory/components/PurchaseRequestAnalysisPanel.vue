@@ -27,7 +27,10 @@ const emit = defineEmits<{
           <span class="lg-type-dot" :style="{ background: item.color }"></span>
           <span class="lg-type-label">{{ item.label }}</span>
           <span class="lg-type-bar-wrap">
-            <span class="lg-type-bar" :style="{ width: item.pct + '%', background: item.color }"></span>
+            <span
+              class="lg-type-bar"
+              :style="{ width: item.pct + '%', background: item.color }"
+            ></span>
           </span>
           <span class="lg-type-num">{{ item.count }}</span>
           <span class="lg-type-pct">{{ item.pct }}%</span>
@@ -43,7 +46,10 @@ const emit = defineEmits<{
           <span class="lg-type-dot" :style="{ background: item.color }"></span>
           <span class="lg-type-label">{{ item.label }}</span>
           <span class="lg-type-bar-wrap">
-            <span class="lg-type-bar" :style="{ width: item.pct + '%', background: item.color }"></span>
+            <span
+              class="lg-type-bar"
+              :style="{ width: item.pct + '%', background: item.color }"
+            ></span>
           </span>
           <span class="lg-type-num">{{ item.count }}</span>
           <span class="lg-type-pct">{{ item.pct }}%</span>

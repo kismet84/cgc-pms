@@ -13,13 +13,22 @@ const analysisPanelSource = readFileSync(
   resolve(currentDir, '../components/PurchaseRequestAnalysisPanel.vue'),
   'utf-8',
 )
-const modalSource = readFileSync(resolve(currentDir, '../components/PurchaseRequestModal.vue'), 'utf-8')
+const modalSource = readFileSync(
+  resolve(currentDir, '../components/PurchaseRequestModal.vue'),
+  'utf-8',
+)
 
 describe('purchase request modal filters', () => {
   it('mounts local search, analysis and modal components while keeping page shell classes', () => {
-    expect(source).toContain("import PurchaseRequestSearchBar from './components/PurchaseRequestSearchBar.vue'")
-    expect(source).toContain("import PurchaseRequestAnalysisPanel from './components/PurchaseRequestAnalysisPanel.vue'")
-    expect(source).toContain("import PurchaseRequestModal from './components/PurchaseRequestModal.vue'")
+    expect(source).toContain(
+      "import PurchaseRequestSearchBar from './components/PurchaseRequestSearchBar.vue'",
+    )
+    expect(source).toContain(
+      "import PurchaseRequestAnalysisPanel from './components/PurchaseRequestAnalysisPanel.vue'",
+    )
+    expect(source).toContain(
+      "import PurchaseRequestModal from './components/PurchaseRequestModal.vue'",
+    )
     expect(source).toContain('<div class="lg-list-page lg-page app-page purchase-request-page">')
     expect(source).toContain('<PurchaseRequestSearchBar')
     expect(source).toContain('<PurchaseRequestAnalysisPanel')
@@ -38,7 +47,9 @@ describe('purchase request modal filters', () => {
     expect(source).toMatch(/projectId,\s*contractType:\s*'PURCHASE'/)
     expect(source).toMatch(/async function handleProjectChange\(projectId\?\: string\)/)
     expect(source).toMatch(/formData\.contractId\s*=\s*undefined/)
-    expect(modalSource).toMatch(/@change="\(\w+: string \| undefined\) => emit\('projectChange', \w+\)"/)
+    expect(modalSource).toMatch(
+      /@change="\(\w+: string \| undefined\) => emit\('projectChange', \w+\)"/,
+    )
     expect(source).toMatch(/await loadContractsByProject\(record\.projectId\)/)
     expect(source).not.toMatch(/fetchContracts\(\)/)
   })
@@ -61,13 +72,19 @@ describe('purchase request modal filters', () => {
     expect(source).toMatch(/type ModalMode = 'create' \| 'edit' \| 'view'/)
     expect(source).toMatch(/const modalMode = ref<ModalMode>\('create'\)/)
     expect(source).toMatch(/const isViewMode = computed\(\(\) => modalMode\.value === 'view'\)/)
-    expect(source).toMatch(/async function handleView\(record: PurchaseRequestVO\)[\s\S]*?modalMode\.value = 'view'/)
-    expect(modalSource).toMatch(/<a-modal[\s\S]*?:ok-button-props="isViewMode \? \{ style: \{ display: 'none' \} \} : undefined"/)
+    expect(source).toMatch(
+      /async function handleView\(record: PurchaseRequestVO\)[\s\S]*?modalMode\.value = 'view'/,
+    )
+    expect(modalSource).toMatch(
+      /<a-modal[\s\S]*?:ok-button-props="isViewMode \? \{ style: \{ display: 'none' \} \} : undefined"/,
+    )
     expect(modalSource).toMatch(/<a-modal[\s\S]*?:cancel-text="isViewMode \? '关闭' : '取消'"/)
     expect(modalSource).toMatch(/v-if="!isViewMode"[\s\S]*?\+ 添加物料/)
     expect(modalSource).toMatch(/v-else-if="column\.key === 'action'">[\s\S]*?v-if="!isViewMode"/)
     expect(modalSource).toContain(':disabled="isViewMode"')
-    expect(source).toMatch(/async function handleModalOk\(\) \{[\s\S]*?if \(isViewMode\.value \|\| submitting\.value\) return/)
+    expect(source).toMatch(
+      /async function handleModalOk\(\) \{[\s\S]*?if \(isViewMode\.value \|\| submitting\.value\) return/,
+    )
   })
 
   it('keeps core list and submit handlers in the entry page after splitting', () => {

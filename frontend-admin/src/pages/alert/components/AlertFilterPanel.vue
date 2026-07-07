@@ -33,7 +33,12 @@ defineProps<{
           allow-clear
           show-search
           :loading="projectsLoading"
-          :options="projectOptions.map((item) => ({ value: String(item.id), label: `${item.projectCode} ${item.projectName}` }))"
+          :options="
+            projectOptions.map((item) => ({
+              value: String(item.id),
+              label: `${item.projectCode} ${item.projectName}`,
+            }))
+          "
           placeholder="请选择项目"
         />
       </div>
@@ -73,7 +78,11 @@ defineProps<{
       </div>
       <div class="alert-filter-item alert-filter-item-range">
         <label>触发时间</label>
-        <a-range-picker v-model:value="filter.triggeredAtRange" value-format="" style="width: 100%" />
+        <a-range-picker
+          v-model:value="filter.triggeredAtRange"
+          value-format=""
+          style="width: 100%"
+        />
       </div>
     </div>
     <div class="alert-filter-foot">

@@ -113,11 +113,15 @@ async function waitForTodoTaskByTitle(title: string, timeoutMs = 10000): Promise
       pageNo: 1,
       pageSize: 100,
     })
-    const task = page.records.find((record) => record.title === title && record.taskStatus === 'PENDING')
+    const task = page.records.find(
+      (record) => record.title === title && record.taskStatus === 'PENDING',
+    )
     if (task) return task
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
-  throw new Error(`需要确认：创建审批样本后 ${timeoutMs}ms 内未在待办列表中看到标题为 ${title} 的 PENDING 任务`)
+  throw new Error(
+    `需要确认：创建审批样本后 ${timeoutMs}ms 内未在待办列表中看到标题为 ${title} 的 PENDING 任务`,
+  )
 }
 
 async function getInstanceDetail(instanceId: string): Promise<InstanceDetail> {
@@ -270,12 +274,18 @@ test.describe('Approval Workflow', () => {
     await expect(sharedPage.locator('.ant-tabs-tab').filter({ hasText: '抄送我的' })).toBeVisible()
 
     await openApprovalDetailByTitle(sharedPage, sample.title)
-    await expect(sharedPage.locator('.approval-detail-modal .ant-descriptions')).toBeVisible({ timeout: 5000 })
+    await expect(sharedPage.locator('.approval-detail-modal .ant-descriptions')).toBeVisible({
+      timeout: 5000,
+    })
     await expect(
-      sharedPage.locator('.approval-detail-modal .approval-detail-section').filter({ hasText: '审批流程' }),
+      sharedPage
+        .locator('.approval-detail-modal .approval-detail-section')
+        .filter({ hasText: '审批流程' }),
     ).toBeVisible({ timeout: 5000 })
     await expect(
-      sharedPage.locator('.approval-detail-modal .approval-detail-section').filter({ hasText: '审批记录' }),
+      sharedPage
+        .locator('.approval-detail-modal .approval-detail-section')
+        .filter({ hasText: '审批记录' }),
     ).toBeVisible({ timeout: 5000 })
 
     await sharedPage.screenshot({ path: 'e2e/screenshots/approval-detail.png', fullPage: true })
@@ -287,9 +297,11 @@ test.describe('Approval Workflow', () => {
     await waitForApprovalList(sharedPage)
     await openApprovalDetailByTitle(sharedPage, sample.title)
 
-    const approveBtn = sharedPage.locator('.approval-detail-modal .approval-actions button').filter({
-      hasText: '同意',
-    })
+    const approveBtn = sharedPage
+      .locator('.approval-detail-modal .approval-actions button')
+      .filter({
+        hasText: '同意',
+      })
     await expect(approveBtn).toBeVisible({ timeout: 5000 })
     await approveBtn.click()
     const approveModal = sharedPage
@@ -301,10 +313,22 @@ test.describe('Approval Workflow', () => {
     await approveModal.locator('.ant-modal-footer .ant-btn-primary').click()
     await expect(approveModal).toBeHidden({ timeout: 5000 })
 
-    const detail = await waitForTaskStatus(sample.instanceId, sample.taskId, 'APPROVED', approveComment)
-    expect(detail.records.some((item) => item.actionType === 'APPROVE' && item.comment === approveComment)).toBeTruthy()
+    const detail = await waitForTaskStatus(
+      sample.instanceId,
+      sample.taskId,
+      'APPROVED',
+      approveComment,
+    )
+    expect(
+      detail.records.some(
+        (item) => item.actionType === 'APPROVE' && item.comment === approveComment,
+      ),
+    ).toBeTruthy()
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/approval-approve-success.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/approval-approve-success.png',
+      fullPage: true,
+    })
   })
 
   test('should reject a pending task with required comment', async () => {
@@ -327,9 +351,17 @@ test.describe('Approval Workflow', () => {
     await rejectModal.locator('.ant-modal-footer .ant-btn-primary').click()
     await expect(rejectModal).toBeHidden({ timeout: 5000 })
 
-    const detail = await waitForTaskStatus(sample.instanceId, sample.taskId, 'REJECTED', rejectComment)
+    const detail = await waitForTaskStatus(
+      sample.instanceId,
+      sample.taskId,
+      'REJECTED',
+      rejectComment,
+    )
     expect(detail.instanceStatus).toBe('REJECTED')
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/approval-reject-success.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/approval-reject-success.png',
+      fullPage: true,
+    })
   })
 })

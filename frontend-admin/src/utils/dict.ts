@@ -62,13 +62,18 @@ export function getDictLabelSync(
   dictValue: string,
   fallback: Partial<Record<string, string>> = {},
 ): string {
-  if (!dictValue) return dictValue
+  const normalizedValue = dictValue.trim()
+  if (!normalizedValue) return dictValue
   const cached = dictCache.get(dictCode)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    const item = cached.data.find((d) => d.dictValue === dictValue)
-    return item?.dictLabel ?? fallback[dictValue] ?? dictValue
+    const item = cached.data.find((d) => d.dictValue.trim() === normalizedValue)
+    const label = item?.dictLabel
+    if (label && label.trim() !== normalizedValue) {
+      return label
+    }
+    return fallback[dictValue] ?? fallback[normalizedValue] ?? label ?? normalizedValue
   }
-  return fallback[dictValue] ?? dictValue
+  return fallback[dictValue] ?? fallback[normalizedValue] ?? normalizedValue
 }
 
 export function getDictTagColorSync(
@@ -76,13 +81,16 @@ export function getDictTagColorSync(
   dictValue: string,
   fallback: Partial<Record<string, string>> = {},
 ): string {
-  if (!dictValue) return 'default'
+  const normalizedValue = dictValue.trim()
+  if (!normalizedValue) return 'default'
   const cached = dictCache.get(dictCode)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    const item = cached.data.find((d) => d.dictValue === dictValue)
-    return normalizeTagColor(item?.listClass || fallback[dictValue] || 'default')
+    const item = cached.data.find((d) => d.dictValue.trim() === normalizedValue)
+    return normalizeTagColor(
+      item?.listClass || fallback[dictValue] || fallback[normalizedValue] || 'default',
+    )
   }
-  return normalizeTagColor(fallback[dictValue] || 'default')
+  return normalizeTagColor(fallback[dictValue] || fallback[normalizedValue] || 'default')
 }
 
 function normalizeTagColor(color: string): string {

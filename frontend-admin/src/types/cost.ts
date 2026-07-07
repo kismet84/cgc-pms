@@ -1,3 +1,5 @@
+import { getDictLabelSync } from '@/utils/dict'
+
 /** Source type display mapping */
 export type SourceType =
   | 'CT_CONTRACT'
@@ -6,6 +8,7 @@ export type SourceType =
   | 'CT_INDIRECT'
   | 'CT_MATERIAL'
   | 'CT_MACHINE'
+  | 'CT_MACHINERY'
   | 'CT_SUBCONTRACT'
   | 'CT_LABOR'
   | 'CT_OTHER'
@@ -19,6 +22,37 @@ export type SourceType =
   | 'BID_COST_TRANSFERRED'
   | 'OVERHEAD_ALLOCATION'
 
+export const COST_TYPE_DICT = 'cost_type'
+export const COST_TYPE_LABEL: Record<string, string> = {
+  CONTRACT_LOCKED: '合同锁定成本',
+  ACTUAL_COST: '实际成本',
+  TARGET_COST: '成本目标',
+  PAID_AMOUNT: '已付款',
+  DYNAMIC_COST: '动态成本',
+  CT_CONTRACT: '合同锁定成本',
+  CT_DIRECT: '直接成本',
+  CT_INDIRECT: '间接成本',
+  CT_MATERIAL: '材料成本',
+  CT_MACHINE: '机械使用成本',
+  CT_MACHINERY: '机械使用成本',
+  CT_SUBCONTRACT: '分包成本',
+  CT_LABOR: '人工成本',
+  CT_OTHER: '其他成本',
+  MATERIAL: '材料费',
+  SUBCONTRACT: '分包费',
+  MACHINERY: '机械费',
+  LABOR: '人工费',
+  VISA: '签证费',
+  MANAGEMENT: '管理费',
+  MATERIAL_RECEIPT: '材料验收成本',
+  MAT_RECEIPT: '材料验收成本',
+  SUB_MEASURE: '分包计量成本',
+  VAR_ORDER: '签证变更成本',
+  VARIATION: '签证变更成本',
+  CHANGE: '合同变更成本',
+  CT_CHANGE: '合同变更成本',
+}
+
 export const SOURCE_TYPE_LABEL: Record<SourceType, string> = {
   CT_CONTRACT: '合同锁定成本',
   CT_REVENUE: '业主收入确认',
@@ -26,6 +60,7 @@ export const SOURCE_TYPE_LABEL: Record<SourceType, string> = {
   CT_INDIRECT: '间接成本',
   CT_MATERIAL: '材料成本',
   CT_MACHINE: '机械使用成本',
+  CT_MACHINERY: '机械使用成本',
   CT_SUBCONTRACT: '分包成本',
   CT_LABOR: '人工成本',
   CT_OTHER: '其他成本',
@@ -47,6 +82,7 @@ export const SOURCE_TYPE_COLOR: Record<SourceType, string> = {
   CT_INDIRECT: 'magenta',
   CT_MATERIAL: 'green',
   CT_MACHINE: 'gold',
+  CT_MACHINERY: 'gold',
   CT_SUBCONTRACT: 'orange',
   CT_LABOR: 'lime',
   CT_OTHER: 'default',
@@ -59,6 +95,24 @@ export const SOURCE_TYPE_COLOR: Record<SourceType, string> = {
   BID_COST: 'geekblue',
   BID_COST_TRANSFERRED: 'lime',
   OVERHEAD_ALLOCATION: 'magenta',
+}
+
+export function getCostTypeLabel(value: string | undefined) {
+  const key = value?.trim()
+  if (!key) return '-'
+  return getDictLabelSync(COST_TYPE_DICT, key, COST_TYPE_LABEL) || key
+}
+
+export function getSourceTypeLabel(value: string | undefined) {
+  const key = value?.trim()
+  if (!key) return '-'
+  return SOURCE_TYPE_LABEL[key as SourceType] ?? key
+}
+
+export function getSourceTypeColor(value: string | undefined) {
+  const key = value?.trim()
+  if (!key) return 'default'
+  return SOURCE_TYPE_COLOR[key as SourceType] ?? 'default'
 }
 
 /** Cost ledger item view object */

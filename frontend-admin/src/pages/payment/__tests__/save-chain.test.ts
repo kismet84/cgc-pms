@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const paymentSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-const formModalSource = readFileSync(resolve(currentDir, '../components/PaymentFormModal.vue'), 'utf-8')
+const formModalSource = readFileSync(
+  resolve(currentDir, '../components/PaymentFormModal.vue'),
+  'utf-8',
+)
 
 describe('PaymentPage save chain integrity', () => {
   describe('createApplication returns string (not {id}) — Bug FE-01 fix', () => {
@@ -31,7 +34,9 @@ describe('PaymentPage save chain integrity', () => {
       expect(handleEditFn?.[0]).toMatch(/applyCode:\s*detail\.applyCode/)
       expect(handleEditFn?.[0]).toMatch(/applyAmount:\s*detail\.applyAmount/)
       expect(handleEditFn?.[0]).toMatch(/applyReason:\s*detail\.applyReason/)
-      expect(handleEditFn?.[0]).toMatch(/detail\.basis\?\.length\s*\?\s*detail\.basis\s*:\s*\(await\s+getBasisList\(record\.id\)\)/)
+      expect(handleEditFn?.[0]).toMatch(
+        /detail\.basis\?\.length\s*\?\s*detail\.basis\s*:\s*\(await\s+getBasisList\(record\.id\)\)/,
+      )
     })
 
     it('shows error message and returns early on getBasisList failure', () => {

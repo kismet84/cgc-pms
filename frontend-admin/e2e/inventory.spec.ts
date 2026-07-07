@@ -1,4 +1,11 @@
-import { test, expect, type APIRequestContext, type BrowserContext, type Page, type Playwright } from '@playwright/test'
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type BrowserContext,
+  type Page,
+  type Playwright,
+} from '@playwright/test'
 import { createAuthenticatedPage } from './auth-session'
 
 const SYSTEM_ERROR = '系统异常，请稍后重试'
@@ -8,13 +15,11 @@ const API_BASE_URL = 'http://localhost:8080'
 let sharedContext: BrowserContext
 let sharedPage: Page
 let apiContext: APIRequestContext
-let seededLedgerSample:
-  | {
-      warehouseName: string
-      materialName: string
-      quantity: string
-    }
-  | null = null
+let seededLedgerSample: {
+  warehouseName: string
+  materialName: string
+  quantity: string
+} | null = null
 
 async function expectNoInventoryError(page: Page) {
   await expect(page.getByText(SYSTEM_ERROR)).toHaveCount(0)
@@ -112,7 +117,9 @@ async function seedInventoryLedgerSample(playwright: Playwright) {
 
   expect(Number(ledger.stock?.availableQty)).toBe(Number(quantity))
   expect(
-    ledger.txns?.records?.some((item) => item.txnType === 'IN' && Number(item.quantity) === Number(quantity)),
+    ledger.txns?.records?.some(
+      (item) => item.txnType === 'IN' && Number(item.quantity) === Number(quantity),
+    ),
   ).toBeTruthy()
 
   seededLedgerSample = { warehouseName, materialName, quantity }
@@ -186,9 +193,15 @@ test.describe('Inventory E2E', () => {
     await expect(sharedPage.getByRole('button', { name: '重置' })).toBeVisible()
     await expect(sharedPage.locator('.stock-table-title')).toContainText('出入库流水')
     await expect(sharedPage.locator('.stock-table-count')).toContainText('共')
-    await expect(sharedPage.locator('.stock-kpi-label').filter({ hasText: '仓库数量' })).toBeVisible()
-    await expect(sharedPage.locator('.stock-kpi-label').filter({ hasText: '物料种类' })).toBeVisible()
-    await expect(sharedPage.locator('.stock-kpi-label').filter({ hasText: '低库存物料' })).toBeVisible()
+    await expect(
+      sharedPage.locator('.stock-kpi-label').filter({ hasText: '仓库数量' }),
+    ).toBeVisible()
+    await expect(
+      sharedPage.locator('.stock-kpi-label').filter({ hasText: '物料种类' }),
+    ).toBeVisible()
+    await expect(
+      sharedPage.locator('.stock-kpi-label').filter({ hasText: '低库存物料' }),
+    ).toBeVisible()
     await expect(sharedPage.locator('.vxe-table').first()).toBeVisible({ timeout: 10000 })
     await expectNoInventoryError(sharedPage)
   })
@@ -223,9 +236,14 @@ test.describe('Inventory E2E', () => {
     )
     await sharedPage.getByRole('button', { name: '查询' }).click()
 
-    await expect(sharedPage.locator('.stock-balance-card, .lg-panel').filter({
-      hasText: seededLedgerSample!.warehouseName,
-    }).first()).toBeVisible({ timeout: 10000 })
+    await expect(
+      sharedPage
+        .locator('.stock-balance-card, .lg-panel')
+        .filter({
+          hasText: seededLedgerSample!.warehouseName,
+        })
+        .first(),
+    ).toBeVisible({ timeout: 10000 })
     await expect(sharedPage.locator('body')).toContainText(seededLedgerSample!.materialName)
     await expect(sharedPage.locator('body')).toContainText('7.0000')
 

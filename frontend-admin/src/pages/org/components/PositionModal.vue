@@ -23,7 +23,7 @@ const emit = defineEmits<{
   ok: []
 }>()
 
-function onCompanyChange(_val: string) {
+function onCompanyChange() {
   props.form.departmentId = ''
 }
 </script>

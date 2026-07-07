@@ -92,7 +92,10 @@ function filterOptionByLabel(input: string, option?: { label?: string | number }
           </a-select>
         </a-form-item>
         <a-form-item label="计量期次">
-          <a-input v-model:value="formData.measurePeriod" placeholder="请输入计量期次（如：第1期）" />
+          <a-input
+            v-model:value="formData.measurePeriod"
+            placeholder="请输入计量期次（如：第1期）"
+          />
         </a-form-item>
         <a-form-item label="计量日期">
           <a-date-picker

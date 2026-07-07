@@ -21,11 +21,9 @@ import {
 import {
   ALERT_CATEGORY_LABELS,
   ALERT_CHANNEL_LABELS,
-  ALERT_PROCESS_STATUS_COLOR,
   ALERT_PROCESS_STATUS_LABELS,
   RULE_CATEGORY_LABELS,
   RULE_TYPE_LABELS,
-  SEVERITY_COLOR,
   getAlertRuleCategory,
   type AlertLogVO,
   type AlertSubscriptionConfig,
@@ -91,7 +89,11 @@ function resolveRoleDefaultPreset(): AlertRolePreset {
   const roleCodes = userStore.roles.map((item) => String(item).toUpperCase())
   const roleName = String(userStore.userInfo?.roleName ?? '')
 
-  if (roleCodes.includes('SUPER_ADMIN') || roleCodes.includes('ADMIN') || roleName.includes('超级管理员')) {
+  if (
+    roleCodes.includes('SUPER_ADMIN') ||
+    roleCodes.includes('ADMIN') ||
+    roleName.includes('超级管理员')
+  ) {
     return {}
   }
   if (roleCodes.includes('PROJECT_MANAGER') || roleName.includes('项目经理')) {
@@ -122,16 +124,20 @@ function applyRoleDefaultView(force = false) {
 
 const activeRolePreset = computed(() => resolveRoleDefaultPreset())
 const hasDefaultScopeDomain = computed(() => Boolean(activeRolePreset.value.alertDomain))
-const availableSubscriptionDomains = computed(() => subscriptionState.value?.availableOptions.domains ?? [])
-const availableSubscriptionChannels = computed(() => subscriptionState.value?.availableOptions.channels ?? [])
+const availableSubscriptionDomains = computed(
+  () => subscriptionState.value?.availableOptions.domains ?? [],
+)
+const availableSubscriptionChannels = computed(
+  () => subscriptionState.value?.availableOptions.channels ?? [],
+)
 const availableSeverityOptions = computed(
   () => subscriptionState.value?.availableOptions.minSeverityOptions ?? ['LOW', 'MEDIUM', 'HIGH'],
 )
-const defaultSubscriptionEnabled = computed(
-  () => Boolean(subscriptionState.value?.defaultSubscription.enabled),
+const defaultSubscriptionEnabled = computed(() =>
+  Boolean(subscriptionState.value?.defaultSubscription.enabled),
 )
-const defaultStatusChangeEnabled = computed(
-  () => Boolean(subscriptionState.value?.defaultSubscription.notifyOnStatusChanged),
+const defaultStatusChangeEnabled = computed(() =>
+  Boolean(subscriptionState.value?.defaultSubscription.notifyOnStatusChanged),
 )
 const currentOperator = computed(
   () =>
@@ -175,7 +181,8 @@ function syncBatchStatusResult(
       item.processStatus = processStatus
       item.statusRemark = statusRemark
       if (processStatus === 'PROCESSED') item.processedAt = new Date().toISOString()
-      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') item.archivedAt = new Date().toISOString()
+      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID')
+        item.archivedAt = new Date().toISOString()
     })
   })
 }
@@ -206,9 +213,7 @@ function syncActiveRecordFromList() {
     return
   }
   const currentId = activeRecord.value?.id
-  const matched = currentId
-    ? list.find((item) => String(item.id) === String(currentId))
-    : null
+  const matched = currentId ? list.find((item) => String(item.id) === String(currentId)) : null
   activeRecord.value = { ...(matched ?? list[0]) }
 }
 
@@ -374,7 +379,8 @@ async function handleChangeStatus(
       item.processStatus = processStatus
       item.statusRemark = statusRemark
       if (processStatus === 'PROCESSED') item.processedAt = new Date().toISOString()
-      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') item.archivedAt = new Date().toISOString()
+      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID')
+        item.archivedAt = new Date().toISOString()
     })
     message.success(
       processStatus === 'PROCESSED'
@@ -393,7 +399,11 @@ async function handleSaveActiveResult() {
   if (!activeRecord.value) return
   const nextStatus: AlertProcessStatus =
     String(activeRecord.value.processStatus ?? 'OPEN') === 'ARCHIVED' ? 'ARCHIVED' : 'PROCESSED'
-  await handleChangeStatus(activeRecord.value, nextStatus, statusRemarkDraft.value.trim() || undefined)
+  await handleChangeStatus(
+    activeRecord.value,
+    nextStatus,
+    statusRemarkDraft.value.trim() || undefined,
+  )
 }
 
 function isSameLocalDay(value: unknown, target = new Date()) {
@@ -476,13 +486,23 @@ const subscriptionRows = computed(() => {
     label: ALERT_CHANNEL_LABELS[channel] ?? channel,
     enabled: Boolean(effective?.enabled && effective.channels.includes(channel)),
     minSeverity:
-      effective?.minSeverity === 'HIGH' ? 'HIGH' : effective?.minSeverity === 'MEDIUM' ? 'MEDIUM' : 'LOW',
+      effective?.minSeverity === 'HIGH'
+        ? 'HIGH'
+        : effective?.minSeverity === 'MEDIUM'
+          ? 'MEDIUM'
+          : 'LOW',
   }))
 })
 
 const gridColumns = computed(() => [
   { field: 'id', title: '告警ID', width: 188, showOverflow: 'title', slots: { default: 'id' } },
-  { field: 'projectId', title: '项目', minWidth: 220, showOverflow: 'title', slots: { default: 'projectId' } },
+  {
+    field: 'projectId',
+    title: '项目',
+    minWidth: 220,
+    showOverflow: 'title',
+    slots: { default: 'projectId' },
+  },
   { field: 'alertDomain', title: '规则域', width: 108, slots: { default: 'alertDomain' } },
   { field: 'ruleType', title: '规则类型', minWidth: 148, slots: { default: 'ruleType' } },
   { field: 'alertCategory', title: '细分类', width: 118, slots: { default: 'alertCategory' } },
@@ -554,7 +574,10 @@ function buildAlertBusinessPath(record: AlertLogVO): string {
   }
 
   const contractId = String(record.contractId ?? '').trim()
-  if (contractId && ['CONTRACT_OVERDUE', 'CONTRACT_EXPIRING'].includes(String(record.ruleType ?? '').trim())) {
+  if (
+    contractId &&
+    ['CONTRACT_OVERDUE', 'CONTRACT_EXPIRING'].includes(String(record.ruleType ?? '').trim())
+  ) {
     return `/contract/${contractId}`
   }
 
@@ -640,13 +663,20 @@ function exportCurrentView() {
     formatDateTime(item.triggeredAt),
     getAlertMessageText(item.message).replace(/\r?\n/g, ' '),
   ])
-  const header = ['告警ID', '项目', '规则域', '规则类型', '细分类', '严重度', '处理状态', '已读', '触发时间', '消息摘要']
+  const header = [
+    '告警ID',
+    '项目',
+    '规则域',
+    '规则类型',
+    '细分类',
+    '严重度',
+    '处理状态',
+    '已读',
+    '触发时间',
+    '消息摘要',
+  ]
   const csv = [header, ...rows]
-    .map((line) =>
-      line
-        .map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`)
-        .join(','),
-    )
+    .map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
     .join('\n')
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
@@ -658,9 +688,13 @@ function exportCurrentView() {
   message.success('已导出当前列表')
 }
 
-watch(activeRecord, (value) => {
-  statusRemarkDraft.value = String(value?.statusRemark ?? '')
-}, { immediate: true })
+watch(
+  activeRecord,
+  (value) => {
+    statusRemarkDraft.value = String(value?.statusRemark ?? '')
+  },
+  { immediate: true },
+)
 
 onMounted(async () => {
   applyRoleDefaultView()

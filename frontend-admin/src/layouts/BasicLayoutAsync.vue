@@ -32,7 +32,11 @@ async function refreshUserInfoIfNeeded() {
   if (!userInfo.value?.userId) {
     return
   }
-  if (userInfo.value.realName && userInfo.value.phone !== undefined && userInfo.value.email !== undefined) {
+  if (
+    userInfo.value.realName &&
+    userInfo.value.phone !== undefined &&
+    userInfo.value.email !== undefined
+  ) {
     return
   }
   try {
@@ -86,7 +90,10 @@ onBeforeUnmount(() => {
             <MenuFoldOutlined class="sidebar-tool-icon" aria-hidden="true" />
             <span v-if="!collapsed">折叠菜单</span>
           </button>
-          <span class="sidebar-tool-button sidebar-bell" :aria-label="bellReady ? '通知' : undefined">
+          <span
+            class="sidebar-tool-button sidebar-bell"
+            :aria-label="bellReady ? '通知' : undefined"
+          >
             <NotificationBell
               v-if="bellReady"
               :label="collapsed ? '' : '通知中心'"

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { MoreOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { ColumnSettingsButton } from '@/components/list-page'
-import { SOURCE_TYPE_COLOR, SOURCE_TYPE_LABEL } from '@/types/cost'
-import type { CostLedgerVO, SourceType } from '@/types/cost'
+import { getSourceTypeColor, getSourceTypeLabel } from '@/types/cost'
+import type { CostLedgerVO } from '@/types/cost'
 
-const props = defineProps<{
+defineProps<{
   isMobile: boolean
   loading: boolean
   tableData: CostLedgerVO[]
@@ -68,9 +68,7 @@ const props = defineProps<{
           </div>
           <div class="cost-ledger-mobile-meta">项目：{{ row.projectName || '-' }}</div>
           <div class="cost-ledger-mobile-meta">合同：{{ row.contractName || '-' }}</div>
-          <div class="cost-ledger-mobile-meta">
-            来源：{{ SOURCE_TYPE_LABEL[row.sourceType as SourceType] || row.sourceType || '-' }}
-          </div>
+          <div class="cost-ledger-mobile-meta">来源：{{ getSourceTypeLabel(row.sourceType) }}</div>
           <div class="cost-ledger-mobile-meta">
             状态：{{
               row.costStatus === 'CONFIRMED'
@@ -94,8 +92,8 @@ const props = defineProps<{
         size="small"
       >
         <template #sourceType="{ row }">
-          <a-tag :color="SOURCE_TYPE_COLOR[row.sourceType as SourceType] || 'default'" size="small">
-            {{ SOURCE_TYPE_LABEL[row.sourceType as SourceType] || row.sourceType }}
+          <a-tag :color="getSourceTypeColor(row.sourceType)" size="small">
+            {{ getSourceTypeLabel(row.sourceType) }}
           </a-tag>
         </template>
         <template #amount="{ row }">

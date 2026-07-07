@@ -16,7 +16,9 @@ describe('Dashboard permission scope', () => {
   })
 
   it('keeps admin and super admin full dashboard coverage', () => {
-    expect(resolveAvailableDashboardRoles(['ADMIN'], ['dashboard:view'])).toEqual(ALL_DASHBOARD_ROLES)
+    expect(resolveAvailableDashboardRoles(['ADMIN'], ['dashboard:view'])).toEqual(
+      ALL_DASHBOARD_ROLES,
+    )
     expect(resolveAvailableDashboardRoles(['SUPER_ADMIN'], [])).toEqual(ALL_DASHBOARD_ROLES)
   })
 })

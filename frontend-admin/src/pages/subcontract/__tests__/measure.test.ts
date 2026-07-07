@@ -36,8 +36,12 @@ describe('SubcontractMeasurePage submit-approval button', () => {
   })
 
   it('mounts split local components from the entry page', () => {
-    expect(source).toContain("import SubcontractMeasureAnalysisRail from './components/SubcontractMeasureAnalysisRail.vue'")
-    expect(source).toContain("import SubcontractMeasureModal from './components/SubcontractMeasureModal.vue'")
+    expect(source).toContain(
+      "import SubcontractMeasureAnalysisRail from './components/SubcontractMeasureAnalysisRail.vue'",
+    )
+    expect(source).toContain(
+      "import SubcontractMeasureModal from './components/SubcontractMeasureModal.vue'",
+    )
     expect(source).toContain('<SubcontractMeasureAnalysisRail')
     expect(source).toContain('<SubcontractMeasureModal')
   })
@@ -48,7 +52,9 @@ describe('SubcontractMeasurePage submit-approval button', () => {
     expect(source).toMatch(
       /<div class="lg-grid">[\s\S]*<div class="subcontract-measure-main-column">[\s\S]*<\/main>\s*<\/div>\s*<SubcontractMeasureAnalysisRail/,
     )
-    expect(analysisRailSource).toContain('<aside class="lg-analysis-rail subcontract-measure-analysis-rail"')
+    expect(analysisRailSource).toContain(
+      '<aside class="lg-analysis-rail subcontract-measure-analysis-rail"',
+    )
   })
 
   it('keeps the key page shell classes and core action entry', () => {

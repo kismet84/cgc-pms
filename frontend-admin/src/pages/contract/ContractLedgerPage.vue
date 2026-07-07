@@ -13,7 +13,7 @@ import ContractKpiStrip from './components/ContractKpiStrip.vue'
 import ContractMobileCardList from './components/ContractMobileCardList.vue'
 import ContractAnalysisPanel from './components/ContractAnalysisPanel.vue'
 import { useContractLedger, TYPE_LABEL, TYPE_COLOR } from './composables/useContractLedger'
-import type { ContractVO, ContractType, ContractStatus } from '@/types/contract'
+import type { ContractType, ContractStatus } from '@/types/contract'
 import { ColumnSettingsButton } from '@/components/list-page'
 
 const {

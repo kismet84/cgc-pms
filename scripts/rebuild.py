@@ -15,6 +15,7 @@ CGC-PMS 开发环境重建脚本
 
 import argparse
 import secrets
+import shutil
 import subprocess
 import sys
 import os
@@ -30,6 +31,26 @@ COMPOSE_FILE = "docker-compose.dev.yml"
 # JDK 21 path — required for Maven builds on Windows
 JAVA_HOME = os.environ.get("JAVA_HOME", r"D:\projects-test\jdk-21\jdk-21.0.11+10")
 
+
+def resolve_windows_command(executable: str) -> str:
+    """Resolve bare command names like pnpm to a real Windows executable path."""
+    if sys.platform != "win32":
+        return executable
+
+    resolved = shutil.which(executable)
+    if resolved:
+        return resolved
+
+    if Path(executable).suffix:
+        return executable
+
+    for suffix in (".cmd", ".bat", ".exe"):
+        resolved = shutil.which(f"{executable}{suffix}")
+        if resolved:
+            return resolved
+
+    return executable
+
 def run(cmd: list[str], *, cwd: Path | None = None, check: bool = True,
         capture: bool = False, timeout: int | None = None, env: dict | None = None) -> subprocess.CompletedProcess:
     """Run a command, print output in real time, return result."""
@@ -38,8 +59,11 @@ def run(cmd: list[str], *, cwd: Path | None = None, check: bool = True,
     if env:
         full_env.update(env)
 
-    if sys.platform == "win32" and cmd and cmd[0].lower().endswith(".cmd"):
-        cmd = ["cmd", "/c", *cmd]
+    if sys.platform == "win32" and cmd:
+        resolved_cmd0 = resolve_windows_command(cmd[0])
+        cmd = [resolved_cmd0, *cmd[1:]]
+        if Path(resolved_cmd0).suffix.lower() in {".cmd", ".bat"}:
+            cmd = ["cmd", "/c", *cmd]
 
     print(f"  \033[36m→ {' '.join(cmd)}\033[0m")
     cwd = cwd or PROJECT_ROOT
@@ -187,8 +211,8 @@ def build_frontend(test: bool = False) -> bool:
             print("  \033[32m[OK] type-check 通过\033[0m")
 
             # lint
-            run(["pnpm", "lint"], cwd=FRONTEND_DIR, timeout=60, check=False)
-            print("  \033[32m[OK] lint 完成\033[0m")
+            run(["pnpm", "lint:check"], cwd=FRONTEND_DIR, timeout=60)
+            print("  \033[32m[OK] lint 检查通过\033[0m")
 
             # unit tests
             run(["pnpm", "test:unit"], cwd=FRONTEND_DIR, timeout=300)

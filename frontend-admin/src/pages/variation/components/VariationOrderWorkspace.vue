@@ -363,7 +363,9 @@ defineProps({
                 <span>{{ varTypeLabel[row.varType] ?? row.varType ?? '-' }}</span>
                 <span>{{ row.direction === 'COST' ? '成本' : row.direction || '-' }}</span>
               </div>
-              <div class="vo-mobile-card-amount">上报金额：{{ fmtWan(row.reportedAmount) }} 万元</div>
+              <div class="vo-mobile-card-amount">
+                上报金额：{{ fmtWan(row.reportedAmount) }} 万元
+              </div>
               <div class="vo-mobile-card-actions">
                 <a-button type="link" size="small" @click="handleView(row)">查看</a-button>
                 <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>

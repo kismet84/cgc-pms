@@ -51,10 +51,7 @@ export function filterDeptNodes(
 }
 
 /** 在部门树中按 ID 查找节点 */
-export function findDeptNode(
-  nodes: unknown,
-  id: string,
-): OrgDepartmentTreeNodeVO | null {
+export function findDeptNode(nodes: unknown, id: string): OrgDepartmentTreeNodeVO | null {
   for (const node of Array.isArray(nodes) ? (nodes as OrgDepartmentTreeNodeVO[]) : []) {
     if (node.id === id) return node
     if (node.children && node.children.length > 0) {

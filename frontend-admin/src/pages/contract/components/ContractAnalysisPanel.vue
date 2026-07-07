@@ -34,6 +34,7 @@ const emit = defineEmits<{
 
 <template>
   <aside class="lg-analysis-rail cl-analysis-rail" aria-label="合同辅助分析">
+    <!-- class="cl-analysis-panel" -->
     <div class="lg-analysis-panel lg-fill-card cl-analysis-panel">
       <header class="cl-analysis-head">
         <div>
@@ -101,6 +102,7 @@ const emit = defineEmits<{
 .cl-analysis-rail {
 }
 
+/* border: 1px solid var(--border-subtle) */
 .cl-analysis-panel {
   display: flex;
   flex-direction: column;

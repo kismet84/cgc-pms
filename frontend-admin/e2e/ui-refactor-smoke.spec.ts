@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Browser } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 /**
  * UI 重构冒烟测试 -- 验证核心页面渲染不空白、关键布局元素可见。

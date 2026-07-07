@@ -38,7 +38,6 @@ const {
   detailItem,
   showDetail,
   closeDetail,
-  fetchData,
   fetchKpi,
   fetchWarehouses,
   handleSearch,

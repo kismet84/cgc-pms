@@ -12,6 +12,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="${LOG_FILE:-/var/log/cgc-pms-backup.log}"
 TARGET="${1:-all}"
+FAILED=0
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
@@ -20,10 +21,15 @@ log() {
 run_mysql_backup() {
     log "=== Starting MySQL backup ==="
     if [ -x "${SCRIPT_DIR}/backup-mysql-full.sh" ]; then
-        "${SCRIPT_DIR}/backup-mysql-full.sh" >> "${LOG_FILE}" 2>&1 && \
-            log "MySQL backup completed successfully" || \
-            log "MySQL backup FAILED (exit code: $?)"
+        if "${SCRIPT_DIR}/backup-mysql-full.sh" >> "${LOG_FILE}" 2>&1; then
+            log "MySQL backup completed successfully"
+        else
+            local exit_code=$?
+            FAILED=1
+            log "MySQL backup FAILED (exit code: ${exit_code})"
+        fi
     else
+        FAILED=1
         log "WARN: backup-mysql-full.sh not found or not executable"
     fi
 }
@@ -31,10 +37,15 @@ run_mysql_backup() {
 run_minio_backup() {
     log "=== Starting MinIO backup ==="
     if [ -x "${SCRIPT_DIR}/backup-minio-mirror.sh" ]; then
-        "${SCRIPT_DIR}/backup-minio-mirror.sh" >> "${LOG_FILE}" 2>&1 && \
-            log "MinIO backup completed successfully" || \
-            log "MinIO backup FAILED (exit code: $?)"
+        if "${SCRIPT_DIR}/backup-minio-mirror.sh" >> "${LOG_FILE}" 2>&1; then
+            log "MinIO backup completed successfully"
+        else
+            local exit_code=$?
+            FAILED=1
+            log "MinIO backup FAILED (exit code: ${exit_code})"
+        fi
     else
+        FAILED=1
         log "WARN: backup-minio-mirror.sh not found or not executable"
     fi
 }
@@ -42,10 +53,15 @@ run_minio_backup() {
 run_verify() {
     log "=== Running backup verification ==="
     if [ -x "${SCRIPT_DIR}/backup-verify.sh" ]; then
-        "${SCRIPT_DIR}/backup-verify.sh" >> "${LOG_FILE}" 2>&1 && \
-            log "Backup verification passed" || \
-            log "Backup verification FAILED (exit code: $?)"
+        if "${SCRIPT_DIR}/backup-verify.sh" >> "${LOG_FILE}" 2>&1; then
+            log "Backup verification passed"
+        else
+            local exit_code=$?
+            FAILED=1
+            log "Backup verification FAILED (exit code: ${exit_code})"
+        fi
     else
+        FAILED=1
         log "WARN: backup-verify.sh not found or not executable"
     fi
 }
@@ -71,5 +87,10 @@ case "${TARGET}" in
         exit 1
         ;;
 esac
+
+if [ "${FAILED}" -ne 0 ]; then
+    log "CGC-PMS Backup Scheduler finished with failures"
+    exit 1
+fi
 
 log "CGC-PMS Backup Scheduler finished"

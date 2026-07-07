@@ -243,9 +243,9 @@ function handlePageSizeChange(_cur: number, size: number) {
   fetchData()
 }
 
-onMounted(fetchData)
-onMounted(() => {
-  void fetchDictData(PROJECT_TYPE_DICT)
+onMounted(async () => {
+  await fetchDictData(PROJECT_TYPE_DICT)
+  await fetchData()
 })
 
 const MOBILE_BP = 768
@@ -325,6 +325,7 @@ const PROJECT_TYPE_LABEL: Record<string, string> = {
   专业分包: '专业分包',
   劳务分包: '劳务分包',
   材料采购: '材料采购',
+  BUILDING: '施工总承包',
   MAIN: '施工总承包',
   SUB: '专业分包',
   PURCHASE: '材料采购',
@@ -829,5 +830,4 @@ const {
 .pj-create-form {
   padding-top: 16px;
 }
-
 </style>

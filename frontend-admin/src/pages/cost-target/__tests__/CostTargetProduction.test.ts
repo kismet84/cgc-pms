@@ -14,17 +14,14 @@ const analysisRailSource = readFileSync(
 )
 const routerSource = readFileSync(resolve(currentDir, '../../../router/index.ts'), 'utf-8')
 
-const {
-  mockGetCostTargetList,
-  mockFetchProjects,
-  mockToggleCol,
-  mockModalConfirm,
-} = vi.hoisted(() => ({
-  mockGetCostTargetList: vi.fn(),
-  mockFetchProjects: vi.fn().mockResolvedValue(undefined),
-  mockToggleCol: vi.fn(),
-  mockModalConfirm: vi.fn(),
-}))
+const { mockGetCostTargetList, mockFetchProjects, mockToggleCol, mockModalConfirm } = vi.hoisted(
+  () => ({
+    mockGetCostTargetList: vi.fn(),
+    mockFetchProjects: vi.fn().mockResolvedValue(undefined),
+    mockToggleCol: vi.fn(),
+    mockModalConfirm: vi.fn(),
+  }),
+)
 
 vi.mock('@/api/modules/costTarget', () => ({
   getCostTargetList: mockGetCostTargetList,
@@ -296,9 +293,7 @@ describe('CostTarget production guards', () => {
     await flushPromises()
     mockGetCostTargetList.mockClear()
 
-    const resetButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('重置'))
+    const resetButton = wrapper.findAll('button').find((button) => button.text().includes('重置'))
     expect(resetButton).toBeTruthy()
     await resetButton!.trigger('click')
     await flushPromises()
@@ -332,9 +327,7 @@ describe('CostTarget production guards', () => {
   })
 
   it('源码继续守住查询绑定、互斥结构和移动端隐藏列设置', () => {
-    expect(source).toMatch(
-      /v-model:value="filter\.approvalStatus"[\s\S]*@change="handleSearch"/,
-    )
+    expect(source).toMatch(/v-model:value="filter\.approvalStatus"[\s\S]*@change="handleSearch"/)
     expect(source).toMatch(/v-model:value="filter\.isActive"[\s\S]*@change="handleSearch"/)
     expect(source).toMatch(
       /function handleReset\(\) \{[\s\S]*filter\.approvalStatus = undefined[\s\S]*filter\.isActive = undefined[\s\S]*fetchData\(\)/,
@@ -354,18 +347,28 @@ describe('CostTarget production guards', () => {
     expect(analysisRailSource).toMatch(
       /<aside class="lg-analysis-rail ct-analysis-rail" aria-label="成本目标辅助分析">/,
     )
-    expect(analysisRailSource).toMatch(/<a-button type="link" size="small" @click="emit\('refresh'\)">刷新<\/a-button>/)
+    expect(analysisRailSource).toMatch(
+      /<a-button type="link" size="small" @click="emit\('refresh'\)">刷新<\/a-button>/,
+    )
     expect(analysisRailSource).toMatch(/\.ct-analysis-panel\s*\{[\s\S]*display:\s*flex;/)
   })
 
   it('桌面表格继续使用纵向流式布局，避免工具栏和分页覆盖操作列', () => {
-    expect(source).toMatch(/\.ct-main-column\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/)
-    expect(source).toMatch(/\.ct-table-panel\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*min-height:\s*0;/)
+    expect(source).toMatch(
+      /\.ct-main-column\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;/,
+    )
+    expect(source).toMatch(
+      /\.ct-table-panel\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*min-height:\s*0;/,
+    )
     expect(source).toMatch(/\.ct-table-toolbar\s*\{[\s\S]*flex:\s*0 0 auto;/)
-    expect(source).toMatch(/\.ct-table-wrap\s*\{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;[\s\S]*min-height:\s*520px;/)
+    expect(source).toMatch(
+      /\.ct-table-wrap\s*\{[\s\S]*flex:\s*1 1 auto;[\s\S]*min-height:\s*0;[\s\S]*min-height:\s*520px;/,
+    )
     expect(source).toMatch(/\.ct-table-panel > \.lg-pagination\s*\{[\s\S]*flex:\s*0 0 auto;/)
     expect(source).not.toMatch(/\.ct-table-toolbar\s*\{[\s\S]*position:\s*(absolute|fixed|sticky);/)
-    expect(source).not.toMatch(/\.ct-table-panel > \.lg-pagination\s*\{[\s\S]*position:\s*(absolute|fixed|sticky);/)
+    expect(source).not.toMatch(
+      /\.ct-table-panel > \.lg-pagination\s*\{[\s\S]*position:\s*(absolute|fixed|sticky);/,
+    )
   })
 
   it('桌面操作列仍可触发查看、编辑和切换版本', async () => {
@@ -385,9 +388,7 @@ describe('CostTarget production guards', () => {
     expect(wrapper.find('.stub-edit-page').attributes('data-mode')).toBe('view')
     expect(mockModalConfirm).not.toHaveBeenCalled()
 
-    const editAction = wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('编辑'))
+    const editAction = wrapper.findAll('button').find((button) => button.text().includes('编辑'))
     expect(editAction).toBeTruthy()
     await editAction!.trigger('click')
     await flushPromises()
@@ -415,18 +416,28 @@ describe('CostTarget production guards', () => {
 
   it('源码保留桌面独立查看入口，并传递 view 模式', () => {
     expect(source).toMatch(/const targetModalMode = ref<'create' \| 'edit' \| 'view'>\('create'\)/)
-    expect(source).toMatch(/function handleView\(row: CostTargetVO\) \{[\s\S]*targetModalMode\.value = 'view'/)
+    expect(source).toMatch(
+      /function handleView\(row: CostTargetVO\) \{[\s\S]*targetModalMode\.value = 'view'/,
+    )
     expect(source).toMatch(/<a-menu-item @click="handleView\(row\)">查看详情<\/a-menu-item>/)
-    expect(source).toMatch(/<a-button type="link" class="ct-mobile-card-link" @click="handleView\(row\)">/)
+    expect(source).toMatch(
+      /<a-button type="link" class="ct-mobile-card-link" @click="handleView\(row\)">/,
+    )
   })
 
   it('详情态源码必须严格只读，且不能走保存提交入口', () => {
     expect(editSource).toMatch(/mode\?: 'create' \| 'edit' \| 'view'/)
     expect(editSource).toMatch(/const isView = computed\(\(\) => props\.mode === 'view'\)/)
     expect(editSource).toMatch(/if \(isView\.value \|\| saving\.value\) return/)
-    expect(editSource).toMatch(/const closeText = computed\(\(\) => \(isView\.value \? '关闭' : '取消'\)\)/)
-    expect(editSource).toMatch(/<a-button v-if="!isView" :loading="saving" @click="handleSave">保存<\/a-button>/)
-    expect(editSource).toMatch(/<a-button v-if="!isView" type="primary" :loading="saving && !submitting" @click="handleSubmit">/)
+    expect(editSource).toMatch(
+      /const closeText = computed\(\(\) => \(isView\.value \? '关闭' : '取消'\)\)/,
+    )
+    expect(editSource).toMatch(
+      /<a-button v-if="!isView" :loading="saving" @click="handleSave">保存<\/a-button>/,
+    )
+    expect(editSource).toMatch(
+      /<a-button v-if="!isView" type="primary" :loading="saving && !submitting" @click="handleSubmit">/,
+    )
     expect(editSource).toMatch(/<div v-if="!isView" class="cte-toolbar">/)
     expect(editSource).toMatch(/:disabled="isView"/)
     expect(editSource).toMatch(/pageTitle = computed\(\(\) => \{[\s\S]*'成本目标详情'/)

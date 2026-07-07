@@ -11,11 +11,13 @@ import AlertFilterPanel from '../components/AlertFilterPanel.vue'
 import AlertSubscriptionModal from '../components/AlertSubscriptionModal.vue'
 import AlertTablePanel from '../components/AlertTablePanel.vue'
 
-const { mockGetAlertSubscription, mockUpdateAlertSubscription, mockRouterPush } = vi.hoisted(() => ({
-  mockGetAlertSubscription: vi.fn(),
-  mockUpdateAlertSubscription: vi.fn(),
-  mockRouterPush: vi.fn(),
-}))
+const { mockGetAlertSubscription, mockUpdateAlertSubscription, mockRouterPush } = vi.hoisted(
+  () => ({
+    mockGetAlertSubscription: vi.fn(),
+    mockUpdateAlertSubscription: vi.fn(),
+    mockRouterPush: vi.fn(),
+  }),
+)
 
 function buildSubscriptionResponse(
   overrides: Partial<AlertSubscriptionResponse> = {},
@@ -518,10 +520,22 @@ describe('alert/index.vue', () => {
 
   it('入口文件只保留编排，关键结构拆到子组件', () => {
     const pageSource = readFileSync(resolve(__dirname, '../index.vue'), 'utf-8')
-    const filterPanelSource = readFileSync(resolve(__dirname, '../components/AlertFilterPanel.vue'), 'utf-8')
-    const tablePanelSource = readFileSync(resolve(__dirname, '../components/AlertTablePanel.vue'), 'utf-8')
-    const detailPanelSource = readFileSync(resolve(__dirname, '../components/AlertDetailPanel.vue'), 'utf-8')
-    const subscriptionModalSource = readFileSync(resolve(__dirname, '../components/AlertSubscriptionModal.vue'), 'utf-8')
+    const filterPanelSource = readFileSync(
+      resolve(__dirname, '../components/AlertFilterPanel.vue'),
+      'utf-8',
+    )
+    const tablePanelSource = readFileSync(
+      resolve(__dirname, '../components/AlertTablePanel.vue'),
+      'utf-8',
+    )
+    const detailPanelSource = readFileSync(
+      resolve(__dirname, '../components/AlertDetailPanel.vue'),
+      'utf-8',
+    )
+    const subscriptionModalSource = readFileSync(
+      resolve(__dirname, '../components/AlertSubscriptionModal.vue'),
+      'utf-8',
+    )
 
     expect(pageSource).toContain('<AlertFilterPanel')
     expect(pageSource).toContain('<AlertTablePanel')
@@ -607,7 +621,9 @@ describe('alert 子组件 DOM/结构证据', () => {
       },
     })
 
-    const labels = wrapper.findAll('.alert-filter-grid .alert-filter-item > label').map((item) => item.text())
+    const labels = wrapper
+      .findAll('.alert-filter-grid .alert-filter-item > label')
+      .map((item) => item.text())
     const actions = wrapper.findAll('.alert-filter-actions button').map((item) => item.text())
 
     expect(wrapper.find('.alert-filter-panel').exists()).toBe(true)
@@ -725,7 +741,13 @@ describe('alert 子组件 DOM/结构证据', () => {
   it('详情面板在不可跳转记录上保持隐藏业务单据入口', () => {
     const wrapper = mount(AlertDetailPanel, {
       props: {
-        activeRecord: createAlertRecord({ sourceType: '', sourceId: '', businessType: '', businessId: '', contractId: '' }),
+        activeRecord: createAlertRecord({
+          sourceType: '',
+          sourceId: '',
+          businessType: '',
+          businessId: '',
+          contractId: '',
+        }),
         statusRemarkDraft: '',
         currentOperator: '测试用户',
         subscriptionRows: [],

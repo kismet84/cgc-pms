@@ -54,7 +54,8 @@ function handleCancel() {
           show-search
           @change="onProjectChange"
           :filter-option="
-            (input: string, option: SelectOption) => option.label?.toLowerCase().includes(input.toLowerCase())
+            (input: string, option: SelectOption) =>
+              option.label?.toLowerCase().includes(input.toLowerCase())
           "
         >
           <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -70,7 +71,8 @@ function handleCancel() {
           allow-clear
           show-search
           :filter-option="
-            (input: string, option: SelectOption) => option.label?.toLowerCase().includes(input.toLowerCase())
+            (input: string, option: SelectOption) =>
+              option.label?.toLowerCase().includes(input.toLowerCase())
           "
           @change="onContractChange"
         >
@@ -83,7 +85,12 @@ function handleCancel() {
         <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
       </a-form-item>
       <a-form-item label="订单类型">
-        <a-select v-model:value="props.formData.orderType" :disabled="isViewMode" placeholder="请选择类型" allow-clear>
+        <a-select
+          v-model:value="props.formData.orderType"
+          :disabled="isViewMode"
+          placeholder="请选择类型"
+          allow-clear
+        >
           <a-select-option value="MATERIAL">材料采购</a-select-option>
           <a-select-option value="EQUIPMENT">设备采购</a-select-option>
           <a-select-option value="SERVICE">服务采购</a-select-option>
@@ -107,17 +114,37 @@ function handleCancel() {
         />
       </a-form-item>
       <a-form-item label="备注">
-        <a-textarea v-model:value="props.formData.remark" :disabled="isViewMode" :rows="2" placeholder="请输入备注" />
+        <a-textarea
+          v-model:value="props.formData.remark"
+          :disabled="isViewMode"
+          :rows="2"
+          placeholder="请输入备注"
+        />
       </a-form-item>
     </a-form>
 
     <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+        "
+      >
         <span style="font-weight: 600; font-size: 14px">订单明细</span>
-        <a-button v-if="!isViewMode" type="dashed" size="small" @click="onAddItem">+ 添加明细</a-button>
+        <a-button v-if="!isViewMode" type="dashed" size="small" @click="onAddItem"
+          >+ 添加明细</a-button
+        >
       </div>
 
-      <a-table :data-source="itemList" :pagination="false" row-key="key" size="small" :scroll="{ y: 250 }">
+      <a-table
+        :data-source="itemList"
+        :pagination="false"
+        row-key="key"
+        size="small"
+        :scroll="{ y: 250 }"
+      >
         <a-table-column title="材料" width="200">
           <template #default="{ record: item, index }">
             <a-select
@@ -128,7 +155,8 @@ function handleCancel() {
               style="width: 100%"
               show-search
               :filter-option="
-                (input: string, option: SelectOption) => option.label?.toLowerCase().includes(input.toLowerCase())
+                (input: string, option: SelectOption) =>
+                  option.label?.toLowerCase().includes(input.toLowerCase())
               "
               @change="(val: string) => onMaterialChange(index, val)"
             >
@@ -174,19 +202,30 @@ function handleCancel() {
         </a-table-column>
         <a-table-column title="金额(元)" width="130">
           <template #default="{ record: item }">
-            <span>{{ Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span>
+            <span>{{
+              Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+            }}</span>
           </template>
         </a-table-column>
         <a-table-column title="操作" width="76">
           <template #default="{ index }">
-            <a-button v-if="!isViewMode" type="link" size="small" danger @click="onRemoveItem(index)">删除</a-button>
+            <a-button
+              v-if="!isViewMode"
+              type="link"
+              size="small"
+              danger
+              @click="onRemoveItem(index)"
+              >删除</a-button
+            >
           </template>
         </a-table-column>
       </a-table>
 
       <div style="text-align: right; margin-top: 8px; font-size: 14px">
         合计：<span style="font-weight: 600; color: #1677ff"
-          >¥{{ Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}</span
+          >¥{{
+            Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+          }}</span
         >
       </div>
     </div>

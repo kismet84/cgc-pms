@@ -5,16 +5,12 @@ import { storeToRefs } from 'pinia'
 import { message } from 'ant-design-vue'
 import { getCostLedger, getCostLedgerSummary, getCostLedgerDetail } from '@/api/modules/cost'
 import { getCostSubjectList } from '@/api/modules/costSubject'
-import type {
-  CostLedgerVO,
-  CostLedgerQueryParams,
-  CostLedgerSummaryVO,
-  SourceType,
-} from '@/types/cost'
-import { SOURCE_TYPE_LABEL } from '@/types/cost'
+import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO } from '@/types/cost'
+import { COST_TYPE_DICT, getCostTypeLabel, getSourceTypeLabel } from '@/types/cost'
 import type { PageResult } from '@/types/api'
 import { useReferenceStore } from '@/stores/reference'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { fetchDictData } from '@/utils/dict'
 import CostLedgerOverview from './components/CostLedgerOverview.vue'
 import CostLedgerTablePanel from './components/CostLedgerTablePanel.vue'
 import CostLedgerAnalysisRail from './components/CostLedgerAnalysisRail.vue'
@@ -29,8 +25,11 @@ function onResize() {
 }
 
 const referenceStore = useReferenceStore()
-const { projects: projectList, contracts: contractList, partners: partnerList } =
-  storeToRefs(referenceStore)
+const {
+  projects: projectList,
+  contracts: contractList,
+  partners: partnerList,
+} = storeToRefs(referenceStore)
 
 const contractOptions = ref(contractList.value ?? [])
 const costSubjectOptions = ref<{ id: string; subjectName: string }[]>([])
@@ -260,30 +259,8 @@ function fmtAmountYuan(val: string | undefined): string {
   return '¥' + n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-const COST_TYPE_LABEL: Record<string, string> = {
-  CONTRACT_LOCKED: '合同锁定成本',
-  ACTUAL_COST: '实际成本',
-  TARGET_COST: '成本目标',
-  PAID_AMOUNT: '已付款',
-  DYNAMIC_COST: '动态成本',
-  CT_CONTRACT: '合同锁定成本',
-  CT_DIRECT: '直接成本',
-  CT_INDIRECT: '间接成本',
-  CT_MATERIAL: '材料成本',
-  CT_MACHINE: '机械使用成本',
-  CT_SUBCONTRACT: '分包成本',
-  CT_LABOR: '人工成本',
-  CT_OTHER: '其他成本',
-  MATERIAL_RECEIPT: '材料验收成本',
-  MAT_RECEIPT: '材料验收成本',
-  SUB_MEASURE: '分包计量成本',
-  VAR_ORDER: '签证变更成本',
-  VARIATION: '签证变更成本',
-  CT_CHANGE: '合同变更成本',
-}
-
 function costTypeLabel(value: string | undefined) {
-  return COST_TYPE_LABEL[value || ''] || value || '-'
+  return getCostTypeLabel(value)
 }
 
 const lockedAmount = computed(() => {
@@ -311,7 +288,7 @@ interface RailItem {
 
 const subjectBreakdown = computed<RailItem[]>(() => {
   const entries = Object.entries(summary.value.byCostType).map(([key, val]) => ({
-    label: COST_TYPE_LABEL[key] ?? key,
+    label: getCostTypeLabel(key),
     amount: val,
   }))
   return entries.length
@@ -321,7 +298,7 @@ const subjectBreakdown = computed<RailItem[]>(() => {
 
 const sourceBreakdown = computed<RailItem[]>(() => {
   const entries = Object.entries(summary.value.bySourceType).map(([key, val]) => ({
-    label: SOURCE_TYPE_LABEL[key as SourceType] ?? key,
+    label: getSourceTypeLabel(key),
     amount: val,
   }))
   return entries.length
@@ -368,6 +345,7 @@ const {
 
 onMounted(async () => {
   window.addEventListener('resize', onResize)
+  await fetchDictData(COST_TYPE_DICT)
   applyRouteQuery()
   referenceStore.fetchProjects()
   referenceStore.fetchPartners()

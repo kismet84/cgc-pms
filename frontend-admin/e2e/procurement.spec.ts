@@ -57,7 +57,9 @@ test.describe('Procurement E2E', () => {
     await expect(sharedPage.getByText('申请总数')).toBeVisible()
     await expect(sharedPage.getByText('草稿申请')).toBeVisible()
     await expect(sharedPage.locator('.purchase-request-table-title')).toContainText('采购申请')
-    await expect(sharedPage.locator('.vxe-table, .ant-table').first()).toBeVisible({ timeout: 10000 })
+    await expect(sharedPage.locator('.vxe-table, .ant-table').first()).toBeVisible({
+      timeout: 10000,
+    })
 
     const codeButton = firstCodeButton(sharedPage, 'PR')
     await expect(codeButton).toBeVisible({ timeout: 10000 })
@@ -89,7 +91,9 @@ test.describe('Procurement E2E', () => {
     await expect(sharedPage.getByText('采购订单数')).toBeVisible()
     await expect(sharedPage.getByText('已下单金额')).toBeVisible()
     await expect(sharedPage.locator('.purchase-order-page')).toContainText('未入库金额')
-    await expect(sharedPage.locator('.vxe-table, .ant-table').first()).toBeVisible({ timeout: 10000 })
+    await expect(sharedPage.locator('.vxe-table, .ant-table').first()).toBeVisible({
+      timeout: 10000,
+    })
 
     const codeButton = firstCodeButton(sharedPage, 'PO')
     await expect(codeButton).toBeVisible({ timeout: 10000 })

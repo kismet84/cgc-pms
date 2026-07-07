@@ -101,9 +101,7 @@ async function handleSave() {
         default-expand-all
         block-node
       />
-      <div v-else-if="!loading" class="permission-empty">
-        暂无菜单数据
-      </div>
+      <div v-else-if="!loading" class="permission-empty">暂无菜单数据</div>
     </a-spin>
   </a-modal>
 </template>

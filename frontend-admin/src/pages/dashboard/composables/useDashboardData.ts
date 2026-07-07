@@ -58,7 +58,10 @@ const DASHBOARD_ROLE_PERMISSION_ENTRIES: ReadonlyArray<readonly [DashboardRole, 
   ['mgmt', 'dashboard:management:view'],
 ]
 
-export function resolveAvailableDashboardRoles(userRoles: string[], permissions: string[]): DashboardRole[] {
+export function resolveAvailableDashboardRoles(
+  userRoles: string[],
+  permissions: string[],
+): DashboardRole[] {
   if (userRoles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')) {
     return ALL_DASHBOARD_ROLES
   }

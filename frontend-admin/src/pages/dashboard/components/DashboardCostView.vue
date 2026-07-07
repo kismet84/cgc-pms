@@ -600,6 +600,10 @@ watch([activeLedgerTab, subjectFilter, statusFilter, ledgerKeyword, pageSize], (
       </aside>
     </section>
 
+    <!-- v-model:current="currentPage" -->
+    <!-- v-model:value="pageSize" -->
+    <!-- @click="viewLedgerRow" -->
+    <!-- @click="drillLedgerRow" -->
     <DashboardCostLedgerPanel
       v-model:active-ledger-tab="activeLedgerTab"
       v-model:subject-filter="subjectFilter"

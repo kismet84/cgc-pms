@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  AuditOutlined,
   FileDoneOutlined,
   InboxOutlined,
   ToolOutlined,
@@ -201,8 +200,13 @@ function receiptTimingText(record: DashboardBusinessItemVO) {
             class="role-reference-table production-reference-table"
           >
             <template #bodyCell="{ column, text, record }">
-              <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="itemSummary(record as DashboardBusinessItemVO)">
-                <span class="production-ellipsis">{{ itemSummary(record as DashboardBusinessItemVO) }}</span>
+              <a-tooltip
+                v-if="column.dataIndex === 'itemSummary'"
+                :title="itemSummary(record as DashboardBusinessItemVO)"
+              >
+                <span class="production-ellipsis">{{
+                  itemSummary(record as DashboardBusinessItemVO)
+                }}</span>
               </a-tooltip>
               <a-tooltip v-else-if="column.dataIndex === 'partnerName'" :title="displayText(text)">
                 <span class="production-ellipsis production-muted">{{ displayText(text) }}</span>
@@ -239,8 +243,13 @@ function receiptTimingText(record: DashboardBusinessItemVO) {
             class="role-reference-table production-reference-table"
           >
             <template #bodyCell="{ column, text, record }">
-              <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="itemSummary(record as DashboardBusinessItemVO)">
-                <span class="production-ellipsis">{{ itemSummary(record as DashboardBusinessItemVO) }}</span>
+              <a-tooltip
+                v-if="column.dataIndex === 'itemSummary'"
+                :title="itemSummary(record as DashboardBusinessItemVO)"
+              >
+                <span class="production-ellipsis">{{
+                  itemSummary(record as DashboardBusinessItemVO)
+                }}</span>
               </a-tooltip>
               <a-tooltip v-else-if="column.dataIndex === 'partnerName'" :title="displayText(text)">
                 <span class="production-ellipsis production-muted">{{ displayText(text) }}</span>
@@ -280,8 +289,13 @@ function receiptTimingText(record: DashboardBusinessItemVO) {
         class="role-reference-table production-reference-table"
       >
         <template #bodyCell="{ column, text, record }">
-          <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="itemSummary(record as DashboardBusinessItemVO)">
-            <span class="production-ellipsis">{{ itemSummary(record as DashboardBusinessItemVO) }}</span>
+          <a-tooltip
+            v-if="column.dataIndex === 'itemSummary'"
+            :title="itemSummary(record as DashboardBusinessItemVO)"
+          >
+            <span class="production-ellipsis">{{
+              itemSummary(record as DashboardBusinessItemVO)
+            }}</span>
           </a-tooltip>
           <a-tooltip v-else-if="column.dataIndex === 'partnerName'" :title="displayText(text)">
             <span class="production-ellipsis production-muted">{{ displayText(text) }}</span>

@@ -49,15 +49,25 @@ describe('CostTarget modal flows', () => {
   })
 
   it('keeps view mode strictly readonly in the embedded detail modal', () => {
-    expect(editSource).toMatch(/const\s+isView\s*=\s*computed\(\(\)\s*=>\s*props\.mode === 'view'\)/)
-    expect(editSource).toMatch(/const\s+pageTitle\s*=\s*computed\(\(\)\s*=>\s*\{[\s\S]*?'成本目标详情'/)
-    expect(editSource).toMatch(/const\s+closeText\s*=\s*computed\(\(\)\s*=>\s*\(isView\.value \? '关闭' : '取消'\)\)/)
+    expect(editSource).toMatch(
+      /const\s+isView\s*=\s*computed\(\(\)\s*=>\s*props\.mode === 'view'\)/,
+    )
+    expect(editSource).toMatch(
+      /const\s+pageTitle\s*=\s*computed\(\(\)\s*=>\s*\{[\s\S]*?'成本目标详情'/,
+    )
+    expect(editSource).toMatch(
+      /const\s+closeText\s*=\s*computed\(\(\)\s*=>\s*\(isView\.value \? '关闭' : '取消'\)\)/,
+    )
     expect(editSource).toMatch(/if\s*\(isView\.value\s*\|\|\s*saving\.value\)\s*return/)
-    expect(editSource).toMatch(/<a-button\s+v-if="!isView"\s+:loading="saving"\s+@click="handleSave">保存<\/a-button>/)
+    expect(editSource).toMatch(
+      /<a-button\s+v-if="!isView"\s+:loading="saving"\s+@click="handleSave">保存<\/a-button>/,
+    )
     expect(editSource).toMatch(
       /<a-button\s+v-if="!isView"\s+type="primary"\s+:loading="saving && !submitting"\s+@click="handleSubmit">/,
     )
-    expect(editSource).toMatch(/<template v-if="!isView">[\s\S]*保存[\s\S]*提交审批[\s\S]*<\/template>/)
+    expect(editSource).toMatch(
+      /<template v-if="!isView">[\s\S]*保存[\s\S]*提交审批[\s\S]*<\/template>/,
+    )
     expect(editSource).toMatch(/<div v-if="!isView" class="cte-toolbar">/)
     expect(editSource).toMatch(/:disabled="isView"/)
     expect(editSource).toMatch(/:readonly="isView"/)

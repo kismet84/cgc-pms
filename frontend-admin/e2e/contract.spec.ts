@@ -1,4 +1,11 @@
-import { test, expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test'
+import {
+  test,
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from '@playwright/test'
 
 const SYSTEM_ERROR = '系统异常，请稍后重试'
 
@@ -14,30 +21,45 @@ async function createAuthenticatedPage(browser: Browser) {
 
 async function selectFirstOption(select: Locator) {
   await select.click()
-  const dropdown = select.page().locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+  const dropdown = select
+    .page()
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
   await expect(dropdown).toBeVisible({ timeout: 10000 })
-  const option = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)').first()
+  const option = dropdown
+    .locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
+    .first()
   await expect(option).toBeVisible({ timeout: 10000 })
   await option.click()
 }
 
 async function selectOptionByText(select: Locator, text: string) {
   await select.click()
-  const dropdown = select.page().locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+  const dropdown = select
+    .page()
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
   await expect(dropdown).toBeVisible({ timeout: 10000 })
   const options = dropdown.locator('.ant-select-item-option:not(.ant-select-item-option-disabled)')
   const preferredOption = options.filter({ hasText: text }).first()
-  const option = (await preferredOption.isVisible().catch(() => false)) ? preferredOption : options.first()
+  const option = (await preferredOption.isVisible().catch(() => false))
+    ? preferredOption
+    : options.first()
   await expect(option).toBeVisible({ timeout: 10000 })
   await option.click()
 }
 
 async function selectTodayFromPicker(picker: Locator) {
   await picker.click()
-  const pickerDropdown = picker.page().locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last()
+  const pickerDropdown = picker
+    .page()
+    .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
+    .last()
   await expect(pickerDropdown).toBeVisible({ timeout: 10000 })
   await pickerDropdown.locator('.ant-picker-cell-today .ant-picker-cell-inner').first().click()
-  await expect(pickerDropdown).toBeHidden({ timeout: 10000 }).catch(() => {})
+  await expect(pickerDropdown)
+    .toBeHidden({ timeout: 10000 })
+    .catch(() => {})
 }
 
 async function selectTodayFromDatePicker(page: Page, label: string) {
@@ -57,7 +79,9 @@ async function fillContractBasicInfo(page: Page) {
     page.locator('.ant-form-item:has(.ant-form-item-label:has-text("所属项目")) .ant-select'),
   )
   await page
-    .locator('.ant-form-item:has(.ant-form-item-label:has-text("合同金额")) .ant-input-number-input')
+    .locator(
+      '.ant-form-item:has(.ant-form-item-label:has-text("合同金额")) .ant-input-number-input',
+    )
     .fill('1000')
   await selectFirstOption(
     page.locator('.ant-form-item:has(.ant-form-item-label:has-text("甲方")) .ant-select'),
@@ -92,12 +116,18 @@ test.describe('Contract draft-save and ledger regression', () => {
 
   test('blocks next step when required basic fields are missing', async () => {
     await sharedPage.goto('/contract/create')
-    await expect(sharedPage.locator('input[placeholder="请输入合同名称"]')).toBeVisible({ timeout: 10000 })
+    await expect(sharedPage.locator('input[placeholder="请输入合同名称"]')).toBeVisible({
+      timeout: 10000,
+    })
 
     await sharedPage.getByRole('button', { name: '下一步' }).click()
 
-    await expect(sharedPage.locator('.ant-form-item-explain-error').filter({ hasText: '请输入合同名称' })).toBeVisible()
-    await expect(sharedPage.locator('.ant-form-item-explain-error').filter({ hasText: '请选择合同类型' })).toBeVisible()
+    await expect(
+      sharedPage.locator('.ant-form-item-explain-error').filter({ hasText: '请输入合同名称' }),
+    ).toBeVisible()
+    await expect(
+      sharedPage.locator('.ant-form-item-explain-error').filter({ hasText: '请选择合同类型' }),
+    ).toBeVisible()
     await expect(sharedPage).toHaveURL(/\/contract\/create/)
     await expect(sharedPage.locator('input[placeholder="请输入合同名称"]')).toBeVisible()
     await expect(sharedPage.getByText('保存失败，请稍后重试')).toHaveCount(0)
@@ -106,7 +136,9 @@ test.describe('Contract draft-save and ledger regression', () => {
 
   test('saves draft with one detail and one payment term through composite endpoint', async () => {
     await sharedPage.goto('/contract/create')
-    await expect(sharedPage.locator('input[placeholder="请输入合同名称"]')).toBeVisible({ timeout: 10000 })
+    await expect(sharedPage.locator('input[placeholder="请输入合同名称"]')).toBeVisible({
+      timeout: 10000,
+    })
     await expect(sharedPage.getByRole('button', { name: '下一步' })).toBeVisible({ timeout: 10000 })
 
     const contractName = await fillContractBasicInfo(sharedPage)
@@ -145,32 +177,51 @@ test.describe('Contract draft-save and ledger regression', () => {
     expect(createdContractName, '需要确认：前置草稿合同未创建成功').toBeTruthy()
     await waitForContractLedger(sharedPage)
 
-    await expect(sharedPage.locator('.cl-table-title').filter({ hasText: '合同列表' })).toBeVisible()
+    await expect(
+      sharedPage.locator('.cl-table-title').filter({ hasText: '合同列表' }),
+    ).toBeVisible()
     const headerText = (await sharedPage.locator('.vxe-header--column').allTextContents()).join(' ')
     expect(headerText).toContain('合同编号')
     expect(headerText).toContain('合同名称')
     expect(headerText).toContain('合同状态')
 
-    await expect(sharedPage.locator('.cl-query-actions button').filter({ hasText: '查询' })).toBeVisible()
-    await expect(sharedPage.locator('.cl-query-actions button').filter({ hasText: '重置' })).toBeVisible()
-    await sharedPage.locator('.cl-query-panel input[placeholder*="搜索合同编号"]').fill(createdContractName!)
+    await expect(
+      sharedPage.locator('.cl-query-actions button').filter({ hasText: '查询' }),
+    ).toBeVisible()
+    await expect(
+      sharedPage.locator('.cl-query-actions button').filter({ hasText: '重置' }),
+    ).toBeVisible()
+    await sharedPage
+      .locator('.cl-query-panel input[placeholder*="搜索合同编号"]')
+      .fill(createdContractName!)
     await sharedPage.locator('.cl-query-actions button').filter({ hasText: '查询' }).click()
 
-    const createdRow = sharedPage.locator('.vxe-body--row').filter({ hasText: createdContractName! }).first()
+    const createdRow = sharedPage
+      .locator('.vxe-body--row')
+      .filter({ hasText: createdContractName! })
+      .first()
     await expect(createdRow).toBeVisible({ timeout: 10000 })
     await expect(createdRow).toContainText(/草稿|DRAFT/)
 
-    await sharedPage.screenshot({ path: 'e2e/screenshots/contract-ledger-list.png', fullPage: true })
+    await sharedPage.screenshot({
+      path: 'e2e/screenshots/contract-ledger-list.png',
+      fullPage: true,
+    })
   })
 
   test('created contract detail shows core tabs from ledger link', async () => {
     expect(createdContractName, '需要确认：前置草稿合同未创建成功').toBeTruthy()
     await waitForContractLedger(sharedPage)
 
-    await sharedPage.locator('.cl-query-panel input[placeholder*="搜索合同编号"]').fill(createdContractName!)
+    await sharedPage
+      .locator('.cl-query-panel input[placeholder*="搜索合同编号"]')
+      .fill(createdContractName!)
     await sharedPage.locator('.cl-query-actions button').filter({ hasText: '查询' }).click()
 
-    const createdRow = sharedPage.locator('.vxe-body--row').filter({ hasText: createdContractName! }).first()
+    const createdRow = sharedPage
+      .locator('.vxe-body--row')
+      .filter({ hasText: createdContractName! })
+      .first()
     await expect(createdRow).toBeVisible({ timeout: 10000 })
     await createdRow.locator('button.cl-contract-link').click()
     await expect(sharedPage.locator('.contract-detail-page')).toBeVisible({ timeout: 10000 })

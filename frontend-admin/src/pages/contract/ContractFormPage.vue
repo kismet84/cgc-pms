@@ -365,7 +365,11 @@ const termsTotal = computed(() =>
 )
 
 onMounted(async () => {
-  await Promise.all([referenceStore.fetchProjects(), referenceStore.fetchPartners(), loadContractTypes()])
+  await Promise.all([
+    referenceStore.fetchProjects(),
+    referenceStore.fetchPartners(),
+    loadContractTypes(),
+  ])
   if (isEdit.value && contractId.value) {
     try {
       await loadContractDetail()

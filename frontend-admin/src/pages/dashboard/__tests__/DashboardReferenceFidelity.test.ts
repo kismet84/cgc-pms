@@ -96,8 +96,8 @@ describe('Dashboard reference fidelity', () => {
     expect(purchaseViewSource).toContain('receiptTimeliness(record)')
     expect(purchaseViewSource).toContain('durationDays(record.overdueDays)')
     expect(purchaseViewSource).toContain('receiptTimeliness(record)')
-    expect(purchaseViewSource).toContain("return `逾期${days}天`")
-    expect(purchaseViewSource).toContain("return `剩余${days}天`")
+    expect(purchaseViewSource).toContain('return `逾期${days}天`')
+    expect(purchaseViewSource).toContain('return `剩余${days}天`')
     expect(purchaseViewSource).toContain('purchase-ellipsis')
     expect(purchaseViewSource).toContain('purchase-date-cell')
     expect(purchaseViewSource).toContain(':scroll="{ x: 756, y: 216 }"')
@@ -187,19 +187,21 @@ describe('Dashboard reference fidelity', () => {
   it('uses receipt date instead of pendingDays zero to label future pending receipts', () => {
     expect(purchaseViewSource).toContain('function receiptTimeliness')
     expect(purchaseViewSource).toContain('Date.UTC')
-    expect(purchaseViewSource).toContain("return `剩余${days}天`")
+    expect(purchaseViewSource).toContain('return `剩余${days}天`')
     expect(purchaseViewSource).toContain("return '今日'")
-    expect(purchaseViewSource).toContain("return `逾期${Math.abs(days)}天`")
+    expect(purchaseViewSource).toContain('return `逾期${Math.abs(days)}天`')
     expect(purchaseViewSource).toContain('receiptTimeliness(record)')
-    expect(purchaseViewSource).not.toContain('if (days === 0) return \'今日\'\n  return `剩余${days}天`')
+    expect(purchaseViewSource).not.toContain(
+      "if (days === 0) return '今日'\n  return `剩余${days}天`",
+    )
   })
 
   it('uses receipt date for production recent receipt timing without touching requisitions', () => {
     expect(productionViewSource).toContain('function receiptTimingText')
     expect(productionViewSource).toContain('Date.UTC')
-    expect(productionViewSource).toContain("return `剩余${days}天`")
+    expect(productionViewSource).toContain('return `剩余${days}天`')
     expect(productionViewSource).toContain("return '今日'")
-    expect(productionViewSource).toContain("return `已过${Math.abs(days)}天`")
+    expect(productionViewSource).toContain('return `已过${Math.abs(days)}天`')
     expect(productionViewSource).toContain('receiptTimingText(record as DashboardBusinessItemVO)')
     expect(productionViewSource).toContain(
       'pendingText((record as DashboardBusinessItemVO).pendingDays)',

@@ -76,9 +76,7 @@ describe('Dashboard data loading behavior', () => {
   it('defaults selectedProjectId to the all-project option', () => {
     expect(composableSource).toMatch(/export\s+const\s+ALL_PROJECT_ID\s*=\s*['"][^'"]+['"]/)
     expect(composableSource).not.toMatch(/export\s+const\s+ALL_PROJECT_ID\s*=\s*['"]{2}/)
-    expect(composableSource).toMatch(
-      /const\s+selectedProjectId\s*=\s*ref<[^>]+>\(ALL_PROJECT_ID\)/,
-    )
+    expect(composableSource).toMatch(/const\s+selectedProjectId\s*=\s*ref<[^>]+>\(ALL_PROJECT_ID\)/)
   })
 
   it('maps the all-project sentinel to undefined before calling dashboard APIs', () => {
@@ -203,9 +201,7 @@ describe('Dashboard data loading behavior', () => {
     for (const name of funcs) {
       // Each function declares optional month param
       expect(dashboardApiSource).toMatch(
-        new RegExp(
-          `export function ${name}\\(projectId\\?: string,\\s*month\\?: string\\)`,
-        ),
+        new RegExp(`export function ${name}\\(projectId\\?: string,\\s*month\\?: string\\)`),
       )
       // Each function body delegates to dashboardParams(projectId, month)
       expect(dashboardApiSource).toMatch(

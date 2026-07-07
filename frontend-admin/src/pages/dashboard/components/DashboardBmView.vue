@@ -25,26 +25,34 @@ const settleOpt = computed(() => bmSettlementOption())
         <div class="role-reference-kpi-value">
           {{ fmtWan(data.totalContractAmount) }} <small>万元</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><DollarOutlined /> 合同规模</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><DollarOutlined /> 合同规模</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #f97316">
         <div class="role-reference-kpi-title">合同变更</div>
         <div class="role-reference-kpi-value is-warning">
           {{ fmtWan(data.contractChangeAmount) }} <small>万元</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><SwapOutlined /> 当前变更额</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><SwapOutlined /> 当前变更额</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #8b5cf6">
         <div class="role-reference-kpi-title">签证变更</div>
         <div class="role-reference-kpi-value">
           {{ fmtWan(data.varOrderAmount) }} <small>万元</small>
         </div>
-        <div class="role-reference-kpi-meta"><span><FileTextOutlined /> 已确认签证</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><FileTextOutlined /> 已确认签证</span>
+        </div>
       </article>
       <article class="role-reference-kpi" style="--kpi-accent: #16a34a">
         <div class="role-reference-kpi-title">结算进度</div>
         <div class="role-reference-kpi-value is-cyan">{{ data.settlementProgress }}</div>
-        <div class="role-reference-kpi-meta"><span><FundOutlined /> 履约结算状态</span></div>
+        <div class="role-reference-kpi-meta">
+          <span><FundOutlined /> 履约结算状态</span>
+        </div>
       </article>
     </section>
 
@@ -80,7 +88,9 @@ const settleOpt = computed(() => bmSettlementOption())
       <aside class="role-reference-side-stack">
         <div class="role-reference-panel role-mini-panel is-blue">
           <div class="role-reference-panel-head mini">
-            <strong>近期合同变更 <b>（{{ data.recentChanges.length }}）</b></strong>
+            <strong
+              >近期合同变更 <b>（{{ data.recentChanges.length }}）</b></strong
+            >
           </div>
           <a-table
             :columns="bmChangeCols"
@@ -94,7 +104,9 @@ const settleOpt = computed(() => bmSettlementOption())
         </div>
         <div class="role-reference-panel role-mini-panel is-orange">
           <div class="role-reference-panel-head mini">
-            <strong>待结算事项 <b>（{{ data.settlementItems.length }}）</b></strong>
+            <strong
+              >待结算事项 <b>（{{ data.settlementItems.length }}）</b></strong
+            >
           </div>
           <a-table
             :columns="bmSettleCols"

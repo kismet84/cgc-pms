@@ -204,7 +204,10 @@ function pendingText(value?: number) {
             class="role-reference-table pm-reference-table"
           >
             <template #bodyCell="{ column, text, record }">
-              <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="taskSummary(record as DashboardTaskItemVO)">
+              <a-tooltip
+                v-if="column.dataIndex === 'itemSummary'"
+                :title="taskSummary(record as DashboardTaskItemVO)"
+              >
                 <span class="pm-ellipsis">{{ taskSummary(record as DashboardTaskItemVO) }}</span>
               </a-tooltip>
               <span v-else-if="column.dataIndex === 'businessType'" class="pm-status">
@@ -242,7 +245,10 @@ function pendingText(value?: number) {
             class="role-reference-table pm-reference-table"
           >
             <template #bodyCell="{ column, text, record }">
-              <a-tooltip v-if="column.dataIndex === 'itemSummary'" :title="taskSummary(record as DashboardTaskItemVO)">
+              <a-tooltip
+                v-if="column.dataIndex === 'itemSummary'"
+                :title="taskSummary(record as DashboardTaskItemVO)"
+              >
                 <span class="pm-ellipsis">{{ taskSummary(record as DashboardTaskItemVO) }}</span>
               </a-tooltip>
               <span v-else-if="column.dataIndex === 'businessType'" class="pm-status">
@@ -284,7 +290,10 @@ function pendingText(value?: number) {
           class="role-reference-table pm-reference-table pm-bottom-table"
         >
           <template #bodyCell="{ column, text, record }">
-            <a-tooltip v-if="column.dataIndex === 'projectName'" :title="displayText((record as DashboardProjectSummaryVO).projectName)">
+            <a-tooltip
+              v-if="column.dataIndex === 'projectName'"
+              :title="displayText((record as DashboardProjectSummaryVO).projectName)"
+            >
               <span class="pm-ellipsis">{{ displayText(text) }}</span>
             </a-tooltip>
             <span v-else-if="column.dataIndex === 'status'" class="pm-status">
@@ -310,7 +319,10 @@ function pendingText(value?: number) {
           class="role-reference-table pm-reference-table pm-bottom-table"
         >
           <template #bodyCell="{ column, text, record }">
-            <a-tooltip v-if="column.dataIndex === 'contractName'" :title="displayText((record as DashboardContractItemVO).contractName)">
+            <a-tooltip
+              v-if="column.dataIndex === 'contractName'"
+              :title="displayText((record as DashboardContractItemVO).contractName)"
+            >
               <span class="pm-ellipsis">{{ displayText(text) }}</span>
             </a-tooltip>
             <span v-else-if="column.dataIndex === 'endDate'" class="pm-date">

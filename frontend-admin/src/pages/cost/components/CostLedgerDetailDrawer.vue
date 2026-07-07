@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { SOURCE_TYPE_COLOR, SOURCE_TYPE_LABEL } from '@/types/cost'
-import type { CostLedgerVO, SourceType } from '@/types/cost'
+import { getSourceTypeColor, getSourceTypeLabel } from '@/types/cost'
+import type { CostLedgerVO } from '@/types/cost'
 
-const props = defineProps<{
+defineProps<{
   open: boolean
   detailItem: CostLedgerVO | null
   fmtAmountYuan: (val: string | undefined) => string
@@ -35,34 +35,48 @@ const emit = defineEmits<{
         </div>
         <div>
           <span>来源类型</span>
-          <a-tag :color="SOURCE_TYPE_COLOR[detailItem.sourceType as SourceType] || 'default'">
-            {{ SOURCE_TYPE_LABEL[detailItem.sourceType as SourceType] || detailItem.sourceType }}
+          <a-tag :color="getSourceTypeColor(detailItem.sourceType)">
+            {{ getSourceTypeLabel(detailItem.sourceType) }}
           </a-tag>
         </div>
       </div>
       <a-descriptions class="cost-ledger-detail-descriptions" :column="2" size="small" bordered>
-        <a-descriptions-item label="成本科目">{{ detailItem.costSubjectName || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="成本科目">{{
+          detailItem.costSubjectName || '-'
+        }}</a-descriptions-item>
         <a-descriptions-item label="费用类型">
           {{ costTypeLabel(detailItem.costType) }}
         </a-descriptions-item>
         <a-descriptions-item label="来源类型">
-          <a-tag :color="SOURCE_TYPE_COLOR[detailItem.sourceType as SourceType] || 'default'">
-            {{ SOURCE_TYPE_LABEL[detailItem.sourceType as SourceType] || detailItem.sourceType }}
+          <a-tag :color="getSourceTypeColor(detailItem.sourceType)">
+            {{ getSourceTypeLabel(detailItem.sourceType) }}
           </a-tag>
         </a-descriptions-item>
-        <a-descriptions-item label="金额(含税)">{{ fmtAmountYuan(detailItem.amount) }}</a-descriptions-item>
-        <a-descriptions-item label="税额">{{ fmtAmountYuan(detailItem.taxAmount) }}</a-descriptions-item>
+        <a-descriptions-item label="金额(含税)">{{
+          fmtAmountYuan(detailItem.amount)
+        }}</a-descriptions-item>
+        <a-descriptions-item label="税额">{{
+          fmtAmountYuan(detailItem.taxAmount)
+        }}</a-descriptions-item>
         <a-descriptions-item label="不含税金额">
           {{ fmtAmountYuan(detailItem.amountWithoutTax) }}
         </a-descriptions-item>
         <a-descriptions-item label="生成标识">
           {{ detailItem.generatedFlag === '1' ? '自动生成' : '手动录入' }}
         </a-descriptions-item>
-        <a-descriptions-item label="来源单据ID">{{ detailItem.sourceId || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="来源明细ID">{{ detailItem.sourceItemId || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="来源单据ID">{{
+          detailItem.sourceId || '-'
+        }}</a-descriptions-item>
+        <a-descriptions-item label="来源明细ID">{{
+          detailItem.sourceItemId || '-'
+        }}</a-descriptions-item>
         <a-descriptions-item label="创建人">{{ detailItem.createdBy || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="创建时间">{{ detailItem.createdAt || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="备注" :span="2">{{ detailItem.remark || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="创建时间">{{
+          detailItem.createdAt || '-'
+        }}</a-descriptions-item>
+        <a-descriptions-item label="备注" :span="2">{{
+          detailItem.remark || '-'
+        }}</a-descriptions-item>
       </a-descriptions>
     </template>
   </a-drawer>

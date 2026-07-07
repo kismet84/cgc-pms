@@ -50,7 +50,7 @@ app.directive('permission', vPermission)
 app.use(VxeLoading)
 app.use(VxeUITable)
 
-app.config.errorHandler = (err, instance, info) => {
+app.config.errorHandler = (err) => {
   console.error('[Global Error]', err)
   // TODO: 接入监控服务 (Sentry / 日志上报)
   if (err instanceof Error) {

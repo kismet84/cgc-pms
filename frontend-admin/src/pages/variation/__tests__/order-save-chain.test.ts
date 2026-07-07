@@ -10,7 +10,10 @@ const workspaceSource = readFileSync(
   resolve(currentDir, '../components/VariationOrderWorkspace.vue'),
   'utf-8',
 )
-const modalSource = readFileSync(resolve(currentDir, '../components/VariationOrderModal.vue'), 'utf-8')
+const modalSource = readFileSync(
+  resolve(currentDir, '../components/VariationOrderModal.vue'),
+  'utf-8',
+)
 
 describe('VariationOrderPage save chain integrity', () => {
   describe('createVarOrder returns string (not {id}) — Bug FE-01 fix', () => {
@@ -49,17 +52,27 @@ describe('VariationOrderPage save chain integrity', () => {
     })
 
     it('blocks submit when project/contract/varType or valid detail is missing', () => {
-      expect(orderSource).toMatch(/if\s*\(!formData\.projectId\)[\s\S]*?message\.warning\('请选择项目'\)/)
-      expect(orderSource).toMatch(/if\s*\(!formData\.contractId\)[\s\S]*?message\.warning\('请选择合同'\)/)
-      expect(orderSource).toMatch(/if\s*\(!formData\.varType\)[\s\S]*?message\.warning\('请选择变更类型'\)/)
-      expect(orderSource).toMatch(/if\s*\(!activeItems\.length\)[\s\S]*?message\.warning\('请至少保留一条有效明细'\)/)
+      expect(orderSource).toMatch(
+        /if\s*\(!formData\.projectId\)[\s\S]*?message\.warning\('请选择项目'\)/,
+      )
+      expect(orderSource).toMatch(
+        /if\s*\(!formData\.contractId\)[\s\S]*?message\.warning\('请选择合同'\)/,
+      )
+      expect(orderSource).toMatch(
+        /if\s*\(!formData\.varType\)[\s\S]*?message\.warning\('请选择变更类型'\)/,
+      )
+      expect(orderSource).toMatch(
+        /if\s*\(!activeItems\.length\)[\s\S]*?message\.warning\('请至少保留一条有效明细'\)/,
+      )
       expect(orderSource).toMatch(/missingCostSubject[\s\S]*?message\.warning\('请选择成本科目'\)/)
     })
 
     it('rolls back the newly created draft if saveVarOrderItems fails', () => {
       expect(orderSource).toMatch(/const\s+newId\s+=\s+await\s+createVarOrder\(formData\)/)
       expect(orderSource).toMatch(/await\s+saveVarOrderItems\(newId,\s*effectiveItems\)/)
-      expect(orderSource).toMatch(/await\s+deleteVarOrder\(newId\)\.catch\(\(cleanupError: unknown\)\s*=>\s*\{/)
+      expect(orderSource).toMatch(
+        /await\s+deleteVarOrder\(newId\)\.catch\(\(cleanupError: unknown\)\s*=>\s*\{/,
+      )
       expect(orderSource).toContain('console.error(cleanupError)')
     })
   })
@@ -91,8 +104,12 @@ describe('VariationOrderPage save chain integrity', () => {
     })
 
     it('keeps workspace and modal markup in local variation components', () => {
-      expect(orderSource).toContain("import VariationOrderWorkspace from './components/VariationOrderWorkspace.vue'")
-      expect(orderSource).toContain("import VariationOrderModal from './components/VariationOrderModal.vue'")
+      expect(orderSource).toContain(
+        "import VariationOrderWorkspace from './components/VariationOrderWorkspace.vue'",
+      )
+      expect(orderSource).toContain(
+        "import VariationOrderModal from './components/VariationOrderModal.vue'",
+      )
       expect(workspaceSource).toContain('class="lg-left vo-main-column"')
       expect(workspaceSource).toContain('class="lg-analysis-rail vo-analysis-rail"')
       expect(modalSource).toContain('<a-modal')

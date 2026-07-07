@@ -132,7 +132,10 @@ function handleForgotPassword() {
               </div>
               <div class="bar-track">
                 <span class="today-line"></span>
-                <span class="progress-bar" :style="{ left: `${row.start}%`, width: `${row.width}%` }"></span>
+                <span
+                  class="progress-bar"
+                  :style="{ left: `${row.start}%`, width: `${row.width}%` }"
+                ></span>
                 <span class="progress-end" :style="{ left: `${row.start + row.width}%` }"></span>
                 <span class="task-label" :style="{ left: `${row.start}%` }">{{ row.task }}</span>
                 <span class="progress-value" :style="{ left: `${row.start + row.width + 3}%` }">
@@ -228,7 +231,9 @@ function handleForgotPassword() {
             </div>
             <div class="overview-grid">
               <div v-for="item in overviewItems" :key="item.label" class="overview-item">
-                <span class="overview-icon" :class="item.accent"><component :is="item.icon" /></span>
+                <span class="overview-icon" :class="item.accent"
+                  ><component :is="item.icon"
+                /></span>
                 <div>
                   <p>{{ item.label }}</p>
                   <strong>{{ item.value }}</strong>
@@ -306,7 +311,6 @@ function handleForgotPassword() {
         </div>
       </aside>
     </main>
-
   </div>
 </template>
 
@@ -317,7 +321,12 @@ function handleForgotPassword() {
   overflow: hidden;
   color: #1d2129;
   background:
-    linear-gradient(90deg, rgba(238, 246, 255, 0.96) 0%, rgba(241, 247, 255, 0.76) 48%, rgba(226, 238, 252, 0.38) 100%),
+    linear-gradient(
+      90deg,
+      rgba(238, 246, 255, 0.96) 0%,
+      rgba(241, 247, 255, 0.76) 48%,
+      rgba(226, 238, 252, 0.38) 100%
+    ),
     url('@/assets/images/login-command-center.png') center / cover no-repeat;
 }
 
@@ -510,7 +519,12 @@ function handleForgotPassword() {
 }
 
 .schedule-list {
-  background: linear-gradient(90deg, transparent 0 24.8%, rgba(22, 119, 255, 0.08) 24.8% 25.1%, transparent 25.1%);
+  background: linear-gradient(
+    90deg,
+    transparent 0 24.8%,
+    rgba(22, 119, 255, 0.08) 24.8% 25.1%,
+    transparent 25.1%
+  );
 }
 
 .schedule-row {
