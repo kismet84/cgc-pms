@@ -27,7 +27,9 @@ if (oversized.length > 0) {
 
 const largest = jsChunks[0]
 if (largest) {
-  console.log(`Bundle size check PASS: largest JS chunk is ${largest.file} (${formatKiB(largest.size)}).`)
+  console.log(
+    `Bundle size check PASS: largest JS chunk is ${largest.file} (${formatKiB(largest.size)}).`,
+  )
 } else {
   console.log('Bundle size check PASS: no JS chunks found.')
 }

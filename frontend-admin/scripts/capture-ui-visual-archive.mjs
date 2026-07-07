@@ -27,13 +27,19 @@ async function login(page) {
 await mkdir(outDir, { recursive: true })
 
 const browser = await chromium.launch({ headless: true })
-const page = await browser.newPage({ viewport: { width: 2560, height: 1600 }, deviceScaleFactor: 1 })
+const page = await browser.newPage({
+  viewport: { width: 2560, height: 1600 },
+  deviceScaleFactor: 1,
+})
 page.setDefaultTimeout(30000)
 await login(page)
 
 const evidence = []
 for (const [name, route, label] of routes) {
-  await page.goto(`http://localhost:5173${route}`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+  await page.goto(`http://localhost:5173${route}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  })
   await page.locator('body').filter({ hasText: label }).waitFor({ timeout: 30000 })
   await page.waitForTimeout(500)
 
@@ -52,7 +58,11 @@ for (const [name, route, label] of routes) {
   evidence.push({ name, route, screenshot, metrics })
 }
 
-await writeFile(`${outDir}/visual-archive-evidence.json`, JSON.stringify({ evidence }, null, 2), 'utf8')
+await writeFile(
+  `${outDir}/visual-archive-evidence.json`,
+  JSON.stringify({ evidence }, null, 2),
+  'utf8',
+)
 await browser.close()
 
 console.log(`Captured ${evidence.length} visual archive screenshots to ${outDir}`)
