@@ -9,8 +9,6 @@ import {
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SearchOutlined,
-  SettingOutlined,
   ShoppingCartOutlined,
   WalletOutlined,
 } from '@ant-design/icons-vue'
@@ -29,6 +27,9 @@ import type { PurchaseRequestVO, PurchaseRequestItemVO } from '@/types/inventory
 import { getContractLedger } from '@/api/modules/contract'
 import type { ContractVO } from '@/types/contract'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
+import PurchaseRequestAnalysisPanel from './components/PurchaseRequestAnalysisPanel.vue'
+import PurchaseRequestModal from './components/PurchaseRequestModal.vue'
+import PurchaseRequestSearchBar from './components/PurchaseRequestSearchBar.vue'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 // 字典常量 - 审批状态
@@ -50,16 +51,6 @@ const filter = reactive({
   requestCode: '',
   keyword: '',
 })
-const filterVisibility = reactive({
-  projectId: true,
-  approvalStatus: true,
-  status: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'approvalStatus', label: '审批状态' },
-  { key: 'status', label: '业务状态' },
-] as const
 
 const loading = ref(false)
 const tableData = ref<PurchaseRequestVO[]>([])
@@ -473,10 +464,6 @@ function getPopupContainer() {
   return document.body
 }
 
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
-}
-
 const kpiReqTotal = computed(() => tableData.value.length)
 const kpiReqPending = computed(
   () =>
@@ -606,89 +593,19 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="lg-search-bar purchase-request-search-bar">
-          <div class="purchase-request-search-fields">
-            <a-select
-              v-if="filterVisibility.projectId"
-              v-model:value="filter.projectId"
-              class="purchase-request-search-select"
-              placeholder="全部项目"
-              allow-clear
-              size="large"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-if="filterVisibility.approvalStatus"
-              v-model:value="filter.approvalStatus"
-              class="purchase-request-search-select is-compact"
-              placeholder="审批状态"
-              allow-clear
-              size="large"
-              @change="handleSearch"
-            >
-              <a-select-option value="DRAFT">草稿</a-select-option>
-              <a-select-option value="APPROVING">审批中</a-select-option>
-              <a-select-option value="APPROVED">已通过</a-select-option>
-              <a-select-option value="REJECTED">已驳回</a-select-option>
-            </a-select>
-            <a-select
-              v-if="filterVisibility.status"
-              v-model:value="filter.status"
-              class="purchase-request-search-select is-compact"
-              placeholder="业务状态"
-              allow-clear
-              size="large"
-              @change="handleSearch"
-            >
-              <a-select-option value="DRAFT">草稿</a-select-option>
-              <a-select-option value="CONVERTED">已转PO</a-select-option>
-            </a-select>
-          </div>
-          <div class="purchase-request-search-keyword-row">
-            <a-input
-              v-model:value="filter.keyword"
-              class="purchase-request-search-input"
-              placeholder="搜索申请编号"
-              allow-clear
-              size="large"
-              @press-enter="handleSearch"
-            >
-              <template #prefix>
-                <SearchOutlined class="purchase-request-search-prefix-icon" />
-              </template>
-            </a-input>
-            <div class="purchase-request-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </div>
-          </div>
-        </div>
+        <PurchaseRequestSearchBar
+          :project-id="filter.projectId"
+          :approval-status="filter.approvalStatus"
+          :status="filter.status"
+          :keyword="filter.keyword"
+          :project-list="projectList"
+          @update:project-id="(value) => (filter.projectId = value)"
+          @update:approval-status="(value) => (filter.approvalStatus = value)"
+          @update:status="(value) => (filter.status = value)"
+          @update:keyword="(value) => (filter.keyword = value)"
+          @search="handleSearch"
+          @reset="handleReset"
+        />
 
         <main class="lg-list-table-panel purchase-request-table-panel">
           <!-- 工具栏 -->
@@ -776,223 +693,37 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail purchase-request-analysis-rail" aria-label="采购申请辅助分析">
-        <div class="lg-analysis-panel lg-fill-card purchase-request-analysis-panel">
-          <header class="purchase-request-analysis-head">
-            <div>
-              <div class="purchase-request-analysis-title">申请分析</div>
-              <div class="purchase-request-analysis-subtitle">业务状态、审批状态与近期申请</div>
-            </div>
-            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
-          </header>
-
-          <section class="purchase-request-analysis-section">
-            <div class="purchase-request-section-title">业务状态分布</div>
-            <div v-for="item in statusBreakdown" :key="item.key" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.color }"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{ width: item.pct + '%', background: item.color }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ item.count }}</span>
-              <span class="lg-type-pct">{{ item.pct }}%</span>
-            </div>
-            <div v-if="!statusBreakdown.length" class="purchase-request-analysis-empty">
-              暂无业务状态数据
-            </div>
-          </section>
-
-          <section class="purchase-request-analysis-section">
-            <div class="purchase-request-section-title">审批状态</div>
-            <div v-for="item in approvalBreakdown" :key="item.key" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.color }"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{ width: item.pct + '%', background: item.color }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ item.count }}</span>
-              <span class="lg-type-pct">{{ item.pct }}%</span>
-            </div>
-          </section>
-
-          <section class="purchase-request-analysis-section">
-            <div class="purchase-request-warning-head">
-              <div class="purchase-request-section-title">近期申请</div>
-              <span class="purchase-request-warning-count">{{ recentRequests.length }} 项</span>
-            </div>
-            <div v-for="item in recentRequests" :key="item.id" class="lg-warning-item">
-              <span class="lg-warning-project">{{ item.projectName || '-' }}</span>
-              <span class="lg-warning-title">{{ item.requestCode }}</span>
-            </div>
-            <div v-if="!recentRequests.length" class="lg-warning-empty">暂无采购申请</div>
-          </section>
-        </div>
-      </aside>
+      <PurchaseRequestAnalysisPanel
+        :status-breakdown="statusBreakdown"
+        :approval-breakdown="approvalBreakdown"
+        :recent-requests="recentRequests"
+        @refresh="fetchData"
+      />
     </div>
 
-    <!-- Add/Edit Modal -->
-    <a-modal
-      v-model:open="modalVisible"
+    <PurchaseRequestModal
+      :open="modalVisible"
       :title="modalTitle"
-      :width="800"
-      :confirm-loading="isViewMode ? false : submitting"
-      :ok-button-props="isViewMode ? { style: { display: 'none' } } : undefined"
-      :cancel-text="isViewMode ? '关闭' : '取消'"
-      destroy-on-close
+      :is-view-mode="isViewMode"
+      :submitting="submitting"
+      :form-data="formData"
+      :project-list="projectList"
+      :contract-list="contractList"
+      :item-list="itemList"
+      :items-count="itemsCount"
+      :item-columns="itemColumns"
+      :material-list="materialList"
+      :filter-option="filterOption"
+      :get-popup-container="getPopupContainer"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
-    >
-      <!-- Header Form -->
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
-        <a-form-item label="项目" required>
-          <a-select
-            v-model:value="formData.projectId"
-            :disabled="isViewMode"
-            placeholder="请选择项目"
-            @change="handleProjectChange"
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-              {{ p.projectName }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="关联合同">
-          <a-select
-            v-model:value="formData.contractId"
-            :disabled="isViewMode"
-            placeholder="选择采购合同"
-            allow-clear
-            show-search
-            :filter-option="filterOption"
-            @change="modalDirty = true"
-          >
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-              {{ c.contractName }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea
-            v-model:value="formData.remark"
-            :disabled="isViewMode"
-            :rows="2"
-            placeholder="请输入备注"
-            @change="modalDirty = true"
-          />
-        </a-form-item>
-      </a-form>
-
-      <!-- Line Items Section -->
-      <div class="pr-items-section">
-        <div class="pr-items-header">
-          <span class="pr-items-title">
-            申请明细
-            <span class="pr-items-count"> {{ itemsCount }} 项 </span>
-          </span>
-          <a-button v-if="!isViewMode" type="dashed" size="small" @click="handleAddItem">
-            + 添加物料
-          </a-button>
-        </div>
-
-        <a-table
-          :data-source="itemList"
-          :pagination="false"
-          table-layout="fixed"
-          :columns="itemColumns"
-          row-key="key"
-          size="small"
-          :scroll="{ y: 250 }"
-        >
-          <template #bodyCell="{ column, record: item }">
-            <template v-if="column.key === 'material'">
-              <div style="display: flex; gap: 4px">
-                <a-select
-                  :value="item.materialId"
-                  :disabled="isViewMode"
-                  placeholder="选择已有物料"
-                  allow-clear
-                  :style="{ width: item.materialId ? '100%' : '50%', flexShrink: 0 }"
-                  show-search
-                  :filter-option="filterOption"
-                  @change="(val: string) => handleMaterialChange(item.key, val)"
-                  @clear="handleMaterialClear(item.key)"
-                >
-                  <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
-                    {{ m.materialName }}
-                  </a-select-option>
-                </a-select>
-                <a-input
-                  v-if="!item.materialId"
-                  v-model:value="item.materialName"
-                  :disabled="isViewMode"
-                  placeholder="自定义物料"
-                  size="small"
-                  style="flex: 1"
-                  @change="modalDirty = true"
-                />
-              </div>
-            </template>
-            <template v-else-if="column.key === 'unit'">
-              <a-input
-                v-model:value="item.unit"
-                :disabled="isViewMode"
-                placeholder="单位"
-                size="small"
-                style="width: 100%"
-                @change="modalDirty = true"
-              />
-            </template>
-            <template v-else-if="column.key === 'quantity'">
-              <a-input-number
-                v-model:value="item.quantity"
-                :disabled="isViewMode"
-                :min="0"
-                :precision="4"
-                style="width: 100%"
-                @change="modalDirty = true"
-              />
-            </template>
-            <template v-else-if="column.key === 'plannedDate'">
-              <a-date-picker
-                v-model:value="item.plannedDate"
-                :disabled="isViewMode"
-                value-format="YYYY-MM-DD"
-                style="width: 100%"
-                size="small"
-                :get-popup-container="getPopupContainer"
-                @change="modalDirty = true"
-              />
-            </template>
-            <template v-else-if="column.key === 'remark'">
-              <a-input
-                v-model:value="item.remark"
-                :disabled="isViewMode"
-                placeholder="备注"
-                size="small"
-                @change="modalDirty = true"
-              />
-            </template>
-            <template v-else-if="column.key === 'action'">
-              <a-button
-                v-if="!isViewMode"
-                type="link"
-                size="small"
-                danger
-                @click="handleRemoveItem(item.key)"
-              >
-                删除
-              </a-button>
-            </template>
-          </template>
-        </a-table>
-      </div>
-    </a-modal>
+      @project-change="handleProjectChange"
+      @mark-dirty="modalDirty = true"
+      @add-item="handleAddItem"
+      @remove-item="handleRemoveItem"
+      @material-change="handleMaterialChange"
+      @material-clear="handleMaterialClear"
+    />
   </div>
 </template>
 
@@ -1018,65 +749,6 @@ onMounted(() => {
 .purchase-request-breadcrumb {
   font-size: 13px;
   line-height: 20px;
-}
-
-.purchase-request-search-bar {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 12px;
-  margin: 0;
-}
-
-.purchase-request-search-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  min-width: 0;
-  width: 100%;
-}
-
-.purchase-request-search-keyword-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  min-width: 0;
-  width: 100%;
-}
-
-.purchase-request-search-keyword-row > :deep(.ant-input-affix-wrapper) {
-  min-width: 320px;
-  flex: 1 1 320px;
-}
-
-.purchase-request-search-prefix-icon {
-  color: var(--text-secondary);
-}
-
-.purchase-request-search-fields > :deep(.ant-select) {
-  min-width: 150px;
-  flex: 1 1 180px;
-}
-
-.purchase-request-search-select {
-  width: 100%;
-}
-
-.purchase-request-search-select.is-compact {
-  min-width: 150px;
-}
-
-.purchase-request-search-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-left: auto;
-  min-width: 0;
 }
 
 .purchase-request-workspace {
@@ -1253,119 +925,6 @@ onMounted(() => {
   border-top: 1px solid var(--border-subtle);
 }
 
-.purchase-request-analysis-rail {
-  display: flex;
-  min-height: 0;
-}
-
-.purchase-request-analysis-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 0;
-  padding: 0 0 12px;
-  overflow: auto;
-  position: sticky;
-  top: 0;
-}
-
-.purchase-request-analysis-head,
-.purchase-request-warning-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.purchase-request-analysis-title {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.purchase-request-analysis-subtitle,
-.purchase-request-warning-count {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.purchase-request-analysis-head {
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.purchase-request-analysis-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  padding: 10px 16px 0;
-}
-
-.purchase-request-analysis-section + .purchase-request-analysis-section {
-  margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.purchase-request-section-title {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.purchase-request-analysis-empty {
-  padding: 10px 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  text-align: center;
-}
-
-.purchase-request-analysis-section :deep(.lg-type-row),
-.lg-type-row {
-  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
-}
-
-.pr-items-section {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 12px;
-  margin-top: 4px;
-}
-
-.pr-items-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.pr-items-title {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.pr-items-count {
-  color: var(--muted);
-  font-weight: 400;
-  font-size: 12px;
-  margin-left: 6px;
-}
-
-:deep(.pr-items-section .ant-table-thead > tr > th:first-child),
-:deep(.pr-items-section .ant-table-tbody > tr > td:first-child) {
-  width: 240px !important;
-  min-width: 240px !important;
-  max-width: 240px !important;
-}
-
-:deep(.pr-items-section .ant-table colgroup col:first-child) {
-  width: 240px !important;
-  min-width: 240px !important;
-  max-width: 240px !important;
-}
-
 @media (max-width: 1200px) {
   .purchase-request-kpi-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1374,44 +933,11 @@ onMounted(() => {
   .purchase-request-kpi-item {
     border-bottom: 1px solid var(--border-subtle);
   }
-
-  .purchase-request-analysis-rail {
-    width: 100%;
-  }
 }
 
 @media (max-width: 768px) {
   .purchase-request-kpi-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .purchase-request-page-meta-row,
-  .purchase-request-search-bar,
-  .purchase-request-search-fields,
-  .purchase-request-search-keyword-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .purchase-request-search-input,
-  .purchase-request-search-select,
-  .purchase-request-search-select.is-compact {
-    width: 100%;
-    min-width: 0;
-    flex-basis: auto;
-  }
-
-  .purchase-request-search-actions {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .purchase-request-search-actions :deep(.ant-btn) {
-    flex: 1;
-  }
-
-  .purchase-request-analysis-panel {
-    position: static;
   }
 }
 </style>

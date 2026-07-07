@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const paymentSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
+const formModalSource = readFileSync(resolve(currentDir, '../components/PaymentFormModal.vue'), 'utf-8')
 
 describe('PaymentPage save chain integrity', () => {
   describe('createApplication returns string (not {id}) — Bug FE-01 fix', () => {
@@ -51,16 +52,16 @@ describe('PaymentPage save chain integrity', () => {
 
   describe('payment basis backend contract', () => {
     it('uses backend basis field names in the modal and submit payload', () => {
-      expect(paymentSource).toContain('v-model:value="item.basisType"')
-      expect(paymentSource).toContain('v-model:value="item.basisId"')
-      expect(paymentSource).toContain('v-model:value="item.basisAmount"')
+      expect(formModalSource).toContain('v-model:value="item.basisType"')
+      expect(formModalSource).toContain('v-model:value="item.basisId"')
+      expect(formModalSource).toContain('v-model:value="item.basisAmount"')
       expect(paymentSource).toMatch(/await\s+saveBasis\(id,\s*basisPayload\)/)
     })
 
     it('does not submit stale sourceType/sourceId/amount field names for basis rows', () => {
-      expect(paymentSource).not.toContain('v-model:value="item.sourceType"')
-      expect(paymentSource).not.toContain('v-model:value="item.sourceId"')
-      expect(paymentSource).not.toContain('v-model:value="item.amount"')
+      expect(formModalSource).not.toContain('v-model:value="item.sourceType"')
+      expect(formModalSource).not.toContain('v-model:value="item.sourceId"')
+      expect(formModalSource).not.toContain('v-model:value="item.amount"')
     })
   })
 })

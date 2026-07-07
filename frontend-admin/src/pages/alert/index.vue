@@ -5,10 +5,7 @@ import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
   BellOutlined,
-  FolderOpenOutlined,
   InboxOutlined,
-  ReloadOutlined,
-  SearchOutlined,
   ThunderboltOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
@@ -35,7 +32,10 @@ import {
   type AlertSubscriptionResponse,
 } from '@/types/alert'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { ColumnSettingsButton } from '@/components/list-page'
+import AlertDetailPanel from './components/AlertDetailPanel.vue'
+import AlertFilterPanel from './components/AlertFilterPanel.vue'
+import AlertSubscriptionModal from './components/AlertSubscriptionModal.vue'
+import AlertTablePanel from './components/AlertTablePanel.vue'
 
 const router = useRouter()
 const store = useAlertStore()
@@ -72,7 +72,6 @@ const pageSize = ref(20)
 const selectedRowKeys = ref<Array<string | number>>([])
 const activeRecord = ref<AlertLogVO | null>(null)
 const statusRemarkDraft = ref('')
-const gridRef = ref()
 const roleDefaultApplied = ref(false)
 
 const projectOptions = computed(() => referenceStore.projects ?? [])
@@ -713,375 +712,84 @@ onMounted(async () => {
           </article>
         </section>
 
-        <section class="alert-panel alert-filter-panel">
-          <div class="alert-filter-grid">
-            <div class="alert-filter-item">
-              <label>项目</label>
-              <a-select
-                v-model:value="filter.projectId"
-                allow-clear
-                show-search
-                :loading="projectsLoading"
-                :options="projectOptions.map((item) => ({ value: String(item.id), label: `${item.projectCode} ${item.projectName}` }))"
-                placeholder="请选择项目"
-              />
-            </div>
-            <div class="alert-filter-item">
-              <label>严重度</label>
-              <a-select
-                v-model:value="filter.severity"
-                allow-clear
-                :options="[
-                  { value: 'HIGH', label: '高危' },
-                  { value: 'MEDIUM', label: '中危' },
-                  { value: 'LOW', label: '低危' },
-                ]"
-                placeholder="请选择严重度"
-              />
-            </div>
-            <div class="alert-filter-item">
-              <label>已读状态</label>
-              <a-select
-                v-model:value="filter.isRead"
-                allow-clear
-                :options="[
-                  { value: 0, label: '未读' },
-                  { value: 1, label: '已读' },
-                ]"
-                placeholder="全部"
-              />
-            </div>
-            <div class="alert-filter-item">
-              <label>处理状态</label>
-              <a-select
-                v-model:value="filter.processStatus"
-                allow-clear
-                :options="processStatusOptions"
-                placeholder="全部"
-              />
-            </div>
-            <div class="alert-filter-item alert-filter-item-range">
-              <label>触发时间</label>
-              <a-range-picker v-model:value="filter.triggeredAtRange" value-format="" style="width: 100%" />
-            </div>
-          </div>
-          <div class="alert-filter-foot">
-            <div class="alert-filter-item alert-filter-item-keyword">
-              <a-input
-                v-model:value="filter.keyword"
-                allow-clear
-                placeholder="告警ID/消息摘要/业务单据号"
-              >
-                <template #prefix>
-                  <SearchOutlined />
-                </template>
-              </a-input>
-            </div>
-            <div class="alert-filter-actions">
-              <a-button type="primary" @click="handleSearch">搜索</a-button>
-              <a-button @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-            </div>
-            <div v-if="hasDefaultScopeDomain" class="alert-filter-scope">
-              <a-checkbox v-model:checked="filter.onlyDefaultScope">仅看默认范围</a-checkbox>
-            </div>
-          </div>
-        </section>
+        <AlertFilterPanel
+          :filter="filter"
+          :projects-loading="projectsLoading"
+          :project-options="projectOptions"
+          :process-status-options="processStatusOptions"
+          :has-default-scope-domain="hasDefaultScopeDomain"
+          :handle-search="handleSearch"
+          :handle-reset="handleReset"
+        />
 
-        <section class="alert-panel alert-table-panel">
-          <div class="alert-toolbar">
-            <div class="alert-toolbar-left">
-              <a-button type="primary" :disabled="selectedCount === 0" @click="handleBatchStatus('PROCESSED')">批量处理</a-button>
-              <a-button :disabled="selectedCount === 0" @click="handleBatchMarkRead">标记已读</a-button>
-              <a-button :disabled="selectedCount === 0" @click="handleBatchStatus('ARCHIVED')">归档</a-button>
-              <a-button @click="exportCurrentView">导出</a-button>
-              <span class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>
-            </div>
-            <ColumnSettingsButton
-              :columns="columnSettings"
-              :visible="colVisible"
-              @toggle="toggleCol"
-            />
-          </div>
-
-          <div class="lg-table-wrap alert-grid-wrap">
-            <vxe-grid
-              ref="gridRef"
-              :data="alerts"
-              :columns="tableColumns"
-              :loading="store.loading"
-              :height="tableHeight"
-              :column-config="{ resizable: true }"
-              :row-config="{ isHover: true }"
-              border="inner"
-              size="mini"
-              show-overflow="title"
-            >
-              <template #selectionHeader>
-                <a-checkbox
-                  :checked="allPageSelected"
-                  :indeterminate="pageSelectionIndeterminate"
-                  @change="(event) => togglePageSelection(event.target.checked)"
-                />
-              </template>
-              <template #selection="{ row }">
-                <a-checkbox
-                  :checked="isRowSelected(row.id)"
-                  @change="(event) => toggleRowSelection(row, event.target.checked)"
-                />
-              </template>
-              <template #id="{ row }">
-                <button type="button" class="alert-link" @click="openDetail(row)">{{ row.id }}</button>
-              </template>
-              <template #projectId="{ row }">
-                <button type="button" class="alert-link alert-project-link" @click="openDetail(row)">
-                  {{ getProjectName(row.projectId) }}
-                </button>
-              </template>
-              <template #alertDomain="{ row }">
-                <span class="alert-cell-text">{{ getAlertDomainLabel(row) }}</span>
-              </template>
-              <template #ruleType="{ row }">
-                <span class="alert-cell-text">{{ RULE_TYPE_LABELS[row.ruleType] || row.ruleType }}</span>
-              </template>
-              <template #alertCategory="{ row }">
-                <span class="alert-cell-text">{{ getAlertTagLabel(row) }}</span>
-              </template>
-              <template #severity="{ row }">
-                <a-tag :color="SEVERITY_COLOR[row.severity] ?? 'default'" class="alert-tag">
-                  {{ formatSeverityText(row.severity) }}
-                </a-tag>
-              </template>
-              <template #processStatus="{ row }">
-                <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(row.processStatus ?? 'OPEN')] ?? 'default'" class="alert-tag">
-                  {{ String(row.processStatus ?? 'OPEN') }}
-                </a-tag>
-              </template>
-              <template #isRead="{ row }">
-                <span class="alert-read-state" :class="{ 'is-unread': row.isRead === 0 }">
-                  <i></i>
-                  {{ row.isRead === 0 ? '未读' : '已读' }}
-                </span>
-              </template>
-              <template #triggeredAt="{ row }">
-                <span class="alert-cell-text">{{ formatDateTime(row.triggeredAt) }}</span>
-              </template>
-              <template #message="{ row }">
-                <button type="button" class="alert-message-button" @click="openDetail(row)">
-                  {{ getAlertMessageText(row.message) }}
-                </button>
-              </template>
-              <template #action="{ row }">
-                <div class="alert-row-actions">
-                  <a-button v-if="row.isRead === 0" type="link" size="small" @click="handleMarkRead(row)">标记已读</a-button>
-                  <a-button
-                    v-if="String(row.processStatus ?? 'OPEN') !== 'PROCESSED'"
-                    type="link"
-                    size="small"
-                    @click="handleChangeStatus(row, 'PROCESSED')"
-                  >
-                    处理
-                  </a-button>
-                  <a-button
-                    v-if="String(row.processStatus ?? 'OPEN') !== 'ARCHIVED'"
-                    type="link"
-                    size="small"
-                    @click="handleChangeStatus(row, 'ARCHIVED')"
-                  >
-                    归档
-                  </a-button>
-                  <a-button type="link" size="small" @click="openDetail(row)">详情</a-button>
-                </div>
-              </template>
-            </vxe-grid>
-          </div>
-
-          <div class="lg-pagination alert-pagination">
-            <span class="lg-total">共 {{ total }} 条</span>
-            <a-pagination
-              v-model:current="pageNo"
-              v-model:page-size="pageSize"
-              :total="total"
-              :page-size-options="['10', '20', '50', '100']"
-              show-size-changer
-              show-quick-jumper
-              @change="handlePageChange"
-              @show-size-change="handlePageSizeChange"
-            />
-          </div>
-        </section>
+        <AlertTablePanel
+          :alerts="alerts"
+          :column-settings="columnSettings"
+          :col-visible="colVisible"
+          :table-columns="tableColumns"
+          :loading="store.loading"
+          :table-height="tableHeight"
+          :all-page-selected="allPageSelected"
+          :page-selection-indeterminate="pageSelectionIndeterminate"
+          :total="total"
+          :page-no="pageNo"
+          :page-size="pageSize"
+          :selected-count="selectedCount"
+          :toggle-col="toggleCol"
+          :toggle-page-selection="togglePageSelection"
+          :is-row-selected="isRowSelected"
+          :toggle-row-selection="toggleRowSelection"
+          :open-detail="openDetail"
+          :get-project-name="getProjectName"
+          :get-alert-domain-label="getAlertDomainLabel"
+          :get-alert-tag-label="getAlertTagLabel"
+          :format-severity-text="formatSeverityText"
+          :format-date-time="formatDateTime"
+          :get-alert-message-text="getAlertMessageText"
+          :handle-mark-read="handleMarkRead"
+          :handle-change-status="handleChangeStatus"
+          :handle-batch-status="handleBatchStatus"
+          :handle-batch-mark-read="handleBatchMarkRead"
+          :handle-page-change="handlePageChange"
+          :handle-page-size-change="handlePageSizeChange"
+          :export-current-view="exportCurrentView"
+        />
       </div>
 
-      <aside class="alert-detail-panel">
-        <div class="alert-detail-head">
-          <div class="alert-detail-title">告警详情</div>
-        </div>
-
-        <template v-if="activeRecord">
-          <section class="alert-detail-section">
-            <div class="alert-section-title">基本信息</div>
-            <div class="alert-detail-grid">
-              <div class="alert-detail-item">
-                <span>告警ID</span>
-                <strong>{{ activeRecord.id }}</strong>
-              </div>
-              <div class="alert-detail-item">
-                <span>严重度</span>
-                <a-tag :color="SEVERITY_COLOR[activeRecord.severity] ?? 'default'">{{ formatSeverityText(activeRecord.severity) }}</a-tag>
-              </div>
-              <div class="alert-detail-item">
-                <span>处理状态</span>
-                <a-tag :color="ALERT_PROCESS_STATUS_COLOR[String(activeRecord.processStatus ?? 'OPEN')] ?? 'default'">
-                  {{ String(activeRecord.processStatus ?? 'OPEN') }}
-                </a-tag>
-              </div>
-              <div class="alert-detail-item">
-                <span>已读状态</span>
-                <span class="alert-read-state" :class="{ 'is-unread': activeRecord.isRead === 0 }">
-                  <i></i>
-                  {{ activeRecord.isRead === 0 ? '未读' : '已读' }}
-                </span>
-              </div>
-              <div class="alert-detail-item">
-                <span>触发时间</span>
-                <strong>{{ formatDateTime(activeRecord.triggeredAt) }}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="alert-detail-section">
-            <div class="alert-section-title">告警内容</div>
-            <div class="alert-content-list">
-              <div class="alert-content-row">
-                <span>规则域</span>
-                <strong>{{ getAlertDomainLabel(activeRecord) }}</strong>
-              </div>
-              <div class="alert-content-row">
-                <span>项目</span>
-                <strong>{{ getProjectName(activeRecord.projectId) }}</strong>
-              </div>
-              <div class="alert-content-row">
-                <span>消息摘要</span>
-                <strong class="is-message">{{ getAlertMessageText(activeRecord.message) }}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="alert-detail-section">
-            <div class="alert-section-title">状态备注</div>
-            <a-textarea
-              v-model:value="statusRemarkDraft"
-              :maxlength="200"
-              :auto-size="{ minRows: 4, maxRows: 6 }"
-              placeholder="请填写处理备注，支持 200 字以内"
-            />
-            <div class="alert-detail-tip">
-              当前状态：{{ getProcessStatusLabel(activeRecord) }}，保存时会同步备注。
-            </div>
-          </section>
-
-          <section class="alert-detail-section">
-            <div class="alert-section-title">处理信息</div>
-            <div class="alert-content-list">
-              <div class="alert-content-row">
-                <span>处理人</span>
-                <strong>{{ currentOperator }}</strong>
-              </div>
-              <div class="alert-content-row">
-                <span>处理时间</span>
-                <strong>{{ formatDateTime(activeRecord.processedAt) }}</strong>
-              </div>
-              <div class="alert-content-row">
-                <span>归档时间</span>
-                <strong>{{ formatDateTime(activeRecord.archivedAt) }}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="alert-detail-section">
-            <div class="alert-section-row">
-              <div class="alert-section-title">通知订阅</div>
-              <a-button type="link" size="small" @click="openSubscriptionModal">编辑</a-button>
-            </div>
-            <div class="alert-subscription-summary">{{ subscriptionSummaryText }}</div>
-            <div class="alert-subscription-table">
-              <div class="alert-subscription-header">
-                <span>通知渠道</span>
-                <span>是否启用</span>
-                <span>最低严重度</span>
-              </div>
-              <div v-for="item in subscriptionRows" :key="item.channel" class="alert-subscription-line">
-                <span>{{ item.label }}</span>
-                <a-switch :checked="item.enabled" disabled size="small" />
-                <span>{{ item.minSeverity }}</span>
-              </div>
-            </div>
-          </section>
-
-          <div class="alert-detail-actions">
-            <a-button v-if="activeRecord.isRead === 0" @click="handleMarkRead(activeRecord)">标记已读</a-button>
-            <a-button v-if="String(activeRecord.processStatus ?? 'OPEN') !== 'ARCHIVED'" @click="handleChangeStatus(activeRecord, 'ARCHIVED', statusRemarkDraft.trim() || undefined)">
-              归档
-            </a-button>
-            <a-button v-if="canOpenBusinessEntry(activeRecord)" @click="openBusinessEntry(activeRecord)">
-              查看业务单据
-            </a-button>
-            <a-button type="primary" @click="handleSaveActiveResult">保存处理结果</a-button>
-          </div>
-        </template>
-
-        <div v-else class="alert-detail-empty">
-          <div class="alert-detail-empty-title">未选择预警</div>
-          <div class="alert-detail-empty-text">请从左侧列表选择一条告警查看详情。</div>
-        </div>
-      </aside>
+      <AlertDetailPanel
+        :active-record="activeRecord"
+        :status-remark-draft="statusRemarkDraft"
+        :current-operator="currentOperator"
+        :subscription-rows="subscriptionRows"
+        :format-severity-text="formatSeverityText"
+        :format-date-time="formatDateTime"
+        :get-alert-domain-label="getAlertDomainLabel"
+        :get-project-name="getProjectName"
+        :get-alert-message-text="getAlertMessageText"
+        :get-process-status-label="getProcessStatusLabel"
+        :open-subscription-modal="openSubscriptionModal"
+        :handle-mark-read="handleMarkRead"
+        :handle-change-status="handleChangeStatus"
+        :can-open-business-entry="canOpenBusinessEntry"
+        :open-business-entry="openBusinessEntry"
+        :handle-save-active-result="handleSaveActiveResult"
+        @update:status-remark-draft="statusRemarkDraft = $event"
+      />
     </div>
 
-    <a-modal
-      v-model:open="subscriptionVisible"
-      title="通知订阅"
-      :confirm-loading="subscriptionSaving"
-      @ok="handleSaveSubscription"
-    >
-      <a-spin :spinning="subscriptionLoading">
-        <div class="alert-subscription-form">
-          <div class="alert-subscription-row">
-            <span class="alert-subscription-label">接收通知</span>
-            <a-switch v-model:checked="subscriptionForm.enabled" :disabled="!defaultSubscriptionEnabled" />
-          </div>
-          <div class="alert-subscription-row is-block">
-            <span class="alert-subscription-label">通知渠道</span>
-            <a-checkbox-group v-model:value="subscriptionForm.channels">
-              <a-checkbox v-for="channel in availableSubscriptionChannels" :key="channel" :value="channel">
-                {{ ALERT_CHANNEL_LABELS[channel] ?? channel }}
-              </a-checkbox>
-            </a-checkbox-group>
-          </div>
-          <div class="alert-subscription-row is-block">
-            <span class="alert-subscription-label">预警域</span>
-            <a-checkbox-group v-model:value="subscriptionForm.domains">
-              <a-checkbox v-for="domain in availableSubscriptionDomains" :key="domain" :value="domain">
-                {{ RULE_CATEGORY_LABELS[domain] ?? domain }}
-              </a-checkbox>
-            </a-checkbox-group>
-          </div>
-          <div class="alert-subscription-row is-block">
-            <span class="alert-subscription-label">最低严重度</span>
-            <a-radio-group v-model:value="subscriptionForm.minSeverity">
-              <a-radio-button v-for="item in availableSeverityOptions" :key="item" :value="item">
-                {{ item === 'HIGH' ? '高危' : item === 'MEDIUM' ? '中危' : '低危' }}
-              </a-radio-button>
-            </a-radio-group>
-          </div>
-          <div class="alert-subscription-row">
-            <span class="alert-subscription-label">状态变更通知</span>
-            <a-switch v-model:checked="subscriptionForm.notifyOnStatusChanged" :disabled="!defaultStatusChangeEnabled" />
-          </div>
-        </div>
-      </a-spin>
-    </a-modal>
+    <AlertSubscriptionModal
+      :open="subscriptionVisible"
+      :loading="subscriptionLoading"
+      :saving="subscriptionSaving"
+      :form="subscriptionForm"
+      :available-subscription-channels="availableSubscriptionChannels"
+      :available-subscription-domains="availableSubscriptionDomains"
+      :available-severity-options="availableSeverityOptions"
+      :default-subscription-enabled="defaultSubscriptionEnabled"
+      :default-status-change-enabled="defaultStatusChangeEnabled"
+      :handle-save-subscription="handleSaveSubscription"
+      @update:open="subscriptionVisible = $event"
+    />
   </div>
 </template>
 
@@ -1107,14 +815,6 @@ onMounted(async () => {
   gap: 16px;
   min-width: 0;
   min-height: 0;
-}
-
-.alert-panel,
-.alert-detail-panel {
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(31, 35, 41, 0.04);
 }
 
 .alert-kpi-grid {
@@ -1220,442 +920,26 @@ onMounted(async () => {
   background: #edf9f0;
 }
 
-.alert-filter-panel {
-  padding: 12px 18px;
-}
-
-.alert-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 10px;
-  width: 100%;
-}
-
-.alert-filter-item {
-  min-width: 0;
-}
-
-.alert-filter-item :deep(.ant-select),
-.alert-filter-item :deep(.ant-picker),
-.alert-filter-item :deep(.ant-input-affix-wrapper) {
-  width: 100%;
-}
-
-.alert-filter-item label {
-  display: block;
-  margin-bottom: 4px;
-  color: #3b4554;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.alert-filter-item-keyword {
-  min-width: 0;
-}
-
-.alert-filter-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.alert-filter-foot .alert-filter-item-keyword {
-  flex: 1 1 auto;
-}
-
-.alert-filter-actions {
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-.alert-filter-scope {
-  margin-left: auto;
-  color: #5f6b7a;
-  font-size: 13px;
-}
-
-.alert-table-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.alert-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid #eef2f7;
-}
-
-.alert-toolbar-left {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.alert-toolbar-meta {
-  margin-left: 4px;
-  color: #8a94a6;
-  font-size: 13px;
-}
-
-.alert-grid-wrap {
-  flex: 1;
-  min-height: 0;
-  padding: 0 14px 6px;
-}
-
-.alert-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 30px;
-  padding: 0 18px;
-}
-
-.alert-link,
-.alert-message-button {
-  padding: 0;
-  background: transparent;
-  border: 0;
-}
-
-.alert-link {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  color: #1677ff;
-  line-height: 20px;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.alert-project-link {
-  text-align: left;
-}
-
-.alert-message-button {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  color: #1f2329;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.alert-cell-text {
-  display: block;
-  overflow: hidden;
-  color: #1f2329;
-  line-height: 20px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.alert-tag {
-  font-weight: 600;
-}
-
-.alert-read-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #5f6b7a;
-}
-
-.alert-read-state i {
-  width: 7px;
-  height: 7px;
-  background: #52c41a;
-  border-radius: 50%;
-}
-
-.alert-read-state.is-unread {
-  color: #ff4d4f;
-}
-
-.alert-read-state.is-unread i {
-  background: #ff4d4f;
-}
-
-.alert-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  margin-left: -8px;
-}
-
-.alert-detail-panel {
-  position: sticky;
-  top: 0;
-  height: 100%;
-  min-height: 0;
-  padding: 0 0 10px;
-}
-
-.alert-detail-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid #eef2f7;
-}
-
-.alert-detail-title {
-  color: #1f2329;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.alert-detail-section {
-  padding: 10px 16px 0;
-}
-
-.alert-section-title {
-  margin-bottom: 8px;
-  color: #1f2329;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.alert-section-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.alert-detail-grid,
-.alert-content-list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.alert-detail-item,
-.alert-content-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  color: #5f6b7a;
-  font-size: 12px;
-}
-
-.alert-detail-item strong,
-.alert-content-row strong {
-  color: #1f2329;
-  font-weight: 600;
-  text-align: right;
-}
-
-.alert-content-row .is-message {
-  max-width: 220px;
-  line-height: 1.35;
-  white-space: pre-wrap;
-}
-
-.alert-detail-tip,
-.alert-subscription-summary {
-  margin-top: 6px;
-  color: #8a94a6;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.alert-subscription-table {
-  margin-top: 8px;
-  overflow: hidden;
-  border: 1px solid #eef2f7;
-  border-radius: 10px;
-}
-
-.alert-subscription-header,
-.alert-subscription-line {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr 0.8fr;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 10px;
-  font-size: 12px;
-}
-
-.alert-subscription-header {
-  color: #5f6b7a;
-  font-weight: 600;
-  background: #fafbfd;
-}
-
-.alert-subscription-line + .alert-subscription-line {
-  border-top: 1px solid #eef2f7;
-}
-
-.alert-detail-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 12px 16px;
-  margin-top: 10px;
-  border-top: 1px solid #eef2f7;
-}
-
-.alert-detail-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 420px;
-  color: #8a94a6;
-  text-align: center;
-}
-
-.alert-detail-empty-title {
-  color: #1f2329;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.alert-detail-empty-text {
-  margin-top: 8px;
-  font-size: 13px;
-}
-
-.alert-subscription-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.alert-subscription-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.alert-subscription-row.is-block {
-  align-items: flex-start;
-  flex-direction: column;
-}
-
-.alert-subscription-label {
-  color: #1f2329;
-  font-weight: 600;
-}
-
-:deep(.alert-grid-wrap .vxe-grid) {
-  height: 100%;
-}
-
-:deep(.alert-grid-wrap .vxe-table--header-wrapper),
-:deep(.alert-grid-wrap .vxe-table--body-wrapper) {
-  width: 100%;
-}
-
-:deep(.alert-grid-wrap .vxe-header--column),
-:deep(.alert-grid-wrap .vxe-body--column) {
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-:deep(.alert-grid-wrap .vxe-cell) {
-  padding: 0 6px;
-  line-height: 16px;
-  font-size: 12px;
-}
-
-:deep(.alert-grid-wrap .vxe-header--column .vxe-cell) {
-  line-height: 24px;
-  font-size: 12px;
-}
-
-:deep(.alert-grid-wrap .vxe-body--row) {
-  height: 16px;
-}
-
-:deep(.alert-grid-wrap .ant-tag) {
-  margin: 0;
-  padding: 0 3px;
-  line-height: 14px;
-  font-size: 10px;
-}
-
-:deep(.alert-grid-wrap .ant-btn-sm) {
-  height: 16px;
-  padding: 0 2px;
-  line-height: 14px;
-  font-size: 12px;
-}
-
-:deep(.alert-grid-wrap .vxe-table--body-wrapper) {
-  min-height: 0;
-}
-
 @media (max-width: 1200px) {
   .alert-shell {
     grid-template-columns: 1fr;
   }
-
-  .alert-detail-panel {
-    position: static;
-    min-height: 0;
-  }
 }
 
 @media (max-width: 1100px) {
-  .alert-kpi-grid,
-  .alert-filter-grid {
+  .alert-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .alert-filter-foot {
-    flex-wrap: wrap;
-  }
-
-  .alert-filter-item-keyword {
-    flex-basis: 100%;
-  }
-
-  .alert-filter-scope {
-    width: 100%;
-    margin-left: 0;
   }
 }
 
 @media (max-width: 768px) {
-  .alert-kpi-grid,
-  .alert-filter-grid {
+  .alert-kpi-grid {
     grid-template-columns: 1fr;
   }
 
   .alert-kpi-card + .alert-kpi-card {
     border-top: 1px solid #eef2f7;
     border-left: 0;
-  }
-
-  .alert-filter-foot,
-  .alert-filter-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .alert-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .alert-filter-scope {
-    width: auto;
   }
 }
 </style>

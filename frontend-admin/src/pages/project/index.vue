@@ -3,28 +3,19 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
-  DollarOutlined,
-  FileTextOutlined,
-  FlagOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SafetyCertificateOutlined,
-  SearchOutlined,
-  SettingOutlined,
-  WarningOutlined,
-} from '@ant-design/icons-vue'
-import {
   getProjectList,
   getProjectDetail,
   createProject,
   updateProject,
   deleteProject,
 } from '@/api/modules/project'
-import { ColumnSettingsButton } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
+import ProjectAnalysisRail from './components/ProjectAnalysisRail.vue'
+import ProjectKpiSummary from './components/ProjectKpiSummary.vue'
+import ProjectQueryPanel from './components/ProjectQueryPanel.vue'
+import ProjectTablePanel from './components/ProjectTablePanel.vue'
 
 const filter = reactive({
   keyword: '',
@@ -636,384 +627,58 @@ const {
 
     <div class="lg-grid project-workspace">
       <div class="lg-left project-main-column">
-        <section class="lg-kpi-strip project-kpi-summary" aria-label="项目关键指标">
-          <div class="project-kpi-item">
-            <div class="project-kpi-content">
-              <span class="project-kpi-label">项目总数</span>
-              <span class="project-kpi-value">{{ projectStats.total || 0 }} <small>个</small></span>
-            </div>
-            <span class="project-kpi-icon is-total"><FileTextOutlined /></span>
-          </div>
-          <div class="project-kpi-item">
-            <div class="project-kpi-content">
-              <span class="project-kpi-label">合同总金额</span>
-              <span class="project-kpi-value">
-                {{
-                  totalContractAmount
-                    ? (totalContractAmount / 10000).toLocaleString('zh-CN', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })
-                    : '0.00'
-                }}
-                <small>万元</small>
-              </span>
-            </div>
-            <span class="project-kpi-icon is-amount"><DollarOutlined /></span>
-          </div>
-          <div class="project-kpi-item">
-            <div class="project-kpi-content">
-              <span class="project-kpi-label">在建项目</span>
-              <span class="project-kpi-value">{{ projectStats.ongoing || 0 }} <small>个</small></span>
-            </div>
-            <span class="project-kpi-icon is-ongoing"><SafetyCertificateOutlined /></span>
-          </div>
-          <div class="project-kpi-item">
-            <div class="project-kpi-content">
-              <span class="project-kpi-label">已竣工项目</span>
-              <span class="project-kpi-value">{{ projectStats.completed || 0 }} <small>个</small></span>
-            </div>
-            <span class="project-kpi-icon is-completed"><FlagOutlined /></span>
-          </div>
-          <div class="project-kpi-item">
-            <div class="project-kpi-content">
-              <span class="project-kpi-label">风险项目</span>
-              <span class="project-kpi-value">{{ projectStats.risk || 0 }} <small>个</small></span>
-            </div>
-            <span class="project-kpi-icon is-risk"><WarningOutlined /></span>
-          </div>
-        </section>
+        <ProjectKpiSummary
+          :project-stats="projectStats"
+          :total-contract-amount="totalContractAmount"
+        />
 
-        <section class="lg-search-bar project-query-panel" aria-label="项目查询条件">
-          <div class="project-filter-grid">
-            <div v-if="filterVisibility.projectType" class="project-filter-item">
-              <label>项目类型</label>
-              <a-select
-                v-model:value="filter.projectType"
-                placeholder="全部类型"
-                allow-clear
-                class="project-search-select"
-                size="large"
-                @change="handleSearch"
-              >
-                <a-select-option v-for="item in PROJECT_TYPE_OPTIONS" :key="item" :value="item">
-                  {{ item }}
-                </a-select-option>
-              </a-select>
-            </div>
-            <div v-if="filterVisibility.status" class="project-filter-item">
-              <label>项目状态</label>
-              <a-select
-                v-model:value="filter.status"
-                placeholder="全部状态"
-                allow-clear
-                class="project-search-select"
-                size="large"
-                @change="handleSearch"
-              >
-                <a-select-option v-for="item in PROJECT_STATUS_OPTIONS" :key="item" :value="item">
-                  {{ STATUS_LABEL[item] ?? item }}
-                </a-select-option>
-              </a-select>
-            </div>
-          </div>
-          <div class="project-filter-foot">
-            <div class="project-filter-item project-filter-item-keyword">
-              <a-input
-                v-model:value="filter.keyword"
-                placeholder="搜索项目编号、名称、类型、建设单位"
-                allow-clear
-                class="project-search-input"
-                size="large"
-                @press-enter="handleSearch"
-              >
-                <template #prefix><SearchOutlined class="project-search-icon" /></template>
-              </a-input>
-            </div>
-            <div class="project-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-              <a-button size="large" @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </div>
-          </div>
-        </section>
+        <ProjectQueryPanel
+          :filter="filter"
+          :filter-visibility="filterVisibility"
+          :filter-setting-items="filterSettingItems"
+          :project-type-options="PROJECT_TYPE_OPTIONS"
+          :project-status-options="PROJECT_STATUS_OPTIONS"
+          :status-label="STATUS_LABEL"
+          @search="handleSearch"
+          @reset="handleReset"
+          @toggle-filter-visibility="toggleFilterVisibility"
+        />
 
-        <main class="lg-list-table-panel project-table-panel">
-          <div class="lg-toolbar project-table-toolbar">
-            <div class="lg-toolbar-left">
-              <div class="project-table-heading">
-                <span class="project-table-title">项目列表</span>
-                <span class="project-table-count">共 {{ total }} 条</span>
-              </div>
-            </div>
-            <div class="lg-toolbar-right project-table-toolbar-right">
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-              <a-button aria-label="刷新项目列表" title="刷新" @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
-                刷新
-              </a-button>
-              <a-button type="primary" @click="handleCreateModalOpen">
-                <template #icon><PlusOutlined /></template>
-                新建项目
-              </a-button>
-            </div>
-          </div>
-
-          <div class="lg-table-wrap project-table-wrap">
-            <div v-if="isMobile" class="project-mobile-list">
-              <a-spin :spinning="loading">
-                <div v-if="tableData.length" class="project-mobile-cards">
-                  <article
-                    v-for="row in tableData"
-                    :key="row.id"
-                    class="project-mobile-card"
-                    @click="router.push(`/project/${row.id}/overview`)"
-                  >
-                    <div class="project-mobile-card-head">
-                      <div class="project-mobile-card-title">{{ row.projectName }}</div>
-                      <a-tag :color="STATUS_COLOR[row.status]" size="small">
-                        {{ STATUS_LABEL[row.status] ?? row.status }}
-                      </a-tag>
-                    </div>
-                    <div class="project-mobile-card-meta">
-                      <span class="project-mobile-card-code">{{ row.projectCode || '-' }}</span>
-                      <a-tag :color="PROJECT_TYPE_COLOR[row.projectType]" size="small">
-                        {{ row.projectType || '未分类' }}
-                      </a-tag>
-                    </div>
-                    <div class="project-mobile-card-row">
-                      <span>合同金额</span>
-                      <span class="project-contract-amount">{{ fmtAmount(row.contractAmount) }}</span>
-                    </div>
-                    <div class="project-mobile-card-row">
-                      <span>计划工期</span>
-                      <span>
-                        {{
-                          row.plannedStartDate || row.plannedEndDate
-                            ? `${row.plannedStartDate || '-'} ~ ${row.plannedEndDate || '-'}`
-                            : '-'
-                        }}
-                      </span>
-                    </div>
-                    <div class="project-mobile-card-row">
-                      <span>审批状态</span>
-                      <a-tag
-                        v-if="row.approvalStatus"
-                        :color="APPROVAL_STATUS_COLOR[row.approvalStatus]"
-                        size="small"
-                      >
-                        {{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}
-                      </a-tag>
-                      <span v-else class="project-empty-text">-</span>
-                    </div>
-                    <div class="project-mobile-card-actions">
-                      <a-button size="small" @click.stop="handleEditModalOpen(row)">编辑</a-button>
-                      <a-button size="small" danger @click.stop="handleDelete(row)">删除</a-button>
-                    </div>
-                  </article>
-                </div>
-                <a-empty v-else description="暂无项目数据" />
-              </a-spin>
-            </div>
-            <vxe-grid
-              v-else
-              :data="tableData"
-              :columns="visibleGridColumns"
-              :loading="loading"
-              :column-config="{ resizable: true, useKey: true }"
-              show-overflow="title"
-              show-header-overflow="title"
-              stripe
-              border="inner"
-              size="small"
-            >
-              <template #projectCode="{ row }">
-                <a-button
-                  class="project-code-link"
-                  type="link"
-                  @click="router.push(`/project/${row.id}/overview`)"
-                >
-                  {{ row.projectCode }}
-                </a-button>
-              </template>
-              <template #projectName="{ row }">
-                <span class="project-name-text">{{ row.projectName }}</span>
-              </template>
-              <template #projectType="{ row }">
-                <a-tag :color="PROJECT_TYPE_COLOR[row.projectType]" size="small">
-                  {{ row.projectType || '未分类' }}
-                </a-tag>
-              </template>
-              <template #contractAmount="{ row }">
-                <span class="lg-money project-contract-amount">{{
-                  fmtAmount(row.contractAmount)
-                }}</span>
-              </template>
-              <template #plannedDuration="{ row }">
-                <span>{{
-                  row.plannedStartDate || row.plannedEndDate
-                    ? `${row.plannedStartDate || '-'} ~ ${row.plannedEndDate || '-'}`
-                    : '-'
-                }}</span>
-              </template>
-              <template #status="{ row }">
-                <a-tag :color="STATUS_COLOR[row.status]" size="small">
-                  {{ STATUS_LABEL[row.status] ?? row.status }}
-                </a-tag>
-              </template>
-              <template #approvalStatus="{ row }">
-                <a-tag
-                  v-if="row.approvalStatus"
-                  :color="APPROVAL_STATUS_COLOR[row.approvalStatus]"
-                  size="small"
-                >
-                  {{ APPROVAL_STATUS_LABEL[row.approvalStatus] ?? row.approvalStatus }}
-                </a-tag>
-                <span v-else class="project-empty-text">-</span>
-              </template>
-              <template #ops="{ row }">
-                <a-dropdown :trigger="['click']">
-                  <a-button class="lg-row-action-trigger" size="small" type="text">
-                    <MoreOutlined />
-                  </a-button>
-                  <template #overlay>
-                    <a-menu>
-                      <a-menu-item @click="router.push(`/project/${row.id}/overview`)">
-                        查看
-                      </a-menu-item>
-                      <a-menu-item @click="handleEditModalOpen(row)">编辑</a-menu-item>
-                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
-              </template>
-            </vxe-grid>
-          </div>
-
-          <div class="lg-pagination project-pagination">
-            <span class="lg-total">共 {{ total }} 条</span>
-            <a-pagination
-              v-model:current="pageNo"
-              v-model:page-size="pageSize"
-              :total="total"
-              :page-size-options="['10', '20', '50', '100']"
-              show-size-changer
-              @change="handlePageChange"
-              @show-size-change="handlePageSizeChange"
-            />
-          </div>
-        </main>
+        <ProjectTablePanel
+          :total="total"
+          :loading="loading"
+          :table-data="tableData"
+          :is-mobile="isMobile"
+          :page-no="pageNo"
+          :page-size="pageSize"
+          :visible-grid-columns="visibleGridColumns"
+          :column-settings="columnSettings"
+          :col-visible="colVisible"
+          :status-label="STATUS_LABEL"
+          :status-color="STATUS_COLOR"
+          :approval-status-label="APPROVAL_STATUS_LABEL"
+          :approval-status-color="APPROVAL_STATUS_COLOR"
+          :project-type-color="PROJECT_TYPE_COLOR"
+          :fmt-amount="fmtAmount"
+          @toggle-col="toggleCol"
+          @refresh="fetchData"
+          @create="handleCreateModalOpen"
+          @overview="router.push(`/project/${$event.id}/overview`)"
+          @edit="handleEditModalOpen"
+          @delete="handleDelete"
+          @page-change="handlePageChange"
+          @page-size-change="handlePageSizeChange"
+        />
       </div>
 
-      <aside class="lg-analysis-rail project-analysis-rail" aria-label="项目辅助分析">
-        <div class="lg-analysis-panel lg-fill-card project-analysis-panel">
-          <header class="project-analysis-head">
-            <div>
-              <div class="project-analysis-title">辅助分析</div>
-              <div class="project-analysis-subtitle">项目概览与重点分组</div>
-            </div>
-          </header>
-
-          <section class="project-analysis-section">
-            <div class="project-section-title">基本盘</div>
-            <div class="project-overview-list">
-              <div class="project-overview-row">
-                <span>项目总数</span>
-                <strong>{{ projectStats.total || 0 }} 个</strong>
-              </div>
-              <div class="project-overview-row">
-                <span>合同总金额</span>
-                <strong>
-                  {{
-                    totalContractAmount
-                      ? (totalContractAmount / 10000).toLocaleString('zh-CN', {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })
-                      : '0.00'
-                  }}
-                  万元
-                </strong>
-              </div>
-              <div class="project-overview-row">
-                <span>在建 / 已竣工</span>
-                <strong>{{ projectStats.ongoing || 0 }} / {{ projectStats.completed || 0 }}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="project-analysis-section">
-            <div class="project-section-title">项目类型分布</div>
-            <div v-for="item in typeDistribution" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot project-dot-primary"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span class="lg-type-num">{{ item.value }}</span>
-              <span class="lg-type-pct">{{ item.percent }}%</span>
-            </div>
-            <div v-if="!typeDistribution.length" class="lg-warning-empty">暂无项目类型</div>
-          </section>
-
-          <section class="project-analysis-section">
-            <div class="project-section-title">项目状态</div>
-            <div v-for="item in statusDistribution" :key="item.key" class="lg-type-row">
-              <span class="lg-type-dot project-dot-success"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span class="lg-type-num">{{ item.value }}</span>
-              <span class="lg-type-pct">{{ item.percent }}%</span>
-            </div>
-            <div v-if="!statusDistribution.length" class="lg-warning-empty">暂无项目状态</div>
-          </section>
-
-          <section class="project-analysis-section">
-            <div class="project-warning-head">
-              <div class="project-section-title">风险项目</div>
-              <span class="project-warning-count">{{ projectStats.risk }} 项</span>
-            </div>
-            <div v-for="item in riskProjects" :key="item.name" class="lg-type-row">
-              <span class="lg-type-dot project-dot-warning"></span>
-              <span class="lg-type-label">{{ item.name }}</span>
-              <span class="project-risk-status">{{ item.status }}</span>
-            </div>
-          </section>
-
-          <section class="project-analysis-section">
-            <div class="project-warning-head">
-              <div class="project-section-title">近期项目</div>
-              <span class="project-warning-count">{{ recentProjects.length }} 项</span>
-            </div>
-            <div v-for="item in recentProjects" :key="item.name" class="lg-type-row">
-              <span class="lg-type-dot project-dot-primary"></span>
-              <span class="lg-type-label">{{ item.name }}</span>
-              <span class="project-risk-status">{{ item.status }}</span>
-            </div>
-          </section>
-        </div>
-      </aside>
+      <ProjectAnalysisRail
+        :project-stats="projectStats"
+        :total-contract-amount="totalContractAmount"
+        :type-distribution="typeDistribution"
+        :status-distribution="statusDistribution"
+        :risk-projects="riskProjects"
+        :recent-projects="recentProjects"
+      />
     </div>
   </div>
 </template>
@@ -1117,393 +782,8 @@ const {
   min-height: 0;
 }
 
-.project-kpi-summary {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0;
-  margin-bottom: 0;
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.project-kpi-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  column-gap: 10px;
-  gap: 10px;
-  min-width: 0;
-  padding: 10px 18px;
-}
-
-.project-kpi-item + .project-kpi-item {
-  border-left: 1px solid var(--border-subtle);
-}
-
-.project-kpi-content {
-  min-width: 0;
-}
-
-.project-kpi-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  font-size: 18px;
-  color: var(--primary);
-  background: var(--primary-soft);
-  border-radius: 10px;
-  flex: 0 0 auto;
-}
-
-.project-kpi-icon.is-amount {
-  color: var(--warning);
-  background: var(--warning-soft);
-}
-
-.project-kpi-icon.is-ongoing,
-.project-kpi-icon.is-completed {
-  color: var(--success);
-  background: var(--success-soft);
-}
-
-.project-kpi-icon.is-risk {
-  color: var(--error);
-  background: var(--error-soft);
-}
-
-.project-kpi-label {
-  display: block;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
-}
-
-.project-kpi-value {
-  display: block;
-  margin-top: 4px;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.project-kpi-value small {
-  margin-left: 4px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.project-table-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  min-height: 0;
-}
-
-.project-table-toolbar {
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.project-table-heading,
-.project-table-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.project-table-title {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.project-table-count,
-.project-toolbar-hint,
-.project-analysis-subtitle,
-.project-warning-count {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.project-table-wrap {
-  flex: 1;
-  min-height: 0;
-}
-
-.project-mobile-list {
-  padding: 12px;
-}
-
-.project-mobile-cards {
-  display: grid;
-  gap: 12px;
-}
-
-.project-mobile-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.project-mobile-card-head,
-.project-mobile-card-meta,
-.project-mobile-card-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.project-mobile-card-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.project-mobile-card-title,
-.project-mobile-card-code,
-.project-mobile-card-row span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.project-mobile-card-title {
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.project-mobile-card-code {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.project-table-wrap :deep(.vxe-header--column .vxe-cell) {
-  justify-content: center;
-  text-align: center;
-}
-
-.project-table-wrap :deep(.vxe-grid) {
-  height: 100%;
-}
-
-.project-code-link,
-.project-name-text,
-.project-contract-amount {
-  font-size: 14px;
-  line-height: 22px;
-}
-
-.project-code-link {
-  height: auto;
-  padding: 0;
-  font-weight: 700;
-}
-
-.project-code-link,
-.project-code-link:hover,
-.project-code-link:focus {
-  background: transparent;
-}
-
-.project-pagination {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.project-analysis-rail {
-}
-
-.project-analysis-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 0;
-  padding: 0 0 12px;
-  overflow: auto;
-  position: sticky;
-  top: 0;
-}
-
-.project-analysis-head {
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.project-warning-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.project-analysis-title {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.project-analysis-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  padding: 10px 16px 0;
-}
-
-.project-analysis-section + .project-analysis-section {
-  margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.project-section-title {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 18px;
-}
-
-.project-overview-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.project-overview-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 18px;
-}
-
-.project-overview-row strong {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.project-analysis-section :deep(.lg-type-row),
-.project-analysis-section .lg-type-row {
-  display: grid;
-  grid-template-columns: 9px minmax(0, 1fr) auto auto;
-  align-items: center;
-  column-gap: 8px;
-  min-height: 0;
-  padding: 0;
-}
-
-.project-analysis-section :deep(.lg-type-label),
-.project-analysis-section .lg-type-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.project-analysis-section :deep(.lg-type-num),
-.project-analysis-section .lg-type-num,
-.project-analysis-section :deep(.lg-type-pct),
-.project-analysis-section .lg-type-pct {
-  font-size: 12px;
-  line-height: 18px;
-  white-space: nowrap;
-}
-
-.project-dot-primary {
-  background: var(--primary);
-}
-
-.project-dot-success {
-  background: var(--success);
-}
-
-.project-dot-warning {
-  background: var(--warning);
-}
-
-.project-risk-status {
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 18px;
-  white-space: nowrap;
-}
-
 .pj-create-form {
   padding-top: 16px;
 }
 
-@media (max-width: 1200px) {
-  .project-filter-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .project-analysis-rail {
-    width: 100%;
-  }
-
-  .project-table-toolbar-right {
-    flex-wrap: wrap;
-  }
-
-  .project-kpi-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 768px) {
-  .project-filter-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .project-filter-foot {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .project-search-actions {
-    width: 100%;
-  }
-
-  .project-search-actions :deep(.ant-btn) {
-    flex: 1;
-  }
-
-  .project-kpi-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .project-kpi-item + .project-kpi-item {
-    border-left: 0;
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .project-analysis-panel {
-    position: static;
-  }
-}
 </style>

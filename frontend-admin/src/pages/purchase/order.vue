@@ -9,8 +9,6 @@ import {
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
-  SettingOutlined,
-  SearchOutlined,
   ShoppingCartOutlined,
   WalletOutlined,
 } from '@ant-design/icons-vue'
@@ -26,10 +24,12 @@ import {
   submitOrderForApproval,
 } from '@/api/modules/purchase'
 import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchase'
-import type { SelectOption } from '@/types/ui'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
+import PurchaseOrderAnalysisRail from './components/PurchaseOrderAnalysisRail.vue'
+import PurchaseOrderModal from './components/PurchaseOrderModal.vue'
+import PurchaseOrderSearchBar from './components/PurchaseOrderSearchBar.vue'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -548,6 +548,17 @@ function onFilterProjectChange(v: string | undefined) {
   handleSearch()
 }
 
+function handleModalProjectChange(v: string) {
+  formData.contractId = undefined
+  formData.partnerId = undefined
+  referenceStore.fetchContracts({
+    projectId: v,
+    contractType: 'PURCHASE',
+    contractStatus: 'PERFORMING',
+    approvalStatus: 'APPROVED',
+  })
+}
+
 async function loadSuppliers() {
   try {
     supplierList.value = await referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })
@@ -636,123 +647,22 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="lg-search-bar purchase-order-search-bar">
-          <div class="purchase-order-search-fields">
-            <a-select
-              v-if="filterVisibility.projectId"
-              v-model:value="filter.projectId"
-              class="purchase-order-search-select"
-              placeholder="全部项目"
-              allow-clear
-              size="large"
-              @change="onFilterProjectChange"
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-if="filterVisibility.contractId"
-              v-model:value="filter.contractId"
-              class="purchase-order-search-select"
-              placeholder="全部合同"
-              allow-clear
-              show-search
-              size="large"
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-              @change="handleSearch"
-            >
-              <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-                {{ c.contractName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-if="filterVisibility.partnerId"
-              v-model:value="filter.partnerId"
-              class="purchase-order-search-select"
-              placeholder="全部供应商"
-              allow-clear
-              show-search
-              size="large"
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-              @change="handleSearch"
-            >
-              <a-select-option v-for="p in supplierList" :key="p.id" :value="p.id">
-                {{ p.partnerName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-if="filterVisibility.orderType"
-              v-model:value="filter.orderType"
-              class="purchase-order-search-select is-compact"
-              placeholder="类型"
-              allow-clear
-              size="large"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="(label, key) in ORDER_TYPE_LABEL" :key="key" :value="key">
-                {{ label }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-if="filterVisibility.orderStatus"
-              v-model:value="filter.orderStatus"
-              class="purchase-order-search-select is-compact"
-              placeholder="状态"
-              allow-clear
-              size="large"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="(_, key) in ORDER_STATUS_LABEL" :key="key" :value="key">
-                {{ orderStatusLabel(String(key)) }}
-              </a-select-option>
-            </a-select>
-          </div>
-          <div class="purchase-order-search-keyword-row">
-            <a-input
-              v-model:value="filter.keyword"
-              class="purchase-order-search-input"
-              placeholder="搜索订单编号、名称"
-              allow-clear
-              size="large"
-              @press-enter="handleSearch"
-            >
-              <template #prefix><SearchOutlined class="purchase-order-search-prefix-icon" /></template>
-            </a-input>
-            <div class="purchase-order-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-              <a-button size="large" @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </div>
-          </div>
-        </div>
+        <PurchaseOrderSearchBar
+          class="purchase-order-search-bar"
+          :filter="filter"
+          :filter-visibility="filterVisibility"
+          :filter-setting-items="filterSettingItems"
+          :project-list="projectList"
+          :contract-list="contractList"
+          :supplier-list="supplierList"
+          :order-type-label="ORDER_TYPE_LABEL"
+          :order-status-label-map="ORDER_STATUS_LABEL"
+          :order-status-label="orderStatusLabel"
+          :on-project-change="onFilterProjectChange"
+          :on-search="handleSearch"
+          :on-reset="handleReset"
+          :on-toggle-filter-visibility="toggleFilterVisibility"
+        />
 
         <main class="lg-list-table-panel purchase-order-table-panel">
           <!-- 工具栏 -->
@@ -855,276 +765,37 @@ onMounted(() => {
       </div>
 
       <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail purchase-order-analysis-rail" aria-label="采购订单辅助分析">
-        <div class="lg-analysis-panel lg-fill-card purchase-order-analysis-panel">
-          <header class="purchase-order-analysis-head">
-            <div>
-              <div class="purchase-order-analysis-title">辅助分析</div>
-              <div class="purchase-order-analysis-subtitle">状态、类型与待履约金额</div>
-            </div>
-            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
-          </header>
-
-          <section class="purchase-order-analysis-focus">
-            <span>本页重点</span>
-            <strong>{{ fmtWan(kpiUnreceived) }} 万</strong>
-            <em>尚未完成到货或验收的采购金额，优先跟踪供应商履约。</em>
-          </section>
-
-          <section class="purchase-order-analysis-section">
-            <div class="purchase-order-section-title">订单状态分布</div>
-            <div v-for="it in orderStatusBreakdown" :key="it.key" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: it.color }"></span>
-              <span class="lg-type-label">{{ it.label }}</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{ width: it.pct + '%', background: it.color }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ it.count }}</span>
-              <span class="lg-type-pct">{{ it.pct }}%</span>
-            </div>
-            <div v-if="!orderStatusBreakdown.length" class="purchase-order-analysis-empty">
-              暂无订单状态数据
-            </div>
-          </section>
-
-          <section class="purchase-order-analysis-section">
-            <div class="purchase-order-section-title">订单类型分布</div>
-            <div v-for="it in orderTypeBreakdown" :key="it.key" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: it.color }"></span>
-              <span class="lg-type-label">{{ it.label }}</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{ width: it.pct + '%', background: it.color }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ it.count }}</span>
-              <span class="lg-type-pct">{{ it.pct }}%</span>
-            </div>
-          </section>
-
-          <section class="purchase-order-analysis-section">
-            <div class="purchase-order-warning-head">
-              <div class="purchase-order-section-title">待履约订单</div>
-              <span class="purchase-order-warning-count">{{ pendingOrders.length }} 项</span>
-            </div>
-            <div v-for="item in pendingOrders" :key="item.id" class="lg-warning-item">
-              <span class="lg-warning-project">{{ item.project }}</span>
-              <span class="lg-warning-title">{{ item.title }}</span>
-              <span class="purchase-order-warning-amount">{{ item.amount }}万</span>
-            </div>
-            <div v-if="!pendingOrders.length" class="lg-warning-empty">暂无待履约订单</div>
-          </section>
-        </div>
-      </aside>
+      <PurchaseOrderAnalysisRail
+        class="purchase-order-analysis-rail"
+        :focus-amount="fmtWan(kpiUnreceived)"
+        :order-status-breakdown="orderStatusBreakdown"
+        :order-type-breakdown="orderTypeBreakdown"
+        :pending-orders="pendingOrders"
+        :on-refresh="fetchData"
+      />
     </div>
 
-    <!-- Add/Edit Modal -->
-    <a-modal
+    <PurchaseOrderModal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="800"
-      :ok-button-props="isViewMode ? { style: { display: 'none' } } : undefined"
-      :cancel-text="isViewMode ? '关闭' : '取消'"
+      :is-view-mode="isViewMode"
+      :form-data="formData"
+      :form-partner-name="formPartnerName"
+      :project-list="projectList"
+      :contract-list="contractList"
+      :material-list="materialList"
+      :item-list="itemList"
+      :items-total-amount="itemsTotalAmount"
+      :on-project-change="handleModalProjectChange"
+      :on-contract-change="onContractChange"
+      :on-add-item="handleAddItem"
+      :on-remove-item="handleRemoveItem"
+      :on-material-change="handleMaterialChange"
+      :on-item-qty-change="handleItemQtyChange"
+      :on-item-price-change="handleItemPriceChange"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
-    >
-      <!-- Header Form -->
-      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }" style="margin-bottom: 8px">
-        <a-form-item label="项目" required>
-          <a-select
-            v-model:value="formData.projectId"
-            :disabled="isViewMode"
-            placeholder="请选择项目"
-            show-search
-            @change="
-              (v: string) => {
-                formData.contractId = undefined
-                formData.partnerId = undefined
-                referenceStore.fetchContracts({
-                  projectId: v,
-                  contractType: 'PURCHASE',
-                  contractStatus: 'PERFORMING',
-                  approvalStatus: 'APPROVED',
-                })
-              }
-            "
-            :filter-option="
-              (input: string, option: SelectOption) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-          >
-            <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-              {{ p.projectName }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="采购合同">
-          <a-select
-            v-model:value="formData.contractId"
-            :disabled="isViewMode"
-            placeholder="请选择合同"
-            allow-clear
-            show-search
-            :filter-option="
-              (input: string, option: SelectOption) =>
-                option.label?.toLowerCase().includes(input.toLowerCase())
-            "
-            @change="onContractChange"
-          >
-            <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-              {{ c.contractName }}
-            </a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="供应商">
-          <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
-        </a-form-item>
-        <a-form-item label="订单类型">
-          <a-select
-            v-model:value="formData.orderType"
-            :disabled="isViewMode"
-            placeholder="请选择类型"
-            allow-clear
-          >
-            <a-select-option value="MATERIAL">材料采购</a-select-option>
-            <a-select-option value="EQUIPMENT">设备采购</a-select-option>
-            <a-select-option value="SERVICE">服务采购</a-select-option>
-            <a-select-option value="OTHER">其他</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="订单日期">
-          <a-date-picker
-            v-model:value="formData.orderDate"
-            :disabled="isViewMode"
-            value-format="YYYY-MM-DD"
-            style="width: 100%"
-          />
-        </a-form-item>
-        <a-form-item label="交货日期">
-          <a-date-picker
-            v-model:value="formData.deliveryDate"
-            :disabled="isViewMode"
-            value-format="YYYY-MM-DD"
-            style="width: 100%"
-          />
-        </a-form-item>
-        <a-form-item label="备注">
-          <a-textarea
-            v-model:value="formData.remark"
-            :disabled="isViewMode"
-            :rows="2"
-            placeholder="请输入备注"
-          />
-        </a-form-item>
-      </a-form>
-
-      <!-- Line Items Section -->
-      <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-          "
-        >
-          <span style="font-weight: 600; font-size: 14px">订单明细</span>
-          <a-button v-if="!isViewMode" type="dashed" size="small" @click="handleAddItem">
-            + 添加明细
-          </a-button>
-        </div>
-
-        <a-table
-          :data-source="itemList"
-          :pagination="false"
-          row-key="key"
-          size="small"
-          :scroll="{ y: 250 }"
-        >
-          <a-table-column title="材料" width="200">
-            <template #default="{ record: item, index }">
-              <a-select
-                :value="item.materialId"
-                :disabled="isViewMode"
-                placeholder="请选择材料"
-                allow-clear
-                style="width: 100%"
-                show-search
-                :filter-option="
-                  (input: string, option: SelectOption) =>
-                    option.label?.toLowerCase().includes(input.toLowerCase())
-                "
-                @change="(val: string) => handleMaterialChange(index, val)"
-              >
-                <a-select-option v-for="m in materialList" :key="m.id" :value="m.id">
-                  {{ m.materialName }}
-                </a-select-option>
-              </a-select>
-            </template>
-          </a-table-column>
-          <a-table-column title="规格" width="100">
-            <template #default="{ record: item }">
-              <span>{{ item.specification || '-' }}</span>
-            </template>
-          </a-table-column>
-          <a-table-column title="单位" width="70">
-            <template #default="{ record: item }">
-              <span>{{ item.unit || '-' }}</span>
-            </template>
-          </a-table-column>
-          <a-table-column title="数量" width="120">
-            <template #default="{ record: item, index }">
-              <a-input-number
-                v-model:value="item.quantity"
-                :disabled="isViewMode"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-                @change="handleItemQtyChange(index)"
-              />
-            </template>
-          </a-table-column>
-          <a-table-column title="单价(元)" width="130">
-            <template #default="{ record: item, index }">
-              <a-input-number
-                v-model:value="item.unitPrice"
-                :disabled="isViewMode"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-                @change="handleItemPriceChange(index)"
-              />
-            </template>
-          </a-table-column>
-          <a-table-column title="金额(元)" width="130">
-            <template #default="{ record: item }">
-              <span>{{
-                Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-              }}</span>
-            </template>
-          </a-table-column>
-          <a-table-column title="操作" width="76">
-            <template #default="{ index }">
-              <a-button v-if="!isViewMode" type="link" size="small" danger @click="handleRemoveItem(index)"
-                >删除</a-button
-              >
-            </template>
-          </a-table-column>
-        </a-table>
-
-        <div style="text-align: right; margin-top: 8px; font-size: 14px">
-          合计：<span style="font-weight: 600; color: #1677ff"
-            >¥{{
-              Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-            }}</span
-          >
-        </div>
-      </div>
-    </a-modal>
+    />
   </div>
 </template>
 
@@ -1152,64 +823,6 @@ onMounted(() => {
   margin-bottom: 0;
   font-size: 13px;
   line-height: 20px;
-}
-
-.purchase-order-search-bar {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  gap: 12px;
-  margin: 0;
-}
-
-.purchase-order-search-fields {
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  min-width: 0;
-  width: 100%;
-}
-
-.purchase-order-search-keyword-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  min-width: 0;
-  width: 100%;
-}
-
-.purchase-order-search-input {
-  flex: 1 1 320px;
-  min-width: 320px;
-}
-
-.purchase-order-search-prefix-icon {
-  color: var(--text-secondary);
-}
-
-.purchase-order-search-select {
-  width: 100%;
-  min-width: 180px;
-  flex: 1 1 180px;
-}
-
-.purchase-order-search-select.is-compact {
-  min-width: 150px;
-}
-
-.purchase-order-search-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-left: auto;
-  min-width: 0;
 }
 
 .purchase-order-workspace {
@@ -1394,99 +1007,6 @@ onMounted(() => {
   min-height: 0;
 }
 
-.purchase-order-analysis-rail {
-  display: flex;
-  min-height: 0;
-}
-
-.purchase-order-analysis-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 14px;
-  overflow: auto;
-  padding: 16px;
-}
-
-.purchase-order-analysis-focus {
-  display: grid;
-  gap: 4px;
-  padding: 14px;
-  background: var(--error-soft);
-  border: 1px solid rgba(239, 68, 68, 0.18);
-  border-radius: var(--radius-md);
-}
-
-.purchase-order-analysis-focus span,
-.purchase-order-analysis-focus em {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.purchase-order-analysis-focus strong {
-  color: var(--error);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 30px;
-}
-
-.purchase-order-analysis-head,
-.purchase-order-warning-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.purchase-order-analysis-title {
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 22px;
-}
-
-.purchase-order-analysis-subtitle,
-.purchase-order-warning-count {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.purchase-order-analysis-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.purchase-order-section-title {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.purchase-order-analysis-empty {
-  padding: 10px 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  text-align: center;
-}
-
-.purchase-order-analysis-section :deep(.lg-type-row),
-.lg-type-row {
-  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
-}
-
-.purchase-order-warning-amount {
-  color: var(--error);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 @media (max-width: 1200px) {
   .purchase-order-page .purchase-order-kpi-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1504,9 +1024,6 @@ onMounted(() => {
     border-bottom: 0;
   }
 
-  .purchase-order-analysis-rail {
-    width: 100%;
-  }
 }
 
 @media (max-width: 768px) {
@@ -1524,28 +1041,5 @@ onMounted(() => {
     border-bottom: 0;
   }
 
-  .purchase-order-search-bar,
-  .purchase-order-search-fields,
-  .purchase-order-search-keyword-row {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .purchase-order-search-actions {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .purchase-order-search-input,
-  .purchase-order-search-select,
-  .purchase-order-search-select.is-compact {
-    width: 100%;
-    min-width: 0;
-    flex-basis: auto;
-  }
-
-  .purchase-order-search-actions :deep(.ant-btn) {
-    flex: 1;
-  }
 }
 </style>

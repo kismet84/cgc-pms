@@ -6,6 +6,11 @@ import { fileURLToPath } from 'node:url'
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const orderSource = readFileSync(resolve(currentDir, '../order.vue'), 'utf-8')
 const configSource = readFileSync(resolve(currentDir, '../pageConfig.ts'), 'utf-8')
+const workspaceSource = readFileSync(
+  resolve(currentDir, '../components/VariationOrderWorkspace.vue'),
+  'utf-8',
+)
+const modalSource = readFileSync(resolve(currentDir, '../components/VariationOrderModal.vue'), 'utf-8')
 
 describe('VariationOrderPage save chain integrity', () => {
   describe('createVarOrder returns string (not {id}) — Bug FE-01 fix', () => {
@@ -31,10 +36,10 @@ describe('VariationOrderPage save chain integrity', () => {
     })
 
     it('renders a cost subject selector in detail rows', () => {
-      expect(orderSource).toMatch(/title="成本科目"/)
-      expect(orderSource).toMatch(/v-model:value="item\.costSubjectId"/)
-      expect(orderSource).toMatch(/:options="costSubjectOptions"/)
-      expect(orderSource).toMatch(/popup-match-select-width="false"/)
+      expect(modalSource).toMatch(/title="成本科目"/)
+      expect(modalSource).toMatch(/v-model:value="item\.costSubjectId"/)
+      expect(modalSource).toMatch(/:options="costSubjectOptions"/)
+      expect(modalSource).toMatch(/popup-match-select-width="false"/)
     })
 
     it('saves only detail rows with quantity greater than zero', () => {
@@ -83,6 +88,15 @@ describe('VariationOrderPage save chain integrity', () => {
       expect(configSource).toContain('export const VAR_TYPE_OPTIONS')
       expect(configSource).toContain('export const APPROVAL_STATUS_LABEL')
       expect(configSource).toContain('export function buildVariationGridColumns')
+    })
+
+    it('keeps workspace and modal markup in local variation components', () => {
+      expect(orderSource).toContain("import VariationOrderWorkspace from './components/VariationOrderWorkspace.vue'")
+      expect(orderSource).toContain("import VariationOrderModal from './components/VariationOrderModal.vue'")
+      expect(workspaceSource).toContain('class="lg-left vo-main-column"')
+      expect(workspaceSource).toContain('class="lg-analysis-rail vo-analysis-rail"')
+      expect(modalSource).toContain('<a-modal')
+      expect(modalSource).toContain('title="成本科目"')
     })
   })
 })

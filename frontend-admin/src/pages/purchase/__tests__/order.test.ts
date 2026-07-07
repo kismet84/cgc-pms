@@ -5,6 +5,15 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../order.vue'), 'utf-8')
+const searchBarSource = readFileSync(
+  resolve(currentDir, '../components/PurchaseOrderSearchBar.vue'),
+  'utf-8',
+)
+const analysisRailSource = readFileSync(
+  resolve(currentDir, '../components/PurchaseOrderAnalysisRail.vue'),
+  'utf-8',
+)
+const modalSource = readFileSync(resolve(currentDir, '../components/PurchaseOrderModal.vue'), 'utf-8')
 
 describe('PurchaseOrderPage submit-approval button', () => {
   it('imports submitOrderForApproval from API module', () => {
@@ -57,15 +66,15 @@ describe('PurchaseOrderPage submit-approval button', () => {
     expect(source).toContain('async function loadSuppliers()')
     expect(source).toContain("supplierList.value = await referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })")
     expect(source).toMatch(/onMounted\([\s\S]*?loadSuppliers\(\)/)
-    expect(source).toMatch(/v-for="p in supplierList"/)
-    expect(source).not.toMatch(/v-for="p in partnerList"/)
+    expect(searchBarSource).toMatch(/v-for="p in supplierList"/)
+    expect(searchBarSource).not.toMatch(/v-for="p in partnerList"/)
   })
 
   it('exposes contractId and partnerId filters in the search bar', () => {
-    expect(source).toMatch(/v-model:value="filter\.contractId"/)
-    expect(source).toMatch(/v-model:value="filter\.partnerId"/)
-    expect(source).toMatch(/placeholder="全部合同"/)
-    expect(source).toMatch(/placeholder="全部供应商"/)
+    expect(searchBarSource).toMatch(/v-model:value="filter\.contractId"/)
+    expect(searchBarSource).toMatch(/v-model:value="filter\.partnerId"/)
+    expect(searchBarSource).toMatch(/placeholder="全部合同"/)
+    expect(searchBarSource).toMatch(/placeholder="全部供应商"/)
   })
 
   it('opens businessId deeplink through order detail API and clears query', () => {
@@ -87,16 +96,36 @@ describe('PurchaseOrderPage submit-approval button', () => {
     expect(source).toMatch(/const modalMode = ref<ModalMode>\('create'\)/)
     expect(source).toMatch(/const isViewMode = computed\(\(\) => modalMode\.value === 'view'\)/)
     expect(source).toMatch(/async function handleView\(record: MatPurchaseOrderVO\)[\s\S]*?modalMode\.value = 'view'/)
-    expect(source).toMatch(/<a-modal[\s\S]*?:ok-button-props="isViewMode \? \{ style: \{ display: 'none' \} \} : undefined"/)
-    expect(source).toMatch(/<a-modal[\s\S]*?:cancel-text="isViewMode \? '关闭' : '取消'"/)
-    expect(source).toMatch(/v-if="!isViewMode"[\s\S]*?\+ 添加明细/)
-    expect(source).toMatch(/<a-table-column title="操作" width="76">[\s\S]*?v-if="!isViewMode"/)
-    expect(source).toContain(':disabled="isViewMode"')
+    expect(modalSource).toMatch(/<a-modal[\s\S]*?:ok-button-props="isViewMode \? \{ style: \{ display: 'none' \} \} : undefined"/)
+    expect(modalSource).toMatch(/<a-modal[\s\S]*?:cancel-text="isViewMode \? '关闭' : '取消'"/)
+    expect(modalSource).toMatch(/v-if="!isViewMode"[\s\S]*?\+ 添加明细/)
+    expect(modalSource).toMatch(/<a-table-column title="操作" width="76">[\s\S]*?v-if="!isViewMode"/)
+    expect(modalSource).toContain(':disabled="isViewMode"')
     expect(source).toMatch(/async function handleModalOk\(\) \{[\s\S]*?if \(isViewMode\.value\) return/)
   })
 })
 
 describe('purchase order page quality guardrails', () => {
+  it('delegates visual-only sections to local order components while keeping page wiring', () => {
+    expect(source).toContain("import PurchaseOrderSearchBar from './components/PurchaseOrderSearchBar.vue'")
+    expect(source).toContain("import PurchaseOrderAnalysisRail from './components/PurchaseOrderAnalysisRail.vue'")
+    expect(source).toContain("import PurchaseOrderModal from './components/PurchaseOrderModal.vue'")
+    expect(source).toMatch(/<PurchaseOrderSearchBar[\s\S]*?class=\"purchase-order-search-bar\"/)
+    expect(source).toMatch(/<PurchaseOrderAnalysisRail[\s\S]*?class=\"purchase-order-analysis-rail\"/)
+    expect(source).toMatch(/<PurchaseOrderModal[\s\S]*?v-model:open=\"modalVisible\"/)
+  })
+
+  it('keeps save chain in parent page with create update and saveOrderItems orchestration', () => {
+    expect(source).toMatch(/if \(editingId\.value\)[\s\S]*?await updateOrder\(editingId\.value, formData\)/)
+    expect(source).toMatch(/else \{[\s\S]*?const result = await createOrder\(formData\)/)
+    expect(source).toMatch(/if \(itemList\.value\.length > 0\)[\s\S]*?await saveOrderItems\(orderId, items\)/)
+  })
+
+  it('keeps search and analysis root DOM classes in local components', () => {
+    expect(searchBarSource).toContain('<div class="lg-search-bar">')
+    expect(analysisRailSource).toContain('<aside class="lg-analysis-rail" aria-label="采购订单辅助分析">')
+  })
+
   it('does not open the modal after detail loading fails', () => {
     expect(source).toMatch(/catch[\s\S]*?message\.error\('加载明细失败'\)[\s\S]*?return/)
   })

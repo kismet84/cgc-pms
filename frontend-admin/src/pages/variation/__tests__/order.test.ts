@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../order.vue'), 'utf-8')
+const workspaceSource = readFileSync(
+  resolve(currentDir, '../components/VariationOrderWorkspace.vue'),
+  'utf-8',
+)
 
 describe('VariationOrderPage submit-approval button', () => {
   it('imports submitVarOrderForApproval from API module', () => {
@@ -24,10 +28,10 @@ describe('VariationOrderPage submit-approval button', () => {
   })
 
   it('renders 提交审批 button only when approvalStatus is DRAFT', () => {
-    expect(source).toMatch(/approvalStatus\s*===\s*APPROVAL_DRAFT/)
+    expect(workspaceSource).toMatch(/approvalStatus\s*===\s*approvalDraft/)
   })
 
   it('wires 提交审批 button to handleSubmitApproval handler', () => {
-    expect(source).toMatch(/handleSubmitApproval\(row\)/)
+    expect(workspaceSource).toMatch(/handleSubmitApproval\(row\)/)
   })
 })

@@ -3,17 +3,6 @@ import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
-  CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  FileTextOutlined,
-  MoreOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  SettingOutlined,
-  WalletOutlined,
-} from '@ant-design/icons-vue'
-import {
   getVarOrderList,
   createVarOrder,
   updateVarOrder,
@@ -28,9 +17,10 @@ import { useReferenceStore } from '@/stores/reference'
 import type { VarOrderVO, VarOrderItemVO } from '@/types/variation'
 import type { ContractItem } from '@/types/contract'
 import type { CostSubjectTreeNode } from '@/types/costSubject'
-import { ColumnSettingsButton } from '@/components/list-page'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import VariationOrderModal from './components/VariationOrderModal.vue'
+import VariationOrderWorkspace from './components/VariationOrderWorkspace.vue'
 import {
   APPROVAL_STATUS_COLOR,
   APPROVAL_STATUS_LABEL,
@@ -508,494 +498,69 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="lg-grid vo-workspace">
-      <div class="lg-left vo-main-column">
-        <div class="lg-kpi-strip vo-kpi-summary" aria-label="变更签证关键指标">
-          <div class="vo-kpi-item">
-            <span class="vo-kpi-icon is-total"><FileTextOutlined /></span>
-            <span class="vo-kpi-label">签证总数</span>
-            <span class="vo-kpi-value">{{ variationStats.total }} <small>单</small></span>
-          </div>
-          <div class="vo-kpi-item">
-            <span class="vo-kpi-icon is-approved"><CheckCircleOutlined /></span>
-            <span class="vo-kpi-label">已通过</span>
-            <span class="vo-kpi-value">{{ variationStats.approved }} <small>单</small></span>
-          </div>
-          <div class="vo-kpi-item">
-            <span class="vo-kpi-icon is-cost"><WalletOutlined /></span>
-            <span class="vo-kpi-label">成本方向</span>
-            <span class="vo-kpi-value">{{ variationStats.cost }} <small>单</small></span>
-          </div>
-          <div class="vo-kpi-item is-warn">
-            <span class="vo-kpi-icon is-draft"><ExclamationCircleOutlined /></span>
-            <span class="vo-kpi-label">草稿待提</span>
-            <span class="vo-kpi-value">{{ variationStats.draft }} <small>单</small></span>
-          </div>
-        </div>
+    <VariationOrderWorkspace
+      :filter="filter"
+      :filter-visibility="filterVisibility"
+      :filter-setting-items="filterSettingItems"
+      :project-list="projectList ?? []"
+      :var-type-options="VAR_TYPE_OPTIONS"
+      :direction-options="DIRECTION_OPTIONS"
+      :total="total"
+      :is-mobile="isMobile"
+      :loading="loading"
+      :table-data="tableData"
+      :visible-grid-columns="visibleGridColumns"
+      :column-settings="columnSettings"
+      :col-visible="colVisible"
+      :variation-stats="variationStats"
+      :variation-type-summary="variationTypeSummary"
+      :approval-status-summary="approvalStatusSummary"
+      :recent-variations="recentVariations"
+      :approval-draft="APPROVAL_DRAFT"
+      :var-type-label="VAR_TYPE_LABEL"
+      :var-type-color="VAR_TYPE_COLOR"
+      :approval-status-label="approvalStatusLabel"
+      :approval-status-color="approvalStatusColor"
+      :fmt-wan="fmtWan"
+      :handle-project-change="handleProjectChange"
+      :handle-search="handleSearch"
+      :handle-reset="handleReset"
+      :toggle-filter-visibility="toggleFilterVisibility"
+      :toggle-col="toggleCol"
+      :fetch-data="fetchData"
+      :handle-add="handleAdd"
+      :handle-view="handleView"
+      :handle-edit="handleEdit"
+      :handle-submit-approval="handleSubmitApproval"
+      :handle-delete="handleDelete"
+      :handle-page-change="handlePageChange"
+      :handle-page-size-change="handlePageSizeChange"
+      :page-no="pageNo"
+      :page-size="pageSize"
+    />
 
-        <section class="lg-search-bar vo-query-panel" aria-label="变更签证查询条件">
-          <div class="vo-query-primary">
-            <a-select
-              v-if="filterVisibility.projectId"
-              v-model:value="filter.projectId"
-              class="vo-query-select"
-              placeholder="全部项目"
-              allow-clear
-              size="large"
-              @change="handleProjectChange"
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-if="filterVisibility.varType"
-              v-model:value="filter.varType"
-              class="vo-query-select"
-              placeholder="变更类型"
-              allow-clear
-              size="large"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">
-                {{ o.label }}
-              </a-select-option>
-            </a-select>
-            <a-select
-              v-if="filterVisibility.direction"
-              v-model:value="filter.direction"
-              class="vo-query-select"
-              placeholder="方向"
-              allow-clear
-              size="large"
-              @change="handleSearch"
-            >
-              <a-select-option v-for="o in DIRECTION_OPTIONS" :key="o.value" :value="o.value">
-                {{ o.label }}
-              </a-select-option>
-            </a-select>
-          </div>
-          <div class="vo-query-keyword-row">
-            <a-input
-              v-model:value="filter.varCode"
-              class="vo-keyword-search"
-              placeholder="搜索变更编号、名称"
-              allow-clear
-              size="large"
-              @press-enter="handleSearch"
-            >
-              <template #prefix><SearchOutlined class="vo-search-prefix-icon" /></template>
-            </a-input>
-            <div class="vo-query-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </div>
-          </div>
-        </section>
-
-        <main class="lg-list-table-panel vo-table-panel">
-          <div class="lg-toolbar vo-table-toolbar">
-            <div class="lg-toolbar-left">
-              <div class="vo-table-heading">
-                <span class="vo-table-title">签证列表</span>
-                <span class="vo-table-count">共 {{ total }} 条</span>
-              </div>
-            </div>
-            <div class="lg-toolbar-right vo-table-toolbar-right">
-              <ColumnSettingsButton
-                v-if="!isMobile"
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-              <a-button aria-label="刷新变更签证列表" title="刷新" @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
-                刷新
-              </a-button>
-              <a-button type="primary" @click="handleAdd">
-                <template #icon><PlusOutlined /></template>
-                新建签证
-              </a-button>
-            </div>
-          </div>
-
-          <div v-if="isMobile" class="vo-mobile-list">
-            <div v-if="loading" class="vo-mobile-state">
-              <a-spin />
-            </div>
-            <a-empty v-else-if="!tableData.length" description="暂无变更签证" />
-            <template v-else>
-              <article v-for="row in tableData" :key="row.id" class="vo-mobile-card">
-                <div class="vo-mobile-card-head">
-                  <a-button class="vo-var-link" type="link" @click="handleView(row)">
-                    {{ row.varCode || '-' }}
-                  </a-button>
-                  <a-tag :color="approvalStatusColor(row.approvalStatus)" size="small">
-                    {{ approvalStatusLabel(row.approvalStatus) }}
-                  </a-tag>
-                </div>
-                <div class="vo-mobile-card-title">{{ row.varName || '-' }}</div>
-                <div class="vo-mobile-card-project">{{ row.projectName || '-' }}</div>
-                <div class="vo-mobile-card-meta">
-                  <span>{{ VAR_TYPE_LABEL[row.varType] ?? row.varType ?? '-' }}</span>
-                  <span>{{ row.direction === 'COST' ? '成本' : row.direction || '-' }}</span>
-                </div>
-                <div class="vo-mobile-card-amount">上报金额：{{ fmtWan(row.reportedAmount) }} 万元</div>
-                <div class="vo-mobile-card-actions">
-                  <a-button type="link" size="small" @click="handleView(row)">查看</a-button>
-                  <a-button type="link" size="small" @click="handleEdit(row)">编辑</a-button>
-                  <a-button
-                    v-if="row.approvalStatus === APPROVAL_DRAFT"
-                    type="link"
-                    size="small"
-                    @click="handleSubmitApproval(row)"
-                  >
-                    提交
-                  </a-button>
-                  <a-button danger type="link" size="small" @click="handleDelete(row)"
-                    >删除</a-button
-                  >
-                </div>
-              </article>
-            </template>
-          </div>
-
-          <div v-else class="lg-table-wrap vo-table-wrap">
-            <vxe-grid
-              :data="tableData"
-              :columns="visibleGridColumns"
-              :loading="loading"
-              :column-config="{ resizable: true, useKey: true }"
-              show-overflow="title"
-              show-header-overflow="title"
-              stripe
-              border="inner"
-              size="small"
-            >
-              <template #varCode="{ row }">
-                <a-button class="vo-var-link" type="link" @click="handleView(row)">
-                  {{ row.varCode }}
-                </a-button>
-              </template>
-              <template #varType="{ row }">
-                <a-tag :color="VAR_TYPE_COLOR[row.varType]" size="small">
-                  {{ VAR_TYPE_LABEL[row.varType] ?? row.varType }}
-                </a-tag>
-              </template>
-              <template #direction="{ row }">
-                <a-tag :color="row.direction === 'COST' ? 'red' : 'green'" size="small">{{
-                  row.direction === 'COST' ? '成本' : row.direction
-                }}</a-tag>
-              </template>
-              <template #reportedAmount="{ row }">
-                <span>{{ fmtWan(row.reportedAmount) }} 万</span>
-              </template>
-              <template #approvedAmount="{ row }">
-                <span>{{ fmtWan(row.approvedAmount) }} 万</span>
-              </template>
-              <template #confirmedAmount="{ row }">
-                <span>{{ fmtWan(row.confirmedAmount) }} 万</span>
-              </template>
-              <template #approvalStatus="{ row }">
-                <a-tag :color="approvalStatusColor(row.approvalStatus)" size="small">
-                  {{ approvalStatusLabel(row.approvalStatus) }}
-                </a-tag>
-              </template>
-              <template #ops="{ row }">
-                <a-dropdown :trigger="['click']">
-                  <a-button class="lg-row-action-trigger" size="small" type="text">
-                    <MoreOutlined />
-                  </a-button>
-                  <template #overlay>
-                    <a-menu>
-                      <a-menu-item
-                        v-if="row.approvalStatus === APPROVAL_DRAFT"
-                        @click="handleSubmitApproval(row)"
-                      >
-                        提交审批
-                      </a-menu-item>
-                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
-              </template>
-            </vxe-grid>
-          </div>
-
-          <div class="lg-pagination vo-pagination">
-            <span class="lg-total">共 {{ total }} 条</span>
-            <a-pagination
-              v-model:current="pageNo"
-              v-model:page-size="pageSize"
-              :total="total"
-              :page-size-options="['10', '20', '50']"
-              show-size-changer
-              show-quick-jumper
-              @change="handlePageChange"
-              @show-size-change="handlePageSizeChange"
-            />
-          </div>
-        </main>
-      </div>
-
-      <aside class="lg-analysis-rail vo-analysis-rail" aria-label="变更签证辅助分析">
-        <div class="lg-analysis-panel lg-fill-card vo-analysis-panel">
-          <header class="vo-analysis-head">
-            <div>
-              <div class="vo-analysis-title">签证分析</div>
-            </div>
-          </header>
-
-          <section class="vo-analysis-section">
-            <div class="vo-section-title">变更类型分布</div>
-            <div v-for="item in variationTypeSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot vo-dot-primary"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span class="lg-type-num">{{ item.count }}</span>
-              <span class="lg-type-pct">{{ item.percent }}%</span>
-            </div>
-          </section>
-
-          <section class="vo-analysis-section">
-            <div class="vo-section-title">审批状态</div>
-            <div v-for="item in approvalStatusSummary" :key="item.key" class="lg-type-row">
-              <span class="lg-type-dot vo-dot-success"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <span class="lg-type-num">{{ item.count }}</span>
-              <span class="lg-type-pct">{{ item.percent }}%</span>
-            </div>
-          </section>
-
-          <section class="vo-analysis-section">
-            <div class="vo-warning-head">
-              <div class="vo-section-title">近期签证</div>
-              <span class="vo-warning-count">{{ recentVariations.length }} 项</span>
-            </div>
-            <div v-for="item in recentVariations" :key="item.id" class="lg-type-row">
-              <span class="lg-type-dot vo-dot-warning"></span>
-              <span class="lg-type-label">{{ item.varName }}</span>
-            </div>
-            <div v-if="!recentVariations.length" class="lg-warning-empty">暂无变更签证</div>
-          </section>
-        </div>
-      </aside>
-    </div>
-
-    <!-- Modal unchanged -->
-    <a-modal
+    <VariationOrderModal
       v-model:open="modalVisible"
       :title="modalTitle"
-      :width="800"
-      :footer="modalReadonly ? null : undefined"
-      @ok="handleSubmit"
-    >
-      <a-form layout="vertical" :model="formData" :disabled="modalReadonly">
-        <a-row :gutter="16">
-          <a-col :span="8"
-            ><a-form-item label="项目"
-              ><a-select
-                v-model:value="formData.projectId"
-                placeholder="请选择项目"
-                style="width: 100%"
-                :options="(projectList ?? []).map((p) => ({ value: p.id, label: p.projectName }))"
-                @change="
-                  (v: string) => {
-                    onFormProjectChange(v)
-                  }
-                " /></a-form-item
-          ></a-col>
-          <a-col :span="8"
-            ><a-form-item label="合同"
-              ><a-select
-                v-model:value="formData.contractId"
-                placeholder="请选择合同"
-                style="width: 100%"
-                :options="
-                  (contractList ?? [])
-                    .filter((c) => !formData.projectId || c.projectId === formData.projectId)
-                    .map((c) => ({ value: c.id, label: c.contractName }))
-                "
-                @change="onContractChange" /></a-form-item
-          ></a-col>
-          <a-col :span="8"
-            ><a-form-item label="合作方"
-              ><a-input
-                :value="formPartnerName"
-                disabled
-                placeholder="选择合同后自动填充乙方" /></a-form-item
-          ></a-col>
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="8"
-            ><a-form-item label="变更类型"
-              ><a-select v-model:value="formData.varType" placeholder="请选择" style="width: 100%"
-                ><a-select-option v-for="o in VAR_TYPE_OPTIONS" :key="o.value" :value="o.value">{{
-                  o.label
-                }}</a-select-option></a-select
-              ></a-form-item
-            ></a-col
-          >
-          <a-col :span="8"
-            ><a-form-item label="变更名称"
-              ><a-input v-model:value="formData.varName" placeholder="变更名称" /></a-form-item
-          ></a-col>
-          <a-col :span="8"
-            ><a-form-item label="方向"
-              ><a-select v-model:value="formData.direction" placeholder="请选择"
-                ><a-select-option
-                  v-for="o in DIRECTION_OPTIONS"
-                  :key="o.value"
-                  :value="o.value"
-                  :disabled="o.disabled"
-                  >{{ o.label }}</a-select-option
-                ></a-select
-              ></a-form-item
-            ></a-col
-          >
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="8"
-            ><a-form-item label="影响工期(天)"
-              ><a-input-number
-                v-model:value="formData.impactDays"
-                :min="0"
-                style="width: 100%" /></a-form-item
-          ></a-col>
-          <a-col :span="8"
-            ><a-form-item label="业主确认"
-              ><a-switch
-                :checked="formData.ownerConfirmFlag === 1"
-                @change="(v: boolean) => (formData.ownerConfirmFlag = v ? 1 : 0)" /></a-form-item
-          ></a-col>
-          <a-col :span="8"
-            ><a-form-item label="备注"
-              ><a-textarea v-model:value="formData.remark" :rows="2" /></a-form-item
-          ></a-col>
-        </a-row>
-      </a-form>
-      <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-          "
-        >
-          <span style="font-weight: 600; font-size: 14px">变更明细</span
-          ><a-button type="dashed" size="small" :disabled="modalReadonly" @click="handleAddItem"
-            >+ 添加明细</a-button
-          >
-        </div>
-        <a-table
-          :data-source="itemList"
-          :loading="contractItemsLoading"
-          :pagination="false"
-          row-key="key"
-          size="small"
-          :scroll="{ x: 900, y: 250 }"
-        >
-          <a-table-column title="清单项名称" width="160"
-            ><template #default="{ record: item }"
-              ><a-input
-                v-model:value="item.itemName"
-                placeholder="名称"
-                :disabled="modalReadonly"
-                style="width: 100%" /></template
-          ></a-table-column>
-          <a-table-column title="单位" width="70"
-            ><template #default="{ record: item }"
-              ><a-input
-                v-model:value="item.unit"
-                placeholder="单位"
-                :disabled="modalReadonly"
-                style="width: 100%" /></template
-          ></a-table-column>
-          <a-table-column title="成本科目" width="180"
-            ><template #default="{ record: item }"
-              ><a-select
-                v-model:value="item.costSubjectId"
-                placeholder="选择成本科目"
-                :options="costSubjectOptions"
-                show-search
-                option-filter-prop="label"
-                popup-match-select-width="false"
-                :dropdown-style="{ minWidth: '280px' }"
-                :disabled="modalReadonly"
-                style="width: 100%" /></template
-          ></a-table-column>
-          <a-table-column title="数量" width="120"
-            ><template #default="{ record: item, index }"
-              ><a-input-number
-                v-model:value="item.quantity"
-                :min="0"
-                :precision="4"
-                :disabled="modalReadonly"
-                style="width: 100%"
-                @change="handleItemQtyChange(index)" /></template
-          ></a-table-column>
-          <a-table-column title="单价(元)" width="130"
-            ><template #default="{ record: item, index }"
-              ><a-input-number
-                v-model:value="item.unitPrice"
-                :min="0"
-                :precision="4"
-                :disabled="modalReadonly"
-                style="width: 100%"
-                @change="handleItemPriceChange(index)" /></template
-          ></a-table-column>
-          <a-table-column title="金额(元)" width="130"
-            ><template #default="{ record: item }"
-              ><span>{{
-                Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-              }}</span></template
-            ></a-table-column
-          >
-          <a-table-column title="操作" width="76"
-            ><template #default="{ index }"
-              ><a-button
-                type="link"
-                size="small"
-                danger
-                :disabled="modalReadonly"
-                @click="handleRemoveItem(index)"
-                >删除</a-button
-              ></template
-            ></a-table-column
-          >
-        </a-table>
-        <div style="text-align: right; margin-top: 8px; font-size: 14px">
-          合计：<span style="font-weight: 600; color: #1677ff"
-            >¥{{
-              Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-            }}</span
-          >
-        </div>
-      </div>
-    </a-modal>
+      :modal-readonly="modalReadonly"
+      :form-data="formData"
+      :project-list="projectList ?? []"
+      :contract-list="contractList ?? []"
+      :form-partner-name="formPartnerName"
+      :var-type-options="VAR_TYPE_OPTIONS"
+      :direction-options="DIRECTION_OPTIONS"
+      :item-list="itemList"
+      :contract-items-loading="contractItemsLoading"
+      :cost-subject-options="costSubjectOptions"
+      :items-total-amount="itemsTotalAmount"
+      :on-form-project-change="onFormProjectChange"
+      :on-contract-change="onContractChange"
+      :handle-submit="handleSubmit"
+      :handle-add-item="handleAddItem"
+      :handle-item-qty-change="handleItemQtyChange"
+      :handle-item-price-change="handleItemPriceChange"
+      :handle-remove-item="handleRemoveItem"
+    />
   </div>
 </template>
 
@@ -1023,376 +588,9 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.vo-query-panel {
-  align-items: stretch;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-}
-
-.vo-query-primary {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.vo-query-keyword-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.vo-keyword-search {
-  flex: 1 1 auto;
-  width: auto;
-  min-width: 0;
-}
-
-.vo-search-prefix-icon {
-  color: var(--text-secondary);
-}
-
-.vo-query-select {
-  flex: 0 0 160px;
-  width: 160px;
-}
-
-.vo-query-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.vo-workspace {
-}
-
-.vo-main-column {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.vo-kpi-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  margin-bottom: 0;
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.vo-kpi-item {
-  position: relative;
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-rows: 19px 27px;
-  column-gap: 10px;
-  align-items: center;
-  min-width: 0;
-  padding: 16px 18px;
-  border-right: 1px solid var(--border-subtle);
-}
-
-.vo-kpi-item:last-child {
-  border-right: 0;
-}
-
-.vo-kpi-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  color: var(--primary);
-  background: var(--primary-soft);
-  border-radius: var(--radius-sm);
-  grid-row: 1 / span 2;
-}
-
-.vo-kpi-icon.is-approved {
-  color: var(--success);
-  background: var(--success-soft);
-}
-
-.vo-kpi-icon.is-cost {
-  color: var(--warning);
-  background: var(--warning-soft);
-}
-
-.vo-kpi-icon.is-draft {
-  color: var(--error);
-  background: var(--error-soft);
-}
-
-.vo-kpi-label {
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vo-kpi-value {
-  overflow: hidden;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 28px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vo-kpi-value small {
-  margin-left: 4px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.vo-table-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  min-height: 0;
-}
-
-.vo-table-toolbar {
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.vo-table-title {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.vo-table-heading,
-.vo-table-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.vo-table-count,
-.vo-warning-count {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.vo-table-wrap {
-  flex: 1;
-  min-height: 0;
-}
-
-.vo-mobile-list {
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-}
-
-.vo-mobile-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 180px;
-}
-
-.vo-mobile-card {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  padding: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.vo-mobile-card-head,
-.vo-mobile-card-meta,
-.vo-mobile-card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.vo-mobile-card-title {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 22px;
-  word-break: break-word;
-}
-
-.vo-mobile-card-project,
-.vo-mobile-card-meta,
-.vo-mobile-card-amount {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-  word-break: break-word;
-}
-
-.vo-table-wrap :deep(.vxe-header--column .vxe-cell) {
-  justify-content: center;
-  text-align: center;
-}
-
-.vo-table-wrap :deep(.vxe-grid) {
-  height: 100%;
-}
-
-.vo-var-link {
-  height: auto;
-  padding: 0;
-  font-weight: 700;
-}
-
-.vo-var-link,
-.vo-var-link:hover,
-.vo-var-link:focus {
-  background: transparent;
-}
-
-.vo-pagination {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.vo-analysis-rail {
-}
-
-.vo-analysis-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 0 0 12px;
-}
-
-.vo-analysis-head,
-.vo-warning-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.vo-analysis-head {
-  padding: 12px 16px 10px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.vo-analysis-title {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.vo-analysis-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  padding: 10px 16px 0;
-}
-
-.vo-analysis-section + .vo-analysis-section {
-  margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.vo-section-title {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.vo-analysis-section :deep(.lg-type-row),
-.vo-analysis-section .lg-type-row {
-  grid-template-columns: 9px minmax(60px, 1fr) 28px 38px;
-}
-
-.vo-dot-primary {
-  background: var(--primary);
-}
-
-.vo-dot-success {
-  background: var(--success);
-}
-
-.vo-dot-warning {
-  background: var(--warning);
-}
-
-@media (max-width: 1200px) {
-  .vo-page-head,
-  .vo-query-panel,
-  .vo-query-keyword-row,
-  .vo-query-primary {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .vo-query-actions {
-    justify-content: flex-start;
-  }
-
-  .vo-table-toolbar-right {
-    flex-wrap: wrap;
-  }
-
-  .vo-keyword-search,
-  .vo-query-select,
-  .vo-analysis-rail {
-    width: 100%;
-    min-width: 0;
-  }
-}
-
 @media (max-width: 768px) {
   .vo-page-meta-row {
     gap: 6px;
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .vo-kpi-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .vo-kpi-item {
-    border-right: 0;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .vo-kpi-item:nth-last-child(-n + 2) {
-    border-bottom: 0;
-  }
-
-  .vo-table-toolbar,
-  .vo-table-toolbar .lg-toolbar-left,
-  .vo-table-toolbar .lg-toolbar-right {
     align-items: flex-start;
     flex-direction: column;
   }

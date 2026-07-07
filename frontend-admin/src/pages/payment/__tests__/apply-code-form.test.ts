@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const paymentSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
+const formModalSource = readFileSync(resolve(currentDir, '../components/PaymentFormModal.vue'), 'utf-8')
 
 describe('PaymentPage applyCode form chain', () => {
   it('keeps applyCode in form state for create and edit flows', () => {
@@ -14,7 +15,7 @@ describe('PaymentPage applyCode form chain', () => {
   })
 
   it('renders applyCode input in create\/edit modal', () => {
-    expect(paymentSource).toContain('label="申请编号"')
-    expect(paymentSource).toContain('v-model:value="formData.applyCode"')
+    expect(formModalSource).toContain('label="申请编号"')
+    expect(formModalSource).toContain('v-model:value="props.formData.applyCode"')
   })
 })

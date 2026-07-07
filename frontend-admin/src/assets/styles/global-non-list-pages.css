@@ -1,0 +1,478 @@
+/* ---- Non-list pages: dashboard, forms, profile, settings, detail views ---- */
+.lg-page:not(.lg-list-page),
+.profile-page,
+.settings-page,
+.project-target-redesign {
+  min-height: 100%;
+  padding: 22px 28px 28px;
+  background: transparent;
+}
+
+.lg-page-shell,
+.profile-layout,
+.settings-shell,
+.overview-grid,
+.edit-shell {
+  gap: 16px;
+}
+
+.lg-detail-header,
+.lg-section,
+.lg-card,
+.dashboard .role-tabs-card,
+.dashboard .kpi-card,
+.dashboard .panel,
+.dashboard .role-panel,
+.profile-left,
+.profile-right > .lg-section,
+.settings-shell > .lg-section,
+.pt-panel,
+.pt-kpi,
+.pt-filter-surface {
+  background: rgba(255, 255, 255, 0.93);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.lg-detail-header {
+  min-height: 82px;
+  padding: 18px 22px;
+}
+
+.lg-detail-title {
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.lg-detail-meta {
+  color: var(--text-secondary);
+}
+
+.lg-section {
+  overflow: hidden;
+}
+
+.lg-section-head,
+.dashboard .panel-header,
+.pt-panel-header {
+  min-height: 58px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(255, 255, 255, 0));
+}
+
+.lg-section-title,
+.dashboard .panel-header,
+.pt-panel-header,
+.lg-card-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.lg-section-body,
+.pt-panel-body {
+  padding: 20px;
+}
+
+.lg-card {
+  padding: 20px;
+}
+
+.profile-layout {
+  max-width: 1180px;
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+
+.profile-left {
+  padding: 28px 24px;
+}
+
+.profile-avatar {
+  border: 4px solid #fff;
+  box-shadow: 0 14px 30px rgba(21, 32, 51, 0.12);
+}
+
+.profile-name {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.profile-role,
+.profile-info {
+  color: var(--text-secondary);
+}
+
+.settings-shell {
+  max-width: 980px;
+}
+
+.settings-actions {
+  padding-top: 2px;
+}
+
+.dashboard .role-tabs-card {
+  padding: 6px 10px 0;
+}
+
+.dashboard .role-tabs :deep(.ant-tabs-nav)::before {
+  border-bottom: 0;
+}
+
+.dashboard .role-tabs :deep(.ant-tabs-tab) {
+  margin: 0 4px 0 0;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.dashboard .role-tabs :deep(.ant-tabs-tab-active) {
+  background: var(--primary-soft);
+}
+
+.dashboard .role-tabs :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  color: var(--primary);
+}
+
+.dashboard .role-tabs :deep(.ant-tabs-ink-bar) {
+  display: none;
+}
+
+.dashboard .kpi-grid,
+.dashboard .role-metric-strip {
+  gap: 12px;
+}
+
+.dashboard .kpi-card {
+  min-height: 98px;
+  padding: 18px 20px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  column-gap: 6px;
+  align-items: flex-start;
+}
+
+.dashboard .kpi-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 0;
+  color: var(--primary);
+  font-size: 12px;
+  line-height: 1;
+  background: transparent !important;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.dashboard .kpi-icon-primary {
+  color: var(--primary);
+}
+
+.dashboard .kpi-icon-warning {
+  color: var(--warning);
+}
+
+.dashboard .kpi-icon-success {
+  color: var(--success);
+}
+
+.dashboard .kpi-icon-info {
+  color: var(--info);
+}
+
+.dashboard .kpi-icon-deviation.is-danger {
+  color: var(--error);
+}
+
+.dashboard .kpi-icon-deviation.is-success {
+  color: var(--success);
+}
+
+.dashboard .kpi-icon-deviation.is-neutral {
+  color: var(--muted);
+}
+
+.dashboard .cost-deviation-value.is-danger {
+  color: var(--error);
+}
+
+.dashboard .cost-deviation-value.is-success {
+  color: var(--success);
+}
+
+.dashboard .cost-deviation-value.is-neutral {
+  color: var(--muted);
+}
+
+.dashboard .kpi-icon-danger {
+  color: var(--error);
+}
+
+.dashboard .kpi-body {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  grid-template-rows: 16px 26px 16px;
+  row-gap: 2px;
+  align-content: center;
+}
+
+.dashboard .kpi-body::after {
+  min-height: 16px;
+  content: '';
+  grid-row: 3;
+}
+
+.dashboard .kpi-title {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+  margin-bottom: 0;
+  grid-row: 1;
+}
+
+.dashboard .kpi-value {
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 26px;
+  grid-row: 2;
+  word-break: break-word;
+}
+
+.dashboard .kpi-value small {
+  font-weight: 600;
+}
+
+.dashboard .kpi-delta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  font-weight: 500;
+  grid-row: 3;
+}
+
+.dashboard .panel,
+.dashboard .role-panel {
+  overflow: hidden;
+}
+
+.dashboard .pm-reference-grid,
+.dashboard .role-analysis-grid,
+.dashboard .pm-bottom-grid,
+.dashboard .role-table-grid {
+  gap: 16px;
+}
+
+.dashboard .pm-reference-grid,
+.dashboard .role-analysis-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.15fr) minmax(280px, 0.9fr) minmax(320px, 1fr);
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.dashboard .pm-bottom-grid,
+.dashboard .role-table-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard .pm-chart,
+.dashboard .pm-donut-chart,
+.dashboard .role-chart {
+  display: block;
+  width: 100%;
+  height: 260px !important;
+  min-height: 260px;
+  max-height: 260px;
+}
+
+.dashboard .role-mini-chart {
+  display: block;
+  width: 100%;
+  height: 220px !important;
+  min-height: 220px;
+  max-height: 220px;
+}
+
+.dashboard .pm-panel,
+.dashboard .role-panel {
+  min-height: 0;
+}
+
+.dashboard .pm-table-panel .ant-table-wrapper,
+.dashboard .role-panel .ant-table-wrapper {
+  min-height: 190px;
+}
+
+@media (max-width: 1100px) {
+  .dashboard .pm-reference-grid,
+  .dashboard .role-analysis-grid,
+  .dashboard .pm-bottom-grid,
+  .dashboard .role-table-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard .kpi-grid,
+  .dashboard .role-metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 360px) {
+  .dashboard .kpi-grid,
+  .dashboard .role-metric-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lg-page .ant-card,
+.project-target-redesign .ant-card,
+.lg-page-shell .ant-card {
+  background: rgba(255, 255, 255, 0.93);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.lg-page .ant-card-head,
+.project-target-redesign .ant-card-head,
+.lg-page-shell .ant-card-head {
+  min-height: 58px;
+  padding: 0 20px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.72), rgba(255, 255, 255, 0));
+  border-bottom-color: var(--border-subtle);
+}
+
+.lg-page .ant-card-head-title,
+.project-target-redesign .ant-card-head-title,
+.lg-page-shell .ant-card-head-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.lg-page .ant-card-body,
+.project-target-redesign .ant-card-body,
+.lg-page-shell .ant-card-body {
+  padding: 20px;
+}
+
+.lg-page .ant-form-item-label > label,
+.project-target-redesign .ant-form-item-label > label,
+.lg-page-shell .ant-form-item-label > label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lg-page .ant-input,
+.lg-page .ant-input-affix-wrapper,
+.lg-page .ant-input-password,
+.lg-page .ant-select-selector,
+.lg-page .ant-picker,
+.project-target-redesign .ant-input,
+.project-target-redesign .ant-input-affix-wrapper,
+.project-target-redesign .ant-input-password,
+.project-target-redesign .ant-select-selector,
+.project-target-redesign .ant-picker,
+.lg-page-shell .ant-input,
+.lg-page-shell .ant-input-affix-wrapper,
+.lg-page-shell .ant-input-password,
+.lg-page-shell .ant-select-selector,
+.lg-page-shell .ant-picker {
+  min-height: 38px;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  box-shadow: none;
+}
+
+.lg-page .ant-input:focus,
+.lg-page .ant-input:focus-visible,
+.lg-page .ant-input-affix-wrapper-focused,
+.lg-page .ant-input-affix-wrapper:focus-visible,
+.lg-page .ant-select-focused,
+.lg-page .ant-select-focused .ant-select-selector,
+.lg-page .ant-select-selector:focus-visible,
+.lg-page .ant-input-number-focused,
+.lg-page .ant-input-number:focus-within,
+.lg-page .ant-picker-focused,
+.lg-page .ant-picker:focus-visible,
+.lg-page-shell .ant-input:focus,
+.lg-page-shell .ant-input:focus-visible,
+.lg-page-shell .ant-input-affix-wrapper-focused,
+.lg-page-shell .ant-input-affix-wrapper:focus-visible,
+.lg-page-shell .ant-select-focused,
+.lg-page-shell .ant-select-focused .ant-select-selector,
+.lg-page-shell .ant-select-selector:focus-visible,
+.lg-page-shell .ant-input-number-focused,
+.lg-page-shell .ant-input-number:focus-within,
+.lg-page-shell .ant-picker-focused,
+.lg-page-shell .ant-picker:focus-visible,
+.project-target-redesign .ant-input:focus,
+.project-target-redesign .ant-input:focus-visible,
+.project-target-redesign .ant-input-affix-wrapper-focused,
+.project-target-redesign .ant-input-affix-wrapper:focus-visible,
+.project-target-redesign .ant-select-focused,
+.project-target-redesign .ant-select-focused .ant-select-selector,
+.project-target-redesign .ant-select-selector:focus-visible,
+.project-target-redesign .ant-input-number-focused,
+.project-target-redesign .ant-input-number:focus-within,
+.project-target-redesign .ant-picker-focused,
+.project-target-redesign .ant-picker:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+.lg-page .ant-input:hover,
+.lg-page .ant-input-affix-wrapper:hover,
+.lg-page .ant-select-selector:hover,
+.lg-page .ant-picker:hover,
+.project-target-redesign .ant-input:hover,
+.project-target-redesign .ant-input-affix-wrapper:hover,
+.project-target-redesign .ant-select-selector:hover,
+.project-target-redesign .ant-picker:hover,
+.lg-page-shell .ant-input:hover,
+.lg-page-shell .ant-input-affix-wrapper:hover,
+.lg-page-shell .ant-select-selector:hover,
+.lg-page-shell .ant-picker:hover {
+  border-color: var(--border-strong);
+}
+
+.ant-switch.ant-switch-checked {
+  background: var(--primary);
+}
+
+.ant-radio-wrapper,
+.ant-checkbox-wrapper {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.ant-descriptions .ant-descriptions-item-label {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.ant-descriptions .ant-descriptions-item-content {
+  color: var(--text);
+}
+
+.project-content-layout .lg-analysis-rail {
+  display: flex;
+  flex-direction: column;
+}
+

@@ -16,8 +16,9 @@ import type { SelectOption } from '@/types/ui'
 import type { CostSummaryVO } from '@/types/cost'
 import type { ProjectVO } from '@/types/project'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { ColumnSettingsButton } from '@/components/list-page'
 import { normalizeArray } from '@/utils/normalizeArray'
+import CostSummaryTablePanel from './components/CostSummaryTablePanel.vue'
+import CostSummaryAnalysisRail from './components/CostSummaryAnalysisRail.vue'
 
 type CostSubjectSummary = CostSummaryVO['subjects'][number]
 type CheckStatus = 'overrun' | 'saving' | 'balanced'
@@ -217,6 +218,21 @@ const sourceCards = computed(() => {
       value: summary.value.paidAmount,
       path: '/payment/application',
     },
+  ]
+})
+
+const sourceRows = computed(() => {
+  if (!summary.value) return []
+  return [
+    { key: 'target', label: '成本目标', value: fmtAmount(summary.value.targetCost), unit: '万元' },
+    {
+      key: 'contract',
+      label: '合同锁定',
+      value: fmtAmount(summary.value.contractLockedCost),
+      unit: '万元',
+    },
+    { key: 'actual', label: '实际成本', value: fmtAmount(summary.value.actualCost), unit: '万元' },
+    { key: 'paid', label: '已付款', value: fmtAmount(summary.value.paidAmount), unit: '万元' },
   ]
 })
 
@@ -424,225 +440,37 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <section class="lg-list-table-panel cost-summary-panel">
-          <div class="lg-toolbar cost-toolbar">
-            <div class="lg-toolbar-left">
-              <div class="cost-toolbar-heading">
-                <strong>科目核对明细</strong>
-                <span class="cost-toolbar-meta">
-                  {{
-                    summary
-                      ? `当前 ${filteredSummarySubjects.length} / ${summarySubjects.length} 个科目`
-                      : '选择项目后开始核对'
-                  }}
-                </span>
-              </div>
-              <div class="cost-toolbar-context">
-                <span class="cost-toolbar-project-label">当前项目</span>
-                <strong>{{ summary?.projectName || selectedProject?.projectName || '-' }}</strong>
-                <span>科目维度核对 · 金额单位：万元</span>
-              </div>
-            </div>
-            <div class="lg-toolbar-right">
-              <div class="cost-reconcile-badges">
-                <a-tag color="blue">成本目标</a-tag>
-                <a-tag color="cyan">合同锁定</a-tag>
-                <a-tag color="green">实际成本</a-tag>
-                <a-tag color="orange">付款进度</a-tag>
-              </div>
-              <a-button
-                size="large"
-                :disabled="!selectedProjectId"
-                @click="handleRefresh"
-                aria-label="重新计算动态成本"
-              >
-                <template #icon><ReloadOutlined /></template>
-                重算动态成本
-              </a-button>
-              <ColumnSettingsButton
-                v-if="!isMobile"
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-            </div>
-          </div>
-
-          <template v-if="summary">
-            <div v-if="isMobile" class="cost-summary-mobile-list">
-              <div v-if="loading" class="cost-summary-mobile-state">
-                <a-spin />
-              </div>
-              <div v-else-if="!filteredSummarySubjects.length" class="cost-summary-mobile-state">
-                <a-empty description="暂无科目明细" />
-              </div>
-              <template v-else>
-                <article
-                  v-for="row in filteredSummarySubjects"
-                  :key="row.costSubjectId"
-                  class="cost-summary-mobile-card"
-                >
-                  <div class="cost-summary-mobile-card-head">
-                    <strong>{{ row.costSubjectName || '-' }}</strong>
-                    <a-tag :class="['cost-check-tag', `is-${getCheckStatus(row)}`]">
-                      {{ getCheckStatusText(row) }}
-                    </a-tag>
-                  </div>
-                  <div class="cost-summary-mobile-card-meta">
-                    成本目标：{{ fmtAmount(row.targetCost) }} 万元
-                  </div>
-                  <div class="cost-summary-mobile-card-meta">
-                    动态成本：{{ fmtAmount(row.dynamicCost) }} 万元
-                  </div>
-                  <div class="cost-summary-mobile-card-meta">
-                    成本偏差：
-                    <span :class="`is-${getDeviationTone(row.costDeviation)}`">
-                      {{ fmtDeviation(row.costDeviation) }} 万元
-                    </span>
-                  </div>
-                </article>
-              </template>
-            </div>
-            <div v-else class="lg-table-wrap cost-summary-table">
-              <vxe-grid
-                :data="filteredSummarySubjects"
-                :columns="visibleGridColumns"
-                :loading="loading"
-                :column-config="{ resizable: true }"
-                stripe
-                border="inner"
-                size="small"
-                height="100%"
-              >
-                <template #checkStatus="{ row }">
-                  <a-tag :class="['cost-check-tag', `is-${getCheckStatus(row)}`]">
-                    {{ getCheckStatusText(row) }}
-                  </a-tag>
-                </template>
-                <template #targetCost="{ row }">
-                  <span>{{ fmtAmount(row.targetCost) }}</span>
-                </template>
-                <template #contractLockedCost="{ row }">
-                  <span>{{ fmtAmount(row.contractLockedCost) }}</span>
-                </template>
-                <template #actualCost="{ row }">
-                  <span>{{ fmtAmount(row.actualCost) }}</span>
-                </template>
-                <template #paidAmount="{ row }">
-                  <span>{{ fmtAmount(row.paidAmount) }}</span>
-                </template>
-                <template #dynamicCost="{ row }">
-                  <span>{{ fmtAmount(row.dynamicCost) }}</span>
-                </template>
-                <template #costDeviation="{ row }">
-                  <span
-                    class="cost-summary-deviation"
-                    :class="`is-${getDeviationTone(row.costDeviation)}`"
-                  >
-                    {{ fmtDeviation(row.costDeviation) }}
-                  </span>
-                </template>
-              </vxe-grid>
-            </div>
-          </template>
-
-          <template v-else>
-            <section class="cost-summary-empty">
-              <FileSearchOutlined class="cost-summary-empty-icon" />
-              <div class="cost-summary-empty-title">请选择项目开始核对</div>
-              <div class="cost-summary-empty-text">
-                选择项目后查看成本来源、科目明细、成本偏差和核对结论。
-              </div>
-            </section>
-          </template>
-        </section>
+        <CostSummaryTablePanel
+          :summary="summary"
+          :selected-project="selectedProject"
+          :selected-project-id="selectedProjectId"
+          :filtered-summary-subjects="filteredSummarySubjects"
+          :summary-subjects="summarySubjects"
+          :is-mobile="isMobile"
+          :loading="loading"
+          :visible-grid-columns="visibleGridColumns"
+          :column-settings="columnSettings"
+          :col-visible="colVisible"
+          :fmt-amount="fmtAmount"
+          :fmt-deviation="fmtDeviation"
+          :get-deviation-tone="getDeviationTone"
+          :get-check-status="getCheckStatus"
+          :get-check-status-text="getCheckStatusText"
+          :on-refresh="handleRefresh"
+          :on-toggle-col="toggleCol"
+        />
       </div>
 
-      <aside class="lg-analysis-rail cost-reconcile-rail">
-        <div class="lg-analysis-panel lg-fill-card cost-reconcile-rail-body">
-          <header class="cost-reconcile-rail-head">
-            <div>
-              <div class="cost-reconcile-rail-title">辅助分析</div>
-            </div>
-          </header>
-
-          <section class="lg-panel">
-            <div class="lg-panel-title">核对结论</div>
-            <div class="cost-conclusion-list">
-              <div
-                v-for="item in conclusionItems"
-                :key="item.label"
-                :class="['cost-conclusion-row', `is-${item.tone}`]"
-              >
-                <span>{{ item.label }}</span>
-                <strong>{{ item.value }}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section class="lg-panel">
-            <div class="lg-panel-title">重点差异科目</div>
-            <div class="cost-risk-list">
-              <template v-if="overBudgetItems.length">
-                <div v-for="item in overBudgetItems.slice(0, 5)" :key="item.costSubjectId">
-                  <span>
-                    <WarningOutlined />
-                    {{ item.costSubjectName }}
-                  </span>
-                  <strong>+{{ fmtAmount(item.costDeviation) }} 万</strong>
-                </div>
-              </template>
-              <div v-else class="cost-summary-muted-state">
-                <CheckCircleOutlined />
-                暂无超目标科目
-              </div>
-            </div>
-          </section>
-
-          <section class="lg-panel">
-            <div class="lg-panel-title">成本来源对比</div>
-            <div class="cost-source-rail-list">
-              <button
-                v-for="item in sourceRows"
-                :key="item.key"
-                type="button"
-                class="cost-source-rail-row"
-              >
-                <span>{{ item.label }}</span>
-                <strong>{{ item.value }}</strong>
-                <span>{{ item.unit }}</span>
-              </button>
-            </div>
-          </section>
-
-          <section class="lg-panel">
-            <div class="lg-panel-title">数据来源</div>
-            <div class="cost-source-rail-list">
-              <button
-                v-for="card in sourceCards"
-                :key="card.key"
-                type="button"
-                class="cost-source-rail-row"
-                @click="go(card.path)"
-              >
-                <span>{{ card.label }}</span>
-                <strong>{{ fmtAmount(card.value) }} 万</strong>
-                <LinkOutlined />
-              </button>
-            </div>
-          </section>
-
-          <section v-if="highRiskItems.length" class="lg-panel">
-            <div class="lg-panel-title">需优先复核</div>
-            <div class="cost-risk-list">
-              <div v-for="item in highRiskItems" :key="`high-${item.costSubjectId}`">
-                <span>{{ item.costSubjectName }}</span>
-                <strong>{{ fmtPercent(item.costDeviation, item.targetCost) }}</strong>
-              </div>
-            </div>
-          </section>
-        </div>
-      </aside>
+      <CostSummaryAnalysisRail
+        :conclusion-items="conclusionItems"
+        :over-budget-items="overBudgetItems"
+        :source-rows="sourceRows"
+        :source-cards="sourceCards"
+        :high-risk-items="highRiskItems"
+        :fmt-amount="fmtAmount"
+        :fmt-percent="fmtPercent"
+        :go="go"
+      />
     </div>
   </div>
 </template>
@@ -825,81 +653,6 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.cost-summary-panel {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  min-height: 0;
-}
-
-.cost-toolbar {
-  flex: 0 0 auto;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.cost-toolbar-meta {
-  margin-left: var(--spacing-xs);
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: 400;
-}
-
-.cost-summary-table {
-  flex: 1 1 auto;
-  margin: 0;
-  min-height: 0;
-}
-
-.cost-summary-mobile-list {
-  display: grid;
-  flex: 1 1 auto;
-  gap: 12px;
-  padding: 12px;
-}
-
-.cost-summary-mobile-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 180px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.cost-summary-mobile-card {
-  display: grid;
-  gap: 8px;
-  padding: 14px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.cost-summary-mobile-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.cost-summary-mobile-card-meta {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
-}
-
-.cost-summary-deviation {
-  font-weight: 600;
-}
-
 .cost-summary-deviation.is-danger,
 .lg-kpi-card-value.is-danger {
   color: var(--error);
@@ -915,220 +668,6 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-.cost-check-tag {
-  margin-right: 0;
-  border-radius: var(--radius-sm);
-}
-
-.cost-check-tag.is-overrun {
-  color: var(--error);
-  background: var(--error-soft);
-  border-color: var(--border-subtle);
-}
-
-.cost-check-tag.is-saving {
-  color: var(--success);
-  background: var(--success-soft);
-  border-color: var(--border-subtle);
-}
-
-.cost-check-tag.is-balanced {
-  color: var(--text-secondary);
-  background: var(--surface-subtle);
-  border-color: var(--border-subtle);
-}
-
-.cost-toolbar-heading {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.cost-toolbar-context {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.cost-toolbar-context strong {
-  color: var(--text);
-  font-size: 14px;
-}
-
-.cost-toolbar-project-label {
-  color: var(--muted);
-}
-
-.cost-reconcile-rail {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-height: 0;
-}
-
-.cost-reconcile-rail-body {
-  gap: 0;
-  overflow: auto;
-}
-
-.cost-reconcile-rail-head {
-  padding: 12px 16px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-bottom: 0;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-}
-
-.cost-reconcile-rail-title {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.cost-reconcile-rail .lg-panel {
-  flex: 0 0 auto;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  border-radius: 0;
-}
-
-.cost-reconcile-rail .lg-panel:first-of-type {
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.cost-source-rail-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: var(--spacing-sm) 14px;
-}
-
-.cost-source-rail-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  padding: 0;
-  color: var(--text-secondary);
-  font: inherit;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.cost-source-rail-row span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cost-source-rail-row strong {
-  color: var(--text);
-  font-size: var(--font-size-sm);
-  white-space: nowrap;
-}
-
-.cost-conclusion-list,
-.cost-risk-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: var(--spacing-sm) 14px;
-}
-
-.cost-conclusion-row,
-.cost-risk-list > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-sm);
-  min-height: 34px;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.cost-conclusion-row strong,
-.cost-risk-list strong {
-  color: var(--text);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.cost-conclusion-row.is-danger strong,
-.cost-risk-list strong {
-  color: var(--error);
-}
-
-.cost-conclusion-row.is-success strong {
-  color: var(--success);
-}
-
-.cost-risk-list span {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.cost-risk-list span :deep(.anticon) {
-  color: var(--error);
-}
-
-.cost-caliber-list {
-  display: grid;
-  gap: 8px;
-  padding: var(--spacing-sm) 14px 14px 28px;
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
-}
-
-.cost-summary-muted-state {
-  justify-content: center;
-  color: var(--muted);
-  text-align: center;
-}
-
-.cost-summary-muted-state :deep(.anticon) {
-  color: var(--success);
-}
-
-.cost-summary-empty {
-  min-height: 430px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-sm);
-  color: var(--muted);
-  background: var(--surface);
-}
-
-.cost-summary-empty-icon {
-  font-size: 46px;
-  color: var(--primary);
-}
-
-.cost-summary-empty-title {
-  font-size: var(--font-size-xl);
-  font-weight: 700;
-  color: var(--text);
-}
-
-.cost-summary-empty-text {
-  font-size: var(--font-size-sm);
-}
-
 @media (max-width: 1280px) {
   .cost-reconcile-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1136,10 +675,6 @@ onUnmounted(() => {
 
   .cost-reconcile-kpis .lg-kpi-card {
     border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .cost-reconcile-badges {
-    justify-content: flex-start;
   }
 }
 
@@ -1160,19 +695,13 @@ onUnmounted(() => {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .cost-summary-search-actions,
   .cost-summary-head-actions {
     justify-content: flex-start;
-  }
-
-  .cost-reconcile-rail {
-    width: 100%;
   }
 }
 
 @media (max-width: 768px) {
-  .cost-reconcile-kpis,
-  .cost-reconcile-rail {
+  .cost-reconcile-kpis {
     display: none;
   }
 }

@@ -1,36 +1,32 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
+import { MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  DollarOutlined,
-  MoreOutlined,
-  PayCircleOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  WalletOutlined,
-} from '@ant-design/icons-vue'
-import {
-  getApplicationList,
-  getApplicationDetail,
   createApplication,
-  updateApplication,
   deleteApplication,
+  doWriteback,
+  getApplicationDetail,
+  getApplicationList,
   getBasisList,
   saveBasis,
   submitForApproval,
-  doWriteback,
+  updateApplication,
 } from '@/api/modules/payment'
-import { useReferenceStore } from '@/stores/reference'
 import { getReceiptItems, getReceiptList } from '@/api/modules/receipt'
 import { getMeasureItems, getMeasureList } from '@/api/modules/subcontract'
-import type { PayApplicationVO, PayApplicationBasisVO } from '@/types/payment'
-import { PAY_TYPE_LABEL, PAY_TYPE_COLOR, PAY_STATUS_LABEL, PAY_STATUS_COLOR } from '@/types/payment'
+import { useColumnSettings } from '@/composables/useColumnSettings'
+import { ColumnSettingsButton } from '@/components/list-page'
+import { useReferenceStore } from '@/stores/reference'
+import { PAY_STATUS_COLOR, PAY_STATUS_LABEL, PAY_TYPE_COLOR, PAY_TYPE_LABEL } from '@/types/payment'
+import type { PayApplicationBasisVO, PayApplicationVO } from '@/types/payment'
+import type { MatReceiptVO } from '@/types/receipt'
+import type { SubMeasureVO } from '@/types/subcontract'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 import { APPROVAL_STATUS_COLOR, APPROVAL_STATUS_LABEL, PAYMENT_GRID_COLUMNS } from './pageConfig'
+import PaymentFormModal from './components/PaymentFormModal.vue'
+import PaymentOverviewPanel from './components/PaymentOverviewPanel.vue'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -41,10 +37,6 @@ const PAY_STATUS_PENDING = 'PENDING'
 const PAY_STATUS_UNPAID = 'UNPAID'
 const PAY_STATUS_PARTIAL = 'PARTIAL'
 const PAY_STATUS_PAID = 'PAID'
-import type { MatReceiptVO } from '@/types/receipt'
-import type { SubMeasureVO } from '@/types/subcontract'
-import { useColumnSettings } from '@/composables/useColumnSettings'
-import { ColumnSettingsButton } from '@/components/list-page'
 
 const filter = reactive({
   projectId: undefined as string | undefined,
@@ -62,6 +54,7 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 const referenceStore = useReferenceStore()
 const { projects, contracts } = storeToRefs(referenceStore)
+
 type BasisType = 'MAT_RECEIPT' | 'SUB_MEASURE'
 type BasisSourceOption = { id: string; label: string; type: BasisType; amount?: string }
 
@@ -84,16 +77,31 @@ const formData = reactive<Partial<PayApplicationVO>>({
 const formPartnerName = computed(
   () => contracts.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
 )
+
 function onContractChange(contractId: string) {
   const c = contracts.value?.find((ct) => ct.id === contractId)
   formData.partnerId = c?.partyBId
 }
+
+function handleFormProjectChange(projectId: string) {
+  formData.contractId = undefined
+  formData.partnerId = undefined
+  referenceStore.fetchContracts({ projectId })
+}
+
+function handleFilterProjectChange(projectId: string | undefined) {
+  filter.contractId = undefined
+  if (projectId) referenceStore.fetchContracts({ projectId })
+  handleSearch()
+}
+
 watch(
   () => formData.contractId,
   (val) => {
     if (!val) formData.partnerId = undefined
   },
 )
+
 const basisList = ref<(Partial<PayApplicationBasisVO> & { key: number })[]>([])
 let basisKeyCounter = 0
 const writebackVisible = ref(false)
@@ -152,6 +160,7 @@ async function fetchData() {
     loading.value = false
   }
 }
+
 async function fetchReceipts() {
   try {
     const res = await getReceiptList({ pageNum: 1, pageSize: 50 })
@@ -175,6 +184,7 @@ async function fetchReceipts() {
     message.warning('验收单依据加载失败，可稍后重试')
   }
 }
+
 async function fetchMeasures() {
   try {
     const res = await getMeasureList({ pageNum: 1, pageSize: 50 })
@@ -203,6 +213,7 @@ function handleSearch() {
   pageNo.value = 1
   fetchData()
 }
+
 function handleReset() {
   filter.projectId = undefined
   filter.contractId = undefined
@@ -213,10 +224,12 @@ function handleReset() {
   pageNo.value = 1
   fetchData()
 }
+
 function handlePageChange(page: number) {
   pageNo.value = page
   fetchData()
 }
+
 function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
@@ -239,6 +252,7 @@ function handleAdd() {
   basisKeyCounter = 0
   modalVisible.value = true
 }
+
 async function handleEdit(record: PayApplicationVO) {
   modalTitle.value = '编辑付款申请'
   editingId.value = record.id
@@ -264,6 +278,7 @@ async function handleEdit(record: PayApplicationVO) {
   }
   modalVisible.value = true
 }
+
 async function handleDelete(record: PayApplicationVO) {
   Modal.confirm({
     title: '确认删除',
@@ -314,6 +329,7 @@ async function handleApproval(record: PayApplicationVO) {
     message.error(getErrorMessage(e, '提交审批失败，请稍后重试'))
   }
 }
+
 function openWriteback(record: PayApplicationVO) {
   writebackTargetId.value = record.id
   writebackForm.payAmount = undefined
@@ -322,6 +338,7 @@ function openWriteback(record: PayApplicationVO) {
   writebackForm.voucherNo = ''
   writebackVisible.value = true
 }
+
 async function handleWritebackOk() {
   try {
     await doWriteback(writebackTargetId.value, writebackForm)
@@ -333,6 +350,7 @@ async function handleWritebackOk() {
     message.error(getErrorMessage(e, '回写失败，请稍后重试'))
   }
 }
+
 function handleWritebackCancel() {
   writebackVisible.value = false
 }
@@ -345,14 +363,17 @@ function handleAddBasis() {
     basisAmount: undefined,
   })
 }
+
 function handleRemoveBasis(idx: number) {
   basisList.value.splice(idx, 1)
 }
+
 function getSourceOptions(sourceType?: string): BasisSourceOption[] {
   if (sourceType === 'MAT_RECEIPT') return receiptItemOptions.value
   if (sourceType === 'SUB_MEASURE') return measureItemOptions.value
   return []
 }
+
 function handleSourceChange(idx: number) {
   basisList.value[idx].basisId = undefined
 }
@@ -406,45 +427,53 @@ function fmtWan(val: string | undefined): string {
   const n = parseFloat(val)
   return isNaN(n) ? '0.00' : (n / 10000).toFixed(2)
 }
+
 const kpiTotalApply = computed(() =>
-  tableData.value.reduce((s, r) => s + (parseFloat(r.applyAmount) || 0), 0),
+  tableData.value.reduce((sum, row) => sum + (parseFloat(row.applyAmount) || 0), 0),
 )
 const kpiActualPaid = computed(() =>
-  tableData.value.reduce((s, r) => s + (parseFloat(r.actualPayAmount || '0') || 0), 0),
+  tableData.value.reduce((sum, row) => sum + (parseFloat(row.actualPayAmount || '0') || 0), 0),
 )
 const kpiUnpaid = computed(() =>
   tableData.value
-    .filter((r) => r.payStatus === PAY_STATUS_UNPAID || r.payStatus === PAY_STATUS_PARTIAL)
-    .reduce((s, r) => s + (parseFloat(r.applyAmount) || 0), 0),
+    .filter((row) => row.payStatus === PAY_STATUS_UNPAID || row.payStatus === PAY_STATUS_PARTIAL)
+    .reduce((sum, row) => sum + (parseFloat(row.applyAmount) || 0), 0),
 )
 const kpiApprovedUnpaid = computed(() =>
   tableData.value
     .filter(
-      (r) =>
-        r.approvalStatus === APPROVAL_APPROVED && (r.payStatus === PAY_STATUS_UNPAID || r.payStatus === PAY_STATUS_PARTIAL),
+      (row) =>
+        row.approvalStatus === APPROVAL_APPROVED &&
+        (row.payStatus === PAY_STATUS_UNPAID || row.payStatus === PAY_STATUS_PARTIAL),
     )
-    .reduce((s, r) => s + (parseFloat(r.approvedAmount) || 0), 0),
+    .reduce((sum, row) => sum + (parseFloat(row.approvedAmount) || 0), 0),
 )
 
+function kpiPct(value: number, max: number): number {
+  if (max === 0) return 0
+  return Math.min(Math.round((value / max) * 100), 100)
+}
+
 const statusBreakdown = computed(() => {
-  const m: Record<string, number> = {}
-  tableData.value.forEach((r) => {
-    m[r.payStatus] = (m[r.payStatus] || 0) + 1
+  const map: Record<string, number> = {}
+  tableData.value.forEach((row) => {
+    map[row.payStatus] = (map[row.payStatus] || 0) + 1
   })
   const max = Math.max(total.value, tableData.value.length, 1)
-  return Object.entries(m).map(([k, v]) => ({
-    key: k,
-    label: payStatusLabel(k),
-    count: v,
-    percent: kpiPct(v, max),
-    color: k === PAY_STATUS_PAID ? '#31c48d' : k === PAY_STATUS_PARTIAL ? '#f59e0b' : '#94a3b8',
+  return Object.entries(map).map(([key, count]) => ({
+    key,
+    label: payStatusLabel(key),
+    count,
+    percent: kpiPct(count, max),
+    color: key === PAY_STATUS_PAID ? '#31c48d' : key === PAY_STATUS_PARTIAL ? '#f59e0b' : '#94a3b8',
   }))
 })
 
 const approvalBreakdown = computed(() => {
-  const m: Record<string, number> = {}
-  tableData.value.forEach((r) => {
-    m[r.approvalStatus || APPROVAL_DRAFT] = (m[r.approvalStatus || APPROVAL_DRAFT] || 0) + 1
+  const map: Record<string, number> = {}
+  tableData.value.forEach((row) => {
+    const key = row.approvalStatus || APPROVAL_DRAFT
+    map[key] = (map[key] || 0) + 1
   })
   const max = Math.max(total.value, tableData.value.length, 1)
   const colors: Record<string, string> = {
@@ -453,18 +482,18 @@ const approvalBreakdown = computed(() => {
     APPROVED: '#31c48d',
     REJECTED: '#ef4444',
   }
-  return Object.entries(m).map(([k, v]) => ({
-    key: k,
-    label: approvalStatusLabel(k),
-    count: v,
-    percent: kpiPct(v, max),
-    color: colors[k] ?? '#94a3b8',
+  return Object.entries(map).map(([key, count]) => ({
+    key,
+    label: approvalStatusLabel(key),
+    count,
+    percent: kpiPct(count, max),
+    color: colors[key] ?? '#94a3b8',
   }))
 })
 
 const pendingPayments = computed(() =>
   tableData.value
-    .filter((r) => r.approvalStatus === APPROVAL_APPROVED && r.payStatus !== PAY_STATUS_PAID)
+    .filter((row) => row.approvalStatus === APPROVAL_APPROVED && row.payStatus !== PAY_STATUS_PAID)
     .map((row) => ({
       id: row.id,
       project: row.projectName || '-',
@@ -475,22 +504,16 @@ const pendingPayments = computed(() =>
 )
 
 const paidPct = computed(() => kpiPct(kpiActualPaid.value, Math.max(kpiTotalApply.value, 1)))
-function fmtAmountText(value: number): string {
-  return fmtWan(String(value))
-}
-
 const kpiMax = computed(() => ({
   unpaid: Math.max(kpiUnpaid.value, 1),
   approvedUnpaid: Math.max(kpiApprovedUnpaid.value, 1),
 }))
-function kpiPct(value: number, max: number): number {
-  if (max === 0) return 0
-  return Math.min(Math.round((value / max) * 100), 100)
+
+function fmtAmountText(value: number): string {
+  return fmtWan(String(value))
 }
 
-// vxe-grid columns
 const gridColumns = computed(() => [...PAYMENT_GRID_COLUMNS])
-
 const {
   visibleColumns: visibleGridColumns,
   columnSettings,
@@ -512,474 +535,144 @@ onMounted(() => {
 
 <template>
   <div class="lg-list-page lg-page app-page payment-page">
-    <!-- 页面头部 -->
-    <div class="lg-page-head payment-page-head">
-      <div class="payment-page-meta-row">
-        <div>
-          <a-breadcrumb class="payment-breadcrumb">
-            <a-breadcrumb-item>付款管理</a-breadcrumb-item>
-            <a-breadcrumb-item>付款申请</a-breadcrumb-item>
-          </a-breadcrumb>
-          <div class="payment-page-title-row">
-            <h1>付款申请台账</h1>
-            <span>待付、已审未付、实际支付回写集中跟踪</span>
+    <PaymentOverviewPanel
+      :filter="filter"
+      :projects="projects ?? []"
+      :contracts="contracts ?? []"
+      :pay-type-label="PAY_TYPE_LABEL"
+      :pay-status-label-map="PAY_STATUS_LABEL"
+      :pay-status-label="payStatusLabel"
+      :fmt-amount-text="fmtAmountText"
+      :on-project-change="handleFilterProjectChange"
+      :on-search="handleSearch"
+      :on-reset="handleReset"
+      :on-refresh="fetchData"
+      :total="total"
+      :kpi-total-apply="kpiTotalApply"
+      :kpi-actual-paid="kpiActualPaid"
+      :kpi-unpaid="kpiUnpaid"
+      :kpi-approved-unpaid="kpiApprovedUnpaid"
+      :paid-pct="paidPct"
+      :kpi-unpaid-pct="kpiPct(kpiUnpaid, kpiMax.unpaid)"
+      :status-breakdown="statusBreakdown"
+      :approval-breakdown="approvalBreakdown"
+      :pending-payments="pendingPayments"
+    >
+      <main class="lg-list-table-panel payment-table-panel">
+        <div class="lg-toolbar payment-toolbar">
+          <div class="lg-toolbar-left">
+            <div class="payment-table-heading">
+              <span class="payment-table-title">付款申请明细</span>
+              <span class="payment-table-count">共 {{ total }} 条，表格为主操作区</span>
+            </div>
+            <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新建申请
+            </a-button>
+            <a-button @click="fetchData">
+              <template #icon><ReloadOutlined /></template>
+              刷新
+            </a-button>
           </div>
-        </div>
-        <div class="payment-head-digest">
-          <div>
-            <span>待付金额</span>
-            <strong>{{ fmtAmountText(kpiUnpaid) }}万</strong>
-          </div>
-          <div>
-            <span>已审未付</span>
-            <strong>{{ fmtAmountText(kpiApprovedUnpaid) }}万</strong>
-          </div>
-          <div>
-            <span>支付完成率</span>
-            <strong>{{ paidPct }}%</strong>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="lg-search-bar payment-search-bar">
-      <div class="payment-search-title">
-        <strong>查询条件</strong>
-        <span>项目 / 合同 / 类型 / 状态</span>
-      </div>
-      <div class="payment-search-fields">
-        <a-select
-          v-model:value="filter.projectId"
-          class="payment-search-select"
-          placeholder="全部项目"
-          allow-clear
-          size="large"
-          @change="
-            (v: string | undefined) => {
-              filter.contractId = undefined
-              if (v) referenceStore.fetchContracts({ projectId: v })
-              handleSearch()
-            }
-          "
-        >
-          <template #suffixIcon><SearchOutlined /></template>
-          <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.contractId"
-          class="payment-search-select"
-          placeholder="全部合同"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="c in contracts" :key="c.id" :value="c.id">
-            {{ c.contractName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.payType"
-          class="payment-search-select is-compact"
-          placeholder="类型"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="(label, key) in PAY_TYPE_LABEL" :key="key" :value="key">
-            {{ label }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.payStatus"
-          class="payment-search-select is-compact"
-          placeholder="状态"
-          allow-clear
-          size="large"
-          @change="handleSearch"
-        >
-          <a-select-option v-for="(_, key) in PAY_STATUS_LABEL" :key="key" :value="key">
-            {{ payStatusLabel(String(key)) }}
-          </a-select-option>
-        </a-select>
-      </div>
-      <div class="payment-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
-    </div>
-
-    <div class="lg-grid payment-workspace">
-      <div class="lg-left">
-        <!-- KPI 横条 -->
-        <div class="lg-kpi-strip payment-kpi-summary" aria-label="付款关键指标">
-          <div class="lg-kpi-card payment-kpi-item">
-            <span class="payment-kpi-icon is-total"><PayCircleOutlined /></span>
-            <span class="payment-kpi-label">申请总数</span>
-            <span class="payment-kpi-value">{{ total }} <small>单</small></span>
-          </div>
-          <div class="lg-kpi-card payment-kpi-item is-wide">
-            <span class="payment-kpi-icon is-amount"><DollarOutlined /></span>
-            <span class="payment-kpi-label">申请金额</span>
-            <span class="payment-kpi-value"
-              >{{ fmtAmountText(kpiTotalApply) }} <small>万元</small></span
-            >
-          </div>
-          <div class="lg-kpi-card payment-kpi-item is-progress">
-            <span class="payment-kpi-icon is-paid"><CheckCircleOutlined /></span>
-            <span class="payment-kpi-label">已付金额</span>
-            <span class="payment-kpi-value"
-              >{{ fmtAmountText(kpiActualPaid) }} <small>万元</small></span
-            >
-            <span class="payment-kpi-progress"
-              ><span :style="{ width: paidPct + '%' }"></span
-            ></span>
-          </div>
-          <div class="lg-kpi-card payment-kpi-item is-progress is-unpaid">
-            <span class="payment-kpi-icon is-unpaid"><WalletOutlined /></span>
-            <span class="payment-kpi-label">待付款金额</span>
-            <span class="payment-kpi-value"
-              >{{ fmtAmountText(kpiUnpaid) }} <small>万元</small></span
-            >
-            <span class="payment-kpi-progress">
-              <span :style="{ width: kpiPct(kpiUnpaid, kpiMax.unpaid) + '%' }"></span>
-            </span>
-          </div>
-          <div class="lg-kpi-card payment-kpi-item">
-            <span class="payment-kpi-icon is-pending"><ClockCircleOutlined /></span>
-            <span class="payment-kpi-label">已批未付</span>
-            <span class="payment-kpi-value"
-              >{{ fmtAmountText(kpiApprovedUnpaid) }} <small>万元</small></span
-            >
+          <div class="lg-toolbar-right">
+            <span class="payment-toolbar-hint">申请编号进入单据，行末查看更多操作</span>
           </div>
         </div>
 
-        <main class="lg-list-table-panel payment-table-panel">
-          <!-- 工具栏 -->
-          <div class="lg-toolbar payment-toolbar">
-            <div class="lg-toolbar-left">
-              <div class="payment-table-heading">
-                <span class="payment-table-title">付款申请明细</span>
-                <span class="payment-table-count">共 {{ total }} 条，表格为主操作区</span>
-              </div>
-              <ColumnSettingsButton
-                :columns="columnSettings"
-                :visible="colVisible"
-                @toggle="toggleCol"
-              />
-              <a-button type="primary" @click="handleAdd">
-                <template #icon><PlusOutlined /></template>
-                新建申请
-              </a-button>
-              <a-button @click="fetchData">
-                <template #icon><ReloadOutlined /></template>
-                刷新
-              </a-button>
-            </div>
-            <div class="lg-toolbar-right">
-              <span class="payment-toolbar-hint">申请编号进入单据，行末查看更多操作</span>
-            </div>
-          </div>
-
-          <!-- 表格 -->
-          <div class="lg-table-wrap">
-            <vxe-grid
-              :data="tableData"
-              :columns="visibleGridColumns"
-              :loading="loading"
-              :column-config="{ resizable: true }"
-              stripe
-              border="inner"
-              size="small"
-            >
-              <template #applyAmount="{ row }">
-                <span class="lg-money">{{ fmtWan(row.applyAmount) }} 万</span>
-              </template>
-              <template #approvedAmount="{ row }">
-                <span class="lg-money">{{ fmtWan(row.approvedAmount) }} 万</span>
-              </template>
-              <template #actualPayAmount="{ row }">
-                <span class="lg-money">{{ fmtWan(row.actualPayAmount) }} 万</span>
-              </template>
-              <template #payType="{ row }">
-                <a-tag :color="PAY_TYPE_COLOR[row.payType] || 'default'" size="small">{{
-                  PAY_TYPE_LABEL[row.payType] ?? row.payType
-                }}</a-tag>
-              </template>
-              <template #payStatus="{ row }">
-                <a-tag :color="payStatusColor(row.payStatus)" size="small">{{
-                  payStatusLabel(row.payStatus)
-                }}</a-tag>
-              </template>
-              <template #approvalStatus="{ row }">
-                <a-tag
-                  :color="approvalStatusColor(row.approvalStatus)"
-                  size="small"
-                  >{{ approvalStatusLabel(row.approvalStatus) }}</a-tag
-                >
-              </template>
-              <template #action="{ row }">
-                <a-dropdown :trigger="['click']">
-                  <a-button class="lg-row-action-trigger" size="small" type="text">
-                    <MoreOutlined />
-                  </a-button>
-                  <template #overlay>
-                    <a-menu>
-                      <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
-                      <a-menu-item
-                        v-if="row.approvalStatus === APPROVAL_DRAFT"
-                        @click="handleApproval(row)"
-                      >
-                        提交审批
-                      </a-menu-item>
-                      <a-menu-item
-                        v-if="row.approvalStatus === APPROVAL_APPROVED && row.payStatus !== PAY_STATUS_PAID"
-                        @click="openWriteback(row)"
-                      >
-                        付款回写
-                      </a-menu-item>
-                      <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
-              </template>
-            </vxe-grid>
-          </div>
-
-          <!-- 分页 -->
-          <div class="lg-pagination">
-            <span class="lg-total">共 {{ total }} 条</span>
-            <a-pagination
-              v-model:current="pageNo"
-              v-model:page-size="pageSize"
-              :total="total"
-              :page-size-options="['10', '20', '50', '100']"
-              show-size-changer
-              show-quick-jumper
-              @change="handlePageChange"
-              @show-size-change="handlePageSizeChange"
-            />
-          </div>
-        </main>
-      </div>
-
-      <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail payment-analysis-rail" aria-label="付款辅助分析">
-        <div class="payment-analysis-panel">
-          <header class="payment-analysis-head">
-            <div>
-              <div class="payment-analysis-title">辅助分析</div>
-              <div class="payment-analysis-subtitle">支付状态、审批状态与待付款</div>
-            </div>
-            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
-          </header>
-
-          <section class="payment-analysis-focus">
-            <span>本页重点</span>
-            <strong>{{ fmtAmountText(kpiApprovedUnpaid) }} 万</strong>
-            <em>已审批但尚未完成支付，优先核对付款回写。</em>
-          </section>
-
-          <section class="payment-analysis-section">
-            <div class="payment-section-title">付款状态统计</div>
-            <div v-for="it in statusBreakdown" :key="it.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: it.color }"></span>
-              <span class="lg-type-label">{{ it.label }}</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{ width: it.percent + '%', background: it.color }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ it.count }}</span>
-              <span class="lg-type-pct">{{ it.percent }}%</span>
-            </div>
-            <div v-if="!statusBreakdown.length" class="payment-analysis-empty">
-              暂无付款状态数据
-            </div>
-          </section>
-
-          <section class="payment-analysis-section">
-            <div class="payment-section-title">审批状态</div>
-            <div v-for="it in approvalBreakdown" :key="it.key" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: it.color }"></span>
-              <span class="lg-type-label">{{ it.label }}</span>
-              <span class="lg-type-bar-wrap">
-                <span
-                  class="lg-type-bar"
-                  :style="{ width: it.percent + '%', background: it.color }"
-                ></span>
-              </span>
-              <span class="lg-type-num">{{ it.count }}</span>
-              <span class="lg-type-pct">{{ it.percent }}%</span>
-            </div>
-          </section>
-
-          <section class="payment-analysis-section">
-            <div class="payment-warning-head">
-              <div class="payment-section-title">待付款提醒</div>
-              <span class="payment-warning-count">{{ pendingPayments.length }} 项</span>
-            </div>
-            <div v-for="item in pendingPayments" :key="item.id" class="lg-warning-item">
-              <span class="lg-warning-project">{{ item.project }}</span>
-              <span class="lg-warning-title">{{ item.title }}</span>
-              <span class="payment-warning-amount">{{ item.amount }}万</span>
-            </div>
-            <div v-if="!pendingPayments.length" class="lg-warning-empty">暂无待付款提醒</div>
-          </section>
-        </div>
-      </aside>
-    </div>
-
-    <!-- Create/Edit Modal -->
-    <a-modal v-model:open="modalVisible" :title="modalTitle" :width="800" @ok="handleSubmit">
-      <a-form layout="vertical" :model="formData">
-        <a-row :gutter="16">
-          <a-col :span="12"
-            ><a-form-item label="项目"
-              ><a-select
-                v-model:value="formData.projectId"
-                placeholder="请选择项目"
-                style="width: 100%"
-                :options="(projects ?? []).map((p) => ({ value: p.id, label: p.projectName }))"
-                @change="
-                  (v: string) => {
-                    formData.contractId = undefined
-                    formData.partnerId = undefined
-                    referenceStore.fetchContracts({ projectId: v })
-                  }
-                " /></a-form-item
-          ></a-col>
-          <a-col :span="12"
-            ><a-form-item label="合同"
-              ><a-select
-                v-model:value="formData.contractId"
-                placeholder="请选择合同"
-                style="width: 100%"
-                :options="(contracts ?? []).map((c) => ({ value: c.id, label: c.contractName }))"
-                @change="onContractChange" /></a-form-item
-          ></a-col>
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12"
-            ><a-form-item label="合作方"
-              ><a-input
-                :value="formPartnerName"
-                disabled
-                placeholder="选择合同后自动填充乙方" /></a-form-item
-          ></a-col>
-          <a-col :span="12"
-            ><a-form-item label="付款类型"
-              ><a-select
-                v-model:value="formData.payType"
-                placeholder="请选择付款类型"
-                style="width: 100%"
-                ><a-select-option v-for="(label, key) in PAY_TYPE_LABEL" :key="key" :value="key">{{
-                  label
-                }}</a-select-option></a-select
-              ></a-form-item
-            ></a-col
+        <div class="lg-table-wrap">
+          <vxe-grid
+            :data="tableData"
+            :columns="visibleGridColumns"
+            :loading="loading"
+            :column-config="{ resizable: true }"
+            stripe
+            border="inner"
+            size="small"
           >
-        </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12"
-            ><a-form-item label="申请编号" required
-              ><a-input
-                v-model:value="formData.applyCode"
-                placeholder="请输入申请编号" /></a-form-item
-          ></a-col>
-          <a-col :span="12"
-            ><a-form-item label="申请金额"
-              ><a-input-number
-                v-model:value="formData.applyAmount"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-                placeholder="金额（元）" /></a-form-item
-          ></a-col>
-          <a-col :span="12"
-            ><a-form-item label="申请原因"
-              ><a-textarea
-                v-model:value="formData.applyReason"
-                placeholder="申请原因"
-                :rows="2" /></a-form-item
-          ></a-col>
-        </a-row>
-      </a-form>
-      <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
-        <div
-          style="
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-          "
-        >
-          <span style="font-weight: 600; font-size: 14px">付款依据</span
-          ><a-button size="small" @click="handleAddBasis">添加依据行</a-button>
+            <template #applyAmount="{ row }">
+              <span class="lg-money">{{ fmtWan(row.applyAmount) }} 万</span>
+            </template>
+            <template #approvedAmount="{ row }">
+              <span class="lg-money">{{ fmtWan(row.approvedAmount) }} 万</span>
+            </template>
+            <template #actualPayAmount="{ row }">
+              <span class="lg-money">{{ fmtWan(row.actualPayAmount) }} 万</span>
+            </template>
+            <template #payType="{ row }">
+              <a-tag :color="PAY_TYPE_COLOR[row.payType] || 'default'" size="small">
+                {{ PAY_TYPE_LABEL[row.payType] ?? row.payType }}
+              </a-tag>
+            </template>
+            <template #payStatus="{ row }">
+              <a-tag :color="payStatusColor(row.payStatus)" size="small">
+                {{ payStatusLabel(row.payStatus) }}
+              </a-tag>
+            </template>
+            <template #approvalStatus="{ row }">
+              <a-tag :color="approvalStatusColor(row.approvalStatus)" size="small">
+                {{ approvalStatusLabel(row.approvalStatus) }}
+              </a-tag>
+            </template>
+            <template #action="{ row }">
+              <a-dropdown :trigger="['click']">
+                <a-button class="lg-row-action-trigger" size="small" type="text">
+                  <MoreOutlined />
+                </a-button>
+                <template #overlay>
+                  <a-menu>
+                    <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                    <a-menu-item v-if="row.approvalStatus === APPROVAL_DRAFT" @click="handleApproval(row)">
+                      提交审批
+                    </a-menu-item>
+                    <a-menu-item
+                      v-if="row.approvalStatus === APPROVAL_APPROVED && row.payStatus !== PAY_STATUS_PAID"
+                      @click="openWriteback(row)"
+                    >
+                      付款回写
+                    </a-menu-item>
+                    <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </template>
+          </vxe-grid>
         </div>
-        <a-table
-          :data-source="basisList"
-          :pagination="false"
-          row-key="key"
-          size="small"
-          :scroll="{ y: 240 }"
-        >
-          <a-table-column title="来源类型" width="100"
-            ><template #default="{ record: item, index }"
-              ><a-select
-                v-model:value="item.basisType"
-                size="small"
-                style="width: 100%"
-                @change="handleSourceChange(index)"
-                ><a-select-option value="MAT_RECEIPT">材料验收</a-select-option
-                ><a-select-option value="SUB_MEASURE">分包计量</a-select-option></a-select
-              ></template
-            ></a-table-column
-          >
-          <a-table-column title="来源单据" width="240"
-            ><template #default="{ record: item }"
-              ><a-select
-                v-model:value="item.basisId"
-                size="small"
-                placeholder="选择明细"
-                allow-clear
-                style="width: 100%"
-                ><a-select-option
-                  v-for="opt in getSourceOptions(item.basisType)"
-                  :key="opt.id"
-                  :value="opt.id"
-                  >{{ opt.label }}</a-select-option
-                ></a-select
-              ></template
-            ></a-table-column
-          >
-          <a-table-column title="金额" width="160"
-            ><template #default="{ record: item }"
-              ><a-input-number
-                v-model:value="item.basisAmount"
-                :min="0"
-                :precision="2"
-                size="small"
-                style="width: 100%"
-                placeholder="金额" /></template
-          ></a-table-column>
-          <a-table-column title="操作" width="76"
-            ><template #default="{ index }"
-              ><a-button type="link" size="small" danger @click="handleRemoveBasis(index)"
-                >删除</a-button
-              ></template
-            ></a-table-column
-          >
-        </a-table>
-      </div>
-    </a-modal>
 
-    <!-- Writeback Modal -->
+        <div class="lg-pagination">
+          <span class="lg-total">共 {{ total }} 条</span>
+          <a-pagination
+            v-model:current="pageNo"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-size-options="['10', '20', '50', '100']"
+            show-size-changer
+            show-quick-jumper
+            @change="handlePageChange"
+            @show-size-change="handlePageSizeChange"
+          />
+        </div>
+      </main>
+    </PaymentOverviewPanel>
+
+    <PaymentFormModal
+      v-model:open="modalVisible"
+      :title="modalTitle"
+      :form-data="formData"
+      :projects="projects ?? []"
+      :contracts="contracts ?? []"
+      :form-partner-name="formPartnerName"
+      :pay-type-label="PAY_TYPE_LABEL"
+      :basis-list="basisList"
+      :get-source-options="getSourceOptions"
+      :on-form-project-change="handleFormProjectChange"
+      :on-contract-change="onContractChange"
+      :on-add-basis="handleAddBasis"
+      :on-source-change="handleSourceChange"
+      :on-remove-basis="handleRemoveBasis"
+      @submit="handleSubmit"
+    />
+
     <a-modal
       v-model:open="writebackVisible"
       title="付款回写"
@@ -988,31 +681,33 @@ onMounted(() => {
       @cancel="handleWritebackCancel"
     >
       <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 16 }">
-        <a-form-item label="支付金额" required
-          ><a-input-number
+        <a-form-item label="支付金额" required>
+          <a-input-number
             v-model:value="writebackForm.payAmount"
             :min="0.01"
             :precision="2"
             style="width: 100%"
             placeholder="请输入支付金额"
-        /></a-form-item>
-        <a-form-item label="支付日期" required
-          ><a-date-picker
+          />
+        </a-form-item>
+        <a-form-item label="支付日期" required>
+          <a-date-picker
             v-model:value="writebackForm.payDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
-        /></a-form-item>
-        <a-form-item label="支付方式" required
-          ><a-select v-model:value="writebackForm.payMethod" placeholder="请选择"
-            ><a-select-option value="BANK_TRANSFER">银行转账</a-select-option
-            ><a-select-option value="CASH">现金</a-select-option
-            ><a-select-option value="CHECK">支票</a-select-option
-            ><a-select-option value="OTHER">其他</a-select-option></a-select
-          ></a-form-item
-        >
-        <a-form-item label="凭证号"
-          ><a-input v-model:value="writebackForm.voucherNo" placeholder="请输入凭证号"
-        /></a-form-item>
+          />
+        </a-form-item>
+        <a-form-item label="支付方式" required>
+          <a-select v-model:value="writebackForm.payMethod" placeholder="请选择">
+            <a-select-option value="BANK_TRANSFER">银行转账</a-select-option>
+            <a-select-option value="CASH">现金</a-select-option>
+            <a-select-option value="CHECK">支票</a-select-option>
+            <a-select-option value="OTHER">其他</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="凭证号">
+          <a-input v-model:value="writebackForm.voucherNo" placeholder="请输入凭证号" />
+        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -1021,240 +716,6 @@ onMounted(() => {
 <style scoped>
 .payment-page {
   gap: 14px;
-}
-
-.payment-page-head {
-  align-items: center;
-  justify-content: space-between;
-  min-height: 0;
-  padding: 18px 20px;
-  background: #fff;
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.payment-page-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  width: 100%;
-  min-width: 0;
-}
-
-.payment-breadcrumb {
-  margin-bottom: 6px;
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.payment-page-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  min-width: 0;
-}
-
-.payment-page-title-row h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 32px;
-}
-
-.payment-page-title-row span,
-.payment-head-digest span,
-.payment-search-title span {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.payment-head-digest {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
-  gap: 10px;
-  min-width: 360px;
-}
-
-.payment-head-digest > div {
-  padding: 10px 12px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.payment-head-digest strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 22px;
-}
-
-.payment-search-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 0;
-  padding: 16px;
-  border-left: 4px solid var(--primary-soft);
-}
-
-.payment-search-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  grid-column: 1 / -1;
-}
-
-.payment-search-title strong {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.payment-search-fields {
-  display: flex;
-  flex: 1 1 auto;
-  gap: 12px;
-  align-items: center;
-  min-width: 0;
-}
-
-.payment-search-select {
-  width: 230px;
-  flex: 0 0 230px;
-}
-
-.payment-search-select.is-compact {
-  width: 150px;
-  flex-basis: 150px;
-}
-
-.payment-search-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-}
-
-.payment-workspace {
-  align-items: stretch;
-  min-height: 0;
-}
-
-.payment-kpi-summary {
-  display: grid;
-  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
-  gap: 0;
-  overflow: hidden;
-  min-height: 84px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.payment-page .lg-left > .payment-kpi-summary {
-  grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
-}
-
-.payment-kpi-item {
-  position: relative;
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  grid-template-rows: 19px 27px 8px;
-  column-gap: 10px;
-  align-items: center;
-  min-width: 0;
-  padding: 16px 18px;
-  border-right: 1px solid var(--border-subtle);
-}
-
-.payment-kpi-item:last-child {
-  border-right: 0;
-}
-
-.payment-kpi-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  color: var(--primary);
-  background: var(--primary-soft);
-  border-radius: var(--radius-sm);
-  grid-row: 1 / span 2;
-}
-
-.payment-kpi-icon.is-amount {
-  color: var(--warning);
-  background: var(--warning-soft);
-}
-
-.payment-kpi-icon.is-paid {
-  color: var(--success);
-  background: var(--success-soft);
-}
-
-.payment-kpi-icon.is-unpaid,
-.payment-kpi-icon.is-pending {
-  color: var(--error);
-  background: var(--error-soft);
-}
-
-.payment-kpi-label {
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.payment-kpi-value {
-  overflow: hidden;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 28px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.payment-kpi-value small {
-  margin-left: 4px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.payment-kpi-progress {
-  display: block;
-  overflow: hidden;
-  height: 4px;
-  background: var(--surface-subtle);
-  border-radius: var(--radius-sm);
-  grid-column: 2;
-}
-
-.payment-kpi-progress > span {
-  display: block;
-  height: 100%;
-  background: var(--kpi-paid);
-  border-radius: var(--radius-sm);
-}
-
-.payment-kpi-item.is-unpaid .payment-kpi-progress > span {
-  background: var(--kpi-unpaid);
 }
 
 .payment-table-panel {
@@ -1284,143 +745,5 @@ onMounted(() => {
 .payment-toolbar-hint {
   color: var(--text-secondary);
   font-size: 12px;
-}
-
-.payment-analysis-rail {
-  width: 336px;
-}
-
-.payment-analysis-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  height: 100%;
-  padding: 18px;
-  background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.payment-analysis-focus {
-  display: grid;
-  gap: 4px;
-  padding: 14px;
-  background: var(--error-soft);
-  border: 1px solid rgba(239, 68, 68, 0.18);
-  border-radius: var(--radius-md);
-}
-
-.payment-analysis-focus span,
-.payment-analysis-focus em {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.payment-analysis-focus strong {
-  color: var(--error);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 30px;
-}
-
-.payment-analysis-head,
-.payment-warning-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.payment-analysis-title {
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 22px;
-}
-
-.payment-analysis-subtitle,
-.payment-warning-count {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.payment-analysis-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.payment-section-title {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-}
-
-.payment-analysis-empty {
-  padding: 10px 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  text-align: center;
-}
-
-.payment-analysis-section :deep(.lg-type-row),
-.lg-type-row {
-  grid-template-columns: 9px minmax(54px, 72px) minmax(72px, 1fr) 20px 38px;
-}
-
-.payment-warning-amount {
-  color: var(--error);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-@media (max-width: 1200px) {
-  .payment-kpi-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .payment-page .lg-left > .payment-kpi-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .payment-kpi-item {
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .payment-analysis-rail {
-    width: 100%;
-  }
-}
-
-@media (max-width: 768px) {
-  .payment-page-meta-row,
-  .payment-search-bar,
-  .payment-search-fields {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .payment-page-subtitle {
-    white-space: normal;
-  }
-
-  .payment-head-digest {
-    width: 100%;
-    min-width: 0;
-    grid-template-columns: 1fr;
-  }
-
-  .payment-search-select,
-  .payment-search-select.is-compact {
-    width: 100%;
-    flex-basis: auto;
-  }
 }
 </style>

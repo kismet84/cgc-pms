@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../order.vue'), 'utf-8')
+const workspaceSource = readFileSync(
+  resolve(currentDir, '../components/VariationOrderWorkspace.vue'),
+  'utf-8',
+)
 
 describe('VariationOrderPage production guards', () => {
   it('uses pageNo instead of legacy pageNum in list request', () => {
@@ -23,19 +27,29 @@ describe('VariationOrderPage production guards', () => {
   })
 
   it('renders dedicated mobile list guarded by isMobile', () => {
-    expect(source).toMatch(/class="vo-mobile-list"/)
-    expect(source).toMatch(/v-if="isMobile"/)
-    expect(source).toMatch(/class="vo-mobile-card"/)
-    expect(source).toMatch(/v-else class="lg-table-wrap vo-table-wrap"/)
+    expect(source).toContain("import VariationOrderWorkspace from './components/VariationOrderWorkspace.vue'")
+    expect(workspaceSource).toMatch(/class="vo-mobile-list"/)
+    expect(workspaceSource).toMatch(/v-if="isMobile"/)
+    expect(workspaceSource).toMatch(/class="vo-mobile-card"/)
+    expect(workspaceSource).toMatch(/v-else class="lg-table-wrap vo-table-wrap"/)
   })
 
   it('shows column settings button only on desktop', () => {
-    expect(source).toMatch(/ColumnSettingsButton[\s\S]*v-if="!isMobile"/)
+    expect(workspaceSource).toMatch(/ColumnSettingsButton[\s\S]*v-if="!isMobile"/)
+  })
+
+  it('keeps workspace scoped styles with the moved vo selectors', () => {
+    expect(workspaceSource).toMatch(/<style scoped>[\s\S]*\.vo-query-panel\s*\{/)
+    expect(workspaceSource).toMatch(/<style scoped>[\s\S]*\.vo-kpi-summary\s*\{/)
+    expect(workspaceSource).toMatch(/@media \(max-width: 1200px\)[\s\S]*\.vo-analysis-rail/)
+    expect(source).not.toMatch(/<style scoped>[\s\S]*\.vo-query-panel\s*\{/)
+    expect(source).not.toMatch(/<style scoped>[\s\S]*\.vo-kpi-summary\s*\{/)
+    expect(source).not.toMatch(/<style scoped>[\s\S]*\.vo-analysis-rail\s*\{/)
   })
 
   it('uses loading empty content tri-state in mobile branch', () => {
-    expect(source).toMatch(/v-if="loading"/)
-    expect(source).toMatch(/v-else-if="!tableData\.length"/)
-    expect(source).toMatch(/<template v-else>/)
+    expect(workspaceSource).toMatch(/v-if="loading"/)
+    expect(workspaceSource).toMatch(/v-else-if="!tableData\.length"/)
+    expect(workspaceSource).toMatch(/<template v-else>/)
   })
 })

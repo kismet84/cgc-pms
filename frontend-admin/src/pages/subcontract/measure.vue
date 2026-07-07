@@ -41,6 +41,8 @@ import type { SelectOption } from '@/types/ui'
 import type { ContractItem } from '@/types/contract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
+import SubcontractMeasureAnalysisRail from './components/SubcontractMeasureAnalysisRail.vue'
+import SubcontractMeasureModal from './components/SubcontractMeasureModal.vue'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 const route = useRoute()
@@ -106,6 +108,10 @@ function measureStatusLabel(status: string | undefined): string {
 
 function measureStatusColor(status: string | undefined): string {
   return getDictTagColorSync(STATUS_DICT, status ?? '', STATUS_COLOR)
+}
+
+function filterOptionByLabel(input: string, option: SelectOption) {
+  return option.label?.toLowerCase().includes(input.toLowerCase())
 }
 
 // ---- vxe-grid columns ----
@@ -426,6 +432,15 @@ async function onContractSelect(contractId: string | undefined) {
   await loadSubTaskOptions()
 }
 
+function handleModalProjectChange(projectId: string) {
+  formData.projectId = projectId
+  formData.contractId = undefined
+  formData.partnerId = undefined
+  formData.subTaskId = undefined
+  subTaskOptions.value = []
+  referenceStore.fetchContracts({ projectId })
+}
+
 async function handleModalOk() {
   if (!formData.projectId) {
     message.warning('请选择项目')
@@ -557,10 +572,7 @@ onMounted(() => {
         allow-clear
         size="large"
         show-search
-        :filter-option="
-          (input: string, option: SelectOption) =>
-            option.label?.toLowerCase().includes(input.toLowerCase())
-        "
+        :filter-option="filterOptionByLabel"
         @change="
           (v: string | undefined) => {
             filter.contractId = undefined
@@ -628,9 +640,7 @@ onMounted(() => {
             </div>
           </div>
           <div class="subcontract-measure-kpi-item">
-            <span class="subcontract-measure-kpi-icon is-purple"
-              ><SafetyCertificateOutlined
-            /></span>
+            <span class="subcontract-measure-kpi-icon is-purple"><SafetyCertificateOutlined /></span>
             <div>
               <span class="subcontract-measure-kpi-label">审核比例</span>
               <strong>{{ approvedRate }}%</strong>
@@ -758,246 +768,39 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside
-        class="lg-analysis-rail subcontract-measure-analysis-rail"
-        aria-label="分包计量辅助分析"
-      >
-        <div class="subcontract-measure-analysis-panel">
-          <section class="subcontract-measure-analysis-section">
-            <div class="subcontract-measure-section-head">
-              <strong>计量状态分布</strong>
-              <span>{{ tableData.length }} 条</span>
-            </div>
-            <div class="subcontract-measure-bar-list">
-              <div
-                v-for="item in measureStatusSummary"
-                :key="item.label"
-                class="subcontract-measure-bar-row"
-              >
-                <div class="subcontract-measure-bar-meta">
-                  <span><i :style="{ background: item.color }"></i>{{ item.label }}</span>
-                  <strong>{{ item.count }} 条</strong>
-                </div>
-                <div class="subcontract-measure-bar-track">
-                  <span :style="{ width: item.pct + '%', background: item.color }"></span>
-                </div>
-              </div>
-            </div>
-          </section>
-          <section class="subcontract-measure-analysis-section">
-            <div class="subcontract-measure-section-head">
-              <strong>金额审核</strong>
-              <span>{{ approvedRate }}%</span>
-            </div>
-            <div class="subcontract-measure-amount-box">
-              <div>
-                <span>申报</span><strong>{{ fmtWan(kpiMeasureTotal) }} 万元</strong>
-              </div>
-              <div>
-                <span>审核</span><strong>{{ fmtWan(kpiApproved) }} 万元</strong>
-              </div>
-            </div>
-          </section>
-          <section class="subcontract-measure-analysis-section">
-            <div class="subcontract-measure-section-head">
-              <strong>近期计量</strong>
-              <span>最新 4 条</span>
-            </div>
-            <div class="subcontract-measure-recent-list">
-              <div
-                v-for="item in recentMeasures"
-                :key="item.id"
-                class="subcontract-measure-recent-item"
-              >
-                <span>{{ item.measureCode || item.measurePeriod }}</span>
-                <strong>{{ measureStatusLabel(item.status) || '-' }}</strong>
-              </div>
-              <div v-if="!recentMeasures.length" class="subcontract-measure-empty">暂无计量</div>
-            </div>
-          </section>
-        </div>
-      </aside>
+      <SubcontractMeasureAnalysisRail
+        :status-count="tableData.length"
+        :kpi-measure-total="kpiMeasureTotal"
+        :kpi-approved="kpiApproved"
+        :approved-rate="approvedRate"
+        :measure-status-summary="measureStatusSummary"
+        :recent-measures="recentMeasures"
+        :fmt-wan="fmtWan"
+        :measure-status-label="measureStatusLabel"
+      />
     </div>
 
-    <!-- Add/Edit Modal -->
-    <a-modal
-      v-model:open="modalVisible"
+    <SubcontractMeasureModal
+      :open="modalVisible"
       :title="modalTitle"
-      :width="800"
-      wrap-class-name="compact-subcontract-measure-modal"
-      @ok="handleModalOk"
-      @cancel="handleModalCancel"
-    >
-      <div class="subcontract-measure-modal-body">
-        <a-form
-          :label-col="{ span: 5 }"
-          :wrapper-col="{ span: 18 }"
-          class="subcontract-measure-modal-form"
-          size="small"
-        >
-          <a-form-item label="项目" required>
-            <a-select
-              v-model:value="formData.projectId"
-              placeholder="请选择项目"
-              show-search
-              @change="
-                (v: string) => {
-                  formData.contractId = undefined
-                  formData.partnerId = undefined
-                  formData.subTaskId = undefined
-                  subTaskOptions.value = []
-                  referenceStore.fetchContracts({ projectId: v })
-                }
-              "
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-            >
-              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-                {{ p.projectName }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item label="分包合同">
-            <a-select
-              v-model:value="formData.contractId"
-              placeholder="请选择合同"
-              allow-clear
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-              @change="(val: string) => onContractSelect(val)"
-            >
-              <a-select-option v-for="c in contractList" :key="c.id" :value="c.id">
-                {{ c.contractName }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item label="分包商">
-            <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
-          </a-form-item>
-          <!-- 关联分包任务 -->
-          <a-form-item label="关联任务">
-            <a-select
-              v-model:value="formData.subTaskId"
-              placeholder="请选择关联分包任务"
-              allow-clear
-              show-search
-              :filter-option="
-                (input: string, option: SelectOption) =>
-                  option.label?.toLowerCase().includes(input.toLowerCase())
-              "
-            >
-              <a-select-option v-for="t in subTaskOptions" :key="t.id" :value="t.id">
-                {{ t.taskCode }} {{ t.taskName }}
-              </a-select-option>
-            </a-select>
-          </a-form-item>
-          <a-form-item label="计量期次">
-            <a-input
-              v-model:value="formData.measurePeriod"
-              placeholder="请输入计量期次（如：第1期）"
-            />
-          </a-form-item>
-          <a-form-item label="计量日期">
-            <a-date-picker
-              v-model:value="formData.measureDate"
-              value-format="YYYY-MM-DD"
-              style="width: 100%"
-            />
-          </a-form-item>
-          <a-form-item label="备注">
-            <a-textarea v-model:value="formData.remark" :rows="1" placeholder="请输入备注" />
-          </a-form-item>
-        </a-form>
-
-        <div class="subcontract-measure-items-section">
-          <div class="subcontract-measure-items-head">
-            <span>计量明细</span>
-            <a-button type="dashed" size="small" @click="handleAddItem">+ 添加明细</a-button>
-          </div>
-
-          <a-table
-            :data-source="itemList"
-            :pagination="false"
-            row-key="key"
-            size="small"
-            :scroll="{ x: 826, y: 220 }"
-          >
-            <a-table-column title="合同清单项" width="200">
-              <template #default="{ record: item, index }">
-                <a-select
-                  :value="item.contractItemId"
-                  placeholder="请选择清单项"
-                  allow-clear
-                  style="width: 100%"
-                  @change="(val: string) => handleContractItemChange(index, val)"
-                >
-                  <a-select-option v-for="ci in contractItemList" :key="ci.id" :value="ci.id">
-                    {{ ci.itemName }}
-                  </a-select-option>
-                </a-select>
-              </template>
-            </a-table-column>
-            <a-table-column title="单位" width="70">
-              <template #default="{ record: item }">
-                <span>{{ item.unit || '-' }}</span>
-              </template>
-            </a-table-column>
-            <a-table-column title="合同量" width="100">
-              <template #default="{ record: item }">
-                <span>{{ item.contractQuantity || '-' }}</span>
-              </template>
-            </a-table-column>
-            <a-table-column title="本期量" width="120">
-              <template #default="{ record: item, index }">
-                <a-input-number
-                  v-model:value="item.currentQuantity"
-                  :min="0"
-                  :precision="4"
-                  style="width: 100%"
-                  @change="handleItemQtyChange(index)"
-                />
-              </template>
-            </a-table-column>
-            <a-table-column title="单价(元)" width="130">
-              <template #default="{ record: item, index }">
-                <a-input-number
-                  v-model:value="item.unitPrice"
-                  :min="0"
-                  :precision="4"
-                  style="width: 100%"
-                  @change="handleItemPriceChange(index)"
-                />
-              </template>
-            </a-table-column>
-            <a-table-column title="金额(元)" width="130">
-              <template #default="{ record: item }">
-                <span>{{
-                  Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-                }}</span>
-              </template>
-            </a-table-column>
-            <a-table-column title="操作" width="76">
-              <template #default="{ index }">
-                <a-button type="link" size="small" danger @click="handleRemoveItem(index)"
-                  >删除</a-button
-                >
-              </template>
-            </a-table-column>
-          </a-table>
-
-          <div class="subcontract-measure-items-total">
-            合计：<span>{{
-              Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-            }}</span>
-          </div>
-        </div>
-      </div>
-    </a-modal>
+      :form-data="formData"
+      :project-list="projectList"
+      :contract-list="contractList"
+      :sub-task-options="subTaskOptions"
+      :form-partner-name="formPartnerName"
+      :item-list="itemList"
+      :contract-item-list="contractItemList"
+      :items-total-amount="itemsTotalAmount"
+      :on-ok="handleModalOk"
+      :on-cancel="handleModalCancel"
+      :on-project-change="handleModalProjectChange"
+      :on-contract-select="onContractSelect"
+      :on-add-item="handleAddItem"
+      :on-remove-item="handleRemoveItem"
+      :on-contract-item-change="handleContractItemChange"
+      :on-item-qty-change="handleItemQtyChange"
+      :on-item-price-change="handleItemPriceChange"
+    />
   </div>
 </template>
 
@@ -1059,7 +862,6 @@ onMounted(() => {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 }
 
 .subcontract-measure-kpi-item {
@@ -1148,204 +950,13 @@ onMounted(() => {
   color: #64748b;
 }
 
-.subcontract-measure-analysis-rail {
-  width: 336px;
-}
-
-.subcontract-measure-analysis-panel {
-  height: 856px;
-  min-height: 856px;
-  box-sizing: border-box;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
-  overflow: hidden;
-}
-
-.subcontract-measure-analysis-section {
-  padding: 18px;
-  border-bottom: 1px solid #edf1f5;
-}
-
-.subcontract-measure-analysis-section:last-child {
-  border-bottom: 0;
-}
-
-.subcontract-measure-section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.subcontract-measure-section-head strong {
-  font-size: 15px;
-  color: #0f172a;
-}
-
-.subcontract-measure-section-head span {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.subcontract-measure-bar-list,
-.subcontract-measure-recent-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.subcontract-measure-bar-meta,
-.subcontract-measure-recent-item,
-.subcontract-measure-amount-box div {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-}
-
-.subcontract-measure-bar-meta span {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-  color: #334155;
-}
-
-.subcontract-measure-bar-meta i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: 0 0 auto;
-}
-
-.subcontract-measure-bar-meta strong,
-.subcontract-measure-recent-item strong,
-.subcontract-measure-amount-box strong {
-  color: #0f172a;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.subcontract-measure-bar-track {
-  margin-top: 7px;
-  height: 6px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  overflow: hidden;
-}
-
-.subcontract-measure-bar-track span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-}
-
-.subcontract-measure-amount-box {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.subcontract-measure-amount-box span {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.subcontract-measure-recent-item {
-  padding: 10px 0;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.subcontract-measure-recent-item:last-child {
-  border-bottom: 0;
-}
-
-.subcontract-measure-recent-item span {
-  min-width: 0;
-  overflow: hidden;
-  color: #334155;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.subcontract-measure-empty {
-  padding: 18px 0;
-  color: #94a3b8;
-  text-align: center;
-  font-size: 13px;
-}
-
-.subcontract-measure-modal-body {
-  max-height: calc(100vh - 220px);
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.subcontract-measure-modal-form :deep(.ant-form-item) {
-  margin-bottom: 8px;
-}
-
-.subcontract-measure-items-section {
-  padding-top: 10px;
-  margin-top: 2px;
-  border-top: 1px solid #f0f0f0;
-}
-
-.subcontract-measure-items-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.subcontract-measure-items-head span {
-  font-weight: 600;
-  font-size: 14px;
-  color: #0f172a;
-}
-
-.subcontract-measure-items-total {
-  margin-top: 8px;
-  text-align: right;
-  font-size: 13px;
-}
-
-.subcontract-measure-items-total span {
-  font-weight: 600;
-  color: #1677ff;
-}
-
-:global(.compact-subcontract-measure-modal .ant-modal-body) {
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-
-:global(.compact-subcontract-measure-modal .ant-modal-footer) {
-  margin-top: 0;
-  padding-top: 10px;
-  border-top: 1px solid #f0f0f0;
-}
-
 .lg-none {
   color: var(--muted);
 }
 
 @media (max-width: 1280px) {
-  .subcontract-measure-search-bar,
-  .subcontract-measure-kpi-summary {
+  .subcontract-measure-search-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .subcontract-measure-analysis-rail {
-    width: 100%;
   }
 }
 </style>

@@ -7,6 +7,14 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../summary.vue'), 'utf-8')
+const tablePanelSource = readFileSync(
+  resolve(currentDir, '../components/CostSummaryTablePanel.vue'),
+  'utf-8',
+)
+const analysisRailSource = readFileSync(
+  resolve(currentDir, '../components/CostSummaryAnalysisRail.vue'),
+  'utf-8',
+)
 
 const {
   mockGetProjectList,
@@ -115,11 +123,35 @@ const AButtonStub = defineComponent({
   },
 })
 
+const AInputStub = defineComponent({
+  name: 'AInputStub',
+  props: {
+    value: { type: String, default: '' },
+  },
+  emits: ['update:value', 'pressEnter'],
+  setup(props, { emit, attrs, slots }) {
+    return () =>
+      h('div', { class: attrs.class }, [
+        slots.prefix?.(),
+        h('input', {
+          class: 'stub-input',
+          value: props.value,
+          onInput: (event: Event) =>
+            emit('update:value', (event.target as HTMLInputElement).value),
+          onKeydown: (event: KeyboardEvent) => {
+            if (event.key === 'Enter') emit('pressEnter')
+          },
+        }),
+      ])
+  },
+})
+
 const stubs = {
   'a-breadcrumb': { template: '<div><slot /></div>' },
   'a-breadcrumb-item': { template: '<span><slot /></span>' },
   'a-select': ASelectStub,
   'a-select-option': ASelectOptionStub,
+  'a-input': AInputStub,
   'a-button': AButtonStub,
   'a-tag': { template: '<span class="stub-tag"><slot /></span>' },
   'a-empty': { template: '<div class="stub-empty">暂无科目明细</div>' },
@@ -233,12 +265,22 @@ describe('CostSummary production guards', () => {
 
     expect(source).toContain('const res = await getProjectList({ pageNo: 1, pageSize: 50 })')
     expect(source).not.toContain('getProjectList({ pageNum: 1, pageSize: 50 })')
-    expect(source).toMatch(/<ColumnSettingsButton[\s\S]*v-if="!isMobile"/)
-    expect(source).toMatch(/<div v-if="isMobile" class="cost-summary-mobile-list">/)
-    expect(source).toMatch(/<div v-else class="lg-table-wrap cost-summary-table">/)
-    expect(source).toContain("{{ row.costSubjectName || '-' }}")
-    expect(source).toContain('成本目标：{{ fmtAmount(row.targetCost) }} 万元')
-    expect(source).toContain('动态成本：{{ fmtAmount(row.dynamicCost) }} 万元')
-    expect(source).toContain('{{ fmtDeviation(row.costDeviation) }} 万元')
+    expect(source).toContain('<CostSummaryTablePanel')
+    expect(tablePanelSource).toMatch(/<ColumnSettingsButton[\s\S]*v-if="!isMobile"/)
+    expect(tablePanelSource).toMatch(/<div v-if="isMobile" class="cost-summary-mobile-list">/)
+    expect(tablePanelSource).toMatch(/<div v-else class="lg-table-wrap cost-summary-table">/)
+    expect(tablePanelSource).toContain("{{ row.costSubjectName || '-' }}")
+    expect(tablePanelSource).toContain('成本目标：{{ fmtAmount(row.targetCost) }} 万元')
+    expect(tablePanelSource).toContain('动态成本：{{ fmtAmount(row.dynamicCost) }} 万元')
+    expect(tablePanelSource).toContain('{{ fmtDeviation(row.costDeviation) }} 万元')
+  })
+
+  it('入口页源码挂载本地表格面板和分析栏组件，避免模板重新膨胀', () => {
+    expect(source).toContain("import CostSummaryTablePanel from './components/CostSummaryTablePanel.vue'")
+    expect(source).toContain("import CostSummaryAnalysisRail from './components/CostSummaryAnalysisRail.vue'")
+    expect(source).toContain('<CostSummaryTablePanel')
+    expect(source).toContain('<CostSummaryAnalysisRail')
+    expect(analysisRailSource).toContain('class="cost-source-rail-row"')
+    expect(analysisRailSource).toContain("['cost-conclusion-row', `is-${item.tone}`]")
   })
 })

@@ -25,4 +25,11 @@ describe('payment page quality guardrails', () => {
     expect(configSource).toContain('export const APPROVAL_STATUS_COLOR')
     expect(configSource).toContain('export const PAYMENT_GRID_COLUMNS')
   })
+
+  it('keeps the page shell split into local subcomponents', () => {
+    expect(source).toContain("from './components/PaymentOverviewPanel.vue'")
+    expect(source).toContain("from './components/PaymentFormModal.vue'")
+    expect(source).toContain('<PaymentOverviewPanel')
+    expect(source).toContain('<PaymentFormModal')
+  })
 })

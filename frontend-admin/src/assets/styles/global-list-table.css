@@ -1,0 +1,556 @@
+/* ---- 表格容器 ---- */
+.lg-table-wrap {
+  background: var(--surface);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  overflow-x: auto;
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  overflow-y: hidden;
+  margin-bottom: 0;
+}
+
+.lg-table-wrap .vxe-grid {
+  height: 100%;
+}
+
+.lg-list-page > .lg-table-wrap,
+.lg-list-page .lg-left > .lg-table-wrap {
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.lg-list-page .lg-toolbar + .lg-table-wrap,
+.lg-list-table-panel .lg-table-wrap {
+  box-shadow: none;
+}
+.lg-link {
+  color: var(--primary);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+.lg-link:hover {
+  color: var(--primary-hover);
+}
+.lg-money {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.lg-ops {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.lg-list-page .lg-ops {
+  justify-content: flex-start;
+  gap: 12px;
+}
+.lg-row-action-trigger {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 16px;
+  border-radius: var(--radius-sm);
+}
+
+.lg-row-action-trigger:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.lg-del {
+  color: var(--error);
+}
+.lg-del:hover {
+  color: #ff7875;
+}
+/* 通用标签 */
+.lg-tag {
+  display: inline-block;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: 20px;
+  padding: 0 8px;
+  white-space: nowrap;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 500;
+}
+.lg-tag--success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.lg-tag--warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.lg-tag--danger {
+  background: var(--error-soft);
+  color: var(--error);
+}
+.lg-tag--pill {
+  border-radius: 12px;
+}
+/* vxe-table 内部统一样式 */
+.lg-table-wrap :deep(.vxe-header--column) {
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  height: 42px;
+}
+.lg-table-wrap :deep(.vxe-body--column) {
+  color: var(--text);
+  font-size: 14px;
+  height: 48px;
+}
+.lg-table-wrap :deep(.vxe-body--row:hover) {
+  background: var(--bg);
+}
+.lg-table-wrap :deep(.vxe-body--row:hover .vxe-body--column) {
+  background: var(--bg);
+}
+.lg-table-wrap :deep(.vxe-table--border-line) {
+  border-color: var(--border);
+}
+
+.lg-list-page .lg-table-wrap :deep(.vxe-table) {
+  border-top: 0;
+}
+
+.lg-list-page .lg-table-wrap :deep(.vxe-header--column) {
+  height: 43px;
+  padding: 0 14px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.lg-list-page .lg-table-wrap :deep(.vxe-body--column) {
+  height: 54px;
+  padding: 0 14px;
+  color: var(--text);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap :deep(.vxe-header--column:first-child),
+.lg-list-page .lg-table-wrap :deep(.vxe-body--column:first-child) {
+  padding-left: 16px;
+}
+
+.lg-list-page .lg-table-wrap :deep(.vxe-cell) {
+  padding-right: 14px;
+  padding-left: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap :deep(.vxe-cell--title),
+.lg-list-page .lg-table-wrap :deep(.vxe-cell > span),
+.lg-list-page .lg-table-wrap :deep(.vxe-cell > a),
+.lg-list-page .lg-table-wrap :deep(.lg-link),
+.lg-list-page .lg-table-wrap :deep(.lg-money),
+.lg-list-page .lg-table-wrap :deep(.lg-tag) {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap :deep(.vxe-body--row:hover),
+.lg-list-page .lg-table-wrap :deep(.vxe-body--row:hover .vxe-body--column) {
+  background: var(--surface-subtle);
+}
+
+.lg-list-page .lg-table-wrap :deep(.ant-table-thead > tr > th) {
+  height: 43px;
+  padding: 11px 16px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap :deep(.ant-table-tbody > tr > td) {
+  height: 54px;
+  padding: 12px 16px;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap :deep(.ant-table-thead > tr > th:first-child),
+.lg-list-page .lg-table-wrap :deep(.ant-table-tbody > tr > td:first-child) {
+  padding-left: 16px;
+}
+
+.lg-list-page .lg-table-wrap :deep(.ant-table-thead > tr > th:first-child > *),
+.lg-list-page .lg-table-wrap :deep(.ant-table-tbody > tr > td:first-child > *) {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap .vxe-header--column {
+  height: 43px;
+  padding: 0 14px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.lg-list-page .lg-table-wrap .vxe-body--column {
+  height: 54px;
+  padding: 0 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table,
+.lg-list-page .lg-table-wrap .ant-table {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table .vxe-cell,
+.lg-list-page .lg-table-wrap .ant-table-cell {
+  line-height: 22px;
+}
+
+.lg-list-page .lg-table-wrap .vxe-cell {
+  padding-right: 14px;
+  padding-left: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table,
+.lg-list-page .lg-table-wrap .vxe-table--main-wrapper,
+.lg-list-page .lg-table-wrap .vxe-table--body-wrapper,
+.lg-list-page .lg-table-wrap .vxe-table--header-wrapper {
+  min-width: 100%;
+}
+
+.lg-list-page .lg-table-wrap .vxe-cell--title,
+.lg-list-page .lg-table-wrap .vxe-cell > span,
+.lg-list-page .lg-table-wrap .vxe-cell > a,
+.lg-list-page .lg-table-wrap .lg-link,
+.lg-list-page .lg-table-wrap .lg-money,
+.lg-list-page .lg-table-wrap .lg-tag {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap .vxe-body--column.col--ellipsis,
+.lg-list-page .lg-table-wrap .vxe-header--column.col--ellipsis {
+  overflow: hidden;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-thead > tr > th {
+  height: 43px;
+  padding: 11px 16px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-tbody > tr > td {
+  height: 54px;
+  padding: 12px 16px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap .ant-table,
+.lg-list-page .lg-table-wrap .ant-table-container,
+.lg-list-page .lg-table-wrap .ant-table-content {
+  min-width: 100%;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-cell {
+  min-width: 112px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-cell:first-child {
+  min-width: 150px;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-cell:has(.lg-ops) {
+  min-width: 132px;
+  max-width: none;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-cell:has(.lg-row-action-trigger) {
+  min-width: 76px;
+  max-width: none;
+}
+
+.lg-list-page .lg-table-wrap .vxe-body--column:has(.lg-row-action-trigger),
+.lg-list-page .lg-table-wrap .vxe-body--column:has(.lg-row-action-trigger) .vxe-cell,
+.lg-list-page .lg-table-wrap .vxe-body--column:has(.lg-row-action-trigger) .vxe-cell--wrapper {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-thead > tr > th:first-child,
+.lg-list-page .lg-table-wrap .ant-table-tbody > tr > td:first-child {
+  padding-left: 16px;
+}
+
+.lg-list-page .lg-table-wrap .ant-table-thead > tr > th:first-child > *,
+.lg-list-page .lg-table-wrap .ant-table-tbody > tr > td:first-child > * {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Ant Design Table 全局统一覆盖 */
+.lg-table-wrap :deep(.ant-table) {
+  font-size: 14px;
+}
+.lg-table-wrap :deep(.ant-table-thead > tr > th) {
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  height: 42px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.lg-table-wrap :deep(.ant-table-tbody > tr > td) {
+  color: var(--text);
+  font-size: 14px;
+  padding: 10px 16px;
+}
+.lg-table-wrap :deep(.ant-table-tbody > tr:hover > td) {
+  background: var(--bg) !important;
+}
+.lg-table-wrap :deep(.ant-table-thead > tr > th::before) {
+  display: none;
+}
+.lg-table-wrap :deep(.ant-table-bordered .ant-table-thead > tr > th),
+.lg-table-wrap :deep(.ant-table-bordered .ant-table-tbody > tr > td) {
+  border-color: var(--border);
+}
+.lg-table-wrap :deep(.ant-table.ant-table-bordered > .ant-table-container) {
+  border-color: var(--border);
+}
+
+/* ---- 移动端卡片列表 ---- */
+.lg-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lg-card-list-loading,
+.lg-card-list-empty {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.lg-card-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 13px 14px;
+  box-shadow: var(--shadow-soft);
+}
+.lg-card-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lg-card-code {
+  font-size: 14px;
+  font-weight: 700;
+}
+.lg-card-head-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.lg-card-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.lg-card-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+.lg-card-label {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 88px;
+  flex-shrink: 0;
+}
+.lg-card-value {
+  color: var(--text);
+  word-break: break-all;
+}
+.lg-card-money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.lg-card-money.is-success {
+  color: var(--success);
+}
+.lg-card-money.is-danger {
+  color: var(--error);
+}
+.lg-card-field-row {
+  display: flex;
+  gap: 16px;
+}
+.lg-card-field-row .lg-card-field {
+  flex: 1;
+  min-width: 0;
+}
+.lg-card-field-row .lg-card-label {
+  min-width: 0;
+}
+.lg-card-item-foot {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---- 分页 ---- */
+.lg-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  min-height: 60px;
+  padding: 16px 20px 0;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 16px;
+}
+
+.lg-list-page .lg-pagination {
+  gap: 16px;
+  min-height: auto;
+  padding: 16px 20px 0;
+  margin-top: 16px;
+}
+
+.lg-list-page > .lg-pagination,
+.lg-list-page .lg-left > .lg-pagination {
+  padding-bottom: 16px;
+  background: var(--surface);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.lg-list-page .lg-toolbar + .lg-table-wrap + .lg-pagination,
+.lg-list-table-panel .lg-pagination {
+  box-shadow: none;
+}
+
+.lg-list-page .lg-pagination :deep(.ant-pagination-options-quick-jumper) {
+  display: none;
+}
+
+.lg-list-page .lg-pagination :deep(.ant-pagination-item),
+.lg-list-page .lg-pagination :deep(.ant-pagination-prev),
+.lg-list-page .lg-pagination :deep(.ant-pagination-next) {
+  min-width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  line-height: 26px;
+}
+
+.lg-list-page .lg-pagination :deep(.ant-select-selector) {
+  height: 28px !important;
+  border-radius: 4px !important;
+}
+.lg-total {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---- 右侧分析面板 ---- */
+.lg-analysis-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.lg-panel {
+  padding: 20px;
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+.lg-panel-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.lg-list-page .lg-analysis-rail .lg-panel {
+  min-height: 0;
+}
+
+.lg-list-page .lg-panel :deep(.echarts) {
+  min-height: 176px;
+}
+
+.lg-list-page .lg-type-row {
+  align-items: flex-start;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.lg-list-page .lg-type-dot {
+  margin-top: 6px;
+}
+
+.lg-list-page .lg-type-label {
+  color: var(--text);
+}
+

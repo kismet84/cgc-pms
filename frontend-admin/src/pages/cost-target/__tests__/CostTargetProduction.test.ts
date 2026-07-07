@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url'
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
 const editSource = readFileSync(resolve(currentDir, '../edit.vue'), 'utf-8')
+const analysisRailSource = readFileSync(
+  resolve(currentDir, '../components/CostTargetAnalysisRail.vue'),
+  'utf-8',
+)
 const routerSource = readFileSync(resolve(currentDir, '../../../router/index.ts'), 'utf-8')
 
 const {
@@ -338,6 +342,20 @@ describe('CostTarget production guards', () => {
     expect(source).toMatch(/<ColumnSettingsButton[\s\S]*v-if="!isMobile"/)
     expect(source).toMatch(/<div v-if="isMobile" class="ct-mobile-list">/)
     expect(source).toMatch(/<div v-else class="lg-table-wrap ct-table-wrap">/)
+  })
+
+  it('右侧分析栏拆到页面私有组件后仍保留原 class 和刷新交互', () => {
+    expect(source).toMatch(
+      /import\s+CostTargetAnalysisRail\s+from\s+['"]\.\/components\/CostTargetAnalysisRail\.vue['"]/,
+    )
+    expect(source).toMatch(
+      /<CostTargetAnalysisRail[\s\S]*:total="total"[\s\S]*:target-status-summary="targetStatusSummary"[\s\S]*:target-version-summary="targetVersionSummary"[\s\S]*:recent-targets="recentTargets"[\s\S]*@refresh="fetchData"/,
+    )
+    expect(analysisRailSource).toMatch(
+      /<aside class="lg-analysis-rail ct-analysis-rail" aria-label="成本目标辅助分析">/,
+    )
+    expect(analysisRailSource).toMatch(/<a-button type="link" size="small" @click="emit\('refresh'\)">刷新<\/a-button>/)
+    expect(analysisRailSource).toMatch(/\.ct-analysis-panel\s*\{[\s\S]*display:\s*flex;/)
   })
 
   it('桌面表格继续使用纵向流式布局，避免工具栏和分页覆盖操作列', () => {

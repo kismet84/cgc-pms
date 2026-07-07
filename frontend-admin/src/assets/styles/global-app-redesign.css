@@ -1,0 +1,906 @@
+/* ============================================================
+   2026 full-app redesign layer
+   ============================================================ */
+body {
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(234, 242, 255, 0.52) 0, rgba(246, 248, 251, 0) 260px), var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.app-page,
+.lg-page,
+.lg-list-page {
+  background: transparent;
+}
+
+.app-page,
+.lg-page,
+.lg-page-shell,
+.lg-list-page,
+.project-list-page,
+.project-target-redesign,
+.pt-page,
+.dashboard,
+.profile-page,
+.settings-page {
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: 14px;
+}
+
+.app-page *,
+.lg-page *,
+.lg-page-shell *,
+.lg-list-page *,
+.project-list-page *,
+.project-target-redesign *,
+.pt-page *,
+.dashboard *,
+.profile-page *,
+.settings-page *,
+.ant-modal *,
+.ant-drawer *,
+.ant-popover *,
+.ant-dropdown * {
+  font-family: var(--font-family);
+}
+
+.app-page .ant-breadcrumb,
+.app-page .ant-breadcrumb a,
+.app-page .ant-breadcrumb li,
+.lg-page .ant-breadcrumb,
+.lg-page .ant-breadcrumb a,
+.lg-page .ant-breadcrumb li,
+.lg-list-page .ant-breadcrumb,
+.lg-list-page .lg-breadcrumb,
+.lg-list-page .lg-page-head-breadcrumb,
+.project-target-redesign .ant-breadcrumb,
+.project-target-redesign .ant-breadcrumb a,
+.project-target-redesign .ant-breadcrumb li,
+.pt-breadcrumb {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.app-page-title,
+.lg-page-head-title,
+.lg-detail-title,
+.lg-section-title,
+.lg-card-title,
+.lg-panel-title,
+.pt-page-title,
+.pt-panel-header,
+.ant-card-head-title,
+.ant-modal-title,
+.ant-drawer-title {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.app-page .ant-input,
+.app-page .ant-input-affix-wrapper,
+.app-page .ant-select-selector,
+.app-page .ant-picker,
+.app-page .ant-input-number,
+.lg-page .ant-input,
+.lg-page .ant-input-affix-wrapper,
+.lg-page .ant-select-selector,
+.lg-page .ant-picker,
+.lg-page .ant-input-number,
+.lg-list-page .ant-input,
+.lg-list-page .ant-input-affix-wrapper,
+.lg-list-page .ant-select-selector,
+.lg-list-page .ant-picker,
+.lg-list-page .ant-input-number,
+.project-target-redesign .ant-input,
+.project-target-redesign .ant-input-affix-wrapper,
+.project-target-redesign .ant-select-selector,
+.project-target-redesign .ant-picker,
+.project-target-redesign .ant-input-number,
+.pt-page .ant-input,
+.pt-page .ant-input-affix-wrapper,
+.pt-page .ant-select-selector,
+.pt-page .ant-picker,
+.pt-page .ant-input-number,
+.ant-modal .ant-input,
+.ant-modal .ant-input-affix-wrapper,
+.ant-modal .ant-select-selector,
+.ant-modal .ant-picker,
+.ant-modal .ant-input-number,
+.ant-drawer .ant-input,
+.ant-drawer .ant-input-affix-wrapper,
+.ant-drawer .ant-select-selector,
+.ant-drawer .ant-picker,
+.ant-drawer .ant-input-number {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.app-page .ant-input::placeholder,
+.app-page .ant-select-selection-placeholder,
+.lg-page .ant-input::placeholder,
+.lg-page .ant-select-selection-placeholder,
+.lg-list-page .ant-input::placeholder,
+.lg-list-page .ant-select-selection-placeholder,
+.project-target-redesign .ant-input::placeholder,
+.project-target-redesign .ant-select-selection-placeholder,
+.pt-page .ant-input::placeholder,
+.pt-page .ant-select-selection-placeholder,
+.ant-modal .ant-input::placeholder,
+.ant-modal .ant-select-selection-placeholder,
+.ant-drawer .ant-input::placeholder,
+.ant-drawer .ant-select-selection-placeholder {
+  color: var(--muted);
+}
+
+.app-page .ant-input-prefix,
+.lg-page .ant-input-prefix,
+.lg-list-page .ant-input-prefix,
+.project-target-redesign .ant-input-prefix,
+.pt-page .ant-input-prefix,
+.ant-modal .ant-input-prefix,
+.ant-drawer .ant-input-prefix {
+  color: var(--text-secondary);
+}
+
+.app-page .ant-btn,
+.lg-page .ant-btn,
+.lg-list-page .ant-btn,
+.project-target-redesign .ant-btn,
+.pt-page .ant-btn,
+.ant-modal .ant-btn,
+.ant-drawer .ant-btn {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.app-page .ant-btn-primary,
+.lg-page .ant-btn-primary,
+.lg-list-page .ant-btn-primary,
+.project-target-redesign .ant-btn-primary,
+.pt-page .ant-btn-primary,
+.ant-modal .ant-btn-primary,
+.ant-drawer .ant-btn-primary {
+  color: #fff;
+}
+
+.app-page .ant-btn-link,
+.app-page .ant-btn-text,
+.lg-page .ant-btn-link,
+.lg-page .ant-btn-text,
+.lg-list-page .ant-btn-link,
+.lg-list-page .ant-btn-text,
+.project-target-redesign .ant-btn-link,
+.project-target-redesign .ant-btn-text,
+.pt-page .ant-btn-link,
+.pt-page .ant-btn-text,
+.ant-modal .ant-btn-link,
+.ant-modal .ant-btn-text,
+.ant-drawer .ant-btn-link,
+.ant-drawer .ant-btn-text {
+  color: var(--primary);
+}
+
+.app-page .ant-form-item-label > label,
+.lg-page .ant-form-item-label > label,
+.lg-list-page .ant-form-item-label > label,
+.project-target-redesign .ant-form-item-label > label,
+.pt-page .ant-form-item-label > label,
+.ant-modal .ant-form-item-label > label,
+.ant-drawer .ant-form-item-label > label {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.ant-modal,
+.ant-drawer,
+.ant-popover,
+.ant-dropdown {
+  color: var(--text);
+  font-family: var(--font-family);
+  font-size: 14px;
+}
+
+.lg-search-actions,
+.pt-filter-actions {
+  gap: 10px;
+}
+
+.ant-btn {
+  border-color: var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.ant-btn:hover,
+.ant-btn:focus {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.ant-btn:active {
+  border-color: var(--primary-active);
+  color: var(--primary-active);
+}
+
+.ant-btn:focus-visible,
+input:focus,
+input:focus-visible,
+[tabindex]:focus,
+[tabindex]:focus-visible,
+.ant-input:focus,
+.ant-input:focus-visible,
+.ant-input-affix-wrapper-focused,
+.ant-input-affix-wrapper:focus-visible,
+.ant-select-focused .ant-select-selector,
+.ant-select-selector:focus-visible,
+.ant-pagination-item a:focus-visible,
+.ant-pagination-item-link:focus-visible,
+.lg-row-action-trigger:focus-visible,
+.ui-action-target:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--primary-soft) !important;
+}
+
+.ant-btn[disabled],
+.ant-btn[disabled]:hover,
+.ant-btn[disabled]:focus,
+.ant-btn[disabled]:active,
+.ant-btn-disabled,
+.ant-btn-disabled:hover,
+.ant-btn-disabled:focus,
+.ant-btn-disabled:active {
+  border-color: var(--border-subtle) !important;
+  color: var(--disabled) !important;
+  background: var(--surface-subtle) !important;
+  box-shadow: none !important;
+}
+
+.ant-btn-primary {
+  color: #fff;
+  background: var(--primary) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
+}
+
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  color: #fff !important;
+  background: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+.ant-btn-primary:active {
+  color: #fff !important;
+  background: var(--primary-active) !important;
+  border-color: var(--primary-active) !important;
+}
+
+.ant-btn-link,
+.ant-btn-text {
+  color: var(--primary);
+}
+
+.ant-btn-link:hover,
+.ant-btn-link:focus,
+.ant-btn-text:hover,
+.ant-btn-text:focus {
+  color: var(--primary-hover);
+  background: var(--primary-soft);
+}
+
+.ant-btn-link:active,
+.ant-btn-text:active {
+  color: var(--primary-active);
+}
+
+.ant-btn-dashed {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--surface);
+}
+
+.ant-btn-dashed:hover,
+.ant-btn-dashed:focus {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--surface);
+}
+
+.ant-btn-primary.ant-btn-background-ghost {
+  color: var(--primary) !important;
+  background: transparent !important;
+  border-color: var(--primary) !important;
+  box-shadow: none;
+}
+
+.ant-btn-primary.ant-btn-background-ghost:hover,
+.ant-btn-primary.ant-btn-background-ghost:focus {
+  color: var(--primary-hover) !important;
+  background: var(--primary-soft) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+.ant-btn-dangerous,
+.ant-btn-link.ant-btn-dangerous,
+.ant-btn-text.ant-btn-dangerous {
+  color: var(--error);
+}
+
+.ant-btn-dangerous:hover,
+.ant-btn-dangerous:focus,
+.ant-btn-link.ant-btn-dangerous:hover,
+.ant-btn-link.ant-btn-dangerous:focus,
+.ant-btn-text.ant-btn-dangerous:hover,
+.ant-btn-text.ant-btn-dangerous:focus {
+  color: #dc2626;
+  border-color: #dc2626;
+  background: var(--error-soft);
+}
+
+.ant-btn-primary.ant-btn-dangerous {
+  color: #fff !important;
+  background: var(--error) !important;
+  border-color: var(--error) !important;
+}
+
+.ant-btn-primary.ant-btn-dangerous:hover,
+.ant-btn-primary.ant-btn-dangerous:focus {
+  color: #fff !important;
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+
+.ant-dropdown-menu-item,
+.ant-dropdown-menu-submenu-title {
+  color: var(--text);
+}
+
+.ant-dropdown-menu-item:hover,
+.ant-dropdown-menu-submenu-title:hover {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.ant-dropdown-menu-item-danger,
+.ant-dropdown-menu-item-danger:hover {
+  color: var(--error) !important;
+}
+
+.ant-dropdown-menu-item-danger:hover {
+  background: var(--error-soft) !important;
+}
+
+.lg-kpi-strip {
+  gap: 12px;
+}
+
+.lg-kpi-card {
+  min-height: 104px;
+  padding: 18px;
+  border-left: 0;
+  overflow: hidden;
+}
+
+.lg-list-page .lg-kpi-card {
+  height: 104px;
+  min-height: 104px;
+}
+
+.lg-kpi-card::after {
+  content: '';
+  position: absolute;
+  right: -18px;
+  top: -28px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.11), rgba(37, 99, 235, 0));
+  pointer-events: none;
+}
+
+.lg-kpi-card-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lg-kpi-card-label::before {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 15px;
+}
+
+.lg-kpi-card-value {
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.lg-kpi-card.is-warn {
+  background: #fff7f7;
+  border-color: #ffd9d9;
+}
+
+.lg-grid,
+.project-content-layout {
+  gap: 16px;
+}
+
+.lg-analysis-rail,
+.project-content-layout .lg-analysis-rail {
+  width: 316px;
+}
+
+.lg-panel {
+  padding: 18px;
+}
+
+.lg-panel-title {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lg-list-table-panel,
+.project-table-panel {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.lg-toolbar {
+  min-height: 62px;
+  padding: 14px 18px;
+  border-color: var(--border-subtle);
+}
+
+.lg-list-page .lg-toolbar {
+  padding: 0 18px 14px;
+}
+
+.lg-list-page .lg-toolbar .ant-btn,
+.lg-toolbar .ant-btn {
+  height: 36px;
+  padding: 6px 13px;
+  border-radius: var(--radius-sm);
+}
+
+.lg-list-page .lg-toolbar .ant-btn-icon-only,
+.lg-toolbar .ant-btn-icon-only {
+  width: 36px;
+}
+
+.lg-table-wrap {
+  background: transparent;
+  border-radius: 0;
+}
+
+.lg-table-wrap .vxe-table,
+.lg-table-wrap .ant-table {
+  color: var(--text);
+  background: transparent;
+}
+
+.app-page .ant-table,
+.lg-page .ant-table,
+.lg-list-page .ant-table,
+.project-target-redesign .ant-table,
+.pt-page .ant-table,
+.ant-modal .ant-table,
+.ant-drawer .ant-table,
+.app-page .vxe-table,
+.lg-page .vxe-table,
+.lg-list-page .vxe-table,
+.project-target-redesign .vxe-table,
+.pt-page .vxe-table {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.app-page .ant-table-thead > tr > th,
+.lg-page .ant-table-thead > tr > th,
+.lg-list-page .ant-table-thead > tr > th,
+.project-target-redesign .ant-table-thead > tr > th,
+.pt-page .ant-table-thead > tr > th,
+.ant-modal .ant-table-thead > tr > th,
+.ant-drawer .ant-table-thead > tr > th,
+.app-page .vxe-header--column,
+.lg-page .vxe-header--column,
+.lg-list-page .vxe-header--column,
+.project-target-redesign .vxe-header--column,
+.pt-page .vxe-header--column {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app-page .ant-table-tbody > tr > td,
+.lg-page .ant-table-tbody > tr > td,
+.lg-list-page .ant-table-tbody > tr > td,
+.project-target-redesign .ant-table-tbody > tr > td,
+.pt-page .ant-table-tbody > tr > td,
+.ant-modal .ant-table-tbody > tr > td,
+.ant-drawer .ant-table-tbody > tr > td,
+.app-page .vxe-body--column,
+.lg-page .vxe-body--column,
+.lg-list-page .vxe-body--column,
+.project-target-redesign .vxe-body--column,
+.pt-page .vxe-body--column {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.app-page .ant-table-cell,
+.lg-page .ant-table-cell,
+.lg-list-page .ant-table-cell,
+.project-target-redesign .ant-table-cell,
+.pt-page .ant-table-cell,
+.ant-modal .ant-table-cell,
+.ant-drawer .ant-table-cell,
+.app-page .vxe-cell,
+.lg-page .vxe-cell,
+.lg-list-page .vxe-cell,
+.project-target-redesign .vxe-cell,
+.pt-page .vxe-cell {
+  line-height: 22px;
+}
+
+.ant-table-selection-column,
+.ant-table-cell.ant-table-selection-column,
+.vxe-header--column.col--checkbox,
+.vxe-body--column.col--checkbox,
+.vxe-footer--column.col--checkbox {
+  display: none !important;
+}
+
+.lg-table-wrap .vxe-header--column,
+.lg-list-page .lg-table-wrap .vxe-header--column,
+.lg-table-wrap .ant-table-thead > tr > th,
+.lg-list-page .lg-table-wrap .ant-table-thead > tr > th {
+  height: 46px;
+  background: #f8fafc !important;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.lg-table-wrap .vxe-body--column,
+.lg-list-page .lg-table-wrap .vxe-body--column,
+.lg-table-wrap .ant-table-tbody > tr > td,
+.lg-list-page .lg-table-wrap .ant-table-tbody > tr > td {
+  height: 56px;
+  color: var(--text);
+  font-size: 14px;
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.lg-table-wrap .vxe-body--row:hover,
+.lg-table-wrap .vxe-body--row:hover .vxe-body--column,
+.lg-table-wrap .ant-table-tbody > tr:hover > td {
+  background: #f4f8ff !important;
+}
+
+.lg-link {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.lg-money {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.lg-tag,
+.ant-tag {
+  border-radius: 999px;
+  border: 0;
+  font-weight: 600;
+}
+
+.lg-pagination {
+  min-height: 58px;
+  padding: 14px 18px 0;
+}
+
+.lg-list-page .lg-pagination .ant-pagination-item,
+.lg-list-page .lg-pagination .ant-pagination-prev,
+.lg-list-page .lg-pagination .ant-pagination-next {
+  border-radius: var(--radius-sm);
+}
+
+.lg-list-page .lg-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lg-list-page {
+  --lg-layout-gap: 12px;
+  --lg-kpi-min-height: 108px;
+  --lg-search-min-height: 108px;
+  --lg-rail-width: 240px;
+  --lg-workspace-height: calc(100vh - 74px);
+}
+
+.lg-list-page .lg-grid {
+  gap: var(--lg-layout-gap);
+  align-items: stretch;
+}
+
+.lg-list-page .lg-left {
+  gap: var(--lg-layout-gap);
+}
+
+.lg-list-page .lg-left > .lg-kpi-strip,
+.lg-list-page .lg-left > .lg-search-bar {
+  flex: 0 0 auto;
+  align-self: auto;
+}
+
+.lg-list-page .lg-left > .lg-kpi-strip {
+  min-height: var(--lg-kpi-min-height);
+  margin-bottom: 0;
+}
+
+.lg-list-page .lg-left > .lg-search-bar {
+  min-height: var(--lg-search-min-height);
+  margin-bottom: 0;
+}
+
+.lg-list-page .lg-left > .lg-list-table-panel,
+.lg-list-page .ct-main-column > .lg-list-table-panel,
+.lg-list-page .lg-grid > .lg-list-table-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lg-list-page .lg-kpi-strip .lg-kpi-card {
+  height: auto;
+  min-height: var(--lg-kpi-min-height);
+}
+
+.lg-list-page .lg-analysis-rail {
+  width: var(--lg-rail-width);
+  flex-shrink: 0;
+  align-self: stretch;
+  min-height: 0;
+}
+
+.lg-list-page .lg-analysis-rail > .lg-analysis-panel,
+.lg-list-page .lg-analysis-rail > .lg-fill-card,
+.lg-list-page .lg-analysis-rail > .lg-analysis-panel.lg-fill-card {
+  flex: 1 1 auto;
+  height: 100%;
+  min-height: 100%;
+  max-height: 100%;
+}
+
+.lg-analysis-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.lg-fill-card {
+  min-height: 0;
+}
+
+@media (min-width: 1201px) {
+  .lg-list-page > .lg-grid {
+    min-height: 0;
+    height: var(--lg-workspace-height);
+  }
+}
+
+.lg-list-page .lg-list-table-panel .lg-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  --lg-table-row-height: 56px;
+  background-color: var(--surface);
+}
+
+.lg-list-page .lg-table-wrap .vxe-grid,
+.lg-list-page .lg-table-wrap .vxe-table,
+.lg-list-page .lg-table-wrap .vxe-table--render-wrapper,
+.lg-list-page .lg-table-wrap .vxe-table--main-wrapper {
+  height: 100% !important;
+  min-height: 100%;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--render-wrapper,
+.lg-list-page .lg-table-wrap .vxe-table--main-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--layout-wrapper {
+  flex: 1 1 auto;
+  height: calc(100% - var(--vxe-ui-table-view-scrollbar-height)) !important;
+  min-height: 0;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--scroll-x-virtual {
+  position: absolute !important;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--vxe-ui-table-view-scrollbar-height) !important;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--header-wrapper {
+  flex: 0 0 auto;
+}
+
+.lg-list-page .lg-table-wrap .vxe-table--body-wrapper,
+.lg-list-page .lg-table-wrap .ant-table-body,
+.lg-list-page .lg-table-wrap .ant-table-content {
+  flex: 1 1 auto;
+  height: auto !important;
+  min-height: 0;
+  background-color: var(--surface);
+}
+
+.lg-pagination,
+.pt-pagination,
+.cc-pagination,
+.lg-list-page .ant-table-pagination.ant-pagination {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 58px;
+  margin: 0;
+  padding: 13px 18px;
+  border-top: 1px solid var(--border-subtle);
+  background: transparent;
+}
+
+.lg-list-table-panel > .lg-pagination,
+.pt-table-panel > .pt-pagination {
+  margin-top: 0;
+}
+
+.lg-total,
+.pt-total,
+.cc-total {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 30px;
+  white-space: nowrap;
+}
+
+.lg-pagination .ant-pagination,
+.pt-pagination .ant-pagination,
+.cc-pagination .ant-pagination,
+.lg-list-page .ant-table-pagination.ant-pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+
+.lg-pagination .ant-pagination-options-quick-jumper,
+.pt-pagination .ant-pagination-options-quick-jumper,
+.cc-pagination .ant-pagination-options-quick-jumper,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-pagination-options-quick-jumper {
+  display: none;
+}
+
+.lg-pagination .ant-pagination-item,
+.lg-pagination .ant-pagination-prev,
+.lg-pagination .ant-pagination-next,
+.pt-pagination .ant-pagination-item,
+.pt-pagination .ant-pagination-prev,
+.pt-pagination .ant-pagination-next,
+.cc-pagination .ant-pagination-item,
+.cc-pagination .ant-pagination-prev,
+.cc-pagination .ant-pagination-next,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-pagination-item,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-pagination-prev,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-pagination-next {
+  min-width: 30px;
+  height: 30px;
+  margin: 0;
+  border-color: var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  line-height: 28px;
+}
+
+.lg-pagination .ant-pagination-item a,
+.pt-pagination .ant-pagination-item a,
+.cc-pagination .ant-pagination-item a,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-pagination-item a {
+  color: var(--text-secondary);
+}
+
+.lg-pagination .ant-pagination-item-active,
+.pt-pagination .ant-pagination-item-active,
+.cc-pagination .ant-pagination-item-active,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-pagination-item-active {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.lg-pagination .ant-pagination-item-active a,
+.pt-pagination .ant-pagination-item-active a,
+.cc-pagination .ant-pagination-item-active a,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-pagination-item-active a {
+  color: #fff;
+}
+
+.lg-pagination .ant-select-selector,
+.pt-pagination .ant-select-selector,
+.cc-pagination .ant-select-selector,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-select-selector {
+  height: 30px !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.lg-pagination .ant-select-selection-item,
+.pt-pagination .ant-select-selection-item,
+.cc-pagination .ant-select-selection-item,
+.lg-list-page .ant-table-pagination.ant-pagination .ant-select-selection-item {
+  line-height: 28px !important;
+}
+
+.ant-modal-content,
+.ant-drawer-content {
+  border-radius: var(--radius-lg);
+}
+
+@media (max-width: 1200px) {
+  .lg-list-page .lg-grid,
+  .project-content-layout {
+    display: block;
+  }
+
+  .lg-analysis-rail,
+  .project-content-layout .lg-analysis-rail {
+    width: 100%;
+    margin-top: 16px;
+  }
+
+  .lg-list-page {
+    height: auto;
+    min-height: calc(100vh - 50px);
+    overflow: visible;
+  }
+
+  .lg-list-page .lg-grid,
+  .lg-list-page .lg-left,
+  .lg-list-page .ct-main-column,
+  .lg-list-page .lg-left > .lg-list-table-panel,
+  .lg-list-page .ct-main-column > .lg-list-table-panel,
+  .lg-list-page .lg-grid > .lg-list-table-panel {
+    min-height: 0;
+  }
+
+  .lg-pagination,
+  .pt-pagination,
+  .cc-pagination,
+  .lg-list-page .ant-table-pagination.ant-pagination {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+

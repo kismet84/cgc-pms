@@ -1,0 +1,515 @@
+/* ============================================================
+   lg-* — 列表/台账页面共享布局类（从 ContractLedgerPage 提炼）
+   ============================================================ */
+
+/* ---- 页面容器 & 头部 ---- */
+.lg-page {
+  background: var(--bg);
+  min-height: 100%;
+  padding: 2px 0;
+}
+
+.lg-list-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 50px);
+  padding: 22px 28px 28px;
+  overflow: visible;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.lg-list-page .lg-page-head {
+  margin-bottom: 14px;
+}
+
+.lg-list-page .lg-page-head-breadcrumb,
+.lg-list-page .lg-breadcrumb,
+.lg-list-page .ant-breadcrumb {
+  margin-bottom: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.lg-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.lg-page-head-breadcrumb {
+  margin-bottom: 5px;
+}
+.lg-page-head-title {
+  margin: 0;
+  font-size: var(--font-size-xxl);
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+.lg-page-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* ---- 搜索栏 ---- */
+.lg-search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  min-height: 78px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.lg-list-page .lg-search-bar {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  overflow: visible;
+}
+
+.lg-list-page .lg-search-bar > .ant-input-affix-wrapper,
+.lg-list-page .lg-search-bar > .ant-input,
+.lg-list-page .lg-search-bar > .ant-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lg-search-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.lg-list-page .lg-search-actions .ant-btn {
+  min-width: 58px;
+}
+.lg-search-bar :deep(.ant-input-affix-wrapper) {
+  flex: 1;
+  min-width: 200px;
+  height: 40px;
+  border-radius: var(--radius-md);
+}
+.lg-search-bar :deep(.ant-input) {
+  font-size: 14px;
+}
+.lg-search-bar :deep(.ant-btn) {
+  height: 40px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+}
+
+/* ---- 搜索栏扩展筛选 ---- */
+.lg-search-bar-expand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0 0;
+  width: 100%;
+}
+.lg-search-bar-expand :deep(.ant-select),
+.lg-search-bar-expand :deep(.ant-picker) {
+  min-width: 160px;
+}
+.lg-search-bar-expand :deep(.ant-select-selector),
+.lg-search-bar-expand :deep(.ant-picker) {
+  height: 40px;
+  border-radius: var(--radius-md);
+}
+.lg-search-bar-expand :deep(.ant-select-selection-item),
+.lg-search-bar-expand :deep(.ant-picker-input > input) {
+  line-height: 38px;
+}
+
+/* ---- 双栏布局 ---- */
+.lg-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 336px;
+  gap: 16px;
+  align-items: start;
+}
+
+.lg-list-page .lg-grid {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 16px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.lg-list-page .lg-left {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.lg-list-page .lg-analysis-rail {
+  width: 290px;
+  flex-shrink: 0;
+}
+
+.lg-list-table-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  flex-direction: column;
+}
+.lg-left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- KPI 横条卡片（桌面） ---- */
+.lg-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.lg-kpi-card {
+  min-height: 98px;
+  padding: 20px;
+  background: var(--surface);
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+.lg-kpi-card.is-warn {
+  background: var(--error-soft);
+  border-color: #ffccc7;
+  border-left: 4px solid var(--error);
+}
+.lg-kpi-card-label {
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.lg-kpi-card-label::before {
+  content: '□';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lg-kpi-card:nth-child(2) .lg-kpi-card-label::before {
+  content: '¥';
+  color: var(--warning);
+}
+
+.lg-kpi-card:nth-child(3) .lg-kpi-card-label::before {
+  content: '✓';
+  color: var(--success);
+}
+
+.lg-kpi-card:nth-child(4) .lg-kpi-card-label::before {
+  content: '⚑';
+  color: var(--success);
+}
+
+.lg-kpi-card.is-warn .lg-kpi-card-label::before,
+.lg-kpi-card:nth-child(5) .lg-kpi-card-label::before {
+  content: '!';
+  color: var(--error);
+}
+
+.lg-kpi-card-label:has(svg)::before {
+  display: none;
+}
+.lg-kpi-card-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.lg-kpi-card-value.is-success {
+  color: var(--success);
+}
+.lg-kpi-card-value.is-danger {
+  color: var(--error);
+}
+.lg-kpi-card-value small {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 2px;
+}
+.lg-kpi-card-bar {
+  height: 3px;
+  border-radius: 99px;
+  background: var(--border-subtle);
+  margin-top: 4px;
+  overflow: hidden;
+}
+.lg-kpi-card-bar span {
+  height: 100%;
+  border-radius: 99px;
+  display: block;
+  transition: width 0.6s ease;
+}
+.lg-kpi-card-bar-fill {
+  width: 100%;
+}
+.lg-kpi-card-bar-fill.is-primary {
+  background: var(--primary);
+}
+.lg-kpi-card-bar-fill.is-success {
+  background: var(--success);
+}
+.lg-kpi-card-bar-fill.is-danger {
+  background: var(--error);
+}
+.lg-kpi-card-hint {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.lg-list-page .lg-kpi-card {
+  height: 98px;
+  min-height: 98px;
+  overflow: hidden;
+}
+
+.lg-list-page .lg-left > .lg-kpi-strip,
+.lg-list-page .ct-main-column > .lg-kpi-strip {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.lg-list-page .lg-left > .lg-kpi-strip .lg-kpi-card,
+.lg-list-page .ct-main-column > .lg-kpi-strip .lg-kpi-card {
+  min-width: 0;
+}
+
+.lg-list-page .lg-kpi-card-bar,
+.lg-list-page .lg-kpi-card-hint {
+  display: none;
+}
+
+/* ---- KPI 移动端单卡片 ---- */
+.lg-kpi-single {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  padding: 8px 0;
+  margin-bottom: 10px;
+}
+.lg-kpi-single-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+.lg-kpi-single-row + .lg-kpi-single-row {
+  border-top: 1px solid var(--border-subtle);
+}
+.lg-kpi-single-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.lg-kpi-single-label {
+  flex: 1;
+  color: var(--text-secondary);
+}
+.lg-kpi-single-value {
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lg-kpi-single-value small {
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+/* ---- 工具栏 ---- */
+.lg-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 66px;
+  margin-bottom: 0;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lg-list-page .lg-toolbar {
+  min-height: auto;
+  padding: 0 20px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lg-list-page > .lg-toolbar,
+.lg-list-page .lg-left > .lg-toolbar {
+  margin-top: 0;
+  background: var(--surface);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  box-shadow: var(--shadow-soft);
+}
+
+.lg-list-page .lg-toolbar :deep(.ant-btn) {
+  height: 34px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  line-height: 20px;
+}
+.lg-list-page .lg-toolbar .ant-btn,
+.lg-toolbar .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 20px;
+  box-shadow: none;
+}
+.lg-list-page .lg-toolbar .ant-btn-icon-only,
+.lg-toolbar .ant-btn-icon-only {
+  width: 34px;
+  padding: 0;
+}
+.lg-toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.lg-toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.lg-toolbar :deep(.ant-btn) {
+  height: 34px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+.lg-toolbar :deep(.ant-btn-primary) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.lg-toolbar :deep(.ant-btn-primary:hover) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.lg-list-page .lg-toolbar.cost-toolbar,
+.lg-toolbar.cost-toolbar {
+  min-height: 56px;
+  padding: 10px 18px 14px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lg-toolbar.cost-toolbar .lg-toolbar-left,
+.lg-toolbar.cost-toolbar .lg-toolbar-right {
+  min-height: 36px;
+  align-items: center;
+}
+
+.lg-toolbar.cost-toolbar .lg-toolbar-left {
+  justify-content: flex-start;
+}
+
+.lg-toolbar.cost-toolbar .lg-toolbar-right {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.lg-toolbar.cost-toolbar .ant-select {
+  min-width: 180px;
+}
+
+.lg-toolbar.cost-toolbar .ant-select-selector {
+  height: 36px !important;
+  align-items: center;
+  border-radius: var(--radius-sm) !important;
+}
+
+@media (max-width: 768px) {
+  .lg-list-page .lg-toolbar.cost-toolbar,
+  .lg-toolbar.cost-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 12px 16px;
+  }
+
+  .lg-toolbar.cost-toolbar .lg-toolbar-left,
+  .lg-toolbar.cost-toolbar .lg-toolbar-right {
+    width: 100%;
+  }
+
+  .lg-toolbar.cost-toolbar .lg-toolbar-right {
+    margin-left: 0;
+  }
+
+  .lg-toolbar.cost-toolbar .ant-select {
+    width: 100% !important;
+  }
+}
+
+.lg-tabs-toolbar {
+  min-height: 56px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lg-tabs-toolbar :deep(.ant-tabs-nav) {
+  margin-bottom: 0;
+}
+
