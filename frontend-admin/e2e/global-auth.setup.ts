@@ -4,6 +4,7 @@ import { chromium } from '@playwright/test'
 
 const authStateFile = 'e2e/.auth/admin.json'
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
+const DEV_LOGIN_PATH = process.env.PLAYWRIGHT_DEV_LOGIN_PATH ?? '/api/auth/dev-login?redirect=/dashboard'
 
 export default async function globalAuthSetup() {
   mkdirSync(dirname(authStateFile), { recursive: true })
@@ -12,6 +13,17 @@ export default async function globalAuthSetup() {
   try {
     const context = await browser.newContext({ baseURL: BASE_URL })
     const page = await context.newPage()
+
+    if (process.env.PLAYWRIGHT_USE_DEV_LOGIN === 'true') {
+      await page.goto(DEV_LOGIN_PATH)
+      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 20000 })
+      await page
+        .locator('.basic-layout, .lg-page, .app-page')
+        .first()
+        .waitFor({ state: 'visible', timeout: 20000 })
+      await page.context().storageState({ path: authStateFile })
+      return
+    }
 
     await page.goto('/login')
     await page

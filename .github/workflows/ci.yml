@@ -275,8 +275,8 @@ jobs:
       - name: Start backend
         run: |
           cd backend
-          nohup ./mvnw -C spring-boot:run -Dspring-boot.run.profiles=test \
-            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }} --spring.datasource.username=${{ env.CI_MYSQL_USER }} --spring.datasource.password=${{ env.CI_MYSQL_PASSWORD }} --spring.redis.host=localhost --spring.redis.port=6379 --jwt.secret=${TEST_JWT_SECRET} --cors.allowed-origins=http://127.0.0.1:4173,http://localhost:4173 --minio.endpoint=http://localhost:9000 --minio.access-key=cgcpmsci --minio.secret-key=cgcpmsci123456 --minio.bucket=cgc-pms-e2e" \
+          nohup ./mvnw -C spring-boot:run -Dspring-boot.run.profiles=test,dev \
+            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }} --spring.datasource.username=${{ env.CI_MYSQL_USER }} --spring.datasource.password=${{ env.CI_MYSQL_PASSWORD }} --spring.redis.host=localhost --spring.redis.port=6379 --jwt.secret=${TEST_JWT_SECRET} --cors.allowed-origins=http://127.0.0.1:4173,http://localhost:4173 --minio.endpoint=http://localhost:9000 --minio.access-key=cgcpmsci --minio.secret-key=cgcpmsci123456 --minio.bucket=cgc-pms-e2e --auth.dev-login.enabled=true --auth.dev-login.default-username=demo_dev_super_admin" \
             > ../backend.log 2>&1 &
           backend_pid=$!
           cd ..
@@ -301,6 +301,8 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
           PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4173
+          PLAYWRIGHT_USE_DEV_LOGIN: 'true'
+          PLAYWRIGHT_DEV_LOGIN_PATH: /api/auth/dev-login?redirect=/dashboard
 
   sql-safety-scan:
     runs-on: ubuntu-latest
