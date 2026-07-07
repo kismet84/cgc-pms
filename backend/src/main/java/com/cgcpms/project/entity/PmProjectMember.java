@@ -33,23 +33,30 @@ public class PmProjectMember extends BaseEntity {
     private Long id;
 
     @NotNull
+    @TableField("tenant_id")
     private Long tenantId;
 
     @NotNull
+    @TableField("project_id")
     private Long projectId;
 
     @NotNull
+    @TableField("user_id")
     private Long userId;
 
     @NotBlank
+    @TableField("role_code")
     private String roleCode;
 
+    @TableField("position_name")
     private String positionName;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @TableField("start_date")
     private LocalDate startDate;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
+    @TableField("end_date")
     private LocalDate endDate;
 
     private String status;

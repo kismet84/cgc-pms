@@ -95,6 +95,7 @@ class InvoiceRecognitionTest {
     @Order(1)
     @DisplayName("Should extract fields from valid Chinese invoice PDF")
     void shouldExtractFieldsFromValidPdf() {
+        Assumptions.assumeTrue(findChineseFont() != null, "Chinese-capable font is required for this PDF extraction test");
         MultipartFile file = createMockMultipartFile(
                 "application/pdf", sampleInvoiceBytes.length, false, sampleInvoiceBytes);
 
@@ -223,6 +224,7 @@ class InvoiceRecognitionTest {
     @DisplayName("Should handle multi-page PDF")
     void shouldHandleMultiPagePdf() throws IOException {
         File fontFile = findChineseFont();
+        Assumptions.assumeTrue(fontFile != null, "Chinese-capable font is required for this PDF extraction test");
         byte[] multiPageBytes = createMultiPagePdf(fontFile);
         MultipartFile file = createMockMultipartFile(
                 "application/pdf", multiPageBytes.length, false, multiPageBytes);

@@ -147,10 +147,15 @@ class WorkflowEngineIntegrationTest {
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfNodeInstance>()
                         .eq(WfNodeInstance::getInstanceId, testInstanceId)
                         .orderByAsc(WfNodeInstance::getNodeOrder));
-        assertEquals(3, nodes.size(), "应有3个节点（审批模板配置了3个节点）");
+        Integer expectedNodeCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM wf_template_node WHERE template_id = ? AND deleted_flag = 0",
+                Integer.class,
+                instance.getTemplateId());
+        assertEquals(expectedNodeCount, nodes.size(), "节点数应与审批模板配置一致");
         assertEquals("ACTIVE", nodes.get(0).getNodeStatus(), "第1个节点应为ACTIVE");
-        assertEquals("WAITING", nodes.get(1).getNodeStatus(), "第2个节点应为WAITING");
-        assertEquals("WAITING", nodes.get(2).getNodeStatus(), "第3个节点应为WAITING");
+        for (int i = 1; i < nodes.size(); i++) {
+            assertEquals("WAITING", nodes.get(i).getNodeStatus(), "后续节点应为WAITING");
+        }
 
         // 验证任务已创建
         List<WfTask> tasks = taskMapper.selectList(

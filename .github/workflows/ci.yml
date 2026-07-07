@@ -261,7 +261,7 @@ jobs:
         run: |
           cd backend
           nohup ./mvnw -C spring-boot:run -Dspring-boot.run.profiles=test \
-            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }} --spring.datasource.username=${{ env.CI_MYSQL_USER }} --spring.datasource.password=${{ env.CI_MYSQL_PASSWORD }} --spring.redis.host=localhost --spring.redis.port=6379" \
+            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }} --spring.datasource.username=${{ env.CI_MYSQL_USER }} --spring.datasource.password=${{ env.CI_MYSQL_PASSWORD }} --spring.redis.host=localhost --spring.redis.port=6379 --jwt.secret=${TEST_JWT_SECRET}" \
             > ../backend.log 2>&1 &
           backend_pid=$!
           cd ..
