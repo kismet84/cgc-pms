@@ -658,6 +658,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         getProjectName: vi.fn(() => 'PRJ-01 测试项目'),
         getAlertDomainLabel: vi.fn(() => '采购'),
         getAlertTagLabel: vi.fn(() => '采购'),
+        getProcessStatusLabel: vi.fn(() => '待处理'),
         formatSeverityText: vi.fn(() => 'HIGH'),
         formatDateTime: vi.fn(() => '2026-07-07 10:00:00'),
         getAlertMessageText: vi.fn(() => '采购订单逾期'),
