@@ -19,7 +19,7 @@ jobs:
       - name: Run backend tests with coverage
         run: cd backend && ./mvnw -C verify
         env:
-          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET }}
+          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Upload backend jar
         if: always()
         uses: actions/upload-artifact@v4
@@ -69,7 +69,7 @@ jobs:
       - name: Run MySQL Flyway smoke test
         run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest test -Dspring.profiles.active=test
         env:
-          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET }}
+          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}
           SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
@@ -266,7 +266,7 @@ jobs:
           sleep 30
           cd ..
         env:
-          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET }}
+          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Install Playwright dependencies
         run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm exec playwright install chromium
       - name: Run E2E tests

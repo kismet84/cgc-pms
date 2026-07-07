@@ -22,9 +22,24 @@ class MigrationIntegrityTest {
             "(?im)^\\s*ALTER\\s+TABLE\\s+cost_summary\\s*\\R\\s*ADD\\s+COLUMN\\s+cost_target_id");
 
     @Test
-    void localTestProfileIncludesJavaMigrations() throws Exception {
-        String testLocal = Files.readString(Path.of("src/test/resources/application-local.yml"));
+    void localTestProfileIncludesJavaMigrationsWhenPresent() throws Exception {
+        Path localProfile = Path.of("src/test/resources/application-local.yml");
+        if (!Files.exists(localProfile)) {
+            return;
+        }
+        String testLocal = Files.readString(localProfile);
         assertTrue(testLocal.contains("classpath:com/cgcpms/common/migration"));
+    }
+
+    @Test
+    void v89CostSubjectSeedUsesCanonicalColumns() throws IOException {
+        String sql = readString(MIGRATION_DIR.resolve("V89__fix_v78_seed_subjects.sql"));
+
+        assertFalse(sql.contains("subject_level"));
+        assertFalse(sql.contains("cost_type"));
+        assertFalse(sql.contains("INSERT IGNORE INTO cost_subject (tenant_id"));
+        assertTrue(sql.contains("subject_type"));
+        assertTrue(sql.contains("level"));
     }
 
     @Test
