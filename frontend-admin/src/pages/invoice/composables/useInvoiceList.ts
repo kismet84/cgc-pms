@@ -1,5 +1,6 @@
 import { ref, reactive, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import {
   getInvoiceList,
   deleteInvoice,
@@ -8,6 +9,7 @@ import {
 } from '@/api/modules/invoice'
 import type { InvoiceVO, PayRecordBrief } from '@/types/invoice'
 import { VERIFY_STATUS_LABEL } from '@/types/invoice'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 
 const INVOICE_BUSINESS_TYPE = 'INVOICE_ATTACHMENT'
 
@@ -18,7 +20,12 @@ export function fmtAmount(val: string | undefined): string {
   return n.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
 }
 
-export function useInvoiceList() {
+type UseInvoiceListOptions = {
+  route: RouteLocationNormalizedLoaded
+  router: Router
+}
+
+export function useInvoiceList({ route, router }: UseInvoiceListOptions) {
   const filter = reactive({
     keyword: '',
     payRecordId: undefined as string | undefined,
@@ -26,12 +33,18 @@ export function useInvoiceList() {
   })
 
   const loading = ref(false)
+  const hasLoaded = ref(false)
+  const listError = ref<string | null>(null)
   const tableData = ref<InvoiceVO[]>([])
   const total = ref(0)
   const pageNo = ref(1)
   const pageSize = ref(20)
+  const queryReady = ref(false)
 
   const payRecordList = ref<PayRecordBrief[]>([])
+  const hasActiveFilters = computed(
+    () => Boolean(filter.keyword || filter.payRecordId || filter.verifyStatus),
+  )
 
   const gridColumns = computed(() => [
     { field: 'invoiceNo', title: '发票号码', minWidth: 150, ellipsis: true },
@@ -63,9 +76,36 @@ export function useInvoiceList() {
     { title: '操作', width: 76, slots: { default: 'action' } },
   ])
 
+  function hydrateFromRouteQuery() {
+    filter.keyword = readStringQuery(route.query.keyword) ?? ''
+    filter.payRecordId = readStringQuery(route.query.payRecordId)
+    filter.verifyStatus = readStringQuery(route.query.verifyStatus)
+    pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+    pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+    queryReady.value = true
+  }
+
+  async function syncRouteQuery() {
+    if (!queryReady.value) return
+    const nextQuery = replaceListQuery(
+      route.query,
+      {
+        keyword: filter.keyword,
+        payRecordId: filter.payRecordId,
+        verifyStatus: filter.verifyStatus,
+        pageNo: pageNo.value,
+        pageSize: pageSize.value,
+      },
+      ['keyword', 'payRecordId', 'verifyStatus', 'pageNo', 'pageSize'],
+    )
+    await router.replace({ path: route.path, query: nextQuery })
+  }
+
   async function fetchData() {
     loading.value = true
+    listError.value = null
     try {
+      await syncRouteQuery()
       const res = await getInvoiceList({
         pageNo: pageNo.value,
         pageSize: pageSize.value,
@@ -73,14 +113,16 @@ export function useInvoiceList() {
         invoiceNo: filter.keyword || undefined,
         verifyStatus: filter.verifyStatus,
       })
-      tableData.value = res.records
+      tableData.value = res.records ?? []
       total.value = Number(res.total ?? 0)
     } catch (e: unknown) {
       console.error(e)
       tableData.value = []
       total.value = 0
+      listError.value = '请检查筛选条件或网络状态后重试。'
       message.error('加载发票列表失败，请稍后重试')
     } finally {
+      hasLoaded.value = true
       loading.value = false
     }
   }
@@ -210,6 +252,7 @@ export function useInvoiceList() {
   })
 
   function init() {
+    hydrateFromRouteQuery()
     fetchPayRecords()
     fetchData()
   }
@@ -217,6 +260,9 @@ export function useInvoiceList() {
   return {
     filter,
     loading,
+    hasLoaded,
+    listError,
+    hasActiveFilters,
     tableData,
     total,
     pageNo,

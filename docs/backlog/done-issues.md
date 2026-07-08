@@ -38,3 +38,10 @@
 合并方式：auto-merge/local-commit-only
 验证结果：通过
 相关报告：docs/quality/issue-004-003-payment-invoice-workflow-regression.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-005-001：付款与发票列表页生产化补强
+
+完成日期：2026-07-08
+合并方式：auto-merge/local-commit-only
+验证结果：通过
+相关报告：docs/quality/issue-005-001-payment-invoice-list-production.md；docs/iterations/iteration-2026-07-08-report.md

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { MoreOutlined, SearchOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
 import type { InvoiceVO, InvoiceRecognizeResultVO } from '@/types/invoice'
 import {
   INVOICE_TYPE_LABEL,
@@ -12,12 +13,18 @@ import { useInvoiceList, fmtAmount } from './composables/useInvoiceList'
 import InvoiceFormModal from './components/InvoiceFormModal.vue'
 import InvoiceKpiStrip from './components/InvoiceKpiStrip.vue'
 import InvoiceVerifyPanel from './components/InvoiceVerifyPanel.vue'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+
+const route = useRoute()
+const router = useRouter()
 
 const {
   filter,
   loading,
+  hasLoaded,
+  listError,
+  hasActiveFilters,
   tableData,
   total,
   pageNo,
@@ -32,7 +39,7 @@ const {
   handleDelete,
   handleVerify,
   init,
-} = useInvoiceList()
+} = useInvoiceList({ route, router })
 
 const {
   visibleColumns: visibleGridColumns,
@@ -45,6 +52,7 @@ const modalVisible = ref(false)
 const modalMode = ref<'create' | 'edit'>('create')
 const editingRecord = ref<InvoiceVO | null>(null)
 const modalRef = ref<InstanceType<typeof InvoiceFormModal> | null>(null)
+const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tableData.value.length)
 
 function handleAdd() {
   modalMode.value = 'create'
@@ -195,7 +203,25 @@ defineExpose({
 
           <!-- 表格 -->
           <div class="lg-table-wrap">
+            <div v-if="listError" class="invoice-list-feedback">
+              <a-result
+                status="error"
+                title="发票列表加载失败"
+                :sub-title="listError"
+              >
+                <template #extra>
+                  <a-button type="primary" @click="fetchData">重试</a-button>
+                </template>
+              </a-result>
+            </div>
+            <div v-else-if="showEmptyState" class="invoice-list-feedback">
+              <LgEmptyState description="暂无符合条件的发票记录">
+                <a-button v-if="hasActiveFilters" @click="handleReset">清空筛选</a-button>
+                <a-button v-else type="primary" @click="handleAdd">新增发票</a-button>
+              </LgEmptyState>
+            </div>
             <vxe-grid
+              v-else
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -376,6 +402,14 @@ defineExpose({
 
 .invoice-toolbar {
   align-items: center;
+}
+
+.invoice-list-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  padding: 24px;
 }
 
 .invoice-table-title {

@@ -20,55 +20,12 @@
 
 ## 执行顺序建议
 
-1. ISSUE-005-001
-2. ISSUE-006-001
-3. ISSUE-007-001
+1. ISSUE-006-001
+2. ISSUE-007-001
 
 ## P0
 
 ## P1
-
-### ISSUE-005-001：付款与发票列表页生产化补强
-
-优先级：P1  
-类型：前端 / 生产化  
-状态：Blocked
-自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
-来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#75-p1-2前端列表页生产化`
-目标：
-- 仅补强付款列表与发票列表的筛选回显、空态、错误态和重试入口，避免一次性扩到全部列表页。
-
-允许修改：
-- `frontend-admin/src/pages/payment/**`
-- `frontend-admin/src/pages/invoice/**`
-- `frontend-admin/src/api/modules/payment.ts`
-- `frontend-admin/src/api/modules/invoice.ts`
-- `frontend-admin/src/components/**`
-- `frontend-admin/src/composables/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-
-禁止修改：
-- `backend/**`
-- `frontend-admin/src/pages/purchase/**`
-- `frontend-admin/src/pages/inventory/**`
-- `frontend-admin/src/router/**`
-- `.codex-autopilot/**`
-
-验收标准：
-- 筛选条件可回显、可重置、可带入刷新后页面。
-- 空态、错误态、重试入口完整可用。
-- 前端验证和浏览器验收报告齐全。
-
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-
-当前阻塞说明：
-- 2026-07-08：实现与静态门禁已完成，但未通过浏览器验收的前端实现只作为 WIP 暂存，未合入当前提交。
-- 2026-07-08：本地后端 `8080` 未就绪，浏览器首页仅显示 `Request failed with status code 500`；`dev-login` 路径在内置浏览器中还被 `ERR_BLOCKED_BY_CLIENT` 拦截，暂不满足真实页面验收条件。
-- 相关报告：`docs/quality/issue-005-001-payment-invoice-list-production.md`
 
 ### ISSUE-006-001：文件上传白名单与发票识别失败兜底
 
@@ -166,3 +123,11 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-004-003-payment-invoice-workflow-regression.md`
+
+### ISSUE-005-001：付款与发票列表页生产化补强
+
+优先级：P1
+类型：前端 / 生产化
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-005-001-payment-invoice-list-production.md`

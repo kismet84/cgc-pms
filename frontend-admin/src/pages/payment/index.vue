@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import { MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   createApplication,
   deleteApplication,
@@ -17,7 +18,8 @@ import {
 import { getReceiptItems, getReceiptList } from '@/api/modules/receipt'
 import { getMeasureItems, getMeasureList } from '@/api/modules/subcontract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useReferenceStore } from '@/stores/reference'
 import { PAY_STATUS_COLOR, PAY_STATUS_LABEL, PAY_TYPE_COLOR, PAY_TYPE_LABEL } from '@/types/payment'
 import type { PayApplicationBasisVO, PayApplicationVO } from '@/types/payment'
@@ -47,12 +49,28 @@ const filter = reactive({
 })
 
 const loading = ref(false)
+const hasLoaded = ref(false)
+const listError = ref<string | null>(null)
 const tableData = ref<PayApplicationVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const route = useRoute()
+const router = useRouter()
+const queryReady = ref(false)
 const referenceStore = useReferenceStore()
 const { projects, contracts } = storeToRefs(referenceStore)
+const hasActiveFilters = computed(
+  () =>
+    Boolean(
+      filter.projectId ||
+        filter.contractId ||
+        filter.partnerId ||
+        filter.payType ||
+        filter.payStatus ||
+        filter.approvalStatus,
+    ),
+)
 
 type BasisType = 'MAT_RECEIPT' | 'SUB_MEASURE'
 type BasisSourceOption = { id: string; label: string; type: BasisType; amount?: string }
@@ -90,7 +108,7 @@ function handleFormProjectChange(projectId: string) {
 
 function handleFilterProjectChange(projectId: string | undefined) {
   filter.contractId = undefined
-  if (projectId) referenceStore.fetchContracts({ projectId })
+  referenceStore.fetchContracts(projectId ? { projectId } : {})
   handleSearch()
 }
 
@@ -137,8 +155,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 async function fetchData() {
   loading.value = true
+  listError.value = null
   try {
+    await syncRouteQuery()
     const res = await getApplicationList({
+      pageNo: pageNo.value,
       pageNum: pageNo.value,
       pageSize: pageSize.value,
       projectId: filter.projectId,
@@ -148,16 +169,49 @@ async function fetchData() {
       payStatus: filter.payStatus,
       approvalStatus: filter.approvalStatus,
     })
-    tableData.value = res.records
+    tableData.value = res.records ?? []
     total.value = Number(res.total ?? 0)
   } catch (e: unknown) {
     console.error(e)
     tableData.value = []
     total.value = 0
+    listError.value = '请检查筛选条件或网络状态后重试。'
     message.error('加载付款申请列表失败')
   } finally {
+    hasLoaded.value = true
     loading.value = false
   }
+}
+
+function hydrateFromRouteQuery() {
+  filter.projectId = readStringQuery(route.query.projectId)
+  filter.contractId = readStringQuery(route.query.contractId)
+  filter.partnerId = readStringQuery(route.query.partnerId)
+  filter.payType = readStringQuery(route.query.payType)
+  filter.payStatus = readStringQuery(route.query.payStatus)
+  filter.approvalStatus = readStringQuery(route.query.approvalStatus)
+  pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+  pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+  queryReady.value = true
+}
+
+async function syncRouteQuery() {
+  if (!queryReady.value) return
+  const nextQuery = replaceListQuery(
+    route.query,
+    {
+      projectId: filter.projectId,
+      contractId: filter.contractId,
+      partnerId: filter.partnerId,
+      payType: filter.payType,
+      payStatus: filter.payStatus,
+      approvalStatus: filter.approvalStatus,
+      pageNo: pageNo.value,
+      pageSize: pageSize.value,
+    },
+    ['projectId', 'contractId', 'partnerId', 'payType', 'payStatus', 'approvalStatus', 'pageNo', 'pageSize'],
+  )
+  await router.replace({ path: route.path, query: nextQuery })
 }
 
 async function fetchReceipts() {
@@ -221,6 +275,7 @@ function handleReset() {
   filter.payStatus = undefined
   filter.approvalStatus = undefined
   pageNo.value = 1
+  referenceStore.fetchContracts({})
   fetchData()
 }
 
@@ -524,12 +579,14 @@ const {
   colVisible,
   toggleCol,
 } = useColumnSettings('payment_list_cols', gridColumns)
+const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tableData.value.length)
 
 onMounted(() => {
+  hydrateFromRouteQuery()
   fetchDictData(PAY_STATUS_DICT)
   fetchDictData(APPROVAL_STATUS_DICT)
   referenceStore.fetchProjects()
-  referenceStore.fetchContracts({})
+  referenceStore.fetchContracts(filter.projectId ? { projectId: filter.projectId } : {})
   referenceStore.fetchPartners()
   fetchData()
   fetchReceipts()
@@ -589,7 +646,25 @@ onMounted(() => {
         </div>
 
         <div class="lg-table-wrap">
+          <div v-if="listError" class="payment-list-feedback">
+            <a-result
+              status="error"
+              title="付款列表加载失败"
+              :sub-title="listError"
+            >
+              <template #extra>
+                <a-button type="primary" @click="fetchData">重试</a-button>
+              </template>
+            </a-result>
+          </div>
+          <div v-else-if="showEmptyState" class="payment-list-feedback">
+            <LgEmptyState description="暂无符合条件的付款申请">
+              <a-button v-if="hasActiveFilters" @click="handleReset">清空筛选</a-button>
+              <a-button v-else type="primary" @click="handleAdd">新建申请</a-button>
+            </LgEmptyState>
+          </div>
           <vxe-grid
+            v-else
             :data="tableData"
             :columns="visibleGridColumns"
             :loading="loading"
@@ -735,6 +810,14 @@ onMounted(() => {
 .payment-table-panel {
   min-height: 754px;
   border-top: 3px solid var(--primary);
+}
+
+.payment-list-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  padding: 24px;
 }
 
 .payment-toolbar {

@@ -136,3 +136,36 @@ Issue：ISSUE-005-001 付款与发票列表页生产化补强
 - 若后续继续该 Issue，需要先恢复已暂存的前端 WIP，再做真实浏览器验收。
 - 付款页与发票页的真实交互验收尚未在可用后端上完成，本轮不能给出“生产化补强通过”结论。
 - `frontend-admin/dist` 和 `.agent-runtime/` 属于本轮临时产物，可忽略，不应作为正式交付物。
+
+---
+
+Issue：ISSUE-005-001 付款与发票列表页生产化补强（阻塞重试）
+
+目标：
+- 解除后端 `8080` 与 `dev-login` 环境前置阻塞，恢复已暂存前端 WIP，补做付款页和发票页真实浏览器验收，并将该 Issue 从 Blocked 收口为 Done。
+
+修改范围摘要：
+- `frontend-admin/src/pages/payment/index.vue`：付款列表接入 query 回显/同步，补错误态、空态和重试入口。
+- `frontend-admin/src/pages/invoice/index.vue`、`frontend-admin/src/pages/invoice/composables/useInvoiceList.ts`：发票列表接入 query 回显/同步，补错误态、空态和重试入口。
+- `frontend-admin/src/composables/listPageQuery.ts` 与 3 个最小测试：覆盖列表 query 读写与生产化接线。
+- `docs/quality/issue-005-001-payment-invoice-list-production.md`、`docs/backlog/ready-issues.md`、`docs/backlog/blocked-issues.md`、`docs/backlog/done-issues.md`：更新通过报告与 backlog 状态。
+
+验证命令摘要：
+- `python scripts/rebuild.py frontend`：通过，前端容器重启成功。
+- 稳定等待：已按项目规则等待 `180秒`。
+- `http://localhost:8080/api/actuator/health`：返回 `200`。
+- `http://localhost:5173/`：返回 `200`。
+- `http://localhost:5173/api/auth/dev-login?redirect=/dashboard`：返回 `302 /dashboard`，Chromium 最终落点 `/dashboard`。
+- `cd frontend-admin; pnpm exec vitest run src/composables/__tests__/listPageQuery.test.ts src/pages/payment/__tests__/list-production.test.ts src/pages/invoice/__tests__/list-production.test.ts`：通过，`3` 个文件、`7` 个用例全部通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+- Chromium 浏览器验收：付款页 `/payment/application` 与发票页 `/invoice` 的筛选回显、重置、刷新保持、空态、错误态和“重试”入口通过。
+
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 付款空态与付款/发票错误态通过浏览器网络拦截触发，未改动后端数据；结论限于前端 UI 分支和重试入口可达性。
+- 本轮未跑全量前端测试，结论限于 ISSUE-005-001 指定补强范围。
