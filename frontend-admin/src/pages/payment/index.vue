@@ -19,6 +19,7 @@ import { getReceiptItems, getReceiptList } from '@/api/modules/receipt'
 import { getMeasureItems, getMeasureList } from '@/api/modules/subcontract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import { formatWanAmount } from '@/composables/listTablePresets'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useReferenceStore } from '@/stores/reference'
 import { PAY_STATUS_COLOR, PAY_STATUS_LABEL, PAY_TYPE_COLOR, PAY_TYPE_LABEL } from '@/types/payment'
@@ -481,11 +482,7 @@ function validateForm(): boolean {
   return true
 }
 
-function fmtWan(val: string | undefined): string {
-  if (!val) return '0.00'
-  const n = parseFloat(val)
-  return isNaN(n) ? '0.00' : (n / 10000).toFixed(2)
-}
+const fmtWan = formatWanAmount
 
 const kpiTotalApply = computed(() =>
   tableData.value.reduce((sum, row) => sum + (parseFloat(row.applyAmount) || 0), 0),

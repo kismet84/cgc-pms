@@ -27,6 +27,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-005-007-list-export-batch-permission.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-005-008：核心列表列宽/固定列/金额日期格式统一回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；列表展示口径已统一
+验证结果：通过
+相关报告：docs/quality/issue-005-008-list-format-column-consistency.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-006-006：文件上传大小与 MIME/扩展名校验回归
 
 完成日期：2026-07-09

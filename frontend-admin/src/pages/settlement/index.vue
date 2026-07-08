@@ -29,6 +29,7 @@ import type {
 import { SETTLEMENT_STATUS_LABEL, SETTLEMENT_STATUS_COLOR } from '@/types/settlement'
 import type { PageResult } from '@/types/api'
 import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import { formatWanAmount } from '@/composables/listTablePresets'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { SETTLEMENT_GRID_COLUMNS, SETTLEMENT_STATUS_COLOR_MAP } from './pageConfig'
@@ -239,13 +240,7 @@ async function handleCreate() {
   }
 }
 
-function fmtWan(val: string | undefined): string {
-  if (!val) return '0.00'
-  const n = parseFloat(val)
-  return isNaN(n)
-    ? '0.00'
-    : (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const fmtWan = formatWanAmount
 
 const kpiMax = computed(() => ({
   totalAmount: Math.max(parseFloat(kpi.value.totalFinalAmount), 1),

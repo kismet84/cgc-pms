@@ -5,6 +5,13 @@ import { getReceiptList, deleteReceipt, submitReceiptForApproval } from '@/api/m
 import { getOrderList } from '@/api/modules/purchase'
 import { getWarehouseList } from '@/api/modules/inventory'
 import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  buildActionColumn,
+  buildAmountColumn,
+  buildDateColumn,
+  buildStatusColumn,
+  formatWanAmount,
+} from '@/composables/listTablePresets'
 import type { MatReceiptVO } from '@/types/receipt'
 import type { MatPurchaseOrderVO } from '@/types/purchase'
 import type { WarehouseVO } from '@/types/inventory'
@@ -24,11 +31,7 @@ export const QUALITY_STATUS_COLOR: Record<string, string> = {
   PENDING: 'processing',
 }
 
-export function fmtAmount(val: string): string {
-  const n = parseFloat(val)
-  if (isNaN(n)) return '0.00'
-  return (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+export const fmtAmount = formatWanAmount
 
 export function useReceiptList({
   route,
@@ -78,22 +81,11 @@ export function useReceiptList({
     { field: 'orderCode', title: '采购订单', minWidth: 140, ellipsis: true },
     { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
     { field: 'partnerName', title: '供应商', minWidth: 140, ellipsis: true },
-    { field: 'receiptDate', title: '验收日期', width: 112 },
-    {
-      field: 'totalAmount',
-      title: '总金额',
-      width: 128,
-      align: 'right' as const,
-      slots: { default: 'totalAmount' },
-    },
-    { field: 'qualityStatus', title: '质量状态', width: 108, slots: { default: 'qualityStatus' } },
-    {
-      field: 'approvalStatus',
-      title: '审批状态',
-      width: 108,
-      slots: { default: 'approvalStatus' },
-    },
-    { title: '操作', width: 76, slots: { default: 'action' } },
+    buildDateColumn('receiptDate', '验收日期'),
+    buildAmountColumn('totalAmount', '总金额'),
+    buildStatusColumn('qualityStatus', '质量状态'),
+    buildStatusColumn('approvalStatus', '审批状态'),
+    buildActionColumn(),
   ])
 
   async function fetchData() {

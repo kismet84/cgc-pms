@@ -226,3 +226,38 @@ Backlog 拆解：Ready 队列补充（P1 第二轮）
 - 本轮只更新 backlog 与 iteration，不执行新拆出的业务任务。
 - 新任务均保持在 `current-focus` 当前允许 Epic 内，不扩大到总工程师、BIM、AI、生产发布、生产数据库连接或 migration 改动。
 - 每个 Issue 均保留最小验证命令与正式归档路径，供后续单轮串行执行。
+
+---
+
+Issue：ISSUE-005-008 核心列表列宽/固定列/金额日期格式统一回归
+
+目标：
+- 回归核心列表页的列宽、固定列、金额格式和日期格式统一口径。
+- 不改后端接口语义，不扩展详情页或新业务字段。
+
+修改范围摘要：
+- `frontend-admin/src/composables/listTablePresets.ts`：新增共享金额格式与列表列 preset，统一金额/日期/时间/状态/操作列口径。
+- `frontend-admin/src/pages/project/index.vue`：项目列表金额列、状态列、操作列接入共享 preset，并移除本地万金额式函数。
+- `frontend-admin/src/pages/contract/composables/useContractLedger.ts`：合同列表金额列、签订日期列、状态列、操作列接入共享 preset，并移除本地万金额式函数。
+- `frontend-admin/src/pages/payment/pageConfig.ts`、`frontend-admin/src/pages/payment/index.vue`：付款列表金额列、状态列、操作列和金额展示复用共享 helper。
+- `frontend-admin/src/pages/settlement/pageConfig.ts`、`frontend-admin/src/pages/settlement/index.vue`：结算列表金额列、状态列、创建时间列、操作列和金额展示复用共享 helper。
+- `frontend-admin/src/pages/receipt/composables/useReceiptList.ts`、`frontend-admin/src/pages/requisition/composables/useRequisitionList.ts`：验收/领料列表金额格式、日期列、状态列和操作列接入共享 preset。
+- `frontend-admin/src/pages/invoice/composables/useInvoiceList.ts`：发票列表金额格式、金额列、日期列、时间列、状态列和操作列接入共享 preset。
+- `frontend-admin/src/pages/__tests__/list-column-format-consistency.test.ts`：新增源码级一致性回归测试。
+- `docs/quality/issue-005-008-list-format-column-consistency.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-005-008 收口为 Done，Ready 队列推进到 ISSUE-007-011。
+
+验证命令摘要：
+- `cd frontend-admin; pnpm exec vitest run src/pages/__tests__/list-column-format-consistency.test.ts`：先失败后通过，`1` 个文件、`3` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；列表展示口径已统一
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未做真实浏览器窄屏验收，固定列与列宽策略结论基于源码、类型检查和构建结果。
+- 仍有部分非本轮代表性页面保留本地金额展示 helper；如需扩展到所有列表页，应另立任务处理。

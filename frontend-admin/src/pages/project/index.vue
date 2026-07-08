@@ -9,6 +9,12 @@ import {
   updateProject,
   deleteProject,
 } from '@/api/modules/project'
+import {
+  buildActionColumn,
+  buildAmountColumn,
+  buildStatusColumn,
+  formatWanAmountWithUnit,
+} from '@/composables/listTablePresets'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
@@ -289,15 +295,6 @@ function onResize() {
 onMounted(() => window.addEventListener('resize', onResize))
 onUnmounted(() => window.removeEventListener('resize', onResize))
 
-function fmtAmount(val: string): string {
-  const n = parseFloat(val)
-  if (isNaN(n)) return '-'
-  return (
-    (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
-    ' 万元'
-  )
-}
-
 function amountYuanToWan(val?: string): number | undefined {
   const amount = Number(val)
   if (!Number.isFinite(amount)) return undefined
@@ -493,15 +490,9 @@ const gridColumns = computed(() => [
     showOverflow: 'tooltip',
     slots: { default: 'projectType' },
   },
-  {
-    field: 'contractAmount',
-    title: '合同金额',
-    width: 140,
-    minWidth: 140,
-    align: 'right' as const,
+  buildAmountColumn('contractAmount', '合同金额', 'contractAmount', {
     showOverflow: false,
-    slots: { default: 'contractAmount' },
-  },
+  }),
   {
     field: 'plannedStartDate',
     key: 'plannedDuration',
@@ -510,21 +501,13 @@ const gridColumns = computed(() => [
     showOverflow: 'tooltip',
     slots: { default: 'plannedDuration' },
   },
-  {
-    field: 'status',
-    title: '状态',
-    width: 88,
+  buildStatusColumn('status', '状态', 'status', {
     showOverflow: 'tooltip',
-    slots: { default: 'status' },
-  },
-  {
-    field: 'approvalStatus',
-    title: '审批状态',
-    width: 108,
+  }),
+  buildStatusColumn('approvalStatus', '审批状态', 'approvalStatus', {
     showOverflow: 'tooltip',
-    slots: { default: 'approvalStatus' },
-  },
-  { key: 'ops', title: '操作', width: 76, slots: { default: 'ops' } },
+  }),
+  buildActionColumn('ops', { key: 'ops' }),
 ])
 const {
   visibleColumns: visibleGridColumns,
@@ -737,7 +720,7 @@ const {
           :approval-status-color="APPROVAL_STATUS_COLOR"
           :project-type-label="projectTypeLabel"
           :project-type-color="projectTypeColor"
-          :fmt-amount="fmtAmount"
+          :fmt-amount="formatWanAmountWithUnit"
           @toggle-col="toggleCol"
           @refresh="fetchData"
           @create="handleCreateModalOpen"

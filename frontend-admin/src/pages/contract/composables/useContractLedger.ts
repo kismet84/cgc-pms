@@ -11,6 +11,13 @@ import type {
   ContractStatus,
 } from '@/types/contract'
 import type { PageResult } from '@/types/api'
+import {
+  buildActionColumn,
+  buildAmountColumn,
+  buildDateColumn,
+  buildStatusColumn,
+  formatWanAmount,
+} from '@/composables/listTablePresets'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // ---- Constants ----
@@ -275,14 +282,7 @@ export function useContractLedger() {
   }
 
   // ---- Helpers ----
-  function fmtAmount(val: string): string {
-    const n = parseFloat(val)
-    if (isNaN(n)) return '0.00'
-    return (n / 10000).toLocaleString('zh-CN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-  }
+  const fmtAmount = formatWanAmount
 
   // ---- Computed analysis ----
   const typeDistribution = computed(() => {
@@ -373,37 +373,24 @@ export function useContractLedger() {
     {
       field: 'contractType',
       title: '合同类型',
-      width: 88,
+      width: 108,
       showOverflow: 'tooltip',
       slots: { default: 'contractType' },
     },
     { field: 'partyAName', title: '甲方', minWidth: 116, showOverflow: 'tooltip' },
     { field: 'partyBName', title: '乙方', minWidth: 104, showOverflow: 'tooltip' },
-    {
-      field: 'contractAmount',
-      title: '合同金额(含税)',
-      width: 132,
-      minWidth: 132,
-      align: 'right' as const,
+    buildAmountColumn('contractAmount', '合同金额(含税)', 'amount', {
       showOverflow: false,
-      slots: { default: 'amount' },
-    },
-    { field: 'signedDate', title: '签订日期', width: 94, showOverflow: 'tooltip' },
-    {
-      field: 'contractStatus',
-      title: '合同状态',
-      width: 88,
+    }),
+    buildDateColumn('signedDate', '签订日期', { showOverflow: 'tooltip' }),
+    buildStatusColumn('contractStatus', '合同状态', 'status', {
       showOverflow: 'tooltip',
-      slots: { default: 'status' },
-    },
-    {
+    }),
+    buildActionColumn('ops', {
       field: 'ops',
-      title: '操作',
-      width: 76,
       align: 'center' as const,
       headerAlign: 'center' as const,
-      slots: { default: 'ops' },
-    },
+    }),
   ])
   const { visibleColumns, columnSettings, colVisible, toggleCol } = useColumnSettings(
     'contract_ledger_cols_v2',

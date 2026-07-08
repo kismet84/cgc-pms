@@ -1,3 +1,5 @@
+import { buildActionColumn, buildAmountColumn, buildStatusColumn } from '@/composables/listTablePresets'
+
 export const APPROVAL_STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
   APPROVING: '审批中',
@@ -17,29 +19,11 @@ export const PAYMENT_GRID_COLUMNS = [
   { field: 'projectName', title: '项目', minWidth: 150, ellipsis: true },
   { field: 'contractName', title: '合同', minWidth: 150, ellipsis: true },
   { field: 'partnerName', title: '合作方', minWidth: 140, ellipsis: true },
-  {
-    field: 'applyAmount',
-    title: '申请金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'applyAmount' },
-  },
-  {
-    field: 'approvedAmount',
-    title: '审批金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'approvedAmount' },
-  },
-  {
-    field: 'actualPayAmount',
-    title: '实付金额',
-    width: 118,
-    align: 'right' as const,
-    slots: { default: 'actualPayAmount' },
-  },
-  { field: 'payType', title: '付款类型', width: 108, slots: { default: 'payType' } },
-  { field: 'payStatus', title: '支付状态', width: 108, slots: { default: 'payStatus' } },
-  { field: 'approvalStatus', title: '审批状态', width: 108, slots: { default: 'approvalStatus' } },
-  { title: '操作', width: 76, slots: { default: 'action' } },
+  buildAmountColumn('applyAmount', '申请金额'),
+  buildAmountColumn('approvedAmount', '审批金额'),
+  buildAmountColumn('actualPayAmount', '实付金额'),
+  buildStatusColumn('payType', '付款类型'),
+  buildStatusColumn('payStatus', '支付状态'),
+  buildStatusColumn('approvalStatus', '审批状态'),
+  buildActionColumn(),
 ] as const

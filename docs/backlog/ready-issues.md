@@ -28,47 +28,14 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-005-008`
-2. `ISSUE-007-011`
-3. `ISSUE-007-012`
-4. `ISSUE-007-013`
-5. `ISSUE-007-014`
+1. `ISSUE-007-011`
+2. `ISSUE-007-012`
+3. `ISSUE-007-013`
+4. `ISSUE-007-014`
 
 ## P0
 
 ## P1
-
-### ISSUE-005-008：核心列表列宽/固定列/金额日期格式统一回归
-
-优先级：P1
-类型：前端 / 生产化 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“列宽、固定列、金额格式、日期格式统一”
-目标：
-- 回归核心列表页的列宽、固定列、金额格式和日期格式统一口径。
-- 不改后端接口语义，不扩展详情页或新业务字段。
-允许修改：
-- `frontend-admin/src/pages/**`
-- `frontend-admin/src/components/**`
-- `frontend-admin/src/composables/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 重点核心列表页的金额、日期显示格式一致，不再各页各自定义。
-- 固定列与列宽策略不遮挡主要操作，窄屏下不出现明显错位。
-- 不因前端统一而改变状态、金额、日期的业务含义。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-005-008-list-format-column-consistency.md`
 
 ### ISSUE-007-011：CPU/内存/进程指标回归
 
@@ -490,6 +457,14 @@
 归档报告：`docs/quality/issue-007-010-backup-scope-redaction-restore-template.md`
 
 ## 已完成/历史
+
+### ISSUE-005-008：核心列表列宽/固定列/金额日期格式统一回归
+
+优先级：P1
+类型：前端 / 生产化 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-005-008-list-format-column-consistency.md`
 
 ### ISSUE-007-008：预警批处理执行结果指标回归
 

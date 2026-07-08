@@ -10,15 +10,18 @@ import {
 import type { InvoiceVO, PayRecordBrief } from '@/types/invoice'
 import { VERIFY_STATUS_LABEL } from '@/types/invoice'
 import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  buildActionColumn,
+  buildAmountColumn,
+  buildDateColumn,
+  buildDateTimeColumn,
+  buildStatusColumn,
+  formatCurrencyAmount,
+} from '@/composables/listTablePresets'
 
 const INVOICE_BUSINESS_TYPE = 'INVOICE_ATTACHMENT'
 
-export function fmtAmount(val: string | undefined): string {
-  if (!val) return '-'
-  const n = parseFloat(val)
-  if (isNaN(n)) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-}
+export const fmtAmount = formatCurrencyAmount
 
 type UseInvoiceListOptions = {
   route: RouteLocationNormalizedLoaded
@@ -48,32 +51,20 @@ export function useInvoiceList({ route, router }: UseInvoiceListOptions) {
 
   const gridColumns = computed(() => [
     { field: 'invoiceNo', title: '发票号码', minWidth: 150, ellipsis: true },
-    { field: 'invoiceType', title: '发票类型', width: 108, slots: { default: 'invoiceType' } },
-    {
-      field: 'invoiceAmount',
-      title: '发票金额',
-      width: 128,
-      align: 'right' as const,
-      slots: { default: 'invoiceAmount' },
-    },
+    buildStatusColumn('invoiceType', '发票类型'),
+    buildAmountColumn('invoiceAmount', '发票金额'),
     {
       field: 'taxRate',
       title: '税率(%)',
       width: 92,
       slots: { default: 'taxRate' },
     },
-    {
-      field: 'taxAmount',
-      title: '税额',
-      width: 110,
-      align: 'right' as const,
-      slots: { default: 'taxAmount' },
-    },
-    { field: 'invoiceDate', title: '开票日期', width: 110 },
-    { field: 'verifyStatus', title: '核验状态', width: 108, slots: { default: 'verifyStatus' } },
+    buildAmountColumn('taxAmount', '税额'),
+    buildDateColumn('invoiceDate', '开票日期'),
+    buildStatusColumn('verifyStatus', '核验状态'),
     { field: 'remark', title: '备注', minWidth: 140, ellipsis: true },
-    { field: 'createdAt', title: '创建时间', width: 150 },
-    { title: '操作', width: 76, slots: { default: 'action' } },
+    buildDateTimeColumn('createdAt', '创建时间'),
+    buildActionColumn(),
   ])
 
   function hydrateFromRouteQuery() {
