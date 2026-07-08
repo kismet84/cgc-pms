@@ -325,3 +325,33 @@ Issue：ISSUE-007-012 Redis 健康与黑名单降级告警回归
 剩余风险：
 - 本轮不连接真实 Redis，不验证外部监控平台采集，只做本地健康组件、日志告警码和 fail-close 回归。
 - local profile 仍允许 blacklist 服务缺失时继续请求，但健康组件返回 `UNKNOWN + BLACKLIST_UNAVAILABLE`，不会把该状态伪装成正常。
+
+---
+
+Issue：ISSUE-007-013 慢 SQL 监控口径回归
+
+目标：
+- 回归项目内慢 SQL 监控口径，明确阈值、日志/指标输出和测试覆盖。
+- 不引入外部 APM，不修改生产数据库配置。
+- 不输出完整 SQL 中的敏感值或连接串。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/common/aspect/SlowSqlObservationAspect.java`：新增 mapper 调用级慢 SQL 观测切面；默认阈值为 `observability.slow-sql.threshold-ms:500`；输出 `SLOW_SQL_DETECTED` 日志、`db.sql.duration` timer 和 `db.sql.slow.count` counter。
+- `backend/src/test/java/com/cgcpms/common/aspect/SlowSqlObservationAspectTest.java`：新增阈值、指标、非慢调用不误报和敏感参数不泄露回归测试。
+- `docs/quality/issue-007-013-slow-sql-observability.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-013 收口为 Done，Ready 队列推进到 ISSUE-007-014。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=SlowSqlObservationAspectTest" test`：先失败后通过；失败原因为缺少 `SlowSqlObservationAspect`，修复后 `3` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：首次失败暴露 `SlowSqlObservationAspect` 多构造器未显式标注注入构造器，已补充 `@Autowired` 修复；复验后仍未通过，失败类集中在既有 `dashboard`、`invoice`、`workflow`、`payment`、`revenue`、`purchase`、`migration` 集成测试，不属于本次改动引入。
+- `cd backend; .\mvnw.cmd "-Dtest=AccountingEntryControllerTest" test`：修复后通过，确认 Spring 上下文可加载慢 SQL 切面。
+- `git diff --check`：通过，仅有换行符转换提示。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮观测粒度为 mapper 方法调用耗时，不在日志中输出完整 SQL 或绑定参数。
+- `operation` 指标 tag 以 mapper 方法名为维度，后续 mapper 数量继续增长时需关注指标基数。

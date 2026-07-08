@@ -28,42 +28,11 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-013`
-2. `ISSUE-007-014`
+1. `ISSUE-007-014`
 
 ## P0
 
 ## P1
-
-### ISSUE-007-013：慢 SQL 监控口径回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“慢 SQL”
-目标：
-- 回归项目内慢 SQL 监控口径，明确阈值、日志/指标输出和测试覆盖。
-- 不引入外部 APM，不修改生产数据库配置。
-允许修改：
-- `backend/src/main/java/com/cgcpms/**`
-- `backend/src/main/resources/**`
-- `backend/src/test/java/com/cgcpms/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 慢 SQL 监控口径有明确配置或文档说明，并可通过本地测试验证。
-- 不输出完整 SQL 中的敏感值或连接串。
-- 缺口若无法在本轮实现，需在质量报告中明确分类和阻塞点。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-007-013-slow-sql-observability.md`
 
 ### ISSUE-007-014：访问日志 userId/tenantId 字段回归
 
