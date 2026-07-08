@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [master, main]
 
+env:
+  BACKEND_JAR_ARTIFACT: backend-jar-${{ github.run_number }}-${{ github.sha }}
+  BACKEND_COVERAGE_ARTIFACT: backend-coverage-${{ github.run_number }}-${{ github.sha }}
+  FRONTEND_DIST_ARTIFACT: frontend-dist-${{ github.run_number }}-${{ github.sha }}
+  FRONTEND_COVERAGE_ARTIFACT: frontend-coverage-${{ github.run_number }}-${{ github.sha }}
+  SBOM_ARTIFACT: sbom-artifacts-${{ github.run_number }}-${{ github.sha }}
+
 jobs:
   backend-test:
     runs-on: ubuntu-latest
@@ -20,18 +27,46 @@ jobs:
         run: cd backend && ./mvnw -C verify
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
+      - name: Upload backend test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            backend/target/surefire-reports
+            backend/target/failsafe-reports
+          if-no-files-found: ignore
       - name: Upload backend jar
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-jar
+          name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: backend/target/cgc-pms-backend.jar
       - name: Upload backend coverage
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-coverage
+          name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}
           path: backend/target/site/jacoco
+
+  backend-dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+      - name: Scan backend dependencies for high and critical vulnerabilities
+        run: cd backend && ./mvnw -C org.owasp:dependency-check-maven:12.2.2:check -Dformats=HTML,JSON -DfailBuildOnCVSS=7 -Dodc.outputDirectory=target/dependency-check
+      - name: Upload dependency scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dependency-scan-${{ github.run_number }}-${{ github.sha }}
+          path: backend/target/dependency-check
+          if-no-files-found: ignore
 
   backend-test-mysql:
     runs-on: ubuntu-latest
@@ -73,6 +108,41 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}
           SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
+      - name: Upload MySQL smoke test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-mysql-test-reports-${{ github.run_number }}-${{ github.sha }}
+          path: backend/target/surefire-reports
+          if-no-files-found: ignore
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+      - name: Lint frontend
+        shell: bash
+        run: |
+          cd frontend-admin
+          mkdir -p .ci-artifacts
+          pnpm install --frozen-lockfile
+          set -o pipefail
+          pnpm lint:check 2>&1 | tee .ci-artifacts/lint-check.txt
+      - name: Upload frontend lint evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-lint-report-${{ github.run_number }}-${{ github.sha }}
+          path: frontend-admin/.ci-artifacts/lint-check.txt
+          if-no-files-found: ignore
 
   type-check:
     runs-on: ubuntu-latest
@@ -109,7 +179,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist
+          name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin/dist
 
   frontend-test:
@@ -132,7 +202,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-coverage
+          name: ${{ env.FRONTEND_COVERAGE_ARTIFACT }}
           path: frontend-admin/coverage-ci
 
   frontend-dependency-audit:
@@ -152,7 +222,7 @@ jobs:
 
   supply-chain-security:
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-build]
+    needs: [backend-test, backend-dependency-scan, frontend-build]
     permissions:
       contents: read
       id-token: write
@@ -161,12 +231,12 @@ jobs:
       - name: Download backend jar
         uses: actions/download-artifact@v4
         with:
-          name: backend-jar
+          name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: artifacts/backend
       - name: Download frontend build
         uses: actions/download-artifact@v4
         with:
-          name: frontend-dist
+          name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: artifacts/frontend-dist
       - name: Package frontend build artifact
         run: tar -C artifacts -czf artifacts/frontend-dist.tar.gz frontend-dist
@@ -205,7 +275,7 @@ jobs:
       - name: Upload generated SBOMs
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-artifacts
+          name: ${{ env.SBOM_ARTIFACT }}
           path: |
             artifacts/backend/cgc-pms-backend.spdx.json
             artifacts/frontend-dist.spdx.json
@@ -255,7 +325,7 @@ jobs:
       - name: Download frontend build
         uses: actions/download-artifact@v4
         with:
-          name: frontend-dist
+          name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin/dist
       - name: Start MinIO
         run: |
@@ -303,6 +373,16 @@ jobs:
           PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4173
           PLAYWRIGHT_USE_DEV_LOGIN: 'true'
           PLAYWRIGHT_DEV_LOGIN_PATH: /api/auth/dev-login?redirect=/dashboard
+      - name: Upload E2E failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-evidence-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            frontend-admin/playwright-report
+            frontend-admin/test-results
+            backend.log
+          if-no-files-found: ignore
 
   sql-safety-scan:
     runs-on: ubuntu-latest
@@ -311,3 +391,43 @@ jobs:
       - name: Run SQL injection safety scan
         shell: pwsh
         run: ./scripts/check-sql-safety.ps1
+
+  build-summary:
+    if: always()
+    runs-on: ubuntu-latest
+    needs:
+      - backend-test
+      - backend-dependency-scan
+      - backend-test-mysql
+      - frontend-lint
+      - type-check
+      - frontend-build
+      - frontend-test
+      - frontend-dependency-audit
+      - supply-chain-security
+      - e2e
+      - sql-safety-scan
+    steps:
+      - name: Write build summary
+        run: |
+          {
+            echo "## CI Build Summary"
+            echo ""
+            echo "- Run number: ${{ github.run_number }}"
+            echo "- Commit SHA: ${{ github.sha }}"
+            echo "- Core gate jobs: frontend-lint, backend-dependency-scan, backend-test, backend-test-mysql, type-check, frontend-build, frontend-test, frontend-dependency-audit, e2e, sql-safety-scan, supply-chain-security"
+            echo "- Artifacts: ${{ env.BACKEND_JAR_ARTIFACT }}, ${{ env.BACKEND_COVERAGE_ARTIFACT }}, ${{ env.FRONTEND_DIST_ARTIFACT }}, ${{ env.FRONTEND_COVERAGE_ARTIFACT }}, ${{ env.SBOM_ARTIFACT }}"
+            echo ""
+            echo "### Job Results"
+            echo "- backend-test: ${{ needs.backend-test.result }}"
+            echo "- backend-dependency-scan: ${{ needs.backend-dependency-scan.result }}"
+            echo "- backend-test-mysql: ${{ needs.backend-test-mysql.result }}"
+            echo "- frontend-lint: ${{ needs.frontend-lint.result }}"
+            echo "- type-check: ${{ needs.type-check.result }}"
+            echo "- frontend-build: ${{ needs.frontend-build.result }}"
+            echo "- frontend-test: ${{ needs.frontend-test.result }}"
+            echo "- frontend-dependency-audit: ${{ needs.frontend-dependency-audit.result }}"
+            echo "- supply-chain-security: ${{ needs.supply-chain-security.result }}"
+            echo "- e2e: ${{ needs.e2e.result }}"
+            echo "- sql-safety-scan: ${{ needs.sql-safety-scan.result }}"
+          } >> "$GITHUB_STEP_SUMMARY"
