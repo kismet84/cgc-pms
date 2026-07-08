@@ -481,3 +481,39 @@ Issue：ISSUE-006-011 发票识别记录与人工确认审计回归
 剩余风险：
 - 本轮未验证外部日志平台或审计报表展示，结论基于 Spring 事件发布与 MockMvc 回归测试。
 - 当前为专用补充审计事件，保留既有通用 `@AuditedOperation` 审计事件；如后续需要统一审计去重或展示聚合，应另立任务处理。
+
+---
+
+Issue：ISSUE-006-012 病毒扫描预留状态与失败兜底回归
+
+目标：
+- 回归病毒扫描预留状态、错误码或扩展点口径，确保未接入真实查毒服务时行为明确。
+- 不把“未扫描”“未接入能力”伪装为“已完成安全扫描”或“安全通过”。
+- 合法上传主流程仍按既定策略工作，不引入误拦截或静默放行。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/file/vo/FileVirusScanStatus.java`：新增 `NOT_SCANNED`、`NOT_CONFIGURED`、`FAILED` 三类预留状态，全部为 `passed=false`。
+- `backend/src/main/java/com/cgcpms/file/vo/SysFileVO.java`：新增 `virusScanStatus`、`virusScanCode`、`virusScanMessage`、`virusScanPassed`。
+- `backend/src/main/java/com/cgcpms/file/service/FileService.java`：上传和列表响应默认返回 `NOT_CONFIGURED`，不阻断合法上传，不伪装为安全检查通过。
+- `backend/src/test/java/com/cgcpms/file/FileServiceTest.java`：新增合法上传预留状态和三类非通过状态断言。
+- `frontend-admin/src/types/file.ts`、`frontend-admin/src/types/__tests__/file.test.ts`：同步前端类型与状态枚举，确保不暴露 `PASSED` 或“已安全扫描”口径。
+- `docs/quality/issue-006-012-virus-scan-placeholder-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-012 收口为 Done，Ready 队列推进到 ISSUE-007-015。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest#testUploadReturnsVirusScanPlaceholderWithoutSafePass+testReservedVirusScanStatusesNeverPass" test`：先失败后通过；失败原因为缺少病毒扫描状态字段/枚举且文案仍含“安全通过”误导词组，修复后 `2` 个用例通过。
+- `cd frontend-admin; pnpm exec vitest run src/types/__tests__/file.test.ts`：先失败后通过；失败原因为前端缺少病毒扫描状态枚举，修复后 `1` 个文件、`2` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`：通过，`48` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd backend; .\mvnw.cmd test`：未通过；Surefire 汇总 `1542` 个测试、`10` 个 failures、`30` 个 errors、`1` 个 skipped，失败类集中在既有 `dashboard`、`invoice validation`、`workflow`、`payment`、`revenue`、`purchase`、`migration` 测试，不属于本次文件病毒扫描预留口径引入。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮不提供真实病毒扫描能力，只提供预留状态与失败兜底口径。
+- 当前未新增 `sys_file` 扫描状态持久化字段；如后续接入真实查毒服务并需要逐文件持久化状态，需要另立 migration 任务确认。
+- 本轮未做真实 MinIO 集成验收，文件存储交互由 MockBean 覆盖。

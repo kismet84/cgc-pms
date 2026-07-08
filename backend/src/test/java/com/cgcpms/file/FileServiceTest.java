@@ -7,6 +7,8 @@ import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.vo.FileVirusScanStatus;
+import com.cgcpms.file.vo.SysFileVO;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
@@ -343,6 +345,41 @@ class FileServiceTest {
 
         assertEquals(2L, fileCountFor(businessType, businessId));
         verify(minioClient, times(2)).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("upload returns virus scan placeholder without marking legal file as safe scanned")
+    void testUploadReturnsVirusScanPlaceholderWithoutSafePass() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "scan-placeholder.pdf", "application/pdf", "%PDF-1.4 scan placeholder".getBytes());
+        String businessType = "SCAN_PLACEHOLDER";
+        long businessId = Math.abs(System.nanoTime());
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/SCAN_PLACEHOLDER/file.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        SysFileVO vo = fileService.upload(file, businessType, businessId);
+
+        assertEquals("NOT_CONFIGURED", vo.getVirusScanStatus());
+        assertEquals("VIRUS_SCAN_NOT_CONFIGURED", vo.getVirusScanCode());
+        assertFalse(Boolean.TRUE.equals(vo.getVirusScanPassed()));
+        assertTrue(vo.getVirusScanMessage().contains("未接入病毒扫描能力"));
+        assertFalse(vo.getVirusScanMessage().contains("安全通过"));
+        assertEquals(1L, fileCountFor(businessType, businessId));
+        verify(minioClient).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("reserved virus scan statuses never imply safe pass")
+    void testReservedVirusScanStatusesNeverPass() {
+        assertFalse(FileVirusScanStatus.NOT_SCANNED.passed());
+        assertFalse(FileVirusScanStatus.NOT_CONFIGURED.passed());
+        assertFalse(FileVirusScanStatus.FAILED.passed());
+        assertEquals("VIRUS_SCAN_NOT_SCANNED", FileVirusScanStatus.NOT_SCANNED.code());
+        assertEquals("VIRUS_SCAN_NOT_CONFIGURED", FileVirusScanStatus.NOT_CONFIGURED.code());
+        assertEquals("VIRUS_SCAN_FAILED", FileVirusScanStatus.FAILED.code());
+        assertFalse(FileVirusScanStatus.NOT_SCANNED.message().contains("安全通过"));
+        assertFalse(FileVirusScanStatus.NOT_CONFIGURED.message().contains("安全通过"));
+        assertFalse(FileVirusScanStatus.FAILED.message().contains("安全通过"));
     }
 
     @Test

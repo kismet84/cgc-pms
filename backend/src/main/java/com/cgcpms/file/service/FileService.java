@@ -6,6 +6,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.config.MinioConfig;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.vo.FileVirusScanStatus;
 import com.cgcpms.file.vo.SysFileVO;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.micrometer.core.instrument.Counter;
@@ -375,7 +376,16 @@ public class FileService {
         vo.setStoragePath(f.getStoragePath());
         vo.setBucketName(f.getBucketName());
         vo.setPresignedUrl(presignedUrl);
+        applyVirusScanPlaceholder(vo);
         if (f.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(f.getCreatedAt()));
         return vo;
+    }
+
+    private void applyVirusScanPlaceholder(SysFileVO vo) {
+        FileVirusScanStatus status = FileVirusScanStatus.NOT_CONFIGURED;
+        vo.setVirusScanStatus(status.name());
+        vo.setVirusScanCode(status.code());
+        vo.setVirusScanMessage(status.message());
+        vo.setVirusScanPassed(status.passed());
     }
 }

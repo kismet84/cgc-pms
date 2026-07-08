@@ -83,6 +83,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-006-011-invoice-recognition-audit-regression.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-006-012：病毒扫描预留状态与失败兜底回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-006-012-virus-scan-placeholder-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-007-009：JVM 与数据库连接池指标回归
 
 完成日期：2026-07-09

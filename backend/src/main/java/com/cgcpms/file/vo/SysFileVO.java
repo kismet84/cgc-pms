@@ -21,4 +21,8 @@ public class SysFileVO implements Serializable {
     private String bucketName;
     private String presignedUrl;
     private String createdAt;
+    private String virusScanStatus;
+    private String virusScanCode;
+    private String virusScanMessage;
+    private Boolean virusScanPassed;
 }
