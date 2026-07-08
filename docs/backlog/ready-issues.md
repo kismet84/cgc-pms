@@ -28,44 +28,13 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-011`
-2. `ISSUE-007-012`
-3. `ISSUE-007-013`
-4. `ISSUE-007-014`
+1. `ISSUE-007-012`
+2. `ISSUE-007-013`
+3. `ISSUE-007-014`
 
 ## P0
 
 ## P1
-
-### ISSUE-007-011：CPU/内存/进程指标回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“CPU / 内存”
-目标：
-- 回归 actuator/prometheus 下 CPU、内存和进程级基础指标可读性。
-- 不引入外部监控平台，不修改生产部署配置，不放宽鉴权边界。
-允许修改：
-- `backend/src/main/java/com/cgcpms/**`
-- `backend/src/main/resources/**`
-- `backend/src/test/java/com/cgcpms/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 本地可验证 CPU、内存、进程相关指标已注册且可通过 actuator/prometheus 读取。
-- 缺失指标时有明确测试失败或质量报告说明。
-- 不放宽现有 actuator 鉴权边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-007-011-process-memory-metrics-regression.md`
 
 ### ISSUE-007-012：Redis 健康与黑名单降级告警回归
 
@@ -489,6 +458,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-007-010-backup-scope-redaction-restore-template.md`
+
+### ISSUE-007-011：CPU/内存/进程指标回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-011-process-memory-metrics-regression.md`
 
 ### ISSUE-007-007：登录失败与文件失败次数指标回归
 

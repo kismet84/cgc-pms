@@ -75,6 +75,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-007-010-backup-scope-redaction-restore-template.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-007-011：CPU/内存/进程指标回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败；首次全量测试存在工具执行时限问题
+验证结果：通过
+相关报告：docs/quality/issue-007-011-process-memory-metrics-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-004-001：成本台账与汇总口径回归
 
 完成日期：2026-07-08

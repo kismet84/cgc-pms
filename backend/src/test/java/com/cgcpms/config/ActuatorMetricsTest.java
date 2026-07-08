@@ -27,13 +27,14 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
         "spring.main.allow-circular-references=true",
-        "management.endpoints.web.exposure.include=health,info,metrics"
+        "management.endpoints.web.exposure.include=health,info,metrics,prometheus"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
@@ -64,17 +65,45 @@ class ActuatorMetricsTest {
     }
 
     @Test
-    @DisplayName("metrics 端点应可在鉴权后读取 JVM 与连接池指标")
-    void shouldExposeMetricsEndpointForJvmAndDatasourceMeters() throws Exception {
+    @DisplayName("metrics 端点应可在鉴权后读取 CPU、内存、进程与连接池指标")
+    void shouldExposeMetricsEndpointForCpuMemoryProcessAndDatasourceMeters() throws Exception {
         mockMvc.perform(get("/api/actuator/metrics")
                         .contextPath("/api")
                         .cookie(adminCookie()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.names").isArray())
                 .andExpect(jsonPath("$.names").value(org.hamcrest.Matchers.hasItems(
+                        "system.cpu.usage",
+                        "process.cpu.usage",
+                        "jvm.memory.used",
+                        "process.uptime",
                         "jvm.threads.live",
                         "hikaricp.connections.max"
                 )));
+
+        mockMvc.perform(get("/api/actuator/metrics/system.cpu.usage")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("system.cpu.usage"));
+
+        mockMvc.perform(get("/api/actuator/metrics/process.cpu.usage")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("process.cpu.usage"));
+
+        mockMvc.perform(get("/api/actuator/metrics/jvm.memory.used")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("jvm.memory.used"));
+
+        mockMvc.perform(get("/api/actuator/metrics/process.uptime")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("process.uptime"));
 
         mockMvc.perform(get("/api/actuator/metrics/jvm.threads.live")
                         .contextPath("/api")
@@ -90,9 +119,27 @@ class ActuatorMetricsTest {
     }
 
     @Test
-    @DisplayName("metrics 端点仍需鉴权，未登录请求不可直接读取")
-    void shouldKeepMetricsEndpointProtected() throws Exception {
+    @DisplayName("prometheus 端点应可在鉴权后抓取 CPU、内存与进程指标")
+    void shouldExposePrometheusEndpointForCpuMemoryAndProcessMetrics() throws Exception {
+        mockMvc.perform(get("/api/actuator/prometheus")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("system_cpu_usage")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("process_cpu_usage")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("jvm_memory_used_bytes")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("process_uptime_seconds")));
+    }
+
+    @Test
+    @DisplayName("metrics 与 prometheus 端点仍需鉴权，未登录请求不可直接读取")
+    void shouldKeepMetricsAndPrometheusEndpointsProtected() throws Exception {
         mockMvc.perform(get("/api/actuator/metrics")
+                        .contextPath("/api"))
+                .andExpect(status().is4xxClientError());
+
+        mockMvc.perform(get("/api/actuator/prometheus")
                         .contextPath("/api"))
                 .andExpect(status().is4xxClientError());
     }
@@ -119,10 +166,14 @@ class ActuatorMetricsTest {
     }
 
     @Test
-    @DisplayName("JVM、连接池和异步线程池指标应存在")
-    void shouldRegisterJvmDatasourceAndAsyncMetrics() {
+    @DisplayName("CPU、内存、进程、连接池和异步线程池指标应存在")
+    void shouldRegisterCpuMemoryProcessDatasourceAndAsyncMetrics() {
         applicationContext.getBean("taskExecutor");
 
+        assertHasMeter("system.cpu.usage");
+        assertHasMeter("process.cpu.usage");
+        assertHasMeter("jvm.memory.used");
+        assertHasMeter("process.uptime");
         assertHasMeter("jvm.threads.live");
         assertHasMeter("hikaricp.connections.max");
         assertNotNull(meterRegistry.find("executor.completed")
