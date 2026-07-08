@@ -28,9 +28,8 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-005-005`
-2. `ISSUE-005-006`
-3. `ISSUE-005-007`
+1. `ISSUE-005-006`
+2. `ISSUE-005-007`
 
 ## P0
 
@@ -103,40 +102,6 @@
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
 归档报告：`docs/quality/issue-005-004-inventory-requisition-list-production.md`
-
-### ISSUE-005-005：分包与结算列表页生产化补强
-
-优先级：P1
-类型：前端 / 生产化 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“分包列表、结算列表”
-目标：
-- 补强分包列表与结算列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
-- 不改分包计量、结算审批或付款关联业务口径。
-允许修改：
-- `frontend-admin/src/pages/subcontract/**`
-- `frontend-admin/src/pages/settlement/**`
-- `frontend-admin/src/api/modules/subcontract.ts`
-- `frontend-admin/src/api/modules/settlement.ts`
-- `frontend-admin/src/composables/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 查询条件刷新后可回显，分页参数不丢失。
-- loading、empty、error、retry 状态可达且不遮挡主要操作。
-- 状态字段、金额字段展示不因前端补强改变业务含义。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-005-005-subcontract-settlement-list-production.md`
 
 ### ISSUE-005-006：预警与审批列表页生产化补强
 
