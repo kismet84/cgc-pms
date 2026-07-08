@@ -42,6 +42,7 @@
 - 前端本地验收默认入口：`http://localhost:5173`
 - 前后端重启后的统一稳定等待时间按 `180秒` 执行；后端至少等待 `180秒` 后再做 health / Flyway / 接口验收，前端至少等待 `180秒` 并确认 Vite ready 后，再做 Playwright UI 验收。
 - 若 Docker 连续多次不可用（如 `dockerDesktopLinuxEngine` 管道不存在、`docker ps` 无法连接、`5173/8080` 均拒绝连接），在需要运行态验收且用户允许运维动作时，先尝试重启 WSL2 与 Docker Desktop，再等待 `180秒` 后复查 `docker ps`、后端 health、前端入口；不得把 Docker 不可用伪装成业务失败或验收通过。
+- 若 `http://localhost:5173` 回退到 `/login`，且前端日志出现 `/api/*` 代理到旧 `172.19.x.x:8080` 的错误，优先判定为前端 dev server 持有旧 backend 容器 IP；先执行 `python scripts/rebuild.py frontend` 再复验，不要先误判为路由守卫或后端业务回退。
 
 ## 质量与避坑入口
 
@@ -51,6 +52,7 @@
 - 前端开发规范与 `lg-*` 设计系统：`docs/05-前端开发规范.md`、`frontend-admin/src/assets/styles/global.css`。
 - 数据库与迁移规范：`docs/07-数据库与迁移规范.md`。
 - UI 基线：`docs/00-UI-Design-Baselines-and-Code-Specifications.md`。
+- CI、页面异常、接口失败先分三类再定性：`工具配置/规则加载问题`、`环境前置问题`、`真实质量/安全问题`；不要把所有红灯都直接归因为业务代码缺陷。
 
 ## 触发协议
 
