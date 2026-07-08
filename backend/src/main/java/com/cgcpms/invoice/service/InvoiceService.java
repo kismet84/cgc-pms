@@ -40,6 +40,8 @@ import com.cgcpms.common.util.DateTimeUtils;
 // TODO: 后续版本可将 8 个 extract* 方法的重叠正则模式提取为 RegexExtractor 接口
 public class InvoiceService {
 
+    private static final int MAX_RECOGNIZE_FILE_SIZE = 10 * 1024 * 1024;
+
     private final PayInvoiceMapper payInvoiceMapper;
     private final PayRecordMapper payRecordMapper;
     private final PayApplicationMapper payApplicationMapper;
@@ -201,11 +203,10 @@ public class InvoiceService {
         } catch (IOException e) {
             throw new BusinessException("FILE_EMPTY", "无法读取文件内容");
         }
-        fileTypeValidator.validate("invoice.pdf", file.getContentType(), content);
-        if (content.length > 10 * 1024 * 1024) {
-            log.warn("Invoice PDF is large ({} MB), this may increase memory pressure",
-                    content.length / 1024 / 1024);
+        if (content.length > MAX_RECOGNIZE_FILE_SIZE) {
+            throw new BusinessException("FILE_TOO_LARGE", "发票文件大小不能超过10MB");
         }
+        fileTypeValidator.validate(file.getOriginalFilename(), file.getContentType(), content);
 
         // PDF text extraction.
         // 发票 PDF 文件通常 < 500KB，全量加载到内存不会造成 OOM。

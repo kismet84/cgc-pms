@@ -20,49 +20,11 @@
 
 ## 执行顺序建议
 
-1. ISSUE-006-001
-2. ISSUE-007-001
+1. ISSUE-007-001
 
 ## P0
 
 ## P1
-
-### ISSUE-006-001：文件上传白名单与发票识别失败兜底
-
-优先级：P1  
-类型：安全 / 后端 / 前端  
-状态：Ready  
-自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
-来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#76-p1-3文件上传与发票识别安全增强`
-目标：
-- 以最小改动补齐文件上传大小与类型白名单校验，并让发票识别失败返回可理解错误，不在本轮引入病毒扫描或外部安全服务。
-
-允许修改：
-- `backend/src/main/java/**/file/**`
-- `backend/src/main/java/**/invoice/**`
-- `backend/src/test/java/**/file/**`
-- `backend/src/test/java/**/invoice/**`
-- `frontend-admin/src/pages/invoice/**`
-- `frontend-admin/src/api/modules/invoice.ts`
-- `docs/quality/**`
-- `docs/iterations/**`
-
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- `frontend-admin/src/pages/system/**`
-- 外部存储配置
-- `.codex-autopilot/**`
-
-验收标准：
-- 非白名单类型或超限文件被拒绝，并返回明确错误。
-- 发票识别失败不导致页面卡死，且有可见错误提示。
-- 至少补 1 个后端校验测试和 1 个前端或接口回归证据。
-
-验证命令：
-- `cd backend; .\mvnw.cmd -Dtest=FileServiceTest,InvoiceServiceTest test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
 
 ### ISSUE-007-001：访问日志上下文与备份清单补强
 
@@ -131,3 +93,11 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-005-001-payment-invoice-list-production.md`
+
+### ISSUE-006-001：文件上传白名单与发票识别失败兜底
+
+优先级：P1
+类型：安全 / 后端 / 前端
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-006-001-file-upload-invoice-recognition.md`

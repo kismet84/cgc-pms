@@ -169,3 +169,31 @@ Issue：ISSUE-005-001 付款与发票列表页生产化补强（阻塞重试）
 剩余风险：
 - 付款空态与付款/发票错误态通过浏览器网络拦截触发，未改动后端数据；结论限于前端 UI 分支和重试入口可达性。
 - 本轮未跑全量前端测试，结论限于 ISSUE-005-001 指定补强范围。
+
+---
+
+Issue：ISSUE-006-001 文件上传白名单与发票识别失败兜底
+
+目标：
+- 以最小改动补齐文件上传大小与类型白名单校验，并让发票识别失败返回可理解错误；不引入病毒扫描、外部安全服务或外部存储配置变更。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/invoice/service/InvoiceService.java`：发票识别入口复用 `FileTypeValidator` 的真实文件名校验，并对超过 10MB 的 PDF 返回 `FILE_TOO_LARGE`。
+- `backend/src/test/java/com/cgcpms/invoice/InvoiceServiceTest.java`：新增超限 PDF 与 PDF 内容非 PDF 扩展名的识别入口回归测试。
+- `frontend-admin/src/pages/invoice/components/InvoiceFormModal.vue`：前端发票识别上传前限制调整为 10MB，普通识别失败展示可理解错误提示并复位 loading。
+- `docs/quality/issue-006-001-file-upload-invoice-recognition.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-001 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest,InvoiceServiceTest" test`：通过，`Tests run: 30, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `git diff --check`：通过。
+
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未引入病毒扫描或外部安全服务，符合 Ready Issue 的明确非目标。
+- 本轮未跑全量后端/前端测试，结论限于 ISSUE-006-001 指定范围。
+- `.codex-autopilot/stop.flag` 保持存在，仅阻断后续 Issue；本轮未启动 ISSUE-007-001。

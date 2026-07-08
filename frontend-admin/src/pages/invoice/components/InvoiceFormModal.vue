@@ -176,9 +176,9 @@ function handleBeforeUpload(file: File) {
     message.error('仅支持PDF格式')
     return Upload.LIST_IGNORE
   }
-  const isLt50M = file.size / 1024 / 1024 < 50
-  if (!isLt50M) {
-    message.error('文件大小不能超过50MB')
+  const isLt10M = file.size / 1024 / 1024 < 10
+  if (!isLt10M) {
+    message.error('文件大小不能超过10MB')
     return Upload.LIST_IGNORE
   }
   return false // prevent auto-upload; manual upload handled in handleRecognize()
@@ -263,7 +263,12 @@ async function handleRecognize() {
     if (axios.isAxiosError(e)) {
       if (e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
         message.error('识别超时，请检查网络后重试')
+      } else {
+        const msg = (e.response?.data as { message?: string } | undefined)?.message
+        message.error(msg || '发票识别失败，请检查文件后重试')
       }
+    } else {
+      message.error('发票识别失败，请检查文件后重试')
     }
   } finally {
     recognizing.value = false

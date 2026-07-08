@@ -45,3 +45,10 @@
 合并方式：auto-merge/local-commit-only
 验证结果：通过
 相关报告：docs/quality/issue-005-001-payment-invoice-list-production.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-006-001：文件上传白名单与发票识别失败兜底
+
+完成日期：2026-07-08
+合并方式：auto-merge/local-commit-only
+验证结果：通过
+相关报告：docs/quality/issue-006-001-file-upload-invoice-recognition.md；docs/iterations/iteration-2026-07-08-report.md

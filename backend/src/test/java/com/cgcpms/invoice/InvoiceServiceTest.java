@@ -177,6 +177,37 @@ class InvoiceServiceTest {
         assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
     }
 
+    @Test
+    @Order(16)
+    @DisplayName("RECOGNIZE: oversized PDF rejected before PDFBox parsing")
+    void shouldRejectRecognizeForOversizedPdf() {
+        byte[] content = new byte[11 * 1024 * 1024];
+        System.arraycopy("%PDF-".getBytes(), 0, content, 0, 5);
+        MockMultipartFile oversizedPdf = new MockMultipartFile(
+                "file",
+                "oversized.pdf",
+                "application/pdf",
+                content);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> invoiceService.recognize(oversizedPdf));
+        assertEquals("FILE_TOO_LARGE", ex.getCode());
+        assertTrue(ex.getMessage().contains("10MB"));
+    }
+
+    @Test
+    @Order(17)
+    @DisplayName("RECOGNIZE: PDF content with non-PDF extension is rejected")
+    void shouldRejectRecognizeForPdfWithNonPdfExtension() {
+        MockMultipartFile disguisedPdf = new MockMultipartFile(
+                "file",
+                "invoice.txt",
+                "application/pdf",
+                "%PDF-1.4 disguised".getBytes());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> invoiceService.recognize(disguisedPdf));
+        assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
+    }
+
     // ── RED 2: duplicate invoice_no per tenant → BusinessException ──
 
     @Test
