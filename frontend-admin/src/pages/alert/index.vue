@@ -30,6 +30,7 @@ import {
   type AlertSubscriptionResponse,
 } from '@/types/alert'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { downloadBlobFile } from '@/utils/download'
 import AlertDetailPanel from './components/AlertDetailPanel.vue'
 import AlertFilterPanel from './components/AlertFilterPanel.vue'
 import AlertSubscriptionModal from './components/AlertSubscriptionModal.vue'
@@ -679,12 +680,7 @@ function exportCurrentView() {
     .map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
     .join('\n')
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `alerts-${new Date().toISOString().slice(0, 10)}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
+  downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)
   message.success('已导出当前列表')
 }
 

@@ -1,5 +1,7 @@
 package com.cgcpms.cost;
 
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import jakarta.servlet.http.Cookie;
@@ -32,16 +34,30 @@ class CostSummaryControllerTest {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private PmProjectMapper projectMapper;
+
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
+    private static final long MANAGED_PROJECT_ID = 8261001L;
+    private static final long PROJECT_MANAGER_ID = 93061L;
+    private static final long NO_PROJECT_ACCESS_USER_ID = 93062L;
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
                 ADMIN_ID, ADMIN_USERNAME, TENANT_ID,
                 List.of("ADMIN"),
                 List.of());
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    private Cookie summaryViewerCookie(long userId, long tenantId, List<String> roles) {
+        String token = jwtUtils.generateToken(
+                userId, "summary-user-" + userId, tenantId,
+                roles,
+                List.of("cost:summary:view"));
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
@@ -129,6 +145,69 @@ class CostSummaryControllerTest {
                 .andExpect(jsonPath("$.data").isArray());
     }
 
+    @Test
+    @Order(6)
+    @DisplayName("GET /cost-summary/{projectId} same-tenant user without project access -> 403")
+    void testGetLatest_SameTenantWithoutProjectAccessForbidden() throws Exception {
+        mockMvc.perform(getWithApi("/cost-summary/" + PROJECT_ID)
+                        .cookie(summaryViewerCookie(NO_PROJECT_ACCESS_USER_ID, TENANT_ID, List.of("COMMON_USER"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("POST /cost-summary/{projectId}/refresh same-tenant user without project access -> 403")
+    void testRefresh_SameTenantWithoutProjectAccessForbidden() throws Exception {
+        mockMvc.perform(postWithApi("/cost-summary/" + PROJECT_ID + "/refresh")
+                        .cookie(summaryViewerCookie(NO_PROJECT_ACCESS_USER_ID, TENANT_ID, List.of("COMMON_USER"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("GET /cost-summary/{projectId}/history same-tenant user without project access -> 403")
+    void testGetHistory_SameTenantWithoutProjectAccessForbidden() throws Exception {
+        mockMvc.perform(getWithApi("/cost-summary/" + PROJECT_ID + "/history")
+                        .cookie(summaryViewerCookie(NO_PROJECT_ACCESS_USER_ID, TENANT_ID, List.of("COMMON_USER"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("GET /cost-summary/{projectId} cross-tenant user -> project hidden")
+    void testGetLatest_CrossTenantUserProjectHidden() throws Exception {
+        mockMvc.perform(getWithApi("/cost-summary/" + PROJECT_ID)
+                        .cookie(summaryViewerCookie(ADMIN_ID, 999L, List.of("ADMIN"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_NOT_FOUND"));
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("GET /cost-summary/{projectId} ALL data-scope viewer -> 200")
+    void testGetLatest_AllDataScopeViewerAllowed() throws Exception {
+        mockMvc.perform(getWithApi("/cost-summary/" + PROJECT_ID)
+                        .cookie(summaryViewerCookie(980000000000000023L, TENANT_ID, List.of("COMMERCIAL_MANAGER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("GET /cost-summary/{projectId} project manager -> 200")
+    void testGetLatest_ProjectManagerAllowed() throws Exception {
+        seedManagedProjectIfAbsent();
+
+        mockMvc.perform(getWithApi("/cost-summary/" + MANAGED_PROJECT_ID)
+                        .cookie(summaryViewerCookie(PROJECT_MANAGER_ID, TENANT_ID, List.of("COMMON_USER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.projectId").value(String.valueOf(MANAGED_PROJECT_ID)));
+    }
+
     // ── helpers ──
 
     private MockHttpServletRequestBuilder getWithApi(String pathWithinContext) {
@@ -137,5 +216,24 @@ class CostSummaryControllerTest {
 
     private MockHttpServletRequestBuilder postWithApi(String pathWithinContext) {
         return post("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private void seedManagedProjectIfAbsent() {
+        if (projectMapper.selectById(MANAGED_PROJECT_ID) != null) {
+            return;
+        }
+        PmProject project = new PmProject();
+        project.setId(MANAGED_PROJECT_ID);
+        project.setTenantId(TENANT_ID);
+        project.setProjectCode("COST-SUMMARY-MANAGED");
+        project.setProjectName("成本摘要项目经理权限测试项目");
+        project.setProjectType("CONSTRUCTION");
+        project.setContractAmount(new java.math.BigDecimal("1000000.00"));
+        project.setTargetCost(new java.math.BigDecimal("800000.00"));
+        project.setProjectManagerId(PROJECT_MANAGER_ID);
+        project.setStatus("ACTIVE");
+        project.setApprovalStatus("APPROVED");
+        project.setCreatedBy(ADMIN_ID);
+        projectMapper.insert(project);
     }
 }

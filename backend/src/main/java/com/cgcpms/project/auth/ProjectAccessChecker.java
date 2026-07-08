@@ -54,13 +54,17 @@ public class ProjectAccessChecker {
             return;
         }
 
+        Long currentUserId = UserContext.getCurrentUserId();
+        if (currentUserId != null && currentUserId.equals(project.getProjectManagerId())) {
+            return;
+        }
+
         // 解析用户的数据范围
         String dataScope = resolveEffectiveDataScope();
         switch (dataScope) {
             case "ALL":
                 return;
             case "SELF":
-                Long currentUserId = UserContext.getCurrentUserId();
                 if (currentUserId != null && currentUserId.equals(project.getCreatedBy())) {
                     return;
                 }

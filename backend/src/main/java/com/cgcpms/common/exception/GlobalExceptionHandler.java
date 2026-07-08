@@ -5,6 +5,7 @@ import com.cgcpms.common.result.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
@@ -48,10 +49,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(BusinessException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Void> handleBusinessException(BusinessException e) {
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
         log.warn("Business exception: code={}, message={}", e.getCode(), e.getMessage());
-        return ApiResponse.fail(e);
+        if ("PROJECT_ACCESS_DENIED".equals(e.getCode())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(forbiddenResponse());
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.fail(e));
     }
 
     @ExceptionHandler(AuthorizationDeniedException.class)

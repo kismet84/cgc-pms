@@ -11,6 +11,7 @@ import type {
   CostManagerLedgerRow,
 } from '@/types/dashboard'
 import { CONTRACT_TYPE_MAP } from '@/types/dashboard'
+import { downloadBlobFile } from '@/utils/download'
 import { devSign, toNum } from '../utils/formatUtils'
 import DashboardCostLedgerPanel from './DashboardCostLedgerPanel.vue'
 
@@ -411,13 +412,7 @@ function exportLedgerCsv() {
     .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(','))
     .join('\n')
   const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
-  const link = document.createElement('a')
-  link.href = URL.createObjectURL(blob)
-  link.download = '成本列表.csv'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  setTimeout(() => URL.revokeObjectURL(link.href))
+  downloadBlobFile(blob, '成本列表.csv')
   message.success('导出成功')
 }
 

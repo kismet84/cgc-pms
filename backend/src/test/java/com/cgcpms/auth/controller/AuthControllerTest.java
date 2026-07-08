@@ -5,8 +5,10 @@ import com.cgcpms.auth.dto.LoginResponse;
 import com.cgcpms.auth.dto.UserInfo;
 import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.auth.util.CookieUtils;
+import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.ratelimit.LoginLockoutStore;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,8 +21,12 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -44,6 +50,9 @@ class AuthControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JwtUtils jwtUtils;
 
     @MockBean
     private AuthService authService;
@@ -79,6 +88,26 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().stringValues("Set-Cookie",
                         org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("XSRF-TOKEN="))));
+    }
+
+    @Test
+    @DisplayName("JWT 已认证 GET 不应清掉现有 XSRF-TOKEN")
+    void authenticatedGetDoesNotClearExistingCsrfCookie() throws Exception {
+        var userInfo = new UserInfo();
+        userInfo.setUsername("demo_dev_super_admin");
+        when(authService.getUserInfo(1L)).thenReturn(userInfo);
+
+        String token = jwtUtils.generateToken(1L, "demo_dev_super_admin", 0L,
+                List.of("SUPER_ADMIN"), List.of("inventory:transaction:add"));
+
+        mockMvc.perform(get("/api/auth/userinfo")
+                        .servletPath("/auth/userinfo")
+                        .contextPath("/api")
+                        .cookie(new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token))
+                        .cookie(new Cookie("XSRF-TOKEN", "stable-csrf-token")))
+                .andExpect(status().isOk())
+                .andExpect(header().stringValues("Set-Cookie",
+                        not(hasItem(containsString("XSRF-TOKEN=;")))));
     }
 
     @Test

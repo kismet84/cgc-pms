@@ -63,6 +63,12 @@ describe('CostLedger production guards', () => {
     expect(source).toContain('await loadContractOptions(val)')
   })
 
+  it('normalizes nullable reference-store project lists before passing them to child panels', () => {
+    expect(source).toContain('const projectOptions = computed(() => projectList.value ?? [])')
+    expect(source).toContain(':project-list="projectOptions"')
+    expect(source).not.toContain(':project-list="projectList"')
+  })
+
   it('renders mobile fallback with loading empty data tri-state and desktop-only column settings', () => {
     expect(tablePanelSource).toMatch(/<div v-if="isMobile" class="cost-ledger-mobile-list">/)
     expect(tablePanelSource).toMatch(/v-if="loading"/)

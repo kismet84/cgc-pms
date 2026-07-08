@@ -3,13 +3,18 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, reactive } from 'vue'
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { AlertLogVO, AlertSubscriptionResponse } from '@/types/alert'
 import AlertPage from '../index.vue'
 import AlertDetailPanel from '../components/AlertDetailPanel.vue'
 import AlertFilterPanel from '../components/AlertFilterPanel.vue'
 import AlertSubscriptionModal from '../components/AlertSubscriptionModal.vue'
 import AlertTablePanel from '../components/AlertTablePanel.vue'
+
+const currentDir = dirname(fileURLToPath(import.meta.url))
+const alertPageSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
+const downloadUtilSource = readFileSync(resolve(currentDir, '../../../utils/download.ts'), 'utf-8')
 
 const { mockGetAlertSubscription, mockUpdateAlertSubscription, mockRouterPush } = vi.hoisted(
   () => ({
@@ -685,6 +690,13 @@ describe('alert 子组件 DOM/结构证据', () => {
     expect(wrapper.find('.alert-grid-wrap').exists()).toBe(true)
     expect(toolbarButtons).toEqual(['批量处理', '标记已读', '归档', '导出'])
     expect(actionButtons).toEqual(['标记已读', '处理', '归档', '详情'])
+  })
+
+  it('导出使用共享下载 helper，避免浏览器点击后无下载事件', () => {
+    expect(downloadUtilSource).toContain('document.body.appendChild(link)')
+    expect(downloadUtilSource).toContain('setTimeout(() => URL.revokeObjectURL(url), 1000)')
+    expect(alertPageSource).toContain("import { downloadBlobFile } from '@/utils/download'")
+    expect(alertPageSource).toContain('downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)')
   })
 
   it('详情面板保持详情/订阅结构，备注双向更新和业务按钮条件', async () => {

@@ -21,4 +21,11 @@ describe('inventory transaction permission gate', () => {
       /确认出库[\s\S]*v-if=\"canSubmitTransaction\"|v-if=\"canSubmitTransaction\"[\s\S]*确认出库/,
     )
   })
+
+  it('keeps visible inline validation feedback for empty inbound and outbound submit attempts', () => {
+    expect(source).toContain('inInlineError')
+    expect(source).toContain('outInlineError')
+    expect(source).toMatch(/<a-alert v-if="inInlineError"[\s\S]*type="warning"/)
+    expect(source).toMatch(/<a-alert[\s\S]*v-if="outInlineError"[\s\S]*type="warning"/)
+  })
 })

@@ -16,6 +16,7 @@ import com.cgcpms.cost.vo.CostProjectSummaryVO;
 import com.cgcpms.cost.vo.CostSummaryVO;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.receipt.entity.MatReceipt;
@@ -57,6 +58,7 @@ public class CostSummaryService {
     private final MatReceiptMapper matReceiptMapper;
     private final VarOrderMapper varOrderMapper;
     private final CostSummaryAssembler assembler;
+    private final ProjectAccessChecker projectAccessChecker;
 
     /**
      * Prevents overlapping executions of the scheduled refresh task.
@@ -73,6 +75,7 @@ public class CostSummaryService {
     private final ConcurrentHashMap<Long, ReentrantLock> refreshLocks = new ConcurrentHashMap<>();
 
     public CostProjectSummaryVO refreshSummary(Long projectId) {
+        projectAccessChecker.checkAccess(projectId, "刷新成本摘要");
         // Use AOP proxy to ensure @Transactional(isolation=REPEATABLE_READ) on the overload is applied
         return ((CostSummaryService) AopContext.currentProxy()).refreshSummary(UserContext.getCurrentTenantId(), projectId);
     }
@@ -243,6 +246,7 @@ public class CostSummaryService {
     }
 
     public CostProjectSummaryVO getProjectSummary(Long projectId) {
+        projectAccessChecker.checkAccess(projectId, "查看成本摘要");
         return getProjectSummary(UserContext.getCurrentTenantId(), projectId);
     }
 
@@ -440,6 +444,7 @@ public class CostSummaryService {
 
     public List<CostSummaryVO> getSummaryHistory(Long projectId) {
         Long tenantId = UserContext.getCurrentTenantId();
+        projectAccessChecker.checkAccess(projectId, "查看成本摘要历史");
 
         LambdaQueryWrapper<CostSummary> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CostSummary::getTenantId, tenantId);

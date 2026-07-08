@@ -103,6 +103,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Check blacklist
         TokenBlacklistService blacklistService = tokenBlacklistServiceProvider.getIfAvailable();
         if (blacklistService == null) {
+            if (environment.acceptsProfiles(Profiles.of("prod"))) {
+                log.error("BLACKLIST_UNAVAILABLE: prod profile requires TokenBlacklistService，拒绝本次请求");
+                writeUnauthorized(response);
+                return;
+            }
             log.warn("BLACKLIST_UNAVAILABLE: TokenBlacklistService 不可用（Redis 未配置），黑名单保护缺失");
         } else if (blacklistService.isBlacklisted(token)) {
             log.warn("BLACKLISTED_TOKEN: 已黑名单令牌尝试访问");

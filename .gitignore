@@ -58,6 +58,12 @@ deploy/ssl/
 .playwright-mcp/
 *-snapshot.yml
 login-snapshot.yml
+output/
+playwright-report/
+test-results/
+coverage/
+coverage-result.json
+admin-state.json
 
 # Local AI / tooling state
 .agent-runtime/

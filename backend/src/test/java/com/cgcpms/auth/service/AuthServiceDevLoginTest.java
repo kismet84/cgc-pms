@@ -3,6 +3,7 @@ package com.cgcpms.auth.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.dto.LoginResponse;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.system.entity.SysMenu;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.entity.SysUserRole;
@@ -23,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -82,7 +84,11 @@ class AuthServiceDevLoginTest {
         when(sysUserMapper.selectById(defaultUser.getId())).thenReturn(defaultUser);
         when(sysUserRoleMapper.selectList(any())).thenReturn(List.of(userRole));
         when(sysRoleMapper.selectBatchIds(any())).thenReturn(List.of(superAdminRole));
-        when(sysMenuMapper.selectList(any())).thenReturn(List.of());
+        when(sysMenuMapper.selectList(any())).thenReturn(List.of(
+                menu("inventory:transaction:add"),
+                menu("requisition:add"),
+                menu("requisition:submit"),
+                menu("workflow:approve")));
         when(jwtUtils.generateToken(eq(defaultUser.getId()), eq(username), eq(defaultUser.getTenantId()), any(), any()))
                 .thenReturn("access-token");
         when(jwtUtils.generateRefreshToken(anyLong())).thenReturn("refresh-token");
@@ -91,6 +97,11 @@ class AuthServiceDevLoginTest {
 
         assertEquals("910001", response.getUserInfo().getUserId());
         assertEquals(username, response.getUserInfo().getUsername());
+        assertTrue(response.getUserInfo().getRoles().contains("SUPER_ADMIN"));
+        assertTrue(response.getUserInfo().getPermissions().contains("inventory:transaction:add"));
+        assertTrue(response.getUserInfo().getPermissions().contains("requisition:add"));
+        assertTrue(response.getUserInfo().getPermissions().contains("requisition:submit"));
+        assertTrue(response.getUserInfo().getPermissions().contains("workflow:approve"));
     }
 
     private SysRole role(Long id, Long tenantId) {
@@ -109,5 +120,11 @@ class AuthServiceDevLoginTest {
         user.setUsername(username);
         user.setStatus("ENABLE");
         return user;
+    }
+
+    private SysMenu menu(String perms) {
+        SysMenu menu = new SysMenu();
+        menu.setPerms(perms);
+        return menu;
     }
 }

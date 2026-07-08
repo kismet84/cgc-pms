@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const read = (p: string) => readFileSync(resolve(currentDir, '..', p), 'utf-8')
+const readRoot = (p: string) => readFileSync(resolve(currentDir, '..', '..', '..', p), 'utf-8')
 
 // Read all split files to form the full source picture
 const indexSource = read('index.vue')
@@ -18,6 +19,7 @@ const productionViewSource = read('components/DashboardProductionView.vue')
 const chiefViewSource = read('components/DashboardChiefEngineerView.vue')
 const financeViewSource = read('components/DashboardFinanceView.vue')
 const mgmtViewSource = read('components/DashboardMgmtView.vue')
+const downloadUtilSource = readRoot('utils/download.ts')
 
 const allViews = [
   pmViewSource,
@@ -264,6 +266,14 @@ describe('Dashboard reference fidelity', () => {
       '<a-button size="small" type="primary" ghost>导出</a-button>',
     )
     expect(costViewSource).not.toContain('<a-pagination :current="1"')
+  })
+
+  it('uses the shared blob download helper so export clicks become real downloads in the browser', () => {
+    expect(downloadUtilSource).toContain('document.body.appendChild(link)')
+    expect(downloadUtilSource).toContain('link.click()')
+    expect(downloadUtilSource).toContain('setTimeout(() => URL.revokeObjectURL(url), 1000)')
+    expect(costViewSource).toContain("import { downloadBlobFile } from '@/utils/download'")
+    expect(costViewSource).toContain("downloadBlobFile(blob, '成本列表.csv')")
   })
 
   it('wires the cost trend cumulative/monthly segmented control', () => {

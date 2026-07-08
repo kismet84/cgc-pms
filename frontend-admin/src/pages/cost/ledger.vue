@@ -33,6 +33,7 @@ const {
 
 const contractOptions = ref(contractList.value ?? [])
 const costSubjectOptions = ref<{ id: string; subjectName: string }[]>([])
+const projectOptions = computed(() => projectList.value ?? [])
 
 async function loadCostSubjectOptions() {
   try {
@@ -377,7 +378,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           :filter="filter"
           :filter-visibility="filterVisibility"
           :filter-setting-items="filterSettingItems"
-          :project-list="projectList"
+          :project-list="projectOptions"
           :contract-options="contractOptions"
           :partner-list="partnerList ?? []"
           :cost-subject-options="costSubjectOptions"

@@ -1,4 +1,0 @@
-- generic [ref=e4]:
-  - img "close-circle" [ref=e5]:
-    - img [ref=e6]
-  - text: 登录已过期，请重新登录

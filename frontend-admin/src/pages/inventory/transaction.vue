@@ -38,6 +38,8 @@ const outForm = reactive({
 
 const inSubmitting = ref(false)
 const outSubmitting = ref(false)
+const inInlineError = ref('')
+const outInlineError = ref('')
 
 const activeForm = computed(() => (activeTab.value === 'in' ? inForm : outForm))
 const filteredMaterials = computed(() => {
@@ -72,19 +74,25 @@ function handleReset() {
   activeForm.value.warehouseId = undefined
   activeForm.value.materialId = undefined
   activeForm.value.quantity = ''
+  if (activeTab.value === 'in') {
+    inInlineError.value = ''
+    return
+  }
+  outInlineError.value = ''
+}
+
+function getTransactionError(form: { warehouseId?: string; materialId?: string; quantity: string }, action: '入库' | '出库') {
+  if (!form.warehouseId) return '请选择仓库'
+  if (!form.materialId) return '请选择物料'
+  if (!form.quantity || parseFloat(form.quantity) <= 0) return `请输入有效的${action}数量`
+  return ''
 }
 
 async function handleStockIn() {
-  if (!inForm.warehouseId) {
-    message.warning('请选择仓库')
-    return
-  }
-  if (!inForm.materialId) {
-    message.warning('请选择物料')
-    return
-  }
-  if (!inForm.quantity || parseFloat(inForm.quantity) <= 0) {
-    message.warning('请输入有效的入库数量')
+  const error = getTransactionError(inForm, '入库')
+  inInlineError.value = error
+  if (error) {
+    message.warning(error)
     return
   }
 
@@ -96,6 +104,7 @@ async function handleStockIn() {
       quantity: inForm.quantity,
     })
     message.success('入库成功')
+    inInlineError.value = ''
     inForm.materialId = undefined
     inForm.quantity = ''
   } catch (e: unknown) {
@@ -107,16 +116,10 @@ async function handleStockIn() {
 }
 
 async function handleStockOut() {
-  if (!outForm.warehouseId) {
-    message.warning('请选择仓库')
-    return
-  }
-  if (!outForm.materialId) {
-    message.warning('请选择物料')
-    return
-  }
-  if (!outForm.quantity || parseFloat(outForm.quantity) <= 0) {
-    message.warning('请输入有效的出库数量')
+  const error = getTransactionError(outForm, '出库')
+  outInlineError.value = error
+  if (error) {
+    message.warning(error)
     return
   }
 
@@ -128,6 +131,7 @@ async function handleStockOut() {
       quantity: outForm.quantity,
     })
     message.success('出库成功')
+    outInlineError.value = ''
     outForm.materialId = undefined
     outForm.quantity = ''
   } catch (e: unknown) {
@@ -294,6 +298,7 @@ onMounted(() => {
             <!-- Stock In Form -->
             <div v-if="activeTab === 'in'">
               <a-form layout="vertical" class="transaction-form">
+                <a-alert v-if="inInlineError" class="transaction-form-alert" type="warning" show-icon :message="inInlineError" />
                 <a-form-item label="入库数量" required>
                   <a-input-number
                     v-model:value="inForm.quantity"
@@ -327,6 +332,13 @@ onMounted(() => {
             <!-- Stock Out Form -->
             <div v-else>
               <a-form layout="vertical" class="transaction-form">
+                <a-alert
+                  v-if="outInlineError"
+                  class="transaction-form-alert"
+                  type="warning"
+                  show-icon
+                  :message="outInlineError"
+                />
                 <a-form-item label="出库数量" required>
                   <a-input-number
                     v-model:value="outForm.quantity"
@@ -565,6 +577,10 @@ onMounted(() => {
 
 .transaction-form :deep(.ant-form-item) {
   margin-bottom: 0;
+}
+
+.transaction-form-alert {
+  margin-bottom: 4px;
 }
 
 .transaction-quantity {
