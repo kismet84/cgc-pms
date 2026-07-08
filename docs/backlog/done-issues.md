@@ -56,6 +56,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-004-005-subcontract-settlement-regression.md；docs/iterations/iteration-2026-07-08-report.md
 
+### ISSUE-004-006：审批中心待办/已办/我发起统一筛选回归
+
+完成日期：2026-07-08
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：Ready Issue 测试配置问题已更正
+验证结果：通过
+相关报告：docs/quality/issue-004-006-approval-workbench-regression.md；docs/iterations/iteration-2026-07-08-report.md
+
 ### ISSUE-005-001：付款与发票列表页生产化补强
 
 完成日期：2026-07-08

@@ -55,7 +55,7 @@ class WorkflowQueryServiceTest {
     private static final long TEMPLATE_ID = 230200000000000001L;
     private static final long NODE_1_ID = 230200000000000101L;
     private static final long PROJECT_ID = 230200000000000201L;
-    private static final String BUSINESS_TYPE = "WQ_TEST_APPROVAL";
+    private static final String BUSINESS_TYPE = WorkflowBusinessTypes.CONTRACT_APPROVAL;
 
     @Autowired
     private WorkflowQueryService queryService;
@@ -206,18 +206,20 @@ class WorkflowQueryServiceTest {
     @DisplayName("getMyTodos 多任务场景按receivedAt降序排列")
     void getMyTodosOrdersByReceivedAtDescending() {
         // Submit two more workflows so USER_ADMIN has multiple tasks
+        seedContract(33333002L);
         WfInstance instance2 = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 33333002L,
                 "多任务测试2", new BigDecimal("500.00"),
-                100L, 100L, "{}", "{}", null);
+                PROJECT_ID, null, "{}", "{}", null);
         assertNotNull(instance2);
 
+        seedContract(33333003L);
         WfInstance instance3 = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 33333003L,
                 "多任务测试3", new BigDecimal("500.00"),
-                100L, 100L, "{}", "{}", null);
+                PROJECT_ID, null, "{}", "{}", null);
         assertNotNull(instance3);
 
         try {
@@ -348,11 +350,12 @@ class WorkflowQueryServiceTest {
         secondNode.setAllowAddSign(1);
         templateNodeMapper.insert(secondNode);
 
+        seedContract(33333012L);
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 33333012L,
                 "二级审批仍运行", new BigDecimal("500.00"),
-                100L, 100L, "测试业务摘要", "{}", null);
+                PROJECT_ID, null, "测试业务摘要", "{}", null);
         WfTask firstTask = taskMapper.selectOne(new LambdaQueryWrapper<WfTask>()
                 .eq(WfTask::getInstanceId, instance.getId())
                 .eq(WfTask::getApproverId, USER_ADMIN)
@@ -659,12 +662,14 @@ class WorkflowQueryServiceTest {
     @Test
     @DisplayName("getInstanceDetail 抄送人可查看无项目实例详情")
     void getInstanceDetailCcUserCanViewNoProjectInstance() {
+        seedContract(33333025L);
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 33333025L,
                 "抄送详情测试", new BigDecimal("500.00"),
-                null, null, "{}", "{}", List.of(USER_SECOND_APPROVER));
+                PROJECT_ID, null, "{}", "{}", List.of(USER_SECOND_APPROVER));
         assertNotNull(instance);
+        jdbcTemplate.update("UPDATE wf_instance SET project_id = NULL WHERE id = ?", instance.getId());
 
         UserContext.clear();
         UserContext.set(io.jsonwebtoken.Jwts.claims()
@@ -789,11 +794,12 @@ class WorkflowQueryServiceTest {
     @DisplayName("getMyCc 有抄送时返回抄送分页含实例状态")
     void getMyCcReturnsCcWithInstanceStatus() {
         // Submit a workflow with ccUserIds
+        seedContract(33333010L);
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 33333010L,
                 "抄送测试", new BigDecimal("500.00"),
-                100L, 100L, "{}", "{}", List.of(USER_ADMIN));
+                PROJECT_ID, null, "{}", "{}", List.of(USER_ADMIN));
         assertNotNull(instance);
 
         try {
@@ -815,11 +821,12 @@ class WorkflowQueryServiceTest {
     @DisplayName("getMyCc 其他用户无抄送时返回空")
     void getMyCcEmptyForUserWithoutCc() {
         // Submit with cc to USER_ADMIN
+        seedContract(33333011L);
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 33333011L,
                 "抄送测试-仅抄送admin", new BigDecimal("500.00"),
-                100L, 100L, "{}", "{}", List.of(USER_ADMIN));
+                PROJECT_ID, null, "{}", "{}", List.of(USER_ADMIN));
         assertNotNull(instance);
 
         try {
@@ -888,6 +895,7 @@ class WorkflowQueryServiceTest {
     }
 
     private void seedTemplateAndSubmit() {
+        jdbcTemplate.update("UPDATE wf_template SET enabled = 0 WHERE id = 50001");
         // 清理可能由之前测试轮次遗留的模板记录（@BeforeEach 可能残留）
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
         jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
@@ -920,11 +928,12 @@ class WorkflowQueryServiceTest {
         templateNodeMapper.insert(node);
 
         // Submit workflow — this creates instance, node instance, task, and record
+        seedContract(33333001L);
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 33333001L,
                 "测试待办标题", new BigDecimal("500.00"),
-                PROJECT_ID, 100L, "测试业务摘要", "{}", null);
+                PROJECT_ID, null, "测试业务摘要", "{}", null);
         assertNotNull(instance, "提交应在测试数据准备阶段成功");
         submittedInstanceId = instance.getId();
 
@@ -940,20 +949,22 @@ class WorkflowQueryServiceTest {
     private void cleanup() {
         // Keep cleanup scoped to this class. Broad tenant-level deletes remove Flyway
         // workflow seed data used by later tests in the same H2 application context.
-        jdbcTemplate.update("DELETE FROM wf_cc WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?)",
-                BUSINESS_TYPE, 33333001L, 33333025L);
+        jdbcTemplate.update("DELETE FROM wf_cc WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)",
+                33333001L, 33333025L);
         jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key IN (?, ?, ?, ?)",
                 "done-test-key-001", "reject-test-key-001", "detail-approve-key-001", "running-done-test-key-001");
-        jdbcTemplate.update("DELETE FROM wf_record WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333025L);
-        jdbcTemplate.update("DELETE FROM wf_task WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333025L);
-        jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?)",
-                BUSINESS_TYPE, 33333001L, 33333025L);
-        jdbcTemplate.update("DELETE FROM wf_instance WHERE business_type = ? OR business_id BETWEEN ? AND ?",
-                BUSINESS_TYPE, 33333001L, 33333025L);
+        jdbcTemplate.update("DELETE FROM wf_record WHERE business_id BETWEEN ? AND ?",
+                33333001L, 33333025L);
+        jdbcTemplate.update("DELETE FROM wf_task WHERE business_id BETWEEN ? AND ?",
+                33333001L, 33333025L);
+        jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)",
+                33333001L, 33333025L);
+        jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id BETWEEN ? AND ?",
+                33333001L, 33333025L);
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
         jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
+        jdbcTemplate.update("UPDATE wf_template SET enabled = 1 WHERE id = 50001");
+        jdbcTemplate.update("DELETE FROM ct_contract WHERE id BETWEEN ? AND ?", 33333001L, 33333025L);
         jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", PROJECT_ID);
     }
 
@@ -975,6 +986,21 @@ class WorkflowQueryServiceTest {
         project.setStatus("ACTIVE");
         project.setCreatedBy(createdBy);
         projectMapper.insert(project);
+    }
+
+    private void seedContract(Long contractId) {
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract (
+                    id, tenant_id, project_id, contract_code, contract_name, contract_type,
+                    party_a_id, party_b_id, contract_amount, current_amount, paid_amount,
+                    contract_status, approval_status, created_by, updated_by
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                contractId, TENANT_0, PROJECT_ID,
+                "WQ-CONTRACT-" + contractId, "审批查询测试合同-" + contractId, "SUB",
+                20001L, 20002L, new BigDecimal("500.00"), new BigDecimal("500.00"), BigDecimal.ZERO,
+                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN);
     }
 
     private void insertParticipantTask(Long approverId) {

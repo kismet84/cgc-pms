@@ -303,3 +303,31 @@ Issue：ISSUE-004-005 分包计量与结算状态链路回归
 剩余风险：
 - 本轮未跑全量后端测试，结论限于 ISSUE-004-005 指定回归范围。
 - 本轮未新增浏览器或前端验收，结算页面交互不属于该 Ready Issue 的允许范围。
+
+---
+
+Issue：ISSUE-004-006 审批中心待办/已办/我发起统一筛选回归
+
+目标：
+- 验证审批中心待办、已办、抄送、我发起四类查询口径与前端工作台冻结口径，确保分页 total、筛选条件和身份边界一致。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/workflow/WorkflowQueryServiceTest.java`：修正测试业务类型、合同测试数据和模板隔离，避免测试配置与真实业务访问校验冲突。
+- `docs/quality/issue-004-006-approval-workbench-regression.md`：新增正式质量报告，记录后端查询与前端工作台回归证据。
+- `docs/backlog/ready-issues.md`：将 ISSUE-004-006 从 Ready 池移出，转入已完成/历史。
+- `docs/backlog/done-issues.md`：追加 Done 记录。
+- 未修改后端生产代码或前端页面代码。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowQueryServiceTest,WorkflowTaskServiceTest,WorkflowSubmitServiceTest" test`：首轮失败，分类为 Ready Issue 测试配置问题；修正后通过，`Tests run: 60, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `cd frontend-admin; pnpm exec vitest run src/pages/approval/__tests__/ApprovalWorkList.test.ts src/pages/approval/__tests__/ApprovalConfirm.test.ts src/pages/approval/__tests__/workflowDisplay.test.ts`：通过，`3` 个文件、`22` 个用例全部通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：Ready Issue 测试配置问题已更正
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未跑全量后端/前端测试，结论限于 ISSUE-004-006 指定范围。
+- 本轮未做真实浏览器验收，前端结论来自 Vitest 组件/逻辑测试。

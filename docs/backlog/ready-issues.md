@@ -28,41 +28,10 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-004-006`
-2. `ISSUE-005-002`
-3. `ISSUE-006-002`
+1. `ISSUE-005-002`
+2. `ISSUE-006-002`
 
 ## P0
-
-### ISSUE-004-006：审批中心待办/已办/我发起统一筛选回归
-
-优先级：P0
-类型：回归 / 后端 / 前端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only；仅限 `backend/src/test/**`、`frontend-admin/src/pages/approval/**`、`docs/quality/**`、`docs/iterations/**`
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节，第 8 条“审批中心 → 状态流转 → 通知 / 预警”
-目标：
-- 回归待办、已办、抄送、我发起四类工作台查询口径，保证分页 total、状态筛选和身份边界一致。
-- 回归前端审批工作台的筛选项、嵌入详情、撤回/重提入口，避免页面口径与后端查询脱节。
-允许修改：
-- `backend/src/test/java/com/cgcpms/workflow/**`
-- `frontend-admin/src/pages/approval/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `backend/src/main/**`
-- `frontend-admin/src/api/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-验收标准：
-- 待办、已办、抄送、我发起分页 total 与记录来源一致。
-- 统一筛选条件不会突破租户、项目、审批参与人边界。
-- 前端工作台只暴露当前冻结口径允许的业务类型和动作入口。
-- 正式报告区分后端查询回归结果与前端工作台回归结果。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=WorkflowQueryServiceTest,WorkflowTaskServiceTest,WorkflowSubmitServiceTest" test`
-- `cd frontend-admin; pnpm exec vitest run src/pages/approval/__tests__/ApprovalWorkList.test.ts src/pages/approval/__tests__/ApprovalConfirm.test.ts src/pages/approval/__tests__/workflowDisplay.test.ts`
-- `git diff --check`
 
 ## P1
 
@@ -175,6 +144,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-004-005-subcontract-settlement-regression.md`
+
+### ISSUE-004-006：审批中心待办/已办/我发起统一筛选回归
+
+优先级：P0
+类型：回归 / 后端 / 前端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-004-006-approval-workbench-regression.md`
 
 ### ISSUE-005-001：付款与发票列表页生产化补强
 
