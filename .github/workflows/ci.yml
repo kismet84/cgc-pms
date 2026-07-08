@@ -54,17 +54,19 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      pull-requests: read
     steps:
       - uses: actions/checkout@v4
-      - name: Review dependency changes for high and critical vulnerabilities
-        if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v4
+      - name: Scan backend high and critical library vulnerabilities
+        uses: aquasecurity/trivy-action@0.33.1
         with:
-          fail-on-severity: high
-      - name: Skip dependency review outside pull requests
-        if: github.event_name != 'pull_request'
-        run: echo "Dependency review runs only for pull_request events; no-op for ${{ github.event_name }}." >> "$GITHUB_STEP_SUMMARY"
+          scan-type: fs
+          scan-ref: backend
+          scanners: vuln
+          vuln-type: library
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: table
+          timeout: 10m
 
   backend-test-mysql:
     runs-on: ubuntu-latest
