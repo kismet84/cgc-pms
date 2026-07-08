@@ -20,48 +20,11 @@
 
 ## 执行顺序建议
 
-1. ISSUE-004-003
-2. ISSUE-005-001
-3. ISSUE-006-001
-4. ISSUE-007-001
+1. ISSUE-005-001
+2. ISSUE-006-001
+3. ISSUE-007-001
 
 ## P0
-
-### ISSUE-004-003：付款发票审批状态链路回归
-
-优先级：P0  
-类型：回归 / 后端 / 测试  
-状态：Ready  
-自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
-来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#74-p0-4成本采购库存付款发票审批主链路回归`
-目标：
-- 仅聚焦付款申请、发票登记、审批状态三者的一致性回归，补齐状态断言与报告，不扩展到财务集成。
-
-允许修改：
-- `backend/src/main/java/**/payment/**`
-- `backend/src/main/java/**/invoice/**`
-- `backend/src/main/java/**/workflow/**`
-- `backend/src/test/java/**/payment/**`
-- `backend/src/test/java/**/invoice/**`
-- `backend/src/test/java/**/workflow/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/java/**/accounting/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- `.codex-autopilot/**`
-
-验收标准：
-- 付款状态与审批状态一致，不出现已通过但未流转或已驳回仍可付款的状态错位。
-- 发票必须关联付款记录或明确给出失败提示。
-- 回归报告列出状态矩阵和通过结论。
-
-验证命令：
-- `cd backend; .\mvnw.cmd -Dtest=PayApplicationServiceTest,InvoiceServiceTest,WorkflowSubmitServiceTest test`
-- `git diff --check`
 
 ## P1
 
@@ -190,3 +153,11 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-004-002-purchase-receipt-inventory-regression.md`
+
+### ISSUE-004-003：付款发票审批状态链路回归
+
+优先级：P0
+类型：回归 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-004-003-payment-invoice-workflow-regression.md`

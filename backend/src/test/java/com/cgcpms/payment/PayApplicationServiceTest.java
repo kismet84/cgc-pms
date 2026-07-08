@@ -11,6 +11,7 @@ import com.cgcpms.payment.mapper.PayApplicationBasisMapper;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.service.PayApplicationService;
+import com.cgcpms.payment.service.PayRecordService;
 import com.cgcpms.payment.vo.PayApplicationVO;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,8 @@ class PayApplicationServiceTest {
     private PayApplicationBasisMapper payApplicationBasisMapper;
     @Autowired
     private PayRecordMapper payRecordMapper;
+    @Autowired
+    private PayRecordService payRecordService;
 
     private Long testAppId;
     private PayApplication testApp;
@@ -591,5 +594,25 @@ class PayApplicationServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> payApplicationService.submitForApproval(testAppId));
         assertEquals("INVALID_STATUS", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("writeback -- REJECTED 付款申请不可付款")
+    void testWriteback_RejectedApplicationNotAllowed() {
+        testApp.setApprovalStatus("REJECTED");
+        testApp.setPayStatus("PENDING");
+        payApplicationMapper.updateById(testApp);
+
+        PayRecord input = new PayRecord();
+        input.setPayApplicationId(testAppId);
+        input.setPayAmount(new BigDecimal("1000.00"));
+        input.setPayDate(LocalDate.now());
+        input.setPayMethod("BANK");
+        input.setExternalTxnNo("TXN-REJECTED-" + System.nanoTime());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> payRecordService.writeback(input));
+        assertEquals("PAY_APP_NOT_APPROVED", ex.getCode());
     }
 }

@@ -72,6 +72,8 @@ public class PayRecordService {
         PayApplication app = payApplicationMapper.selectByIdForUpdate(payApplicationId, UserContext.getCurrentTenantId());
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        if (!"APPROVED".equals(app.getApprovalStatus()))
+            throw new BusinessException("PAY_APP_NOT_APPROVED", "仅审批通过的付款申请可付款");
 
         List<PayRecord> existing = payRecordMapper.selectList(
             new LambdaQueryWrapper<PayRecord>()

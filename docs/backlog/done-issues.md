@@ -31,3 +31,10 @@
 合并方式：auto-merge/local-commit-only
 验证结果：通过
 相关报告：docs/quality/issue-004-002-purchase-receipt-inventory-regression.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-004-003：付款发票审批状态链路回归
+
+完成日期：2026-07-08
+合并方式：auto-merge/local-commit-only
+验证结果：通过
+相关报告：docs/quality/issue-004-003-payment-invoice-workflow-regression.md；docs/iterations/iteration-2026-07-08-report.md

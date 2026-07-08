@@ -81,3 +81,30 @@ Issue：ISSUE-004-002 采购收货库存数量一致性回归
 - 原 Ready Issue 中 `InventoryServiceTest` 类名不存在，本轮已使用真实库存服务测试类 `MatStockServiceTest` 替代。
 - 本轮未跑全量后端测试，结论限于 ISSUE-004-002 指定回归范围。
 - 说明：`docs/plans/cgc-pms-production-enhancement-plan.md` 迁移到 `docs/backlog/cgc-pms-production-enhancement-plan.md` 属于用户手动执行/确认的既有变更，非子智能体越权；本轮不回滚该迁移，ISSUE-004-002 结论仍仅以采购/收货/库存测试结果为准。
+
+---
+
+Issue：ISSUE-004-003 付款发票审批状态链路回归
+
+目标：
+- 确保付款申请、发票登记、审批状态三者一致性回归通过，避免审批驳回仍可付款或发票缺少付款记录仍可登记。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/payment/service/PayRecordService.java`：付款写回入口新增 `approvalStatus=APPROVED` 门禁。
+- `backend/src/test/java/com/cgcpms/payment/PayApplicationServiceTest.java`：新增驳回付款申请不可付款回归测试。
+- `docs/quality/issue-004-003-payment-invoice-workflow-regression.md`：新增正式质量报告和状态矩阵。
+- `docs/backlog/ready-issues.md`：将 ISSUE-004-003 从 Ready 池移出。
+- `docs/backlog/done-issues.md`：追加 Done 记录。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=PayApplicationServiceTest#testWriteback_RejectedApplicationNotAllowed" test`：先红后绿，最终通过，`Tests run: 1, Failures: 0, Errors: 0, Skipped: 0`。
+- `cd backend; .\mvnw.cmd "-Dtest=PayApplicationServiceTest,InvoiceServiceTest,WorkflowSubmitServiceTest" test`：通过，`Tests run: 53, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `cd backend; .\mvnw.cmd "-Dtest=PaymentWritebackTest,PaymentFinancialConsistencyTest" test`：通过，`Tests run: 20, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过，仅有 CRLF 提示。
+
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：非阻塞
+剩余风险：
+- 本轮未跑全量后端测试，结论限于 ISSUE-004-003 指定回归范围及付款写回影响面。
