@@ -752,3 +752,33 @@ Issue：ISSUE-005-005 分包与结算列表页生产化补强
 剩余风险：
 - 本轮未做真实浏览器验收，结论基于指定 Vitest、类型检查、构建和代码审查。
 - 本轮未跑全量前端测试，结论限于 ISSUE-005-005 指定分包/结算列表生产化范围。
+
+---
+
+Issue：ISSUE-005-006 预警与审批列表页生产化补强
+
+目标：
+- 补强预警列表与审批列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
+- 不改预警规则、审批状态机或后端权限边界。
+
+修改范围摘要：
+- `frontend-admin/src/pages/alert/index.vue`、`frontend-admin/src/pages/alert/components/AlertTablePanel.vue`：预警列表新增 URL query 恢复与同步，覆盖 `keyword`、`projectId`、`alertDomain`、`ruleType`、`severity`、`isRead`、`processStatus`、`triggeredStart`、`triggeredEnd`、`onlyDefaultScope`、`pageNo`、`pageSize`；补错误态、空态和重试入口。
+- `frontend-admin/src/pages/approval/todo.vue`：审批列表新增 URL query 恢复与同步，覆盖 `keyword`、`businessType`、`instanceStatus`、`startTime`、`endTime`、`pageNo`、`pageSize`；补错误态、空态和重试入口。
+- `frontend-admin/src/pages/alert/__tests__/index.test.ts`、`frontend-admin/src/pages/approval/__tests__/ApprovalWorkList.test.ts`：补充生产化守卫测试。
+- `docs/quality/issue-005-006-alert-approval-list-production.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-005-006 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd frontend-admin; pnpm exec vitest run src/composables/__tests__/listPageQuery.test.ts src/pages/approval/__tests__/ApprovalWorkList.test.ts src/pages/alert/__tests__/index.test.ts`：通过，`3` 个文件、`25` 个用例全部通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未做真实浏览器验收，结论基于指定 Vitest、类型检查、构建和代码审查。
+- 本轮未跑全量前端测试，结论限于 ISSUE-005-006 指定预警/审批列表生产化范围。

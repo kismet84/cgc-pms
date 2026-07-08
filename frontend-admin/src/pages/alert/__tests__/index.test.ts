@@ -16,11 +16,23 @@ const currentDir = dirname(fileURLToPath(import.meta.url))
 const alertPageSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
 const downloadUtilSource = readFileSync(resolve(currentDir, '../../../utils/download.ts'), 'utf-8')
 
-const { mockGetAlertSubscription, mockUpdateAlertSubscription, mockRouterPush } = vi.hoisted(
+const {
+  mockGetAlertSubscription,
+  mockUpdateAlertSubscription,
+  mockRouterPush,
+  mockRouterReplace,
+  mockRoute,
+} = vi.hoisted(
   () => ({
     mockGetAlertSubscription: vi.fn(),
     mockUpdateAlertSubscription: vi.fn(),
     mockRouterPush: vi.fn(),
+    mockRouterReplace: vi.fn(),
+    mockRoute: {
+      path: '/alert',
+      query: {},
+      meta: {},
+    },
   }),
 )
 
@@ -110,7 +122,8 @@ vi.mock('@/stores/user', () => ({
   useUserStore: () => mockUserStore,
 }))
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: mockRouterPush }),
+  useRouter: () => ({ push: mockRouterPush, replace: mockRouterReplace }),
+  useRoute: () => mockRoute,
 }))
 vi.mock('@/api/modules/alert', () => ({
   getAlertSubscription: mockGetAlertSubscription,
@@ -331,6 +344,7 @@ const AlertSubscriptionModalHarness = defineComponent({
 function createGlobalStubs(overrides: Record<string, unknown> = {}) {
   return {
     ColumnSettingsButton: { template: '<button class="column-settings-stub">列设置</button>' },
+    LgEmptyState: { template: '<div class="lg-empty-state-stub"><slot /></div>' },
     VxeGrid: VxeGridStub,
     VxeGridInstance: true,
     VxeColumn: true,
@@ -349,6 +363,7 @@ function createGlobalStubs(overrides: Record<string, unknown> = {}) {
     'a-dropdown': { template: '<div><slot /><slot name="overlay" /></div>' },
     'a-menu': { template: '<div><slot /></div>' },
     'a-menu-item': { template: '<button><slot /></button>' },
+    'a-result': { template: '<div class="a-result-stub"><slot /><slot name="extra" /></div>' },
     'a-range-picker': { template: '<div class="range-picker-stub"></div>' },
     'a-switch': ASwitchStub,
     'a-modal': AModalStub,
@@ -386,6 +401,9 @@ beforeEach(() => {
   mockAlertStore.pageNo = 1
   mockAlertStore.pageSize = 20
   mockReferenceStore.projects = []
+  mockRoute.path = '/alert'
+  mockRoute.query = {}
+  mockRoute.meta = {}
   mockGetAlertSubscription.mockResolvedValue(buildSubscriptionResponse())
   mockUpdateAlertSubscription.mockResolvedValue(
     buildSubscriptionResponse({
@@ -477,6 +495,19 @@ describe('alert/index.vue', () => {
         pageSize: 20,
       }),
     )
+    expect(mockRouterReplace).toHaveBeenLastCalledWith({
+      path: '/alert',
+      query: expect.objectContaining({
+        keyword: '关键字',
+        projectId: 'P-01',
+        severity: 'HIGH',
+        isRead: '0',
+        processStatus: 'PROCESSED',
+        onlyDefaultScope: '1',
+        pageNo: '1',
+        pageSize: '20',
+      }),
+    })
   })
 
   it('表格详情、备注保存、订阅保存和业务单据跳转链路仍可达', async () => {
@@ -551,6 +582,15 @@ describe('alert/index.vue', () => {
     expect(pageSource).toContain('triggeredAtRange')
     expect(pageSource).toContain('alertDomain')
     expect(pageSource).toContain('ruleType')
+    expect(pageSource).toContain(
+      "import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'",
+    )
+    expect(pageSource).toContain('const route = useRoute()')
+    expect(pageSource).toContain('const hasLoaded = ref(false)')
+    expect(pageSource).toContain('const listError = ref<string | null>(null)')
+    expect(pageSource).toContain('function hydrateFromRouteQuery()')
+    expect(pageSource).toContain('async function syncRouteQuery()')
+    expect(pageSource).toContain('await router.replace({ path: route.path, query: nextQuery })')
     expect(pageSource).toContain('pageNo: pageNo.value')
     expect(pageSource).toContain('pageSize: pageSize.value')
     expect(pageSource).toContain('record.bizType ?? record.businessType ?? record.sourceType')
@@ -584,6 +624,9 @@ describe('alert/index.vue', () => {
     expect(tablePanelSource).toContain("handleChangeStatus(row, 'PROCESSED')")
     expect(tablePanelSource).toContain('<template #triggeredAt="{ row }">')
     expect(tablePanelSource).toContain('class="alert-message-button"')
+    expect(tablePanelSource).toContain('<a-result status="error" title="预警列表加载失败" :sub-title="listError">')
+    expect(tablePanelSource).toContain('<LgEmptyState description="暂无符合条件的预警记录">')
+    expect(tablePanelSource).toContain('<a-button type="primary" @click="handleRetry">重试</a-button>')
     expect(tablePanelSource).toContain('.alert-toolbar-left')
     expect(tablePanelSource).toContain('flex-wrap: wrap')
 
@@ -655,6 +698,9 @@ describe('alert 子组件 DOM/结构证据', () => {
         pageNo: 1,
         pageSize: 20,
         selectedCount: 1,
+        listError: null,
+        showEmptyState: false,
+        hasActiveFilters: false,
         toggleCol: vi.fn(),
         togglePageSelection: vi.fn(),
         isRowSelected: vi.fn(() => false),
@@ -673,6 +719,8 @@ describe('alert 子组件 DOM/结构证据', () => {
         handleBatchMarkRead: vi.fn(),
         handlePageChange: vi.fn(),
         handlePageSizeChange: vi.fn(),
+        handleReset: vi.fn(),
+        handleRetry: vi.fn(),
         exportCurrentView: vi.fn(),
       },
       global: {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import dayjs from 'dayjs'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
@@ -21,8 +22,9 @@ import {
   type WfInstanceVO,
 } from '@/api/modules/workflow'
 import type { PageParams, PageResult } from '@/types/api'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 import { useUserStore } from '@/stores/user'
 import {
   canAccessWorkflowBusinessEntry,
@@ -51,6 +53,8 @@ const userStore = useUserStore()
 const activeTab = ref(String(route.meta.approvalTab ?? 'todo'))
 
 const loading = ref(false)
+const hasLoaded = ref(false)
+const listError = ref<string | null>(null)
 const pageNo = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
@@ -102,6 +106,35 @@ const statusFilterOptions = [{ label: '全部', value: '' }, ...instanceStatusOp
 
 const businessTypeFilterOptions = [{ label: '全部业务', value: '' }, ...coreBusinessTypeOptions]
 
+function hydrateFromRouteQuery() {
+  filterKeyword.value = readStringQuery(route.query.keyword) ?? ''
+  filterBusinessType.value = readStringQuery(route.query.businessType) ?? ''
+  filterInstanceStatus.value = readStringQuery(route.query.instanceStatus) ?? ''
+  const startTime = readStringQuery(route.query.startTime)
+  const endTime = readStringQuery(route.query.endTime)
+  filterTimeRange.value =
+    startTime && endTime ? [dayjs(startTime), dayjs(endTime)] : null
+  pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+  pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+}
+
+async function syncRouteQuery() {
+  const nextQuery = replaceListQuery(
+    route.query,
+    {
+      keyword: filterKeyword.value.trim() || undefined,
+      businessType: filterBusinessType.value || undefined,
+      instanceStatus: filterInstanceStatus.value || undefined,
+      startTime: filterTimeRange.value?.[0]?.startOf('day').format('YYYY-MM-DD HH:mm:ss'),
+      endTime: filterTimeRange.value?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss'),
+      pageNo: pageNo.value,
+      pageSize: pageSize.value,
+    },
+    ['keyword', 'businessType', 'instanceStatus', 'startTime', 'endTime', 'pageNo', 'pageSize'],
+  )
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
 function syncActiveTotal(value: unknown) {
   const nextTotal = Number(value ?? 0)
   total.value = Number.isFinite(nextTotal) ? nextTotal : 0
@@ -126,6 +159,8 @@ function buildQueryParams(): PageParams {
 }
 
 async function fetchData() {
+  listError.value = null
+  await syncRouteQuery()
   loading.value = true
   try {
     const params = buildQueryParams()
@@ -154,16 +189,32 @@ async function fetchData() {
     else if (activeTab.value === 'cc') ccData.value = []
     else if (activeTab.value === 'mine') mineData.value = []
     syncActiveTotal(0)
+    listError.value = '请检查筛选条件或网络状态后重试。'
     message.error('加载列表失败，请稍后重试')
   } finally {
+    hasLoaded.value = true
     loading.value = false
   }
 }
 
 function handleTabChange(key: string) {
   pageNo.value = 1
-  router.push(`/approval/${key}`)
-  fetchData()
+  router.push({
+    path: `/approval/${key}`,
+    query: replaceListQuery(
+      route.query,
+      {
+        keyword: filterKeyword.value.trim() || undefined,
+        businessType: filterBusinessType.value || undefined,
+        instanceStatus: filterInstanceStatus.value || undefined,
+        startTime: filterTimeRange.value?.[0]?.startOf('day').format('YYYY-MM-DD HH:mm:ss'),
+        endTime: filterTimeRange.value?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss'),
+        pageNo: 1,
+        pageSize: pageSize.value,
+      },
+      ['keyword', 'businessType', 'instanceStatus', 'startTime', 'endTime', 'pageNo', 'pageSize'],
+    ),
+  })
 }
 
 function handlePageChange(pno: number, psize: number) {
@@ -256,6 +307,16 @@ const approvalSummary = computed(() => [
   { label: '发起实例', count: tabTotals.value.mine, color: '#722ed1' },
 ])
 const recentApprovals = computed(() => tableData.value.slice(0, 4))
+const hasActiveFilters = computed(
+  () =>
+    Boolean(filterKeyword.value.trim()) ||
+    Boolean(filterBusinessType.value) ||
+    Boolean(filterInstanceStatus.value) ||
+    Boolean(filterTimeRange.value?.length),
+)
+const showEmptyState = computed(
+  () => hasLoaded.value && !loading.value && !listError.value && !tableData.value.length,
+)
 const detailNodes = computed(() => (Array.isArray(detail.value?.nodes) ? detail.value.nodes : []))
 const detailRecords = computed(() =>
   Array.isArray(detail.value?.records) ? detail.value.records : [],
@@ -458,10 +519,6 @@ function tableEmptyText(): string {
   return '暂无抄送记录'
 }
 
-function shouldShowTableEmpty(): boolean {
-  return total.value === 0 && tableData.value.length === 0
-}
-
 function getNodeStatusMeta(status: unknown) {
   return getWorkflowNodeStatusMeta(status, nodeStatusMap)
 }
@@ -471,6 +528,7 @@ function getTaskStatusMeta(status: unknown) {
 }
 
 onMounted(() => {
+  hydrateFromRouteQuery()
   preloadWorkflowDisplayDicts()
   fetchData()
 })
@@ -481,7 +539,7 @@ watch(
     const nextTab = String(tab ?? 'todo')
     if (nextTab === activeTab.value) return
     activeTab.value = nextTab
-    pageNo.value = 1
+    hydrateFromRouteQuery()
     fetchData()
   },
 )
@@ -540,7 +598,20 @@ watch(
         </div>
 
         <div class="lg-table-wrap">
+          <div v-if="listError" class="approval-list-feedback">
+            <a-result status="error" title="审批列表加载失败" :sub-title="listError">
+              <template #extra>
+                <a-button type="primary" @click="fetchData">重试</a-button>
+              </template>
+            </a-result>
+          </div>
+          <div v-else-if="showEmptyState" class="approval-list-feedback">
+            <LgEmptyState :description="tableEmptyText()">
+              <a-button v-if="hasActiveFilters" @click="handleFilterReset">清空筛选</a-button>
+            </LgEmptyState>
+          </div>
           <vxe-grid
+            v-else
             :data="tableData"
             :columns="visibleGridColumns"
             :loading="loading"
@@ -587,9 +658,6 @@ watch(
                   </a-menu>
                 </template>
               </a-dropdown>
-            </template>
-            <template #empty>
-              <div v-if="shouldShowTableEmpty()" class="lg-empty-text">{{ tableEmptyText() }}</div>
             </template>
           </vxe-grid>
         </div>
@@ -845,6 +913,10 @@ watch(
 .approval-filter-keyword {
   flex: 1;
   min-width: 220px;
+}
+
+.approval-list-feedback {
+  padding: 12px 0;
 }
 
 .approval-detail-section h3 {

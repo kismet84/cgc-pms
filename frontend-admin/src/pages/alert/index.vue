@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import dayjs from 'dayjs'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { Dayjs } from 'dayjs'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
   BellOutlined,
@@ -30,6 +31,7 @@ import {
   type AlertSubscriptionResponse,
 } from '@/types/alert'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 import { downloadBlobFile } from '@/utils/download'
 import AlertDetailPanel from './components/AlertDetailPanel.vue'
 import AlertFilterPanel from './components/AlertFilterPanel.vue'
@@ -37,6 +39,7 @@ import AlertSubscriptionModal from './components/AlertSubscriptionModal.vue'
 import AlertTablePanel from './components/AlertTablePanel.vue'
 
 const router = useRouter()
+const route = useRoute()
 const store = useAlertStore()
 const userStore = useUserStore()
 const referenceStore = useReferenceStore()
@@ -66,6 +69,8 @@ const filter = reactive({
 })
 
 const projectsLoading = ref(false)
+const hasLoaded = ref(false)
+const listError = ref<string | null>(null)
 const pageNo = ref(1)
 const pageSize = ref(20)
 const selectedRowKeys = ref<Array<string | number>>([])
@@ -157,6 +162,60 @@ function resolveSearchAlertDomain() {
   return filter.alertDomain
 }
 
+function hydrateFromRouteQuery() {
+  filter.keyword = readStringQuery(route.query.keyword) ?? ''
+  filter.projectId = readStringQuery(route.query.projectId)
+  filter.alertDomain = readStringQuery(route.query.alertDomain)
+  filter.ruleType = readStringQuery(route.query.ruleType)
+  filter.severity = readStringQuery(route.query.severity)
+  const isRead = readStringQuery(route.query.isRead)
+  filter.isRead = isRead === undefined ? undefined : Number(isRead)
+  filter.processStatus = readStringQuery(route.query.processStatus)
+  const triggeredStart = readStringQuery(route.query.triggeredStart)
+  const triggeredEnd = readStringQuery(route.query.triggeredEnd)
+  filter.triggeredAtRange =
+    triggeredStart && triggeredEnd ? [dayjs(triggeredStart), dayjs(triggeredEnd)] : null
+  const onlyDefaultScope = readStringQuery(route.query.onlyDefaultScope)
+  filter.onlyDefaultScope = onlyDefaultScope === 'true' || onlyDefaultScope === '1'
+  pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+  pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+}
+
+async function syncRouteQuery() {
+  const nextQuery = replaceListQuery(
+    route.query,
+    {
+      keyword: filter.keyword.trim() || undefined,
+      projectId: filter.projectId,
+      alertDomain: filter.alertDomain,
+      ruleType: filter.ruleType,
+      severity: filter.severity,
+      isRead: filter.isRead,
+      processStatus: filter.processStatus,
+      triggeredStart: filter.triggeredAtRange?.[0]?.startOf('day').format('YYYY-MM-DD HH:mm:ss'),
+      triggeredEnd: filter.triggeredAtRange?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss'),
+      onlyDefaultScope: filter.onlyDefaultScope ? 1 : undefined,
+      pageNo: pageNo.value,
+      pageSize: pageSize.value,
+    },
+    [
+      'keyword',
+      'projectId',
+      'alertDomain',
+      'ruleType',
+      'severity',
+      'isRead',
+      'processStatus',
+      'triggeredStart',
+      'triggeredEnd',
+      'onlyDefaultScope',
+      'pageNo',
+      'pageSize',
+    ],
+  )
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
 function syncActiveRecord(id: string | number, updater: (record: AlertLogVO) => void) {
   if (activeRecord.value && String(activeRecord.value.id) === String(id)) {
     updater(activeRecord.value)
@@ -226,6 +285,8 @@ function syncActiveRecordFromList() {
 }
 
 async function fetchData() {
+  listError.value = null
+  await syncRouteQuery()
   try {
     await store.fetchAlerts({
       keyword: filter.keyword.trim() || undefined,
@@ -245,7 +306,10 @@ async function fetchData() {
     syncActiveRecordFromList()
   } catch (error) {
     console.error(error)
+    listError.value = '请检查筛选条件或网络状态后重试。'
     message.error('加载预警列表失败，请稍后重试')
+  } finally {
+    hasLoaded.value = true
   }
 }
 
@@ -481,6 +545,21 @@ const kpiCards = computed(() => [
 ])
 
 const selectedCount = computed(() => selectedRowKeys.value.length)
+const hasActiveFilters = computed(
+  () =>
+    Boolean(filter.keyword.trim()) ||
+    Boolean(filter.projectId) ||
+    Boolean(filter.alertDomain) ||
+    Boolean(filter.ruleType) ||
+    Boolean(filter.severity) ||
+    filter.isRead !== undefined ||
+    Boolean(filter.processStatus) ||
+    Boolean(filter.triggeredAtRange?.length) ||
+    filter.onlyDefaultScope,
+)
+const showEmptyState = computed(
+  () => hasLoaded.value && !store.loading && !listError.value && !alerts.value.length,
+)
 const tableHeight = '100%'
 const checkboxColumn = {
   field: '__selection',
@@ -711,7 +790,12 @@ watch(
 )
 
 onMounted(async () => {
-  applyRoleDefaultView()
+  hydrateFromRouteQuery()
+  if (!filter.alertDomain && !filter.onlyDefaultScope) {
+    applyRoleDefaultView()
+  } else {
+    roleDefaultApplied.value = true
+  }
   projectsLoading.value = true
   try {
     if (!referenceStore.projects?.length) {
@@ -783,6 +867,9 @@ onMounted(async () => {
           :page-no="pageNo"
           :page-size="pageSize"
           :selected-count="selectedCount"
+          :list-error="listError"
+          :show-empty-state="showEmptyState"
+          :has-active-filters="hasActiveFilters"
           :toggle-col="toggleCol"
           :toggle-page-selection="togglePageSelection"
           :is-row-selected="isRowSelected"
@@ -801,6 +888,8 @@ onMounted(async () => {
           :handle-batch-mark-read="handleBatchMarkRead"
           :handle-page-change="handlePageChange"
           :handle-page-size-change="handlePageSizeChange"
+          :handle-reset="handleReset"
+          :handle-retry="fetchData"
           :export-current-view="exportCurrentView"
         />
       </div>

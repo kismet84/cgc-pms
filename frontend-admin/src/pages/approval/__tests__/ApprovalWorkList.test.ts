@@ -87,21 +87,31 @@ describe('approval work list route titles', () => {
     expect(source).toContain("return '暂无已处理记录'")
     expect(source).toContain("return '暂无抄送记录'")
     expect(source).toContain("return '暂无发起记录'")
-    expect(source).toContain('<template #empty>')
-    expect(source).toContain('function shouldShowTableEmpty()')
-    expect(source).toContain('return total.value === 0 && tableData.value.length === 0')
+    expect(source).toContain('const hasLoaded = ref(false)')
+    expect(source).toContain('const listError = ref<string | null>(null)')
+    expect(source).toContain('const showEmptyState = computed(')
+    expect(source).toContain('<a-result status="error" title="审批列表加载失败" :sub-title="listError">')
+    expect(source).toContain('<LgEmptyState :description="tableEmptyText()">')
     expect(source).toContain(
-      '<div v-if="shouldShowTableEmpty()" class="lg-empty-text">{{ tableEmptyText() }}</div>',
+      '<a-button v-if="hasActiveFilters" @click="handleFilterReset">清空筛选</a-button>',
     )
-    expect(source).not.toContain('<div class="lg-empty-text">{{ tableEmptyText() }}</div>')
     expect(source).toContain('handleDetail(row as { instanceId: string })')
   })
 
   it('filters approval tabs with server-side query params', () => {
+    expect(source).toContain(
+      "import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'",
+    )
     expect(source).toContain("const filterKeyword = ref('')")
     expect(source).toContain("const filterBusinessType = ref('')")
     expect(source).toContain("const filterInstanceStatus = ref('')")
     expect(source).toContain('const filterTimeRange = ref')
+    expect(source).toContain('function hydrateFromRouteQuery()')
+    expect(source).toContain("filterKeyword.value = readStringQuery(route.query.keyword) ?? ''")
+    expect(source).toContain('pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)')
+    expect(source).toContain('pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)')
+    expect(source).toContain('async function syncRouteQuery()')
+    expect(source).toContain('await router.replace({ path: route.path, query: nextQuery })')
     expect(source).toContain('function buildQueryParams()')
     expect(source).toContain('if (keyword) params.keyword = keyword')
     expect(source).toContain(
@@ -121,11 +131,14 @@ describe('approval work list route titles', () => {
     expect(source).toContain('getMyDone(params)')
     expect(source).toContain('getMyCc(params)')
     expect(source).toContain('getMyInitiatedInstances(params)')
+    expect(source).toMatch(/fetchData\(\) \{\s*listError\.value = null\s*await syncRouteQuery\(\)/)
     expect(source).toContain('function handleFilterSearch')
     expect(source).toMatch(
       /function handleFilterSearch[\s\S]*?pageNo\.value = 1[\s\S]*?fetchData\(\)/,
     )
     expect(source).toContain('function handleFilterReset')
+    expect(source).toContain('router.push({')
+    expect(source).toContain('path: `/approval/${key}`')
     expect(source).toContain('<a-input')
     expect(source).toContain('<a-range-picker v-model:value="filterTimeRange"')
     expect(source).not.toContain('tableData.value.filter')

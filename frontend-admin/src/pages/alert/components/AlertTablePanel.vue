@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AlertLogVO } from '@/types/alert'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { ALERT_PROCESS_STATUS_COLOR, RULE_TYPE_LABELS, SEVERITY_COLOR } from '@/types/alert'
 
 type AlertProcessStatus = 'OPEN' | 'PROCESSED' | 'ARCHIVED' | 'INVALID'
@@ -18,6 +18,9 @@ defineProps<{
   pageNo: number
   pageSize: number
   selectedCount: number
+  listError: string | null
+  showEmptyState: boolean
+  hasActiveFilters: boolean
   toggleCol: (key: string) => void
   togglePageSelection: (checked: boolean) => void
   isRowSelected: (id: string | number) => boolean
@@ -40,6 +43,8 @@ defineProps<{
   handleBatchMarkRead: () => void
   handlePageChange: (page: number) => void
   handlePageSizeChange: (page: number, size: number) => void
+  handleReset: () => void
+  handleRetry: () => void
   exportCurrentView: () => void
 }>()
 </script>
@@ -65,7 +70,20 @@ defineProps<{
     </div>
 
     <div class="lg-table-wrap alert-grid-wrap">
+      <div v-if="listError" class="alert-list-feedback">
+        <a-result status="error" title="预警列表加载失败" :sub-title="listError">
+          <template #extra>
+            <a-button type="primary" @click="handleRetry">重试</a-button>
+          </template>
+        </a-result>
+      </div>
+      <div v-else-if="showEmptyState" class="alert-list-feedback">
+        <LgEmptyState description="暂无符合条件的预警记录">
+          <a-button v-if="hasActiveFilters" @click="handleReset">清空筛选</a-button>
+        </LgEmptyState>
+      </div>
       <vxe-grid
+        v-else
         :data="alerts"
         :columns="tableColumns"
         :loading="loading"
@@ -218,6 +236,10 @@ defineProps<{
   flex: 1;
   min-height: 0;
   padding: 0 14px 6px;
+}
+
+.alert-list-feedback {
+  padding: 12px 0;
 }
 
 .alert-pagination {
