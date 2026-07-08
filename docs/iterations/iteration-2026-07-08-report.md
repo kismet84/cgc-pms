@@ -558,3 +558,29 @@ Issue：ISSUE-007-004 接口性能与错误率监控指标回归
 剩余风险：
 - 本轮未接入 Prometheus、告警平台或可视化面板，结论限于项目内 Micrometer/Actuator 本地断言。
 - 匿名 `/api/actuator/health` 安全策略未纳入本轮修改范围；如需把匿名健康检查作为上线门禁，应另开安全/运维范围 Issue。
+
+---
+
+Issue：ISSUE-007-005 访问日志 projectId/status/duration/exception 字段回归
+
+目标：
+- 回归访问日志中的 `method`、`path`、`projectId`、`status`、`duration`、`exception` 字段。
+- 在不扩展日志平台和不引入新依赖的前提下，补齐本地可验证的 `projectId` 归因口径与敏感信息不泄露断言。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/common/filter/TraceIdFilter.java`：访问日志字段补充 `projectId`、`exception`，并将 `durationMs` 回归为 `duration`；`projectId` 解析顺序为请求参数、`projectId` 路由变量和 `/projects/{id}` 路径片段兜底。
+- `backend/src/test/java/com/cgcpms/common/filter/TraceIdFilterLoggingTest.java`：新增命中 Ready Issue 原验证通配符的回归测试，覆盖成功/异常请求日志字段与敏感信息不泄露断言。
+- `docs/quality/issue-007-005-access-log-fields-regression.md`、`docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：新增正式报告并完成 backlog 收口。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=*Trace*Test,*Logging*Test" test`：预检发现原仓库不存在对应访问日志回归测试；新增 `TraceIdFilterLoggingTest` 后通过，`Tests run: 2, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：Ready Issue 配置问题已更正；访问日志字段回归断言已补齐
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前 `projectId` 只在请求参数、`projectId` 路由变量或 `/projects/{id}` 路径模式下可自动识别；其他业务路径没有统一项目上下文时仍记为 `-`。
+- `exception` 当前只记录异常类型名，不记录异常消息；这有利于避免敏感信息泄露，但不提供更细的错误细节。

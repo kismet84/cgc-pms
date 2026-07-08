@@ -149,3 +149,11 @@
 失败分类或非失败分类：Ready Issue 配置问题已更正；本地监控指标断言已补齐
 验证结果：通过
 相关报告：docs/quality/issue-007-004-actuator-metrics-regression.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-007-005：访问日志 projectId/status/duration/exception 字段回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：Ready Issue 配置问题已更正；访问日志字段回归断言已补齐
+验证结果：通过
+相关报告：docs/quality/issue-007-005-access-log-fields-regression.md；docs/iterations/iteration-2026-07-08-report.md

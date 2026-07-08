@@ -36,33 +36,6 @@
 
 ## P1
 
-### ISSUE-007-005：访问日志 projectId/status/duration/exception 字段回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 2 条“日志字段”
-目标：
-- 回归访问日志中 method、path、status、duration、exception 字段。
-- 尽量补齐 projectId 可追踪口径；若当前请求上下文无法稳定解析，正式报告说明边界。
-允许修改：
-- `backend/src/main/java/com/cgcpms/common/**`
-- `backend/src/test/java/com/cgcpms/common/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产日志采集平台配置
-验收标准：
-- 成功和异常请求均能留下可追踪访问日志字段。
-- 日志字段不泄露 Token、Cookie、请求体等敏感内容。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=*Trace*Test,*Logging*Test" test`
-- `git diff --check`
-
 ### ISSUE-007-006：备份范围与恢复演练报告模板补强
 
 优先级：P1
@@ -134,6 +107,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-007-004-actuator-metrics-regression.md`
+
+### ISSUE-007-005：访问日志 projectId/status/duration/exception 字段回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-005-access-log-fields-regression.md`
 
 ### ISSUE-006-005：发票识别失败原因与人工确认口径回归
 

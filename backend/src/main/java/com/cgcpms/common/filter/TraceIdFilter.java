@@ -12,8 +12,10 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerMapping;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -36,6 +38,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         long startNanos = System.nanoTime();
+        Throwable failure = null;
         String traceId = request.getHeader(TRACE_ID_HEADER);
         if (traceId == null || traceId.isBlank()) {
             traceId = UUID.randomUUID().toString().replace("-", "");
@@ -55,20 +58,53 @@ public class TraceIdFilter extends OncePerRequestFilter {
             response.setHeader(TRACE_ID_HEADER, traceId);
             response.setHeader(REQUEST_ID_HEADER, requestId);
             filterChain.doFilter(request, response);
+        } catch (IOException | ServletException | RuntimeException ex) {
+            failure = ex;
+            throw ex;
         } finally {
-            long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
-            log.info("HTTP_ACCESS traceId={} requestId={} method={} path={} status={} durationMs={} clientIp={}",
+            long duration = (System.nanoTime() - startNanos) / 1_000_000;
+            log.info("HTTP_ACCESS traceId={} requestId={} method={} path={} projectId={} status={} duration={} exception={} clientIp={}",
                     traceId,
                     requestId,
                     request.getMethod(),
                     request.getRequestURI(),
+                    resolveProjectId(request),
                     response.getStatus(),
-                    durationMs,
+                    duration,
+                    failure == null ? "-" : failure.getClass().getSimpleName(),
                     resolveClientIp(request));
             MDC.remove(MDC_KEY);
             MDC.remove(REQUEST_ID_MDC_KEY);
             TraceIdContext.clear();
         }
+    }
+
+    private String resolveProjectId(HttpServletRequest request) {
+        String projectId = request.getParameter("projectId");
+        if (projectId != null && !projectId.isBlank()) {
+            return projectId.trim();
+        }
+        Object uriVariables = request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+        if (uriVariables instanceof Map<?, ?> vars) {
+            Object value = vars.get("projectId");
+            if (value != null) {
+                String candidate = value.toString().trim();
+                if (!candidate.isEmpty()) {
+                    return candidate;
+                }
+            }
+        }
+        String path = request.getRequestURI();
+        int marker = path.indexOf("/projects/");
+        if (marker >= 0) {
+            int start = marker + "/projects/".length();
+            int end = path.indexOf('/', start);
+            String candidate = (end >= 0 ? path.substring(start, end) : path.substring(start)).trim();
+            if (!candidate.isEmpty() && candidate.chars().allMatch(Character::isDigit)) {
+                return candidate;
+            }
+        }
+        return "-";
     }
 
     private String resolveClientIp(HttpServletRequest request) {
