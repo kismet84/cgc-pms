@@ -292,6 +292,17 @@ class PayApplicationServiceTest {
         assertEquals("PAY_APP_NOT_FOUND", ex.getCode());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("M2: getById -- 同租户无项目权限不可查看付款申请")
+    void testGetById_NoProjectAccess() {
+        TestUserContext.setUser(TENANT_ID, 999L, "no-project", List.of());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> payApplicationService.getById(testAppId));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // getPage
     // ═══════════════════════════════════════════════════════════════

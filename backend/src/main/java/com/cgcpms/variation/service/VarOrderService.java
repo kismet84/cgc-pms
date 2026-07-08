@@ -11,6 +11,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.variation.entity.VarOrder;
@@ -46,6 +47,7 @@ public class VarOrderService {
     private final CtContractMapper ctContractMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final WorkflowEngine workflowEngine;
+    private final ProjectAccessChecker projectAccessChecker;
 
     public IPage<VarOrderVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                       Long partnerId, String varType, String direction, String varCode) {
@@ -93,6 +95,7 @@ public class VarOrderService {
         VarOrder order = varOrderMapper.selectById(id);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
+        checkProjectAccess(order.getProjectId(), "查看变更签证");
 
         VarOrderVO vo = toVO(order);
 
@@ -118,6 +121,7 @@ public class VarOrderService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(VarOrder order) {
         validateDraftOrder(order);
+        validateProjectAndContract(order.getProjectId(), order.getContractId(), "创建变更签证");
 
         // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -165,6 +169,7 @@ public class VarOrderService {
         VarOrder existing = varOrderMapper.selectById(order.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
+        checkProjectAccess(existing.getProjectId(), "编辑变更签证");
 
         if (!"DRAFT".equals(existing.getApprovalStatus()))
             throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可编辑");
@@ -172,6 +177,10 @@ public class VarOrderService {
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
         validateDraftOrder(order);
+        validateProjectAndContract(
+                order.getProjectId() != null ? order.getProjectId() : existing.getProjectId(),
+                order.getContractId() != null ? order.getContractId() : existing.getContractId(),
+                "编辑变更签证");
 
         varOrderMapper.updateById(order);
     }
@@ -182,6 +191,7 @@ public class VarOrderService {
         VarOrder order = varOrderMapper.selectById(varOrderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
+        checkProjectAccess(order.getProjectId(), "编辑变更签证明细");
 
         if (!"DRAFT".equals(order.getApprovalStatus()))
             throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可编辑");
@@ -214,6 +224,7 @@ public class VarOrderService {
         VarOrder existing = varOrderMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
+        checkProjectAccess(existing.getProjectId(), "删除变更签证");
 
         if (!"DRAFT".equals(existing.getApprovalStatus()))
             throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可删除");
@@ -231,14 +242,10 @@ public class VarOrderService {
         VarOrder order = varOrderMapper.selectById(varOrderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
+        checkProjectAccess(order.getProjectId(), "提交变更签证审批");
 
         if (!"DRAFT".equals(order.getApprovalStatus()))
             throw new BusinessException("VAR_ORDER_ALREADY_SUBMITTED", "签证已提交审批，不可重复提交");
-
-        LambdaUpdateWrapper<VarOrder> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(VarOrder::getId, varOrderId)
-                .set(VarOrder::getApprovalStatus, "APPROVING");
-        varOrderMapper.update(null, updateWrapper);
 
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -251,6 +258,11 @@ public class VarOrderService {
                 order.getProjectId(),
                 order.getContractId(),
                 null, null, null);
+
+        LambdaUpdateWrapper<VarOrder> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(VarOrder::getId, varOrderId)
+                .set(VarOrder::getApprovalStatus, "APPROVING");
+        varOrderMapper.update(null, updateWrapper);
     }
 
     private void validateDraftOrder(VarOrder order) {
@@ -263,6 +275,24 @@ public class VarOrderService {
         if (!StringUtils.hasText(order.getVarType())) {
             throw new BusinessException("VAR_ORDER_TYPE_REQUIRED", "请选择变更类型");
         }
+    }
+
+    private void validateProjectAndContract(Long projectId, Long contractId, String action) {
+        checkProjectAccess(projectId, action);
+        CtContract contract = ctContractMapper.selectById(contractId);
+        if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        }
+        if (!java.util.Objects.equals(contract.getProjectId(), projectId)) {
+            throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "合同不属于当前项目");
+        }
+    }
+
+    private void checkProjectAccess(Long projectId, String action) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_REQUIRED", "变更签证缺少项目关系");
+        }
+        projectAccessChecker.checkAccess(projectId, action);
     }
 
     private List<VarOrderItem> normalizeDraftItems(List<VarOrderItem> items) {

@@ -46,6 +46,7 @@ class WorkflowSubmitServiceTest {
     private static final long PARTNER_B_ID = 20002L;
     private static final long CONTRACT_ID_DUPLICATE = 31001L;
     private static final long CONTRACT_ID_DELETED = 31002L;
+    private static final long CONTRACT_ID_TEMPLATE = 31999L;
     private static final String BUSINESS_TYPE = "CONTRACT_APPROVAL";
 
     @Autowired
@@ -124,6 +125,7 @@ class WorkflowSubmitServiceTest {
 
         ensureContract(CONTRACT_ID_DUPLICATE, "CT-TEST-WF-DUP", "工作流重复提交测试合同");
         ensureContract(CONTRACT_ID_DELETED, "CT-TEST-WF-DEL", "工作流逻辑删除测试合同");
+        ensureContract(CONTRACT_ID_TEMPLATE, "CT-TEST-WF-TPL", "工作流模板存在测试合同");
     }
 
     private void ensureContract(Long id, String code, String name) {
@@ -233,11 +235,25 @@ class WorkflowSubmitServiceTest {
     void testContractApprovalTemplateExists() {
         WfInstance instance = workflowEngine.submit(
                 TestUserContext.USER_ADMIN, "admin", TestUserContext.TENANT_0,
-                BUSINESS_TYPE, 31999L,
+                BUSINESS_TYPE, CONTRACT_ID_TEMPLATE,
                 "模板存在性验证", new BigDecimal("1000.00"),
-                PROJECT_ID, 31999L,
+                PROJECT_ID, CONTRACT_ID_TEMPLATE,
                 null, null, null);
         assertNotNull(instance, "CONTRACT_APPROVAL 模板应存在并可创建实例");
         assertEquals(WorkflowConstants.INSTANCE_RUNNING, instance.getInstanceStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("M2: submit rejects forged projectId that does not match business object")
+    void testSubmitRejectsForgedProjectId() {
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                workflowEngine.submit(
+                        TestUserContext.USER_ADMIN, "admin", TestUserContext.TENANT_0,
+                        BUSINESS_TYPE, CONTRACT_ID_DUPLICATE,
+                        "伪造项目提交", new BigDecimal("640000.00"),
+                        99999L, CONTRACT_ID_DUPLICATE,
+                        null, null, null));
+        assertEquals("WORKFLOW_PROJECT_MISMATCH", ex.getCode());
     }
 }

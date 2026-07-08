@@ -11,6 +11,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class CtContractChangeService {
     private final CtContractChangeMapper ctContractChangeMapper;
     private final CtContractMapper ctContractMapper;
     private final WorkflowEngine workflowEngine;
+    private final ProjectAccessChecker projectAccessChecker;
 
     public IPage<CtContractChange> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                            String changeType, String approvalStatus, String changeCode) {
@@ -48,6 +50,7 @@ public class CtContractChangeService {
         CtContractChange entity = ctContractChangeMapper.selectById(id);
         if (entity == null || !entity.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CT_CHANGE_NOT_FOUND", "合同变更不存在");
+        checkProjectAccess(entity.getProjectId(), "查看合同变更");
         return entity;
     }
 
@@ -57,6 +60,9 @@ public class CtContractChangeService {
         CtContract contract = ctContractMapper.selectById(change.getContractId());
         if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        checkProjectAccess(change.getProjectId(), "创建合同变更");
+        if (!java.util.Objects.equals(contract.getProjectId(), change.getProjectId()))
+            throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "合同不属于当前项目");
 
         String contractStatus = contract.getContractStatus();
         if (ContractStatusConstants.STATUS_DRAFT.equals(contractStatus)
@@ -101,6 +107,7 @@ public class CtContractChangeService {
         CtContractChange existing = ctContractChangeMapper.selectById(change.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CT_CHANGE_NOT_FOUND", "合同变更不存在");
+        checkProjectAccess(existing.getProjectId(), "编辑合同变更");
 
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
             throw new BusinessException("CT_CHANGE_IN_APPROVAL", "合同变更审批中或已审批，不可编辑");
@@ -115,6 +122,7 @@ public class CtContractChangeService {
         CtContractChange existing = ctContractChangeMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CT_CHANGE_NOT_FOUND", "合同变更不存在");
+        checkProjectAccess(existing.getProjectId(), "删除合同变更");
 
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
             throw new BusinessException("CT_CHANGE_IN_APPROVAL", "合同变更审批中或已审批，不可删除");
@@ -132,13 +140,10 @@ public class CtContractChangeService {
         CtContractChange existing = ctContractChangeMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CT_CHANGE_NOT_FOUND", "合同变更不存在");
+        checkProjectAccess(existing.getProjectId(), "提交合同变更审批");
 
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
             throw new BusinessException("CT_CHANGE_ALREADY_SUBMITTED", "合同变更已提交审批，不可重复提交");
-
-        ctContractChangeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()
-                .eq(CtContractChange::getId, id)
-                .set(CtContractChange::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING));
 
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -151,5 +156,16 @@ public class CtContractChangeService {
                 existing.getProjectId(),
                 existing.getContractId(),
                 null, null, null);
+
+        ctContractChangeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()
+                .eq(CtContractChange::getId, id)
+                .set(CtContractChange::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING));
+    }
+
+    private void checkProjectAccess(Long projectId, String action) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_REQUIRED", "合同变更缺少项目关系");
+        }
+        projectAccessChecker.checkAccess(projectId, action);
     }
 }

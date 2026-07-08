@@ -14,6 +14,7 @@ import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
@@ -52,6 +53,7 @@ public class MatPurchaseOrderService {
     private final CtContractMapper ctContractMapper;
     private final MdMaterialMapper mdMaterialMapper;
     private final WorkflowEngine workflowEngine;
+    private final ProjectAccessChecker projectAccessChecker;
 
     public IPage<MatPurchaseOrderVO> getPage(long pageNum, long pageSize, Long projectId, Long contractId,
                                               Long partnerId, String orderStatus, String orderType, String orderCode) {
@@ -93,6 +95,7 @@ public class MatPurchaseOrderService {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(id);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
+        checkProjectAccess(order.getProjectId(), "查看采购订单");
 
         MatPurchaseOrderVO vo = toVO(order);
 
@@ -118,6 +121,7 @@ public class MatPurchaseOrderService {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(orderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
+        checkProjectAccess(order.getProjectId(), "查看采购订单明细");
 
         LambdaQueryWrapper<MatPurchaseOrderItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MatPurchaseOrderItem::getOrderId, orderId)
@@ -136,6 +140,7 @@ public class MatPurchaseOrderService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatPurchaseOrder order) {
+        checkProjectAccess(order.getProjectId(), "创建采购订单");
         // Auto-generate order code: PO-yyyyMMdd-XXX
         String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         order.setOrderStatus("DRAFT");
@@ -146,6 +151,8 @@ public class MatPurchaseOrderService {
             CtContract contract = ctContractMapper.selectById(order.getContractId());
             if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
                 throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
+            if (!java.util.Objects.equals(contract.getProjectId(), order.getProjectId()))
+                throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "关联合同不属于当前项目");
             if (!ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus()))
                 throw new BusinessException("CONTRACT_NOT_PERFORMING", "关联合同非执行中状态，无法创建采购订单");
         }
@@ -187,6 +194,7 @@ public class MatPurchaseOrderService {
         MatPurchaseOrder existing = matPurchaseOrderMapper.selectById(order.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
+        checkProjectAccess(existing.getProjectId(), "编辑采购订单");
 
         // Guard: cannot edit if approving or approved
         if ("APPROVED".equals(existing.getApprovalStatus()) || "APPROVING".equals(existing.getApprovalStatus()))
@@ -197,6 +205,9 @@ public class MatPurchaseOrderService {
             CtContract contract = ctContractMapper.selectById(order.getContractId());
             if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
                 throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
+            Long projectId = order.getProjectId() != null ? order.getProjectId() : existing.getProjectId();
+            if (!java.util.Objects.equals(contract.getProjectId(), projectId))
+                throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "关联合同不属于当前项目");
             if (!ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus()))
                 throw new BusinessException("CONTRACT_NOT_PERFORMING", "关联合同非执行中状态，无法关联");
         }
@@ -215,6 +226,7 @@ public class MatPurchaseOrderService {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(orderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
+        checkProjectAccess(order.getProjectId(), "提交采购订单审批");
 
         // 只允许草稿状态提交
         if (!"DRAFT".equals(order.getApprovalStatus()))
@@ -223,12 +235,6 @@ public class MatPurchaseOrderService {
         // 必须有订单编号
         if (order.getOrderCode() == null || order.getOrderCode().isBlank())
             throw new BusinessException("PURCHASE_ORDER_NO_CODE", "订单编号不能为空，无法提交审批");
-
-        // 更新审批状态为审批中
-        LambdaUpdateWrapper<MatPurchaseOrder> updateWrapper = new LambdaUpdateWrapper<>();
-        updateWrapper.eq(MatPurchaseOrder::getId, orderId)
-                .set(MatPurchaseOrder::getApprovalStatus, "APPROVING");
-        matPurchaseOrderMapper.update(null, updateWrapper);
 
         // 调用审批引擎
         Long userId = UserContext.getCurrentUserId();
@@ -242,6 +248,12 @@ public class MatPurchaseOrderService {
                 order.getProjectId(),
                 order.getContractId(),
                 null, null, null);
+
+        // 更新审批状态为审批中
+        LambdaUpdateWrapper<MatPurchaseOrder> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(MatPurchaseOrder::getId, orderId)
+                .set(MatPurchaseOrder::getApprovalStatus, "APPROVING");
+        matPurchaseOrderMapper.update(null, updateWrapper);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -249,6 +261,7 @@ public class MatPurchaseOrderService {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(id);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
+        checkProjectAccess(order.getProjectId(), "删除采购订单");
 
         if (!"DRAFT".equals(order.getApprovalStatus()))
             throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可删除");
@@ -262,6 +275,7 @@ public class MatPurchaseOrderService {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(orderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_ORDER_NOT_FOUND", "采购订单不存在");
+        checkProjectAccess(order.getProjectId(), "编辑采购订单明细");
 
         if (!"DRAFT".equals(order.getApprovalStatus()))
             throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可编辑明细");
@@ -309,6 +323,13 @@ public class MatPurchaseOrderService {
             if (contract != null) vo.setContractName(contract.getContractName());
         }
         return vo;
+    }
+
+    private void checkProjectAccess(Long projectId, String action) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_REQUIRED", "采购订单缺少项目关系");
+        }
+        projectAccessChecker.checkAccess(projectId, action);
     }
 
     private MatPurchaseOrderVO toVO(MatPurchaseOrder o, Map<Long, String> projectNames,

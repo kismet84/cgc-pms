@@ -13,7 +13,9 @@ import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
@@ -47,6 +49,7 @@ public class BusinessObjectAuthorizer {
     private final PayInvoiceMapper invoiceMapper;
     private final MatReceiptMapper receiptMapper;
     private final PayApplicationMapper paymentMapper;
+    private final PayRecordMapper payRecordMapper;
     private final SubMeasureMapper subcontractMapper;
     private final StlSettlementMapper settlementMapper;
     private final VarOrderMapper variationMapper;
@@ -96,6 +99,7 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该合同文件");
                 }
+                checkProjectAccess(contract.getProjectId(), action + "合同文件");
                 break;
             }
             case "INVOICE": {
@@ -108,6 +112,7 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该发票文件");
                 }
+                checkProjectAccess(resolveInvoiceProjectId(invoice), action + "发票文件");
                 break;
             }
             case "RECEIPT": {
@@ -120,6 +125,7 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该收货单文件");
                 }
+                checkProjectAccess(receipt.getProjectId(), action + "收货单文件");
                 break;
             }
             case "PAYMENT": {
@@ -132,6 +138,7 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该付款申请文件");
                 }
+                checkProjectAccess(payment.getProjectId(), action + "付款申请文件");
                 break;
             }
             case "SUBCONTRACT": {
@@ -144,6 +151,7 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该分包计量文件");
                 }
+                checkProjectAccess(subcontract.getProjectId(), action + "分包计量文件");
                 break;
             }
             case "SETTLEMENT": {
@@ -156,6 +164,7 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该结算单文件");
                 }
+                checkProjectAccess(settlement.getProjectId(), action + "结算单文件");
                 break;
             }
             case "VARIATION": {
@@ -168,6 +177,7 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该变更单文件");
                 }
+                checkProjectAccess(variation.getProjectId(), action + "变更单文件");
                 break;
             }
             case "BID_COST": {
@@ -180,6 +190,7 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该目标成本文件");
                 }
+                checkProjectAccess(bidCost.getProjectId(), action + "目标成本文件");
                 break;
             }
             case "PARTNER": {
@@ -210,5 +221,36 @@ public class BusinessObjectAuthorizer {
                 throw new BusinessException("FILE_BIZ_TYPE_UNKNOWN",
                         "不支持的业务类型: " + businessType);
         }
+    }
+
+    private void checkProjectAccess(Long projectId, String action) {
+        if (projectId == null) {
+            throw new BusinessException("FILE_ACCESS_DENIED", "业务对象缺少项目关系，拒绝访问文件");
+        }
+        projectAccessChecker.checkAccess(projectId, action);
+    }
+
+    private Long resolveInvoiceProjectId(PayInvoice invoice) {
+        if (invoice.getPayRecordId() != null) {
+            PayRecord record = payRecordMapper.selectById(invoice.getPayRecordId());
+            if (record != null && record.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                if (record.getProjectId() != null) {
+                    return record.getProjectId();
+                }
+                if (record.getPayApplicationId() != null) {
+                    PayApplication app = paymentMapper.selectById(record.getPayApplicationId());
+                    if (app != null && app.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                        return app.getProjectId();
+                    }
+                }
+            }
+        }
+        if (invoice.getPayApplicationId() != null) {
+            PayApplication app = paymentMapper.selectById(invoice.getPayApplicationId());
+            if (app != null && app.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                return app.getProjectId();
+            }
+        }
+        return null;
     }
 }

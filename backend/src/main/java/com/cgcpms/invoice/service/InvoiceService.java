@@ -15,7 +15,10 @@ import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -39,6 +42,8 @@ public class InvoiceService {
 
     private final PayInvoiceMapper payInvoiceMapper;
     private final PayRecordMapper payRecordMapper;
+    private final PayApplicationMapper payApplicationMapper;
+    private final ProjectAccessChecker projectAccessChecker;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     // ── Query ──
@@ -61,6 +66,7 @@ public class InvoiceService {
         PayInvoice invoice = payInvoiceMapper.selectById(id);
         if (invoice == null || !invoice.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
+        checkInvoiceProjectAccess(invoice, "查看发票");
         return toVO(invoice);
     }
 
@@ -85,6 +91,7 @@ public class InvoiceService {
             throw new BusinessException("PAY_RECORD_NOT_FOUND",
                     "关联的付款记录(" + invoice.getPayRecordId() + ")不存在或不属于当前租户");
         }
+        checkProjectAccess(resolveProjectId(payRecord, invoice.getPayApplicationId()), "创建发票");
         checkAndThrowDuplicate(invoice.getInvoiceNo(), () -> payInvoiceMapper.insert(invoice));
         log.debug("Invoice created successfully");
         return invoice.getId();
@@ -95,6 +102,8 @@ public class InvoiceService {
         PayInvoice existing = payInvoiceMapper.selectById(invoice.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
+        checkInvoiceProjectAccess(existing, "编辑发票");
+        ensurePending(existing);
 
         // If invoice_no is being changed, check for duplicate active invoices
         if (invoice.getInvoiceNo() != null && !invoice.getInvoiceNo().equals(existing.getInvoiceNo())) {
@@ -109,6 +118,8 @@ public class InvoiceService {
         PayInvoice existing = payInvoiceMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
+        checkInvoiceProjectAccess(existing, "删除发票");
+        ensurePending(existing);
         payInvoiceMapper.deleteById(id);
     }
 
@@ -124,6 +135,7 @@ public class InvoiceService {
         PayInvoice invoice = payInvoiceMapper.selectById(id);
         if (invoice == null || !invoice.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
+        checkInvoiceProjectAccess(invoice, "核验发票");
 
         if (!"PENDING".equals(invoice.getVerifyStatus())) {
             throw new BusinessException("VERIFY_STATUS_CONFLICT",
@@ -272,6 +284,54 @@ public class InvoiceService {
         if (count != null && count > 0) {
             throw new BusinessException("INVOICE_NO_DUPLICATE",
                     "发票号码(" + invoiceNo + ")已存在，同一租户下发票号码不可重复");
+        }
+    }
+
+    private void checkInvoiceProjectAccess(PayInvoice invoice, String action) {
+        checkProjectAccess(resolveProjectId(invoice.getPayRecordId(), invoice.getPayApplicationId()), action);
+    }
+
+    private Long resolveProjectId(Long payRecordId, Long payApplicationId) {
+        if (payRecordId != null) {
+            PayRecord record = payRecordMapper.selectById(payRecordId);
+            if (record != null && record.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                Long projectId = resolveProjectId(record, payApplicationId);
+                if (projectId != null) {
+                    return projectId;
+                }
+            }
+        }
+        if (payApplicationId != null) {
+            PayApplication app = payApplicationMapper.selectById(payApplicationId);
+            if (app != null && app.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                return app.getProjectId();
+            }
+        }
+        return null;
+    }
+
+    private Long resolveProjectId(PayRecord record, Long fallbackPayApplicationId) {
+        if (record.getProjectId() != null) {
+            return record.getProjectId();
+        }
+        Long payApplicationId = record.getPayApplicationId() != null ? record.getPayApplicationId() : fallbackPayApplicationId;
+        if (payApplicationId == null) {
+            return null;
+        }
+        PayApplication app = payApplicationMapper.selectById(payApplicationId);
+        return app != null && app.getTenantId().equals(UserContext.getCurrentTenantId()) ? app.getProjectId() : null;
+    }
+
+    private void checkProjectAccess(Long projectId, String action) {
+        if (projectId == null) {
+            throw new BusinessException("INVOICE_PROJECT_MISSING", "发票缺少项目关系");
+        }
+        projectAccessChecker.checkAccess(projectId, action);
+    }
+
+    private void ensurePending(PayInvoice invoice) {
+        if ("VERIFIED".equals(invoice.getVerifyStatus()) || "ABNORMAL".equals(invoice.getVerifyStatus())) {
+            throw new BusinessException("INVOICE_VERIFIED_LOCKED", "发票已核验或异常，不可编辑删除");
         }
     }
 

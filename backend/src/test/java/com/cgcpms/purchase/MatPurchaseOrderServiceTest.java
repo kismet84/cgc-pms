@@ -81,6 +81,21 @@ class MatPurchaseOrderServiceTest {
         assertThrows(BusinessException.class, () -> service.getById(id));
     }
 
+    @Test @Transactional @DisplayName("M2: getById → same tenant without project access is denied")
+    void testGetById_NoProjectAccess() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+
+        UserContext.clear();
+        UserContext.set(Jwts.claims().add("userId", 999L).add("username", "no-project")
+                .add("tenantId", TENANT_ID).add("roleCodes", List.of()).build());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.getById(id));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+    }
+
     @Test @Transactional @DisplayName("getPage → returns paginated results")
     void testGetPage() {
         var page = service.getPage(1, 10, null, null, null, null, null, null);

@@ -26,6 +26,7 @@ import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.vo.PayApplicationBasisVO;
 import com.cgcpms.payment.vo.PayApplicationVO;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
@@ -70,6 +71,7 @@ public class PayApplicationService {
     private final CtContractPaymentTermMapper contractPaymentTermMapper;
     private final PayRecordMapper payRecordMapper;
     private final WorkflowEngine workflowEngine;
+    private final ProjectAccessChecker projectAccessChecker;
 
     public PayApplicationService(
             PayApplicationMapper payApplicationMapper,
@@ -83,6 +85,7 @@ public class PayApplicationService {
             SubMeasureMapper subMeasureMapper,
             CtContractPaymentTermMapper contractPaymentTermMapper,
             PayRecordMapper payRecordMapper,
+            ProjectAccessChecker projectAccessChecker,
             @org.springframework.context.annotation.Lazy WorkflowEngine workflowEngine) {
         this.payApplicationMapper = payApplicationMapper;
         this.payApplicationBasisMapper = payApplicationBasisMapper;
@@ -95,6 +98,7 @@ public class PayApplicationService {
         this.subMeasureMapper = subMeasureMapper;
         this.contractPaymentTermMapper = contractPaymentTermMapper;
         this.payRecordMapper = payRecordMapper;
+        this.projectAccessChecker = projectAccessChecker;
         this.workflowEngine = workflowEngine;
     }
 
@@ -146,6 +150,7 @@ public class PayApplicationService {
         PayApplication app = payApplicationMapper.selectById(id);
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        checkProjectAccess(app.getProjectId(), "查看付款申请");
 
         // Pre-fetch related name maps to avoid N+1 queries (same pattern as getPage)
         Map<Long, String> projectNames = app.getProjectId() != null
@@ -173,9 +178,10 @@ public class PayApplicationService {
     }
 
     public List<PayApplicationBasisVO> getBasisList(Long applicationId) {
+        PayApplication app = requireExisting(applicationId, "查看付款依据");
         List<PayApplicationBasis> basisList = payApplicationBasisMapper.selectList(
                 new LambdaQueryWrapper<PayApplicationBasis>()
-                        .eq(PayApplicationBasis::getTenantId, UserContext.getCurrentTenantId())
+                        .eq(PayApplicationBasis::getTenantId, app.getTenantId())
                         .eq(PayApplicationBasis::getPayApplicationId, applicationId));
         return basisList.stream().map(this::toBasisVO).collect(Collectors.toList());
     }
@@ -184,6 +190,7 @@ public class PayApplicationService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(PayApplication app) {
+        validateProjectAndContract(app.getProjectId(), app.getContractId(), "创建付款申请");
         boolean autoGenerateCode = !StringUtils.hasText(app.getApplyCode());
         String prefix = "PAY-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
@@ -238,12 +245,17 @@ public class PayApplicationService {
         PayApplication existing = payApplicationMapper.selectById(app.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        checkProjectAccess(existing.getProjectId(), "编辑付款申请");
 
         if (!"DRAFT".equals(existing.getApprovalStatus()))
             throw new BusinessException("PAY_APP_IN_APPROVAL", "付款申请审批中或已审批，不可编辑");
 
         app.setApprovalStatus(existing.getApprovalStatus());
         app.setPayStatus(existing.getPayStatus());
+        validateProjectAndContract(
+                app.getProjectId() != null ? app.getProjectId() : existing.getProjectId(),
+                app.getContractId() != null ? app.getContractId() : existing.getContractId(),
+                "编辑付款申请");
         payApplicationMapper.updateById(app);
     }
 
@@ -252,6 +264,7 @@ public class PayApplicationService {
         PayApplication existing = payApplicationMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        checkProjectAccess(existing.getProjectId(), "删除付款申请");
 
         if (!"DRAFT".equals(existing.getApprovalStatus()))
             throw new BusinessException("PAY_APP_IN_APPROVAL", "付款申请审批中或已审批，不可删除");
@@ -339,6 +352,7 @@ public class PayApplicationService {
         PayApplication app = payApplicationMapper.selectById(applicationId);
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        checkProjectAccess(app.getProjectId(), "编辑付款依据");
 
         if (!"DRAFT".equals(app.getApprovalStatus()))
             throw new BusinessException("PAY_APP_IN_APPROVAL", "付款申请审批中或已审批，不可编辑付款依据");
@@ -401,6 +415,7 @@ public class PayApplicationService {
         PayApplication payApp = payApplicationMapper.selectById(id);
         if (payApp == null || !payApp.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        checkProjectAccess(payApp.getProjectId(), "提交付款申请审批");
 
         if (!"DRAFT".equals(payApp.getApprovalStatus()))
             throw new BusinessException("INVALID_STATUS", "仅草稿状态的付款申请可提交审批");
@@ -428,9 +443,6 @@ public class PayApplicationService {
             throw new BusinessException("PAY_AMOUNT_MISMATCH", "申请金额(" + payApp.getApplyAmount() + ")与依据金额合计(" + basisTotal + ")不一致");
         }
 
-        payApp.setApprovalStatus("APPROVING");
-        payApplicationMapper.updateById(payApp);
-
         workflowEngine.submit(
                 UserContext.getCurrentUserId(),
                 UserContext.getCurrentUsername(),
@@ -443,6 +455,9 @@ public class PayApplicationService {
                 payApp.getContractId(),
                 payApp.getApplyReason(),
                 null, null);
+
+        payApp.setApprovalStatus("APPROVING");
+        payApplicationMapper.updateById(payApp);
     }
 
     /**
@@ -627,6 +642,36 @@ public class PayApplicationService {
         if (measureIds.isEmpty()) return Map.of();
         return subMeasureMapper.selectBatchIds(measureIds).stream()
                 .collect(Collectors.toMap(SubMeasure::getId, Function.identity()));
+    }
+
+    private PayApplication requireExisting(Long id, String action) {
+        PayApplication app = payApplicationMapper.selectById(id);
+        if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        }
+        checkProjectAccess(app.getProjectId(), action);
+        return app;
+    }
+
+    private void validateProjectAndContract(Long projectId, Long contractId, String action) {
+        checkProjectAccess(projectId, action);
+        if (contractId == null) {
+            throw new BusinessException("MISSING_CONTRACT", "付款申请缺少关联合同");
+        }
+        CtContract contract = ctContractMapper.selectById(contractId);
+        if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
+        }
+        if (!Objects.equals(contract.getProjectId(), projectId)) {
+            throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "关联合同不属于当前项目");
+        }
+    }
+
+    private void checkProjectAccess(Long projectId, String action) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_REQUIRED", "付款申请缺少项目关系");
+        }
+        projectAccessChecker.checkAccess(projectId, action);
     }
 
     // ---- VO conversion helpers ----

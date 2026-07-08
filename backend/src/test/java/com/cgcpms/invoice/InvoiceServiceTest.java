@@ -13,6 +13,8 @@ import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceVO;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
@@ -37,6 +39,7 @@ class InvoiceServiceTest {
     private static final long TENANT_ID = 1L;
     private static final long USER_ADMIN = 1L;
     private static final long SEED_PAY_RECORD_ID = 91001L;
+    private static final long SEED_PROJECT_ID = 91001L;
 
     @Autowired
     private InvoiceService invoiceService;
@@ -46,6 +49,9 @@ class InvoiceServiceTest {
 
     @Autowired
     private PayRecordMapper payRecordMapper;
+
+    @Autowired
+    private PmProjectMapper projectMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -65,11 +71,25 @@ class InvoiceServiceTest {
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
+        jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", SEED_PROJECT_ID);
+
+        PmProject project = new PmProject();
+        project.setId(SEED_PROJECT_ID);
+        project.setTenantId(TENANT_ID);
+        project.setProjectCode("PRJ-INVOICE-91001");
+        project.setProjectName("发票测试项目");
+        project.setProjectType("CONSTRUCTION");
+        project.setContractAmount(new BigDecimal("1000000.00"));
+        project.setTargetCost(new BigDecimal("800000.00"));
+        project.setStatus("RUNNING");
+        project.setApprovalStatus("APPROVED");
+        projectMapper.insert(project);
 
         // 插入种子付款记录，供发票创建时关联使用
         PayRecord seed = new PayRecord();
         seed.setId(SEED_PAY_RECORD_ID);
         seed.setTenantId(TENANT_ID);
+        seed.setProjectId(SEED_PROJECT_ID);
         seed.setPayApplicationId(SEED_PAY_RECORD_ID);
         seed.setPayAmount(new BigDecimal("100000.00"));
         seed.setPayDate(LocalDate.of(2026, 6, 1));
@@ -332,6 +352,29 @@ class InvoiceServiceTest {
         assertThrows(BusinessException.class, () -> {
             invoiceService.getById(id);
         });
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("M2: VERIFIED invoice cannot be updated or deleted")
+    void shouldRejectUpdateAndDeleteAfterVerified() {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setInvoiceNo("INV-M2-016");
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setInvoiceAmount(new BigDecimal("1000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
+        Long id = invoiceService.create(invoice);
+        invoiceService.verify(id, "VERIFIED");
+
+        PayInvoice update = new PayInvoice();
+        update.setId(id);
+        update.setRemark("blocked");
+
+        BusinessException updateEx = assertThrows(BusinessException.class, () -> invoiceService.update(update));
+        assertEquals("INVOICE_VERIFIED_LOCKED", updateEx.getCode());
+
+        BusinessException deleteEx = assertThrows(BusinessException.class, () -> invoiceService.delete(id));
+        assertEquals("INVOICE_VERIFIED_LOCKED", deleteEx.getCode());
     }
 
     // ── RED 10: register with pay_record_id ──

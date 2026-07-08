@@ -27,6 +27,7 @@ public class WorkflowSubmitService {
     private final WfNodeInstanceMapper wfNodeInstanceMapper;
     private final WfTaskMapper wfTaskMapper;
     private final WfCcService wfCcService;
+    private final WorkflowBusinessAccessValidator businessAccessValidator;
 
     @Transactional(rollbackFor = Exception.class)
     public WfInstance submit(Long userId, String username, Long tenantId,
@@ -35,6 +36,8 @@ public class WorkflowSubmitService {
                              Long projectId, Long contractId,
                              String businessSummary, String variables,
                              List<Long> ccUserIds) {
+
+        businessAccessValidator.validateSubmit(businessType, businessId, tenantId, projectId, contractId);
 
         WfTemplate template = core.findTemplate(businessType, tenantId, amount);
         List<WfTemplateNode> templateNodes = core.findTemplateNodes(template.getId());
