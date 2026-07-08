@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, computed, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   MoreOutlined,
   PlusOutlined,
@@ -17,7 +18,7 @@ import { useRequisitionList, fmtAmount } from './composables/useRequisitionList'
 import { useRequisitionForm } from './composables/useRequisitionForm'
 import RequisitionKpiStrip from './components/RequisitionKpiStrip.vue'
 import RequisitionFormModal from './components/RequisitionFormModal.vue'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // 字典常量 - 审批状态
@@ -40,6 +41,8 @@ const APPROVAL_STATUS_COLOR: Record<string, string> = {
 }
 
 const referenceStore = useReferenceStore()
+const route = useRoute()
+const router = useRouter()
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 
@@ -58,6 +61,7 @@ const filterSettingItems = [
 const {
   filter,
   loading,
+  listError,
   tableData,
   total,
   pageNo,
@@ -73,8 +77,10 @@ const {
   handlePageSizeChange,
   handleDelete,
   handleSubmitApproval,
+  hasActiveFilters,
+  showEmptyState,
   init,
-} = useRequisitionList()
+} = useRequisitionList({ route, router })
 
 const {
   visibleColumns: visibleGridColumns,
@@ -333,7 +339,21 @@ onMounted(() => {
           </div>
 
           <div class="lg-table-wrap">
+            <div v-if="listError" class="requisition-list-feedback">
+              <a-result status="error" title="领料申请列表加载失败" :sub-title="listError">
+                <template #extra>
+                  <a-button type="primary" @click="fetchData">重试</a-button>
+                </template>
+              </a-result>
+            </div>
+            <div v-else-if="showEmptyState" class="requisition-list-feedback">
+              <LgEmptyState description="暂无符合条件的领料申请">
+                <a-button v-if="hasActiveFilters" @click="handleReset">清空筛选</a-button>
+                <a-button v-else type="primary" @click="handleAdd">新建领料</a-button>
+              </LgEmptyState>
+            </div>
             <vxe-grid
+              v-else
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -612,6 +632,14 @@ onMounted(() => {
 .requisition-table-panel .lg-table-wrap {
   flex: 1;
   min-height: 0;
+}
+
+.requisition-list-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  padding: 24px;
 }
 
 .requisition-analysis-rail {

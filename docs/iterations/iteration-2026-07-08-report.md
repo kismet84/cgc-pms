@@ -694,3 +694,32 @@ Issue：ISSUE-007-008 预警批处理执行结果指标回归
 剩余风险：
 - 本轮只覆盖现有预警批处理接口响应指标，不提供外部监控采集、告警规则或面板。
 - `metrics` 只包含整数计数，不包含失败原因、消息正文、Token、凭据或用户隐私。
+
+---
+
+Issue：ISSUE-005-004 库存与领料列表页生产化补强
+
+目标：
+- 补强库存台账列表与领料申请列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口；不改库存数量业务口径，不扩展后端接口语义。
+
+修改范围摘要：
+- `frontend-admin/src/pages/inventory/stock.vue`、`frontend-admin/src/pages/inventory/composables/useStockLedger.ts`：库存台账新增 URL query 恢复与同步，覆盖 `projectId`、`warehouseId`、`materialId`、`keyword`、`pageNo`、`pageSize`；补错误态、空态和重试入口。
+- `frontend-admin/src/pages/requisition/index.vue`、`frontend-admin/src/pages/requisition/composables/useRequisitionList.ts`：领料申请列表新增 URL query 恢复与同步，覆盖 `projectId`、`warehouseId`、`approvalStatus`、`requisitionCode`、`pageNo`、`pageSize`；补错误态、空态和重试入口。
+- `frontend-admin/src/pages/inventory/__tests__/stock-production.test.ts`、`frontend-admin/src/pages/requisition/__tests__/list-production.test.ts`：补充生产化守卫测试。
+- `docs/quality/issue-005-004-inventory-requisition-list-production.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-005-004 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd frontend-admin; pnpm exec vitest run src/composables/__tests__/listPageQuery.test.ts src/pages/inventory/__tests__/stock-production.test.ts src/pages/requisition/__tests__/list-production.test.ts`：通过，`3` 个文件、`7` 个用例全部通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未做真实浏览器验收，结论基于指定 Vitest、类型检查、构建和代码审查。
+- 本轮未跑全量前端测试，结论限于 ISSUE-005-004 指定库存/领料列表生产化范围。

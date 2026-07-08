@@ -1,4 +1,5 @@
 import { ref, reactive, computed } from 'vue'
+import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
   getRequisitionList,
@@ -6,6 +7,7 @@ import {
   submitRequisitionForApproval,
 } from '@/api/modules/requisition'
 import { getWarehouseList } from '@/api/modules/inventory'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 import type { MatRequisitionVO } from '@/types/requisition'
 import type { WarehouseVO } from '@/types/inventory'
 
@@ -15,7 +17,13 @@ export function fmtAmount(val: string): string {
   return (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export function useRequisitionList() {
+export function useRequisitionList({
+  route,
+  router,
+}: {
+  route: RouteLocationNormalizedLoaded
+  router: Router
+}) {
   const filter = reactive({
     projectId: undefined as string | undefined,
     contractId: undefined as string | undefined,
@@ -25,12 +33,25 @@ export function useRequisitionList() {
   })
 
   const loading = ref(false)
+  const hasLoaded = ref(false)
+  const listError = ref<string | null>(null)
   const tableData = ref<MatRequisitionVO[]>([])
   const total = ref(0)
   const pageNo = ref(1)
   const pageSize = ref(20)
+  const queryReady = ref(false)
 
   const warehouseList = ref<WarehouseVO[]>([])
+  const hasActiveFilters = computed(
+    () =>
+      Boolean(
+        filter.projectId ||
+          filter.contractId ||
+          filter.warehouseId ||
+          filter.approvalStatus ||
+          filter.requisitionCode,
+      ),
+  )
 
   // ---- KPI computeds ----
   const kpiTotalCount = computed(() => total.value)
@@ -73,7 +94,9 @@ export function useRequisitionList() {
 
   async function fetchData() {
     loading.value = true
+    listError.value = null
     try {
+      await syncRouteQuery()
       const res = await getRequisitionList({
         pageNo: pageNo.value,
         pageSize: pageSize.value,
@@ -89,10 +112,39 @@ export function useRequisitionList() {
       console.error(e)
       tableData.value = []
       total.value = 0
+      listError.value = '请检查筛选条件或网络状态后重试。'
       message.error('加载领料申请列表失败，请稍后重试')
     } finally {
+      hasLoaded.value = true
       loading.value = false
     }
+  }
+
+  function hydrateFromRouteQuery() {
+    filter.projectId = readStringQuery(route.query.projectId)
+    filter.warehouseId = readStringQuery(route.query.warehouseId)
+    filter.approvalStatus = readStringQuery(route.query.approvalStatus)
+    filter.requisitionCode = readStringQuery(route.query.requisitionCode) ?? ''
+    pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+    pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+    queryReady.value = true
+  }
+
+  async function syncRouteQuery() {
+    if (!queryReady.value) return
+    const nextQuery = replaceListQuery(
+      route.query,
+      {
+        projectId: filter.projectId,
+        warehouseId: filter.warehouseId,
+        approvalStatus: filter.approvalStatus,
+        requisitionCode: filter.requisitionCode || undefined,
+        pageNo: pageNo.value,
+        pageSize: pageSize.value,
+      },
+      ['projectId', 'warehouseId', 'approvalStatus', 'requisitionCode', 'pageNo', 'pageSize'],
+    )
+    await router.replace({ path: route.path, query: nextQuery })
   }
 
   async function fetchWarehouses() {
@@ -117,6 +169,7 @@ export function useRequisitionList() {
     filter.approvalStatus = undefined
     filter.requisitionCode = ''
     pageNo.value = 1
+    listError.value = null
     fetchData()
   }
 
@@ -170,13 +223,22 @@ export function useRequisitionList() {
   }
 
   function init() {
+    hydrateFromRouteQuery()
     fetchWarehouses()
     fetchData()
   }
 
+  const showEmptyState = computed(
+    () => hasLoaded.value && !loading.value && !listError.value && !tableData.value.length,
+  )
+
   return {
     filter,
     loading,
+    hasLoaded,
+    listError,
+    hasActiveFilters,
+    showEmptyState,
     tableData,
     total,
     pageNo,

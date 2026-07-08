@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import {
@@ -9,7 +10,7 @@ import {
   getSourceTypeColor,
   getSourceTypeLabel,
 } from './composables/useStockLedger'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import StockSearchBar from './components/StockSearchBar.vue'
 import StockKpiStrip from './components/StockKpiStrip.vue'
 import StockTxnTable from './components/StockTxnTable.vue'
@@ -17,10 +18,13 @@ import StockTxnDetailDrawer from './components/StockTxnDetailDrawer.vue'
 import StockAnalysisPanel from './components/StockAnalysisPanel.vue'
 
 const referenceStore = useReferenceStore()
+const route = useRoute()
+const router = useRouter()
 
 const {
   filter,
   loading,
+  listError,
   stock,
   txnList,
   txnTotal,
@@ -53,7 +57,10 @@ const {
   lowStockWarn,
   inOutStats,
   visibleGridColumns,
-} = useStockLedger()
+  showEmptyState,
+  hasActiveFilters,
+  init,
+} = useStockLedger({ route, router })
 
 // ---- 移动端检测 ----
 const MOBILE_BP = 768
@@ -67,8 +74,7 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   await referenceStore.fetchProjects()
   await referenceStore.fetchMaterials()
-  fetchWarehouses()
-  fetchKpi()
+  init()
 })
 onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
@@ -157,9 +163,22 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             </div>
           </div>
 
+          <div v-if="listError" class="stock-list-feedback">
+            <a-result status="error" title="库存台账加载失败" :sub-title="listError">
+              <template #extra>
+                <a-button type="primary" @click="fetchData">重试</a-button>
+              </template>
+            </a-result>
+          </div>
+          <div v-else-if="showEmptyState" class="stock-list-feedback">
+            <LgEmptyState description="暂无符合条件的库存流水">
+              <a-button v-if="hasActiveFilters" @click="handleReset">清空筛选</a-button>
+              <a-button v-else type="primary" @click="handleSearch">重新查询</a-button>
+            </LgEmptyState>
+          </div>
           <!-- 桌面端表格 -->
           <StockTxnTable
-            v-if="!isMobile"
+            v-else-if="!isMobile"
             :txn-list="txnList"
             :loading="loading"
             :grid-columns="visibleGridColumns"
@@ -337,6 +356,14 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .stock-page .lg-list-table-panel .lg-table-wrap {
   flex: 1;
   min-height: 0;
+}
+
+.stock-list-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  padding: 24px;
 }
 
 .stock-page :deep(.lg-analysis-rail) {

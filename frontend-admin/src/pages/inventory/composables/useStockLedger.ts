@@ -1,7 +1,9 @@
 import { ref, reactive, computed } from 'vue'
+import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { getStockLedger, getStockKpi, getWarehouseList } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 import type { WarehouseVO, MatStockTxnVO, StockKpiVO } from '@/types/inventory'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
@@ -53,7 +55,13 @@ export function getSourceTypeColor(type: string | null | undefined): string {
   return SOURCE_TYPE_COLOR[type] ?? 'default'
 }
 
-export function useStockLedger() {
+export function useStockLedger({
+  route,
+  router,
+}: {
+  route: RouteLocationNormalizedLoaded
+  router: Router
+}) {
   const referenceStore = useReferenceStore()
   const projects = computed(() => referenceStore.projects ?? [])
   const materialList = computed(() => referenceStore.materials ?? [])
@@ -68,6 +76,8 @@ export function useStockLedger() {
 
   // ---- 表格状态 ----
   const loading = ref(false)
+  const hasLoaded = ref(false)
+  const listError = ref<string | null>(null)
   const stock = ref<{
     warehouseId: string
     materialId: string
@@ -81,6 +91,11 @@ export function useStockLedger() {
   const txnTotal = ref(0)
   const txnPageNo = ref(1)
   const txnPageSize = ref(20)
+  const queryReady = ref(false)
+  const hasActiveFilters = computed(
+    () => Boolean(filter.projectId || filter.warehouseId || filter.materialId || filter.keyword),
+  )
+  const hasRequiredFilters = computed(() => Boolean(filter.warehouseId && filter.materialId))
 
   // ---- KPI 状态 ----
   const emptyKpi: StockKpiVO = {
@@ -121,11 +136,17 @@ export function useStockLedger() {
   // ---- 防陈旧响应 ----
   let fetchSeq = 0
 
+  function resetTxnState() {
+    stock.value = null
+    txnList.value = []
+    txnTotal.value = 0
+  }
+
   async function fetchData() {
+    listError.value = null
+    await syncRouteQuery()
     if (!filter.warehouseId) {
-      stock.value = null
-      txnList.value = []
-      txnTotal.value = 0
+      resetTxnState()
       return
     }
     if (!filter.materialId) {
@@ -157,13 +178,42 @@ export function useStockLedger() {
     } catch (e: unknown) {
       if (mySeq !== fetchSeq) return
       console.error(e)
-      stock.value = null
-      txnList.value = []
-      txnTotal.value = 0
+      resetTxnState()
+      listError.value = '请检查筛选条件或网络状态后重试。'
       message.error('加载库存台账失败，请稍后重试')
     } finally {
-      if (mySeq === fetchSeq) loading.value = false
+      if (mySeq === fetchSeq) {
+        hasLoaded.value = true
+        loading.value = false
+      }
     }
+  }
+
+  function hydrateFromRouteQuery() {
+    filter.projectId = readStringQuery(route.query.projectId)
+    filter.warehouseId = readStringQuery(route.query.warehouseId)
+    filter.materialId = readStringQuery(route.query.materialId)
+    filter.keyword = readStringQuery(route.query.keyword) ?? ''
+    txnPageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+    txnPageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+    queryReady.value = true
+  }
+
+  async function syncRouteQuery() {
+    if (!queryReady.value) return
+    const nextQuery = replaceListQuery(
+      route.query,
+      {
+        projectId: filter.projectId,
+        warehouseId: filter.warehouseId,
+        materialId: filter.materialId,
+        keyword: filter.keyword || undefined,
+        pageNo: txnPageNo.value,
+        pageSize: txnPageSize.value,
+      },
+      ['projectId', 'warehouseId', 'materialId', 'keyword', 'pageNo', 'pageSize'],
+    )
+    await router.replace({ path: route.path, query: nextQuery })
   }
 
   async function fetchKpi() {
@@ -201,12 +251,16 @@ export function useStockLedger() {
     filter.materialId = undefined
     filter.projectId = undefined
     txnPageNo.value = 1
-    stock.value = null
-    txnList.value = []
-    txnTotal.value = 0
+    hasLoaded.value = false
+    listError.value = null
+    resetTxnState()
+    fetchWarehouses()
+    fetchKpi()
+    void syncRouteQuery()
   }
 
   function onProjectChange(projectId: string | undefined) {
+    filter.projectId = projectId
     filter.warehouseId = undefined
     if (projectId) {
       fetchWarehouses(projectId)
@@ -320,10 +374,28 @@ export function useStockLedger() {
     toggleCol,
   } = useColumnSettings('stock_ledger_cols', gridColumns)
 
+  const showEmptyState = computed(
+    () => hasLoaded.value && !loading.value && !listError.value && hasRequiredFilters.value && !txnList.value.length,
+  )
+
+  function init() {
+    hydrateFromRouteQuery()
+    fetchWarehouses(filter.projectId)
+    fetchKpi()
+    if (hasRequiredFilters.value) {
+      fetchData()
+    }
+  }
+
   return {
     // 状态
     filter,
     loading,
+    hasLoaded,
+    listError,
+    hasActiveFilters,
+    hasRequiredFilters,
+    showEmptyState,
     stock,
     txnList,
     txnTotal,
@@ -365,5 +437,6 @@ export function useStockLedger() {
     inOutStats,
     gridColumns,
     visibleGridColumns,
+    init,
   }
 }
