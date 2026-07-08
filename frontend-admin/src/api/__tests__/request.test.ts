@@ -163,3 +163,32 @@ describe('api request csrf header injection', () => {
     expect(capture.mock.calls[0]?.[0].headers.get('X-XSRF-TOKEN')).toBeUndefined()
   })
 })
+
+describe('api request error prompts', () => {
+  it('uses per-request errorMessage when backend rejects the request', async () => {
+    const requestModule = await loadRequestModule({
+      dev: false,
+    })
+
+    await expect(
+      requestModule.request({
+        url: '/files/f1/url',
+        method: 'get',
+        errorMessage: '文件下载失败，请确认权限或链接是否已过期',
+        adapter: async (config: InternalAxiosRequestConfig) =>
+          ({
+            data: {
+              code: 'FILE_ACCESS_DENIED',
+              message: '无权访问该合同文件',
+            },
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            config,
+          }) as const,
+      }),
+    ).rejects.toThrow('无权访问该合同文件')
+
+    expect(mockMessageError).toHaveBeenCalledWith('文件下载失败，请确认权限或链接是否已过期')
+  })
+})

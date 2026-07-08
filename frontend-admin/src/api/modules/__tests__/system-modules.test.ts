@@ -154,7 +154,11 @@ describe('system-related API modules', () => {
     expect(uploadCall.params).toEqual({ businessType: 'invoice', businessId: 'i1' })
     expect(uploadCall.timeout).toBe(120000)
     expect(uploadCall.data).toBeInstanceOf(FormData)
-    expect(mockRequest).toHaveBeenNthCalledWith(2, { url: '/files/f1/url', method: 'get' })
+    expect(mockRequest).toHaveBeenNthCalledWith(2, {
+      url: '/files/f1/url',
+      method: 'get',
+      errorMessage: '文件下载失败，请确认权限或链接是否已过期',
+    })
     expect(mockRequest).toHaveBeenNthCalledWith(3, {
       url: '/files',
       method: 'get',

@@ -28,9 +28,8 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-006-008`
-2. `ISSUE-007-009`
-3. `ISSUE-007-010`
+1. `ISSUE-007-009`
+2. `ISSUE-007-010`
 
 ## P0
 
@@ -249,7 +248,7 @@
 
 优先级：P1
 类型：安全 / 后端 / 前端 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“临时访问链接设置过期时间”
 目标：
@@ -277,6 +276,7 @@
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
+归档报告：`docs/quality/issue-006-008-file-download-expiry-auth-prompt.md`
 
 ### ISSUE-007-009：JVM 与数据库连接池指标回归
 

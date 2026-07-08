@@ -330,7 +330,9 @@ public class FileService {
     }
 
     private boolean isPresignedUrl(String url) {
-        return url != null && url.contains("X-Amz-Signature=");
+        return url != null
+                && url.contains("X-Amz-Signature=")
+                && url.contains("X-Amz-Expires=" + TimeUnit.MINUTES.toSeconds(PRESIGNED_URL_EXPIRE_MINUTES));
     }
 
     private boolean isTextFile(SysFile file) {

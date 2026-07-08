@@ -1,6 +1,8 @@
 import { request } from '@/api/request'
 import type { SysFileVO } from '@/types/file'
 
+const FILE_DOWNLOAD_ERROR_MESSAGE = '文件下载失败，请确认权限或链接是否已过期'
+
 /** Upload a file (FormData multipart, extended timeout for large files) */
 export function uploadFile(file: File, businessType: string, businessId: string) {
   const formData = new FormData()
@@ -19,6 +21,7 @@ export function getFileUrl(id: string) {
   return request<string>({
     url: `/files/${id}/url`,
     method: 'get',
+    errorMessage: FILE_DOWNLOAD_ERROR_MESSAGE,
   })
 }
 

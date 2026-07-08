@@ -13,6 +13,8 @@ const SUCCESS_CODE = '0'
 /** Queue timeout in ms — draining forever-queued requests */
 const REFRESH_QUEUE_TIMEOUT = 15_000
 
+type RequestConfigWithPrompt = InternalAxiosRequestConfig & { errorMessage?: string }
+
 const runtimeApiBaseUrl = (
   window as unknown as { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }
 ).__APP_RUNTIME_CONFIG__?.apiBaseUrl
@@ -53,6 +55,10 @@ function attachCsrfHeader(config: InternalAxiosRequestConfig): InternalAxiosRequ
 
   config.headers.set(CSRF_HEADER_NAME, csrfToken)
   return config
+}
+
+function getConfiguredErrorMessage(config?: InternalAxiosRequestConfig): string | undefined {
+  return (config as RequestConfigWithPrompt | undefined)?.errorMessage
 }
 
 /** Axios instance for normal API calls — carries the 401 interceptor. */
@@ -106,7 +112,7 @@ service.interceptors.response.use(
     if (res.code === SUCCESS_CODE) {
       return res.data as never
     }
-    message.error(res.message || '操作失败，请稍后重试')
+    message.error(getConfiguredErrorMessage(response.config) || res.message || '操作失败，请稍后重试')
     return Promise.reject(new Error(res.message || '操作失败'))
   },
   async (error) => {
@@ -159,7 +165,11 @@ service.interceptors.response.use(
     }
 
     if (status !== 401) {
-      const msg = error?.response?.data?.message || error.message || '网络异常，请检查连接'
+      const msg =
+        getConfiguredErrorMessage(originalRequest) ||
+        error?.response?.data?.message ||
+        error.message ||
+        '网络异常，请检查连接'
       message.error(msg)
     }
     return Promise.reject(error)

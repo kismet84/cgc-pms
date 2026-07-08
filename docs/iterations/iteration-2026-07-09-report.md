@@ -112,3 +112,40 @@ Issue：ISSUE-006-007 私有桶默认策略与公开 URL 禁用回归
 剩余风险：
 - 本轮不修改 MinIO 桶策略和生产对象存储配置；真实桶私有策略仍需由部署环境配置保证。
 - 当前兜底以 MinIO/S3 预签名 URL 的 `X-Amz-Signature` 参数作为临时链接判据；如未来切换非 S3 签名方案，需要同步调整判据。
+
+---
+
+Issue：ISSUE-006-008 文件下载临时链接过期与鉴权失败提示回归
+
+目标：
+- 回归下载临时链接的过期时间、鉴权失败响应和前端失败提示。
+- 不新增外部文件网关，不改变权限模型。
+- 确保合法下载不回退。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/file/service/FileService.java`：预签名 URL 兜底校验要求同时包含 `X-Amz-Signature` 与 `X-Amz-Expires=300`。
+- `backend/src/test/java/com/cgcpms/file/FileServiceTest.java`：新增缺少明确过期参数的签名 URL 拒绝回归，并补齐合法临时链接夹具。
+- `frontend-admin/src/api/modules/file.ts`：文件下载 URL 请求携带专用失败提示。
+- `frontend-admin/src/api/request.ts`：请求拦截器优先展示每个请求配置的错误提示。
+- `frontend-admin/src/api/__tests__/request.test.ts`、`frontend-admin/src/api/modules/__tests__/system-modules.test.ts`：补充前端失败提示回归。
+- `docs/quality/issue-006-008-file-download-expiry-auth-prompt.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-008 收口为 Done，Ready 队列推进到 ISSUE-007-009。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest#testGetPresignedUrlRejectsSignedUrlWithoutExplicitExpiry" test`：先失败，原因是有签名但无 `X-Amz-Expires=300` 的 URL 被接受。
+- `cd frontend-admin; pnpm exec vitest run src/api/modules/__tests__/system-modules.test.ts src/api/__tests__/request.test.ts`：先失败，原因是文件下载 URL 请求未携带专用失败提示。
+- 上述后端单测修复后通过，`1` 个用例通过。
+- 上述前端目标测试修复后通过，`2` 个文件、`10` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`：通过，`38` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；前端提示回归已补齐
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮不修改 MinIO 桶策略、生产对象存储配置或外部文件网关。
+- 当前过期判据绑定 MinIO/S3 的 `X-Amz-Expires=300` 参数；如未来切换非 S3 签名方案，需要同步调整判据与测试。
