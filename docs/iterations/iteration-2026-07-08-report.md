@@ -416,3 +416,32 @@ Issue：ISSUE-006-003 附件删除鉴权与审计回归
 剩余风险：
 - 本轮未跑全量后端测试，结论限于 ISSUE-006-003 指定 file 模块、业务对象授权和审计切面范围。
 - 本轮未连接真实 MinIO，删除副作用通过 `MinioClient.removeObject` 参数捕获验证。
+
+---
+
+Issue：ISSUE-006-004 发票识别重复发票与付款关联回归
+
+目标：
+- 回归发票登记/更新链路中的重复发票号、金额、日期和付款记录关联一致性。
+- 补齐发票号码、金额、日期、付款记录关联的最小安全断言。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/invoice/service/InvoiceService.java`：更新携带新 `payRecordId` 时校验付款记录存在、同租户并按新付款记录做项目权限校验。
+- `backend/src/test/java/com/cgcpms/invoice/InvoiceServiceTest.java`：补齐重复发票失败后原金额、日期、付款记录不变，以及无效付款记录更新被拒绝的断言。
+- `backend/src/test/java/com/cgcpms/invoice/InvoiceControllerTest.java`：补齐 register 端到端付款记录、金额、日期追溯和重复 register 错误码断言；修正控制器测试夹具顺序耦合。
+- `docs/quality/issue-006-004-invoice-duplicate-payment-link.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-004 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceServiceTest#shouldRejectUpdateToInvalidPayRecordAndKeepOriginalFields" test`：先红后绿，最终通过，`Tests run: 1, Failures: 0, Errors: 0, Skipped: 0`。
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceServiceTest,InvoiceControllerTest" test`：通过，`Tests run: 35, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：测试前置配置、测试编写和测试夹具问题已更正；生产更新路径一致性缺口已修复
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未跑全量后端测试，结论限于 ISSUE-006-004 指定 invoice 模块和控制器回归范围。
+- 外部发票识别服务、PDF 解析失败和人工确认口径留给 ISSUE-006-005。

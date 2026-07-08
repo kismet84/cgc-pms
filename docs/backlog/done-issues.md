@@ -109,3 +109,11 @@
 失败分类或非失败分类：测试配置与测试夹具问题已更正；现有生产实现通过新增安全边界回归
 验证结果：通过
 相关报告：docs/quality/issue-006-003-file-delete-auth-audit.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-006-004：发票识别重复发票与付款关联回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：测试前置配置、测试编写和测试夹具问题已更正；生产更新路径一致性缺口已修复
+验证结果：通过
+相关报告：docs/quality/issue-006-004-invoice-duplicate-payment-link.md；docs/iterations/iteration-2026-07-08-report.md

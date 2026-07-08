@@ -3,10 +3,8 @@ package com.cgcpms.invoice;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
-import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
-import com.cgcpms.payment.service.PayApplicationService;
-import com.cgcpms.payment.service.PayRecordService;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.Cookie;
@@ -44,10 +42,7 @@ class InvoiceControllerTest {
     private JwtUtils jwtUtils;
 
     @Autowired
-    private PayApplicationService payApplicationService;
-
-    @Autowired
-    private PayRecordService payRecordService;
+    private PayRecordMapper payRecordMapper;
 
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
@@ -87,24 +82,19 @@ class InvoiceControllerTest {
     void initData() {
         setUserContext();
         try {
-            // Create pay application and pay record (prerequisites for invoice register)
-            PayApplication app = new PayApplication();
-            app.setProjectId(PROJECT_ID);
-            app.setContractId(CONTRACT_ID);
-            app.setPartnerId(PARTNER_ID);
-            app.setApplyAmount(new BigDecimal("10000.00"));
-            app.setPayType("MATERIAL");
-            app.setApplyReason("集成测试-发票测试用付款申请");
-            Long appId = payApplicationService.create(app);
-
             PayRecord record = new PayRecord();
-            record.setPayApplicationId(appId);
+            record.setTenantId(TENANT_ID);
+            record.setProjectId(PROJECT_ID);
+            record.setPayApplicationId(PROJECT_ID);
+            record.setContractId(CONTRACT_ID);
+            record.setPartnerId(PARTNER_ID);
             record.setPayAmount(new BigDecimal("3000.00"));
             record.setPayDate(LocalDate.now());
             record.setPayMethod("BANK_TRANSFER");
+            record.setPayStatus("PAID");
             record.setExternalTxnNo("INV-TEST-TXN-" + System.nanoTime());
-            var vo = payRecordService.writeback(record);
-            payRecordId = Long.parseLong(vo.getId());
+            payRecordMapper.insert(record);
+            payRecordId = record.getId();
         } finally {
             clearUserContext();
         }
@@ -336,27 +326,45 @@ class InvoiceControllerTest {
 
     @Test
     @Order(10)
-    @DisplayName("POST /invoices/register -> 200 registers invoice linked to pay record")
-    void testRegister() throws Exception {
+    @DisplayName("POST /invoices/register -> 200 links pay record and duplicate invoiceNo -> 400")
+    void testRegisterLinksPayRecordAndRejectsDuplicateInvoiceNo() throws Exception {
         Assertions.assertNotNull(payRecordId, "Prerequisite: payRecordId must be created");
+        String invoiceNo = "INV-REG-" + System.nanoTime();
 
         String body = """
                 {
                     "payRecordId": %d,
-                    "invoiceNo": "INV-REG-%d",
+                    "invoiceNo": "%s",
                     "invoiceType": "VAT_SPECIAL",
                     "invoiceAmount": 3000.00,
                     "invoiceDate": "2026-06-22"
                 }
-                """.formatted(payRecordId, System.nanoTime());
+                """.formatted(payRecordId, invoiceNo);
 
-        mockMvc.perform(withCsrf(postWithApi("/invoices/register"))
+        String response = mockMvc.perform(withCsrf(postWithApi("/invoices/register"))
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data").isString());
+                .andExpect(jsonPath("$.data").isString())
+                .andReturn().getResponse().getContentAsString();
+
+        Long registeredId = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+        mockMvc.perform(getWithApi("/invoices/" + registeredId)
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.invoiceNo").value(invoiceNo))
+                .andExpect(jsonPath("$.data.invoiceAmount").value("3000.00"))
+                .andExpect(jsonPath("$.data.invoiceDate").value("2026-06-22"))
+                .andExpect(jsonPath("$.data.payRecordId").value(String.valueOf(payRecordId)));
+
+        mockMvc.perform(withCsrf(postWithApi("/invoices/register"))
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVOICE_NO_DUPLICATE"));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -367,15 +375,31 @@ class InvoiceControllerTest {
     @Order(11)
     @DisplayName("DELETE /invoices/{id} -> 200 deletes invoice")
     void testDelete() throws Exception {
-        Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");
+        Assertions.assertNotNull(payRecordId, "Prerequisite: payRecordId must be created");
+        String body = """
+                {
+                    "invoiceNo": "INV-DEL-%d",
+                    "invoiceType": "VAT_SPECIAL",
+                    "invoiceAmount": 1800.00,
+                    "invoiceDate": "2026-06-23",
+                    "payRecordId": %d
+                }
+                """.formatted(System.nanoTime(), payRecordId);
+        String response = mockMvc.perform(withCsrf(postWithApi("/invoices"))
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Long deleteId = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
 
-        mockMvc.perform(withCsrf(deleteWithApi("/invoices/" + invoiceId))
+        mockMvc.perform(withCsrf(deleteWithApi("/invoices/" + deleteId))
                         .cookie(adminCookie()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
 
         // Verify deleted
-        mockMvc.perform(getWithApi("/invoices/" + invoiceId)
+        mockMvc.perform(getWithApi("/invoices/" + deleteId)
                         .cookie(adminCookie()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVOICE_NOT_FOUND"));

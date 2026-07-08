@@ -218,6 +218,7 @@ class InvoiceServiceTest {
         invoice1.setInvoiceNo("INV-DUP-002");
         invoice1.setInvoiceType("VAT_SPECIAL");
         invoice1.setInvoiceAmount(new BigDecimal("5000.00"));
+        invoice1.setInvoiceDate(LocalDate.of(2026, 6, 2));
         invoice1.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id1 = invoiceService.create(invoice1);
         assertNotNull(id1);
@@ -226,12 +227,22 @@ class InvoiceServiceTest {
         invoice2.setInvoiceNo("INV-DUP-002");
         invoice2.setInvoiceType("VAT_NORMAL");
         invoice2.setInvoiceAmount(new BigDecimal("3000.00"));
+        invoice2.setInvoiceDate(LocalDate.of(2026, 7, 2));
         invoice2.setPayRecordId(SEED_PAY_RECORD_ID);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             invoiceService.create(invoice2);
         });
         assertEquals("INVOICE_NO_DUPLICATE", ex.getCode());
+
+        Long activeCount = payInvoiceMapper.selectCount(new LambdaQueryWrapper<PayInvoice>()
+                .eq(PayInvoice::getTenantId, TENANT_ID)
+                .eq(PayInvoice::getInvoiceNo, "INV-DUP-002"));
+        assertEquals(1L, activeCount);
+        InvoiceVO vo = invoiceService.getById(id1);
+        assertEquals("5000.00", vo.getInvoiceAmount());
+        assertEquals("2026-06-02", vo.getInvoiceDate());
+        assertEquals(String.valueOf(SEED_PAY_RECORD_ID), vo.getPayRecordId());
     }
 
     // ── RED 3: verify status transition PENDING → VERIFIED ──
@@ -406,6 +417,33 @@ class InvoiceServiceTest {
 
         BusinessException deleteEx = assertThrows(BusinessException.class, () -> invoiceService.delete(id));
         assertEquals("INVOICE_VERIFIED_LOCKED", deleteEx.getCode());
+    }
+
+    @Test
+    @Order(18)
+    @DisplayName("UPDATE: invalid payRecordId is rejected and original invoice fields remain unchanged")
+    void shouldRejectUpdateToInvalidPayRecordAndKeepOriginalFields() {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setInvoiceNo("INV-PAYLINK-018");
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setInvoiceAmount(new BigDecimal("2600.00"));
+        invoice.setInvoiceDate(LocalDate.of(2026, 6, 18));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
+        Long id = invoiceService.create(invoice);
+
+        PayInvoice update = new PayInvoice();
+        update.setId(id);
+        update.setPayRecordId(99999999999L);
+        update.setInvoiceAmount(new BigDecimal("8800.00"));
+        update.setInvoiceDate(LocalDate.of(2026, 7, 18));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> invoiceService.update(update));
+        assertEquals("PAY_RECORD_NOT_FOUND", ex.getCode());
+
+        InvoiceVO vo = invoiceService.getById(id);
+        assertEquals(String.valueOf(SEED_PAY_RECORD_ID), vo.getPayRecordId());
+        assertEquals("2600.00", vo.getInvoiceAmount());
+        assertEquals("2026-06-18", vo.getInvoiceDate());
     }
 
     // ── RED 10: register with pay_record_id ──

@@ -28,42 +28,13 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-006-004`
-2. `ISSUE-006-005`
-3. `ISSUE-007-002`
-4. `ISSUE-007-003`
+1. `ISSUE-006-005`
+2. `ISSUE-007-002`
+3. `ISSUE-007-003`
 
 ## P0
 
 ## P1
-
-### ISSUE-006-004：发票识别重复发票与付款关联回归
-
-优先级：P1
-类型：安全 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节，第 3 条“发票识别增强”
-目标：
-- 回归发票识别结果与付款记录关联、重复发票检测或提示口径。
-- 补齐发票号码、金额、日期、付款记录关联的最小安全断言。
-允许修改：
-- `backend/src/main/java/com/cgcpms/invoice/**`
-- `backend/src/test/java/com/cgcpms/invoice/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部发票识别服务配置
-验收标准：
-- 重复发票不会被静默当作全新有效发票处理。
-- 发票识别结果必须能追溯到付款记录或明确返回可理解失败原因。
-- 正式报告记录失败分类、验证命令和剩余风险。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=InvoiceServiceTest,InvoiceControllerTest" test`
-- `git diff --check`
 
 ### ISSUE-006-005：发票识别失败原因与人工确认口径回归
 
@@ -155,6 +126,14 @@
 
 
 ## 已完成/历史
+
+### ISSUE-006-004：发票识别重复发票与付款关联回归
+
+优先级：P1
+类型：安全 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-006-004-invoice-duplicate-payment-link.md`
 
 ### ISSUE-006-003：附件删除鉴权与审计回归
 

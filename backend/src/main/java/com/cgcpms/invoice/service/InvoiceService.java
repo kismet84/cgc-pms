@@ -107,6 +107,18 @@ public class InvoiceService {
         checkInvoiceProjectAccess(existing, "编辑发票");
         ensurePending(existing);
 
+        if (invoice.getPayRecordId() != null) {
+            PayRecord payRecord = payRecordMapper.selectById(invoice.getPayRecordId());
+            if (payRecord == null || !payRecord.getTenantId().equals(existing.getTenantId())) {
+                throw new BusinessException("PAY_RECORD_NOT_FOUND",
+                        "关联的付款记录(" + invoice.getPayRecordId() + ")不存在或不属于当前租户");
+            }
+            Long fallbackPayApplicationId = invoice.getPayApplicationId() != null
+                    ? invoice.getPayApplicationId()
+                    : existing.getPayApplicationId();
+            checkProjectAccess(resolveProjectId(payRecord, fallbackPayApplicationId), "编辑发票");
+        }
+
         // If invoice_no is being changed, check for duplicate active invoices
         if (invoice.getInvoiceNo() != null && !invoice.getInvoiceNo().equals(existing.getInvoiceNo())) {
             ensureActiveInvoiceNoUnique(invoice.getInvoiceNo(), invoice.getId());
