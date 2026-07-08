@@ -201,8 +201,8 @@ Codex 每轮完成后，必须满足以下条件才允许自动合并：
 ```text
 1. 当前任务来自 docs/backlog/ready-issues.md
 2. 当前任务属于 docs/backlog/current-focus.md 允许范围
-3. 没有 .codex-autopilot/stop.flag
-4. 没有 .codex-autopilot/pause.flag
+3. 当前任务启动前没有 .codex-autopilot/stop.flag
+4. 当前任务启动前没有 .codex-autopilot/pause.flag
 5. git diff --check 通过
 6. 后端任务必须执行后端测试或说明原因
 7. 前端任务必须执行 type-check / build 或说明原因
@@ -225,8 +225,8 @@ Codex 每轮完成后，必须满足以下条件才允许自动合并：
 3. 不合并
 4. 写入 docs/backlog/blocked-issues.md
 5. 写入 docs/iterations/iteration-YYYY-MM-DD-report.md
-6. 检查 stop.flag
-7. 如未停止，进入下一个可执行 Issue
+6. 当前任务收口后检查 stop.flag / pause.flag / enabled.flag
+7. 如未停止，进入下一个可执行 Issue；如已停止，仅结束连续模式，不回滚当前任务收口结果
 ```
 
 ---
@@ -408,7 +408,8 @@ Write-Host "Stop requested. Codex will stop at the next checkpoint."
 ```text
 这是软停止。
 不会强杀 Codex。
-当前任务到下一个 checkpoint 后停止。
+stop.flag + 删除 enabled.flag 只阻断下一任务启动。
+已启动的当前任务允许自然收口，可按通过、blocked、失败，或自身安全 checkpoint 收口。
 不会进入下一轮。
 不会破坏正在写的文件。
 ```
@@ -628,11 +629,13 @@ powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-
 - `.codex-autopilot/pause.flag`
 - `.codex-autopilot/state.json`
 
-如果不存在 `enabled.flag`，立即停止本轮，不修改代码。
+如果在启动新任务前不存在 `enabled.flag`，立即停止本轮，不启动新任务。
 
-如果存在 `stop.flag`，立即停止本轮，不修改代码。
+如果在启动新任务前存在 `stop.flag`，立即停止本轮，不启动新任务。
 
-如果存在 `pause.flag`，立即停止本轮，不修改代码。
+如果在启动新任务前存在 `pause.flag`，立即停止本轮，不启动新任务。
+
+如果当前任务已经启动后才发现 `enabled.flag` 被删除，或出现 `stop.flag` / `pause.flag`，只允许当前任务安全收口，不做强制中断；收口完成后不得进入下一轮。
 
 ## 必读文件
 
@@ -697,8 +700,8 @@ powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-
 3. 自审变更范围。
 4. 更新 iteration 报告。
 5. 更新 done-issues 或 blocked-issues。
-6. 确认没有 stop.flag。
-7. 确认没有 pause.flag。
+6. 若当前任务启动前已通过 stop/pause 检查，则允许继续完成本次收口。
+7. 当前任务收口后必须检查 stop.flag / pause.flag / enabled.flag，再决定是否进入下一轮。
 
 合并方式：
 
@@ -723,7 +726,7 @@ git push origin master
 3. 不合并。
 4. 写入 `docs/backlog/blocked-issues.md`。
 5. 写入 `docs/iterations/iteration-YYYY-MM-DD-report.md`。
-6. 继续下一个可执行 Issue，除非存在 stop.flag。
+6. 当前任务收口后检查 stop.flag / pause.flag / enabled.flag；仅在仍允许继续时才进入下一个可执行 Issue。
 
 ## 每步 checkpoint
 
@@ -737,7 +740,9 @@ git push origin master
 - 合并后
 - 进入下一轮前
 
-如果发现 stop.flag，立即停止。
+如果在当前任务开始前发现 stop.flag，立即停止，不启动该任务。
+
+如果在当前任务执行中发现 stop.flag，只做安全收口，不强制中断；当前任务回报后停止下一任务派发。
 
 ## 输出要求
 
@@ -811,7 +816,7 @@ git push origin master
 - .codex-autopilot/stop.flag
 - .codex-autopilot/pause.flag
 
-发现 stop.flag 或 pause.flag 时，停止当前轮，不进入下一轮。
+发现 stop.flag 或 pause.flag 时，若当前任务尚未启动则停止当前轮；若当前任务已启动，则允许其自然收口，但不进入下一轮。
 
 ### 禁止
 
@@ -1172,7 +1177,7 @@ powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-
 实现要求：
 
 - start 脚本写入 enabled.flag，删除 stop.flag 和 pause.flag。
-- stop 脚本写入 stop.flag，删除 enabled.flag。
+- stop 脚本写入 stop.flag，删除 enabled.flag；其语义是阻断下一任务，不强杀当前任务。
 - pause 脚本写入 pause.flag。
 - resume 脚本删除 pause.flag。
 - status 脚本读取 state.json。
