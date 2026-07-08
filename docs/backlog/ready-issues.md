@@ -28,45 +28,14 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-006-003`
-2. `ISSUE-006-004`
-3. `ISSUE-006-005`
-4. `ISSUE-007-002`
-5. `ISSUE-007-003`
+1. `ISSUE-006-004`
+2. `ISSUE-006-005`
+3. `ISSUE-007-002`
+4. `ISSUE-007-003`
 
 ## P0
 
 ## P1
-
-### ISSUE-006-003：附件删除鉴权与审计回归
-
-优先级：P1
-类型：安全 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节，第 2 条“文件访问控制”和第 4 条“审计”
-目标：
-- 回归附件删除前的租户边界、业务对象写权限校验与 MinIO 删除调用顺序。
-- 补齐删除审计操作类型、异常路径和未授权删除不触发对象存储删除的断言。
-允许修改：
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/audit/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部存储配置
-验收标准：
-- 未授权用户无法删除他人或无写权限业务对象附件。
-- 未授权删除不会调用 MinIO `removeObject`。
-- 删除成功、删除失败和权限拒绝路径有明确断言或正式报告说明。
-- 正式报告记录安全边界、失败分类和剩余风险。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest,BusinessObjectAuthorizerTest,OperationAuditAspectTest" test`
-- `git diff --check`
 
 ### ISSUE-006-004：发票识别重复发票与付款关联回归
 
@@ -186,6 +155,14 @@
 
 
 ## 已完成/历史
+
+### ISSUE-006-003：附件删除鉴权与审计回归
+
+优先级：P1
+类型：安全 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-006-003-file-delete-auth-audit.md`
 
 ### ISSUE-006-002：附件下载鉴权与临时链接回归
 

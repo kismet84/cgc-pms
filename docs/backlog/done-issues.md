@@ -101,3 +101,11 @@
 失败分类或非失败分类：测试编写问题已更正；现有生产实现通过新增安全边界回归
 验证结果：通过
 相关报告：docs/quality/issue-006-002-file-download-auth-temp-link.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-006-003：附件删除鉴权与审计回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：测试配置与测试夹具问题已更正；现有生产实现通过新增安全边界回归
+验证结果：通过
+相关报告：docs/quality/issue-006-003-file-delete-auth-audit.md；docs/iterations/iteration-2026-07-08-report.md

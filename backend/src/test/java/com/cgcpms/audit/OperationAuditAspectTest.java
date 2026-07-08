@@ -2,26 +2,42 @@ package com.cgcpms.audit;
 
 import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.common.TestUserContext;
+import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.file.service.FileService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.EventListener;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.doThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "minio.enabled=true",
+        "minio.endpoint=http://localhost:9000",
+        "minio.access-key=test",
+        "minio.secret-key=test",
+        "minio.bucket=test-bucket"
+})
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("local")
 @DisplayName("OperationAuditAspect — 切面审计测试")
@@ -60,9 +76,13 @@ class OperationAuditAspectTest {
     @Autowired
     private ApplicationEventPublisher publisher;
 
+    @MockBean
+    private FileService fileService;
+
     @AfterEach
     void tearDown() {
         TestUserContext.clear();
+        SecurityContextHolder.clearContext();
         TestListenerConfig.captured.set(null);
     }
 
@@ -150,5 +170,55 @@ class OperationAuditAspectTest {
         assertEquals("RECEIPT", event.businessType());
         assertEquals("777", event.businessId());
         assertEquals("10.0.0.1", event.sourceIp());
+    }
+
+    @Test
+    @DisplayName("附件删除成功发布 DELETE 审计事件")
+    void testFileDeletePublishesSuccessAuditEvent() throws Exception {
+        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setDeleteAuthority();
+
+        mockMvc.perform(delete("/files/{id}", 71001L))
+                .andExpect(status().isOk());
+
+        OperationAuditEvent event = TestListenerConfig.captured.get();
+        assertNotNull(event);
+        assertEquals(TestUserContext.TENANT_0, event.tenantId());
+        assertEquals(TestUserContext.USER_ADMIN, event.userId());
+        assertEquals("DELETE", event.operationType());
+        assertEquals("FILE", event.businessType());
+        assertEquals("71001", event.businessId());
+        assertEquals("DELETE", event.httpMethod());
+        assertEquals("/files/71001", event.requestPath());
+        assertTrue(event.successFlag());
+        assertNull(event.errorCode());
+    }
+
+    @Test
+    @DisplayName("附件删除拒绝发布失败审计事件")
+    void testFileDeleteDeniedPublishesFailedAuditEvent() throws Exception {
+        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setDeleteAuthority();
+        doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权删除该文件"))
+                .when(fileService).delete(71002L);
+
+        mockMvc.perform(delete("/files/{id}", 71002L))
+                .andExpect(status().isBadRequest());
+
+        OperationAuditEvent event = TestListenerConfig.captured.get();
+        assertNotNull(event);
+        assertEquals("DELETE", event.operationType());
+        assertEquals("FILE", event.businessType());
+        assertEquals("71002", event.businessId());
+        assertEquals("DELETE", event.httpMethod());
+        assertEquals("/files/71002", event.requestPath());
+        assertFalse(event.successFlag());
+        assertEquals("BusinessException", event.errorCode());
+    }
+
+    private void setDeleteAuthority() {
+        var auth = new UsernamePasswordAuthenticationToken(
+                "audit-test", "N/A", List.of(new SimpleGrantedAuthority("file:delete")));
+        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 }

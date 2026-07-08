@@ -10,11 +10,13 @@ import com.cgcpms.file.service.FileService;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import io.minio.http.Method;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -46,6 +48,9 @@ class FileServiceTest {
 
     @Autowired
     private SysFileMapper sysFileMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     /** Mock MinIO client 避免真实网络连接 */
     @MockBean
@@ -297,6 +302,52 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("delete rejects cross-tenant file before write auth and MinIO removal")
+    void testDeleteHidesCrossTenantFileBeforeSideEffects() {
+        SysFile file = insertFile("CONTRACT", 30004L, 9999L,
+                "contract-delete.pdf", "application/pdf");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.delete(file.getId()));
+
+        assertEquals("FILE_NOT_FOUND", ex.getCode());
+        assertEquals(1, countRawFileRows(file.getId(), 0));
+        verify(authorizer, never()).checkWriteAccess(any(), any());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("delete rejects business object write denial before MinIO removal")
+    void testDeleteRejectsBusinessObjectWriteDeniedBeforeMinioRemoval() {
+        SysFile file = insertFile("CONTRACT", 30005L, TestUserContext.TENANT_0,
+                "contract-denied.pdf", "application/pdf");
+        doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权删除该合同文件"))
+                .when(authorizer).checkWriteAccess("CONTRACT", 30005L);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.delete(file.getId()));
+
+        assertEquals("FILE_ACCESS_DENIED", ex.getCode());
+        assertNotNull(sysFileMapper.selectById(file.getId()));
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("delete removes object from MinIO then logically deletes record")
+    void testDeleteRemovesObjectThenDeletesRecord() throws Exception {
+        SysFile file = insertFile("CONTRACT", 30006L, TestUserContext.TENANT_0,
+                "contract-ok.pdf", "application/pdf");
+
+        fileService.delete(file.getId());
+
+        var args = org.mockito.ArgumentCaptor.forClass(RemoveObjectArgs.class);
+        verify(minioClient).removeObject(args.capture());
+        assertEquals("test-bucket", args.getValue().bucket());
+        assertEquals("CONTRACT/30006/contract-ok.pdf", args.getValue().object());
+        assertNull(sysFileMapper.selectById(file.getId()));
+    }
+
+    @Test
     @DisplayName("getPresignedUrl keeps text downloads as attachment with utf-8 plain text")
     void testGetPresignedUrlSetsTextDownloadHeaders() throws Exception {
         SysFile file = insertFile("CONTRACT", 30003L, TestUserContext.TENANT_0,
@@ -333,5 +384,11 @@ class FileServiceTest {
         file.setBucketName("test-bucket");
         sysFileMapper.insert(file);
         return file;
+    }
+
+    private Integer countRawFileRows(Long id, int deletedFlag) {
+        return jdbcTemplate.queryForObject(
+                "select count(*) from sys_file where id = ? and deleted_flag = ?",
+                Integer.class, id, deletedFlag);
     }
 }

@@ -388,3 +388,31 @@ Issue：ISSUE-006-002 附件下载鉴权与临时链接回归
 剩余风险：
 - 本轮未跑全量后端测试，结论限于 ISSUE-006-002 指定 file 模块与业务对象授权范围。
 - 本轮未连接真实 MinIO，临时链接策略通过 `GetPresignedObjectUrlArgs` 参数捕获验证。
+
+---
+
+Issue：ISSUE-006-003 附件删除鉴权与审计回归
+
+目标：
+- 回归附件删除前的租户边界、业务对象写权限校验、MinIO 删除调用顺序与 DELETE 审计事件。
+- 补齐删除成功、删除失败和权限拒绝路径的最小安全断言。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/file/FileServiceTest.java`：新增跨租户删除拒绝、业务对象写权限拒绝不触发 MinIO、授权成功调用 `removeObject` 后逻辑删除记录的回归断言。
+- `backend/src/test/java/com/cgcpms/audit/OperationAuditAspectTest.java`：新增 `DELETE /files/{id}` 成功与业务拒绝两条审计事件断言，覆盖操作类型、业务类型、业务 ID、请求路径、成功标记和错误码。
+- `docs/quality/issue-006-003-file-delete-auth-audit.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-003 从 Ready 收口为 Done。
+- 本轮未修改后端生产代码、前端、migration、deploy 或外部对象存储配置。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest,BusinessObjectAuthorizerTest,OperationAuditAspectTest" test`：先后暴露测试配置/测试夹具问题；修正后通过，`Tests run: 31, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：测试配置与测试夹具问题已更正；现有生产实现通过新增安全边界回归
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未跑全量后端测试，结论限于 ISSUE-006-003 指定 file 模块、业务对象授权和审计切面范围。
+- 本轮未连接真实 MinIO，删除副作用通过 `MinioClient.removeObject` 参数捕获验证。
