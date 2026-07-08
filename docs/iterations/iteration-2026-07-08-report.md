@@ -533,3 +533,28 @@ Issue：ISSUE-007-003 操作审计字段与文件操作审计回归
 剩余风险：
 - 当前操作审计事件和持久化表无 `traceId` 字段；本轮禁止修改 migration，未扩展审计表结构。traceId 仍由访问日志链路承载。
 - 本轮未跑全量后端测试，结论限于 ISSUE-007-003 指定审计切面、审计服务和文件服务回归范围。
+
+---
+
+Issue：ISSUE-007-004 接口性能与错误率监控指标回归
+
+目标：
+- 回归接口耗时、错误率与基础运行指标的本地可观测性，不接入外部监控平台。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java`：新增命中 Ready Issue 通配符的回归测试，覆盖 `HealthEndpoint` 注册、`http.server.requests` 成功/失败指标、JVM/Hikari/异步线程池指标存在性。
+- `docs/quality/issue-007-004-actuator-metrics-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-004 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=*Metrics*Test,*Actuator*Test" test`：首轮失败，归类为 Ready Issue 配置问题；补齐 `ActuatorMetricsTest` 后通过，`Tests run: 3, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：Ready Issue 配置问题已更正；本地监控指标断言已补齐
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未接入 Prometheus、告警平台或可视化面板，结论限于项目内 Micrometer/Actuator 本地断言。
+- 匿名 `/api/actuator/health` 安全策略未纳入本轮修改范围；如需把匿名健康检查作为上线门禁，应另开安全/运维范围 Issue。

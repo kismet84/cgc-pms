@@ -28,43 +28,13 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-004`
-2. `ISSUE-007-005`
-3. `ISSUE-007-006`
-4. `ISSUE-007-007`
+1. `ISSUE-007-005`
+2. `ISSUE-007-006`
+3. `ISSUE-007-007`
 
 ## P0
 
 ## P1
-
-### ISSUE-007-004：接口性能与错误率监控指标回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 1 条“监控指标”
-目标：
-- 回归接口耗时、错误率、JVM/数据库连接池等现有 Actuator 指标是否可用。
-- 若当前实现缺少项目内可测入口，只做最小测试或正式说明，不接入外部监控平台。
-允许修改：
-- `backend/src/main/java/com/cgcpms/config/**`
-- `backend/src/main/java/com/cgcpms/common/**`
-- `backend/src/test/java/com/cgcpms/config/**`
-- `backend/src/test/java/com/cgcpms/common/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与日志采集平台配置
-验收标准：
-- 指标端点或指标注册逻辑有最小自动化断言。
-- 正式报告说明覆盖哪些指标、哪些仍需外部平台接入。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=*Metrics*Test,*Actuator*Test" test`
-- `git diff --check`
 
 ### ISSUE-007-005：访问日志 projectId/status/duration/exception 字段回归
 
@@ -156,6 +126,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-007-003-operation-audit-file-actions.md`
+
+### ISSUE-007-004：接口性能与错误率监控指标回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-004-actuator-metrics-regression.md`
 
 ### ISSUE-006-005：发票识别失败原因与人工确认口径回归
 

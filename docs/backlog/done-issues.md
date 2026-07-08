@@ -141,3 +141,11 @@
 失败分类或非失败分类：真实代码质量问题已修复；上传审计业务对象上下文已补强
 验证结果：通过
 相关报告：docs/quality/issue-007-003-operation-audit-file-actions.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-007-004：接口性能与错误率监控指标回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：Ready Issue 配置问题已更正；本地监控指标断言已补齐
+验证结果：通过
+相关报告：docs/quality/issue-007-004-actuator-metrics-regression.md；docs/iterations/iteration-2026-07-08-report.md
