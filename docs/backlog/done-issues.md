@@ -125,3 +125,11 @@
 失败分类或非失败分类：真实代码质量问题已修复；失败路径和人工确认边界已补强
 验证结果：通过
 相关报告：docs/quality/issue-006-005-invoice-recognition-manual-confirmation.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-007-002：MinIO 健康指标与文件失败监控回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；健康指标分类与上传失败口径已补强
+验证结果：通过
+相关报告：docs/quality/issue-007-002-minio-health-upload-monitoring.md；docs/iterations/iteration-2026-07-08-report.md

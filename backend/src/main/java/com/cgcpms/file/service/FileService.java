@@ -21,6 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -129,6 +132,9 @@ public class FileService {
             throw e;
         } catch (Exception e) {
             log.error("File upload failed: businessType={}, businessId={}", businessType, businessId, e);
+            if (isStorageUnavailable(e)) {
+                throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务暂不可用，请稍后重试");
+            }
             throw new BusinessException("FILE_UPLOAD_FAILED", "文件上传失败，请稍后重试");
         }
     }
@@ -248,6 +254,19 @@ public class FileService {
                     .build());
             return null;
         });
+    }
+
+    private boolean isStorageUnavailable(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof ConnectException
+                    || current instanceof SocketTimeoutException
+                    || current instanceof UnknownHostException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private String genPresignedUrl(String bucket, String object) {

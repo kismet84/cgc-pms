@@ -20,6 +20,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.net.ConnectException;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -269,6 +271,51 @@ class FileServiceTest {
                 () -> fileService.upload(file, businessType, businessId));
         assertEquals("FILE_UPLOAD_FAILED", ex.getCode());
         assertEquals(0L, sysFileMapper.selectCount(query));
+        verify(minioClient, times(3)).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("upload classifies MinIO connectivity failures as FILE_STORAGE_UNAVAILABLE without leaking config")
+    void testUploadClassifiesMinioConnectivityFailure() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "storage-down.pdf", "application/pdf", "%PDF-1.4 storage down".getBytes());
+        String businessType = "STORAGE_DOWN";
+        long businessId = Math.abs(System.nanoTime());
+
+        when(minioClient.putObject(any(PutObjectArgs.class)))
+                .thenThrow(new ConnectException("connect http://localhost:9000 with accessKey=test secretKey=test"))
+                .thenThrow(new ConnectException("connect http://localhost:9000 with accessKey=test secretKey=test"))
+                .thenThrow(new ConnectException("connect http://localhost:9000 with accessKey=test secretKey=test"));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.upload(file, businessType, businessId));
+
+        assertEquals("FILE_STORAGE_UNAVAILABLE", ex.getCode());
+        assertEquals("文件服务暂不可用，请稍后重试", ex.getMessage());
+        assertFalse(ex.getMessage().contains("http://localhost:9000"));
+        assertFalse(ex.getMessage().contains("accessKey"));
+        assertFalse(ex.getMessage().contains("secretKey"));
+        verify(minioClient, times(3)).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("upload keeps non-connectivity putObject failures as FILE_UPLOAD_FAILED")
+    void testUploadClassifiesGenericPutObjectFailure() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "upload-failed.pdf", "application/pdf", "%PDF-1.4 upload failed".getBytes());
+        String businessType = "UPLOAD_FAIL";
+        long businessId = Math.abs(System.nanoTime());
+
+        when(minioClient.putObject(any(PutObjectArgs.class)))
+                .thenThrow(new IllegalStateException("stream aborted"))
+                .thenThrow(new IllegalStateException("stream aborted"))
+                .thenThrow(new IllegalStateException("stream aborted"));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.upload(file, businessType, businessId));
+
+        assertEquals("FILE_UPLOAD_FAILED", ex.getCode());
+        assertEquals("文件上传失败，请稍后重试", ex.getMessage());
         verify(minioClient, times(3)).putObject(any(PutObjectArgs.class));
     }
 

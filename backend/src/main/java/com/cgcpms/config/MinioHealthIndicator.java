@@ -34,6 +34,7 @@ public class MinioHealthIndicator implements HealthIndicator {
         MinioClient client = minioClientProvider.getIfAvailable();
         if (client == null) {
             return Health.down()
+                    .withDetail("category", "CLIENT_UNAVAILABLE")
                     .withDetail("reason", "MinioClient bean not available")
                     .build();
         }
@@ -43,6 +44,7 @@ public class MinioHealthIndicator implements HealthIndicator {
             boolean exists = client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
             if (!exists) {
                 return Health.down()
+                        .withDetail("category", "BUCKET_MISSING")
                         .withDetail("reason", "Configured bucket does not exist")
                         .build();
             }
@@ -50,7 +52,8 @@ public class MinioHealthIndicator implements HealthIndicator {
         } catch (Exception e) {
             log.warn("MinIO health check failed: {}", e.getMessage());
             return Health.down()
-                    .withDetail("error", "MinIO connection failed")
+                    .withDetail("category", "CONNECTION_FAILED")
+                    .withDetail("reason", "MinIO connection failed")
                     .build();
         }
     }

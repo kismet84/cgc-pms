@@ -28,42 +28,11 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-002`
-2. `ISSUE-007-003`
+1. `ISSUE-007-003`
 
 ## P0
 
 ## P1
-
-### ISSUE-007-002：MinIO 健康指标与文件失败监控回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节，第 1 条“监控指标”
-目标：
-- 回归 MinIO 健康检查、文件上传失败可观测性和异常分类口径。
-- 补齐本地测试不依赖真实外部对象存储的断言。
-允许修改：
-- `backend/src/main/java/com/cgcpms/config/**`
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/config/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部对象存储配置
-验收标准：
-- MinIO 健康检查成功、失败路径都有稳定断言。
-- 文件上传失败不会泄露敏感配置，并能归类为文件服务不可用或上传失败。
-- 正式报告记录运行前置、失败分类和剩余风险。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=MinioHealthIndicatorTest,FileServiceTest" test`
-- `git diff --check`
 
 ### ISSUE-007-003：操作审计字段与文件操作审计回归
 
@@ -137,6 +106,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-007-001-access-log-backup-checklist.md`
+
+### ISSUE-007-002：MinIO 健康指标与文件失败监控回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-002-minio-health-upload-monitoring.md`
 
 ### ISSUE-000-001：搭建本地 Codex AutoPilot 第一轮治理框架
 

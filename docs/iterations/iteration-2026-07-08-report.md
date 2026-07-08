@@ -476,3 +476,32 @@ Issue：ISSUE-006-005 发票识别失败原因与人工确认口径回归
 - 本轮未修改前端，结论限于后端识别返回口径和服务层人工确认边界。
 - 本轮未接入外部发票识别服务，仍沿用本地 PDFBox 文本解析。
 - 本轮未跑全量后端测试，结论限于 ISSUE-006-005 指定 invoice 模块回归范围。
+
+---
+
+Issue：ISSUE-007-002 MinIO 健康指标与文件失败监控回归
+
+目标：
+- 回归 MinIO 健康检查成功、桶缺失、连接失败三类口径。
+- 回归文件上传失败可观测性，区分文件服务暂不可用与普通上传失败。
+- 确认失败路径不泄露对象存储敏感配置。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/config/MinioHealthIndicator.java`：失败路径补充稳定 `category`，连接失败统一返回 `reason=MinIO connection failed`。
+- `backend/src/main/java/com/cgcpms/file/service/FileService.java`：上传失败单点分类，连接/超时/域名解析异常映射为 `FILE_STORAGE_UNAVAILABLE`。
+- `backend/src/test/java/com/cgcpms/config/MinioHealthIndicatorTest.java`、`backend/src/test/java/com/cgcpms/file/FileServiceTest.java`：新增健康指标分类、上传失败分类和敏感配置不泄露断言。
+- `docs/quality/issue-007-002-minio-health-upload-monitoring.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-002 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=MinioHealthIndicatorTest,FileServiceTest" test`：先红后绿，最终通过，`Tests run: 24, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；健康指标分类与上传失败口径已补强
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前连接类故障识别覆盖 `ConnectException`、`SocketTimeoutException`、`UnknownHostException`；若后续需要细分更多 MinIO SDK 异常，可在现有单点分类入口扩展。
+- 本轮未连接真实 MinIO，结论限于 mock 条件下的健康指标与异常分类回归。

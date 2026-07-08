@@ -48,6 +48,7 @@ class MinioHealthIndicatorTest {
 
         assertEquals("DOWN", health.getStatus().getCode());
         assertFalse(health.getDetails().containsKey("bucket"));
+        assertEquals("BUCKET_MISSING", health.getDetails().get("category"));
         assertEquals("Configured bucket does not exist", health.getDetails().get("reason"));
     }
 
@@ -69,7 +70,8 @@ class MinioHealthIndicatorTest {
     @DisplayName("bucketExists throws exception -> DOWN")
     void shouldReportDownWhenBucketExistsThrowsException() throws Exception {
         MinioClient client = mock(MinioClient.class);
-        when(client.bucketExists(any(BucketExistsArgs.class))).thenThrow(new RuntimeException("boom"));
+        when(client.bucketExists(any(BucketExistsArgs.class)))
+                .thenThrow(new RuntimeException("boom http://localhost:9000 accessKey=test secretKey=test"));
 
         MinioConfig config = new MinioConfig();
         config.setBucket("cgc-pms");
@@ -78,7 +80,11 @@ class MinioHealthIndicatorTest {
         Health health = indicator.health();
 
         assertEquals("DOWN", health.getStatus().getCode());
-        assertEquals("MinIO connection failed", health.getDetails().get("error"));
+        assertEquals("CONNECTION_FAILED", health.getDetails().get("category"));
+        assertEquals("MinIO connection failed", health.getDetails().get("reason"));
+        assertFalse(health.getDetails().toString().contains("http://localhost:9000"));
+        assertFalse(health.getDetails().toString().contains("accessKey"));
+        assertFalse(health.getDetails().toString().contains("secretKey"));
     }
 
     private ObjectProvider<MinioClient> provider(MinioClient client) {
