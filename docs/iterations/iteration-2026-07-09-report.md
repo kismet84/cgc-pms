@@ -450,3 +450,34 @@ Issue：ISSUE-006-010 文件业务对象绑定完整性回归
 - 本轮不新增文件绑定表或 schema，绑定完整性依赖既有 `businessType/businessId` 与 `BusinessObjectAuthorizer`。
 - 新增业务类型仍需在 authorizer 中补充存在性、租户与项目关系口径。
 - 本轮未做真实 MinIO 集成验收，MinIO 交互由 MockBean 覆盖。
+
+---
+
+Issue：ISSUE-006-011 发票识别记录与人工确认审计回归
+
+目标：
+- 回归发票识别与人工确认链路的审计记录，确保识别成功、识别失败、人工确认三类关键动作均可追踪。
+- 审计记录不得泄露票据图片直链、凭据、token 或完整敏感载荷。
+- 合法识别与人工确认流程不回退，前端提示与后端结果一致。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/file/audit/InvoiceRecognitionAuditAspect.java`：新增发票识别与人工确认专用审计切面，补充 `INVOICE_RECOGNITION` 与 `INVOICE_MANUAL_CONFIRM` 事件。
+- `backend/src/test/java/com/cgcpms/file/InvoiceRecognitionAuditAspectTest.java`：新增识别成功、识别失败、人工确认三类审计断言，并覆盖敏感信息不泄漏。
+- `docs/quality/issue-006-011-invoice-recognition-audit-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-011 收口为 Done，Ready 队列推进到 ISSUE-006-012。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceRecognitionAuditAspectTest" test`：先失败后通过；失败原因为缺少发票识别与人工确认专用审计事件，修复后 `3` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceRecognitionAuditAspectTest,InvoiceRecognitionTest,InvoiceServiceTest,OperationAuditAspectTest,OperationAuditServiceTest" test`：通过，`44` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd backend; .\mvnw.cmd test`：工具层 120 秒超时后 Surefire 报告继续生成；汇总为 `1540` 个测试、`10` 个 failures、`30` 个 errors、`1` 个 skipped，失败类集中在既有 `dashboard`、`invoice validation`、`workflow`、`payment`、`revenue`、`purchase`、`migration` 测试，不属于本次审计补强引入。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败；全量 Maven 命令首次存在工具执行时限问题
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未验证外部日志平台或审计报表展示，结论基于 Spring 事件发布与 MockMvc 回归测试。
+- 当前为专用补充审计事件，保留既有通用 `@AuditedOperation` 审计事件；如后续需要统一审计去重或展示聚合，应另立任务处理。

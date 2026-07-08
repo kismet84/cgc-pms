@@ -75,6 +75,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-006-010-file-biz-binding-integrity.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-006-011：发票识别记录与人工确认审计回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败；全量 Maven 命令首次存在工具执行时限问题
+验证结果：通过
+相关报告：docs/quality/issue-006-011-invoice-recognition-audit-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-007-009：JVM 与数据库连接池指标回归
 
 完成日期：2026-07-09
