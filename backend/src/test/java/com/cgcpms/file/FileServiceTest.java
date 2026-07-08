@@ -248,6 +248,8 @@ class FileServiceTest {
         when(minioClient.putObject(any(PutObjectArgs.class)))
                 .thenThrow(new RuntimeException("transient minio error"))
                 .thenReturn(null);
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/RETRY_OK/file.pdf?X-Amz-Signature=test");
 
         assertDoesNotThrow(() -> fileService.upload(file, businessType, businessId));
         assertEquals(1L, sysFileMapper.selectCount(query));
@@ -422,6 +424,25 @@ class FileServiceTest {
         assertTrue(args.getValue().extraQueryParams()
                 .get("response-content-disposition")
                 .contains("attachment; filename=\"notes.txt\""));
+    }
+
+    @Test
+    @DisplayName("getPresignedUrl rejects unsigned public bucket URL")
+    void testGetPresignedUrlRejectsUnsignedPublicUrl() throws Exception {
+        SysFile file = insertFile("CONTRACT", 30007L, TestUserContext.TENANT_0,
+                "public.pdf", "application/pdf");
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/CONTRACT/30007/public.pdf");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.getPresignedUrl(file.getId()));
+
+        assertEquals("FILE_URL_ERROR", ex.getCode());
+        assertEquals("获取下载链接失败，请稍后重试", ex.getMessage());
+        var args = org.mockito.ArgumentCaptor.forClass(GetPresignedObjectUrlArgs.class);
+        verify(minioClient).getPresignedObjectUrl(args.capture());
+        assertEquals(Method.GET, args.getValue().method());
+        assertEquals(5 * 60, args.getValue().expiry());
     }
 
     private SysFile insertFile(String businessType, Long businessId, Long tenantId,

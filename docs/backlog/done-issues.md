@@ -35,6 +35,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-006-006-file-upload-validation.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-006-007：私有桶默认策略与公开 URL 禁用回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；测试夹具问题已更正
+验证结果：通过
+相关报告：docs/quality/issue-006-007-private-bucket-public-url-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-004-001：成本台账与汇总口径回归
 
 完成日期：2026-07-08

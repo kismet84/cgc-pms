@@ -309,7 +309,7 @@ public class FileService {
                 extraQueryParams.put("response-content-type", "text/plain; charset=utf-8");
                 extraQueryParams.put("response-content-disposition", "attachment; filename=\"" + file.getFileName() + "\"");
             }
-            return minioClient.getPresignedObjectUrl(
+            String url = minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .bucket(bucket)
                             .object(object)
@@ -317,10 +317,20 @@ public class FileService {
                             .expiry(PRESIGNED_URL_EXPIRE_MINUTES, TimeUnit.MINUTES)
                             .method(Method.GET)
                             .build());
+            if (!isPresignedUrl(url)) {
+                throw new BusinessException("FILE_URL_ERROR", "生成下载链接失败");
+            }
+            return url;
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to generate presigned URL: bucket={}, object={}", bucket, object, e);
             throw new BusinessException("FILE_URL_ERROR", "生成下载链接失败: " + e.getMessage());
         }
+    }
+
+    private boolean isPresignedUrl(String url) {
+        return url != null && url.contains("X-Amz-Signature=");
     }
 
     private boolean isTextFile(SysFile file) {

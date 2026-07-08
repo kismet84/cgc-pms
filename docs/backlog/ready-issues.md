@@ -28,10 +28,9 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-006-007`
-2. `ISSUE-006-008`
-3. `ISSUE-007-009`
-4. `ISSUE-007-010`
+1. `ISSUE-006-008`
+2. `ISSUE-007-009`
+3. `ISSUE-007-010`
 
 ## P0
 
@@ -221,7 +220,7 @@
 
 优先级：P1
 类型：安全 / 后端 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件访问控制”
 目标：
@@ -244,6 +243,7 @@
 验证命令：
 - `cd backend; .\mvnw.cmd "-Dtest=*File*" test`
 - `git diff --check`
+归档报告：`docs/quality/issue-006-007-private-bucket-public-url-regression.md`
 
 ### ISSUE-006-008：文件下载临时链接过期与鉴权失败提示回归
 
