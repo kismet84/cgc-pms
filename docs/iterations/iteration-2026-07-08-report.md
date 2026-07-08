@@ -224,3 +224,30 @@ Issue：ISSUE-000-001 AutoPilot 运行优化补录
 剩余风险：
 - 本轮只固化规则、模板和 stop 文案，没有新增自动 health-check 脚本；后续执行仍依赖子智能体按规则落实。
 - `docs/quality/**` 未新增独立模板文件；质量报告分类要求已通过规则与计划书约束同步，后续正式报告需按新字段执行。
+
+---
+
+Issue：ISSUE-007-001 访问日志上下文与备份清单补强
+
+目标：
+- 仅补 traceId/requestId 等访问日志上下文字段及最小备份清单文档，不在本轮做完整监控平台接入。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/common/filter/TraceIdFilter.java`：复用既有请求过滤器，补充 `X-Request-Id`、MDC `requestId` 和 `HTTP_ACCESS` 访问日志字段。
+- `docs/10-部署运维手册.md`：补充访问日志采集字段、备份范围、恢复入口和恢复演练清单。
+- `docs/quality/issue-007-001-access-log-backup-checklist.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-001 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `LoggingConfigTest` 预检：不存在；因 `backend/src/test/**` 不在本 Issue 允许修改范围内，未新增测试类。
+- `cd backend; .\mvnw.cmd "-DskipTests" test`：通过，后端主代码与测试代码编译成功，`BUILD SUCCESS`。
+- `git diff --check`：通过，仅有 `docs/10-部署运维手册.md` 的 LF/CRLF 提示。
+
+失败分类或非失败分类：Ready Issue 配置问题已更正；实现与文档补强通过
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未接入外部监控平台，生产日志采集规则仍需后续在实际平台配置。
+- 本轮未新增测试源码，结论限于允许范围内的代码编译、代码审查和正式报告证据。

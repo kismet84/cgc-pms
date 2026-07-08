@@ -28,47 +28,22 @@
 
 ## 执行顺序建议
 
-1. ISSUE-007-001
+当前无 Ready Issue。
 
 ## P0
 
 ## P1
 
-### ISSUE-007-001：访问日志上下文与备份清单补强
-
-优先级：P1  
-类型：运维 / 文档 / 后端  
-状态：Ready  
-自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
-来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#77-p1-4生产监控日志与备份恢复`
-目标：
-- 仅补 traceId/requestId 等访问日志上下文字段及最小备份清单文档，不在本轮做完整监控平台接入。
-
-允许修改：
-- `backend/src/main/java/**/config/**`
-- `backend/src/main/java/**/common/**`
-- `deploy/**`
-- `docs/10-部署运维手册.md`
-- `docs/quality/**`
-- `docs/iterations/**`
-
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- 生产环境凭据
-- 外部监控平台配置
-- `.codex-autopilot/**`
-
-验收标准：
-- 访问日志可稳定输出 traceId/requestId 和基础请求上下文。
-- 备份范围、恢复入口、演练要求在文档中有明确清单。
-- 验证记录能证明日志字段生效或文档清单已补齐。
-
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=LoggingConfigTest" test`
-- `git diff --check`
 
 ## 已完成/历史
+
+### ISSUE-007-001：访问日志上下文与备份清单补强
+
+优先级：P1
+类型：运维 / 文档 / 后端
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-001-access-log-backup-checklist.md`
 
 ### ISSUE-000-001：搭建本地 Codex AutoPilot 第一轮治理框架
 
