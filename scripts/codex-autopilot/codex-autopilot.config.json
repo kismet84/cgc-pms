@@ -1,0 +1,60 @@
+{
+  "repoRoot": "D:\\projects-test\\cgc-pms",
+  "baseBranch": "master",
+  "worktreeRoot": "D:\\projects-test\\cgc-pms\\.worktrees",
+  "autopilotDir": "D:\\projects-test\\cgc-pms\\.codex-autopilot",
+  "mode": "codex-desktop-automation",
+  "autoMerge": true,
+  "autoPush": false,
+  "allowTestDataMutation": true,
+  "allowTestDataDeletion": true,
+  "requireTestDataResetMarker": true,
+  "maxIssuesPerRun": 1,
+  "maxFilesChangedPerIssue": 20,
+  "maxRunMinutes": 90,
+  "cycleIntervalMinutes": 30,
+  "allowedEpics": [
+    "EPIC-000",
+    "EPIC-001",
+    "EPIC-002",
+    "EPIC-003",
+    "EPIC-004",
+    "EPIC-005",
+    "EPIC-006",
+    "EPIC-007"
+  ],
+  "forbiddenPaths": [
+    ".git\\**",
+    "%USERPROFILE%\\**",
+    "C:\\Windows\\**",
+    "..\\**"
+  ],
+  "devDataResetAllowedWhen": {
+    "springProfiles": [
+      "dev",
+      "test",
+      "demo"
+    ],
+    "databaseHosts": [
+      "localhost",
+      "127.0.0.1"
+    ],
+    "requiredMarkerFile": ".codex-autopilot\\ALLOW_TEST_DATA_RESET",
+    "dockerComposeProject": "cgc-pms"
+  },
+  "backendValidation": [
+    "cd backend && mvn test"
+  ],
+  "frontendValidation": [
+    "cd frontend-admin && pnpm type-check",
+    "cd frontend-admin && pnpm build"
+  ],
+  "fullValidation": [
+    "cd backend && mvn test",
+    "cd frontend-admin && pnpm type-check",
+    "cd frontend-admin && pnpm build"
+  ],
+  "mergeGateValidation": [
+    "git diff --check"
+  ]
+}

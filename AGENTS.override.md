@@ -159,3 +159,44 @@ CI 与验收失败分类规则：
 - 等待子智能体执行期间，保持静默，不展示纯等待命令或计时过程；只在子智能体有结果、出现阻塞或需要用户决策时汇报。
 - Git/验收收口回报尽量使用最小模板：`正式交付物=...`、`验收证据=...`、`临时产物=...`、`git 状态=...`、`结论=通过/不通过`、`阻塞=...`、`剩余风险=...`。
 - 涉及方案时，优先选择最小可行方案，避免不必要抽象和大范围改造。
+
+## Codex Local AutoPilot Rules
+
+本仓库允许 Codex 在本地测试环境中按规则执行 AutoPilot，但边界必须先于效率。
+
+### 基本禁止
+
+- 不自动发布生产
+- 不连接生产数据库
+- 不删除仓库外文件
+- 不删除 `.git`
+- 不删除用户目录
+- 无 Ready Issue 不写代码
+
+### Ready Issue 与 checkpoint
+
+- 业务或治理变更前必须先确认任务来自 `docs/backlog/ready-issues.md`
+- 每个关键 checkpoint 都要检查 `.codex-autopilot/stop.flag` 和 `.codex-autopilot/pause.flag`
+- 至少在开始前、选任务后、改代码前、跑验证前、自动合并前、更新报告后检查一次 stop/pause
+
+### 测试数据重置边界
+
+- 仅允许 dev/test/demo 环境
+- 数据库 host 必须同时满足 `localhost` 或 `127.0.0.1`
+- 清库、删测试数据、重置测试数据前必须存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`
+- 未同时满足环境、host、marker 三项时，禁止执行测试数据删除或重置
+
+### 自动合并前置
+
+- 必须先执行对应验证命令并通过 `git diff --check`
+- 必须更新 iteration report 与 backlog 状态
+- 必须再次确认没有 `stop.flag` / `pause.flag`
+- 不满足前置条件时禁止自动合并
+
+### 项目级关键词协议
+
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-stop.ps1`
+- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动自动迭代系统`、`停止自动迭代系统` 才能触发对应动作，避免误触发
+- 触发前仍需遵守主线程/子智能体边界；若当前会话是项目总负责人主线程，应派运维型子智能体执行，或仅在用户明确授权下执行
+- 执行完成后必须回报 AutoPilot 的 flag/state 检查结果，至少说明 `stop.flag`、`pause.flag` 与相关运行状态
