@@ -28,8 +28,11 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-005-006`
-2. `ISSUE-005-007`
+1. `ISSUE-006-006`
+2. `ISSUE-006-007`
+3. `ISSUE-006-008`
+4. `ISSUE-007-009`
+5. `ISSUE-007-010`
 
 ## P0
 
@@ -142,7 +145,7 @@
 
 优先级：P1
 类型：前端 / 权限 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“批量操作、权限按钮控制、导出权限”
 目标：
@@ -177,6 +180,157 @@
 验证命令：
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-005-007-list-export-batch-permission.md`
+
+### ISSUE-006-006：文件上传大小与 MIME/扩展名校验回归
+
+优先级：P1
+类型：安全 / 后端 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件上传限制”
+目标：
+- 回归文件大小、MIME、扩展名三类上传限制，确保非法文件在后端被拒绝，前端提示不误导。
+- 不新增病毒扫描服务，不改变生产对象存储配置。
+允许修改：
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `frontend-admin/src/pages/**`
+- `frontend-admin/src/components/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 非白名单扩展名、伪造 MIME、超大文件均不可上传。
+- 前端提示与后端拒绝原因一致，不只依赖前端校验。
+- 不影响合法 PDF/Word/Excel/图片上传。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+
+### ISSUE-006-007：私有桶默认策略与公开 URL 禁用回归
+
+优先级：P1
+类型：安全 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件访问控制”
+目标：
+- 回归文件访问必须经鉴权接口或临时链接，不暴露公开桶直链。
+- 不修改生产 MinIO 配置，不连接生产对象存储。
+允许修改：
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 文件服务不返回永久公开 URL。
+- 未授权下载仍被拒绝。
+- 合法授权下载路径不回退。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`
+- `git diff --check`
+
+### ISSUE-006-008：文件下载临时链接过期与鉴权失败提示回归
+
+优先级：P1
+类型：安全 / 后端 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“临时访问链接设置过期时间”
+目标：
+- 回归下载临时链接的过期时间、鉴权失败响应和前端失败提示。
+- 不新增外部文件网关，不改变权限模型。
+允许修改：
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `frontend-admin/src/pages/**`
+- `frontend-admin/src/components/**`
+- `frontend-admin/src/api/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 临时链接具备明确过期时间。
+- 过期或无权下载时返回可识别错误。
+- 前端下载失败提示清晰，合法下载不回退。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+
+### ISSUE-007-009：JVM 与数据库连接池指标回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“监控指标”
+目标：
+- 回归 actuator 暴露 JVM 与数据库连接池关键指标，确保本地监控入口可用。
+- 不引入外部监控平台，不修改生产部署配置。
+允许修改：
+- `backend/src/main/java/com/cgcpms/**`
+- `backend/src/main/resources/**`
+- `backend/src/test/java/com/cgcpms/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- health/metrics 可读取 JVM 与 datasource 相关指标。
+- 指标缺失时有明确测试失败或质量报告说明。
+- 不放宽鉴权边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+
+### ISSUE-007-010：备份清单脱敏与恢复演练报告模板回归
+
+优先级：P1
+类型：运维 / 文档 / 归档
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“备份范围、恢复演练”
+目标：
+- 回归备份范围清单、敏感配置脱敏要求和恢复演练报告模板。
+- 不执行真实备份恢复，不读取生产凭据。
+允许修改：
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+- `docs/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 清单覆盖数据库、MinIO 文件、配置文件、密钥、日志归档。
+- 模板包含恢复耗时、恢复数据范围和失败原因字段。
+- 文档不得包含真实密钥或生产连接串。
+验证命令：
 - `git diff --check`
 
 ## 已完成/历史

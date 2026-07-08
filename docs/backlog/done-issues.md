@@ -19,6 +19,14 @@
 验证结果：通过  
 相关报告：docs/iterations/iteration-2026-07-08-report.md
 
+### ISSUE-005-007：列表页导出与批量操作权限态回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类
+验证结果：通过
+相关报告：docs/quality/issue-005-007-list-export-batch-permission.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-004-001：成本台账与汇总口径回归
 
 完成日期：2026-07-08

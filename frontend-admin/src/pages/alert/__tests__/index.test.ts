@@ -110,6 +110,7 @@ const mockReferenceStore = {
 const mockUserStore = {
   roles: ['PURCHASE_MANAGER'],
   userInfo: { roleName: '采购经理', nickname: '测试用户' },
+  hasPermission: vi.fn((code: string) => code === 'alert:view' || code === 'alert:edit'),
 }
 
 vi.mock('@/stores/alert', () => ({
@@ -401,6 +402,10 @@ beforeEach(() => {
   mockAlertStore.pageNo = 1
   mockAlertStore.pageSize = 20
   mockReferenceStore.projects = []
+  mockUserStore.roles = ['PURCHASE_MANAGER']
+  mockUserStore.hasPermission.mockImplementation(
+    (code: string) => code === 'alert:view' || code === 'alert:edit',
+  )
   mockRoute.path = '/alert'
   mockRoute.query = {}
   mockRoute.meta = {}
@@ -722,6 +727,8 @@ describe('alert 子组件 DOM/结构证据', () => {
         handleReset: vi.fn(),
         handleRetry: vi.fn(),
         exportCurrentView: vi.fn(),
+        canManageAlerts: true,
+        canExportAlerts: true,
       },
       global: {
         stubs: createGlobalStubs(),
@@ -738,6 +745,61 @@ describe('alert 子组件 DOM/结构证据', () => {
     expect(wrapper.find('.alert-grid-wrap').exists()).toBe(true)
     expect(toolbarButtons).toEqual(['批量处理', '标记已读', '归档', '导出'])
     expect(actionButtons).toEqual(['标记已读', '处理', '归档', '详情'])
+  })
+
+  it('无编辑/导出权限时隐藏预警批量、导出和行级写操作入口', () => {
+    const wrapper = mount(AlertTablePanel, {
+      props: {
+        alerts: [createAlertRecord()],
+        columnSettings: [{ key: 'message', label: '消息摘要' }],
+        colVisible: { message: true },
+        tableColumns: [{ field: 'message' }],
+        loading: false,
+        tableHeight: '400px',
+        allPageSelected: false,
+        pageSelectionIndeterminate: false,
+        total: 1,
+        pageNo: 1,
+        pageSize: 20,
+        selectedCount: 1,
+        listError: null,
+        showEmptyState: false,
+        hasActiveFilters: false,
+        toggleCol: vi.fn(),
+        togglePageSelection: vi.fn(),
+        isRowSelected: vi.fn(() => false),
+        toggleRowSelection: vi.fn(),
+        openDetail: vi.fn(),
+        getProjectName: vi.fn(() => 'PRJ-01 测试项目'),
+        getAlertDomainLabel: vi.fn(() => '采购'),
+        getAlertTagLabel: vi.fn(() => '采购'),
+        getProcessStatusLabel: vi.fn(() => '待处理'),
+        formatSeverityText: vi.fn(() => 'HIGH'),
+        formatDateTime: vi.fn(() => '2026-07-07 10:00:00'),
+        getAlertMessageText: vi.fn(() => '采购订单逾期'),
+        handleMarkRead: vi.fn(),
+        handleChangeStatus: vi.fn(),
+        handleBatchStatus: vi.fn(),
+        handleBatchMarkRead: vi.fn(),
+        handlePageChange: vi.fn(),
+        handlePageSizeChange: vi.fn(),
+        handleReset: vi.fn(),
+        handleRetry: vi.fn(),
+        exportCurrentView: vi.fn(),
+        canManageAlerts: false,
+        canExportAlerts: false,
+      },
+      global: {
+        stubs: createGlobalStubs(),
+      },
+    })
+
+    const toolbarButtons = wrapper.findAll('.alert-toolbar-left button').map((item) => item.text())
+    const actionButtons = wrapper.findAll('.alert-row-actions button').map((item) => item.text())
+
+    expect(toolbarButtons).toEqual([])
+    expect(actionButtons).toEqual(['详情'])
+    expect(wrapper.find('.alert-toolbar-meta').exists()).toBe(false)
   })
 
   it('导出使用共享下载 helper，避免浏览器点击后无下载事件', () => {

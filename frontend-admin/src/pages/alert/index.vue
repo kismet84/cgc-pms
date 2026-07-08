@@ -84,6 +84,11 @@ const alerts = computed(() => store.alerts)
 const processStatusOptions = computed(() =>
   Object.entries(ALERT_PROCESS_STATUS_LABELS).map(([value, label]) => ({ value, label })),
 )
+const isAlertAdmin = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
+)
+const canManageAlerts = computed(() => isAlertAdmin.value || userStore.hasPermission('alert:edit'))
+const canExportAlerts = computed(() => isAlertAdmin.value || userStore.hasPermission('alert:view'))
 
 type AlertRolePreset = {
   alertDomain?: string
@@ -387,6 +392,7 @@ function openDetail(record: AlertLogVO) {
 }
 
 async function handleMarkRead(record: AlertLogVO) {
+  if (!canManageAlerts.value) return
   try {
     await store.markRead(String(record.id))
     syncActiveRecord(record.id, (item) => {
@@ -400,6 +406,7 @@ async function handleMarkRead(record: AlertLogVO) {
 }
 
 async function handleBatchMarkRead() {
+  if (!canManageAlerts.value) return
   const unreadIds = getSelectedRows()
     .filter((item) => item.isRead === 0)
     .map((item) => item.id)
@@ -419,6 +426,7 @@ async function handleBatchMarkRead() {
 }
 
 async function handleBatchStatus(processStatus: AlertProcessStatus) {
+  if (!canManageAlerts.value) return
   const rows = getSelectedRows()
   if (!rows.length) {
     message.info('请先勾选告警')
@@ -445,6 +453,7 @@ async function handleChangeStatus(
   processStatus: AlertProcessStatus,
   statusRemark?: string,
 ) {
+  if (!canManageAlerts.value) return
   try {
     await store.changeStatus(record.id, processStatus, statusRemark)
     const now = new Date().toISOString()
@@ -745,6 +754,7 @@ async function handleSaveSubscription() {
 }
 
 function exportCurrentView() {
+  if (!canExportAlerts.value) return
   if (!alerts.value.length) {
     message.info('当前没有可导出的预警数据')
     return
@@ -870,6 +880,8 @@ onMounted(async () => {
           :list-error="listError"
           :show-empty-state="showEmptyState"
           :has-active-filters="hasActiveFilters"
+          :can-manage-alerts="canManageAlerts"
+          :can-export-alerts="canExportAlerts"
           :toggle-col="toggleCol"
           :toggle-page-selection="togglePageSelection"
           :is-row-selected="isRowSelected"

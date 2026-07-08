@@ -21,6 +21,8 @@ defineProps<{
   listError: string | null
   showEmptyState: boolean
   hasActiveFilters: boolean
+  canManageAlerts: boolean
+  canExportAlerts: boolean
   toggleCol: (key: string) => void
   togglePageSelection: (checked: boolean) => void
   isRowSelected: (id: string | number) => boolean
@@ -54,17 +56,23 @@ defineProps<{
     <div class="alert-toolbar">
       <div class="alert-toolbar-left">
         <a-button
+          v-if="canManageAlerts"
           type="primary"
           :disabled="selectedCount === 0"
           @click="handleBatchStatus('PROCESSED')"
           >批量处理</a-button
         >
-        <a-button :disabled="selectedCount === 0" @click="handleBatchMarkRead">标记已读</a-button>
-        <a-button :disabled="selectedCount === 0" @click="handleBatchStatus('ARCHIVED')"
+        <a-button v-if="canManageAlerts" :disabled="selectedCount === 0" @click="handleBatchMarkRead"
+          >标记已读</a-button
+        >
+        <a-button
+          v-if="canManageAlerts"
+          :disabled="selectedCount === 0"
+          @click="handleBatchStatus('ARCHIVED')"
           >归档</a-button
         >
-        <a-button @click="exportCurrentView">导出</a-button>
-        <span class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>
+        <a-button v-if="canExportAlerts" @click="exportCurrentView">导出</a-button>
+        <span v-if="canManageAlerts" class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>
       </div>
       <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
     </div>
@@ -153,11 +161,15 @@ defineProps<{
         </template>
         <template #action="{ row }">
           <div class="alert-row-actions">
-            <a-button v-if="row.isRead === 0" type="link" size="small" @click="handleMarkRead(row)"
+            <a-button
+              v-if="canManageAlerts && row.isRead === 0"
+              type="link"
+              size="small"
+              @click="handleMarkRead(row)"
               >标记已读</a-button
             >
             <a-button
-              v-if="String(row.processStatus ?? 'OPEN') !== 'PROCESSED'"
+              v-if="canManageAlerts && String(row.processStatus ?? 'OPEN') !== 'PROCESSED'"
               type="link"
               size="small"
               @click="handleChangeStatus(row, 'PROCESSED')"
@@ -165,7 +177,7 @@ defineProps<{
               处理
             </a-button>
             <a-button
-              v-if="String(row.processStatus ?? 'OPEN') !== 'ARCHIVED'"
+              v-if="canManageAlerts && String(row.processStatus ?? 'OPEN') !== 'ARCHIVED'"
               type="link"
               size="small"
               @click="handleChangeStatus(row, 'ARCHIVED')"
