@@ -95,6 +95,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-005-004-inventory-requisition-list-production.md；docs/iterations/iteration-2026-07-08-report.md
 
+### ISSUE-005-005：分包与结算列表页生产化补强
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类
+验证结果：通过
+相关报告：docs/quality/issue-005-005-subcontract-settlement-list-production.md；docs/iterations/iteration-2026-07-08-report.md
+
 ### ISSUE-006-001：文件上传白名单与发票识别失败兜底
 
 完成日期：2026-07-08

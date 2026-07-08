@@ -108,7 +108,7 @@
 
 优先级：P1
 类型：前端 / 生产化 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“分包列表、结算列表”
 目标：
@@ -136,6 +136,7 @@
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
+归档报告：`docs/quality/issue-005-005-subcontract-settlement-list-production.md`
 
 ### ISSUE-005-006：预警与审批列表页生产化补强
 

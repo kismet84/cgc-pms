@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useReferenceStore } from '@/stores/reference'
 import { storeToRefs } from 'pinia'
 import {
@@ -28,10 +28,12 @@ import type {
 } from '@/types/settlement'
 import { SETTLEMENT_STATUS_LABEL, SETTLEMENT_STATUS_COLOR } from '@/types/settlement'
 import type { PageResult } from '@/types/api'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { SETTLEMENT_GRID_COLUMNS, SETTLEMENT_STATUS_COLOR_MAP } from './pageConfig'
 
+const route = useRoute()
 const router = useRouter()
 const referenceStore = useReferenceStore()
 const { projects, contracts } = storeToRefs(referenceStore)
@@ -47,6 +49,8 @@ const filter = reactive({
 })
 
 const loading = ref(false)
+const hasLoaded = ref(false)
+const listError = ref<string | null>(null)
 const tableData = ref<SettlementVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -89,7 +93,34 @@ function onProjectChange(val: string | undefined) {
   if (val) referenceStore.fetchContracts({ projectId: val })
 }
 
+function hydrateFromRouteQuery() {
+  filter.keyword = readStringQuery(route.query.keyword) ?? ''
+  filter.projectId = readStringQuery(route.query.projectId)
+  filter.settlementStatus = readStringQuery(route.query.settlementStatus) as
+    | SettlementStatus
+    | undefined
+  pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+  pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+}
+
+async function syncRouteQuery() {
+  const nextQuery = replaceListQuery(
+    route.query,
+    {
+      keyword: filter.keyword,
+      projectId: filter.projectId,
+      settlementStatus: filter.settlementStatus,
+      pageNo: pageNo.value,
+      pageSize: pageSize.value,
+    },
+    ['keyword', 'projectId', 'settlementStatus', 'pageNo', 'pageSize'],
+  )
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
 async function fetchData() {
+  listError.value = null
+  await syncRouteQuery()
   loading.value = true
   const params: SettlementQueryParams = {
     projectId: filter.projectId,
@@ -111,8 +142,10 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
+    listError.value = '请检查筛选条件或网络状态后重试。'
     message.error('加载结算列表失败')
   } finally {
+    hasLoaded.value = true
     loading.value = false
   }
 }
@@ -242,6 +275,7 @@ function onResize() {
   isMobile.value = window.innerWidth < MOBILE_BP
 }
 onMounted(() => {
+  hydrateFromRouteQuery()
   window.addEventListener('resize', onResize)
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({})
@@ -307,6 +341,8 @@ const paymentWarnings = computed(() =>
 function rowSettlementAmount(row: SettlementVO): string {
   return row.finalAmount || row.contractAmount || '0'
 }
+
+const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tableData.value.length)
 </script>
 
 <template>
@@ -473,7 +509,26 @@ function rowSettlementAmount(row: SettlementVO): string {
 
           <!-- 表格 -->
           <div class="lg-table-wrap">
+            <div v-if="listError" class="settlement-list-feedback">
+              <a-result status="error" title="结算列表加载失败" :sub-title="listError">
+                <template #extra>
+                  <a-button type="primary" @click="fetchData">重试</a-button>
+                </template>
+              </a-result>
+            </div>
+            <div v-else-if="showEmptyState" class="settlement-list-feedback">
+              <LgEmptyState description="暂无符合条件的结算记录">
+                <a-button
+                  v-if="filter.keyword || filter.projectId || filter.settlementStatus"
+                  @click="handleReset"
+                >
+                  清空筛选
+                </a-button>
+                <a-button v-else type="primary" @click="openCreateModal">新建结算</a-button>
+              </LgEmptyState>
+            </div>
             <vxe-grid
+              v-else
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"

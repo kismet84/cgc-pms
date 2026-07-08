@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -22,8 +23,9 @@ import {
 import { useReferenceStore } from '@/stores/reference'
 import type { SubTaskVO } from '@/types/subcontract'
 import type { SelectOption } from '@/types/ui'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import {
   SUBCONTRACT_TASK_GRID_COLUMNS,
   SUBCONTRACT_TASK_STATUS_COLOR,
@@ -40,7 +42,11 @@ const filter = reactive({
   keyword: '',
 })
 
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
+const hasLoaded = ref(false)
+const listError = ref<string | null>(null)
 const tableData = ref<SubTaskVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -101,7 +107,32 @@ const {
   plannedEndDate: false,
 })
 
+function hydrateFromRouteQuery() {
+  filter.projectId = readStringQuery(route.query.projectId)
+  filter.status = readStringQuery(route.query.status)
+  filter.keyword = readStringQuery(route.query.keyword) ?? ''
+  pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+  pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+}
+
+async function syncRouteQuery() {
+  const nextQuery = replaceListQuery(
+    route.query,
+    {
+      projectId: filter.projectId,
+      status: filter.status,
+      keyword: filter.keyword,
+      pageNo: pageNo.value,
+      pageSize: pageSize.value,
+    },
+    ['projectId', 'status', 'keyword', 'pageNo', 'pageSize'],
+  )
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
 async function fetchData() {
+  listError.value = null
+  await syncRouteQuery()
   loading.value = true
   try {
     const res = await getSubTaskList({
@@ -119,8 +150,10 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
+    listError.value = '请检查筛选条件或网络状态后重试。'
     message.error('加载分包任务列表失败，请稍后重试')
   } finally {
+    hasLoaded.value = true
     loading.value = false
   }
 }
@@ -291,7 +324,10 @@ function statusPct(count: number) {
   return Math.round((count / base) * 100)
 }
 
+const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tableData.value.length)
+
 onMounted(() => {
+  hydrateFromRouteQuery()
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({ contractType: 'SUB' })
   referenceStore.fetchPartners({ partnerType: 'SUB' })
@@ -425,7 +461,23 @@ onMounted(() => {
           </div>
 
           <div class="lg-table-wrap">
+            <div v-if="listError" class="subcontract-task-list-feedback">
+              <a-result status="error" title="分包任务列表加载失败" :sub-title="listError">
+                <template #extra>
+                  <a-button type="primary" @click="fetchData">重试</a-button>
+                </template>
+              </a-result>
+            </div>
+            <div v-else-if="showEmptyState" class="subcontract-task-list-feedback">
+              <LgEmptyState description="暂无符合条件的分包任务">
+                <a-button v-if="filter.keyword || filter.projectId || filter.status" @click="handleReset">
+                  清空筛选
+                </a-button>
+                <a-button v-else type="primary" @click="handleAdd">新建任务</a-button>
+              </LgEmptyState>
+            </div>
             <vxe-grid
+              v-else
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"

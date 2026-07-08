@@ -723,3 +723,32 @@ Issue：ISSUE-005-004 库存与领料列表页生产化补强
 剩余风险：
 - 本轮未做真实浏览器验收，结论基于指定 Vitest、类型检查、构建和代码审查。
 - 本轮未跑全量前端测试，结论限于 ISSUE-005-004 指定库存/领料列表生产化范围。
+
+---
+
+Issue：ISSUE-005-005 分包与结算列表页生产化补强
+
+目标：
+- 补强分包任务列表与结算列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口；不改分包计量、结算审批或付款关联业务口径。
+
+修改范围摘要：
+- `frontend-admin/src/pages/subcontract/task.vue`：分包任务页新增 URL query 恢复与同步，覆盖 `projectId`、`status`、`keyword`、`pageNo`、`pageSize`；补错误态、空态和重试入口。
+- `frontend-admin/src/pages/settlement/index.vue`：结算列表页新增 URL query 恢复与同步，覆盖 `projectId`、`settlementStatus`、`keyword`、`pageNo`、`pageSize`；补错误态、空态和重试入口。
+- `frontend-admin/src/pages/subcontract/__tests__/task.test.ts`、`frontend-admin/src/pages/settlement/__tests__/index.test.ts`：补充生产化守卫测试。
+- `docs/quality/issue-005-005-subcontract-settlement-list-production.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-005-005 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd frontend-admin; pnpm exec vitest run src/composables/__tests__/listPageQuery.test.ts src/pages/subcontract/__tests__/task.test.ts src/pages/settlement/__tests__/index.test.ts`：通过，`3` 个文件、`10` 个用例全部通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未做真实浏览器验收，结论基于指定 Vitest、类型检查、构建和代码审查。
+- 本轮未跑全量前端测试，结论限于 ISSUE-005-005 指定分包/结算列表生产化范围。
