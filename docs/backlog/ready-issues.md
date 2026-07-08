@@ -28,40 +28,199 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-008`
+1. `ISSUE-005-003`
+2. `ISSUE-005-004`
+3. `ISSUE-005-005`
+4. `ISSUE-005-006`
+5. `ISSUE-005-007`
 
 ## P0
 
 ## P1
 
+### ISSUE-005-003：采购与收货列表页生产化补强
+
+优先级：P1
+类型：前端 / 生产化 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“采购列表、收货列表”
+目标：
+- 补强采购列表与收货列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
+- 不扩展详情页重构、新业务字段或后端接口语义。
+允许修改：
+- `frontend-admin/src/pages/purchase/**`
+- `frontend-admin/src/pages/receipt/**`
+- `frontend-admin/src/api/modules/purchase.ts`
+- `frontend-admin/src/api/modules/receipt.ts`
+- `frontend-admin/src/composables/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 查询条件刷新后可回显，分页参数不丢失。
+- loading、empty、error、retry 状态可达且不遮挡主要操作。
+- 无权限按钮不可见的既有逻辑不回退。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+
+### ISSUE-005-004：库存与领料列表页生产化补强
+
+优先级：P1
+类型：前端 / 生产化 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“库存列表、领料列表”
+目标：
+- 补强库存列表与领料列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
+- 不改库存数量业务口径，不扩展后端接口语义。
+允许修改：
+- `frontend-admin/src/pages/inventory/**`
+- `frontend-admin/src/pages/requisition/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/api/modules/requisition.ts`
+- `frontend-admin/src/composables/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 查询条件刷新后可回显，分页参数不丢失。
+- loading、empty、error、retry 状态可达且不遮挡主要操作。
+- 库存数量和领料状态展示不因前端补强改变业务含义。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+
+### ISSUE-005-005：分包与结算列表页生产化补强
+
+优先级：P1
+类型：前端 / 生产化 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“分包列表、结算列表”
+目标：
+- 补强分包列表与结算列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
+- 不改分包计量、结算审批或付款关联业务口径。
+允许修改：
+- `frontend-admin/src/pages/subcontract/**`
+- `frontend-admin/src/pages/settlement/**`
+- `frontend-admin/src/api/modules/subcontract.ts`
+- `frontend-admin/src/api/modules/settlement.ts`
+- `frontend-admin/src/composables/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 查询条件刷新后可回显，分页参数不丢失。
+- loading、empty、error、retry 状态可达且不遮挡主要操作。
+- 状态字段、金额字段展示不因前端补强改变业务含义。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+
+### ISSUE-005-006：预警与审批列表页生产化补强
+
+优先级：P1
+类型：前端 / 生产化 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“预警列表、审批列表”
+目标：
+- 补强预警列表与审批列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
+- 不改预警规则、审批状态机或后端权限边界。
+允许修改：
+- `frontend-admin/src/pages/alert/**`
+- `frontend-admin/src/pages/approval/**`
+- `frontend-admin/src/stores/alert.ts`
+- `frontend-admin/src/api/modules/alert.ts`
+- `frontend-admin/src/api/modules/workflow.ts`
+- `frontend-admin/src/composables/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 查询条件刷新后可回显，分页参数不丢失。
+- loading、empty、error、retry 状态可达且不遮挡主要操作。
+- 预警权限域、审批待办/已办/我发起口径不回退。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+
+### ISSUE-005-007：列表页导出与批量操作权限态回归
+
+优先级：P1
+类型：前端 / 权限 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“批量操作、权限按钮控制、导出权限”
+目标：
+- 回归核心列表页导出按钮、批量操作按钮和权限态展示。
+- 不新增导出后端能力，不改变权限模型。
+允许修改：
+- `frontend-admin/src/pages/project/**`
+- `frontend-admin/src/pages/contract/**`
+- `frontend-admin/src/pages/purchase/**`
+- `frontend-admin/src/pages/receipt/**`
+- `frontend-admin/src/pages/inventory/**`
+- `frontend-admin/src/pages/requisition/**`
+- `frontend-admin/src/pages/subcontract/**`
+- `frontend-admin/src/pages/settlement/**`
+- `frontend-admin/src/pages/payment/**`
+- `frontend-admin/src/pages/invoice/**`
+- `frontend-admin/src/pages/alert/**`
+- `frontend-admin/src/pages/approval/**`
+- `frontend-admin/src/composables/**`
+- `frontend-admin/src/stores/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 无权限时导出和批量操作入口不可见或不可用。
+- 有权限时既有可用入口不回退。
+- 不通过前端按钮隐藏替代后端权限校验；本轮只回归前端权限态。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+
+## 已完成/历史
+
 ### ISSUE-007-008：预警批处理执行结果指标回归
 
 优先级：P1
 类型：运维 / 安全 / 后端 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 1 条“预警批处理执行结果”
-目标：
-- 回归预警批处理执行结果的可观测性。
-- 若当前仅有日志没有指标，补最小指标或正式说明，不接入外部平台。
-允许修改：
-- `backend/src/main/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部监控平台配置
-验收标准：
-- 预警批处理成功/失败或执行结果至少有一类自动化断言或明确剩余风险说明。
-- 失败统计不记录用户隐私、Token、外部通知凭据或消息正文等敏感信息。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest" test`
-- `git diff --check`
-
-## 已完成/历史
+归档报告：`docs/quality/issue-007-008-alert-batch-result-metrics.md`
 
 ### ISSUE-007-007：登录失败与文件失败次数指标回归
 

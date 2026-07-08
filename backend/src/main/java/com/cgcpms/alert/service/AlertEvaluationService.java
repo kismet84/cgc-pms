@@ -258,6 +258,7 @@ public class AlertEvaluationService {
             result.put("total", 0);
             result.put("success", 0);
             result.put("failed", 0);
+            result.put("metrics", batchMetrics(0, 0, 0));
             result.put("successIds", List.of());
             result.put("failures", List.of());
             return result;
@@ -286,6 +287,7 @@ public class AlertEvaluationService {
         result.put("total", ids.size());
         result.put("success", successIds.size());
         result.put("failed", failures.size());
+        result.put("metrics", batchMetrics(ids.size(), successIds.size(), failures.size()));
         result.put("successIds", successIds);
         result.put("failures", failures);
         return result;
@@ -432,9 +434,18 @@ public class AlertEvaluationService {
         result.put("total", ids.size());
         result.put("success", successIds.size());
         result.put("failed", failures.size());
+        result.put("metrics", batchMetrics(ids.size(), successIds.size(), failures.size()));
         result.put("successIds", successIds);
         result.put("failures", failures);
         return result;
+    }
+
+    private Map<String, Object> batchMetrics(int total, int success, int failed) {
+        return Map.of(
+                "total", total,
+                "success", success,
+                "failed", failed,
+                "skipped", Math.max(0, total - success - failed));
     }
 
     private Map<String, Object> batchFailure(Long alertId, String reason) {

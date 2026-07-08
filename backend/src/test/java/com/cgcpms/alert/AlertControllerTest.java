@@ -185,6 +185,10 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.data.total").value(2))
                 .andExpect(jsonPath("$.data.success").value(1))
                 .andExpect(jsonPath("$.data.failed").value(1))
+                .andExpect(jsonPath("$.data.metrics.total").value(2))
+                .andExpect(jsonPath("$.data.metrics.success").value(1))
+                .andExpect(jsonPath("$.data.metrics.failed").value(1))
+                .andExpect(jsonPath("$.data.metrics.skipped").value(0))
                 .andExpect(jsonPath("$.data.failures[0].alertId").value(999999));
 
         AlertLog updated = alertLogMapper.selectById(alert.getId());
@@ -204,6 +208,10 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.data.total").value(1))
                 .andExpect(jsonPath("$.data.success").value(0))
                 .andExpect(jsonPath("$.data.failed").value(1))
+                .andExpect(jsonPath("$.data.metrics.total").value(1))
+                .andExpect(jsonPath("$.data.metrics.success").value(0))
+                .andExpect(jsonPath("$.data.metrics.failed").value(1))
+                .andExpect(jsonPath("$.data.metrics.skipped").value(0))
                 .andExpect(jsonPath("$.data.failures[0].reason").value("预警状态不合法"));
 
         AlertLog unchanged = alertLogMapper.selectById(alert.getId());

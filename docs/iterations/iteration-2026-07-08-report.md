@@ -638,3 +638,30 @@ Issue：ISSUE-007-007 登录失败与文件失败次数指标回归
 剩余风险：
 - 本轮未接入 Prometheus、告警平台或可视化面板，结论限于项目内 Micrometer 本地断言。
 - 指标按错误码聚合，不包含租户、用户、文件名、文件内容、密码、Token 等敏感维度。
+
+---
+
+Issue：ISSUE-007-008 预警批处理执行结果指标回归
+
+目标：
+- 回归预警批处理执行结果的本地可观测性。
+- 若当前仅有接口结果没有指标，补最小指标或正式说明，不接入外部平台。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`：为批量已读、批量状态更新响应补充 `metrics={total,success,failed,skipped}`。
+- `backend/src/test/java/com/cgcpms/alert/AlertControllerTest.java`：新增批量已读部分成功、批量状态非法失败的指标断言。
+- `docs/quality/issue-007-008-alert-batch-result-metrics.md`、`docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：新增正式报告并完成 backlog 收口。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertControllerTest" test`：红灯验证通过，失败原因为缺少 `$.data.metrics.total`。
+- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest" test`：通过，`Tests run: 46, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；预警批处理响应指标已补齐
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只覆盖现有预警批处理接口响应指标，不提供外部监控采集、告警规则或面板。
+- `metrics` 只包含整数计数，不包含失败原因、消息正文、Token、凭据或用户隐私。
