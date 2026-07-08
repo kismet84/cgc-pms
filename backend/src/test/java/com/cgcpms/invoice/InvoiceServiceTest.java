@@ -10,6 +10,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.service.InvoiceService;
+import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
@@ -18,6 +19,9 @@ import com.cgcpms.project.mapper.PmProjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -25,7 +29,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -446,6 +453,55 @@ class InvoiceServiceTest {
         assertEquals("2026-06-18", vo.getInvoiceDate());
     }
 
+    @Test
+    @Order(19)
+    @DisplayName("RECOGNIZE: parse failure returns reason and does not block invoice create")
+    void shouldReturnRecognizeFailureReasonAndKeepInvoiceFlowAvailable() {
+        MockMultipartFile brokenPdf = new MockMultipartFile(
+                "file",
+                "broken.pdf",
+                "application/pdf",
+                malformedPdfBytes());
+
+        InvoiceRecognizeResultVO result = invoiceService.recognize(brokenPdf);
+
+        assertFalse(result.getSuccess());
+        assertTrue(result.getManualConfirmationRequired());
+        assertEquals("PDF_RECOGNIZE_FAILED", result.getErrorCode());
+        assertEquals("PDF识别失败，请人工确认发票信息", result.getErrorMessage());
+        assertEquals(0L, invoiceCount());
+
+        PayInvoice invoice = new PayInvoice();
+        invoice.setInvoiceNo("INV-FALLBACK-019");
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setInvoiceAmount(new BigDecimal("1600.00"));
+        invoice.setInvoiceDate(LocalDate.of(2026, 6, 19));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
+
+        Long id = invoiceService.create(invoice);
+
+        InvoiceVO vo = invoiceService.getById(id);
+        assertEquals("INV-FALLBACK-019", vo.getInvoiceNo());
+        assertEquals("PENDING", vo.getVerifyStatus());
+    }
+
+    @Test
+    @Order(20)
+    @DisplayName("RECOGNIZE: extracted high risk fields are not persisted before manual confirmation")
+    void shouldNotPersistRecognizedFieldsBeforeManualConfirmation() throws IOException {
+        MockMultipartFile emptyPdf = new MockMultipartFile(
+                "file",
+                "empty.pdf",
+                "application/pdf",
+                emptyPdfBytes());
+
+        InvoiceRecognizeResultVO result = invoiceService.recognize(emptyPdf);
+
+        assertTrue(result.getSuccess());
+        assertTrue(result.getManualConfirmationRequired());
+        assertEquals(0L, invoiceCount());
+    }
+
     // ── RED 10: register with pay_record_id ──
 
     @Test
@@ -517,5 +573,32 @@ class InvoiceServiceTest {
             invoiceService.create(invoice);
         });
         assertEquals("PAY_RECORD_NOT_FOUND", ex.getCode());
+    }
+
+    private long invoiceCount() {
+        Long count = payInvoiceMapper.selectCount(new LambdaQueryWrapper<PayInvoice>()
+                .eq(PayInvoice::getTenantId, TENANT_ID));
+        return count == null ? 0L : count;
+    }
+
+    private static byte[] malformedPdfBytes() {
+        return """
+                %PDF-1.4
+                1 0 obj
+                << /Type /Catalog /Pages 2 0 R >>
+                endobj
+                """.getBytes(StandardCharsets.US_ASCII);
+    }
+
+    private static byte[] emptyPdfBytes() throws IOException {
+        PDDocument doc = new PDDocument();
+        try {
+            doc.addPage(new PDPage(PDRectangle.A4));
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            doc.save(output);
+            return output.toByteArray();
+        } finally {
+            doc.close();
+        }
     }
 }

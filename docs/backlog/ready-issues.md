@@ -28,41 +28,12 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-006-005`
-2. `ISSUE-007-002`
-3. `ISSUE-007-003`
+1. `ISSUE-007-002`
+2. `ISSUE-007-003`
 
 ## P0
 
 ## P1
-
-### ISSUE-006-005：发票识别失败原因与人工确认口径回归
-
-优先级：P1
-类型：安全 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节，第 3 条“发票识别增强”
-目标：
-- 回归 PDF 解析失败时的错误原因、主流程不被阻断和人工确认前不自动写入高风险结果的口径。
-- 补齐失败兜底、人工确认状态和异常路径断言。
-允许修改：
-- `backend/src/main/java/com/cgcpms/invoice/**`
-- `backend/src/test/java/com/cgcpms/invoice/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部发票识别服务配置
-验收标准：
-- PDF 解析失败返回明确错误原因，且不影响付款/发票主流程继续处理。
-- 未经人工确认的识别结果不得直接覆盖关键发票字段。
-- 正式报告记录安全边界、失败分类和剩余风险。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=InvoiceServiceTest" test`
-- `git diff --check`
 
 ### ISSUE-007-002：MinIO 健康指标与文件失败监控回归
 
@@ -126,6 +97,14 @@
 
 
 ## 已完成/历史
+
+### ISSUE-006-005：发票识别失败原因与人工确认口径回归
+
+优先级：P1
+类型：安全 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-006-005-invoice-recognition-manual-confirmation.md`
 
 ### ISSUE-006-004：发票识别重复发票与付款关联回归
 

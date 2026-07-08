@@ -445,3 +445,34 @@ Issue：ISSUE-006-004 发票识别重复发票与付款关联回归
 剩余风险：
 - 本轮未跑全量后端测试，结论限于 ISSUE-006-004 指定 invoice 模块和控制器回归范围。
 - 外部发票识别服务、PDF 解析失败和人工确认口径留给 ISSUE-006-005。
+
+---
+
+Issue：ISSUE-006-005 发票识别失败原因与人工确认口径回归
+
+目标：
+- 回归 PDF 解析失败时的错误原因、主流程不被阻断和人工确认前不自动写入高风险识别结果的口径。
+- 补齐失败兜底、人工确认状态和异常路径断言。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/invoice/service/InvoiceService.java`：PDFBox 加密/解析异常改为返回失败识别结果，不再阻断调用方主流程；成功和失败结果均要求人工确认。
+- `backend/src/main/java/com/cgcpms/invoice/vo/InvoiceRecognizeResultVO.java`：新增 `success`、`manualConfirmationRequired`、`errorCode`、`errorMessage`。
+- `backend/src/test/java/com/cgcpms/invoice/InvoiceServiceTest.java`：新增失败原因、主流程继续、识别不落库和人工确认状态断言。
+- `backend/src/test/java/com/cgcpms/invoice/InvoiceRecognitionTest.java`：加密 PDF、损坏 PDF 失败路径改为失败 VO 回归。
+- `docs/quality/issue-006-005-invoice-recognition-manual-confirmation.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-005 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceServiceTest,InvoiceRecognitionTest" test`：通过，`Tests run: 29, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceServiceTest" test`：通过，`Tests run: 21, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；失败路径和人工确认边界已补强
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未修改前端，结论限于后端识别返回口径和服务层人工确认边界。
+- 本轮未接入外部发票识别服务，仍沿用本地 PDFBox 文本解析。
+- 本轮未跑全量后端测试，结论限于 ISSUE-006-005 指定 invoice 模块回归范围。

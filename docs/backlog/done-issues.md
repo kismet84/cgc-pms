@@ -117,3 +117,11 @@
 失败分类或非失败分类：测试前置配置、测试编写和测试夹具问题已更正；生产更新路径一致性缺口已修复
 验证结果：通过
 相关报告：docs/quality/issue-006-004-invoice-duplicate-payment-link.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-006-005：发票识别失败原因与人工确认口径回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；失败路径和人工确认边界已补强
+验证结果：通过
+相关报告：docs/quality/issue-006-005-invoice-recognition-manual-confirmation.md；docs/iterations/iteration-2026-07-08-report.md

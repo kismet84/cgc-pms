@@ -231,10 +231,10 @@ public class InvoiceService {
             stripper.setSortByPosition(true);
             text = stripper.getText(document);
         } catch (InvalidPasswordException e) {
-            throw new BusinessException("PDF_ENCRYPTED", "PDF文件已加密，无法识别");
+            return recognizeFailure("PDF_ENCRYPTED", "PDF文件已加密，无法识别，请人工确认发票信息");
         } catch (Exception e) {
             log.error("PDF recognize failed for invoice file", e);
-            throw new BusinessException("PDF_RECOGNIZE_FAILED", "PDF识别失败", e);
+            return recognizeFailure("PDF_RECOGNIZE_FAILED", "PDF识别失败，请人工确认发票信息");
         } finally {
             if (document != null) {
                 try {
@@ -247,6 +247,8 @@ public class InvoiceService {
 
         // Regex extraction
         InvoiceRecognizeResultVO result = new InvoiceRecognizeResultVO();
+        result.setSuccess(true);
+        result.setManualConfirmationRequired(true);
         result.setInvoiceNo(extractInvoiceNo(text));
         result.setInvoiceType(extractInvoiceType(text));
         result.setInvoiceAmount(extractAmount(text, "价税合计.*?[¥￥]\\s*([\\d,]+\\.?\\d*)"));
@@ -266,6 +268,15 @@ public class InvoiceService {
 
         log.debug("Invoice PDF recognition completed");
 
+        return result;
+    }
+
+    private InvoiceRecognizeResultVO recognizeFailure(String errorCode, String errorMessage) {
+        InvoiceRecognizeResultVO result = new InvoiceRecognizeResultVO();
+        result.setSuccess(false);
+        result.setManualConfirmationRequired(true);
+        result.setErrorCode(errorCode);
+        result.setErrorMessage(errorMessage);
         return result;
     }
 

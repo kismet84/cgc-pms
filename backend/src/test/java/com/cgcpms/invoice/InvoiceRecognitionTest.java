@@ -175,16 +175,18 @@ class InvoiceRecognitionTest {
 
     @Test
     @Order(3)
-    @DisplayName("Should reject encrypted PDF")
-    void shouldRejectEncryptedPdf() throws IOException {
+    @DisplayName("Should return failure details for encrypted PDF")
+    void shouldReturnFailureDetailsForEncryptedPdf() throws IOException {
         byte[] encryptedPdfBytes = createEncryptedPdfBytes("userpass");
         MultipartFile file = createMockMultipartFile(
                 "application/pdf", encryptedPdfBytes.length, false, encryptedPdfBytes);
 
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> invoiceService.recognize(file),
-                "Should throw BusinessException for encrypted PDF");
-        assertEquals("PDF_ENCRYPTED", ex.getCode(), "Error code should be PDF_ENCRYPTED");
+        InvoiceRecognizeResultVO result = invoiceService.recognize(file);
+
+        assertFalse(result.getSuccess());
+        assertTrue(result.getManualConfirmationRequired());
+        assertEquals("PDF_ENCRYPTED", result.getErrorCode());
+        assertEquals("PDF文件已加密，无法识别，请人工确认发票信息", result.getErrorMessage());
     }
 
     // ── Test 4: Non-PDF file ──
@@ -283,16 +285,18 @@ class InvoiceRecognitionTest {
 
     @Test
     @Order(8)
-    @DisplayName("Should return fixed message when PDF recognition fails")
-    void shouldReturnFixedMessageWhenPdfRecognitionFails() {
+    @DisplayName("Should return failure details when PDF recognition fails")
+    void shouldReturnFailureDetailsWhenPdfRecognitionFails() {
         byte[] brokenPdfBytes = createMalformedPdfBytes();
         MultipartFile file = createMockMultipartFile(
                 "application/pdf", brokenPdfBytes.length, false, brokenPdfBytes);
 
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> invoiceService.recognize(file));
-        assertEquals("PDF_RECOGNIZE_FAILED", ex.getCode());
-        assertEquals("PDF识别失败", ex.getMessage());
+        InvoiceRecognizeResultVO result = invoiceService.recognize(file);
+
+        assertFalse(result.getSuccess());
+        assertTrue(result.getManualConfirmationRequired());
+        assertEquals("PDF_RECOGNIZE_FAILED", result.getErrorCode());
+        assertEquals("PDF识别失败，请人工确认发票信息", result.getErrorMessage());
     }
 
     // ── Helper methods ──
