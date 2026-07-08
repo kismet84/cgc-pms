@@ -19,8 +19,7 @@ import static org.mockito.Mockito.*;
  * Verifies:
  * - Normal blacklist/isBlacklisted operations work correctly
  * - Redis connection failures are detected and logged (audit trail)
- * - isBlacklisted returns false (safe default) when Redis is unreachable,
- *   but the service handles the error gracefully
+ * - isBlacklisted returns true (fail-close) when Redis is unreachable
  */
 @DisplayName("TokenBlacklistService — Redis 降级行为")
 class TokenBlacklistServiceTest {
@@ -55,16 +54,14 @@ class TokenBlacklistServiceTest {
         @Test
         @DisplayName("blacklist 设置 key 并写入 Redis")
         void blacklistSetsKey() {
-            // blacklist should not throw
-            assertDoesNotThrow(() -> service.blacklist("test-token-12345678901234567890123456789012", 60000L));
+            assertTrue(service.blacklist("test-token-12345678901234567890123456789012", 60000L));
         }
 
         @Test
         @DisplayName("blacklist TTL <= 0 时跳过写入")
         void blacklistSkipsWhenTtlNotPositive() {
-            // should not throw, just skips
-            assertDoesNotThrow(() -> service.blacklist("test-token", 0L));
-            assertDoesNotThrow(() -> service.blacklist("test-token", -1L));
+            assertTrue(service.blacklist("test-token", 0L));
+            assertTrue(service.blacklist("test-token", -1L));
         }
 
         @Test

@@ -1,9 +1,11 @@
 package com.cgcpms.auth.controller;
 
+import com.cgcpms.auth.config.JwtProperties;
 import com.cgcpms.auth.dto.LoginRequest;
 import com.cgcpms.auth.dto.LoginResponse;
 import com.cgcpms.auth.dto.UserInfo;
 import com.cgcpms.auth.service.AuthService;
+import com.cgcpms.auth.service.TokenBlacklistService;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.exception.BusinessException;
@@ -12,10 +14,15 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -28,7 +35,9 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -53,6 +62,9 @@ class AuthControllerTest {
 
     @Autowired
     private JwtUtils jwtUtils;
+
+    @Autowired
+    private JwtProperties jwtProperties;
 
     @MockBean
     private AuthService authService;
@@ -244,5 +256,60 @@ class AuthControllerTest {
         org.junit.jupiter.api.Assertions.assertFalse(source.contains("@RateLimit"));
         org.junit.jupiter.api.Assertions.assertTrue(securityConfigSource.contains("environment.acceptsProfiles(Profiles.of(\"dev\", \"local\"))"));
         org.junit.jupiter.api.Assertions.assertTrue(securityConfigSource.contains("auth.dev-login.enabled:false"));
+    }
+
+    @Test
+    @DisplayName("POST /auth/refresh prod 黑名单服务缺失 → fail-close")
+    void refreshFailsClosedWhenBlacklistMissingInProd() {
+        AuthController controller = authControllerWithoutBlacklistInProd();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE, jwtUtils.generateRefreshToken(1L)));
+
+        var result = controller.refresh(request, new MockHttpServletResponse(), null);
+
+        org.junit.jupiter.api.Assertions.assertEquals("AUTH_TOKEN_INVALID", result.getCode());
+        verify(authService, never()).loginById(any());
+    }
+
+    @Test
+    @DisplayName("POST /auth/logout prod 黑名单服务缺失 → fail-close")
+    void logoutFailsClosedWhenBlacklistMissingInProd() {
+        AuthController controller = authControllerWithoutBlacklistInProd();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
+                jwtUtils.generateToken(1L, "admin", 0L, List.of("ADMIN"), List.of())));
+
+        var result = controller.logout(request, new MockHttpServletResponse());
+
+        org.junit.jupiter.api.Assertions.assertEquals("AUTH_TOKEN_INVALID", result.getCode());
+    }
+
+    @Test
+    @DisplayName("POST /auth/refresh prod 黑名单写入失败 → fail-close")
+    void refreshFailsClosedWhenBlacklistWriteFailsInProd() {
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+        when(blacklistService.isBlacklisted(any())).thenReturn(false);
+        when(blacklistService.blacklist(any(), anyLong())).thenReturn(false);
+        AuthController controller = authControllerInProd(blacklistService);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE, jwtUtils.generateRefreshToken(1L)));
+
+        var result = controller.refresh(request, new MockHttpServletResponse(), null);
+
+        org.junit.jupiter.api.Assertions.assertEquals("AUTH_TOKEN_INVALID", result.getCode());
+        verify(authService, never()).loginById(any());
+    }
+
+    private AuthController authControllerWithoutBlacklistInProd() {
+        return authControllerInProd(null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private AuthController authControllerInProd(TokenBlacklistService blacklistService) {
+        ObjectProvider<TokenBlacklistService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(blacklistService);
+        Environment environment = mock(Environment.class);
+        when(environment.acceptsProfiles(any(Profiles.class))).thenReturn(true);
+        return new AuthController(authService, jwtUtils, jwtProperties, new CookieUtils(), provider, environment);
     }
 }

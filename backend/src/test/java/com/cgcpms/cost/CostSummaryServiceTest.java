@@ -43,6 +43,8 @@ class CostSummaryServiceTest {
 
     private static final long TENANT_ID = 0L;
     private static final long USER_ADMIN = 1L;
+    private static final long USER_PROJECT_MANAGER = 91001L;
+    private static final long USER_PROJECT_CREATOR = 91002L;
 
     @Autowired
     private CostSummaryService costSummaryService;
@@ -82,7 +84,13 @@ class CostSummaryServiceTest {
         project.setStatus("ACTIVE");
         project.setApprovalStatus("APPROVED");
         project.setTenantId(TENANT_ID);
-        if (projectMapper.selectById(80001L) == null) projectMapper.insert(project);
+        project.setProjectManagerId(USER_PROJECT_MANAGER);
+        project.setCreatedBy(USER_PROJECT_CREATOR);
+        if (projectMapper.selectById(80001L) == null) {
+            projectMapper.insert(project);
+        } else {
+            projectMapper.updateById(project);
+        }
         testProjectId = 80001L;
     }
 
@@ -150,6 +158,18 @@ class CostSummaryServiceTest {
     void testRefreshSummary_NullParams() {
         assertThrows(BusinessException.class,
                 () -> costSummaryService.refreshSummary(null, testProjectId));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TC4-1: refreshSummary — 项目经理可刷新本人项目")
+    void testRefreshSummary_ProjectManagerAllowed() {
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "project_manager", List.of());
+
+        CostProjectSummaryVO result = costSummaryService.refreshSummary(testProjectId);
+
+        assertNotNull(result);
+        assertEquals(String.valueOf(testProjectId), result.getProjectId());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -256,6 +276,17 @@ class CostSummaryServiceTest {
         List<CostSummaryVO> history = costSummaryService.getSummaryHistory(testProjectId);
         assertNotNull(history);
         // 有 cost_item 时会有记录，无 cost_item 时空列表
+        assertNotNull(history);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TC12-1: getSummaryHistory — 创建人 SELF 数据范围可查看历史")
+    void testGetSummaryHistory_CreatorAllowed() {
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_CREATOR, "project_creator", List.of());
+
+        List<CostSummaryVO> history = costSummaryService.getSummaryHistory(testProjectId);
+
         assertNotNull(history);
     }
 

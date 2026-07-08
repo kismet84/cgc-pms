@@ -13,10 +13,9 @@ import java.time.Duration;
  *
  * <p>When Redis is unavailable, operations degrade safely:
  * <ul>
- *   <li>{@link #blacklist(String, long)} logs a warning — blacklist write is lost</li>
- *   <li>{@link #isBlacklisted(String)} returns {@code false} (safe default) and logs a warning</li>
+ *   <li>{@link #blacklist(String, long)} logs a warning and returns {@code false}</li>
+ *   <li>{@link #isBlacklisted(String)} returns {@code true} (fail-close) and logs a warning</li>
  * </ul>
- * In both cases the system remains operational but blacklist protection is absent.
  * Monitoring should alert on these log patterns:
  * <ul>
  *   <li>{@code TOKEN_BLACKLIST_WRITE_FAILED}</li>
@@ -36,15 +35,17 @@ public class TokenBlacklistService {
     }
 
     /** Blacklist a token using its last 32 chars as key, with given TTL. */
-    public void blacklist(String token, long ttlMillis) {
-        if (ttlMillis <= 0) return;
+    public boolean blacklist(String token, long ttlMillis) {
+        if (ttlMillis <= 0) return true;
         String key = PREFIX + tokenKey(token);
         try {
             redisTemplate.opsForValue().set(key, "1", Duration.ofMillis(ttlMillis));
             log.debug("Token blacklisted with TTL: {}ms", ttlMillis);
+            return true;
         } catch (RuntimeException e) {
             log.warn("TOKEN_BLACKLIST_WRITE_FAILED: Redis不可用，令牌黑名单写入失败, ttl={}ms",
                     ttlMillis, e);
+            return false;
         }
     }
 

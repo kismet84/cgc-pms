@@ -17,6 +17,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,15 +31,18 @@ public class AuthController {
     private final JwtProperties jwtProperties;
     private final CookieUtils cookieUtils;
     private final ObjectProvider<TokenBlacklistService> blacklistProvider;
+    private final Environment environment;
 
     public AuthController(AuthService authService, JwtUtils jwtUtils, JwtProperties jwtProperties,
                           CookieUtils cookieUtils,
-                          ObjectProvider<TokenBlacklistService> blacklistProvider) {
+                          ObjectProvider<TokenBlacklistService> blacklistProvider,
+                          Environment environment) {
         this.authService = authService;
         this.jwtUtils = jwtUtils;
         this.jwtProperties = jwtProperties;
         this.cookieUtils = cookieUtils;
         this.blacklistProvider = blacklistProvider;
+        this.environment = environment;
     }
 
     @RateLimit(maxRequests = 5, windowSeconds = 60)
@@ -67,16 +72,22 @@ public class AuthController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> logout(HttpServletRequest request,
                                      HttpServletResponse response) {
+        TokenBlacklistService svc = blacklistProvider.getIfAvailable();
+        if (svc == null && isProdProfile()) {
+            return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单服务不可用");
+        }
         String token = resolveAccessToken(request);
         if (token != null && jwtUtils.validateToken(token)) {
-            TokenBlacklistService svc = blacklistProvider.getIfAvailable();
-            if (svc != null) svc.blacklist(token, jwtUtils.getRemainingTtlMillis(token));
+            if (svc != null && !svc.blacklist(token, jwtUtils.getRemainingTtlMillis(token)) && isProdProfile()) {
+                return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
+            }
         }
         // M-008: Also blacklist refresh token on logout
         String refreshToken = cookieUtils.getCookieValue(request, CookieUtils.REFRESH_TOKEN_COOKIE);
         if (refreshToken != null && !refreshToken.isBlank() && jwtUtils.validateToken(refreshToken)) {
-            TokenBlacklistService svc = blacklistProvider.getIfAvailable();
-            if (svc != null) svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken));
+            if (svc != null && !svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken)) && isProdProfile()) {
+                return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
+            }
         }
         cookieUtils.clearAuthCookies(response);
         UserContext.clear();
@@ -100,16 +111,23 @@ public class AuthController {
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Refresh token无效");
         }
         TokenBlacklistService svc = blacklistProvider.getIfAvailable();
+        if (svc == null && isProdProfile()) {
+            return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单服务不可用");
+        }
         if (svc != null && svc.isBlacklisted(refreshToken)) {
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Refresh token已失效");
         }
         Claims claims = jwtUtils.parseToken(refreshToken);
         Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
-        if (svc != null) svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken));
+        if (svc != null && !svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken)) && isProdProfile()) {
+            return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
+        }
         // Blacklist old access token to prevent replay during its remaining TTL
         String oldAccessToken = resolveAccessToken(request);
         if (oldAccessToken != null && jwtUtils.validateToken(oldAccessToken)) {
-            if (svc != null) svc.blacklist(oldAccessToken, jwtUtils.getRemainingTtlMillis(oldAccessToken));
+            if (svc != null && !svc.blacklist(oldAccessToken, jwtUtils.getRemainingTtlMillis(oldAccessToken)) && isProdProfile()) {
+                return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
+            }
         }
         LoginResponse result = authService.loginById(userId);
         setTokenCookies(response, result.getToken(), result.getRefreshToken());
@@ -153,5 +171,9 @@ public class AuthController {
             return authHeader.substring(prefix.length()).trim();
         }
         return authHeader.trim();
+    }
+
+    private boolean isProdProfile() {
+        return environment.acceptsProfiles(Profiles.of("prod"));
     }
 }
