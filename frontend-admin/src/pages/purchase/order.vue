@@ -24,8 +24,9 @@ import {
   submitOrderForApproval,
 } from '@/api/modules/purchase'
 import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchase'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 import PurchaseOrderAnalysisRail from './components/PurchaseOrderAnalysisRail.vue'
 import PurchaseOrderModal from './components/PurchaseOrderModal.vue'
@@ -67,16 +68,30 @@ const filterSettingItems = [
 ] as const
 
 const loading = ref(false)
+const hasLoaded = ref(false)
+const listError = ref<string | null>(null)
 const tableData = ref<MatPurchaseOrderVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const queryReady = ref(false)
 
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 const materialList = computed(() => referenceStore.materials ?? [])
 const supplierList = ref<{ id: string; partnerName?: string }[]>([])
+const hasActiveFilters = computed(
+  () =>
+    Boolean(
+      filter.projectId ||
+        filter.contractId ||
+        filter.partnerId ||
+        filter.orderStatus ||
+        filter.orderType ||
+        filter.keyword,
+    ),
+)
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建采购订单')
@@ -188,7 +203,9 @@ const {
 
 async function fetchData() {
   loading.value = true
+  listError.value = null
   try {
+    await syncRouteQuery()
     const res = await getOrderList({
       pageNum: pageNo.value,
       pageSize: pageSize.value,
@@ -205,10 +222,44 @@ async function fetchData() {
     console.error(e)
     tableData.value = []
     total.value = 0
-    message.error('加载采购订单列表失败，请稍后重试')
+    listError.value = '请检查筛选条件或网络状态后重试。'
+    message.error('加载采购订单列表失败')
   } finally {
+    hasLoaded.value = true
     loading.value = false
   }
+}
+
+function hydrateFromRouteQuery() {
+  filter.projectId = readStringQuery(route.query.projectId)
+  filter.contractId = readStringQuery(route.query.contractId)
+  filter.partnerId = readStringQuery(route.query.partnerId)
+  filter.orderStatus = readStringQuery(route.query.orderStatus)
+  filter.orderType = readStringQuery(route.query.orderType)
+  filter.keyword = readStringQuery(route.query.keyword) ?? ''
+  filter.orderCode = filter.keyword
+  pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+  pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+  queryReady.value = true
+}
+
+async function syncRouteQuery() {
+  if (!queryReady.value) return
+  const nextQuery = replaceListQuery(
+    route.query,
+    {
+      projectId: filter.projectId,
+      contractId: filter.contractId,
+      partnerId: filter.partnerId,
+      orderStatus: filter.orderStatus,
+      orderType: filter.orderType,
+      keyword: filter.keyword || undefined,
+      pageNo: pageNo.value,
+      pageSize: pageSize.value,
+    },
+    ['projectId', 'contractId', 'partnerId', 'orderStatus', 'orderType', 'keyword', 'pageNo', 'pageSize'],
+  )
+  await router.replace({ path: route.path, query: nextQuery })
 }
 
 function handleSearch() {
@@ -225,6 +276,11 @@ function handleReset() {
   filter.orderCode = ''
   filter.keyword = ''
   pageNo.value = 1
+  referenceStore.fetchContracts({
+    contractType: 'PURCHASE',
+    contractStatus: 'PERFORMING',
+    approvalStatus: 'APPROVED',
+  })
   fetchData()
 }
 
@@ -580,10 +636,14 @@ async function loadSuppliers() {
   }
 }
 
+const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tableData.value.length)
+
 onMounted(() => {
+  hydrateFromRouteQuery()
   fetchDictData(ORDER_STATUS_DICT)
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({
+    ...(filter.projectId ? { projectId: filter.projectId } : {}),
     contractType: 'PURCHASE',
     contractStatus: 'PERFORMING',
     approvalStatus: 'APPROVED',
@@ -705,7 +765,25 @@ onMounted(() => {
 
           <!-- 表格 -->
           <div class="lg-table-wrap">
+            <div v-if="listError" class="purchase-order-list-feedback">
+              <a-result
+                status="error"
+                title="采购订单列表加载失败"
+                :sub-title="listError"
+              >
+                <template #extra>
+                  <a-button type="primary" @click="fetchData">重试</a-button>
+                </template>
+              </a-result>
+            </div>
+            <div v-else-if="showEmptyState" class="purchase-order-list-feedback">
+              <LgEmptyState description="暂无符合条件的采购订单">
+                <a-button v-if="hasActiveFilters" @click="handleReset">清空筛选</a-button>
+                <a-button v-else type="primary" @click="handleAdd">新建订单</a-button>
+              </LgEmptyState>
+            </div>
             <vxe-grid
+              v-else
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -1018,6 +1096,14 @@ onMounted(() => {
 .purchase-order-table-panel .lg-table-wrap {
   flex: 1;
   min-height: 0;
+}
+
+.purchase-order-list-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  padding: 24px;
 }
 
 @media (max-width: 1200px) {

@@ -1,8 +1,10 @@
 import { ref, reactive, computed } from 'vue'
+import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { getReceiptList, deleteReceipt, submitReceiptForApproval } from '@/api/modules/receipt'
 import { getOrderList } from '@/api/modules/purchase'
 import { getWarehouseList } from '@/api/modules/inventory'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
 import type { MatReceiptVO } from '@/types/receipt'
 import type { MatPurchaseOrderVO } from '@/types/purchase'
 import type { WarehouseVO } from '@/types/inventory'
@@ -28,7 +30,13 @@ export function fmtAmount(val: string): string {
   return (n / 10000).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export function useReceiptList() {
+export function useReceiptList({
+  route,
+  router,
+}: {
+  route: RouteLocationNormalizedLoaded
+  router: Router
+}) {
   const filter = reactive({
     projectId: undefined as string | undefined,
     orderId: undefined as string | undefined,
@@ -39,13 +47,19 @@ export function useReceiptList() {
   })
 
   const loading = ref(false)
+  const hasLoaded = ref(false)
+  const listError = ref<string | null>(null)
   const tableData = ref<MatReceiptVO[]>([])
   const total = ref(0)
   const pageNo = ref(1)
   const pageSize = ref(20)
+  const queryReady = ref(false)
 
   const orderList = ref<MatPurchaseOrderVO[]>([])
   const warehouseList = ref<WarehouseVO[]>([])
+  const hasActiveFilters = computed(
+    () => Boolean(filter.projectId || filter.orderId || filter.receiptCode || filter.qualityStatus),
+  )
 
   // ---- KPI computeds ----
   const kpiTotalCount = computed(() => total.value)
@@ -84,7 +98,9 @@ export function useReceiptList() {
 
   async function fetchData() {
     loading.value = true
+    listError.value = null
     try {
+      await syncRouteQuery()
       const res = await getReceiptList({
         pageNum: pageNo.value,
         pageSize: pageSize.value,
@@ -101,10 +117,39 @@ export function useReceiptList() {
       console.error(e)
       tableData.value = []
       total.value = 0
-      message.error('加载验收列表失败，请稍后重试')
+      listError.value = '请检查筛选条件或网络状态后重试。'
+      message.error('加载验收列表失败')
     } finally {
+      hasLoaded.value = true
       loading.value = false
     }
+  }
+
+  function hydrateFromRouteQuery() {
+    filter.projectId = readStringQuery(route.query.projectId)
+    filter.orderId = readStringQuery(route.query.orderId)
+    filter.receiptCode = readStringQuery(route.query.receiptCode) ?? ''
+    filter.qualityStatus = readStringQuery(route.query.qualityStatus)
+    pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
+    pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
+    queryReady.value = true
+  }
+
+  async function syncRouteQuery() {
+    if (!queryReady.value) return
+    const nextQuery = replaceListQuery(
+      route.query,
+      {
+        projectId: filter.projectId,
+        orderId: filter.orderId,
+        receiptCode: filter.receiptCode || undefined,
+        qualityStatus: filter.qualityStatus,
+        pageNo: pageNo.value,
+        pageSize: pageSize.value,
+      },
+      ['projectId', 'orderId', 'receiptCode', 'qualityStatus', 'pageNo', 'pageSize'],
+    )
+    await router.replace({ path: route.path, query: nextQuery })
   }
 
   async function fetchOrders() {
@@ -193,6 +238,7 @@ export function useReceiptList() {
   }
 
   function init() {
+    hydrateFromRouteQuery()
     fetchOrders()
     fetchWarehouses()
     fetchData()
@@ -201,6 +247,9 @@ export function useReceiptList() {
   return {
     filter,
     loading,
+    hasLoaded,
+    listError,
+    hasActiveFilters,
     tableData,
     total,
     pageNo,

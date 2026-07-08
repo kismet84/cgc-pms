@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, computed, reactive } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   MoreOutlined,
   PlusOutlined,
@@ -19,9 +20,11 @@ import {
 import { useReceiptForm } from './composables/useReceiptForm'
 import ReceiptKpiStrip from './components/ReceiptKpiStrip.vue'
 import ReceiptFormModal from './components/ReceiptFormModal.vue'
-import { ColumnSettingsButton } from '@/components/list-page'
+import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
+const route = useRoute()
+const router = useRouter()
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
@@ -41,6 +44,9 @@ const filterSettingItems = [
 const {
   filter,
   loading,
+  hasLoaded,
+  listError,
+  hasActiveFilters,
   tableData,
   total,
   pageNo,
@@ -59,7 +65,7 @@ const {
   handleDelete,
   handleSubmitApproval,
   init,
-} = useReceiptList()
+} = useReceiptList({ route, router })
 
 const {
   visibleColumns: visibleGridColumns,
@@ -87,6 +93,8 @@ const {
   handleModalOk,
   handleModalCancel,
 } = useReceiptForm(fetchData, orderList)
+
+const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tableData.value.length)
 
 async function handleView(row: Parameters<typeof handleEdit>[0]) {
   await handleEdit(row)
@@ -136,7 +144,9 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
 
 onMounted(() => {
   referenceStore.fetchProjects()
-  referenceStore.fetchContracts({ contractType: 'PURCHASE' })
+  referenceStore.fetchContracts(
+    filter.projectId ? { projectId: filter.projectId, contractType: 'PURCHASE' } : { contractType: 'PURCHASE' },
+  )
   referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })
   init()
 })
@@ -282,7 +292,25 @@ onMounted(() => {
           </div>
 
           <div class="lg-table-wrap">
+            <div v-if="listError" class="receipt-list-feedback">
+              <a-result
+                status="error"
+                title="验收列表加载失败"
+                :sub-title="listError"
+              >
+                <template #extra>
+                  <a-button type="primary" @click="fetchData">重试</a-button>
+                </template>
+              </a-result>
+            </div>
+            <div v-else-if="showEmptyState" class="receipt-list-feedback">
+              <LgEmptyState description="暂无符合条件的材料验收记录">
+                <a-button v-if="hasActiveFilters" @click="handleReset">清空筛选</a-button>
+                <a-button v-else type="primary" @click="handleAdd">新建验收</a-button>
+              </LgEmptyState>
+            </div>
             <vxe-grid
+              v-else
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -541,6 +569,14 @@ onMounted(() => {
 .receipt-table-panel > .lg-table-wrap {
   flex: 1;
   min-height: 0;
+}
+
+.receipt-list-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  padding: 24px;
 }
 
 .receipt-table-panel > .lg-pagination {

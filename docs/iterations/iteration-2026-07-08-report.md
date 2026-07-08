@@ -363,6 +363,35 @@ Issue：ISSUE-005-002 项目与合同列表页生产化补强
 
 ---
 
+Issue：ISSUE-005-003 采购与收货列表页生产化补强
+
+目标：
+- 补强采购订单列表与材料验收列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口；不扩展详情页重构、新业务字段或后端接口语义。
+
+修改范围摘要：
+- `frontend-admin/src/pages/purchase/order.vue`：采购订单列表新增 URL query 恢复与同步，覆盖 `projectId`、`contractId`、`partnerId`、`orderStatus`、`orderType`、`keyword`、`pageNo`、`pageSize`；补错误态、空态和重试入口。
+- `frontend-admin/src/pages/receipt/index.vue`、`frontend-admin/src/pages/receipt/composables/useReceiptList.ts`：材料验收列表新增 URL query 恢复与同步，覆盖 `projectId`、`orderId`、`receiptCode`、`qualityStatus`、`pageNo`、`pageSize`；补错误态、空态和重试入口。
+- `frontend-admin/src/pages/purchase/__tests__/list-production.test.ts`、`frontend-admin/src/pages/receipt/__tests__/list-production.test.ts`：补充生产化守卫测试。
+- `docs/quality/issue-005-003-purchase-receipt-list-production.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-005-003 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd frontend-admin; pnpm exec vitest run src/composables/__tests__/listPageQuery.test.ts src/pages/purchase/__tests__/order.test.ts src/pages/purchase/__tests__/list-production.test.ts src/pages/receipt/__tests__/index.test.ts src/pages/receipt/__tests__/list-production.test.ts`：通过，`5` 个文件、`32` 个用例全部通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未做真实浏览器验收，结论基于指定 Vitest、类型检查、构建和代码审查。
+- 本轮未跑全量前端测试，结论限于 ISSUE-005-003 指定采购/收货列表生产化范围。
+
+---
+
 Issue：ISSUE-006-002 附件下载鉴权与临时链接回归
 
 目标：
