@@ -65,3 +65,9 @@ auth:
   dev-login:
     enabled: true
     default-username: demo_dev_super_admin
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,metrics}

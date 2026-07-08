@@ -52,12 +52,12 @@ jwt:
   header: Authorization
   token-prefix: "Bearer "
 
-# Actuator — 仅暴露 health 和 info（非 prod 默认全开的安全加固）
+# Actuator — 暴露 health/info/metrics，本地监控仍受鉴权保护
 management:
   endpoints:
     web:
       exposure:
-        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info}
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,metrics}
   endpoint:
     health:
       show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:when-authorized}

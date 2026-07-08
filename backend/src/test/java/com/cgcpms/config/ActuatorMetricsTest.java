@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "spring.main.allow-circular-references=true",
-        "management.endpoints.web.exposure.include=health,info"
+        "management.endpoints.web.exposure.include=health,info,metrics"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
@@ -61,6 +61,40 @@ class ActuatorMetricsTest {
     void shouldExposeHealthEndpoint() {
         assertNotNull(healthEndpoint);
         assertNotNull(healthEndpoint.health().getStatus());
+    }
+
+    @Test
+    @DisplayName("metrics 端点应可在鉴权后读取 JVM 与连接池指标")
+    void shouldExposeMetricsEndpointForJvmAndDatasourceMeters() throws Exception {
+        mockMvc.perform(get("/api/actuator/metrics")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.names").isArray())
+                .andExpect(jsonPath("$.names").value(org.hamcrest.Matchers.hasItems(
+                        "jvm.threads.live",
+                        "hikaricp.connections.max"
+                )));
+
+        mockMvc.perform(get("/api/actuator/metrics/jvm.threads.live")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("jvm.threads.live"));
+
+        mockMvc.perform(get("/api/actuator/metrics/hikaricp.connections.max")
+                        .contextPath("/api")
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("hikaricp.connections.max"));
+    }
+
+    @Test
+    @DisplayName("metrics 端点仍需鉴权，未登录请求不可直接读取")
+    void shouldKeepMetricsEndpointProtected() throws Exception {
+        mockMvc.perform(get("/api/actuator/metrics")
+                        .contextPath("/api"))
+                .andExpect(status().is4xxClientError());
     }
 
     @Test

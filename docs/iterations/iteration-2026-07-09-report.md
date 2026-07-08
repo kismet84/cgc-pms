@@ -149,3 +149,33 @@ Issue：ISSUE-006-008 文件下载临时链接过期与鉴权失败提示回归
 剩余风险：
 - 本轮不修改 MinIO 桶策略、生产对象存储配置或外部文件网关。
 - 当前过期判据绑定 MinIO/S3 的 `X-Amz-Expires=300` 参数；如未来切换非 S3 签名方案，需要同步调整判据与测试。
+
+---
+
+Issue：ISSUE-007-009 JVM 与数据库连接池指标回归
+
+目标：
+- 回归 actuator 暴露 JVM 与数据库连接池关键指标，确保本地监控入口可用。
+- 不引入外部监控平台，不修改生产部署配置，不放宽鉴权边界。
+
+修改范围摘要：
+- `backend/src/main/resources/application-dev.yml`：默认开放 `health,info,metrics`，恢复开发环境监控入口。
+- `backend/src/main/resources/application-local.yml`：新增 `metrics` 暴露配置，确保 local/H2 测试环境可读取指标。
+- `backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java`：补充 `metrics` 列表、JVM 指标、HikariCP 指标和未登录拒绝回归断言。
+- `docs/quality/issue-007-009-jvm-datasource-metrics-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-009 收口为 Done，Ready 队列推进到 ISSUE-007-010。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=ActuatorMetricsTest" test`：先失败后通过；失败原因为鉴权后访问 `/api/actuator/metrics` 返回 `404`，说明端点未暴露。
+- `cd backend; .\mvnw.cmd "-Dtest=ActuatorMetricsTest,GlobalWriteRateLimitFilterTest" test`：通过，`9` 个用例通过；确认 `metrics` 仍受鉴权保护，`health` 白名单不回退。
+- `cd backend; .\mvnw.cmd test`：未通过；失败点集中在既有 `dashboard`、`invoice`、`workflow`、`payment`、`revenue` 集成测试，不属于本次改动引入。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 生产默认值未改动，线上如需暴露 `metrics` 仍需通过环境变量显式开启。
+- 本轮只覆盖本地 profile 与测试链路，未做真实部署环境监控采集验证。

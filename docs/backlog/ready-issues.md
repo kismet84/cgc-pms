@@ -28,8 +28,7 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-009`
-2. `ISSUE-007-010`
+1. `ISSUE-007-010`
 
 ## P0
 
@@ -282,7 +281,7 @@
 
 优先级：P1
 类型：运维 / 后端 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“监控指标”
 目标：
@@ -306,6 +305,7 @@
 验证命令：
 - `cd backend; .\mvnw.cmd test`
 - `git diff --check`
+归档报告：`docs/quality/issue-007-009-jvm-datasource-metrics-regression.md`
 
 ### ISSUE-007-010：备份清单脱敏与恢复演练报告模板回归
 
@@ -342,6 +342,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-007-008-alert-batch-result-metrics.md`
+
+### ISSUE-007-009：JVM 与数据库连接池指标回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-009-jvm-datasource-metrics-regression.md`
 
 ### ISSUE-007-007：登录失败与文件失败次数指标回归
 
