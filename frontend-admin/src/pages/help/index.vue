@@ -32,7 +32,7 @@ const faqItems = [
     key: '4',
     header: '如何上传文件？',
     answer:
-      '在合同详情或项目详情页面，点击"上传附件"按钮，选择文件（支持 PDF/Word/Excel/图片，最大 50MB）。',
+      '在合同详情或项目详情页面，点击"上传附件"按钮，选择文件（支持 PDF/Word/Excel/图片，最大 20MB）。',
   },
   {
     key: '5',

@@ -28,11 +28,10 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-006-006`
-2. `ISSUE-006-007`
-3. `ISSUE-006-008`
-4. `ISSUE-007-009`
-5. `ISSUE-007-010`
+1. `ISSUE-006-007`
+2. `ISSUE-006-008`
+3. `ISSUE-007-009`
+4. `ISSUE-007-010`
 
 ## P0
 
@@ -187,7 +186,7 @@
 
 优先级：P1
 类型：安全 / 后端 / 前端 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件上传限制”
 目标：
@@ -216,6 +215,7 @@
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
+归档报告：`docs/quality/issue-006-006-file-upload-validation.md`
 
 ### ISSUE-006-007：私有桶默认策略与公开 URL 禁用回归
 

@@ -27,6 +27,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-005-007-list-export-batch-permission.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-006-006：文件上传大小与 MIME/扩展名校验回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；测试前置问题已更正
+验证结果：通过
+相关报告：docs/quality/issue-006-006-file-upload-validation.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-004-001：成本台账与汇总口径回归
 
 完成日期：2026-07-08

@@ -92,13 +92,13 @@ class FileServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 2. 超大文件拒绝 (MAX_FILE_SIZE = 50MB)
+    // 2. 超大文件拒绝 (MAX_FILE_SIZE = 20MB)
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("upload rejects oversized file (>50MB) with FILE_TOO_LARGE")
+    @DisplayName("upload rejects oversized file (>20MB) with FILE_TOO_LARGE")
     void testUploadRejectsOversizedFile() {
-        byte[] bigContent = new byte[51 * 1024 * 1024]; // 51 MB
+        byte[] bigContent = new byte[20 * 1024 * 1024 + 1];
         // Set valid PDF signature at the start so size check is reached
         System.arraycopy("%PDF-".getBytes(), 0, bigContent, 0, 5);
         MockMultipartFile bigFile = new MockMultipartFile(

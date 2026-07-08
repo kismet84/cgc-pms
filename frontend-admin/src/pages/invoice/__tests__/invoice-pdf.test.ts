@@ -31,6 +31,11 @@ vi.mock('axios', () => ({
   },
 }))
 
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}))
+
 // ── Mock ant-design-vue ──
 vi.mock('ant-design-vue', () => ({
   message: {
@@ -128,10 +133,16 @@ describe('Invoice PDF Upload', () => {
 
   it('should validate file size in beforeUpload', () => {
     const vm = wrapper.vm
-    // PDF type passes, but size exceeds 50MB
-    const oversized = createFileLike('large.pdf', 'application/pdf', 51)
+    const oversized = createFileLike('large.pdf', 'application/pdf', 21)
     const result = vm.handleBeforeUpload(oversized)
     expect(result).toBe('LIST_IGNORE')
-    expect(vi.mocked(message.error)).toHaveBeenCalledWith('文件大小不能超过50MB')
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('文件大小不能超过20MB')
+  })
+
+  it('should allow PDF file under backend upload limit in beforeUpload', () => {
+    const vm = wrapper.vm
+    const valid = createFileLike('valid.pdf', 'application/pdf', 15)
+    expect(vm.handleBeforeUpload(valid)).toBe(false)
+    expect(vi.mocked(message.error)).not.toHaveBeenCalled()
   })
 })

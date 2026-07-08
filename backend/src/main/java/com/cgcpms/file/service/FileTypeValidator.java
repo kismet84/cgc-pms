@@ -237,11 +237,11 @@ public final class FileTypeValidator {
 
         // Office Open XML: various client MIME values
         if (detectedMime.startsWith("application/vnd.openxmlformats-officedocument")) {
-            if (ext.equals(".docx") && (cm.contains("wordprocessingml") || cm.contains("vnd.openxmlformats")))
+            if (ext.equals(".docx") && cm.contains("wordprocessingml"))
                 return true;
-            if (ext.equals(".xlsx") && (cm.contains("spreadsheetml") || cm.contains("vnd.openxmlformats")))
+            if (ext.equals(".xlsx") && cm.contains("spreadsheetml"))
                 return true;
-            if (ext.equals(".pptx") && (cm.contains("presentationml") || cm.contains("vnd.openxmlformats")))
+            if (ext.equals(".pptx") && cm.contains("presentationml"))
                 return true;
         }
 

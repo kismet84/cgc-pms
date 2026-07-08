@@ -91,16 +91,21 @@ class FileTypeValidatorTest {
     @Test
     @DisplayName("DOCX 合法签名通过（ZIP + Content_Types.xml）")
     void testDocxValid() {
-        // Minimal ZIP header + [Content_Types].xml entry
-        byte[] header = new byte[] {0x50, 0x4B, 0x03, 0x04};
-        byte[] contentTypes = "Content_Types]".getBytes();
-        byte[] content = new byte[header.length + contentTypes.length + 100];
-        System.arraycopy(header, 0, content, 0, header.length);
-        System.arraycopy(contentTypes, 0, content, 60, contentTypes.length);
+        byte[] content = officeContent();
         ValidationResult result = validator.validate("doc.docx",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document", content);
         assertEquals("doc.docx", result.sanitizedName());
         assertEquals(".docx", result.extension());
+        assertTrue(result.detectedMime().startsWith("application/vnd.openxmlformats-officedocument"));
+    }
+
+    @Test
+    @DisplayName("XLSX 合法签名通过（ZIP + Content_Types.xml）")
+    void testXlsxValid() {
+        ValidationResult result = validator.validate("sheet.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", officeContent());
+        assertEquals("sheet.xlsx", result.sanitizedName());
+        assertEquals(".xlsx", result.extension());
         assertTrue(result.detectedMime().startsWith("application/vnd.openxmlformats-officedocument"));
     }
 
@@ -143,9 +148,9 @@ class FileTypeValidatorTest {
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("超限文件（>50MB）→ BusinessException")
+    @DisplayName("超限文件（>20MB）→ BusinessException")
     void testOversizedFile() {
-        byte[] bigContent = new byte[51 * 1024 * 1024]; // 51 MB
+        byte[] bigContent = new byte[20 * 1024 * 1024 + 1];
         // Set PDF signature at the start
         System.arraycopy("%PDF-".getBytes(), 0, bigContent, 0, 5);
         BusinessException ex = assertThrows(BusinessException.class, () ->
@@ -230,5 +235,25 @@ class FileTypeValidatorTest {
                 validator.validate("doc.pdf", "image/png", content));
         assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
         assertTrue(ex.getMessage().contains("类型不匹配") || ex.getMessage().contains("不匹配"));
+    }
+
+    @Test
+    @DisplayName("DOCX 文件声明为 Excel MIME → BusinessException")
+    void testOfficeMimeMismatch() {
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                validator.validate("doc.docx",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        officeContent()));
+        assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
+        assertTrue(ex.getMessage().contains("类型不匹配") || ex.getMessage().contains("不匹配"));
+    }
+
+    private byte[] officeContent() {
+        byte[] header = new byte[] {0x50, 0x4B, 0x03, 0x04};
+        byte[] contentTypes = "Content_Types]".getBytes();
+        byte[] content = new byte[header.length + contentTypes.length + 100];
+        System.arraycopy(header, 0, content, 0, header.length);
+        System.arraycopy(contentTypes, 0, content, 60, contentTypes.length);
+        return content;
     }
 }

@@ -9,6 +9,7 @@ import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO } from '@/type
 import { uploadFile } from '@/api/modules/file'
 
 const INVOICE_BUSINESS_TYPE = 'INVOICE_ATTACHMENT'
+const MAX_UPLOAD_SIZE_MB = 20
 
 const props = defineProps<{
   visible: boolean
@@ -176,9 +177,9 @@ function handleBeforeUpload(file: File) {
     message.error('仅支持PDF格式')
     return Upload.LIST_IGNORE
   }
-  const isLt10M = file.size / 1024 / 1024 < 10
-  if (!isLt10M) {
-    message.error('文件大小不能超过10MB')
+  const isWithinLimit = file.size / 1024 / 1024 <= MAX_UPLOAD_SIZE_MB
+  if (!isWithinLimit) {
+    message.error(`文件大小不能超过${MAX_UPLOAD_SIZE_MB}MB`)
     return Upload.LIST_IGNORE
   }
   return false // prevent auto-upload; manual upload handled in handleRecognize()
