@@ -1,5 +1,5 @@
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { getContractLedger, getContractKpi, deleteContract } from '@/api/modules/contract'
@@ -51,6 +51,7 @@ export const STATUS_COLOR: Record<ContractStatus, string> = {
 }
 
 export function useContractLedger() {
+  const route = useRoute()
   const router = useRouter()
   const referenceStore = useReferenceStore()
   const projects = computed(() => referenceStore.projects ?? [])
@@ -158,6 +159,7 @@ export function useContractLedger() {
   async function fetchData() {
     const mySeq = ++fetchSeq
     loading.value = true
+    syncQueryToRoute()
     const params: ContractQueryParams = {
       projectId: filter.projectId,
       contractType: filter.contractType,
@@ -229,10 +231,48 @@ export function useContractLedger() {
   }
 
   onMounted(async () => {
+    restoreFilterFromRoute()
     await referenceStore.fetchProjects()
     fetchData()
     fetchKpi()
   })
+
+  function readQueryString(key: string): string | undefined {
+    const value = route.query[key]
+    return Array.isArray(value) ? value[0] || undefined : value || undefined
+  }
+
+  function readQueryNumber(key: string, fallback: number): number {
+    const value = Number(readQueryString(key))
+    return Number.isFinite(value) && value > 0 ? value : fallback
+  }
+
+  function restoreFilterFromRoute() {
+    filter.keyword = readQueryString('keyword') || ''
+    filter.projectId = readQueryString('projectId')
+    filter.contractType = readQueryString('contractType') as ContractType | undefined
+    filter.contractStatus = readQueryString('contractStatus') as ContractStatus | undefined
+    const startDate = readQueryString('startDate')
+    const endDate = readQueryString('endDate')
+    filter.dateRange = startDate || endDate ? [startDate || '', endDate || ''] : []
+    pageNo.value = readQueryNumber('pageNo', 1)
+    pageSize.value = readQueryNumber('pageSize', 20)
+  }
+
+  function syncQueryToRoute() {
+    const query = {
+      ...route.query,
+      keyword: filter.keyword || undefined,
+      projectId: filter.projectId || undefined,
+      contractType: filter.contractType || undefined,
+      contractStatus: filter.contractStatus || undefined,
+      startDate: filter.dateRange[0] || undefined,
+      endDate: filter.dateRange[1] || undefined,
+      pageNo: pageNo.value === 1 ? undefined : String(pageNo.value),
+      pageSize: pageSize.value === 20 ? undefined : String(pageSize.value),
+    }
+    router.replace({ query })
+  }
 
   // ---- Helpers ----
   function fmtAmount(val: string): string {

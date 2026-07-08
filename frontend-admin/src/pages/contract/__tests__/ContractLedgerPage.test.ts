@@ -45,4 +45,26 @@ describe('ContractLedgerPage modal flows', () => {
     )
     expect(composableSource).toMatch(/function handleDelete[\s\S]*?Modal\.confirm\(/)
   })
+
+  it('restores and preserves contract ledger filters through URL query parameters', () => {
+    expect(composableSource).toMatch(
+      /import\s+\{\s*useRoute,\s*useRouter\s*\}\s+from ['"]vue-router['"]/,
+    )
+    expect(composableSource).toMatch(/function restoreFilterFromRoute\(\)/)
+    expect(composableSource).toMatch(/filter\.keyword = readQueryString\('keyword'\) \|\| ''/)
+    expect(composableSource).toMatch(/filter\.projectId = readQueryString\('projectId'\)/)
+    expect(composableSource).toMatch(
+      /filter\.contractType = readQueryString\('contractType'\) as ContractType \| undefined/,
+    )
+    expect(composableSource).toMatch(
+      /filter\.contractStatus = readQueryString\('contractStatus'\) as ContractStatus \| undefined/,
+    )
+    expect(composableSource).toMatch(/filter\.dateRange = startDate \|\| endDate/)
+    expect(composableSource).toMatch(/pageNo\.value = readQueryNumber\('pageNo', 1\)/)
+    expect(composableSource).toMatch(/pageSize\.value = readQueryNumber\('pageSize', 20\)/)
+    expect(composableSource).toMatch(/function syncQueryToRoute\(\)/)
+    expect(composableSource).toMatch(/router\.replace\(\{ query \}\)/)
+    expect(composableSource).toMatch(/restoreFilterFromRoute\(\)[\s\S]*referenceStore\.fetchProjects/)
+    expect(composableSource).toMatch(/syncQueryToRoute\(\)[\s\S]*getContractLedger\(params\)/)
+  })
 })

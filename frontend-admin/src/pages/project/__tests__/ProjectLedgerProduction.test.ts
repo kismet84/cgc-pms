@@ -50,6 +50,21 @@ describe('ProjectLedgerProduction source guards', () => {
     )
   })
 
+  it('restores and preserves list filters through URL query parameters', () => {
+    const source = readProjectSource()
+    expect(source).toMatch(/import\s+\{\s*useRoute,\s*useRouter\s*\}\s+from 'vue-router'/)
+    expect(source).toMatch(/function restoreFilterFromRoute\(\)/)
+    expect(source).toMatch(/filter\.keyword = readQueryString\('keyword'\) \|\| ''/)
+    expect(source).toMatch(/filter\.projectType = readQueryString\('projectType'\)/)
+    expect(source).toMatch(/filter\.status = readQueryString\('status'\)/)
+    expect(source).toMatch(/pageNo\.value = readQueryNumber\('pageNo', 1\)/)
+    expect(source).toMatch(/pageSize\.value = readQueryNumber\('pageSize', 20\)/)
+    expect(source).toMatch(/function syncQueryToRoute\(\)/)
+    expect(source).toMatch(/router\.replace\(\{ query \}\)/)
+    expect(source).toMatch(/restoreFilterFromRoute\(\)[\s\S]*await fetchDictData\(PROJECT_TYPE_DICT\)/)
+    expect(source).toMatch(/syncQueryToRoute\(\)[\s\S]*getProjectList/)
+  })
+
   it('keeps amount conversion helpers consistent for create and edit', () => {
     const source = readProjectSource()
     expect(source).toMatch(/function amountYuanToWan/)
@@ -86,7 +101,7 @@ describe('ProjectLedgerProduction source guards', () => {
   it('preloads project type dict before the first fetch to avoid raw code flashes', () => {
     const source = readProjectSource()
     expect(source).toMatch(
-      /onMounted\(async \(\) => \{\s*await fetchDictData\(PROJECT_TYPE_DICT\)\s*await fetchData\(\)/,
+      /onMounted\(async \(\) => \{[\s\S]*await fetchDictData\(PROJECT_TYPE_DICT\)\s*await fetchData\(\)/,
     )
     expect(source).not.toContain('onMounted(fetchData)')
   })

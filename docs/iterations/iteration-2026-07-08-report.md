@@ -331,3 +331,32 @@ Issue：ISSUE-004-006 审批中心待办/已办/我发起统一筛选回归
 剩余风险：
 - 本轮未跑全量后端/前端测试，结论限于 ISSUE-004-006 指定范围。
 - 本轮未做真实浏览器验收，前端结论来自 Vitest 组件/逻辑测试。
+
+---
+
+Issue：ISSUE-005-002 项目与合同列表页生产化补强
+
+目标：
+- 统一项目与合同列表页的查询条件回显、分页参数、loading/empty/error 态与 URL 参数保留行为；不扩展详情页重构或新业务字段。
+
+修改范围摘要：
+- `frontend-admin/src/pages/project/index.vue`：新增项目列表 URL query 恢复与同步，覆盖 `keyword`、`projectType`、`status`、`pageNo`、`pageSize`。
+- `frontend-admin/src/pages/contract/composables/useContractLedger.ts`：新增合同列表 URL query 恢复与同步，覆盖 `keyword`、`projectId`、`contractType`、`contractStatus`、`startDate`、`endDate`、`pageNo`、`pageSize`。
+- `frontend-admin/src/pages/project/__tests__/ProjectLedgerProduction.test.ts`、`frontend-admin/src/pages/contract/__tests__/ContractLedgerPage.test.ts`：补充 URL 参数恢复与保留的源代码守卫。
+- `docs/quality/issue-005-002-project-contract-list-production.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-005-002 从 Ready 收口为 Done。
+
+验证命令摘要：
+- `cd frontend-admin; pnpm exec vitest run src/pages/project/__tests__/ProjectLedgerProduction.test.ts src/pages/project/__tests__/ProjectNav.test.ts src/pages/contract/__tests__/ContractLedgerPage.test.ts src/pages/contract/__tests__/ContractFormPage.test.ts src/pages/contract/__tests__/useContractLedger-ui-consistency.test.ts`：首轮失败归类为测试守卫配置问题；修正后通过，`5` 个文件、`21` 条用例全部通过。
+- `cd frontend-admin; pnpm type-check`：通过，`vue-tsc --noEmit` 无错误。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：测试守卫配置问题已更正；实现与前端验证通过
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未做真实浏览器验收，结论基于指定 Vitest、类型检查和代码审查。
+- 本轮未跑全量前端测试，结论限于 ISSUE-005-002 指定项目与合同列表生产化范围。
+- 下一 Ready Issue 为 `ISSUE-006-002`，涉及附件下载鉴权与临时链接安全边界，需要主线程重新分档后再继续。

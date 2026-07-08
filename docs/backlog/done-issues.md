@@ -71,6 +71,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-005-001-payment-invoice-list-production.md；docs/iterations/iteration-2026-07-08-report.md
 
+### ISSUE-005-002：项目与合同列表页生产化补强
+
+完成日期：2026-07-08
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：测试守卫配置问题已更正；实现与前端验证通过
+验证结果：通过
+相关报告：docs/quality/issue-005-002-project-contract-list-production.md；docs/iterations/iteration-2026-07-08-report.md
+
 ### ISSUE-006-001：文件上传白名单与发票识别失败兜底
 
 完成日期：2026-07-08

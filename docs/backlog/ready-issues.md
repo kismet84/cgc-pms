@@ -28,42 +28,11 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-005-002`
-2. `ISSUE-006-002`
+1. `ISSUE-006-002`
 
 ## P0
 
 ## P1
-
-### ISSUE-005-002：项目与合同列表页生产化补强
-
-优先级：P1
-类型：前端 / 生产化
-状态：Ready
-自动合并：auto-merge/local-commit-only；仅限 `frontend-admin/src/pages/project/**`、`frontend-admin/src/pages/contract/**`、`docs/quality/**`、`docs/iterations/**`
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节，第 1-2 条“项目列表、合同列表”
-目标：
-- 统一项目与合同列表页的查询条件回显、分页参数、loading/empty/error 态与 URL 参数保留行为。
-- 只处理列表页生产化问题，不扩展到详情页重构或新业务字段。
-允许修改：
-- `frontend-admin/src/pages/project/**`
-- `frontend-admin/src/pages/contract/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `backend/**`
-- `frontend-admin/src/pages/payment/**`
-- `frontend-admin/src/pages/invoice/**`
-- `deploy/**`
-验收标准：
-- 项目与合同列表均使用服务端分页和稳定的查询参数回显。
-- 页面出现空态、异常态时有可理解反馈，不靠控制台信息兜底。
-- 现有详情、编辑、删除入口不回退。
-- 正式报告说明两页共性修复项与各自残留风险。
-验证命令：
-- `cd frontend-admin; pnpm exec vitest run src/pages/project/__tests__/ProjectLedgerProduction.test.ts src/pages/project/__tests__/ProjectNav.test.ts src/pages/contract/__tests__/ContractLedgerPage.test.ts src/pages/contract/__tests__/ContractFormPage.test.ts src/pages/contract/__tests__/useContractLedger-ui-consistency.test.ts`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
 
 ### ISSUE-006-002：附件下载鉴权与临时链接回归
 
@@ -152,6 +121,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-004-006-approval-workbench-regression.md`
+
+### ISSUE-005-002：项目与合同列表页生产化补强
+
+优先级：P1
+类型：前端 / 生产化
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-005-002-project-contract-list-production.md`
 
 ### ISSUE-005-001：付款与发票列表页生产化补强
 

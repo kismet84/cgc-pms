@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
   getProjectList,
@@ -40,6 +40,7 @@ const pageSize = ref(20)
 
 const createVisible = ref(false)
 const createLoading = ref(false)
+const route = useRoute()
 const router = useRouter()
 const createFormRef = ref()
 const createForm = reactive({
@@ -199,6 +200,7 @@ async function handleCreateSubmit() {
 
 async function fetchData() {
   loading.value = true
+  syncQueryToRoute()
   try {
     const res: PageResult<ProjectVO> = await getProjectList({
       pageNo: pageNo.value,
@@ -243,7 +245,38 @@ function handlePageSizeChange(_cur: number, size: number) {
   fetchData()
 }
 
+function readQueryString(key: string): string | undefined {
+  const value = route.query[key]
+  return Array.isArray(value) ? value[0] || undefined : value || undefined
+}
+
+function readQueryNumber(key: string, fallback: number): number {
+  const value = Number(readQueryString(key))
+  return Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+function restoreFilterFromRoute() {
+  filter.keyword = readQueryString('keyword') || ''
+  filter.projectType = readQueryString('projectType')
+  filter.status = readQueryString('status')
+  pageNo.value = readQueryNumber('pageNo', 1)
+  pageSize.value = readQueryNumber('pageSize', 20)
+}
+
+function syncQueryToRoute() {
+  const query = {
+    ...route.query,
+    keyword: filter.keyword || undefined,
+    projectType: filter.projectType || undefined,
+    status: filter.status || undefined,
+    pageNo: pageNo.value === 1 ? undefined : String(pageNo.value),
+    pageSize: pageSize.value === 20 ? undefined : String(pageSize.value),
+  }
+  router.replace({ query })
+}
+
 onMounted(async () => {
+  restoreFilterFromRoute()
   await fetchDictData(PROJECT_TYPE_DICT)
   await fetchData()
 })
