@@ -172,6 +172,11 @@ class ContractCompositeSaveTest {
         return request;
     }
 
+    private void assertMoneyEquals(String expected, BigDecimal actual) {
+        assertNotNull(actual);
+        assertEquals(0, new BigDecimal(expected).compareTo(actual), "金额应一致");
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // GREEN-1: 复合原子保存 — header + items + terms 全量持久化
     // ═══════════════════════════════════════════════════════════════
@@ -287,6 +292,92 @@ class ContractCompositeSaveTest {
         assertEquals("首付款", terms.get(0).getTermName());
         assertEquals("验收款", terms.get(1).getTermName());
         assertEquals("质保金", terms.get(2).getTermName());
+    }
+
+    @Test
+    @DisplayName("ISSUE-004-007: 合同金额、清单合计与付款条件金额/日期/状态保持一致")
+    void testContractItemsAndPaymentTermsRemainConsistent() {
+        CtContract contract = buildContract(null, "ISSUE-004-007-金额日期状态一致性");
+        contract.setContractAmount(new BigDecimal("640000.00"));
+        contract.setCurrentAmount(new BigDecimal("640000.00"));
+        contract.setSignedDate(LocalDate.of(2026, 3, 1));
+        contract.setStartDate(LocalDate.of(2026, 3, 15));
+        contract.setEndDate(LocalDate.of(2026, 12, 31));
+
+        CtContractItem concrete = buildItem("CI-ISSUE-004-007-001", "混凝土工程",
+                new BigDecimal("400.00"), new BigDecimal("700.00"));
+        concrete.setSortOrder(1);
+        CtContractItem steel = buildItem("CI-ISSUE-004-007-002", "钢筋工程",
+                new BigDecimal("120.00"), new BigDecimal("3000.00"));
+        steel.setSortOrder(2);
+
+        CtContractPaymentTerm advance = buildTerm("预付款", new BigDecimal("25.00"), 1);
+        advance.setPaymentAmount(new BigDecimal("160000.00"));
+        advance.setPaymentCondition("合同签订且履约保证提交后支付");
+        advance.setPlannedDate(LocalDate.of(2026, 3, 20));
+        advance.setTermStatus("PENDING");
+
+        CtContractPaymentTerm progress = buildTerm("进度款", new BigDecimal("50.00"), 2);
+        progress.setPaymentAmount(new BigDecimal("320000.00"));
+        progress.setPaymentCondition("主体工程完成 50% 后支付");
+        progress.setPlannedDate(LocalDate.of(2026, 7, 31));
+        progress.setTermStatus("PENDING");
+
+        CtContractPaymentTerm finalPayment = buildTerm("结算款", new BigDecimal("25.00"), 3);
+        finalPayment.setPaymentAmount(new BigDecimal("160000.00"));
+        finalPayment.setPaymentCondition("竣工结算确认后支付");
+        finalPayment.setPlannedDate(LocalDate.of(2026, 12, 31));
+        finalPayment.setTermStatus("WAITING_SETTLEMENT");
+
+        ContractSaveRequest request = new ContractSaveRequest();
+        request.setContract(contract);
+        request.setItems(List.of(concrete, steel));
+        request.setPaymentTerms(List.of(advance, progress, finalPayment));
+        request.setSubmitForApproval(false);
+
+        Long contractId = contractService.compositeSave(request);
+
+        CtContract saved = contractMapper.selectById(contractId);
+        assertNotNull(saved);
+        assertMoneyEquals("640000.00", saved.getContractAmount());
+        assertMoneyEquals("640000.00", saved.getCurrentAmount());
+        assertEquals(LocalDate.of(2026, 3, 1), saved.getSignedDate());
+        assertEquals(LocalDate.of(2026, 3, 15), saved.getStartDate());
+        assertEquals(LocalDate.of(2026, 12, 31), saved.getEndDate());
+        assertEquals("DRAFT", saved.getContractStatus());
+        assertEquals(ContractStatusConstants.APPROVAL_DRAFT, saved.getApprovalStatus());
+
+        List<CtContractItem> savedItems = contractItemMapper.selectList(
+                new LambdaQueryWrapper<CtContractItem>()
+                        .eq(CtContractItem::getContractId, contractId)
+                        .orderByAsc(CtContractItem::getSortOrder));
+        assertEquals(2, savedItems.size());
+        BigDecimal itemTotal = savedItems.stream()
+                .map(CtContractItem::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertMoneyEquals("640000.00", itemTotal);
+        assertEquals("CI-ISSUE-004-007-001", savedItems.get(0).getItemCode());
+        assertEquals("CI-ISSUE-004-007-002", savedItems.get(1).getItemCode());
+
+        List<CtContractPaymentTerm> savedTerms = paymentTermMapper.selectList(
+                new LambdaQueryWrapper<CtContractPaymentTerm>()
+                        .eq(CtContractPaymentTerm::getContractId, contractId)
+                        .orderByAsc(CtContractPaymentTerm::getSortOrder));
+        assertEquals(3, savedTerms.size());
+        BigDecimal termAmountTotal = savedTerms.stream()
+                .map(CtContractPaymentTerm::getPaymentAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal termRatioTotal = savedTerms.stream()
+                .map(CtContractPaymentTerm::getPaymentRatio)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertMoneyEquals("640000.00", termAmountTotal);
+        assertMoneyEquals("100.00", termRatioTotal);
+        assertEquals(LocalDate.of(2026, 3, 20), savedTerms.get(0).getPlannedDate());
+        assertEquals(LocalDate.of(2026, 7, 31), savedTerms.get(1).getPlannedDate());
+        assertEquals(LocalDate.of(2026, 12, 31), savedTerms.get(2).getPlannedDate());
+        assertEquals("PENDING", savedTerms.get(0).getTermStatus());
+        assertEquals("PENDING", savedTerms.get(1).getTermStatus());
+        assertEquals("WAITING_SETTLEMENT", savedTerms.get(2).getTermStatus());
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -547,3 +547,31 @@ Issue：ISSUE-007-015 访问日志 traceId/requestId 透传与响应头回归
 剩余风险：
 - 本轮只覆盖应用内访问日志与响应头行为，不验证外部日志平台字段解析、索引或链路追踪展示。
 - `TraceIdContext` 当前只保存 `traceId`，`requestId` 通过 MDC 与访问日志覆盖；如未来业务代码需要直接读取 `requestId` 上下文，需另立任务扩展上下文对象。
+
+---
+
+Issue：ISSUE-004-007 合同清单金额与付款条件回归
+
+目标：
+- 回归合同主表、合同清单和付款条件之间的金额、日期与状态口径。
+- 确保来源单据与汇总字段一致。
+- 不改合同业务语义，不扩大为合同模块重构或数据库结构调整。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/contract/ContractCompositeSaveTest.java`：新增合同复合保存一致性回归，覆盖合同头金额、清单合计、付款条件合计、付款比例合计、合同日期、付款计划日期和状态字段。
+- `docs/quality/issue-004-007-contract-payment-terms-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-004-007 收口为 Done，Ready 队列推进到 ISSUE-004-008。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=ContractCompositeSaveTest" test`：通过，`7` 个用例通过；当前生产实现已满足合同金额、清单合计、付款条件金额/日期/状态稳定落库口径，本轮未修改生产代码。
+- `cd backend; .\mvnw.cmd test`：未通过，失败类集中在既有 `dashboard`、`invoice validation`、`workflow`、`payment`、`revenue`、`purchase`、`migration` 集成测试，不属于本次合同清单与付款条件回归引入。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：现有生产实现满足目标；测试门禁已补强；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只覆盖后端合同复合保存，不覆盖前端合同表单展示和真实浏览器交互。
+- 本轮不新增合同金额自动校验或自动重算规则；如需保存时强制拒绝清单合计与合同金额不一致，需另立业务规则确认任务。

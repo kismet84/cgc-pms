@@ -19,6 +19,14 @@
 验证结果：通过  
 相关报告：docs/iterations/iteration-2026-07-08-report.md
 
+### ISSUE-004-007：合同清单金额与付款条件回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：现有生产实现满足目标；测试门禁已补强；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-004-007-contract-payment-terms-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-005-007：列表页导出与批量操作权限态回归
 
 完成日期：2026-07-09
