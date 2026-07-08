@@ -10,6 +10,7 @@ import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.ratelimit.LoginLockoutStore;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,9 @@ class AuthControllerTest {
 
     @Autowired
     private JwtProperties jwtProperties;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     @MockBean
     private AuthService authService;
@@ -125,6 +129,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /auth/login 无效凭据 → 400(AUTH_FAILED)")
     void testLoginFail() throws Exception {
+        double before = loginFailureCount("AUTH_FAILED");
         when(authService.login(any(LoginRequest.class)))
                 .thenThrow(new BusinessException("AUTH_FAILED", "用户名或密码错误"));
 
@@ -136,6 +141,8 @@ class AuthControllerTest {
                                 {"username":"admin","password":"wrongpassword"}"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AUTH_FAILED"));
+        org.junit.jupiter.api.Assertions.assertEquals(before + 1,
+                loginFailureCount("AUTH_FAILED"), 0.001);
     }
 
     @Test
@@ -310,6 +317,13 @@ class AuthControllerTest {
         when(provider.getIfAvailable()).thenReturn(blacklistService);
         Environment environment = mock(Environment.class);
         when(environment.acceptsProfiles(any(Profiles.class))).thenReturn(true);
-        return new AuthController(authService, jwtUtils, jwtProperties, new CookieUtils(), provider, environment);
+        ObjectProvider<MeterRegistry> metricsProvider = mock(ObjectProvider.class);
+        when(metricsProvider.getIfAvailable()).thenReturn(meterRegistry);
+        return new AuthController(authService, jwtUtils, jwtProperties, new CookieUtils(), provider, environment, metricsProvider);
+    }
+
+    private double loginFailureCount(String code) {
+        var counter = meterRegistry.find("auth.login.failures").tag("code", code).counter();
+        return counter == null ? 0 : counter.count();
     }
 }

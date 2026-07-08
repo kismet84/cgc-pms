@@ -610,3 +610,31 @@ Issue：ISSUE-007-006 备份范围与恢复演练报告模板补强
 剩余风险：
 - 本轮仅补模板与清单，不代表宿主机侧日志归档、密钥保管和月度恢复演练已自动落地。
 - 当前没有新增独立脚本或自动校验，后续仍需运维按模板完成真实演练并保留证据。
+
+---
+
+Issue：ISSUE-007-007 登录失败与文件失败次数指标回归
+
+目标：
+- 回归登录失败次数和文件上传失败次数的本地可观测性。
+- 若当前仅有日志没有指标，补最小指标或正式说明，不接入外部平台。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/auth/controller/AuthController.java`：正式登录失败分支记录 `auth.login.failures{code=...}`。
+- `backend/src/main/java/com/cgcpms/file/service/FileService.java`：文件上传失败分支记录 `file.upload.failures{code=...}`。
+- `backend/src/test/java/com/cgcpms/auth/controller/AuthControllerTest.java`：断言 `AUTH_FAILED` 登录失败指标递增。
+- `backend/src/test/java/com/cgcpms/file/FileServiceTest.java`：断言 `FILE_UPLOAD_FAILED` 文件上传失败指标递增，并验证指标标签不包含敏感键。
+- `docs/quality/issue-007-007-login-file-failure-metrics.md`、`docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：新增正式报告并完成 backlog 收口。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=AuthControllerTest,FileServiceTest" test`：通过，`Tests run: 33, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；登录失败与文件上传失败本地指标已补齐
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未接入 Prometheus、告警平台或可视化面板，结论限于项目内 Micrometer 本地断言。
+- 指标按错误码聚合，不包含租户、用户、文件名、文件内容、密码、Token 等敏感维度。

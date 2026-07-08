@@ -28,27 +28,25 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-007`
+1. `ISSUE-007-008`
 
 ## P0
 
 ## P1
 
-### ISSUE-007-007：登录失败与文件失败次数指标回归
+### ISSUE-007-008：预警批处理执行结果指标回归
 
 优先级：P1
 类型：运维 / 安全 / 后端 / 测试
 状态：Ready
 自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 1 条“登录失败次数 / 文件上传失败次数”
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 1 条“预警批处理执行结果”
 目标：
-- 回归登录失败次数和文件上传失败次数的可观测性。
+- 回归预警批处理执行结果的可观测性。
 - 若当前仅有日志没有指标，补最小指标或正式说明，不接入外部平台。
 允许修改：
-- `backend/src/main/java/com/cgcpms/auth/**`
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/auth/**`
-- `backend/src/test/java/com/cgcpms/file/**`
+- `backend/src/main/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
 - `docs/quality/**`
 - `docs/iterations/**`
 禁止修改：
@@ -57,13 +55,21 @@
 - `deploy/**`
 - 生产凭据与外部监控平台配置
 验收标准：
-- 登录失败和文件上传失败至少有一类自动化断言或明确剩余风险说明。
-- 失败统计不记录密码、Token、文件内容等敏感信息。
+- 预警批处理成功/失败或执行结果至少有一类自动化断言或明确剩余风险说明。
+- 失败统计不记录用户隐私、Token、外部通知凭据或消息正文等敏感信息。
 验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AuthControllerTest,FileServiceTest" test`
+- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest" test`
 - `git diff --check`
 
 ## 已完成/历史
+
+### ISSUE-007-007：登录失败与文件失败次数指标回归
+
+优先级：P1
+类型：运维 / 安全 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-007-login-file-failure-metrics.md`
 
 ### ISSUE-007-003：操作审计字段与文件操作审计回归
 

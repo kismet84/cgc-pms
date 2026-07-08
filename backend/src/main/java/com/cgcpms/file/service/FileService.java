@@ -8,6 +8,8 @@ import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.vo.SysFileVO;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -15,6 +17,7 @@ import io.minio.RemoveObjectArgs;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
@@ -50,6 +53,7 @@ public class FileService {
     private final MinioConfig minioConfig;
     private final com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer;
     private final RetryTemplate minioRetryTemplate;
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     /**
@@ -75,6 +79,15 @@ public class FileService {
     @Transactional(rollbackFor = Exception.class)
     @CircuitBreaker(name = "minio", fallbackMethod = "uploadFallback")
     public SysFileVO upload(MultipartFile file, String businessType, Long businessId) {
+        try {
+            return doUpload(file, businessType, businessId);
+        } catch (BusinessException e) {
+            recordUploadFailure(e.getCode());
+            throw e;
+        }
+    }
+
+    private SysFileVO doUpload(MultipartFile file, String businessType, Long businessId) {
         if (file.isEmpty()) {
             throw new BusinessException("FILE_EMPTY", "上传文件不能为空");
         }
@@ -230,6 +243,7 @@ public class FileService {
             throw businessException;
         }
         log.error("MinIO circuit breaker fallback on upload: businessType={}, businessId={}", businessType, businessId, throwable);
+        recordUploadFailure("FILE_STORAGE_UNAVAILABLE");
         throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务暂不可用，请稍后重试");
     }
 
@@ -267,6 +281,21 @@ public class FileService {
             current = current.getCause();
         }
         return false;
+    }
+
+    private void recordUploadFailure(String code) {
+        MeterRegistry registry = meterRegistryProvider.getIfAvailable();
+        if (registry == null) {
+            return;
+        }
+        Counter.builder("file.upload.failures")
+                .tag("code", metricTag(code))
+                .register(registry)
+                .increment();
+    }
+
+    private String metricTag(String value) {
+        return value == null || value.isBlank() ? "UNKNOWN" : value;
     }
 
     private String genPresignedUrl(String bucket, String object) {

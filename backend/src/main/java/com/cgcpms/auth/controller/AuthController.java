@@ -11,7 +11,10 @@ import com.cgcpms.auth.service.TokenBlacklistService;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.annotation.RateLimit;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.ApiResponse;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,17 +35,20 @@ public class AuthController {
     private final CookieUtils cookieUtils;
     private final ObjectProvider<TokenBlacklistService> blacklistProvider;
     private final Environment environment;
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
 
     public AuthController(AuthService authService, JwtUtils jwtUtils, JwtProperties jwtProperties,
                           CookieUtils cookieUtils,
                           ObjectProvider<TokenBlacklistService> blacklistProvider,
-                          Environment environment) {
+                          Environment environment,
+                          ObjectProvider<MeterRegistry> meterRegistryProvider) {
         this.authService = authService;
         this.jwtUtils = jwtUtils;
         this.jwtProperties = jwtProperties;
         this.cookieUtils = cookieUtils;
         this.blacklistProvider = blacklistProvider;
         this.environment = environment;
+        this.meterRegistryProvider = meterRegistryProvider;
     }
 
     @RateLimit(maxRequests = 5, windowSeconds = 60)
@@ -50,7 +56,13 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                              HttpServletResponse response) {
-        LoginResponse result = authService.login(request);
+        LoginResponse result;
+        try {
+            result = authService.login(request);
+        } catch (BusinessException e) {
+            recordLoginFailure(e.getCode());
+            throw e;
+        }
         setTokenCookies(response, result.getToken(), result.getRefreshToken());
         // Strip tokens from JSON body — they are now HttpOnly cookies only.
         // This is a security best practice: HttpOnly cookies are inaccessible to
@@ -175,5 +187,20 @@ public class AuthController {
 
     private boolean isProdProfile() {
         return environment.acceptsProfiles(Profiles.of("prod"));
+    }
+
+    private void recordLoginFailure(String code) {
+        MeterRegistry registry = meterRegistryProvider.getIfAvailable();
+        if (registry == null) {
+            return;
+        }
+        Counter.builder("auth.login.failures")
+                .tag("code", metricTag(code))
+                .register(registry)
+                .increment();
+    }
+
+    private String metricTag(String value) {
+        return value == null || value.isBlank() ? "UNKNOWN" : value;
     }
 }

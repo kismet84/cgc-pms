@@ -7,6 +7,7 @@ import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.service.FileService;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -53,6 +54,9 @@ class FileServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     /** Mock MinIO client 避免真实网络连接 */
     @MockBean
@@ -301,6 +305,7 @@ class FileServiceTest {
     @Test
     @DisplayName("upload keeps non-connectivity putObject failures as FILE_UPLOAD_FAILED")
     void testUploadClassifiesGenericPutObjectFailure() throws Exception {
+        double before = uploadFailureCount("FILE_UPLOAD_FAILED");
         MockMultipartFile file = new MockMultipartFile(
                 "file", "upload-failed.pdf", "application/pdf", "%PDF-1.4 upload failed".getBytes());
         String businessType = "UPLOAD_FAIL";
@@ -317,6 +322,8 @@ class FileServiceTest {
         assertEquals("FILE_UPLOAD_FAILED", ex.getCode());
         assertEquals("文件上传失败，请稍后重试", ex.getMessage());
         verify(minioClient, times(3)).putObject(any(PutObjectArgs.class));
+        assertEquals(before + 1, uploadFailureCount("FILE_UPLOAD_FAILED"), 0.001);
+        assertUploadFailureMetricHasNoSensitiveTags("FILE_UPLOAD_FAILED");
     }
 
     @Test
@@ -437,5 +444,24 @@ class FileServiceTest {
         return jdbcTemplate.queryForObject(
                 "select count(*) from sys_file where id = ? and deleted_flag = ?",
                 Integer.class, id, deletedFlag);
+    }
+
+    private double uploadFailureCount(String code) {
+        var counter = meterRegistry.find("file.upload.failures").tag("code", code).counter();
+        return counter == null ? 0 : counter.count();
+    }
+
+    private void assertUploadFailureMetricHasNoSensitiveTags(String code) {
+        var counter = meterRegistry.find("file.upload.failures").tag("code", code).counter();
+        assertNotNull(counter);
+        assertTrue(counter.getId().getTags().stream()
+                .noneMatch(tag -> {
+                    String key = tag.getKey().toLowerCase();
+                    return key.contains("password")
+                            || key.contains("token")
+                            || key.contains("content")
+                            || key.contains("filename")
+                            || key.contains("file_name");
+                }));
     }
 }

@@ -165,3 +165,11 @@
 失败分类或非失败分类：非失败分类
 验证结果：通过
 相关报告：docs/quality/issue-007-006-backup-scope-restore-drill-template.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-007-007：登录失败与文件失败次数指标回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；登录失败与文件上传失败本地指标已补齐
+验证结果：通过
+相关报告：docs/quality/issue-007-007-login-file-failure-metrics.md；docs/iterations/iteration-2026-07-08-report.md
