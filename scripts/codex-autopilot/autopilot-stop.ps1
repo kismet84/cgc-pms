@@ -33,4 +33,4 @@ $State.stopRequested = $true
 $State.lastHeartbeatAt = $Now
 $State | ConvertTo-Json | Out-File -Encoding utf8 $StatePath
 
-Write-Host "Stop requested. Codex will stop at the next checkpoint."
+Write-Host "Stop requested. Current task may finish naturally; no new task will start after this checkpoint."

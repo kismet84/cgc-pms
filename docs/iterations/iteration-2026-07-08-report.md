@@ -198,3 +198,29 @@ Issue：ISSUE-006-001 文件上传白名单与发票识别失败兜底
 - 本轮未跑全量后端/前端测试，结论限于 ISSUE-006-001 指定范围。
 - `.codex-autopilot/stop.flag` 保持存在，仅阻断后续 Issue；本轮未启动 ISSUE-007-001。
 - AutoPilot 停止语义已在规则文档中澄清：`停止自动迭代系统` 阻断下一任务启动，不强制中断已启动任务，当前任务收口后再检查 stop/pause/enabled。
+
+---
+
+Issue：ISSUE-000-001 AutoPilot 运行优化补录
+
+目标：
+- 将 2026-07-08 最近运行暴露的 8 项治理问题固化进 AutoPilot 规则、模板和本地 stop 脚本，避免把命令调用、环境前置或 Ready Issue 配置误判成业务代码失败。
+
+修改范围摘要：
+- `AGENTS.override.md`：补充 health gate、PowerShell Maven 单参数规范、Ready Issue 验证命令预检、环境前置分类、stop/pause 收口边界。
+- `docs/plans/cgc-pms-local-codex-autopilot-plan.md`：同步自动合并条件、失败分类、blocked WIP stash 规则、模板字段与 stop 文案。
+- `docs/backlog/ready-issues.md`、`docs/backlog/blocked-issues.md`、`docs/backlog/done-issues.md`：补齐验证命令规范、失败分类、WIP stash 记录字段。
+- `scripts/codex-autopilot/autopilot-stop.ps1`：仅调整提示语，明确当前任务可自然收口、后续任务不再启动。
+
+验证命令摘要：
+- `git diff --check`：通过。
+- `powershell -NoProfile -Command "[System.Management.Automation.Language.Parser]::ParseFile('D:\\projects-test\\cgc-pms\\scripts\\codex-autopilot\\autopilot-stop.ps1',[ref]$null,[ref]$null) | Out-Null"`：通过。
+
+失败分类或非失败分类：非失败分类
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：非阻塞
+剩余风险：
+- 本轮只固化规则、模板和 stop 文案，没有新增自动 health-check 脚本；后续执行仍依赖子智能体按规则落实。
+- `docs/quality/**` 未新增独立模板文件；质量报告分类要求已通过规则与计划书约束同步，后续正式报告需按新字段执行。

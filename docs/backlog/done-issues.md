@@ -8,6 +8,7 @@
 
 完成日期：YYYY-MM-DD  
 合并方式：auto-merge / manual  
+失败分类或非失败分类：非失败分类 / 命令调用问题已修复 / 环境前置类已恢复 / Ready Issue 配置问题已更正 / 真实代码质量问题已修复
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 

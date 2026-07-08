@@ -203,30 +203,37 @@ Codex 每轮完成后，必须满足以下条件才允许自动合并：
 2. 当前任务属于 docs/backlog/current-focus.md 允许范围
 3. 当前任务启动前没有 .codex-autopilot/stop.flag
 4. 当前任务启动前没有 .codex-autopilot/pause.flag
-5. git diff --check 通过
-6. 后端任务必须执行后端测试或说明原因
-7. 前端任务必须执行 type-check / build 或说明原因
-8. migration 任务必须同时考虑 MySQL / H2
-9. 测试数据重置任务必须确认是 dev/test/demo 环境
-10. 自审结果为 PASS
-11. iteration report 已更新
-12. backlog 已更新
+5. 浏览器验收前已检查 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`
+6. 任一 health gate 失败时先归类为环境前置类，执行 runtime refresh 并稳定等待 `180秒` 后复验
+7. 验证命令中的测试类、测试方法选择器、脚本入口均已校验存在；不存在时先归类为 Ready Issue 配置问题，可做最小等价替换并写入正式报告
+8. Windows PowerShell 下包含逗号的 Maven `-Dtest=` 参数必须整体加引号；首次 `ParserError` 先归类为命令调用问题
+9. git diff --check 通过
+10. 后端任务必须执行后端测试或说明原因
+11. 前端任务必须执行 type-check / build 或说明原因
+12. migration 任务必须同时考虑 MySQL / H2
+13. 测试数据重置任务必须确认是 dev/test/demo 环境
+14. 自审结果为 PASS
+15. iteration report 已更新
+16. backlog 已更新
 ```
 
 ---
 
 ### 6.3 自动合并失败处理
 
-如果测试失败：
+如果测试失败或验证未通过：
 
 ```text
 1. Codex 最多尝试自修 2 次
-2. 仍失败则停止当前 Issue
-3. 不合并
-4. 写入 docs/backlog/blocked-issues.md
-5. 写入 docs/iterations/iteration-YYYY-MM-DD-report.md
-6. 当前任务收口后检查 stop.flag / pause.flag / enabled.flag
-7. 如未停止，进入下一个可执行 Issue；如已停止，仅结束连续模式，不回滚当前任务收口结果
+2. 先分类为命令调用问题 / 环境前置类 / Ready Issue 配置问题 / 真实代码质量或安全问题，再决定是否自修
+3. Docker / backend / frontend 未启动、health gate 不通时，先执行 runtime refresh 并稳定等待 `180秒` 后复验
+4. 仍失败则停止当前 Issue
+5. 不合并
+6. 写入 docs/backlog/blocked-issues.md
+7. 写入 docs/iterations/iteration-YYYY-MM-DD-report.md
+8. 如存在未验收 WIP，先 `git stash push`，记录 stash hash / message、恢复条件与未完成验收项
+9. 当前任务收口后检查 stop.flag / pause.flag / enabled.flag
+10. 如未停止，进入下一个可执行 Issue；如已停止，仅结束连续模式，不回滚当前任务收口结果
 ```
 
 ---
@@ -400,7 +407,7 @@ if (!(Test-Path $AutoDir)) {
 "stop requested at $(Get-Date -Format s)" | Out-File -Encoding UTF8 "$AutoDir\stop.flag"
 Remove-Item "$AutoDir\enabled.flag" -ErrorAction SilentlyContinue
 
-Write-Host "Stop requested. Codex will stop at the next checkpoint."
+Write-Host "Stop requested. Current task may finish naturally; no new task will start after this checkpoint."
 ```
 
 说明：
@@ -635,7 +642,7 @@ powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-
 
 如果在启动新任务前存在 `pause.flag`，立即停止本轮，不启动新任务。
 
-如果当前任务已经启动后才发现 `enabled.flag` 被删除，或出现 `stop.flag` / `pause.flag`，只允许当前任务安全收口，不做强制中断；收口完成后不得进入下一轮。
+如果当前任务已经启动后才发现 `enabled.flag` 被删除，或出现 `stop.flag` / `pause.flag`，只允许当前任务安全收口，不做强制中断；当前任务结果允许正常提交，收口完成后不得进入下一轮。
 
 ## 必读文件
 
@@ -664,6 +671,12 @@ powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-
 7. 可以在本轮完成。
 
 如果没有合格任务，只更新 backlog，不写业务代码。
+
+浏览器验收前必须先检查 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`；任一失败先归类为环境前置类并执行 runtime refresh，稳定等待 `180秒` 后复验。
+
+验证命令中的测试类、测试方法选择器、脚本入口必须先校验存在；不存在时归类为 Ready Issue 配置问题，可做最小等价替换，但必须写入正式报告。
+
+Windows PowerShell 下包含逗号的 Maven `-Dtest=` 参数必须整体加引号，例如 `.\mvnw.cmd "-Dtest=FileServiceTest,InvoiceServiceTest" test`；首次 `ParserError` 先归类为命令调用问题。
 
 ## 允许测试数据操作
 
@@ -719,14 +732,17 @@ git push origin master
 
 ## 失败处理
 
-如果测试失败：
+如果测试失败或验证未通过：
 
 1. 尝试最多 2 轮修复。
-2. 仍失败则停止当前 Issue。
-3. 不合并。
-4. 写入 `docs/backlog/blocked-issues.md`。
-5. 写入 `docs/iterations/iteration-YYYY-MM-DD-report.md`。
-6. 当前任务收口后检查 stop.flag / pause.flag / enabled.flag；仅在仍允许继续时才进入下一个可执行 Issue。
+2. 先分类为命令调用问题 / 环境前置类 / Ready Issue 配置问题 / 真实代码质量或安全问题。
+3. Docker / backend / frontend 未启动、health gate 不通时，先执行 runtime refresh 并稳定等待 `180秒` 后复验。
+4. 仍失败则停止当前 Issue。
+5. 不合并。
+6. 写入 `docs/backlog/blocked-issues.md`。
+7. 写入 `docs/iterations/iteration-YYYY-MM-DD-report.md`。
+8. 若有未验收 WIP，先 stash 并记录 stash hash / message、恢复条件、未完成验收项。
+9. 当前任务收口后检查 stop.flag / pause.flag / enabled.flag；仅在仍允许继续时才进入下一个可执行 Issue。
 
 ## 每步 checkpoint
 
@@ -976,6 +992,11 @@ powershell -ExecutionPolicy Bypass -File scripts/codex-autopilot/autopilot-start
 powershell -ExecutionPolicy Bypass -File scripts/codex-autopilot/autopilot-status.ps1
 powershell -ExecutionPolicy Bypass -File scripts/codex-autopilot/autopilot-stop.ps1
 ```
+
+补充要求：
+
+- 若验证命令包含 Maven `-Dtest=` 且值中有逗号，必须整体加引号。
+- 若测试类、测试方法选择器或脚本入口不存在，先归类为 Ready Issue 配置问题，可做最小等价替换。
 ````
 
 ---
@@ -993,6 +1014,8 @@ powershell -ExecutionPolicy Bypass -File scripts/codex-autopilot/autopilot-stop.
 
 ### ISSUE-015-001：总工程师驾驶舱
 
+失败分类：命令调用问题 / 环境前置类 / Ready Issue 配置问题 / 真实代码质量或安全问题
+
 阻塞原因：
 
 - 缺少技术方案业务对象
@@ -1006,6 +1029,13 @@ powershell -ExecutionPolicy Bypass -File scripts/codex-autopilot/autopilot-stop.
 - 技术问题状态流转完成
 - 技术域接口和页面完成
 - 总工程师指标来自真实技术域数据
+
+WIP 暂存：
+
+- stash hash：待补充
+- stash message：待补充
+- 恢复条件：待补充
+- 未完成验收项：待补充
 ```
 
 ---
@@ -1023,6 +1053,7 @@ powershell -ExecutionPolicy Bypass -File scripts/codex-autopilot/autopilot-stop.
 
 完成日期：YYYY-MM-DD  
 合并方式：auto-merge / manual  
+失败分类或非失败分类：非失败分类 / 命令调用问题已修复 / 环境前置类已恢复 / Ready Issue 配置问题已更正 / 真实代码质量问题已修复
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 ```

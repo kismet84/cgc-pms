@@ -180,6 +180,10 @@ CI 与验收失败分类规则：
 - 当 `docs/backlog/ready-issues.md` 没有合格 Ready Issue 时，只能先读取长期总任务池，并按 `docs/backlog/current-focus.md` 拆出最多 3 个小型 Ready Issue；本轮只做拆解与队列更新，不得边拆边改业务代码
 - 每个关键 checkpoint 都要检查 `.codex-autopilot/stop.flag` 和 `.codex-autopilot/pause.flag`；若是在当前任务开始前发现，则不得启动下一个任务；若是在当前任务执行中发现，则只做安全收口，不强制中断
 - 至少在开始前、选任务后、改代码前、跑验证前、自动合并前、更新报告后检查一次 stop/pause
+- 运行前置或浏览器验收前必须先做 health gate：检查 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`；任一不通先归类为环境前置类并执行 runtime refresh，稳定等待 `180秒` 后再复验
+- Docker / backend / frontend 未启动、端口不通、dev-login 无法打通时，先归类为环境前置类；不得直接定性为业务代码失败
+- Ready Issue 中的验证命令必须先校验测试类、测试方法选择器或脚本入口是否真实存在；若不存在，先归类为 Ready Issue 配置问题，可做最小等价替换并把替换结果写入 iteration / quality / blocked / done 正式报告，不直接判测试失败
+- Windows PowerShell 下包含逗号的 Maven 参数必须写成单参数字符串，例如 `.\mvnw.cmd "-Dtest=FileServiceTest,InvoiceServiceTest" test`；首次出现 `ParserError` 或参数拆分异常时，先归类为命令调用问题，不直接判测试失败
 
 ### 测试数据重置边界
 
@@ -193,6 +197,8 @@ CI 与验收失败分类规则：
 - 必须先执行对应验证命令并通过 `git diff --check`
 - 必须更新 iteration report 与 backlog 状态
 - 必须再次确认没有 `stop.flag` / `pause.flag`
+- 当前任务已启动后若出现 `stop.flag`，允许自然收口并提交当前任务结果；收口后不得再派发下一任务
+- `pause.flag` 默认比 `stop.flag` 更严格：新任务不得启动，已启动任务只允许安全收口；除非 Ready Issue 明确要求更严格中断策略，否则不得强杀当前任务
 - 不满足前置条件时禁止自动合并
 
 ### 项目级关键词协议

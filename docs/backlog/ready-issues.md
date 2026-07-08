@@ -18,6 +18,14 @@
   - 合并前再次确认不存在 `.codex-autopilot/stop.flag` 或 `.codex-autopilot/pause.flag`。
 - 任一门禁失败即转为 blocked，不进入人工等待态。
 
+## 运行前置与验证命令规范
+
+- 浏览器验收前必须先检查 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`。
+- 任一 health gate 不通，先归类为环境前置类；执行 runtime refresh，稳定等待 `180秒` 后复验，不直接判业务代码失败。
+- Docker / backend / frontend 未启动或端口不通，按环境前置类处理；恢复失败再 blocked。
+- PowerShell 下包含逗号的 Maven `-Dtest=` 参数必须整体加引号，避免参数拆分或 `ParserError`。
+- 验证命令中的测试类、测试方法选择器、脚本入口必须先校验存在；若不存在，归类为 Ready Issue 配置问题，可做最小等价替换，但必须在正式报告写明替换前后内容与原因。
+
 ## 执行顺序建议
 
 1. ISSUE-007-001
@@ -57,7 +65,7 @@
 - 验证记录能证明日志字段生效或文档清单已补齐。
 
 验证命令：
-- `cd backend; .\mvnw.cmd -Dtest=LoggingConfigTest test`
+- `cd backend; .\mvnw.cmd "-Dtest=LoggingConfigTest" test`
 - `git diff --check`
 
 ## 已完成/历史
