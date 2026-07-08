@@ -2,6 +2,7 @@ package com.cgcpms.alert.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -93,4 +94,43 @@ public class AlertLog implements Serializable {
     private Integer deletedFlag;
 
     private String remark;
+
+    @JsonProperty("bizType")
+    public String getBizType() {
+        return sourceType;
+    }
+
+    @JsonProperty("bizId")
+    public Long getBizId() {
+        return sourceId;
+    }
+
+    @JsonProperty("businessType")
+    public String getBusinessType() {
+        return sourceType;
+    }
+
+    @JsonProperty("businessId")
+    public Long getBusinessId() {
+        return sourceId;
+    }
+
+    @JsonProperty("handledStatus")
+    public String getHandledStatus() {
+        return processStatus;
+    }
+
+    @JsonProperty("handledBy")
+    public Long getHandledBy() {
+        return updatedBy;
+    }
+
+    @JsonProperty("handledAt")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    public LocalDateTime getHandledAt() {
+        if ("ARCHIVED".equals(processStatus) || "INVALID".equals(processStatus)) {
+            return archivedAt != null ? archivedAt : processedAt;
+        }
+        return processedAt != null ? processedAt : archivedAt;
+    }
 }
