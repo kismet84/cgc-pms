@@ -6,6 +6,7 @@ import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.service.PayApplicationService;
 import com.cgcpms.payment.service.PayRecordService;
 import io.jsonwebtoken.Claims;
@@ -49,6 +50,9 @@ class PayRecordControllerTest {
 
     @Autowired
     private PayApplicationService payApplicationService;
+
+    @Autowired
+    private PayApplicationMapper payApplicationMapper;
 
     @Autowired
     private PayRecordService payRecordService;
@@ -99,6 +103,11 @@ class PayRecordControllerTest {
             app.setPayType("MATERIAL");
             app.setApplyReason("集成测试-付款申请");
             payApplicationId = payApplicationService.create(app);
+            PayApplication approvedApp = payApplicationMapper.selectById(payApplicationId);
+            approvedApp.setApprovalStatus("APPROVED");
+            approvedApp.setPayStatus("APPROVED");
+            approvedApp.setApprovedAmount(approvedApp.getApplyAmount());
+            payApplicationMapper.updateById(approvedApp);
 
             // Create a pay record via writeback (prerequisite for getById)
             PayRecord record = new PayRecord();

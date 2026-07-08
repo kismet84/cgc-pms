@@ -357,3 +357,11 @@
 失败分类或非失败分类：真实代码质量问题已修复；合同变更重复审批回调导致合同现行金额重复累计的缺口已修复；全量测试存在既有无关失败
 验证结果：通过
 相关报告：docs/quality/issue-004-008-variation-cost-revenue-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
+### ISSUE-004-009：付款审批与财务回写状态同步回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；付款控制器测试夹具问题已更正；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-004-009-payment-workflow-finance-regression.md；docs/iterations/iteration-2026-07-09-report.md

@@ -607,3 +607,36 @@ Issue：ISSUE-004-008 签证变更成本与收入调整回归
 剩余风险：
 - 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
 - 本轮未修复收入确认提交审批既有失败断言；收入调整链路以审批回调 `onApproved` 幂等为本 Issue 验收口径。
+
+---
+
+Issue：ISSUE-004-009 付款审批与财务回写状态同步回归
+
+目标：
+- 回归付款申请从审批通过到财务回写的状态同步口径。
+- 确保付款状态、审批状态与回写结果一致。
+- 不改审批状态机定义，不扩大为财务集成改造。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/payment/handler/PayRequestWorkflowHandler.java`：审批通过时同步 `approvedAmount = applyAmount`，对齐已批未付金额口径。
+- `backend/src/test/java/com/cgcpms/payment/handler/PayRequestWorkflowHandlerTest.java`：补充审批通过、驳回场景下 `approvalStatus/payStatus/approvedAmount` 断言。
+- `backend/src/test/java/com/cgcpms/payment/PaymentWritebackTest.java`：补充财务回写后 `PayRecord.payStatus`、审批状态不回退与实付金额同步断言。
+- `backend/src/test/java/com/cgcpms/payment/PayRecordControllerTest.java`：修正测试夹具，显式模拟审批通过后再执行财务回写。
+- `docs/quality/issue-004-009-payment-workflow-finance-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-004-009 收口为 Done，Ready 队列推进到 ISSUE-004-010。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=PayRequestWorkflowHandlerTest#testOnApproved" test`：先失败，失败原因为审批通过后 `approvedAmount` 未同步为申请金额。
+- `cd backend; .\mvnw.cmd "-Dtest=PayRequestWorkflowHandlerTest,PaymentWritebackTest,PayApplicationServiceTest,PayRecordControllerTest" test`：通过，`62` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过，最终 Surefire 汇总 `1554` 个测试、`11` 个 failures、`29` 个 errors、`1` 个 skipped；失败类集中在既有 `dashboard`、`invoice validation`、`migration`、`purchase`、`revenue`、`workflow` 和跨阶段集成测试，不属于本轮付款审批/财务回写改动引入。
+- `git diff --check`：通过，仅有换行符转换提示。
+
+失败分类或非失败分类：真实代码质量问题已修复；付款控制器测试夹具问题已更正；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
+- 本轮不接入真实外部财务系统，不验证生产财务回写通道。
+- 本轮不修改审批状态机定义，审批流程节点和通知联动仍按既有实现运行。

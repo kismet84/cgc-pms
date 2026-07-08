@@ -50,7 +50,8 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
         int rows = payApplicationMapper.update(null, new LambdaUpdateWrapper<PayApplication>()
                 .eq(PayApplication::getId, payAppId)
                 .set(PayApplication::getApprovalStatus, "APPROVED")
-                .set(PayApplication::getPayStatus, "APPROVED"));
+                .set(PayApplication::getPayStatus, "APPROVED")
+                .set(PayApplication::getApprovedAmount, app.getApplyAmount()));
         if (rows != 1) {
             throw new BusinessException("PAY_APP_STATUS_CONFLICT",
                     "付款申请记录不存在或已被并发更新，请刷新后重试");

@@ -80,6 +80,9 @@ class PayRequestWorkflowHandlerTest {
         PayApplication updated = payApplicationMapper.selectById(app.getId());
         assertNotNull(updated);
         assertEquals("APPROVED", updated.getApprovalStatus());
+        assertEquals("APPROVED", updated.getPayStatus(), "审批通过后付款状态应进入已批未付");
+        assertEquals(0, app.getApplyAmount().compareTo(updated.getApprovedAmount()),
+                "审批通过金额应同步为申请金额，供后续财务回写核对");
     }
 
     @Test
@@ -119,6 +122,7 @@ class PayRequestWorkflowHandlerTest {
 
         PayApplication updated = payApplicationMapper.selectById(app.getId());
         assertEquals("REJECTED", updated.getApprovalStatus());
+        assertEquals("PENDING", updated.getPayStatus(), "审批驳回不应误置为已批未付或已付款");
     }
 
     @Test

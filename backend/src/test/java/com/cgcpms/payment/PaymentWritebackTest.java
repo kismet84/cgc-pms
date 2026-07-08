@@ -254,10 +254,15 @@ class PaymentWritebackTest {
     @Transactional
     @DisplayName("T-WB-5: 级联更新 — 部分付款 pay_application 状态变为 PARTIALLY_PAID")
     void testWritebackCascade_PartiallyPaid() {
-        payRecordService.writeback(buildPayRecord(new BigDecimal("300000.00"), "TXN-PART-001"));
+        PayRecordVO vo = payRecordService.writeback(buildPayRecord(new BigDecimal("300000.00"), "TXN-PART-001"));
 
         PayApplication app = payApplicationMapper.selectById(testPayAppId);
+        PayRecord record = payRecordMapper.selectById(Long.parseLong(vo.getId()));
+        assertEquals("SUCCESS", record.getPayStatus(), "财务回写记录应为 SUCCESS");
+        assertEquals("APPROVED", app.getApprovalStatus(), "财务回写不应回退审批通过状态");
         assertEquals("PARTIALLY_PAID", app.getPayStatus(), "部分支付状态应为 PARTIALLY_PAID");
+        assertEquals(0, new BigDecimal("300000.00").compareTo(app.getActualPayAmount()),
+                "付款申请实付金额应等于 SUCCESS 回写金额合计");
     }
 
     @Test
