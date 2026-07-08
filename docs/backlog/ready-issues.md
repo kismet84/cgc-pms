@@ -28,11 +28,184 @@
 
 ## 执行顺序建议
 
-当前无 Ready Issue。
+1. `ISSUE-006-009：上传文件 hash 生成与重复文件口径回归`
+2. `ISSUE-006-010：文件业务对象绑定完整性回归`
+3. `ISSUE-006-011：发票识别记录与人工确认审计回归`
+4. `ISSUE-006-012：病毒扫描预留状态与失败兜底回归`
+5. `ISSUE-007-015：访问日志 traceId/requestId 透传与响应头回归`
 
 ## P0
 
 ## P1
+
+### ISSUE-006-009：上传文件 hash 生成与重复文件口径回归
+
+优先级：P1
+类型：后端 / 文件安全 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件 hash”
+目标：
+- 回归上传链路中的文件 hash 生成、持久化与重复文件判定口径，确保同内容文件不会绕过既有审计与业务绑定约束。
+- 不引入外部查毒服务，不改变对象存储生产配置，不扩大为文件中心重构。
+允许修改：
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `frontend-admin/src/pages/**`
+- `frontend-admin/src/components/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 病毒扫描服务、生产对象存储配置
+验收标准：
+- 后端对上传文件生成稳定 hash，并对重复上传场景给出明确、可断言的处理结果。
+- 合法非重复文件上传不回退，既有业务绑定与审计逻辑不被绕过。
+- 若前端需要提示，提示口径与后端返回一致，不误导为网络或权限问题。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-006-009-file-hash-duplication-guard.md`
+
+### ISSUE-006-010：文件业务对象绑定完整性回归
+
+优先级：P1
+类型：后端 / 文件安全 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件必须绑定业务对象”
+目标：
+- 回归文件与业务对象的绑定校验，确保孤儿附件、错误业务对象或越权绑定在后端被拒绝。
+- 不改变现有权限模型，不扩展为通用附件中心改造。
+允许修改：
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `frontend-admin/src/pages/**`
+- `frontend-admin/src/components/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 权限模型重构、生产对象存储配置
+验收标准：
+- 后端拒绝未绑定业务对象、绑定对象不存在或绑定关系非法的上传/关联请求。
+- 合法业务对象绑定路径不回退，既有下载、删除、鉴权接口保持可用。
+- 前端失败提示与后端错误原因一致，不误报为成功或上传完成。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-006-010-file-biz-binding-integrity.md`
+
+### ISSUE-006-011：发票识别记录与人工确认审计回归
+
+优先级：P1
+类型：后端 / 审计 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“识别记录、人工确认记录”
+目标：
+- 回归发票识别与人工确认链路的审计记录，确保识别成功、识别失败、人工确认三类关键动作均可追踪。
+- 不改变发票识别业务口径，不引入外部平台依赖。
+允许修改：
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `frontend-admin/src/pages/**`
+- `frontend-admin/src/components/**`
+- `frontend-admin/src/api/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 发票识别供应商配置、外部平台接入
+验收标准：
+- 识别成功、识别失败、人工确认三类操作均有稳定审计断言，包含必要但不敏感的上下文字段。
+- 审计记录不得泄露票据图片直链、凭据、token 或完整敏感载荷。
+- 合法识别与人工确认流程不回退，前端提示与后端结果一致。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-006-011-invoice-recognition-audit-regression.md`
+
+### ISSUE-006-012：病毒扫描预留状态与失败兜底回归
+
+优先级：P1
+类型：后端 / 文件安全 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“病毒扫描预留接口”
+目标：
+- 回归病毒扫描预留状态、错误码或扩展点口径，确保在未接入真实查毒服务时，系统行为明确且不误判为已完成安全扫描。
+- 不新增病毒扫描服务，不连接外部文件网关，不改变生产对象存储配置。
+允许修改：
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `frontend-admin/src/pages/**`
+- `frontend-admin/src/components/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 新增病毒扫描服务、生产对象存储配置
+验收标准：
+- 系统对“未扫描”“扫描失败”“未接入查毒能力”等预留状态有明确口径，不伪装为安全通过。
+- 未接入真实查毒服务时，合法上传主流程仍按既定策略工作，不引入误拦截或静默放行。
+- 前端提示与后端返回一致，不使用“上传成功且已安全扫描”之类误导性文案。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-006-012-virus-scan-placeholder-regression.md`
+
+### ISSUE-007-015：访问日志 traceId/requestId 透传与响应头回归
+
+优先级：P1
+类型：后端 / 可观测性 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“日志字段：traceId/requestId”
+目标：
+- 回归访问日志中的 `traceId`、`requestId` 字段透传、生成与响应头回写，确保成功请求、匿名请求、异常请求均可稳定关联。
+- 不放宽鉴权边界，不扩大为整套日志平台改造。
+允许修改：
+- `backend/src/main/java/com/cgcpms/**`
+- `backend/src/test/java/com/cgcpms/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 外部日志平台、生产部署配置
+验收标准：
+- 成功请求、匿名请求、异常请求三类路径均能稳定产出 `traceId/requestId`，缺失时有明确兜底规则。
+- 若请求已携带相关标识，日志与响应头透传口径一致；若未携带，系统生成值可被测试稳定断言。
+- 日志与响应头不得泄露 token、cookie、密码、完整请求体等敏感内容。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-007-015-trace-request-id-regression.md`
 
 ### ISSUE-005-003：采购与收货列表页生产化补强
 
