@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class CostLedgerServiceTest {
 
     private static final long PROJECT_ID = 10001L;
+    private static final long LEDGER_DEMO_PROJECT_ID = 2071032241708793858L;
     private static final long TEST_KEYWORD_PROJECT_ID = 99010001L;
 
     @Autowired
@@ -283,6 +284,25 @@ class CostLedgerServiceTest {
             costItemMapper.deleteById(confirmed.getId());
             costItemMapper.deleteById(pending.getId());
         }
+    }
+
+    @Test
+    @DisplayName("getPage: V134为目标项目补齐MAT_REQUISITION成本台账直证据")
+    void getPageIncludesMaterialRequisitionSeedForTargetProject() {
+        IPage<CostLedgerVO> page = costLedgerService.getPage(1, 20,
+                LEDGER_DEMO_PROJECT_ID, null, null, null,
+                null, "MAT_REQUISITION", null, null, null, null);
+
+        assertFalse(page.getRecords().isEmpty(), "target project should have MAT_REQUISITION ledger rows");
+        CostLedgerVO matched = page.getRecords().stream()
+                .filter(vo -> String.valueOf(LEDGER_DEMO_PROJECT_ID).equals(vo.getProjectId()))
+                .filter(vo -> "MAT_REQUISITION".equals(vo.getSourceType()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("expected target project MAT_REQUISITION ledger evidence"));
+        System.out.println("LEDGER_EVIDENCE projectId=" + matched.getProjectId()
+                + " sourceType=" + matched.getSourceType()
+                + " sourceId=" + matched.getSourceId()
+                + " sourceItemId=" + matched.getSourceItemId());
     }
 
     @Test

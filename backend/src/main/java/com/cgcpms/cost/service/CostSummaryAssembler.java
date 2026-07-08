@@ -52,6 +52,7 @@ class CostSummaryAssembler {
         if (item == null) return false;
         String sourceType = item.getSourceType();
         return "MAT_RECEIPT".equals(sourceType)
+                || "MAT_REQUISITION".equals(sourceType)
                 || "SUB_MEASURE".equals(sourceType)
                 || "VAR_ORDER".equals(sourceType)
                 || "CT_CHANGE".equals(sourceType)
