@@ -70,8 +70,10 @@ export function getAlertList(params: AlertListParams) {
     params: {
       ...params,
       alertDomain: params.alertDomain ?? params.category,
+      category: params.category ?? params.alertDomain,
       triggeredStart: params.triggeredStart ?? params.triggeredAtStart,
       triggeredEnd: params.triggeredEnd ?? params.triggeredAtEnd,
+      pageNo: params.pageNo ?? params.pageNum,
       pageNum: params.pageNo ?? params.pageNum,
     },
   })

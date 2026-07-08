@@ -25,6 +25,10 @@ import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
+import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.inventory.entity.MatStockTxn;
+import com.cgcpms.inventory.mapper.MatStockTxnMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -76,6 +80,10 @@ class AlertEvaluationServiceTest {
     private CostSubjectMapper costSubjectMapper;
     @Autowired
     private MatPurchaseOrderMapper purchaseOrderMapper;
+    @Autowired
+    private MatReceiptMapper receiptMapper;
+    @Autowired
+    private MatStockTxnMapper stockTxnMapper;
     @Autowired
     private SysNotificationMapper notificationMapper;
     @Autowired
@@ -162,6 +170,15 @@ class AlertEvaluationServiceTest {
                 .eq(MatPurchaseOrder::getTenantId, TENANT_ID)
                 .in(MatPurchaseOrder::getProjectId, List.of(testProjectId, 82001L, 82002L, 83001L, 83002L))
                 .likeRight(MatPurchaseOrder::getOrderCode, "ALERT-PO-"));
+        stockTxnMapper.delete(new LambdaQueryWrapper<MatStockTxn>()
+                .eq(MatStockTxn::getTenantId, TENANT_ID)
+                .eq(MatStockTxn::getSourceType, "MAT_RECEIPT")
+                .eq(MatStockTxn::getWarehouseId, 91001L)
+                .eq(MatStockTxn::getMaterialId, 91001L));
+        receiptMapper.delete(new LambdaQueryWrapper<MatReceipt>()
+                .eq(MatReceipt::getTenantId, TENANT_ID)
+                .in(MatReceipt::getProjectId, List.of(testProjectId, 82001L, 82002L, 83001L, 83002L))
+                .likeRight(MatReceipt::getReceiptCode, "ALERT-RC-"));
         notificationMapper.delete(new LambdaQueryWrapper<SysNotification>()
                 .eq(SysNotification::getTenantId, TENANT_ID)
                 .in(SysNotification::getBizType, List.of("ALERT", "ALERT_STATUS")));
@@ -470,6 +487,58 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("TA8c-2: evaluatePurchaseDeliveryOverdue — 已完成收货和入库的逾期采购订单不再触发")
+    void testEvaluatePurchaseDeliveryOverdue_SkipsCompletedReceiptAndStockIn() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setTenantId(TENANT_ID);
+        order.setProjectId(testProjectId);
+        order.setOrderCode("ALERT-PO-OVERDUE-DONE-001");
+        order.setOrderType("MATERIAL");
+        order.setOrderDate(LocalDate.now().minusDays(10));
+        order.setDeliveryDate(LocalDate.now().minusDays(2));
+        order.setOrderStatus("APPROVED");
+        order.setApprovalStatus("APPROVED");
+        order.setTotalAmount(new BigDecimal("1200.00"));
+        order.setDeletedFlag(0);
+        purchaseOrderMapper.insert(order);
+
+        MatReceipt receipt = new MatReceipt();
+        receipt.setTenantId(TENANT_ID);
+        receipt.setProjectId(testProjectId);
+        receipt.setOrderId(order.getId());
+        receipt.setContractId(order.getContractId());
+        receipt.setPartnerId(order.getPartnerId());
+        receipt.setReceiptCode("ALERT-RC-DONE-001");
+        receipt.setReceiptDate(LocalDate.now().minusDays(1));
+        receipt.setWarehouseId(91001L);
+        receipt.setTotalAmount(order.getTotalAmount());
+        receipt.setApprovalStatus("APPROVED");
+        receipt.setDeletedFlag(0);
+        receiptMapper.insert(receipt);
+
+        MatStockTxn stockIn = new MatStockTxn();
+        stockIn.setTenantId(TENANT_ID);
+        stockIn.setWarehouseId(91001L);
+        stockIn.setMaterialId(91001L);
+        stockIn.setTxnType("IN");
+        stockIn.setQuantity(BigDecimal.ONE);
+        stockIn.setAvailableAfter(BigDecimal.ONE);
+        stockIn.setSourceType("MAT_RECEIPT");
+        stockIn.setSourceId(receipt.getId());
+        stockTxnMapper.insert(stockIn);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        Long alertCount = alertLogMapper.selectCount(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, testProjectId)
+                .eq(AlertLog::getRuleType, "PURCHASE_DELIVERY_OVERDUE")
+                .eq(AlertLog::getSourceId, order.getId()));
+        assertEquals(0L, alertCount, "已完成收货和入库的采购订单不应继续生成逾期预警");
+    }
+
+    @Test
+    @Transactional
     @DisplayName("TA8d: page — alertDomain 为空的旧合同预警按规则类型归入合同类")
     void testPage_LegacyNullDomainMatchesContractDomain() {
         AlertLog legacy = new AlertLog();
@@ -627,6 +696,40 @@ class AlertEvaluationServiceTest {
         AlertLog archived = alertLogMapper.selectById(alert.getId());
         assertEquals("ARCHIVED", archived.getProcessStatus());
         assertNotNull(archived.getArchivedAt());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11b-2: updateStatus — 暴露 handled 与 biz 兼容语义")
+    void testUpdateStatus_ExposesHandledAndBizAliases() {
+        seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(testProjectId);
+        alert.setRuleType("PURCHASE_DELIVERY_OVERDUE");
+        alert.setAlertDomain("PURCHASE");
+        alert.setAlertCategory("PURCHASE_DELIVERY");
+        alert.setSourceType("PURCHASE_ORDER");
+        alert.setSourceId(91002001L);
+        alert.setSeverity("MEDIUM");
+        alert.setMessage("状态兼容字段测试");
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setDeletedFlag(0);
+        alertLogMapper.insert(alert);
+
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+        assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "PROCESSED", "已处理"));
+
+        AlertLog processed = alertLogMapper.selectById(alert.getId());
+        assertEquals("PURCHASE_ORDER", processed.getBizType());
+        assertEquals(91002001L, processed.getBizId());
+        assertEquals("PURCHASE_ORDER", processed.getBusinessType());
+        assertEquals(91002001L, processed.getBusinessId());
+        assertEquals("PROCESSED", processed.getHandledStatus());
+        assertEquals(USER_PROJECT_MANAGER, processed.getHandledBy());
+        assertNotNull(processed.getHandledAt());
     }
 
     @Test

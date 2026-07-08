@@ -16,6 +16,8 @@ import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.inventory.mapper.MatStockTxnMapper;
+import com.cgcpms.inventory.entity.MatStockTxn;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
@@ -53,6 +55,7 @@ class AlertRuleEvaluator {
     private final PayRecordMapper payRecordMapper;
     private final SubMeasureMapper subMeasureMapper;
     private final MatReceiptMapper matReceiptMapper;
+    private final MatStockTxnMapper matStockTxnMapper;
     private final MatPurchaseOrderMapper purchaseOrderMapper;
     private final VarOrderMapper varOrderMapper;
     private final StlSettlementMapper stlSettlementMapper;
@@ -343,25 +346,27 @@ class AlertRuleEvaluator {
         if (!isEnabled(config)) {
             return Collections.emptyList();
         }
-        MatPurchaseOrder order = purchaseOrderMapper.selectOne(
+        List<MatPurchaseOrder> overdueOrders = purchaseOrderMapper.selectList(
                 new LambdaQueryWrapper<MatPurchaseOrder>()
                         .eq(MatPurchaseOrder::getTenantId, tenantId)
                         .eq(MatPurchaseOrder::getProjectId, projectId)
                         .lt(MatPurchaseOrder::getDeliveryDate, LocalDate.now())
                         .notIn(MatPurchaseOrder::getOrderStatus, List.of("COMPLETED", "CANCELLED"))
-                        .orderByAsc(MatPurchaseOrder::getDeliveryDate)
-                        .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment
-        if (order == null) {
-            return Collections.emptyList();
+                        .orderByAsc(MatPurchaseOrder::getDeliveryDate));
+        for (MatPurchaseOrder order : overdueOrders) {
+            if (isReceiptAndStockInCompleted(tenantId, order.getId())) {
+                continue;
+            }
+            String dedupKey = sourceRuleDedupKey("PURCHASE_ORDER", order.getId(), "PURCHASE_DELIVERY_OVERDUE");
+            if (isDuplicate(tenantId, dedupKey, dedupHours(config))) {
+                continue;
+            }
+            return List.of(buildAlert(tenantId, projectId, order.getContractId(),
+                    "PURCHASE_DELIVERY_OVERDUE", "MEDIUM",
+                    AlertMessageTemplates.format("PURCHASE_DELIVERY_OVERDUE", order.getOrderCode(), order.getDeliveryDate()),
+                    config, "PURCHASE_ORDER", order.getId(), dedupKey));
         }
-        String dedupKey = sourceRuleDedupKey("PURCHASE_ORDER", order.getId(), "PURCHASE_DELIVERY_OVERDUE");
-        if (isDuplicate(tenantId, dedupKey, dedupHours(config))) {
-            return Collections.emptyList();
-        }
-        return List.of(buildAlert(tenantId, projectId, order.getContractId(),
-                "PURCHASE_DELIVERY_OVERDUE", "MEDIUM",
-                AlertMessageTemplates.format("PURCHASE_DELIVERY_OVERDUE", order.getOrderCode(), order.getDeliveryDate()),
-                config, "PURCHASE_ORDER", order.getId(), dedupKey));
+        return Collections.emptyList();
     }
 
     // ── rule config helpers ──
@@ -426,6 +431,26 @@ class AlertRuleEvaluator {
                         .in(AlertLog::getProcessStatus, List.of("OPEN", "PROCESSED"))
                         .ge(AlertLog::getTriggeredAt, since));
         return count != null && count > 0;
+    }
+
+    private boolean isReceiptAndStockInCompleted(Long tenantId, Long orderId) {
+        List<MatReceipt> approvedReceipts = matReceiptMapper.selectList(
+                new LambdaQueryWrapper<MatReceipt>()
+                        .eq(MatReceipt::getTenantId, tenantId)
+                        .eq(MatReceipt::getOrderId, orderId)
+                        .eq(MatReceipt::getApprovalStatus, "APPROVED"));
+        for (MatReceipt receipt : approvedReceipts) {
+            Long stockInCount = matStockTxnMapper.selectCount(
+                    new LambdaQueryWrapper<MatStockTxn>()
+                            .eq(MatStockTxn::getTenantId, tenantId)
+                            .eq(MatStockTxn::getSourceType, "MAT_RECEIPT")
+                            .eq(MatStockTxn::getSourceId, receipt.getId())
+                            .eq(MatStockTxn::getTxnType, "IN"));
+            if (stockInCount != null && stockInCount > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private AlertLog buildAlert(Long tenantId, Long projectId, Long contractId,

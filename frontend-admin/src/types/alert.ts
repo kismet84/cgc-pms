@@ -19,6 +19,8 @@ export interface AlertLogVO {
   updatedAt: string
   remark?: string
   /** 可选业务定位字段，兼容并行后端扩展 */
+  bizType?: string
+  bizId?: string | number
   sourceType?: string
   sourceId?: string | number
   businessType?: string
@@ -28,8 +30,11 @@ export interface AlertLogVO {
   alertCategory?: string
   category?: string
   processStatus?: string
+  handledStatus?: string
   processedAt?: string
   archivedAt?: string
+  handledBy?: string
+  handledAt?: string
   statusRemark?: string
   /** 可选默认域标记，兼容并行后端扩展 */
   defaultScope?: boolean | number | string

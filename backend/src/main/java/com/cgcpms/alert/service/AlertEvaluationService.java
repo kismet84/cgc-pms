@@ -8,6 +8,7 @@ import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.entity.AlertRuleConfig;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.notification.AlertNotificationDispatcher;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
@@ -301,6 +302,7 @@ public class AlertEvaluationService {
         accessScopeResolver.assertAlertAccess(tenantId, alert);
         alert.setProcessStatus(processStatus);
         alert.setStatusRemark(StringUtils.hasText(statusRemark) ? statusRemark.trim() : null);
+        alert.setUpdatedBy(UserContext.getCurrentUserId());
         if ("PROCESSED".equals(processStatus)) {
             alert.setProcessedAt(LocalDateTime.now());
         }
