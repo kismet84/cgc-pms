@@ -177,7 +177,7 @@ CI 与验收失败分类规则：
 
 - 业务或治理变更前必须先确认任务来自 `docs/backlog/ready-issues.md`
 - AutoPilot 任务来源采用两级队列：`docs/backlog/cgc-pms-production-enhancement-plan.md` 是长期总任务池，`docs/backlog/ready-issues.md` 是当前执行队列
-- 当 `docs/backlog/ready-issues.md` 没有合格 Ready Issue 时，只能先读取长期总任务池，并按 `docs/backlog/current-focus.md` 拆出最多 3 个小型 Ready Issue；本轮只做拆解与队列更新，不得边拆边改业务代码
+- 当 `docs/backlog/ready-issues.md` 没有合格 Ready Issue 时，只能先读取长期总任务池，并按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；该轮只更新 backlog，不直接修改业务代码；后续执行仍按每轮最多处理 1 个 Ready Issue
 - 每个关键 checkpoint 都要检查 `.codex-autopilot/stop.flag` 和 `.codex-autopilot/pause.flag`；若是在当前任务开始前发现，则不得启动下一个任务；若是在当前任务执行中发现，则只做安全收口，不强制中断
 - 至少在开始前、选任务后、改代码前、跑验证前、自动合并前、更新报告后检查一次 stop/pause
 - 运行前置或浏览器验收前必须先做 health gate：检查 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`；任一不通先归类为环境前置类并执行 runtime refresh，稳定等待 `180秒` 后再复验
