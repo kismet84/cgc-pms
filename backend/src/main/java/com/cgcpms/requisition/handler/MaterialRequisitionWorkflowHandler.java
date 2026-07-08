@@ -3,6 +3,7 @@ package com.cgcpms.requisition.handler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.service.CostGenerationService;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.requisition.entity.MatRequisition;
 import com.cgcpms.requisition.entity.MatRequisitionItem;
@@ -33,6 +34,7 @@ public class MaterialRequisitionWorkflowHandler implements WorkflowBusinessHandl
     private final MatRequisitionMapper requisitionMapper;
     private final MatRequisitionItemMapper requisitionItemMapper;
     private final MatStockService matStockService;
+    private final CostGenerationService costGenerationService;
 
     @Override
     public String supportBusinessType() {
@@ -88,6 +90,8 @@ public class MaterialRequisitionWorkflowHandler implements WorkflowBusinessHandl
                 throw e;
             }
         }
+
+        costGenerationService.generateCost("MAT_REQUISITION", requisitionId);
 
         // Set stockOutFlag and approval status
         requisitionMapper.update(null, new LambdaUpdateWrapper<MatRequisition>()
