@@ -28,11 +28,186 @@
 
 ## 执行顺序建议
 
-当前无 Ready Issue。
+1. `ISSUE-004-007：合同清单金额与付款条件回归`
+2. `ISSUE-004-008：签证变更成本与收入调整回归`
+3. `ISSUE-004-009：付款审批与财务回写状态同步回归`
+4. `ISSUE-004-010：审批流转通知与预警联动回归`
+5. `ISSUE-004-011：驾驶舱汇总指标来源单据下钻回归`
 
 ## P0
 
 ## P1
+
+### ISSUE-004-007：合同清单金额与付款条件回归
+
+优先级：P1
+类型：回归 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“合同 → 合同清单 → 付款条件”
+目标：
+- 回归合同主表、合同清单和付款条件之间的金额、日期与状态口径，确保来源单据与汇总字段一致。
+- 不改合同业务语义，不扩大为合同模块重构或数据库结构调整。
+允许修改：
+- `backend/src/main/java/com/cgcpms/contract/**`
+- `backend/src/test/java/com/cgcpms/contract/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 合同业务重构、生产数据库连接
+验收标准：
+- 合同金额、清单合计与付款条件汇总在测试中可稳定断言。
+- 状态、日期与金额字段不出现前后不一致或回写缺失。
+- 不引入新的越权、跨租户或跨项目读取路径。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-004-007-contract-payment-terms-regression.md`
+
+### ISSUE-004-008：签证变更成本与收入调整回归
+
+优先级：P1
+类型：回归 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“签证 / 变更 → 成本 / 收入调整”
+目标：
+- 回归签证、合同变更对成本与收入调整链路的影响，确保调整结果与来源单据一致。
+- 不扩大为收入模块重构，不修改已存在的 migration。
+允许修改：
+- `backend/src/main/java/com/cgcpms/variation/**`
+- `backend/src/main/java/com/cgcpms/contract/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- `backend/src/main/java/com/cgcpms/revenue/**`
+- `backend/src/test/java/com/cgcpms/variation/**`
+- `backend/src/test/java/com/cgcpms/contract/**`
+- `backend/src/test/java/com/cgcpms/cost/**`
+- `backend/src/test/java/com/cgcpms/revenue/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 收入口径重构、生产数据库连接
+验收标准：
+- 签证/变更金额对成本或收入调整结果有稳定断言。
+- 调整后的汇总口径与来源单据一致，不出现重复累计或漏记。
+- 不放宽租户、项目或业务状态边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-004-008-variation-cost-revenue-regression.md`
+
+### ISSUE-004-009：付款审批与财务回写状态同步回归
+
+优先级：P1
+类型：回归 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“付款申请 → 审批 → 财务回写”
+目标：
+- 回归付款申请从审批通过到财务回写的状态同步口径，确保付款状态、审批状态与回写结果一致。
+- 不改审批状态机定义，不扩大为财务集成改造。
+允许修改：
+- `backend/src/main/java/com/cgcpms/payment/**`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- `backend/src/test/java/com/cgcpms/payment/**`
+- `backend/src/test/java/com/cgcpms/workflow/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 财务生产集成、审批状态机重构、生产数据库连接
+验收标准：
+- 付款审批通过、驳回、财务回写后三类状态同步关系有稳定断言。
+- 付款记录不会出现“审批状态已完成但财务状态未同步”之类静默不一致。
+- 不新增对外部财务系统的真实连接或生产配置变更。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-004-009-payment-workflow-finance-regression.md`
+
+### ISSUE-004-010：审批流转通知与预警联动回归
+
+优先级：P1
+类型：回归 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“审批中心 → 状态流转 → 通知 / 预警”
+目标：
+- 回归审批状态流转到通知与预警的联动口径，确保关键流转事件能触发正确的通知或预警信号。
+- 不扩大为通知平台或预警规则中心重构。
+允许修改：
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- `backend/src/main/java/com/cgcpms/notification/**`
+- `backend/src/main/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/workflow/**`
+- `backend/src/test/java/com/cgcpms/notification/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 通知外部渠道接入、预警规则中心重构、生产数据库连接
+验收标准：
+- 至少覆盖审批提交、审批完成、审批异常三类流转下的通知/预警联动断言。
+- 通知与预警不重复触发、不静默丢失。
+- 不放宽现有权限、租户与项目边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-004-010-workflow-notification-alert-regression.md`
+
+### ISSUE-004-011：驾驶舱汇总指标来源单据下钻回归
+
+优先级：P1
+类型：回归 / 后端 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“驾驶舱 → 汇总指标 → 来源单据下钻”
+目标：
+- 回归驾驶舱汇总指标与来源单据下钻链路，确保指标可解释、来源可定位。
+- 不扩大为驾驶舱重设计或新增报表中心能力。
+允许修改：
+- `backend/src/main/java/com/cgcpms/dashboard/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- `backend/src/main/java/com/cgcpms/revenue/**`
+- `backend/src/test/java/com/cgcpms/dashboard/**`
+- `backend/src/test/java/com/cgcpms/cost/**`
+- `backend/src/test/java/com/cgcpms/revenue/**`
+- `frontend-admin/src/pages/dashboard/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 驾驶舱大改版、报表中心扩展、生产数据库连接
+验收标准：
+- 至少一组核心驾驶舱指标与来源单据之间存在稳定回归断言。
+- 下钻入口或接口在合法场景可定位来源单据，非法或缺失来源时不伪造结果。
+- 不放宽驾驶舱现有鉴权与数据边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-004-011-dashboard-source-drilldown-regression.md`
 
 ### ISSUE-006-009：上传文件 hash 生成与重复文件口径回归
 
