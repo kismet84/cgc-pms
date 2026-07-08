@@ -206,3 +206,23 @@ Issue：ISSUE-007-010 备份清单脱敏与恢复演练报告模板回归
 剩余风险：
 - 文档已明确脱敏要求，但外部工单、截图和主机侧台账仍依赖执行人持续遵守同一脱敏口径。
 - 仓库内文档不能替代真实主机 secret 管理和周期性恢复演练落实。
+
+---
+
+Backlog 拆解：Ready 队列补充（P1 第二轮）
+
+来源：
+- `docs/backlog/current-focus.md`
+- `docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2`、`7.7 P1-4`
+
+新增 Ready Issue：
+- `ISSUE-005-008`：核心列表列宽/固定列/金额日期格式统一回归。
+- `ISSUE-007-011`：CPU/内存/进程指标回归。
+- `ISSUE-007-012`：Redis 健康与黑名单降级告警回归。
+- `ISSUE-007-013`：慢 SQL 监控口径回归。
+- `ISSUE-007-014`：访问日志 userId/tenantId 字段回归。
+
+拆解边界：
+- 本轮只更新 backlog 与 iteration，不执行新拆出的业务任务。
+- 新任务均保持在 `current-focus` 当前允许 Epic 内，不扩大到总工程师、BIM、AI、生产发布、生产数据库连接或 migration 改动。
+- 每个 Issue 均保留最小验证命令与正式归档路径，供后续单轮串行执行。

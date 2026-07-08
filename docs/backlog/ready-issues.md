@@ -28,11 +28,166 @@
 
 ## 执行顺序建议
 
-- 当前无 Ready Issue
+1. `ISSUE-005-008`
+2. `ISSUE-007-011`
+3. `ISSUE-007-012`
+4. `ISSUE-007-013`
+5. `ISSUE-007-014`
 
 ## P0
 
 ## P1
+
+### ISSUE-005-008：核心列表列宽/固定列/金额日期格式统一回归
+
+优先级：P1
+类型：前端 / 生产化 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“列宽、固定列、金额格式、日期格式统一”
+目标：
+- 回归核心列表页的列宽、固定列、金额格式和日期格式统一口径。
+- 不改后端接口语义，不扩展详情页或新业务字段。
+允许修改：
+- `frontend-admin/src/pages/**`
+- `frontend-admin/src/components/**`
+- `frontend-admin/src/composables/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 重点核心列表页的金额、日期显示格式一致，不再各页各自定义。
+- 固定列与列宽策略不遮挡主要操作，窄屏下不出现明显错位。
+- 不因前端统一而改变状态、金额、日期的业务含义。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-005-008-list-format-column-consistency.md`
+
+### ISSUE-007-011：CPU/内存/进程指标回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“CPU / 内存”
+目标：
+- 回归 actuator/prometheus 下 CPU、内存和进程级基础指标可读性。
+- 不引入外部监控平台，不修改生产部署配置，不放宽鉴权边界。
+允许修改：
+- `backend/src/main/java/com/cgcpms/**`
+- `backend/src/main/resources/**`
+- `backend/src/test/java/com/cgcpms/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 本地可验证 CPU、内存、进程相关指标已注册且可通过 actuator/prometheus 读取。
+- 缺失指标时有明确测试失败或质量报告说明。
+- 不放宽现有 actuator 鉴权边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-007-011-process-memory-metrics-regression.md`
+
+### ISSUE-007-012：Redis 健康与黑名单降级告警回归
+
+优先级：P1
+类型：运维 / 安全 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“Redis”
+目标：
+- 回归 Redis 健康口径与 Token blacklist 相关降级告警信号。
+- 确保本地可验证 `BLACKLIST_UNAVAILABLE`、`TOKEN_BLACKLIST_WRITE_FAILED`、`TOKEN_BLACKLIST_CHECK_FAILED` 等关键口径，不修改生产 Redis 配置。
+允许修改：
+- `backend/src/main/java/com/cgcpms/**`
+- `backend/src/main/resources/**`
+- `backend/src/test/java/com/cgcpms/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- Redis 缺失/失败路径的健康或告警信号有稳定测试覆盖。
+- 不把生产 Redis 强依赖降级为“正常运行”语义。
+- 不记录真实密码、连接串或其他敏感信息。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-007-012-redis-blacklist-observability.md`
+
+### ISSUE-007-013：慢 SQL 监控口径回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“慢 SQL”
+目标：
+- 回归项目内慢 SQL 监控口径，明确阈值、日志/指标输出和测试覆盖。
+- 不引入外部 APM，不修改生产数据库配置。
+允许修改：
+- `backend/src/main/java/com/cgcpms/**`
+- `backend/src/main/resources/**`
+- `backend/src/test/java/com/cgcpms/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 慢 SQL 监控口径有明确配置或文档说明，并可通过本地测试验证。
+- 不输出完整 SQL 中的敏感值或连接串。
+- 缺口若无法在本轮实现，需在质量报告中明确分类和阻塞点。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-007-013-slow-sql-observability.md`
+
+### ISSUE-007-014：访问日志 userId/tenantId 字段回归
+
+优先级：P1
+类型：运维 / 安全 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“userId / tenantId”
+目标：
+- 回归访问日志中的 `userId`、`tenantId` 字段口径。
+- 确保日志可追踪主体身份，同时不泄露 Token、Cookie、密码等敏感内容。
+允许修改：
+- `backend/src/main/java/com/cgcpms/**`
+- `backend/src/test/java/com/cgcpms/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+验收标准：
+- 成功请求、匿名请求、异常请求下的 `userId`/`tenantId` 口径有稳定断言。
+- 日志不记录密码、Token、Cookie、完整请求体等敏感内容。
+- 无法识别身份时有明确兜底值，而不是输出脏数据。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-007-014-access-log-user-tenant-context.md`
 
 ### ISSUE-005-003：采购与收货列表页生产化补强
 
