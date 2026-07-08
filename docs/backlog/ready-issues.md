@@ -32,7 +32,7 @@
 
 优先级：P1  
 类型：前端 / 生产化  
-状态：Ready  
+状态：Blocked
 自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
 来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#75-p1-2前端列表页生产化`
 目标：
@@ -64,6 +64,11 @@
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
+
+当前阻塞说明：
+- 2026-07-08：实现与静态门禁已完成，但未通过浏览器验收的前端实现只作为 WIP 暂存，未合入当前提交。
+- 2026-07-08：本地后端 `8080` 未就绪，浏览器首页仅显示 `Request failed with status code 500`；`dev-login` 路径在内置浏览器中还被 `ERR_BLOCKED_BY_CLIENT` 拦截，暂不满足真实页面验收条件。
+- 相关报告：`docs/quality/issue-005-001-payment-invoice-list-production.md`
 
 ### ISSUE-006-001：文件上传白名单与发票识别失败兜底
 

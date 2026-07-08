@@ -108,3 +108,31 @@ Issue：ISSUE-004-003 付款发票审批状态链路回归
 阻塞：非阻塞
 剩余风险：
 - 本轮未跑全量后端测试，结论限于 ISSUE-004-003 指定回归范围及付款写回影响面。
+
+---
+
+Issue：ISSUE-005-001 付款与发票列表页生产化补强
+
+目标：
+- 仅补强付款列表与发票列表的筛选回显、刷新保持、空态、错误态和重试入口，不扩到采购、库存、路由或后端。
+
+修改范围摘要：
+- `docs/quality/issue-005-001-payment-invoice-list-production.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/blocked-issues.md`：将该 Issue 从 Ready 转为 Blocked。
+- 未通过浏览器验收的前端实现与测试已暂存为 WIP，未随本轮 blocked 收口提交。
+
+验证命令摘要：
+- `cd frontend-admin; pnpm exec vitest run src/composables/__tests__/listPageQuery.test.ts src/pages/payment/__tests__/list-production.test.ts src/pages/invoice/__tests__/list-production.test.ts`：通过，`3` 个文件、`7` 个用例全部通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+- 运行态检查：`http://127.0.0.1:5173/` 返回 `200`；`http://localhost:8080/actuator/health` 连接被拒绝；浏览器首页显示 `Request failed with status code 500`。
+
+是否自动合并：否
+是否推送：否
+结论：不通过
+阻塞：环境前置类，后端运行态未就绪且 `dev-login` 在内置浏览器中被拦截
+剩余风险：
+- 若后续继续该 Issue，需要先恢复已暂存的前端 WIP，再做真实浏览器验收。
+- 付款页与发票页的真实交互验收尚未在可用后端上完成，本轮不能给出“生产化补强通过”结论。
+- `frontend-admin/dist` 和 `.agent-runtime/` 属于本轮临时产物，可忽略，不应作为正式交付物。
