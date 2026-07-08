@@ -159,7 +159,7 @@ CGC-PMS 的产品定位建议定义为：
 6. 完成监控、日志、备份、恢复、部署手册。
 7. 完成试点演示数据、角色手册和验收材料。
 
-> P0 阶段进度摘要：第27条主线 CI/CD 与上线门禁已完成并合并，第28条主线预警中心 M1 已完成计划、后端、前端与正式验收归档；短期 P0 剩余重点转向权限、租户、项目数据边界加固与主链路回归。
+> P0 阶段进度摘要：第27条主线 CI/CD 与上线门禁已完成并合并，第28条主线预警中心 M1 已完成计划、后端、前端与正式验收归档，第29条主线权限、租户、项目数据边界加固已完成并合并推送；短期 P0 下一重点转向成本、付款、库存、审批主链路回归。
 
 ---
 
@@ -368,6 +368,22 @@ frontend-admin/src/stores/alert.ts
 ---
 
 ### 7.3 P0-3：权限、租户、项目数据边界加固
+
+#### 当前状态
+
+1. 状态：已完成并合并推送。
+2. 分支：`codex/mainline-29-permission-boundary`。
+3. 合并后 `master` / `origin/master`：`54147b5003927fbe8fb04d4ffab356ce07750d83`。
+4. 关键提交：
+   - `a21a21e0d`：计划书。
+   - `adc34ffb2`：M2 权限边界加固。
+   - `54147b50`：M3 工作流 canonical 元数据与附件测试收口。
+5. 验收：
+   - M2 独立验收通过，最终验收通过。
+   - 定向测试 `BusinessObjectAuthorizerTest,WorkflowSubmitServiceTest,MatPurchaseOrderServiceTest,VarOrderServiceTest,CtContractChangeServiceTest,PayApplicationServiceTest,InvoiceServiceTest` 退出码 0。
+6. 剩余风险：
+   - 阻塞：无。
+   - 非阻塞：仅 Mockito 动态 agent 警告，作为后续构建兼容性提醒。
 
 #### 功能说明
 
