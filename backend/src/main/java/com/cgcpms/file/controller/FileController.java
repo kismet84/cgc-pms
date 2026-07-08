@@ -23,7 +23,7 @@ public class FileController {
     private final FileService fileService;
 
     @PostMapping("/upload")
-    @AuditedOperation(type = "UPLOAD", businessType = "FILE")
+    @AuditedOperation(type = "UPLOAD", businessType = "FILE", businessIdExpression = "#businessId")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:upload')")
     @RateLimit(maxRequests = 20, windowSeconds = 60, key = RateLimitKey.USER)
     public ApiResponse<SysFileVO> upload(

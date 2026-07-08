@@ -28,27 +28,30 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-003`
+1. `ISSUE-007-004`
+2. `ISSUE-007-005`
+3. `ISSUE-007-006`
+4. `ISSUE-007-007`
 
 ## P0
 
 ## P1
 
-### ISSUE-007-003：操作审计字段与文件操作审计回归
+### ISSUE-007-004：接口性能与错误率监控指标回归
 
 优先级：P1
-类型：运维 / 安全 / 后端 / 测试
+类型：运维 / 后端 / 测试
 状态：Ready
 自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节第 4 条“审计”和第 `7.7 P1-4` 节第 2 条“日志字段”
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 1 条“监控指标”
 目标：
-- 回归上传、下载、删除等文件操作的审计类型和关键上下文字段。
-- 补齐 trace/user/tenant/path/status 等字段缺失时的正式说明或测试断言。
+- 回归接口耗时、错误率、JVM/数据库连接池等现有 Actuator 指标是否可用。
+- 若当前实现缺少项目内可测入口，只做最小测试或正式说明，不接入外部监控平台。
 允许修改：
-- `backend/src/main/java/com/cgcpms/audit/**`
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/audit/**`
-- `backend/src/test/java/com/cgcpms/file/**`
+- `backend/src/main/java/com/cgcpms/config/**`
+- `backend/src/main/java/com/cgcpms/common/**`
+- `backend/src/test/java/com/cgcpms/config/**`
+- `backend/src/test/java/com/cgcpms/common/**`
 - `docs/quality/**`
 - `docs/iterations/**`
 禁止修改：
@@ -57,15 +60,102 @@
 - `deploy/**`
 - 生产凭据与日志采集平台配置
 验收标准：
-- 文件上传、下载、删除的审计操作类型与业务对象信息可追踪。
-- 审计异常不应放大为业务数据损坏；若当前实现只记录部分字段，报告必须明确剩余风险。
-- 正式报告记录验证命令、失败分类和剩余风险。
+- 指标端点或指标注册逻辑有最小自动化断言。
+- 正式报告说明覆盖哪些指标、哪些仍需外部平台接入。
 验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=OperationAuditServiceTest,OperationAuditAspectTest,FileServiceTest" test`
+- `cd backend; .\mvnw.cmd "-Dtest=*Metrics*Test,*Actuator*Test" test`
 - `git diff --check`
 
+### ISSUE-007-005：访问日志 projectId/status/duration/exception 字段回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 2 条“日志字段”
+目标：
+- 回归访问日志中 method、path、status、duration、exception 字段。
+- 尽量补齐 projectId 可追踪口径；若当前请求上下文无法稳定解析，正式报告说明边界。
+允许修改：
+- `backend/src/main/java/com/cgcpms/common/**`
+- `backend/src/test/java/com/cgcpms/common/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+禁止修改：
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产日志采集平台配置
+验收标准：
+- 成功和异常请求均能留下可追踪访问日志字段。
+- 日志字段不泄露 Token、Cookie、请求体等敏感内容。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=*Trace*Test,*Logging*Test" test`
+- `git diff --check`
+
+### ISSUE-007-006：备份范围与恢复演练报告模板补强
+
+优先级：P1
+类型：运维 / 文档 / 归档
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 3、4 条“备份范围 / 恢复演练”
+目标：
+- 补齐 MySQL、MinIO、配置、密钥、日志归档的备份范围清单。
+- 补齐恢复演练报告模板，记录恢复耗时、数据范围和失败原因。
+允许修改：
+- `docs/10-部署运维手册.md`
+- `docs/quality/**`
+- `docs/iterations/**`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 生产凭据、真实密钥和生产备份配置
+验收标准：
+- 文档包含可执行检查清单和演练报告模板。
+- 正式报告说明本轮未连接生产、不执行真实恢复。
+验证命令：
+- `git diff --check`
+
+### ISSUE-007-007：登录失败与文件失败次数指标回归
+
+优先级：P1
+类型：运维 / 安全 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 1 条“登录失败次数 / 文件上传失败次数”
+目标：
+- 回归登录失败次数和文件上传失败次数的可观测性。
+- 若当前仅有日志没有指标，补最小指标或正式说明，不接入外部平台。
+允许修改：
+- `backend/src/main/java/com/cgcpms/auth/**`
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/auth/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+禁止修改：
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部监控平台配置
+验收标准：
+- 登录失败和文件上传失败至少有一类自动化断言或明确剩余风险说明。
+- 失败统计不记录密码、Token、文件内容等敏感信息。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AuthControllerTest,FileServiceTest" test`
+- `git diff --check`
 
 ## 已完成/历史
+
+### ISSUE-007-003：操作审计字段与文件操作审计回归
+
+优先级：P1
+类型：运维 / 安全 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-003-operation-audit-file-actions.md`
 
 ### ISSUE-006-005：发票识别失败原因与人工确认口径回归
 

@@ -4,6 +4,7 @@ import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.vo.SysFileVO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -28,7 +30,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -173,10 +178,65 @@ class OperationAuditAspectTest {
     }
 
     @Test
+    @DisplayName("附件上传成功发布 UPLOAD 审计事件并保留业务对象上下文")
+    void testFileUploadPublishesSuccessAuditEvent() throws Exception {
+        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setFileAuthority("file:upload");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "audit.txt", "text/plain", "audit".getBytes());
+        SysFileVO vo = new SysFileVO();
+        vo.setId("99001");
+        vo.setBusinessType("CONTRACT");
+        vo.setBusinessId("88001");
+        when(fileService.upload(file, "CONTRACT", 88001L)).thenReturn(vo);
+
+        mockMvc.perform(multipart("/files/upload")
+                        .file(file)
+                        .param("businessType", "CONTRACT")
+                        .param("businessId", "88001"))
+                .andExpect(status().isOk());
+
+        OperationAuditEvent event = TestListenerConfig.captured.get();
+        assertNotNull(event);
+        assertEquals(TestUserContext.TENANT_0, event.tenantId());
+        assertEquals(TestUserContext.USER_ADMIN, event.userId());
+        assertEquals("UPLOAD", event.operationType());
+        assertEquals("FILE", event.businessType());
+        assertEquals("88001", event.businessId());
+        assertEquals("POST", event.httpMethod());
+        assertEquals("/files/upload", event.requestPath());
+        assertTrue(event.successFlag());
+        assertNull(event.errorCode());
+    }
+
+    @Test
+    @DisplayName("附件下载成功发布 DOWNLOAD 审计事件")
+    void testFileDownloadPublishesSuccessAuditEvent() throws Exception {
+        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setFileAuthority("file:query");
+        when(fileService.getPresignedUrl(71003L)).thenReturn("http://download.local/file");
+
+        mockMvc.perform(get("/files/{id}/url", 71003L))
+                .andExpect(status().isOk());
+
+        OperationAuditEvent event = TestListenerConfig.captured.get();
+        assertNotNull(event);
+        assertEquals(TestUserContext.TENANT_0, event.tenantId());
+        assertEquals(TestUserContext.USER_ADMIN, event.userId());
+        assertEquals("DOWNLOAD", event.operationType());
+        assertEquals("FILE", event.businessType());
+        assertEquals("71003", event.businessId());
+        assertEquals("GET", event.httpMethod());
+        assertEquals("/files/71003/url", event.requestPath());
+        assertTrue(event.successFlag());
+        assertNull(event.errorCode());
+    }
+
+    @Test
     @DisplayName("附件删除成功发布 DELETE 审计事件")
     void testFileDeletePublishesSuccessAuditEvent() throws Exception {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
-        setDeleteAuthority();
+        setFileAuthority("file:delete");
 
         mockMvc.perform(delete("/files/{id}", 71001L))
                 .andExpect(status().isOk());
@@ -198,7 +258,7 @@ class OperationAuditAspectTest {
     @DisplayName("附件删除拒绝发布失败审计事件")
     void testFileDeleteDeniedPublishesFailedAuditEvent() throws Exception {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
-        setDeleteAuthority();
+        setFileAuthority("file:delete");
         doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权删除该文件"))
                 .when(fileService).delete(71002L);
 
@@ -216,9 +276,9 @@ class OperationAuditAspectTest {
         assertEquals("BusinessException", event.errorCode());
     }
 
-    private void setDeleteAuthority() {
+    private void setFileAuthority(String authority) {
         var auth = new UsernamePasswordAuthenticationToken(
-                "audit-test", "N/A", List.of(new SimpleGrantedAuthority("file:delete")));
+                "audit-test", "N/A", List.of(new SimpleGrantedAuthority(authority)));
         SecurityContextHolder.getContext().setAuthentication(auth);
     }
 }

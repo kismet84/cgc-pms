@@ -505,3 +505,31 @@ Issue：ISSUE-007-002 MinIO 健康指标与文件失败监控回归
 剩余风险：
 - 当前连接类故障识别覆盖 `ConnectException`、`SocketTimeoutException`、`UnknownHostException`；若后续需要细分更多 MinIO SDK 异常，可在现有单点分类入口扩展。
 - 本轮未连接真实 MinIO，结论限于 mock 条件下的健康指标与异常分类回归。
+
+---
+
+Issue：ISSUE-007-003 操作审计字段与文件操作审计回归
+
+目标：
+- 回归上传、下载、删除等文件操作的审计类型和关键上下文字段。
+- 补齐 trace/user/tenant/path/status 等字段缺失时的正式说明或测试断言。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/file/controller/FileController.java`：上传审计注解补充 `businessIdExpression = "#businessId"`，让上传事件保留业务对象上下文。
+- `backend/src/test/java/com/cgcpms/audit/OperationAuditAspectTest.java`：新增上传、下载审计事件断言，并复用删除成功/失败断言覆盖文件操作审计。
+- `docs/quality/issue-007-003-operation-audit-file-actions.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-003 从 Ready 收口为 Done，并按 current-focus 拆出下一轮 Ready Issue。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=OperationAuditAspectTest#testFileUploadPublishesSuccessAuditEvent" test`：先红后绿，最终通过，`Tests run: 1, Failures: 0, Errors: 0, Skipped: 0`。
+- `cd backend; .\mvnw.cmd "-Dtest=OperationAuditServiceTest,OperationAuditAspectTest,FileServiceTest" test`：通过，`Tests run: 32, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；上传审计业务对象上下文已补强
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前操作审计事件和持久化表无 `traceId` 字段；本轮禁止修改 migration，未扩展审计表结构。traceId 仍由访问日志链路承载。
+- 本轮未跑全量后端测试，结论限于 ISSUE-007-003 指定审计切面、审计服务和文件服务回归范围。
