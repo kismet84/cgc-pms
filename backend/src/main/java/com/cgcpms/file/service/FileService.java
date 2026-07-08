@@ -34,10 +34,11 @@ import com.cgcpms.common.util.DateTimeUtils;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import jakarta.annotation.PostConstruct;
+import java.security.MessageDigest;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -117,11 +118,12 @@ public class FileService {
 
         try {
             String originalName = vr.sanitizedName();
-            String fileName = UUID.randomUUID().toString().replace("-", "") + vr.extension();
+            String fileName = sha256Hex(content) + vr.extension();
             String storagePath = businessType + "/" + businessId + "/" + fileName;
             String bucketName = minioConfig.getBucket();
             String contentType = vr.detectedMime();
 
+            rejectDuplicateFile(businessType, businessId, fileName);
             putObjectWithRetry(bucketName, storagePath, contentType, content);
 
             // Persist file record
@@ -268,6 +270,26 @@ public class FileService {
                     .build());
             return null;
         });
+    }
+
+    private void rejectDuplicateFile(String businessType, Long businessId, String fileName) {
+        Long duplicates = sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, UserContext.getCurrentTenantId())
+                .eq(SysFile::getBusinessType, businessType)
+                .eq(SysFile::getBusinessId, businessId)
+                .eq(SysFile::getFileName, fileName));
+        if (duplicates != null && duplicates > 0) {
+            throw new BusinessException("FILE_DUPLICATE", "文件已存在，请勿重复上传");
+        }
+    }
+
+    private String sha256Hex(byte[] content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(content));
+        } catch (Exception e) {
+            throw new BusinessException("FILE_UPLOAD_FAILED", "文件上传失败，请稍后重试");
+        }
     }
 
     private boolean isStorageUnavailable(Throwable throwable) {

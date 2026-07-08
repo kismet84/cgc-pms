@@ -234,6 +234,67 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("upload stores SHA-256 hash in fileName and storagePath")
+    void testUploadStoresStableContentHashInFileNameAndStoragePath() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "hash.pdf", "application/pdf", "%PDF-1.4 stable hash".getBytes());
+        String businessType = "HASH_OK";
+        long businessId = Math.abs(System.nanoTime());
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/HASH_OK/file.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        fileService.upload(file, businessType, businessId);
+
+        SysFile stored = onlyFileFor(businessType, businessId);
+        assertTrue(stored.getFileName().matches("[a-f0-9]{64}\\.pdf"),
+                "fileName should persist SHA-256 hash plus extension: " + stored.getFileName());
+        assertEquals(businessType + "/" + businessId + "/" + stored.getFileName(), stored.getStoragePath());
+        assertEquals("hash.pdf", stored.getOriginalName());
+    }
+
+    @Test
+    @DisplayName("upload rejects duplicate content for same business object after auth and without second object write")
+    void testUploadRejectsDuplicateContentForSameBusinessObject() throws Exception {
+        MockMultipartFile first = new MockMultipartFile(
+                "file", "first.pdf", "application/pdf", "%PDF-1.4 duplicate".getBytes());
+        MockMultipartFile duplicate = new MockMultipartFile(
+                "file", "second.pdf", "application/pdf", "%PDF-1.4 duplicate".getBytes());
+        String businessType = "HASH_DUP";
+        long businessId = Math.abs(System.nanoTime());
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/HASH_DUP/file.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        fileService.upload(first, businessType, businessId);
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.upload(duplicate, businessType, businessId));
+
+        assertEquals("FILE_DUPLICATE", ex.getCode());
+        assertTrue(ex.getMessage().contains("文件已存在"));
+        assertEquals(1L, fileCountFor(businessType, businessId));
+        verify(authorizer, times(2)).checkWriteAccess(businessType, businessId);
+        verify(minioClient, times(1)).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("upload allows different content for same business object")
+    void testUploadAllowsDifferentContentForSameBusinessObject() throws Exception {
+        MockMultipartFile first = new MockMultipartFile(
+                "file", "first.pdf", "application/pdf", "%PDF-1.4 first unique".getBytes());
+        MockMultipartFile second = new MockMultipartFile(
+                "file", "second.pdf", "application/pdf", "%PDF-1.4 second unique".getBytes());
+        String businessType = "HASH_DISTINCT";
+        long businessId = Math.abs(System.nanoTime());
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/HASH_DISTINCT/file.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        assertDoesNotThrow(() -> fileService.upload(first, businessType, businessId));
+        assertDoesNotThrow(() -> fileService.upload(second, businessType, businessId));
+
+        assertEquals(2L, fileCountFor(businessType, businessId));
+        verify(minioClient, times(2)).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
     @DisplayName("upload retries putObject once then succeeds and inserts one record")
     void testUploadRetriesPutObjectThenSucceeds() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
@@ -479,6 +540,22 @@ class FileServiceTest {
         file.setBucketName("test-bucket");
         sysFileMapper.insert(file);
         return file;
+    }
+
+    private SysFile onlyFileFor(String businessType, Long businessId) {
+        var files = sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getBusinessType, businessType)
+                .eq(SysFile::getBusinessId, businessId)
+                .eq(SysFile::getTenantId, TestUserContext.TENANT_0));
+        assertEquals(1, files.size());
+        return files.get(0);
+    }
+
+    private Long fileCountFor(String businessType, Long businessId) {
+        return sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getBusinessType, businessType)
+                .eq(SysFile::getBusinessId, businessId)
+                .eq(SysFile::getTenantId, TestUserContext.TENANT_0));
     }
 
     private Integer countRawFileRows(Long id, int deletedFlag) {

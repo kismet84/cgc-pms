@@ -386,3 +386,35 @@ Issue：ISSUE-007-014 访问日志 userId/tenantId 字段回归
 剩余风险：
 - 本轮只覆盖应用内访问日志格式与本地单元测试，不验证外部日志平台字段解析规则。
 - 异步请求若在认证过滤器之外创建新的请求链路，仍需依赖请求属性或 `UserContext` 正确传递；本轮未扩展异步日志链路。
+
+---
+
+Issue：ISSUE-006-009 上传文件 hash 生成与重复文件口径回归
+
+目标：
+- 回归上传链路中的文件 hash 生成、持久化与重复文件判定口径。
+- 确保同内容文件不会绕过既有审计与业务绑定约束。
+- 确保合法非重复文件上传不回退。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/file/service/FileService.java`：上传文件以 `SHA-256` 内容摘要生成 `{sha256}.{extension}` 存储文件名，并通过既有 `file_name/storage_path` 持久化 hash；同租户、同业务对象、同 hash 文件在写对象存储前拒绝，返回 `FILE_DUPLICATE`。
+- `backend/src/test/java/com/cgcpms/file/FileServiceTest.java`：补充 hash 文件名/路径持久化、重复内容拒绝且不二次写 MinIO、不同内容合法上传三类回归断言。
+- `docs/quality/issue-006-009-file-hash-duplication-guard.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-009 收口为 Done，Ready 队列推进到 ISSUE-006-010。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest#testUploadStoresStableContentHashInFileNameAndStoragePath+testUploadRejectsDuplicateContentForSameBusinessObject+testUploadAllowsDifferentContentForSameBusinessObject" test`：先失败后通过；失败原因为既有实现使用 UUID 文件名且未拦截重复内容，修复后 `3` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest" test`：通过，`25` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`：通过，`41` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd backend; .\mvnw.cmd test`：未通过；失败类集中在既有 `dashboard`、`invoice`、`workflow`、`payment`、`revenue`、`purchase`、`migration` 集成测试，不属于本次文件上传 hash 改动引入。
+- `git diff --check`：通过，仅有换行符转换提示。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未新增独立 `file_hash` 数据库字段，hash 通过既有 `file_name/storage_path` 持久化；如后续需要独立字段或唯一索引，需另立 migration 任务确认。
+- 重复判定范围限定为同租户同业务对象，不做跨业务对象或跨租户级去重。

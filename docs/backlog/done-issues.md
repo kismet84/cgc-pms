@@ -59,6 +59,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-006-008-file-download-expiry-auth-prompt.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-006-009：上传文件 hash 生成与重复文件口径回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-006-009-file-hash-duplication-guard.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-007-009：JVM 与数据库连接池指标回归
 
 完成日期：2026-07-09
