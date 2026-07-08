@@ -196,7 +196,11 @@ CI 与验收失败分类规则：
 ### 项目级关键词协议
 
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动连续自动迭代系统` 时，视为请求进入连续执行模式：先确保 AutoPilot 已启动（必要时先执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`），然后在当前会话中基于 `docs/backlog/ready-issues.md` 串行执行多轮；每轮最多只处理 1 个 Ready Issue；每轮结束后必须检查 `stop.flag`、`pause.flag`、`enabled.flag`，只有在仍允许继续且仍存在 Ready Issue 时才进入下一轮
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-stop.ps1`
-- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动自动迭代系统`、`停止自动迭代系统` 才能触发对应动作，避免误触发
+- 连续执行模式的停止条件包括：收到 `停止自动迭代系统`、发现 `stop.flag` 或 `pause.flag`、没有可继续处理的 Ready Issue、当前 Issue 连续自修后仍失败且已写入 blocked、或触达系统/会话限制
+- 连续执行模式仍保持以下边界：`autoPush=false`、不发布生产、不连接生产库、不删除仓库外文件；若涉及自动合并，仍必须先通过既有门禁与前置校验
+- 普通 `启动自动迭代系统` 仍只表示打开开关并恢复轮询，不等同于连续长跑执行多轮
+- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动自动迭代系统`、`启动连续自动迭代系统`、`停止自动迭代系统` 才能触发对应动作，避免误触发
 - 触发前仍需遵守主线程/子智能体边界；若当前会话是项目总负责人主线程，应派运维型子智能体执行，或仅在用户明确授权下执行
 - 执行完成后必须回报 AutoPilot 的 flag/state 检查结果，至少说明 `stop.flag`、`pause.flag` 与相关运行状态
