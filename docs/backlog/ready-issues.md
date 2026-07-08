@@ -28,10 +28,9 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-006-010：文件业务对象绑定完整性回归`
-2. `ISSUE-006-011：发票识别记录与人工确认审计回归`
-3. `ISSUE-006-012：病毒扫描预留状态与失败兜底回归`
-4. `ISSUE-007-015：访问日志 traceId/requestId 透传与响应头回归`
+1. `ISSUE-006-011：发票识别记录与人工确认审计回归`
+2. `ISSUE-006-012：病毒扫描预留状态与失败兜底回归`
+3. `ISSUE-007-015：访问日志 traceId/requestId 透传与响应头回归`
 
 ## P0
 
@@ -76,7 +75,7 @@
 
 优先级：P1
 类型：后端 / 文件安全 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件必须绑定业务对象”
 目标：

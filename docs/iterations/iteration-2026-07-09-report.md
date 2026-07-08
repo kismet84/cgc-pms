@@ -418,3 +418,35 @@ Issue：ISSUE-006-009 上传文件 hash 生成与重复文件口径回归
 剩余风险：
 - 本轮未新增独立 `file_hash` 数据库字段，hash 通过既有 `file_name/storage_path` 持久化；如后续需要独立字段或唯一索引，需另立 migration 任务确认。
 - 重复判定范围限定为同租户同业务对象，不做跨业务对象或跨租户级去重。
+
+---
+
+Issue：ISSUE-006-010 文件业务对象绑定完整性回归
+
+目标：
+- 回归文件与业务对象的绑定校验，确保孤儿附件、错误业务对象或越权绑定在后端被拒绝。
+- 合法业务对象绑定路径不回退，既有下载、删除、鉴权接口保持可用。
+- 前端失败提示与后端错误原因一致。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/file/service/FileService.java`：抽出并复用 `validateBusinessBindingParams`；上传、列表和显式读权限检查入口先校验 `businessType/businessId`，再进入 authorizer 或数据库查询。
+- `backend/src/test/java/com/cgcpms/file/FileServiceTest.java`：新增非法业务类型、业务对象不存在、越权绑定、列表读权限失败和临时链接不生成的回归断言。
+- `docs/quality/issue-006-010-file-biz-binding-integrity.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-010 收口为 Done，Ready 队列推进到 ISSUE-006-011。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest#testUploadRejectsInvalidBusinessTypeBeforeAuthorizer+testUploadRejectsMissingBusinessObjectBeforeSideEffects+testUploadRejectsUnauthorizedBusinessObjectBeforeSideEffects+testListByBusinessRejectsInvalidBusinessTypeBeforeAuthorizer+testListByBusinessRejectsReadDeniedBeforeTemporaryUrlGeneration" test`：先失败后通过；失败原因为非法 `businessType` 未在 authorizer/list 查询前统一拒绝，修复后 `5` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`：通过，`46` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd backend; .\mvnw.cmd test`：未通过；失败类集中在既有 `dashboard`、`invoice`、`workflow`、`payment`、`revenue`、`purchase`、`migration` 集成测试，不属于本次文件绑定改动引入。
+- `git diff --check`：通过，仅有换行符转换提示。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮不新增文件绑定表或 schema，绑定完整性依赖既有 `businessType/businessId` 与 `BusinessObjectAuthorizer`。
+- 新增业务类型仍需在 authorizer 中补充存在性、租户与项目关系口径。
+- 本轮未做真实 MinIO 集成验收，MinIO 交互由 MockBean 覆盖。

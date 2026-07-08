@@ -103,18 +103,9 @@ public class FileService {
         FileTypeValidator.ValidationResult vr = fileTypeValidator.validate(
                 file.getOriginalFilename(), file.getContentType(), content);
 
-        if (businessType == null || businessType.isBlank()) {
-            throw new BusinessException("FILE_PARAM_MISSING", "业务类型不能为空");
-        }
-        if (businessId == null) {
-            throw new BusinessException("FILE_PARAM_MISSING", "业务ID不能为空");
-        }
+        validateBusinessBindingParams(businessType, businessId);
         // 业务对象写权限校验
         authorizer.checkWriteAccess(businessType, businessId);
-        // Sanitize businessType to prevent path traversal
-        if (!businessType.matches("[A-Za-z0-9_-]+")) {
-            throw new BusinessException("FILE_PARAM_INVALID", "业务类型格式非法");
-        }
 
         try {
             String originalName = vr.sanitizedName();
@@ -211,12 +202,7 @@ public class FileService {
      * List files associated with a business entity.
      */
     public List<SysFileVO> listByBusiness(String businessType, Long businessId) {
-        if (businessType == null || businessType.isBlank()) {
-            throw new BusinessException("FILE_PARAM_MISSING", "业务类型不能为空");
-        }
-        if (businessId == null) {
-            throw new BusinessException("FILE_PARAM_MISSING", "业务ID不能为空");
-        }
+        validateBusinessBindingParams(businessType, businessId);
         // 业务对象读权限校验
         authorizer.checkReadAccess(businessType, businessId);
 
@@ -237,6 +223,7 @@ public class FileService {
      * 业务对象读权限校验（供控制器调用）。
      */
     public void checkBizReadPermission(String businessType, Long businessId) {
+        validateBusinessBindingParams(businessType, businessId);
         authorizer.checkReadAccess(businessType, businessId);
     }
 
@@ -258,6 +245,18 @@ public class FileService {
     }
 
     // ---- private helpers ----
+
+    private void validateBusinessBindingParams(String businessType, Long businessId) {
+        if (businessType == null || businessType.isBlank()) {
+            throw new BusinessException("FILE_PARAM_MISSING", "业务类型不能为空");
+        }
+        if (businessId == null) {
+            throw new BusinessException("FILE_PARAM_MISSING", "业务ID不能为空");
+        }
+        if (!businessType.matches("[A-Za-z0-9_-]+")) {
+            throw new BusinessException("FILE_PARAM_INVALID", "业务类型格式非法");
+        }
+    }
 
     private void putObjectWithRetry(String bucketName, String storagePath, String contentType, byte[] content)
             throws Exception {

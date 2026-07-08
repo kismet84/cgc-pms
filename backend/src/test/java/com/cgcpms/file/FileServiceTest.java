@@ -69,6 +69,7 @@ class FileServiceTest {
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        clearInvocations(minioClient, authorizer);
     }
 
     @AfterEach
@@ -195,6 +196,20 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("upload rejects invalid businessType before business authorizer")
+    void testUploadRejectsInvalidBusinessTypeBeforeAuthorizer() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "path.pdf", "application/pdf", "%PDF-1.4 path traversal".getBytes());
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                fileService.upload(file, "CONTRACT/../etc", 1L));
+
+        assertEquals("FILE_PARAM_INVALID", ex.getCode());
+        verify(authorizer, never()).checkWriteAccess(any(), any());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
     @DisplayName("upload allows valid businessType with alphanumeric, dash, underscore")
     void testUploadAllowsValidBusinessTypeFormat() {
         byte[] pdfContent = "%PDF-1.4 valid".getBytes();
@@ -212,6 +227,42 @@ class FileServiceTest {
             assertNotEquals("FILE_PARAM_INVALID", e.getCode(),
                     "合法格式 businessType 不应被格式校验拒绝: " + e.getCode());
         }
+    }
+
+    @Test
+    @DisplayName("upload rejects missing business object before object storage and DB insert")
+    void testUploadRejectsMissingBusinessObjectBeforeSideEffects() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "missing.pdf", "application/pdf", "%PDF-1.4 missing business".getBytes());
+        String businessType = "CONTRACT";
+        long businessId = Math.abs(System.nanoTime());
+        doThrow(new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "合同不存在: " + businessId))
+                .when(authorizer).checkWriteAccess(businessType, businessId);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.upload(file, businessType, businessId));
+
+        assertEquals("FILE_BIZ_OBJ_NOT_FOUND", ex.getCode());
+        assertEquals(0L, fileCountFor(businessType, businessId));
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("upload rejects unauthorized business object before object storage and DB insert")
+    void testUploadRejectsUnauthorizedBusinessObjectBeforeSideEffects() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "denied.pdf", "application/pdf", "%PDF-1.4 denied business".getBytes());
+        String businessType = "CONTRACT";
+        long businessId = Math.abs(System.nanoTime());
+        doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权访问该合同文件"))
+                .when(authorizer).checkWriteAccess(businessType, businessId);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.upload(file, businessType, businessId));
+
+        assertEquals("FILE_ACCESS_DENIED", ex.getCode());
+        assertEquals(0L, fileCountFor(businessType, businessId));
+        verifyNoInteractions(minioClient);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -524,6 +575,34 @@ class FileServiceTest {
         verify(minioClient).getPresignedObjectUrl(args.capture());
         assertEquals(Method.GET, args.getValue().method());
         assertEquals(5 * 60, args.getValue().expiry());
+    }
+
+    @Test
+    @DisplayName("listByBusiness rejects invalid businessType before business authorizer")
+    void testListByBusinessRejectsInvalidBusinessTypeBeforeAuthorizer() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.listByBusiness("CONTRACT/../etc", 1L));
+
+        assertEquals("FILE_PARAM_INVALID", ex.getCode());
+        verify(authorizer, never()).checkReadAccess(any(), any());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("listByBusiness rejects read-denied business object before temporary URL generation")
+    void testListByBusinessRejectsReadDeniedBeforeTemporaryUrlGeneration() {
+        String businessType = "CONTRACT";
+        long businessId = Math.abs(System.nanoTime());
+        insertFile(businessType, businessId, TestUserContext.TENANT_0,
+                "contract-denied.pdf", "application/pdf");
+        doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权访问该合同文件"))
+                .when(authorizer).checkReadAccess(businessType, businessId);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.listByBusiness(businessType, businessId));
+
+        assertEquals("FILE_ACCESS_DENIED", ex.getCode());
+        verifyNoInteractions(minioClient);
     }
 
     private SysFile insertFile(String businessType, Long businessId, Long tenantId,
