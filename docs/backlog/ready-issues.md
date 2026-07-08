@@ -14,46 +14,13 @@
 
 ## 执行顺序建议
 
-1. ISSUE-004-001
-2. ISSUE-004-002
-3. ISSUE-004-003
-4. ISSUE-005-001
-5. ISSUE-006-001
-6. ISSUE-007-001
+1. ISSUE-004-002
+2. ISSUE-004-003
+3. ISSUE-005-001
+4. ISSUE-006-001
+5. ISSUE-007-001
 
 ## P0
-
-### ISSUE-004-001：成本台账与汇总口径回归
-
-优先级：P0  
-类型：回归 / 后端 / 测试  
-状态：Ready  
-自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
-目标：
-- 核对成本台账、成本汇总、成本科目联动的金额口径，补齐最小必要测试与归档，确保主链路回归可追溯。
-
-允许修改：
-- `backend/src/main/java/**/cost/**`
-- `backend/src/test/java/**/cost/**`
-- `backend/src/test/java/**/dashboard/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/java/**/payment/**`
-- `backend/src/main/java/**/invoice/**`
-- `backend/src/main/resources/db/migration/**`
-- `.codex-autopilot/**`
-
-验收标准：
-- 成本汇总金额与来源单据、科目维度汇总口径一致。
-- 新增或修正的测试能稳定覆盖本次回归点。
-- 质量报告明确记录口径、样例数据和通过结论。
-
-验证命令：
-- `cd backend; .\mvnw.cmd -Dtest=DashboardServiceTest,CostServiceTest test`
-- `git diff --check`
 
 ### ISSUE-004-002：采购收货库存数量一致性回归
 

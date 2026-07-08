@@ -17,3 +17,10 @@
 合并方式：not-merged/manual-pending  
 验证结果：通过  
 相关报告：docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-004-001：成本台账与汇总口径回归
+
+完成日期：2026-07-08
+合并方式：auto-merge/local-commit-only
+验证结果：通过
+相关报告：docs/quality/issue-004-001-cost-ledger-regression.md；docs/iterations/iteration-2026-07-08-report.md
