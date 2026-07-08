@@ -28,7 +28,7 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-010`
+- 当前无 Ready Issue
 
 ## P0
 
@@ -311,7 +311,7 @@
 
 优先级：P1
 类型：运维 / 文档 / 归档
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“备份范围、恢复演练”
 目标：
@@ -332,6 +332,7 @@
 - 文档不得包含真实密钥或生产连接串。
 验证命令：
 - `git diff --check`
+归档报告：`docs/quality/issue-007-010-backup-scope-redaction-restore-template.md`
 
 ## 已完成/历史
 
@@ -350,6 +351,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-007-009-jvm-datasource-metrics-regression.md`
+
+### ISSUE-007-010：备份清单脱敏与恢复演练报告模板回归
+
+优先级：P1
+类型：运维 / 文档 / 归档
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-010-backup-scope-redaction-restore-template.md`
 
 ### ISSUE-007-007：登录失败与文件失败次数指标回归
 

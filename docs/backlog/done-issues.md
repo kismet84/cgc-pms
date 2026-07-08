@@ -59,6 +59,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-007-009-jvm-datasource-metrics-regression.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-007-010：备份清单脱敏与恢复演练报告模板回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类
+验证结果：通过
+相关报告：docs/quality/issue-007-010-backup-scope-redaction-restore-template.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-004-001：成本台账与汇总口径回归
 
 完成日期：2026-07-08
