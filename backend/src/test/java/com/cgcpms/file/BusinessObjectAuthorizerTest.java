@@ -1,6 +1,7 @@
 package com.cgcpms.file;
 
 import com.cgcpms.common.TestUserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
@@ -27,6 +28,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -143,5 +149,19 @@ class BusinessObjectAuthorizerTest {
         authorizer.checkWriteAccess("SETTLEMENT", 70001L);
 
         verify(projectAccessChecker).checkAccess(10006L, "写入结算单文件");
+    }
+
+    @Test
+    void contractFileAccessRejectsCrossTenantObjectBeforeProjectCheck() {
+        CtContract contract = new CtContract();
+        contract.setTenantId(9999L);
+        contract.setProjectId(10007L);
+        when(contractMapper.selectById(30007L)).thenReturn(contract);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> authorizer.checkReadAccess("CONTRACT", 30007L));
+
+        assertEquals("FILE_ACCESS_DENIED", ex.getCode());
+        verify(projectAccessChecker, never()).checkAccess(anyLong(), anyString());
     }
 }

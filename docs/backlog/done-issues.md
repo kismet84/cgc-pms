@@ -93,3 +93,11 @@
 失败分类或非失败分类：Ready Issue 配置问题已更正；实现与文档补强通过
 验证结果：通过
 相关报告：docs/quality/issue-007-001-access-log-backup-checklist.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-006-002：附件下载鉴权与临时链接回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：测试编写问题已更正；现有生产实现通过新增安全边界回归
+验证结果：通过
+相关报告：docs/quality/issue-006-002-file-download-auth-temp-link.md；docs/iterations/iteration-2026-07-08-report.md

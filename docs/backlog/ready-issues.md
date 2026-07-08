@@ -28,25 +28,30 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-006-002`
+1. `ISSUE-006-003`
+2. `ISSUE-006-004`
+3. `ISSUE-006-005`
+4. `ISSUE-007-002`
+5. `ISSUE-007-003`
 
 ## P0
 
 ## P1
 
-### ISSUE-006-002：附件下载鉴权与临时链接回归
+### ISSUE-006-003：附件删除鉴权与审计回归
 
 优先级：P1
 类型：安全 / 后端 / 测试
 状态：Ready
-自动合并：auto-merge/local-commit-only；仅限 `backend/src/main/java/com/cgcpms/file/**`、`backend/src/test/java/com/cgcpms/file/**`、`docs/quality/**`、`docs/iterations/**`
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节，第 2 条“文件访问控制”
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节，第 2 条“文件访问控制”和第 4 条“审计”
 目标：
-- 回归文件下载鉴权、业务对象读权限校验与临时下载链接生成口径。
-- 补齐未授权读取、跨业务对象读取、文本附件下载头等安全边界断言。
+- 回归附件删除前的租户边界、业务对象写权限校验与 MinIO 删除调用顺序。
+- 补齐删除审计操作类型、异常路径和未授权删除不触发对象存储删除的断言。
 允许修改：
 - `backend/src/main/java/com/cgcpms/file/**`
 - `backend/src/test/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/audit/**`
 - `docs/quality/**`
 - `docs/iterations/**`
 禁止修改：
@@ -55,16 +60,140 @@
 - `deploy/**`
 - 生产凭据与外部存储配置
 验收标准：
-- 未授权用户无法获取他人业务对象附件下载链接。
-- 已授权用户获取到的临时链接仍受既有下载策略约束。
-- 文本类附件下载头、审计操作类型与异常路径有明确断言。
+- 未授权用户无法删除他人或无写权限业务对象附件。
+- 未授权删除不会调用 MinIO `removeObject`。
+- 删除成功、删除失败和权限拒绝路径有明确断言或正式报告说明。
 - 正式报告记录安全边界、失败分类和剩余风险。
 验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest,BusinessObjectAuthorizerTest" test`
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest,BusinessObjectAuthorizerTest,OperationAuditAspectTest" test`
+- `git diff --check`
+
+### ISSUE-006-004：发票识别重复发票与付款关联回归
+
+优先级：P1
+类型：安全 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节，第 3 条“发票识别增强”
+目标：
+- 回归发票识别结果与付款记录关联、重复发票检测或提示口径。
+- 补齐发票号码、金额、日期、付款记录关联的最小安全断言。
+允许修改：
+- `backend/src/main/java/com/cgcpms/invoice/**`
+- `backend/src/test/java/com/cgcpms/invoice/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+禁止修改：
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部发票识别服务配置
+验收标准：
+- 重复发票不会被静默当作全新有效发票处理。
+- 发票识别结果必须能追溯到付款记录或明确返回可理解失败原因。
+- 正式报告记录失败分类、验证命令和剩余风险。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceServiceTest,InvoiceControllerTest" test`
+- `git diff --check`
+
+### ISSUE-006-005：发票识别失败原因与人工确认口径回归
+
+优先级：P1
+类型：安全 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节，第 3 条“发票识别增强”
+目标：
+- 回归 PDF 解析失败时的错误原因、主流程不被阻断和人工确认前不自动写入高风险结果的口径。
+- 补齐失败兜底、人工确认状态和异常路径断言。
+允许修改：
+- `backend/src/main/java/com/cgcpms/invoice/**`
+- `backend/src/test/java/com/cgcpms/invoice/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+禁止修改：
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部发票识别服务配置
+验收标准：
+- PDF 解析失败返回明确错误原因，且不影响付款/发票主流程继续处理。
+- 未经人工确认的识别结果不得直接覆盖关键发票字段。
+- 正式报告记录安全边界、失败分类和剩余风险。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceServiceTest" test`
+- `git diff --check`
+
+### ISSUE-007-002：MinIO 健康指标与文件失败监控回归
+
+优先级：P1
+类型：运维 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节，第 1 条“监控指标”
+目标：
+- 回归 MinIO 健康检查、文件上传失败可观测性和异常分类口径。
+- 补齐本地测试不依赖真实外部对象存储的断言。
+允许修改：
+- `backend/src/main/java/com/cgcpms/config/**`
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/config/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+禁止修改：
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部对象存储配置
+验收标准：
+- MinIO 健康检查成功、失败路径都有稳定断言。
+- 文件上传失败不会泄露敏感配置，并能归类为文件服务不可用或上传失败。
+- 正式报告记录运行前置、失败分类和剩余风险。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=MinioHealthIndicatorTest,FileServiceTest" test`
+- `git diff --check`
+
+### ISSUE-007-003：操作审计字段与文件操作审计回归
+
+优先级：P1
+类型：运维 / 安全 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节第 4 条“审计”和第 `7.7 P1-4` 节第 2 条“日志字段”
+目标：
+- 回归上传、下载、删除等文件操作的审计类型和关键上下文字段。
+- 补齐 trace/user/tenant/path/status 等字段缺失时的正式说明或测试断言。
+允许修改：
+- `backend/src/main/java/com/cgcpms/audit/**`
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/audit/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+禁止修改：
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与日志采集平台配置
+验收标准：
+- 文件上传、下载、删除的审计操作类型与业务对象信息可追踪。
+- 审计异常不应放大为业务数据损坏；若当前实现只记录部分字段，报告必须明确剩余风险。
+- 正式报告记录验证命令、失败分类和剩余风险。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=OperationAuditServiceTest,OperationAuditAspectTest,FileServiceTest" test`
 - `git diff --check`
 
 
 ## 已完成/历史
+
+### ISSUE-006-002：附件下载鉴权与临时链接回归
+
+优先级：P1
+类型：安全 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-006-002-file-download-auth-temp-link.md`
 
 ### ISSUE-007-001：访问日志上下文与备份清单补强
 

@@ -360,3 +360,31 @@ Issue：ISSUE-005-002 项目与合同列表页生产化补强
 - 本轮未做真实浏览器验收，结论基于指定 Vitest、类型检查和代码审查。
 - 本轮未跑全量前端测试，结论限于 ISSUE-005-002 指定项目与合同列表生产化范围。
 - 下一 Ready Issue 为 `ISSUE-006-002`，涉及附件下载鉴权与临时链接安全边界，需要主线程重新分档后再继续。
+
+---
+
+Issue：ISSUE-006-002 附件下载鉴权与临时链接回归
+
+目标：
+- 回归文件下载鉴权、业务对象读权限校验与临时下载链接生成口径。
+- 补齐未授权读取、跨业务对象读取、文本附件下载头等安全边界断言。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/file/FileServiceTest.java`：新增跨租户文件隐藏、业务对象读权限拒绝不生成 MinIO 链接、文本附件下载头和 5 分钟 GET 临时链接断言。
+- `backend/src/test/java/com/cgcpms/file/BusinessObjectAuthorizerTest.java`：新增跨租户合同对象拒绝且不进入项目权限检查断言。
+- `docs/quality/issue-006-002-file-download-auth-temp-link.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-006-002 从 Ready 收口为 Done，并按 current-focus 拆出下一轮 Ready Issue。
+- 本轮未修改后端生产代码、前端、migration 或外部对象存储配置。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=FileServiceTest,BusinessObjectAuthorizerTest" test`：首轮因测试代码引用不存在的 `TestUserContext.TENANT_1` 编译失败，归类为测试编写问题；修正后通过，`Tests run: 22, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：测试编写问题已更正；现有生产实现通过新增安全边界回归
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未跑全量后端测试，结论限于 ISSUE-006-002 指定 file 模块与业务对象授权范围。
+- 本轮未连接真实 MinIO，临时链接策略通过 `GetPresignedObjectUrlArgs` 参数捕获验证。

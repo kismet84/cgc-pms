@@ -7,8 +7,10 @@ import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.service.FileService;
+import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.http.Method;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -263,5 +265,73 @@ class FileServiceTest {
         assertEquals("FILE_UPLOAD_FAILED", ex.getCode());
         assertEquals(0L, sysFileMapper.selectCount(query));
         verify(minioClient, times(3)).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("getPresignedUrl rejects files outside current tenant as not found")
+    void testGetPresignedUrlHidesCrossTenantFile() {
+        SysFile file = insertFile("CONTRACT", 30001L, 9999L,
+                "contract.pdf", "application/pdf");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.getPresignedUrl(file.getId()));
+
+        assertEquals("FILE_NOT_FOUND", ex.getCode());
+        verify(authorizer, never()).checkReadAccess(any(), any());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("getPresignedUrl rejects business object read denial before temporary link")
+    void testGetPresignedUrlRejectsBusinessObjectReadDenied() {
+        SysFile file = insertFile("CONTRACT", 30002L, TestUserContext.TENANT_0,
+                "contract.pdf", "application/pdf");
+        doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权访问该合同文件"))
+                .when(authorizer).checkReadAccess("CONTRACT", 30002L);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.getPresignedUrl(file.getId()));
+
+        assertEquals("FILE_ACCESS_DENIED", ex.getCode());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("getPresignedUrl keeps text downloads as attachment with utf-8 plain text")
+    void testGetPresignedUrlSetsTextDownloadHeaders() throws Exception {
+        SysFile file = insertFile("CONTRACT", 30003L, TestUserContext.TENANT_0,
+                "notes.txt", "text/plain");
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/CONTRACT/30003/notes.txt?X-Amz-Signature=test");
+
+        String url = fileService.getPresignedUrl(file.getId());
+
+        assertTrue(url.contains("X-Amz-Signature=test"));
+        var args = org.mockito.ArgumentCaptor.forClass(GetPresignedObjectUrlArgs.class);
+        verify(minioClient).getPresignedObjectUrl(args.capture());
+        assertEquals(Method.GET, args.getValue().method());
+        assertEquals(5 * 60, args.getValue().expiry());
+        assertTrue(args.getValue().extraQueryParams()
+                .get("response-content-type")
+                .contains("text/plain; charset=utf-8"));
+        assertTrue(args.getValue().extraQueryParams()
+                .get("response-content-disposition")
+                .contains("attachment; filename=\"notes.txt\""));
+    }
+
+    private SysFile insertFile(String businessType, Long businessId, Long tenantId,
+                               String fileName, String contentType) {
+        SysFile file = new SysFile();
+        file.setTenantId(tenantId);
+        file.setBusinessType(businessType);
+        file.setBusinessId(businessId);
+        file.setFileName(fileName);
+        file.setOriginalName(fileName);
+        file.setFileSize(12L);
+        file.setContentType(contentType);
+        file.setStoragePath(businessType + "/" + businessId + "/" + fileName);
+        file.setBucketName("test-bucket");
+        sysFileMapper.insert(file);
+        return file;
     }
 }
