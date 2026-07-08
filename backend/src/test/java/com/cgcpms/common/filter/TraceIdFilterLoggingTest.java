@@ -19,6 +19,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,9 +45,11 @@ class TraceIdFilterLoggingTest {
     }
 
     @Test
-    @DisplayName("成功请求记录 userId/tenantId/method/path/projectId/status/duration/exception 且不泄露敏感信息")
+    @DisplayName("成功请求透传 traceId/requestId 到响应头和访问日志且不泄露敏感信息")
     void logsAccessFieldsForSuccessfulRequestWithoutSensitiveData() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/projects/123/members");
+        request.addHeader(TraceIdFilter.TRACE_ID_HEADER, "trace-from-client");
+        request.addHeader(TraceIdFilter.REQUEST_ID_HEADER, "request-from-client");
         request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("projectId", "123"));
         request.setAttribute("accessLog.userId", 7L);
         request.setAttribute("accessLog.tenantId", 0L);
@@ -60,6 +63,10 @@ class TraceIdFilterLoggingTest {
 
         String message = lastMessage();
         assertEquals(201, response.getStatus());
+        assertEquals("trace-from-client", response.getHeader(TraceIdFilter.TRACE_ID_HEADER));
+        assertEquals("request-from-client", response.getHeader(TraceIdFilter.REQUEST_ID_HEADER));
+        assertTrue(message.contains("traceId=trace-from-client"));
+        assertTrue(message.contains("requestId=request-from-client"));
         assertTrue(message.contains("method=GET"));
         assertTrue(message.contains("path=/api/projects/123/members"));
         assertTrue(message.contains("projectId=123"));
@@ -68,13 +75,11 @@ class TraceIdFilterLoggingTest {
         assertTrue(message.contains("status=201"));
         assertTrue(message.contains("exception=-"));
         assertTrue(message.matches(".*duration=\\d+.*"), message);
-        assertFalse(message.contains("top-secret-token"));
-        assertFalse(message.contains("secret-cookie"));
-        assertFalse(message.contains("body-secret"));
+        assertNoSensitiveData(message);
     }
 
     @Test
-    @DisplayName("匿名请求记录 userId/tenantId 兜底值")
+    @DisplayName("匿名请求生成 traceId/requestId 并记录 userId/tenantId 兜底值")
     void logsFallbackIdentityForAnonymousRequest() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/actuator/health");
         request.addHeader("Authorization", "Bearer should-not-leak");
@@ -85,17 +90,24 @@ class TraceIdFilterLoggingTest {
         filter.doFilter(request, response, (req, res) -> ((MockHttpServletResponse) res).setStatus(200));
 
         String message = lastMessage();
+        String generatedTraceId = response.getHeader(TraceIdFilter.TRACE_ID_HEADER);
+        String generatedRequestId = response.getHeader(TraceIdFilter.REQUEST_ID_HEADER);
+        assertGeneratedCorrelationId(generatedTraceId);
+        assertGeneratedCorrelationId(generatedRequestId);
+        assertTrue(message.contains("traceId=" + generatedTraceId));
+        assertTrue(message.contains("requestId=" + generatedRequestId));
         assertTrue(message.contains("userId=-"));
         assertTrue(message.contains("tenantId=-"));
         assertTrue(message.contains("status=200"));
-        assertFalse(message.contains("should-not-leak"));
-        assertFalse(message.contains("anonymous-cookie"));
+        assertNoSensitiveData(message);
     }
 
     @Test
-    @DisplayName("异常请求记录 userId/tenantId、query projectId、500 状态和异常类型")
+    @DisplayName("异常请求透传 traceId/requestId 并记录 userId/tenantId、query projectId、500 状态和异常类型")
     void logsProjectIdStatusAndExceptionForFailedRequest() {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/purchase-requests");
+        request.addHeader(TraceIdFilter.TRACE_ID_HEADER, "trace-failure");
+        request.addHeader(TraceIdFilter.REQUEST_ID_HEADER, "request-failure");
         request.setQueryString("projectId=456");
         request.addParameter("projectId", "456");
         request.setAttribute("accessLog.userId", 8L);
@@ -114,6 +126,10 @@ class TraceIdFilterLoggingTest {
 
         String message = lastMessage();
         assertInstanceOf(RuntimeException.class, thrown);
+        assertEquals("trace-failure", response.getHeader(TraceIdFilter.TRACE_ID_HEADER));
+        assertEquals("request-failure", response.getHeader(TraceIdFilter.REQUEST_ID_HEADER));
+        assertTrue(message.contains("traceId=trace-failure"));
+        assertTrue(message.contains("requestId=request-failure"));
         assertTrue(message.contains("method=POST"));
         assertTrue(message.contains("path=/api/purchase-requests"));
         assertTrue(message.contains("projectId=456"));
@@ -122,14 +138,32 @@ class TraceIdFilterLoggingTest {
         assertTrue(message.contains("status=500"));
         assertTrue(message.contains("exception=RuntimeException"));
         assertTrue(message.matches(".*duration=\\d+.*"), message);
-        assertFalse(message.contains("should-not-leak"));
-        assertFalse(message.contains("super-secret"));
-        assertFalse(message.contains("failing-token"));
-        assertFalse(message.contains("failing-cookie"));
+        assertNoSensitiveData(message);
     }
 
     private String lastMessage() {
         assertFalse(appender.list.isEmpty(), "expected access log entry");
         return appender.list.get(appender.list.size() - 1).getFormattedMessage();
+    }
+
+    private void assertGeneratedCorrelationId(String value) {
+        assertNotNull(value);
+        assertFalse(value.isBlank());
+        assertTrue(value.matches("[a-f0-9]{32}"), value);
+    }
+
+    private void assertNoSensitiveData(String message) {
+        assertFalse(message.contains("Authorization"));
+        assertFalse(message.contains("Cookie"));
+        assertFalse(message.contains("password"));
+        assertFalse(message.contains("token"));
+        assertFalse(message.contains("top-secret-token"));
+        assertFalse(message.contains("secret-cookie"));
+        assertFalse(message.contains("body-secret"));
+        assertFalse(message.contains("should-not-leak"));
+        assertFalse(message.contains("anonymous-cookie"));
+        assertFalse(message.contains("super-secret"));
+        assertFalse(message.contains("failing-token"));
+        assertFalse(message.contains("failing-cookie"));
     }
 }

@@ -517,3 +517,33 @@ Issue：ISSUE-006-012 病毒扫描预留状态与失败兜底回归
 - 本轮不提供真实病毒扫描能力，只提供预留状态与失败兜底口径。
 - 当前未新增 `sys_file` 扫描状态持久化字段；如后续接入真实查毒服务并需要逐文件持久化状态，需要另立 migration 任务确认。
 - 本轮未做真实 MinIO 集成验收，文件存储交互由 MockBean 覆盖。
+
+---
+
+Issue：ISSUE-007-015 访问日志 traceId/requestId 透传与响应头回归
+
+目标：
+- 回归访问日志中的 `traceId`、`requestId` 字段透传、生成与响应头回写。
+- 确保成功请求、匿名请求、异常请求均可稳定关联。
+- 日志与响应头不得泄露 token、cookie、密码、完整请求体等敏感内容。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/common/filter/TraceIdFilterLoggingTest.java`：补充成功、匿名、异常请求下 `traceId/requestId` 响应头与访问日志一致性断言。
+- `backend/src/test/java/com/cgcpms/common/filter/TraceIdFilterLoggingTest.java`：补充缺失标识时生成 32 位十六进制关联 ID 的可断言口径。
+- `backend/src/test/java/com/cgcpms/common/filter/TraceIdFilterLoggingTest.java`：补充 Authorization、Cookie、password、token、请求体敏感值和异常消息敏感值不泄漏断言。
+- `docs/quality/issue-007-015-trace-request-id-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-015 收口为 Done，Ready 队列标记为当前无 Ready Issue。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=TraceIdFilterLoggingTest" test`：通过，`3` 个用例通过；当前生产实现已满足 traceId/requestId 透传、生成、响应头回写和访问日志字段输出，本轮未修改生产代码。
+- `cd backend; .\mvnw.cmd test`：未通过，失败类集中在既有 `dashboard`、`invoice validation`、`workflow`、`payment`、`revenue`、`purchase`、`migration` 集成测试，不属于本次访问日志 trace/request 回归引入。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：现有生产实现满足目标；测试门禁已补强；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只覆盖应用内访问日志与响应头行为，不验证外部日志平台字段解析、索引或链路追踪展示。
+- `TraceIdContext` 当前只保存 `traceId`，`requestId` 通过 MDC 与访问日志覆盖；如未来业务代码需要直接读取 `requestId` 上下文，需另立任务扩展上下文对象。

@@ -139,6 +139,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-007-014-access-log-user-tenant-context.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-007-015：访问日志 traceId/requestId 透传与响应头回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：现有生产实现满足目标；测试门禁已补强；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-007-015-trace-request-id-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-004-001：成本台账与汇总口径回归
 
 完成日期：2026-07-08

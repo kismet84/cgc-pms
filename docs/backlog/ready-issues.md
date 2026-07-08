@@ -28,7 +28,7 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-015：访问日志 traceId/requestId 透传与响应头回归`
+当前无 Ready Issue。
 
 ## P0
 
@@ -177,7 +177,7 @@
 
 优先级：P1
 类型：后端 / 可观测性 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“日志字段：traceId/requestId”
 目标：
