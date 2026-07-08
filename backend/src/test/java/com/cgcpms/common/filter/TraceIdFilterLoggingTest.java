@@ -44,10 +44,12 @@ class TraceIdFilterLoggingTest {
     }
 
     @Test
-    @DisplayName("成功请求记录 method/path/projectId/status/duration/exception 且不泄露敏感信息")
+    @DisplayName("成功请求记录 userId/tenantId/method/path/projectId/status/duration/exception 且不泄露敏感信息")
     void logsAccessFieldsForSuccessfulRequestWithoutSensitiveData() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/projects/123/members");
         request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("projectId", "123"));
+        request.setAttribute("accessLog.userId", 7L);
+        request.setAttribute("accessLog.tenantId", 0L);
         request.addHeader("Authorization", "Bearer top-secret-token");
         request.addHeader("Cookie", "ACCESS_TOKEN=secret-cookie");
         request.setContent("token=body-secret".getBytes(StandardCharsets.UTF_8));
@@ -61,6 +63,8 @@ class TraceIdFilterLoggingTest {
         assertTrue(message.contains("method=GET"));
         assertTrue(message.contains("path=/api/projects/123/members"));
         assertTrue(message.contains("projectId=123"));
+        assertTrue(message.contains("userId=7"));
+        assertTrue(message.contains("tenantId=0"));
         assertTrue(message.contains("status=201"));
         assertTrue(message.contains("exception=-"));
         assertTrue(message.matches(".*duration=\\d+.*"), message);
@@ -70,11 +74,34 @@ class TraceIdFilterLoggingTest {
     }
 
     @Test
-    @DisplayName("异常请求记录 query projectId、500 状态和异常类型")
+    @DisplayName("匿名请求记录 userId/tenantId 兜底值")
+    void logsFallbackIdentityForAnonymousRequest() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/actuator/health");
+        request.addHeader("Authorization", "Bearer should-not-leak");
+        request.addHeader("Cookie", "ACCESS_TOKEN=anonymous-cookie");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (req, res) -> ((MockHttpServletResponse) res).setStatus(200));
+
+        String message = lastMessage();
+        assertTrue(message.contains("userId=-"));
+        assertTrue(message.contains("tenantId=-"));
+        assertTrue(message.contains("status=200"));
+        assertFalse(message.contains("should-not-leak"));
+        assertFalse(message.contains("anonymous-cookie"));
+    }
+
+    @Test
+    @DisplayName("异常请求记录 userId/tenantId、query projectId、500 状态和异常类型")
     void logsProjectIdStatusAndExceptionForFailedRequest() {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/purchase-requests");
         request.setQueryString("projectId=456");
         request.addParameter("projectId", "456");
+        request.setAttribute("accessLog.userId", 8L);
+        request.setAttribute("accessLog.tenantId", 2L);
+        request.addHeader("Authorization", "Bearer failing-token");
+        request.addHeader("Cookie", "ACCESS_TOKEN=failing-cookie");
         request.setContent("password=super-secret".getBytes(StandardCharsets.UTF_8));
 
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -90,11 +117,15 @@ class TraceIdFilterLoggingTest {
         assertTrue(message.contains("method=POST"));
         assertTrue(message.contains("path=/api/purchase-requests"));
         assertTrue(message.contains("projectId=456"));
+        assertTrue(message.contains("userId=8"));
+        assertTrue(message.contains("tenantId=2"));
         assertTrue(message.contains("status=500"));
         assertTrue(message.contains("exception=RuntimeException"));
         assertTrue(message.matches(".*duration=\\d+.*"), message);
         assertFalse(message.contains("should-not-leak"));
         assertFalse(message.contains("super-secret"));
+        assertFalse(message.contains("failing-token"));
+        assertFalse(message.contains("failing-cookie"));
     }
 
     private String lastMessage() {

@@ -28,40 +28,11 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-014`
+当前无 Ready Issue。
 
 ## P0
 
 ## P1
-
-### ISSUE-007-014：访问日志 userId/tenantId 字段回归
-
-优先级：P1
-类型：运维 / 安全 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“userId / tenantId”
-目标：
-- 回归访问日志中的 `userId`、`tenantId` 字段口径。
-- 确保日志可追踪主体身份，同时不泄露 Token、Cookie、密码等敏感内容。
-允许修改：
-- `backend/src/main/java/com/cgcpms/**`
-- `backend/src/test/java/com/cgcpms/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 成功请求、匿名请求、异常请求下的 `userId`/`tenantId` 口径有稳定断言。
-- 日志不记录密码、Token、Cookie、完整请求体等敏感内容。
-- 无法识别身份时有明确兜底值，而不是输出脏数据。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-007-014-access-log-user-tenant-context.md`
 
 ### ISSUE-005-003：采购与收货列表页生产化补强
 

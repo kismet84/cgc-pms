@@ -99,6 +99,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-007-013-slow-sql-observability.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-007-014：访问日志 userId/tenantId 字段回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-007-014-access-log-user-tenant-context.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-004-001：成本台账与汇总口径回归
 
 完成日期：2026-07-08

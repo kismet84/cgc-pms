@@ -20,6 +20,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -120,6 +121,8 @@ class JwtAuthenticationFilterTest {
         localFilter.doFilter(request, response, chain);
 
         verify(chain).doFilter(request, response);
+        assertEquals(1L, request.getAttribute("accessLog.userId"));
+        assertEquals(0L, request.getAttribute("accessLog.tenantId"));
     }
 
     private static class ExposedJwtAuthenticationFilter extends JwtAuthenticationFilter {

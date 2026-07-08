@@ -6,6 +6,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.service.TokenBlacklistService;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.filter.TraceIdFilter;
 import com.cgcpms.common.result.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
@@ -117,6 +118,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             Claims claims = jwtUtils.parseToken(token);
             UserContext.set(claims);
+            request.setAttribute(TraceIdFilter.ACCESS_LOG_USER_ID_ATTRIBUTE, UserContext.getCurrentUserId());
+            request.setAttribute(TraceIdFilter.ACCESS_LOG_TENANT_ID_ATTRIBUTE, UserContext.getCurrentTenantId());
             
             List<GrantedAuthority> authorities = buildAuthorities(claims);
             

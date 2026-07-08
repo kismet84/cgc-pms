@@ -1,5 +1,6 @@
 package com.cgcpms.common.filter;
 
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.context.TraceIdContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -32,6 +33,8 @@ public class TraceIdFilter extends OncePerRequestFilter {
     public static final String REQUEST_ID_HEADER = "X-Request-Id";
     public static final String MDC_KEY = "traceId";
     public static final String REQUEST_ID_MDC_KEY = "requestId";
+    public static final String ACCESS_LOG_USER_ID_ATTRIBUTE = "accessLog.userId";
+    public static final String ACCESS_LOG_TENANT_ID_ATTRIBUTE = "accessLog.tenantId";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -63,12 +66,14 @@ public class TraceIdFilter extends OncePerRequestFilter {
             throw ex;
         } finally {
             long duration = (System.nanoTime() - startNanos) / 1_000_000;
-            log.info("HTTP_ACCESS traceId={} requestId={} method={} path={} projectId={} status={} duration={} exception={} clientIp={}",
+            log.info("HTTP_ACCESS traceId={} requestId={} method={} path={} projectId={} userId={} tenantId={} status={} duration={} exception={} clientIp={}",
                     traceId,
                     requestId,
                     request.getMethod(),
                     request.getRequestURI(),
                     resolveProjectId(request),
+                    resolveUserId(request),
+                    resolveTenantId(request),
                     response.getStatus(),
                     duration,
                     failure == null ? "-" : failure.getClass().getSimpleName(),
@@ -100,6 +105,35 @@ public class TraceIdFilter extends OncePerRequestFilter {
             int start = marker + "/projects/".length();
             int end = path.indexOf('/', start);
             String candidate = (end >= 0 ? path.substring(start, end) : path.substring(start)).trim();
+            if (!candidate.isEmpty() && candidate.chars().allMatch(Character::isDigit)) {
+                return candidate;
+            }
+        }
+        return "-";
+    }
+
+    private String resolveUserId(HttpServletRequest request) {
+        return resolveIdentityValue(request.getAttribute(ACCESS_LOG_USER_ID_ATTRIBUTE), UserContext.getCurrentUserId());
+    }
+
+    private String resolveTenantId(HttpServletRequest request) {
+        return resolveIdentityValue(request.getAttribute(ACCESS_LOG_TENANT_ID_ATTRIBUTE), UserContext.getCurrentTenantId());
+    }
+
+    private String resolveIdentityValue(Object requestValue, Long contextValue) {
+        String value = normalizeIdentityValue(requestValue);
+        if (!"-".equals(value)) {
+            return value;
+        }
+        return normalizeIdentityValue(contextValue);
+    }
+
+    private String normalizeIdentityValue(Object value) {
+        if (value instanceof Number number) {
+            return String.valueOf(number.longValue());
+        }
+        if (value instanceof CharSequence sequence) {
+            String candidate = sequence.toString().trim();
             if (!candidate.isEmpty() && candidate.chars().allMatch(Character::isDigit)) {
                 return candidate;
             }

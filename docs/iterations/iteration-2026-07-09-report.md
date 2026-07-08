@@ -355,3 +355,34 @@ Issue：ISSUE-007-013 慢 SQL 监控口径回归
 剩余风险：
 - 本轮观测粒度为 mapper 方法调用耗时，不在日志中输出完整 SQL 或绑定参数。
 - `operation` 指标 tag 以 mapper 方法名为维度，后续 mapper 数量继续增长时需关注指标基数。
+
+---
+
+Issue：ISSUE-007-014 访问日志 userId/tenantId 字段回归
+
+目标：
+- 回归访问日志中的 `userId`、`tenantId` 字段口径。
+- 确保成功请求、匿名请求、异常请求都有稳定断言。
+- 日志不得泄露 Token、Cookie、密码、完整请求体等敏感内容。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/common/filter/TraceIdFilter.java`：`HTTP_ACCESS` 新增 `userId`、`tenantId` 字段；无法识别身份时输出 `-`。
+- `backend/src/main/java/com/cgcpms/auth/filter/JwtAuthenticationFilter.java`：JWT 校验通过后将 `userId`、`tenantId` 写入请求属性，供最外层访问日志在认证上下文清理后读取。
+- `backend/src/test/java/com/cgcpms/common/filter/TraceIdFilterLoggingTest.java`：补充成功、匿名、异常请求下身份字段和敏感信息不泄漏断言。
+- `backend/src/test/java/com/cgcpms/auth/filter/JwtAuthenticationFilterTest.java`：补充认证成功后访问日志身份请求属性断言。
+- `docs/quality/issue-007-014-access-log-user-tenant-context.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-014 收口为 Done，Ready 队列标记为当前无 Ready Issue。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=TraceIdFilterLoggingTest,JwtAuthenticationFilterTest" test`：先失败后通过；失败原因为访问日志缺少 `userId`/`tenantId` 且 JWT 过滤器未写入访问日志身份请求属性，修复后 `7` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过，失败类集中在既有 `dashboard`、`invoice`、`workflow`、`payment`、`revenue`、`purchase`、`migration` 集成测试，不属于本次改动引入。
+- `git diff --check`：通过，仅有换行符转换提示。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只覆盖应用内访问日志格式与本地单元测试，不验证外部日志平台字段解析规则。
+- 异步请求若在认证过滤器之外创建新的请求链路，仍需依赖请求属性或 `UserContext` 正确传递；本轮未扩展异步日志链路。
