@@ -251,3 +251,29 @@ Issue：ISSUE-007-001 访问日志上下文与备份清单补强
 剩余风险：
 - 本轮未接入外部监控平台，生产日志采集规则仍需后续在实际平台配置。
 - 本轮未新增测试源码，结论限于允许范围内的代码编译、代码审查和正式报告证据。
+
+---
+
+Issue：ISSUE-004-004 领料出库与项目成本归集回归
+
+目标：
+- 验证领料审批通过后出库流水、库存扣减与项目成本归集三类证据一致，避免领料主链路回退。
+
+修改范围摘要：
+- `docs/quality/issue-004-004-requisition-stock-cost-regression.md`：新增正式质量报告，记录状态字段、出库流水、库存扣减和成本归集证据。
+- `docs/backlog/ready-issues.md`：将 ISSUE-004-004 从 Ready 池移出，转入已完成/历史。
+- `docs/backlog/done-issues.md`：追加 Done 记录。
+- 本轮未修改后端生产代码或测试代码；现有 `MatRequisitionWorkflowSubmitTest` 已覆盖该 Issue 的核心断言。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=MatRequisitionWorkflowSubmitTest,MatStockServiceTest,CostLedgerServiceTest" test`：通过，`Tests run: 49, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未跑全量后端测试，结论限于 ISSUE-004-004 指定回归范围。
+- 领料成本科目仍沿用既有默认材料科目解析逻辑，本轮不扩展成本科目配置能力。

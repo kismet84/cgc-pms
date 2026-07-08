@@ -28,43 +28,12 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-004-004`
-2. `ISSUE-004-005`
-3. `ISSUE-004-006`
-4. `ISSUE-005-002`
-5. `ISSUE-006-002`
+1. `ISSUE-004-005`
+2. `ISSUE-004-006`
+3. `ISSUE-005-002`
+4. `ISSUE-006-002`
 
 ## P0
-
-### ISSUE-004-004：领料出库与项目成本归集回归
-
-优先级：P0
-类型：回归 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only；仅限 `backend/src/test/**`、`docs/quality/**`、`docs/iterations/**`
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节，第 4 条“领料 → 出库 → 项目成本”
-目标：
-- 补齐领料审批通过后的出库流水、库存扣减与项目成本归集一致性断言。
-- 产出正式回归报告，明确金额字段、状态字段、来源单据三类证据。
-允许修改：
-- `backend/src/test/java/com/cgcpms/requisition/**`
-- `backend/src/test/java/com/cgcpms/inventory/**`
-- `backend/src/test/java/com/cgcpms/cost/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `backend/src/main/**`
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-验收标准：
-- 领料审批通过后产生可追溯出库流水。
-- 库存数量变化与出库流水一致。
-- 项目成本归集金额能回溯到本次领料单据。
-- 正式报告记录失败分类、验证结果与剩余风险。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=MatRequisitionWorkflowSubmitTest,MatStockServiceTest,CostLedgerServiceTest" test`
-- `git diff --check`
 
 ### ISSUE-004-005：分包计量与结算状态链路回归
 
@@ -220,6 +189,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-004-003-payment-invoice-workflow-regression.md`
+
+### ISSUE-004-004：领料出库与项目成本归集回归
+
+优先级：P0
+类型：回归 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-004-004-requisition-stock-cost-regression.md`
 
 ### ISSUE-005-001：付款与发票列表页生产化补强
 
