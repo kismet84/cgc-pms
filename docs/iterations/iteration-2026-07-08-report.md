@@ -584,3 +584,29 @@ Issue：ISSUE-007-005 访问日志 projectId/status/duration/exception 字段回
 剩余风险：
 - 当前 `projectId` 只在请求参数、`projectId` 路由变量或 `/projects/{id}` 路径模式下可自动识别；其他业务路径没有统一项目上下文时仍记为 `-`。
 - `exception` 当前只记录异常类型名，不记录异常消息；这有利于避免敏感信息泄露，但不提供更细的错误细节。
+
+---
+
+Issue：ISSUE-007-006 备份范围与恢复演练报告模板补强
+
+目标：
+- 补齐 MySQL、MinIO、配置、密钥、日志归档的备份范围清单。
+- 补齐恢复演练报告模板，固定恢复耗时、数据范围和失败原因字段。
+- 保持本轮只做文档补强，不连接生产环境，不执行真实备份/恢复。
+
+修改范围摘要：
+- `docs/10-部署运维手册.md`：扩展备份范围清单，新增密钥元数据、日志归档、配置与证书范围说明；补入恢复演练模板与最小示例。
+- `docs/quality/issue-007-006-backup-scope-restore-drill-template.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：完成 backlog 收口。
+
+验证命令摘要：
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮仅补模板与清单，不代表宿主机侧日志归档、密钥保管和月度恢复演练已自动落地。
+- 当前没有新增独立脚本或自动校验，后续仍需运维按模板完成真实演练并保留证据。

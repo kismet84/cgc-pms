@@ -28,37 +28,11 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-006`
-2. `ISSUE-007-007`
+1. `ISSUE-007-007`
 
 ## P0
 
 ## P1
-
-### ISSUE-007-006：备份范围与恢复演练报告模板补强
-
-优先级：P1
-类型：运维 / 文档 / 归档
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节第 3、4 条“备份范围 / 恢复演练”
-目标：
-- 补齐 MySQL、MinIO、配置、密钥、日志归档的备份范围清单。
-- 补齐恢复演练报告模板，记录恢复耗时、数据范围和失败原因。
-允许修改：
-- `docs/10-部署运维手册.md`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `backend/**`
-- `frontend-admin/**`
-- `deploy/**`
-- 生产凭据、真实密钥和生产备份配置
-验收标准：
-- 文档包含可执行检查清单和演练报告模板。
-- 正式报告说明本轮未连接生产、不执行真实恢复。
-验证命令：
-- `git diff --check`
 
 ### ISSUE-007-007：登录失败与文件失败次数指标回归
 
@@ -114,6 +88,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-007-005-access-log-fields-regression.md`
+
+### ISSUE-007-006：备份范围与恢复演练报告模板补强
+
+优先级：P1
+类型：运维 / 文档 / 归档
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-006-backup-scope-restore-drill-template.md`
 
 ### ISSUE-006-005：发票识别失败原因与人工确认口径回归
 
