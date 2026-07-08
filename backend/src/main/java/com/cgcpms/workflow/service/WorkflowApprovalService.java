@@ -5,7 +5,6 @@ import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,7 +13,6 @@ import java.time.LocalDateTime;
 /**
  * Handles approve and reject workflow operations.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WorkflowApprovalService {
@@ -23,6 +21,7 @@ public class WorkflowApprovalService {
     private final WfInstanceMapper wfInstanceMapper;
     private final WfNodeInstanceMapper wfNodeInstanceMapper;
     private final WfTaskMapper wfTaskMapper;
+    private final WorkflowNotificationAlertService workflowNotificationAlertService;
 
     @Transactional(rollbackFor = Exception.class)
     public void approve(Long taskId, Long userId, String username,
@@ -47,16 +46,13 @@ public class WorkflowApprovalService {
                 userId, username, comment);
 
         // Notify submitter
-        try {
-            WfInstance instanceForNotify = wfInstanceMapper.selectById(task.getInstanceId());
-            if (instanceForNotify != null) {
-                core.notificationService.create(instanceForNotify.getTenantId(), instanceForNotify.getInitiatorId(),
-                        username + "同意了你的申请",
-                        username + "同意了你的申请：" + instanceForNotify.getTitle(),
-                        "WORKFLOW", instanceForNotify.getId());
-            }
-        } catch (Exception e) {
-            log.warn("Failed to create approve notification: {}", e.getMessage());
+        WfInstance instanceForNotify = wfInstanceMapper.selectById(task.getInstanceId());
+        if (instanceForNotify != null) {
+            workflowNotificationAlertService.createWorkflowNotification(instanceForNotify,
+                    instanceForNotify.getInitiatorId(),
+                    username + "同意了你的申请",
+                    username + "同意了你的申请：" + instanceForNotify.getTitle(),
+                    "APPROVAL_COMPLETED");
         }
 
         // Check if node is complete
@@ -137,14 +133,10 @@ public class WorkflowApprovalService {
                 WorkflowConstants.ACTION_REJECT, username, comment);
 
         // Notify submitter
-        try {
-            core.notificationService.create(instance.getTenantId(), instance.getInitiatorId(),
-                    username + "驳回了你的申请",
-                    username + "驳回了你的申请：" + instance.getTitle(),
-                    "WORKFLOW", instance.getId());
-        } catch (Exception e) {
-            log.warn("Failed to create reject notification: {}", e.getMessage());
-        }
+        workflowNotificationAlertService.createWorkflowNotification(instance, instance.getInitiatorId(),
+                username + "驳回了你的申请",
+                username + "驳回了你的申请：" + instance.getTitle(),
+                "APPROVAL_REJECTED");
     }
 
     // ──────────────────────── Extracted helpers ────────────────────────

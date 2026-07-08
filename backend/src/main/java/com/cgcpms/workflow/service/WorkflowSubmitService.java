@@ -6,7 +6,6 @@ import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +16,6 @@ import java.util.List;
 /**
  * Handles submit and resubmit workflow operations.
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WorkflowSubmitService {
@@ -28,6 +26,7 @@ public class WorkflowSubmitService {
     private final WfTaskMapper wfTaskMapper;
     private final WfCcService wfCcService;
     private final WorkflowBusinessAccessValidator businessAccessValidator;
+    private final WorkflowNotificationAlertService workflowNotificationAlertService;
 
     @Transactional(rollbackFor = Exception.class)
     public WfInstance submit(Long userId, String username, Long tenantId,
@@ -98,8 +97,8 @@ public class WorkflowSubmitService {
         }
 
         // Notify approvers
-        notifyApprovers(instance.getId(), tenantId,
-                username + "提交了审批", username + "提交了审批：" + instance.getTitle());
+        notifyApprovers(instance,
+                username + "提交了审批", username + "提交了审批：" + instance.getTitle(), "SUBMIT_PENDING");
 
         return instance;
     }
@@ -148,8 +147,8 @@ public class WorkflowSubmitService {
                 userId, username, null);
 
         // Notify approvers for the new round
-        notifyApprovers(instanceId, instance.getTenantId(),
-                username + "重新提交了审批", username + "重新提交了审批：" + instance.getTitle());
+        notifyApprovers(instance,
+                username + "重新提交了审批", username + "重新提交了审批：" + instance.getTitle(), "RESUBMIT_PENDING");
 
         return instance;
     }
@@ -178,19 +177,14 @@ public class WorkflowSubmitService {
         return nodeInstances;
     }
 
-    private void notifyApprovers(Long instanceId, Long tenantId, String title, String content) {
+    private void notifyApprovers(WfInstance instance, String title, String content, String eventType) {
         List<WfTask> pendingTasks = wfTaskMapper.selectList(
                 new LambdaQueryWrapper<WfTask>()
-                        .eq(WfTask::getInstanceId, instanceId)
+                        .eq(WfTask::getInstanceId, instance.getId())
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
         for (WfTask t : pendingTasks) {
-            try {
-                core.notificationService.create(tenantId, t.getApproverId(),
-                        title, content,
-                        "WORKFLOW", instanceId);
-            } catch (Exception e) {
-                log.warn("Failed to create notification for approver {}: {}", t.getApproverId(), e.getMessage());
-            }
+            workflowNotificationAlertService.createWorkflowNotification(instance, t.getApproverId(),
+                    title, content, eventType);
         }
     }
 }

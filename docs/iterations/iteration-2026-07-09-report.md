@@ -640,3 +640,37 @@ Issue：ISSUE-004-009 付款审批与财务回写状态同步回归
 - 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
 - 本轮不接入真实外部财务系统，不验证生产财务回写通道。
 - 本轮不修改审批状态机定义，审批流程节点和通知联动仍按既有实现运行。
+
+---
+
+Issue：ISSUE-004-010 审批流转通知与预警联动回归
+
+目标：
+- 回归审批状态流转到通知与预警的联动口径。
+- 覆盖审批提交、审批完成、审批异常三类关键事件。
+- 不扩大为通知平台或预警规则中心重构。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/workflow/service/WorkflowNotificationAlertService.java`：新增工作流通知与预警兜底服务，复用现有站内通知和 `alert_log`，不接入外部渠道。
+- `backend/src/main/java/com/cgcpms/workflow/service/WorkflowSubmitService.java`：审批提交/重新提交待办通知改由兜底服务创建，通知失败时生成工作流预警信号。
+- `backend/src/main/java/com/cgcpms/workflow/service/WorkflowApprovalService.java`：审批完成/驳回通知改由兜底服务创建，通知失败时生成工作流预警信号。
+- `backend/src/test/java/com/cgcpms/workflow/service/WorkflowNotificationAlertServiceTest.java`：新增提交通知成功、审批完成通知失败预警、同事件异常预警去重和敏感信息脱敏断言。
+- `docs/quality/issue-004-010-workflow-notification-alert-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-004-010 收口为 Done；Ready 队列保留 ISSUE-004-011，但用户已请求停止自动迭代，本轮不启动下一任务。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowNotificationAlertServiceTest" test`：先失败，红灯原因为新增测试引用的 `WorkflowNotificationAlertService` 尚不存在；实现后通过，`3` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowNotificationAlertServiceTest,WorkflowSubmitServiceTest" test`：通过，`8` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowEngineIntegrationTest#test15_lifecycleNotifications" test`：未通过，失败原因为该集成方法单独运行缺少 `tenantId=777` 的合同业务对象，报错 `审批业务对象不存在`；分类为既有测试夹具/前置数据问题，非本轮通知联动实现回退。
+- `cd backend; .\mvnw.cmd test`：未通过，Surefire 汇总 `1557` 个测试、`11` 个 failures、`29` 个 errors、`1` 个 skipped；失败类集中在既有 `dashboard`、`invoice validation`、`migration`、`payment/purchase/revenue` 和旧 `workflow` 集成测试夹具/业务类型前置，不属于本轮审批通知/预警联动改动引入。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；通知异常预警兜底已补齐；全量测试存在既有无关失败；用户停止请求已阻断下一任务派发
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
+- 本轮只复用站内通知和应用内 `alert_log` 预警信号，不验证外部通知平台、短信、邮件或企业微信渠道。
+- 用户已发出 `停止自动迭代系统`，当前观察到 stopRequested=true 且 enabled=false；本轮完成当前 Issue 安全收口后不得启动 ISSUE-004-011。

@@ -365,3 +365,11 @@
 失败分类或非失败分类：真实代码质量问题已修复；付款控制器测试夹具问题已更正；全量测试存在既有无关失败
 验证结果：通过
 相关报告：docs/quality/issue-004-009-payment-workflow-finance-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
+### ISSUE-004-010：审批流转通知与预警联动回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；通知异常预警兜底已补齐；全量测试存在既有无关失败；用户已请求停止自动迭代，已阻断下一任务派发
+验证结果：通过
+相关报告：docs/quality/issue-004-010-workflow-notification-alert-regression.md；docs/iterations/iteration-2026-07-09-report.md

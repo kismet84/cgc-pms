@@ -28,8 +28,7 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-004-010：审批流转通知与预警联动回归`
-2. `ISSUE-004-011：驾驶舱汇总指标来源单据下钻回归`
+1. `ISSUE-004-011：驾驶舱汇总指标来源单据下钻回归`
 
 ## P0
 
@@ -137,7 +136,7 @@
 
 优先级：P1
 类型：回归 / 后端 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“审批中心 → 状态流转 → 通知 / 预警”
 目标：
