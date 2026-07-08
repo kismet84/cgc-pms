@@ -291,3 +291,37 @@ Issue：ISSUE-007-011 CPU/内存/进程指标回归
 剩余风险：
 - 本轮未做真实运行态 Prometheus 抓取，只覆盖本地 MockMvc 与 meter registry 注册断言。
 - `executor.completed` 相关 Prometheus duplicate tag key 警告仍存在，但当前抓取结果与断言未受影响。
+
+---
+
+Issue：ISSUE-007-012 Redis 健康与黑名单降级告警回归
+
+目标：
+- 回归 Redis 健康口径与 Token blacklist 相关降级告警信号。
+- 确保本地可验证 `BLACKLIST_UNAVAILABLE`、`TOKEN_BLACKLIST_WRITE_FAILED`、`TOKEN_BLACKLIST_CHECK_FAILED` 等关键口径。
+- 不修改生产 Redis 配置，不把生产 Redis 强依赖降级为“正常运行”语义。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/config/TokenBlacklistHealthIndicator.java`：新增 blacklist 健康组件；prod 缺少服务返回 `DOWN`，local 缺少服务返回 `UNKNOWN`，Redis 探测失败返回 `DOWN`。
+- `backend/src/main/java/com/cgcpms/auth/service/TokenBlacklistService.java`：新增 `isAvailable()` 探针，并将 Redis 异常日志改为固定告警码 + 异常类型，避免输出 Redis 连接串或密码。
+- `backend/src/main/java/com/cgcpms/auth/controller/AuthController.java`：refresh/logout prod fail-close 分支补充 `BLACKLIST_UNAVAILABLE` / `TOKEN_BLACKLIST_WRITE_FAILED` 告警日志。
+- `backend/src/test/java/com/cgcpms/config/TokenBlacklistHealthIndicatorTest.java`：新增 health indicator 回归测试。
+- `backend/src/test/java/com/cgcpms/auth/service/TokenBlacklistServiceTest.java`、`backend/src/test/java/com/cgcpms/auth/controller/AuthControllerTest.java`、`backend/src/test/java/com/cgcpms/auth/filter/JwtAuthenticationFilterTest.java`：补充三类告警码、fail-close 和日志脱敏断言。
+- `docs/quality/issue-007-012-redis-blacklist-observability.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-007-012 收口为 Done，Ready 队列推进到 ISSUE-007-013。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=TokenBlacklistServiceTest,TokenBlacklistHealthIndicatorTest" test`：先失败，原因是缺少 `TokenBlacklistHealthIndicator` 和 `TokenBlacklistService.isAvailable()`。
+- `cd backend; .\mvnw.cmd "-Dtest=AuthControllerTest,JwtAuthenticationFilterTest" test`：先失败，原因是 `AuthController` 的 prod refresh fail-close 分支未输出 `BLACKLIST_UNAVAILABLE` / `TOKEN_BLACKLIST_WRITE_FAILED`。
+- `cd backend; .\mvnw.cmd "-Dtest=TokenBlacklistServiceTest,TokenBlacklistHealthIndicatorTest,JwtAuthenticationFilterTest,AuthControllerTest" test`：修复后通过，`28` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过；失败类未命中本轮 Redis blacklist 相关目标测试，按既有无关后端测试红灯分类。失败类包括 `DashboardChiefEngineerServiceTest`、`InvoiceValidationTest`、`MigrationSoftDeleteBehaviorTest`、`PayRecordControllerTest`、`Phase2FullChainIntegrationTest`、`Phase4IntegrationTest`、`PurchaseRequestServiceTest`、`ContractRevenueServiceTest`、`WorkflowApproverResolverTest`、`WorkflowConcurrencyTest`、`WorkflowCoreServiceTest`、`WorkflowEngineIntegrationTest`、`WorkflowTemplateManagementTest`。
+- `git diff --check`：通过，仅有换行符转换提示。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮不连接真实 Redis，不验证外部监控平台采集，只做本地健康组件、日志告警码和 fail-close 回归。
+- local profile 仍允许 blacklist 服务缺失时继续请求，但健康组件返回 `UNKNOWN + BLACKLIST_UNAVAILABLE`，不会把该状态伪装成正常。

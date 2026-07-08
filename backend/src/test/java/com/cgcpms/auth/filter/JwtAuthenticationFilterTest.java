@@ -10,7 +10,10 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -23,6 +26,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @DisplayName("JWT authentication filter")
+@ExtendWith(OutputCaptureExtension.class)
 class JwtAuthenticationFilterTest {
 
     private final ExposedJwtAuthenticationFilter filter = new ExposedJwtAuthenticationFilter();
@@ -44,7 +48,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     @DisplayName("prod profile rejects requests when token blacklist service is unavailable")
-    void prodRejectsWhenBlacklistServiceUnavailable() throws Exception {
+    void prodRejectsWhenBlacklistServiceUnavailable(CapturedOutput output) throws Exception {
         JwtUtils jwtUtils = mock(JwtUtils.class);
         JwtProperties jwtProperties = mock(JwtProperties.class);
         CookieUtils cookieUtils = mock(CookieUtils.class);
@@ -77,6 +81,9 @@ class JwtAuthenticationFilterTest {
 
         verify(chain, never()).doFilter(any(), any());
         org.junit.jupiter.api.Assertions.assertEquals(401, response.getStatus());
+        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("BLACKLIST_UNAVAILABLE"));
+        org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("redis://"));
+        org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("REDIS_PASSWORD"));
     }
 
     @Test

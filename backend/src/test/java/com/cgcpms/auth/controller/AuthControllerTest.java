@@ -14,11 +14,14 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.MediaType;
@@ -56,6 +59,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("AuthController — 登录端点测试")
+@ExtendWith(OutputCaptureExtension.class)
 class AuthControllerTest {
 
     @Autowired
@@ -267,7 +271,7 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("POST /auth/refresh prod 黑名单服务缺失 → fail-close")
-    void refreshFailsClosedWhenBlacklistMissingInProd() {
+    void refreshFailsClosedWhenBlacklistMissingInProd(CapturedOutput output) {
         AuthController controller = authControllerWithoutBlacklistInProd();
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE, jwtUtils.generateRefreshToken(1L)));
@@ -275,6 +279,9 @@ class AuthControllerTest {
         var result = controller.refresh(request, new MockHttpServletResponse(), null);
 
         org.junit.jupiter.api.Assertions.assertEquals("AUTH_TOKEN_INVALID", result.getCode());
+        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("BLACKLIST_UNAVAILABLE"));
+        org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("redis://"));
+        org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("REDIS_PASSWORD"));
         verify(authService, never()).loginById(any());
     }
 
@@ -293,7 +300,7 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("POST /auth/refresh prod 黑名单写入失败 → fail-close")
-    void refreshFailsClosedWhenBlacklistWriteFailsInProd() {
+    void refreshFailsClosedWhenBlacklistWriteFailsInProd(CapturedOutput output) {
         TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
         when(blacklistService.isBlacklisted(any())).thenReturn(false);
         when(blacklistService.blacklist(any(), anyLong())).thenReturn(false);
@@ -304,6 +311,9 @@ class AuthControllerTest {
         var result = controller.refresh(request, new MockHttpServletResponse(), null);
 
         org.junit.jupiter.api.Assertions.assertEquals("AUTH_TOKEN_INVALID", result.getCode());
+        org.junit.jupiter.api.Assertions.assertTrue(output.getOut().contains("TOKEN_BLACKLIST_WRITE_FAILED"));
+        org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("redis://"));
+        org.junit.jupiter.api.Assertions.assertFalse(output.getOut().contains("REDIS_PASSWORD"));
         verify(authService, never()).loginById(any());
     }
 

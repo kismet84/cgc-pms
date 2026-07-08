@@ -28,43 +28,12 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-007-012`
-2. `ISSUE-007-013`
-3. `ISSUE-007-014`
+1. `ISSUE-007-013`
+2. `ISSUE-007-014`
 
 ## P0
 
 ## P1
-
-### ISSUE-007-012：Redis 健康与黑名单降级告警回归
-
-优先级：P1
-类型：运维 / 安全 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“Redis”
-目标：
-- 回归 Redis 健康口径与 Token blacklist 相关降级告警信号。
-- 确保本地可验证 `BLACKLIST_UNAVAILABLE`、`TOKEN_BLACKLIST_WRITE_FAILED`、`TOKEN_BLACKLIST_CHECK_FAILED` 等关键口径，不修改生产 Redis 配置。
-允许修改：
-- `backend/src/main/java/com/cgcpms/**`
-- `backend/src/main/resources/**`
-- `backend/src/test/java/com/cgcpms/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- Redis 缺失/失败路径的健康或告警信号有稳定测试覆盖。
-- 不把生产 Redis 强依赖降级为“正常运行”语义。
-- 不记录真实密码、连接串或其他敏感信息。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-007-012-redis-blacklist-observability.md`
 
 ### ISSUE-007-013：慢 SQL 监控口径回归
 
@@ -466,6 +435,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-007-011-process-memory-metrics-regression.md`
+
+### ISSUE-007-012：Redis 健康与黑名单降级告警回归
+
+优先级：P1
+类型：运维 / 安全 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-007-012-redis-blacklist-observability.md`
 
 ### ISSUE-007-007：登录失败与文件失败次数指标回归
 

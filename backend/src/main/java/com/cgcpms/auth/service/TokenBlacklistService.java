@@ -43,8 +43,8 @@ public class TokenBlacklistService {
             log.debug("Token blacklisted with TTL: {}ms", ttlMillis);
             return true;
         } catch (RuntimeException e) {
-            log.warn("TOKEN_BLACKLIST_WRITE_FAILED: Redis不可用，令牌黑名单写入失败, ttl={}ms",
-                    ttlMillis, e);
+            log.warn("TOKEN_BLACKLIST_WRITE_FAILED: Redis不可用，令牌黑名单写入失败, ttl={}ms, errorType={}",
+                    ttlMillis, safeErrorType(e));
             return false;
         }
     }
@@ -61,8 +61,24 @@ public class TokenBlacklistService {
         try {
             return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + tokenKey(token)));
         } catch (RuntimeException e) {
-            log.warn("TOKEN_BLACKLIST_CHECK_FAILED: Redis不可用，黑名单检查回退为拒绝（fail-close）", e);
+            log.warn("TOKEN_BLACKLIST_CHECK_FAILED: Redis不可用，黑名单检查回退为拒绝（fail-close）, errorType={}",
+                    safeErrorType(e));
             return true;
+        }
+    }
+
+    /**
+     * Lightweight probe for actuator health. It intentionally avoids logging
+     * Redis exception messages because they may contain connection details.
+     */
+    public boolean isAvailable() {
+        try {
+            redisTemplate.hasKey(PREFIX + "__health_probe__");
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("TOKEN_BLACKLIST_CHECK_FAILED: Redis不可用，黑名单健康检查失败, errorType={}",
+                    safeErrorType(e));
+            return false;
         }
     }
 
@@ -73,5 +89,9 @@ public class TokenBlacklistService {
      */
     private String tokenKey(String token) {
         return token.length() > 32 ? token.substring(token.length() - 32) : token;
+    }
+
+    private String safeErrorType(RuntimeException e) {
+        return e == null ? "RuntimeException" : e.getClass().getSimpleName();
     }
 }

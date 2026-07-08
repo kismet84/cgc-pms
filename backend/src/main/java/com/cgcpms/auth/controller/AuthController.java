@@ -19,6 +19,7 @@ import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
+@Slf4j
 public class AuthController {
 
     private final AuthService authService;
@@ -86,11 +88,13 @@ public class AuthController {
                                      HttpServletResponse response) {
         TokenBlacklistService svc = blacklistProvider.getIfAvailable();
         if (svc == null && isProdProfile()) {
+            log.error("BLACKLIST_UNAVAILABLE: prod profile requires TokenBlacklistService for logout，拒绝本次请求");
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单服务不可用");
         }
         String token = resolveAccessToken(request);
         if (token != null && jwtUtils.validateToken(token)) {
             if (svc != null && !svc.blacklist(token, jwtUtils.getRemainingTtlMillis(token)) && isProdProfile()) {
+                log.warn("TOKEN_BLACKLIST_WRITE_FAILED: prod profile rejects logout because access token blacklist write failed");
                 return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
             }
         }
@@ -98,6 +102,7 @@ public class AuthController {
         String refreshToken = cookieUtils.getCookieValue(request, CookieUtils.REFRESH_TOKEN_COOKIE);
         if (refreshToken != null && !refreshToken.isBlank() && jwtUtils.validateToken(refreshToken)) {
             if (svc != null && !svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken)) && isProdProfile()) {
+                log.warn("TOKEN_BLACKLIST_WRITE_FAILED: prod profile rejects logout because refresh token blacklist write failed");
                 return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
             }
         }
@@ -124,6 +129,7 @@ public class AuthController {
         }
         TokenBlacklistService svc = blacklistProvider.getIfAvailable();
         if (svc == null && isProdProfile()) {
+            log.error("BLACKLIST_UNAVAILABLE: prod profile requires TokenBlacklistService for refresh，拒绝本次请求");
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单服务不可用");
         }
         if (svc != null && svc.isBlacklisted(refreshToken)) {
@@ -132,12 +138,14 @@ public class AuthController {
         Claims claims = jwtUtils.parseToken(refreshToken);
         Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
         if (svc != null && !svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken)) && isProdProfile()) {
+            log.warn("TOKEN_BLACKLIST_WRITE_FAILED: prod profile rejects refresh because refresh token blacklist write failed");
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
         }
         // Blacklist old access token to prevent replay during its remaining TTL
         String oldAccessToken = resolveAccessToken(request);
         if (oldAccessToken != null && jwtUtils.validateToken(oldAccessToken)) {
             if (svc != null && !svc.blacklist(oldAccessToken, jwtUtils.getRemainingTtlMillis(oldAccessToken)) && isProdProfile()) {
+                log.warn("TOKEN_BLACKLIST_WRITE_FAILED: prod profile rejects refresh because old access token blacklist write failed");
                 return ApiResponse.fail("AUTH_TOKEN_INVALID", "Token黑名单写入失败");
             }
         }
