@@ -80,3 +80,4 @@ Issue：ISSUE-004-002 采购收货库存数量一致性回归
 剩余风险：
 - 原 Ready Issue 中 `InventoryServiceTest` 类名不存在，本轮已使用真实库存服务测试类 `MatStockServiceTest` 替代。
 - 本轮未跑全量后端测试，结论限于 ISSUE-004-002 指定回归范围。
+- 说明：`docs/plans/cgc-pms-production-enhancement-plan.md` 迁移到 `docs/backlog/cgc-pms-production-enhancement-plan.md` 属于用户手动执行/确认的既有变更，非子智能体越权；本轮不回滚该迁移，ISSUE-004-002 结论仍仅以采购/收货/库存测试结果为准。

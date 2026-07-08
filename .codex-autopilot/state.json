@@ -1,0 +1,10 @@
+﻿{
+    "enabled":  false,
+    "status":  "STOPPING",
+    "startedAt":  "2026-07-08T19:07:10",
+    "lastHeartbeatAt":  "2026-07-08T19:41:18",
+    "stopRequested":  true,
+    "autoMerge":  true,
+    "autoPush":  false,
+    "allowTestDataReset":  true
+}
