@@ -245,6 +245,22 @@ class WorkflowSubmitServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("M3: submit stores canonical project and contract metadata")
+    void testSubmitStoresCanonicalBusinessMetadata() {
+        WfInstance instance = workflowEngine.submit(
+                TestUserContext.USER_ADMIN, "admin", TestUserContext.TENANT_0,
+                BUSINESS_TYPE, CONTRACT_ID_TEMPLATE,
+                "canonical 元数据验证", new BigDecimal("1000.00"),
+                null, null,
+                null, null, null);
+
+        assertNotNull(instance, "缺省请求项目时仍应基于真实业务对象创建实例");
+        assertEquals(PROJECT_ID, instance.getProjectId(), "实例项目应保存真实业务对象项目");
+        assertEquals(CONTRACT_ID_TEMPLATE, instance.getContractId(), "实例合同应保存真实业务对象合同");
+    }
+
+    @Test
+    @Transactional
     @DisplayName("M2: submit rejects forged projectId that does not match business object")
     void testSubmitRejectsForgedProjectId() {
         BusinessException ex = assertThrows(BusinessException.class, () ->

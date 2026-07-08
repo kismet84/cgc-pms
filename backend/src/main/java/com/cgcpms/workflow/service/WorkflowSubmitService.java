@@ -37,7 +37,8 @@ public class WorkflowSubmitService {
                              String businessSummary, String variables,
                              List<Long> ccUserIds) {
 
-        businessAccessValidator.validateSubmit(businessType, businessId, tenantId, projectId, contractId);
+        WorkflowBusinessAccessValidator.ValidationResult businessAccess =
+                businessAccessValidator.validateSubmit(businessType, businessId, tenantId, projectId, contractId);
 
         WfTemplate template = core.findTemplate(businessType, tenantId, amount);
         List<WfTemplateNode> templateNodes = core.findTemplateNodes(template.getId());
@@ -48,8 +49,8 @@ public class WorkflowSubmitService {
         instance.setTemplateId(template.getId());
         instance.setBusinessType(businessType);
         instance.setBusinessId(businessId);
-        instance.setProjectId(projectId);
-        instance.setContractId(contractId);
+        instance.setProjectId(businessAccess.getProjectId());
+        instance.setContractId(businessAccess.getContractId());
         instance.setTitle(title);
         instance.setAmount(amount);
         instance.setInstanceStatus(WorkflowConstants.INSTANCE_RUNNING);
