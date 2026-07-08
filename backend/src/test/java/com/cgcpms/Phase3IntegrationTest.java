@@ -709,8 +709,18 @@ class Phase3IntegrationTest {
         assertFalse(notifications.isEmpty(),
                 "预警评估应生成至少一条通知记录（bizType=ALERT）");
 
-        // 6. 验证通知字段完整性
-        SysNotification notification = notifications.get(0);
+        // 6. 验证通知字段完整性；不要依赖最新一条通知恰好对应某个特定 ruleType
+        SysNotification notification = null;
+        AlertLog alert = null;
+        for (SysNotification candidate : notifications) {
+            AlertLog candidateAlert = alertLogMapper.selectById(candidate.getBizId());
+            if (candidateAlert != null && "CONTRACT_EXPIRING".equals(candidateAlert.getRuleType())) {
+                notification = candidate;
+                alert = candidateAlert;
+                break;
+            }
+        }
+        assertNotNull(notification, "应存在关联 CONTRACT_EXPIRING 预警的通知记录");
         assertEquals(0L, notification.getTenantId().longValue(),
                 "通知tenantId应为0（来自project，非UserContext）");
         assertEquals(USER_ADMIN, notification.getUserId(),
@@ -728,7 +738,6 @@ class Phase3IntegrationTest {
                 "通知isRead应为0（未读）");
 
         // 7. 验证通知关联的 alert_log 存在
-        AlertLog alert = alertLogMapper.selectById(notification.getBizId());
         assertNotNull(alert, "通知关联的alert_log应存在");
         assertEquals(PROJECT_ID, alert.getProjectId().longValue(),
                 "alert_log的projectId应匹配");
