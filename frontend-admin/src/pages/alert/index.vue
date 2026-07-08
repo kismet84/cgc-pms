@@ -83,7 +83,6 @@ const processStatusOptions = computed(() =>
 type AlertRolePreset = {
   alertDomain?: string
   onlyDefaultScope?: boolean
-  downgraded?: boolean
 }
 
 function resolveRoleDefaultPreset(): AlertRolePreset {
@@ -101,16 +100,13 @@ function resolveRoleDefaultPreset(): AlertRolePreset {
     return {}
   }
   if (roleCodes.includes('COMMERCIAL_MANAGER') || roleName.includes('商务经理')) {
-    return {}
+    return { alertDomain: 'COST', onlyDefaultScope: true }
   }
   if (roleCodes.includes('PURCHASE_MANAGER') || roleName.includes('采购经理')) {
-    return { alertDomain: 'PURCHASE' }
+    return { alertDomain: 'PURCHASE', onlyDefaultScope: true }
   }
   if (roleCodes.includes('PRODUCTION_MANAGER') || roleName.includes('生产经理')) {
-    return { downgraded: true }
-  }
-  if (roleCodes.includes('CHIEF_ENGINEER') || roleName.includes('总工程师')) {
-    return { downgraded: true }
+    return { alertDomain: 'COST', onlyDefaultScope: true }
   }
   return {}
 }
@@ -149,6 +145,9 @@ const currentOperator = computed(
         '',
     ).trim() || '-',
 )
+const activeOperator = computed(
+  () => String(activeRecord.value?.handledBy ?? currentOperator.value ?? '').trim() || '-',
+)
 
 function resolveSearchAlertDomain() {
   const preset = activeRolePreset.value
@@ -177,13 +176,21 @@ function syncBatchStatusResult(
   processStatus: AlertProcessStatus,
   statusRemark?: string,
 ) {
+  const now = new Date().toISOString()
   successIds.forEach((id) => {
     syncActiveRecord(id, (item) => {
       item.processStatus = processStatus
+      item.handledStatus = processStatus
+      item.handledBy = currentOperator.value
       item.statusRemark = statusRemark
-      if (processStatus === 'PROCESSED') item.processedAt = new Date().toISOString()
-      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID')
-        item.archivedAt = new Date().toISOString()
+      if (processStatus === 'PROCESSED') {
+        item.processedAt = now
+        item.handledAt = now
+      }
+      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') {
+        item.archivedAt = now
+        item.handledAt = now
+      }
     })
   })
 }
@@ -376,12 +383,20 @@ async function handleChangeStatus(
 ) {
   try {
     await store.changeStatus(record.id, processStatus, statusRemark)
+    const now = new Date().toISOString()
     syncActiveRecord(record.id, (item) => {
       item.processStatus = processStatus
+      item.handledStatus = processStatus
+      item.handledBy = currentOperator.value
       item.statusRemark = statusRemark
-      if (processStatus === 'PROCESSED') item.processedAt = new Date().toISOString()
-      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID')
-        item.archivedAt = new Date().toISOString()
+      if (processStatus === 'PROCESSED') {
+        item.processedAt = now
+        item.handledAt = now
+      }
+      if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') {
+        item.archivedAt = now
+        item.handledAt = now
+      }
     })
     message.success(
       processStatus === 'PROCESSED'
@@ -556,8 +571,10 @@ function formatSeverityText(value: string) {
 }
 
 function buildAlertBusinessPath(record: AlertLogVO): string {
-  const businessType = String(record.sourceType ?? record.businessType ?? '').trim()
-  const businessId = String(record.sourceId ?? record.businessId ?? '').trim()
+  const businessType = String(
+    record.bizType ?? record.businessType ?? record.sourceType ?? '',
+  ).trim()
+  const businessId = String(record.bizId ?? record.businessId ?? record.sourceId ?? '').trim()
   if (businessType && businessId) {
     const dynamicRouteMap: Record<string, (id: string) => string> = {
       CONTRACT: (id) => `/contract/${id}`,
@@ -567,6 +584,7 @@ function buildAlertBusinessPath(record: AlertLogVO): string {
       PAY_APPLICATION: (id) => `/payment/application?businessId=${id}`,
       PAY_REQUEST: (id) => `/payment/application?businessId=${id}`,
       PURCHASE_ORDER: (id) => `/purchase/order?businessId=${id}`,
+      PURCHASE_RECEIPT: (id) => `/purchase/receipt?businessId=${id}`,
       VAR_ORDER: (id) => `/variation/order?businessId=${id}`,
       VARIATION: (id) => `/variation/order?businessId=${id}`,
       PURCHASE: (id) => `/purchase/order?businessId=${id}`,
@@ -790,7 +808,7 @@ onMounted(async () => {
       <AlertDetailPanel
         :active-record="activeRecord"
         :status-remark-draft="statusRemarkDraft"
-        :current-operator="currentOperator"
+        :current-operator="activeOperator"
         :subscription-rows="subscriptionRows"
         :format-severity-text="formatSeverityText"
         :format-date-time="formatDateTime"

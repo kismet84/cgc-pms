@@ -61,12 +61,38 @@ export const useAlertStore = defineStore('alert', () => {
       alert.processStatus = processStatus
       if (processStatus === 'PROCESSED') {
         alert.processedAt = now
+        alert.handledAt = now
       }
       if (processStatus === 'ARCHIVED' || processStatus === 'INVALID') {
         alert.archivedAt = now
+        alert.handledAt = now
       }
       alert.statusRemark = statusRemark
+      alert.handledStatus = processStatus
     })
+  }
+
+  function normalizeAlert(alert: AlertLogVO): AlertLogVO {
+    const businessType = alert.bizType ?? alert.businessType ?? alert.sourceType ?? undefined
+    const businessId = alert.bizId ?? alert.businessId ?? alert.sourceId ?? undefined
+    const handledStatus = alert.handledStatus ?? alert.processStatus ?? undefined
+    const handledAt = alert.handledAt ?? alert.processedAt ?? alert.archivedAt ?? undefined
+    const handledBy = alert.handledBy ?? undefined
+
+    return {
+      ...alert,
+      bizType: alert.bizType ?? businessType,
+      bizId: alert.bizId ?? businessId,
+      sourceType: alert.sourceType ?? businessType,
+      sourceId: alert.sourceId ?? businessId,
+      businessType: alert.businessType ?? businessType,
+      businessId: alert.businessId ?? businessId,
+      processStatus: alert.processStatus ?? handledStatus,
+      handledStatus,
+      handledBy,
+      processedAt: alert.processedAt ?? handledAt,
+      handledAt,
+    }
   }
 
   function normalizeBatchResult(
@@ -103,6 +129,8 @@ export const useAlertStore = defineStore('alert', () => {
     if (params.projectId && String(alert.projectId) !== String(params.projectId)) return false
     if (params.severity && alert.severity !== params.severity) return false
     if (params.isRead !== undefined && alert.isRead !== params.isRead) return false
+    if (params.processStatus && String(alert.processStatus ?? 'OPEN') !== params.processStatus)
+      return false
     if (params.ruleType && alert.ruleType !== params.ruleType) return false
     if (
       params.alertDomain &&
@@ -122,6 +150,8 @@ export const useAlertStore = defineStore('alert', () => {
         alert.ruleType,
         getAlertRuleCategory(alert.ruleType, alert.alertDomain, alert.category),
         String(alert.projectId),
+        String(alert.bizId ?? alert.businessId ?? alert.sourceId ?? ''),
+        String(alert.bizType ?? alert.businessType ?? alert.sourceType ?? ''),
       ]
         .join(' ')
         .toLowerCase()
@@ -148,7 +178,8 @@ export const useAlertStore = defineStore('alert', () => {
   }
 
   function applyLegacyPageFallback(list: AlertLogVO[], params: AlertListParams) {
-    const filtered = list.filter((alert) => matchesLegacyFilters(alert, params))
+    const normalized = list.map((alert) => normalizeAlert(alert))
+    const filtered = normalized.filter((alert) => matchesLegacyFilters(alert, params))
     const nextPageNo = Number(params.pageNo ?? params.pageNum ?? 1)
     const nextPageSize = Number(params.pageSize ?? 20)
     const start = (nextPageNo - 1) * nextPageSize
@@ -162,7 +193,9 @@ export const useAlertStore = defineStore('alert', () => {
     result: Exclude<AlertListResponse, AlertLogVO[]>,
     params: AlertListParams,
   ) {
-    alerts.value = Array.isArray(result?.records) ? result.records : []
+    alerts.value = Array.isArray(result?.records)
+      ? result.records.map((item) => normalizeAlert(item))
+      : []
     total.value = Number(result?.total ?? alerts.value.length)
     pageNo.value = Number(result?.pageNo ?? params.pageNo ?? params.pageNum ?? 1)
     pageSize.value = Number(result?.pageSize ?? params.pageSize ?? 20)
@@ -262,7 +295,7 @@ export const useAlertStore = defineStore('alert', () => {
   }
 
   function updateListState(nextAlerts: AlertLogVO[]) {
-    alerts.value = nextAlerts
+    alerts.value = nextAlerts.map((item) => normalizeAlert(item))
   }
 
   async function triggerBatchEvaluate() {
