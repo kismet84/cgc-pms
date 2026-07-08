@@ -277,3 +277,29 @@ Issue：ISSUE-004-004 领料出库与项目成本归集回归
 剩余风险：
 - 本轮未跑全量后端测试，结论限于 ISSUE-004-004 指定回归范围。
 - 领料成本科目仍沿用既有默认材料科目解析逻辑，本轮不扩展成本科目配置能力。
+
+---
+
+Issue：ISSUE-004-005 分包计量与结算状态链路回归
+
+目标：
+- 验证分包计量提交、结算生成、审批状态写回、来源和付款关联结果，避免分包结算链路回退。
+
+修改范围摘要：
+- `docs/quality/issue-004-005-subcontract-settlement-regression.md`：新增正式质量报告，记录状态、金额、来源、付款和保护条件证据。
+- `docs/backlog/ready-issues.md`：将 ISSUE-004-005 从 Ready 池移出，转入已完成/历史。
+- `docs/backlog/done-issues.md`：追加 Done 记录。
+- 本轮未修改后端生产代码或测试代码；现有四个测试类已覆盖该 Issue 的核心断言。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=SubMeasureServiceTest,StlSettlementServiceTest,SettlementWorkflowHandlerTest,StlSettlementQueryServiceTest" test`：通过，`Tests run: 62, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未跑全量后端测试，结论限于 ISSUE-004-005 指定回归范围。
+- 本轮未新增浏览器或前端验收，结算页面交互不属于该 Ready Issue 的允许范围。

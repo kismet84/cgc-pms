@@ -48,6 +48,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-004-004-requisition-stock-cost-regression.md；docs/iterations/iteration-2026-07-08-report.md
 
+### ISSUE-004-005：分包计量与结算状态链路回归
+
+完成日期：2026-07-08
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类
+验证结果：通过
+相关报告：docs/quality/issue-004-005-subcontract-settlement-regression.md；docs/iterations/iteration-2026-07-08-report.md
+
 ### ISSUE-005-001：付款与发票列表页生产化补强
 
 完成日期：2026-07-08

@@ -28,41 +28,11 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-004-005`
-2. `ISSUE-004-006`
-3. `ISSUE-005-002`
-4. `ISSUE-006-002`
+1. `ISSUE-004-006`
+2. `ISSUE-005-002`
+3. `ISSUE-006-002`
 
 ## P0
-
-### ISSUE-004-005：分包计量与结算状态链路回归
-
-优先级：P0
-类型：回归 / 后端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only；仅限 `backend/src/test/**`、`docs/quality/**`、`docs/iterations/**`
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节，第 5 条“分包任务 → 计量 → 结算”
-目标：
-- 补齐分包计量、结算生成、审批通过后的状态流转与金额口径断言。
-- 覆盖“草稿/审批中/审批通过”关键保护条件，避免结算链路回退。
-允许修改：
-- `backend/src/test/java/com/cgcpms/subcontract/**`
-- `backend/src/test/java/com/cgcpms/settlement/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-禁止修改：
-- `backend/src/main/**`
-- `frontend-admin/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-验收标准：
-- 分包计量提交审批、通过、驳回、撤回状态符合既有业务口径。
-- 结算金额计算、结算来源与付款关联结果可解释。
-- 审批通过后禁止误编辑或误删除。
-- 正式报告记录链路样本、断言结果与非阻塞风险。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=SubMeasureServiceTest,StlSettlementServiceTest,SettlementWorkflowHandlerTest,StlSettlementQueryServiceTest" test`
-- `git diff --check`
 
 ### ISSUE-004-006：审批中心待办/已办/我发起统一筛选回归
 
@@ -197,6 +167,14 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-004-004-requisition-stock-cost-regression.md`
+
+### ISSUE-004-005：分包计量与结算状态链路回归
+
+优先级：P0
+类型：回归 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-004-005-subcontract-settlement-regression.md`
 
 ### ISSUE-005-001：付款与发票列表页生产化补强
 
