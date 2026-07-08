@@ -575,3 +575,35 @@ Issue：ISSUE-004-007 合同清单金额与付款条件回归
 剩余风险：
 - 本轮只覆盖后端合同复合保存，不覆盖前端合同表单展示和真实浏览器交互。
 - 本轮不新增合同金额自动校验或自动重算规则；如需保存时强制拒绝清单合计与合同金额不一致，需另立业务规则确认任务。
+
+---
+
+Issue：ISSUE-004-008 签证变更成本与收入调整回归
+
+目标：
+- 回归签证、合同变更对成本与收入调整链路的影响，确保调整结果与来源单据一致。
+- 覆盖重复审批回调下的重复累计或漏记风险。
+- 不扩大为收入、成本、合同模块重构，不修改已存在的 migration。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/contract/change/handler/CtContractChangeWorkflowHandler.java`：新增合同变更审批回调幂等退出，避免已审批、已生效且成本已生成的合同变更再次递增合同 `currentAmount`。
+- `backend/src/test/java/com/cgcpms/contract/change/handler/CtContractChangeWorkflowHandlerTest.java`：新增合同变更审批重复回调断言，覆盖 `CT_CHANGE` 成本项来源、金额、项目、合同和状态一致性。
+- `backend/src/test/java/com/cgcpms/variation/handler/VarOrderWorkflowHandlerTest.java`：新增 COST 方向签证审批断言，覆盖 `VAR_ORDER` 成本项与签证明细金额合计一致，重复回调不重复生成。
+- `backend/src/test/java/com/cgcpms/revenue/ContractRevenueServiceTest.java`：新增收入确认审批重复回调断言，覆盖 `CT_REVENUE` 收入调整项与来源收入确认单一致。
+- `docs/quality/issue-004-008-variation-cost-revenue-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-004-008 收口为 Done，Ready 队列推进到 ISSUE-004-009。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=CtContractChangeWorkflowHandlerTest,VarOrderWorkflowHandlerTest,ContractRevenueServiceTest" test`：先失败，新增合同变更重复回调断言暴露 `currentAmount` 被二次递增；同次运行中既有 `ContractRevenueServiceTest.testSubmitForApproval` 失败，分类为既有无关断言问题。
+- `cd backend; .\mvnw.cmd "-Dtest=CtContractChangeWorkflowHandlerTest,VarOrderWorkflowHandlerTest,ContractRevenueServiceTest#testOnApproved_RevenueAdjustmentIsIdempotent" test`：通过，`15` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过，失败类集中在既有 `dashboard`、`invoice validation`、`migration`、`payment`、`purchase`、`revenue submitForApproval`、`workflow` 集成测试；本轮目标回归断言已通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
+- 本轮未修复收入确认提交审批既有失败断言；收入调整链路以审批回调 `onApproved` 幂等为本 Issue 验收口径。

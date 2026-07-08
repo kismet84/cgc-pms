@@ -61,6 +61,12 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
         if (change == null) {
             throw new IllegalStateException("合同变更不存在，changeId=" + changeId);
         }
+        if ("APPROVED".equals(change.getApprovalStatus())
+                && Integer.valueOf(1).equals(change.getEffectiveFlag())
+                && Integer.valueOf(1).equals(change.getCostGeneratedFlag())) {
+            log.info("合同变更审批回调幂等退出 changeId={}", changeId);
+            return;
+        }
 
         // 1. Update change: approval status + effective flag
         changeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()

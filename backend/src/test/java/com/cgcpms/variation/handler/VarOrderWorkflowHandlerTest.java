@@ -1,8 +1,13 @@
 package com.cgcpms.variation.handler;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.entity.VarOrderItem;
+import com.cgcpms.variation.mapper.VarOrderItemMapper;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
@@ -13,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,6 +36,12 @@ class VarOrderWorkflowHandlerTest {
 
     @Autowired
     private VarOrderMapper varOrderMapper;
+
+    @Autowired
+    private VarOrderItemMapper varOrderItemMapper;
+
+    @Autowired
+    private CostItemMapper costItemMapper;
 
     @BeforeEach
     void setupContext() {
@@ -84,6 +96,52 @@ class VarOrderWorkflowHandlerTest {
         VarOrder updated = varOrderMapper.selectById(order.getId());
         assertNotNull(updated, "签证变更应仍然存在");
         assertEquals("APPROVED", updated.getApprovalStatus(), "审批状态应变为 APPROVED");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("ISSUE-004-008: COST方向签证审批生成来源一致成本且重复回调不重复累计")
+    void testOnApproved_CostVariationGeneratesCostItemsOnce() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(10001L);
+        order.setContractId(30001L);
+        order.setPartnerId(50001L);
+        order.setVarCode("VO-ISSUE-004-008-" + System.nanoTime());
+        order.setVarName("ISSUE-004-008 成本签证");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        order.setReportedAmount(new BigDecimal("12000.00"));
+        order.setApprovalStatus("DRAFT");
+        order.setCostGeneratedFlag(0);
+        order.setTenantId(TENANT_0);
+        varOrderMapper.insert(order);
+
+        VarOrderItem item1 = item(order.getId(), "签证材料调整", "7000.00", 90001L);
+        VarOrderItem item2 = item(order.getId(), "签证人工调整", "5000.00", 90002L);
+        varOrderItemMapper.insert(item1);
+        varOrderItemMapper.insert(item2);
+
+        WorkflowContext ctx = contextFor(order.getId(), 2400003L);
+
+        handler.onApproved(ctx);
+        handler.onApproved(ctx);
+
+        VarOrder updated = varOrderMapper.selectById(order.getId());
+        assertEquals("APPROVED", updated.getApprovalStatus());
+        assertEquals(1, updated.getCostGeneratedFlag());
+
+        var costs = costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getTenantId, TENANT_0)
+                .eq(CostItem::getSourceType, "VAR_ORDER")
+                .eq(CostItem::getSourceId, order.getId())
+                .orderByAsc(CostItem::getAmount));
+        assertEquals(2, costs.size(), "重复审批回调不应重复生成签证成本项");
+        assertMoneyEquals("12000.00", costs.stream()
+                .map(CostItem::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        assertTrue(costs.stream().allMatch(cost -> "VARIATION".equals(cost.getCostType())));
+        assertTrue(costs.stream().allMatch(cost -> "CONFIRMED".equals(cost.getCostStatus())));
+        assertTrue(costs.stream().allMatch(cost -> cost.getSourceItemId() != null));
     }
 
     @Test
@@ -150,5 +208,32 @@ class VarOrderWorkflowHandlerTest {
 
         VarOrder updated = varOrderMapper.selectById(order.getId());
         assertEquals("DRAFT", updated.getApprovalStatus(), "撤回后审批状态应变为 DRAFT");
+    }
+
+    private VarOrderItem item(Long orderId, String itemName, String amount, Long costSubjectId) {
+        VarOrderItem item = new VarOrderItem();
+        item.setTenantId(TENANT_0);
+        item.setVarOrderId(orderId);
+        item.setItemName(itemName);
+        item.setUnit("项");
+        item.setQuantity(BigDecimal.ONE);
+        item.setUnitPrice(new BigDecimal(amount));
+        item.setAmount(new BigDecimal(amount));
+        item.setCostSubjectId(costSubjectId);
+        return item;
+    }
+
+    private WorkflowContext contextFor(Long businessId, Long instanceId) {
+        WfInstance instance = new WfInstance();
+        instance.setBusinessId(businessId);
+        instance.setId(instanceId);
+        WorkflowContext ctx = new WorkflowContext();
+        ctx.setInstance(instance);
+        return ctx;
+    }
+
+    private void assertMoneyEquals(String expected, BigDecimal actual) {
+        assertNotNull(actual);
+        assertEquals(0, new BigDecimal(expected).compareTo(actual));
     }
 }
