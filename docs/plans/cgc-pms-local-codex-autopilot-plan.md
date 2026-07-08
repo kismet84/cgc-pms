@@ -640,7 +640,7 @@ powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-
 
 - AGENTS.override.md
 - AGENTS.md
-- docs/plans/cgc-pms-production-enhancement-plan.md
+- docs/backlog/cgc-pms-production-enhancement-plan.md
 - docs/backlog/current-focus.md
 - docs/backlog/ready-issues.md
 - docs/backlog/blocked-issues.md
@@ -1193,7 +1193,7 @@ powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-
 第一轮完成 AutoPilot 框架后，第二轮可以启动治理任务：
 
 ```text
-请基于 docs/plans/cgc-pms-production-enhancement-plan.md 和 docs/backlog/epics.md，
+请基于 docs/backlog/cgc-pms-production-enhancement-plan.md 和 docs/backlog/epics.md，
 将 P0 阶段拆成可执行 Ready Issues。
 
 只允许修改：

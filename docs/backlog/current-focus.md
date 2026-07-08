@@ -4,6 +4,12 @@
 
 P0：主链路回归与生产准入补强
 
+## 任务来源
+
+- 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
+- 当前执行队列：`docs/backlog/ready-issues.md`
+- 当前执行队列没有合格 Ready Issue 时，只允许按本文件的当前阶段和禁止范围，从长期总任务池拆出下一批 Ready Issue；拆解轮不直接修改业务代码。
+
 ## 当前允许执行的 Epic
 
 - EPIC-004：主链路回归

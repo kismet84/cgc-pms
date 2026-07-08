@@ -19,6 +19,8 @@
 
 ## 轮次门禁
 
+- AutoPilot 采用两级队列：`docs/backlog/cgc-pms-production-enhancement-plan.md` 是长期总任务池，`docs/backlog/ready-issues.md` 是当前执行队列。
+- 当当前执行队列没有合格 Ready Issue 时，本轮只从长期总任务池中按 `current-focus.md` 拆出最多 3 个小型 Ready Issue 并更新 backlog；拆解轮不直接修改业务代码，下一轮再执行。
 - 只能从 `docs/backlog/ready-issues.md` 选择状态为 `Ready` 的 Issue。
 - 开始前、选题后、改代码前、跑验证前、更新报告后都要检查 `.codex-autopilot/stop.flag` 与 `.codex-autopilot/pause.flag`。
 - 每轮最多处理 1 个 Issue，最多修改 20 个文件，不跨两个 Epic 混做。

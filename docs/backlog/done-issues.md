@@ -24,3 +24,10 @@
 合并方式：auto-merge/local-commit-only
 验证结果：通过
 相关报告：docs/quality/issue-004-001-cost-ledger-regression.md；docs/iterations/iteration-2026-07-08-report.md
+
+### ISSUE-004-002：采购收货库存数量一致性回归
+
+完成日期：2026-07-08
+合并方式：auto-merge/local-commit-only
+验证结果：通过
+相关报告：docs/quality/issue-004-002-purchase-receipt-inventory-regression.md；docs/iterations/iteration-2026-07-08-report.md

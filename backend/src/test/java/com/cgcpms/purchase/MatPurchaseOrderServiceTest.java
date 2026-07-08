@@ -1,6 +1,6 @@
 package com.cgcpms.purchase;
 
-import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
@@ -9,10 +9,10 @@ import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.purchase.service.MatPurchaseOrderService;
 import com.cgcpms.purchase.vo.MatPurchaseOrderItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
-import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,12 +33,30 @@ class MatPurchaseOrderServiceTest {
     @Autowired private MatPurchaseOrderService service;
     @Autowired private MatPurchaseOrderMapper orderMapper;
     @Autowired private MatPurchaseOrderItemMapper itemMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @BeforeEach void setupContext() {
-        UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")
-                .add("tenantId", TENANT_ID).add("roleCodes", List.of("ADMIN")).build());
+        TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
+        ensureWorkflowApprover();
     }
-    @AfterEach void clearContext() { UserContext.clear(); }
+    @AfterEach void clearContext() {
+        jdbcTemplate.update("DELETE FROM sys_user WHERE id = ? AND username = ?", USER_ADMIN, "test_purchase_approver");
+        TestUserContext.clear();
+    }
+
+    private void ensureWorkflowApprover() {
+        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, USER_ADMIN);
+        if (count != null && count > 0) {
+            return;
+        }
+        jdbcTemplate.update("""
+                INSERT INTO sys_user
+                    (id, tenant_id, username, password, real_name, status, is_admin,
+                     created_by, updated_by, deleted_flag, deleted_token, remark)
+                VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?)
+                """, USER_ADMIN, TENANT_ID, "test_purchase_approver", "{noop}test",
+                "采购审批测试人", USER_ADMIN, USER_ADMIN, "MatPurchaseOrderServiceTest local approver");
+    }
 
     @Test @Transactional @DisplayName("create → auto-generates PO code, returns ID")
     void testCreate() {
@@ -76,8 +94,8 @@ class MatPurchaseOrderServiceTest {
         order.setOrderType("PURCHASE");
         Long id = service.create(order);
 
-        UserContext.clear();
-        UserContext.set(Jwts.claims().add("userId", 999L).add("tenantId", 999L).add("roleCodes", List.of("ADMIN")).build());
+        TestUserContext.clear();
+        TestUserContext.setUser(999L, 999L, "other-tenant", List.of("ADMIN"));
         assertThrows(BusinessException.class, () -> service.getById(id));
     }
 
@@ -88,9 +106,8 @@ class MatPurchaseOrderServiceTest {
         order.setOrderType("PURCHASE");
         Long id = service.create(order);
 
-        UserContext.clear();
-        UserContext.set(Jwts.claims().add("userId", 999L).add("username", "no-project")
-                .add("tenantId", TENANT_ID).add("roleCodes", List.of()).build());
+        TestUserContext.clear();
+        TestUserContext.setUser(TENANT_ID, 999L, "no-project", List.of());
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.getById(id));
         assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());

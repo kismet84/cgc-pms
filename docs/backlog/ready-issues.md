@@ -1,5 +1,11 @@
 # Ready Issues
 
+## 任务来源
+
+- 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
+- 本文件是当前执行队列，不是任务源全集。
+- 当本文件没有合格 Ready Issue 时，AutoPilot 应先从长期总任务池中按 `current-focus.md` 拆出最多 3 个一轮可执行 Issue；该轮只更新 backlog，不直接修改业务代码。
+
 ## AutoPilot 自动合并门禁
 
 - Ready Issue 在允许修改范围内完成实现与自审后，允许自动合并；`autoPush=false`，不自动推送。
@@ -14,48 +20,12 @@
 
 ## 执行顺序建议
 
-1. ISSUE-004-002
-2. ISSUE-004-003
-3. ISSUE-005-001
-4. ISSUE-006-001
-5. ISSUE-007-001
+1. ISSUE-004-003
+2. ISSUE-005-001
+3. ISSUE-006-001
+4. ISSUE-007-001
 
 ## P0
-
-### ISSUE-004-002：采购收货库存数量一致性回归
-
-优先级：P0  
-类型：回归 / 后端 / 测试  
-状态：Ready  
-自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
-目标：
-- 仅围绕采购单、收货单、库存流水数量链路做一致性回归，修正最小必要实现或测试，避免一次扩散到付款、发票、审批域。
-
-允许修改：
-- `backend/src/main/java/**/purchase/**`
-- `backend/src/main/java/**/receipt/**`
-- `backend/src/main/java/**/inventory/**`
-- `backend/src/test/java/**/purchase/**`
-- `backend/src/test/java/**/receipt/**`
-- `backend/src/test/java/**/inventory/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-
-禁止修改：
-- `frontend-admin/**`
-- `backend/src/main/java/**/payment/**`
-- `backend/src/main/java/**/invoice/**`
-- `backend/src/main/resources/db/migration/**`
-- `.codex-autopilot/**`
-
-验收标准：
-- 采购下单、收货、入出库后的数量链路一致。
-- 回归测试覆盖至少一个正常链路和一个边界链路。
-- 质量报告能解释修复点与未覆盖范围。
-
-验证命令：
-- `cd backend; .\mvnw.cmd -Dtest=MatPurchaseOrderServiceTest,MatReceiptServiceTest,InventoryServiceTest test`
-- `git diff --check`
 
 ### ISSUE-004-003：付款发票审批状态链路回归
 
@@ -63,6 +33,7 @@
 类型：回归 / 后端 / 测试  
 状态：Ready  
 自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
+来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#74-p0-4成本采购库存付款发票审批主链路回归`
 目标：
 - 仅聚焦付款申请、发票登记、审批状态三者的一致性回归，补齐状态断言与报告，不扩展到财务集成。
 
@@ -100,6 +71,7 @@
 类型：前端 / 生产化  
 状态：Ready  
 自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
+来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#75-p1-2前端列表页生产化`
 目标：
 - 仅补强付款列表与发票列表的筛选回显、空态、错误态和重试入口，避免一次性扩到全部列表页。
 
@@ -136,6 +108,7 @@
 类型：安全 / 后端 / 前端  
 状态：Ready  
 自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
+来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#76-p1-3文件上传与发票识别安全增强`
 目标：
 - 以最小改动补齐文件上传大小与类型白名单校验，并让发票识别失败返回可理解错误，不在本轮引入病毒扫描或外部安全服务。
 
@@ -172,6 +145,7 @@
 类型：运维 / 文档 / 后端  
 状态：Ready  
 自动合并：允许；必须通过自动合并门禁；`autoPush=false`  
+来源：`docs/backlog/cgc-pms-production-enhancement-plan.md#77-p1-4生产监控日志与备份恢复`
 目标：
 - 仅补 traceId/requestId 等访问日志上下文字段及最小备份清单文档，不在本轮做完整监控平台接入。
 
@@ -208,3 +182,11 @@
 状态：Done  
 自动合并：否  
 归档报告：`docs/iterations/iteration-2026-07-08-report.md`
+
+### ISSUE-004-002：采购收货库存数量一致性回归
+
+优先级：P0
+类型：回归 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+归档报告：`docs/quality/issue-004-002-purchase-receipt-inventory-regression.md`

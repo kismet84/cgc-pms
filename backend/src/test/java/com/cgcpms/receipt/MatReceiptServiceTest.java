@@ -1,9 +1,15 @@
 package com.cgcpms.receipt;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
+import com.cgcpms.purchase.service.MatPurchaseOrderService;
 import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.receipt.service.MatReceiptService;
 import com.cgcpms.receipt.vo.MatReceiptVO;
@@ -14,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,6 +41,12 @@ class MatReceiptServiceTest {
 
     @Autowired
     private MatReceiptMapper receiptMapper;
+
+    @Autowired
+    private MatPurchaseOrderService orderService;
+
+    @Autowired
+    private MatPurchaseOrderItemMapper orderItemMapper;
 
     private static final long PROJECT_ID = 10001L;
 
@@ -121,6 +134,60 @@ class MatReceiptServiceTest {
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 receiptService.getById(99999L));
         assertEquals("RECEIPT_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("R-2c: 保存收货明细同步采购已收数量，替换明细后不重复累计")
+    void testSaveItemsBatchSyncsPurchaseReceivedQuantity() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long orderId = orderService.create(order);
+
+        MatPurchaseOrderItem orderItem = new MatPurchaseOrderItem();
+        orderItem.setOrderId(orderId);
+        orderItem.setProjectId(PROJECT_ID);
+        orderItem.setMaterialId(1001L);
+        orderItem.setQuantity(new BigDecimal("10.0000"));
+        orderItem.setUnitPrice(new BigDecimal("2.0000"));
+        orderItem.setAmount(new BigDecimal("20.0000"));
+        orderService.saveItemsBatch(orderId, List.of(orderItem));
+        Long orderItemId = orderItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                        .eq(MatPurchaseOrderItem::getOrderId, orderId))
+                .stream()
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        MatReceipt receipt = buildReceipt("QUALIFIED");
+        receipt.setOrderId(orderId);
+        Long receiptId = receiptService.create(receipt);
+
+        MatReceiptItem first = new MatReceiptItem();
+        first.setOrderItemId(orderItemId);
+        first.setMaterialId(1001L);
+        first.setActualQuantity(new BigDecimal("4.0000"));
+        first.setQualifiedQuantity(new BigDecimal("3.0000"));
+        first.setUnitPrice(new BigDecimal("2.0000"));
+        first.setAmount(new BigDecimal("8.0000"));
+        receiptService.saveItemsBatch(receiptId, List.of(first));
+        assertEquals(0, new BigDecimal("4.0000")
+                .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
+
+        MatReceiptItem replacement = new MatReceiptItem();
+        replacement.setOrderItemId(orderItemId);
+        replacement.setMaterialId(1001L);
+        replacement.setActualQuantity(new BigDecimal("2.0000"));
+        replacement.setQualifiedQuantity(new BigDecimal("2.0000"));
+        replacement.setUnitPrice(new BigDecimal("2.0000"));
+        replacement.setAmount(new BigDecimal("4.0000"));
+        receiptService.saveItemsBatch(receiptId, List.of(replacement));
+        assertEquals(0, new BigDecimal("2.0000")
+                .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
+
+        receiptService.saveItemsBatch(receiptId, List.of());
+        assertEquals(0, BigDecimal.ZERO
+                .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
     }
 
     // ═══════════════════════════════════════════════════════════════

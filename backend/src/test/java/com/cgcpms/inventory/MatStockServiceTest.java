@@ -86,6 +86,23 @@ class MatStockServiceTest {
         assertEquals(0, qty.compareTo(txn.getAvailableAfter()));
     }
 
+    @Test
+    @Transactional
+    @DisplayName("REGRESSION: 收货来源入库保留库存流水来源")
+    void testStockInKeepsReceiptSourceOnTxn() {
+        long receiptId = 88002002L;
+        BigDecimal qty = new BigDecimal("7.0000");
+        stockService.stockIn(WAREHOUSE_ID, MATERIAL_ID, qty, "MAT_RECEIPT", receiptId);
+
+        MatStockLedgerVO ledger = stockService.getLedger(WAREHOUSE_ID, MATERIAL_ID, null, null, null, null, 1, 20);
+        assertEquals(1, ledger.getTxns().getTotal());
+        var txn = ledger.getTxns().getRecords().get(0);
+        assertEquals("IN", txn.getTxnType());
+        assertEquals(0, qty.compareTo(txn.getQuantity()));
+        assertEquals("MAT_RECEIPT", txn.getSourceType());
+        assertEquals(receiptId, txn.getSourceId());
+    }
+
     // ═══════════════════════════════════════════════════════════
     // RED → GREEN: stockIn — 累加入库
     // ═══════════════════════════════════════════════════════════

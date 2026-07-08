@@ -176,6 +176,8 @@ CI 与验收失败分类规则：
 ### Ready Issue 与 checkpoint
 
 - 业务或治理变更前必须先确认任务来自 `docs/backlog/ready-issues.md`
+- AutoPilot 任务来源采用两级队列：`docs/backlog/cgc-pms-production-enhancement-plan.md` 是长期总任务池，`docs/backlog/ready-issues.md` 是当前执行队列
+- 当 `docs/backlog/ready-issues.md` 没有合格 Ready Issue 时，只能先读取长期总任务池，并按 `docs/backlog/current-focus.md` 拆出最多 3 个小型 Ready Issue；本轮只做拆解与队列更新，不得边拆边改业务代码
 - 每个关键 checkpoint 都要检查 `.codex-autopilot/stop.flag` 和 `.codex-autopilot/pause.flag`
 - 至少在开始前、选任务后、改代码前、跑验证前、自动合并前、更新报告后检查一次 stop/pause
 
