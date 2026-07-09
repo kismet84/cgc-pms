@@ -907,13 +907,18 @@ class AlertEvaluationServiceTest {
     }
 
     private void insertRuleConfig(String ruleType, BigDecimal thresholdRatio, Integer windowDays, String severityOverride) {
+        insertRuleConfig(ruleType, thresholdRatio, windowDays, severityOverride, 1);
+    }
+
+    private void insertRuleConfig(String ruleType, BigDecimal thresholdRatio, Integer windowDays,
+                                  String severityOverride, Integer dedupHours) {
         AlertRuleConfig config = new AlertRuleConfig();
         config.setTenantId(TENANT_ID);
         config.setRuleType(ruleType);
         config.setAlertDomain(alertDomain(ruleType));
         config.setAlertCategory(alertCategory(ruleType));
         config.setEnabled(1);
-        config.setDedupHours(1);
+        config.setDedupHours(dedupHours);
         config.setThresholdRatio(thresholdRatio);
         config.setWindowDays(windowDays);
         config.setSeverityOverride(severityOverride);
@@ -924,7 +929,9 @@ class AlertEvaluationServiceTest {
     private String alertDomain(String ruleType) {
         return switch (ruleType) {
             case "DYNAMIC_COST_EXCEEDS_TARGET" -> "COST";
+            case "CONTRACT_OVERDUE" -> "CONTRACT";
             case "CONTRACT_EXPIRING" -> "CONTRACT";
+            case "PURCHASE_DELIVERY_OVERDUE" -> "PURCHASE";
             default -> "OTHER";
         };
     }
@@ -932,7 +939,9 @@ class AlertEvaluationServiceTest {
     private String alertCategory(String ruleType) {
         return switch (ruleType) {
             case "DYNAMIC_COST_EXCEEDS_TARGET" -> "COST_DYNAMIC";
+            case "CONTRACT_OVERDUE" -> "CONTRACT_TERM";
             case "CONTRACT_EXPIRING" -> "CONTRACT_TERM";
+            case "PURCHASE_DELIVERY_OVERDUE" -> "PURCHASE_DELIVERY";
             default -> "OTHER";
         };
     }
@@ -956,6 +965,40 @@ class AlertEvaluationServiceTest {
                 .eq(AlertLog::getTenantId, TENANT_ID)
                 .eq(AlertLog::getProjectId, testProjectId)
                 .eq(AlertLog::getRuleType, ruleType));
+    }
+
+    private AlertLog insertDedupAlert(Long projectId, String ruleType, String alertDomain, String alertCategory,
+                                      String dedupKey, LocalDateTime triggeredAt) {
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(projectId);
+        alert.setRuleType(ruleType);
+        alert.setAlertDomain(alertDomain);
+        alert.setAlertCategory(alertCategory);
+        alert.setDedupKey(dedupKey);
+        alert.setSeverity("HIGH");
+        alert.setMessage("去重测试已有告警");
+        alert.setTriggeredAt(triggeredAt);
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setDeletedFlag(0);
+        alertLogMapper.insert(alert);
+        return alert;
+    }
+
+    private MatPurchaseOrder overduePurchaseOrder(String orderCode, LocalDate deliveryDate) {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setTenantId(TENANT_ID);
+        order.setProjectId(testProjectId);
+        order.setOrderCode(orderCode);
+        order.setOrderType("MATERIAL");
+        order.setOrderDate(deliveryDate.minusDays(7));
+        order.setDeliveryDate(deliveryDate);
+        order.setOrderStatus("APPROVED");
+        order.setApprovalStatus("APPROVED");
+        order.setTotalAmount(new BigDecimal("1200.00"));
+        order.setDeletedFlag(0);
+        return order;
     }
 
     @Test
@@ -1254,6 +1297,95 @@ class AlertEvaluationServiceTest {
                         .eq(AlertLog::getProjectId, testProjectId)
                         .eq(AlertLog::getRuleType, "CONTRACT_OVERDUE"));
         assertEquals(1, overdueAlerts.size(), "24小时内去重应生效，同规则只保留1条");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA14b: 规则治理 — dedup_hours 窗口内重复评估不生成第二条有效告警")
+    void testRuleGovernance_DedupHoursSuppressesWithinConfiguredWindow() {
+        deleteRuleConfig("CONTRACT_OVERDUE");
+        deleteAlerts("CONTRACT_OVERDUE");
+        insertRuleConfig("CONTRACT_OVERDUE", null, null, null, 2);
+
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().minusDays(1));
+        contractMapper.updateById(contract);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        List<AlertLog> alerts = alertsByRuleType("CONTRACT_OVERDUE");
+        assertEquals(1, alerts.size(), "dedup_hours=2 窗口内重复评估不应新增第二条有效告警");
+        assertEquals("P:" + testProjectId + ":R:CONTRACT_OVERDUE", alerts.get(0).getDedupKey());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA14c: 规则治理 — 缩小 dedup_hours 后窗口外旧告警允许重新生成")
+    void testRuleGovernance_DedupHoursAllowsAfterWindowShrinks() {
+        deleteRuleConfig("CONTRACT_OVERDUE");
+        deleteAlerts("CONTRACT_OVERDUE");
+        insertRuleConfig("CONTRACT_OVERDUE", null, null, null, 1);
+        insertDedupAlert(testProjectId, "CONTRACT_OVERDUE", "CONTRACT", "CONTRACT_TERM",
+                "P:" + testProjectId + ":R:CONTRACT_OVERDUE", LocalDateTime.now().minusHours(2));
+
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().minusDays(1));
+        contractMapper.updateById(contract);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        assertEquals(2, alertsByRuleType("CONTRACT_OVERDUE").size(),
+                "旧告警在默认24小时内但已超出配置 dedup_hours=1 时，应允许重新生成");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA14d: 规则治理 — 去重键不串并不同规则、业务键和项目边界")
+    void testRuleGovernance_DedupKeySeparatesRuleSourceAndProjectBoundaries() {
+        deleteRuleConfig("CONTRACT_OVERDUE");
+        deleteRuleConfig("CONTRACT_EXPIRING");
+        deleteRuleConfig("PURCHASE_DELIVERY_OVERDUE");
+        deleteAlerts("CONTRACT_OVERDUE");
+        deleteAlerts("CONTRACT_EXPIRING");
+        deleteAlerts("PURCHASE_DELIVERY_OVERDUE");
+        insertRuleConfig("CONTRACT_OVERDUE", null, null, null, 24);
+        insertRuleConfig("CONTRACT_EXPIRING", null, 30, null, 24);
+        insertRuleConfig("PURCHASE_DELIVERY_OVERDUE", null, null, null, 24);
+
+        insertDedupAlert(testProjectId, "CONTRACT_OVERDUE", "CONTRACT", "CONTRACT_TERM",
+                "P:" + testProjectId + ":R:CONTRACT_OVERDUE", LocalDateTime.now().minusMinutes(30));
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().plusDays(15));
+        contractMapper.updateById(contract);
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+        assertEquals(1, alertsByRuleType("CONTRACT_EXPIRING").size(),
+                "同项目不同规则类型不能被 CONTRACT_OVERDUE 的去重键抑制");
+
+        MatPurchaseOrder firstOrder = overduePurchaseOrder("ALERT-PO-DEDUP-001", LocalDate.now().minusDays(3));
+        purchaseOrderMapper.insert(firstOrder);
+        MatPurchaseOrder secondOrder = overduePurchaseOrder("ALERT-PO-DEDUP-002", LocalDate.now().minusDays(2));
+        purchaseOrderMapper.insert(secondOrder);
+        insertDedupAlert(testProjectId, "PURCHASE_DELIVERY_OVERDUE", "PURCHASE", "PURCHASE_DELIVERY",
+                "S:PURCHASE_ORDER:" + firstOrder.getId() + ":R:PURCHASE_DELIVERY_OVERDUE",
+                LocalDateTime.now().minusMinutes(30));
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+        Long secondOrderAlerts = alertLogMapper.selectCount(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, testProjectId)
+                .eq(AlertLog::getRuleType, "PURCHASE_DELIVERY_OVERDUE")
+                .eq(AlertLog::getSourceId, secondOrder.getId()));
+        assertEquals(1L, secondOrderAlerts, "同规则不同采购订单 sourceId 不能被错误串并");
+
+        Long otherProjectId = 84001L;
+        seedProject(otherProjectId, "ALERT-DEDUP-OTHER", USER_CREATOR);
+        seedOverdueContract(84001L, otherProjectId, "A-CT-DEDUP-OTHER");
+        alertService.evaluateProject(TENANT_ID, otherProjectId);
+        Long otherProjectAlerts = alertLogMapper.selectCount(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, otherProjectId)
+                .eq(AlertLog::getRuleType, "CONTRACT_OVERDUE"));
+        assertEquals(1L, otherProjectAlerts, "同规则不同项目不能被其他项目的 project dedupKey 抑制");
     }
 
     @Test

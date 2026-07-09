@@ -124,6 +124,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-020-rule-governance-config-effectiveness.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-021：规则治理中心平台化缺口-M3：规则侧去重时窗与重复预警抑制生效回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；规则侧去重时窗与重复预警抑制生效回归已补齐；后端 61 项测试、D 最终验收、E 最终复审与 git diff --check 通过；`启动迭代-10` 已达到 `10/10` 上限并停止继续派发
+验证结果：通过
+相关报告：docs/quality/issue-008-021-rule-governance-dedup-suppression-window.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

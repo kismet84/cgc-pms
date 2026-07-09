@@ -1,6 +1,7 @@
 ## Ready 队列状态
 
 - 当前无合格 Ready Issue。
+- `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
 - `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
 - `ISSUE-008-019` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `8/10` 个实施型 Ready Issue。
 - `ISSUE-008-018：通知平台平台化缺口-M4：同告警重复通知抑制与站内信频控回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `7/10` 个实施型 Ready Issue。
@@ -37,8 +38,8 @@
 
 ## 执行顺序建议
 
-1. 当前 Ready 队列已空，需由主线程/A 基于长期任务池重新裁决下一条 P2 Ready。
-2. 后续若继续规则治理中心或切换到 WBS / 甘特图、供应商评分 / 采购增强、通知平台后续题，仍需重新确认优先级与并行边界。
+1. `启动迭代-10` 已达到 `10/10` 上限，当前停止继续派发下一任务。
+2. 后续若继续规则治理中心或切换到 WBS / 甘特图、供应商评分 / 采购增强、通知平台后续题，仍需由主线程/A 重新确认优先级、并行边界与启用条件。
 
 ## P0
 
@@ -235,6 +236,42 @@
 归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
 
 ## P2
+
+### ISSUE-008-021：规则治理中心平台化缺口-M3：规则侧去重时窗与重复预警抑制生效回归
+
+优先级：P2
+类型：规则治理中心 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.2 规则治理中心` 节“去重策略 / 抑制策略”；`docs/quality/issue-008-006-规则治理中心.md`；`docs/quality/issue-008-020-rule-governance-config-effectiveness.md`；`docs/quality/issue-008-018-notification-dedup-frequency-guard.md`
+是否需要新增 migration：否；优先复用现有 `alert_rule_config.dedup_hours`、`AlertRuleEvaluator` 与 `AlertEvaluationServiceTest`，不新增规则治理表结构。
+目标：
+- 补齐 `alert_rule_config.dedup_hours` 在规则评估侧的最小生效回归，证明同一规则、同一业务对象在去重窗口内不会重复生成第二条告警，而超出窗口后仍可再次生成。
+- 明确“规则侧重复告警抑制”与已完成的“通知平台分发侧抑制 / 并发幂等”边界，避免把通知发送去重当成规则治理已闭环。
+- 不扩大为规则治理中心页面、规则设计器、执行日志、效果分析、外部渠道通知或新一轮 migration。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 新增规则治理表、规则设计器、执行日志页、效果分析页
+- 邮件、短信、企业微信、钉钉、WebSocket 等外部渠道真实接入
+- 借机放宽预警域、租户、角色、项目边界或把现有规则评估链路改造成大范围通用规则引擎
+验收标准：
+- 至少一组后端回归证明：同一规则、同一业务对象在 `dedup_hours` 窗口内重复评估时，不会生成第二条有效告警。
+- 至少一组后端回归证明：超出 `dedup_hours` 窗口或显式缩小窗口后，规则可重新生成新的告警，不会被永久抑制。
+- 至少一组后端回归证明：不同规则类型、不同业务键或不同项目边界不会被错误串并，既有 `enabled`、`threshold_ratio`、`window_days`、`severity_override` 生效语义不回退。
+- 不新增 migration，不修改已应用 migration；不把通知平台分发侧抑制、并发幂等或发送记录语义误包装为本 Issue 收口依据。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-021-rule-governance-dedup-suppression-window.md`
 
 ### ISSUE-008-020：规则治理中心平台化缺口-M2：阈值/窗口/严重度配置生效回归
 
