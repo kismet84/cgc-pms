@@ -4,6 +4,7 @@ param(
   [string]$IssueId = "",
   [string]$Title = "",
   [string]$ReadyPath = "",
+  [string]$RunId = "",
   [switch]$DryRun,
   [switch]$Noop
 )
@@ -104,6 +105,37 @@ function New-Result {
   }
 }
 
+function Write-RunEvent {
+  param(
+    [string]$RunDir,
+    [string]$Event,
+    [object]$Data
+  )
+
+  $eventPath = Join-Path $RunDir "events.jsonl"
+  $payload = [ordered]@{
+    timestamp = Get-Date -Format o
+    event = $Event
+    mode = if ($DryRun) { "dry-run" } elseif ($Noop) { "noop" } else { "noop" }
+    issueId = if ($Data.issueId) { $Data.issueId } else { "" }
+    title = if ($Data.title) { $Data.title } else { $Title }
+    checkpoint = if ($Data.checkpoint) { $Data.checkpoint } else { "" }
+    decision = if ($Data.decision) { $Data.decision } else { "" }
+    status = if ($Data.status) { $Data.status } else { "" }
+    stopReason = if ($Data.stopReason) { $Data.stopReason } else { "" }
+    dryRun = [bool]$DryRun
+    apply = $false
+    maxIterations = $null
+  }
+  foreach ($name in @($Data.PSObject.Properties.Name)) {
+    if ($payload.Contains($name)) {
+      continue
+    }
+    $payload[$name] = $Data.$name
+  }
+  ($payload | ConvertTo-Json -Compress -Depth 8) | Add-Content -Encoding utf8 $eventPath
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (!$ConfigPath) {
   $ConfigPath = Join-Path $scriptDir "codex-autopilot.config.json"
@@ -122,9 +154,17 @@ New-Item -ItemType Directory -Path $runsDir -Force | Out-Null
 $issues = @(Get-IssueBlocks $ReadyPath)
 $issue = Select-Issue $issues $IssueId $Title
 $gitSummary = Get-GitSummary $RepoRoot
-$runId = Get-Date -Format "yyyyMMdd-HHmmss"
+if (!$RunId) {
+  $RunId = "{0}-{1}" -f (Get-Date -Format "yyyyMMdd-HHmmss-fff"), $PID
+}
+$runId = $RunId
 $runDir = Join-Path $runsDir $runId
 New-Item -ItemType Directory -Path $runDir -Force | Out-Null
+Write-RunEvent $runDir "executor.start" ([pscustomobject]@{
+  issueId = if ($issue) { $issue.issueId } else { $IssueId }
+  title = if ($issue) { $issue.title } else { $Title }
+  decision = "EXECUTOR_START"
+})
 
 if (!$issue) {
   $result = New-Result "" $Title "blocked" "ready_issue_config" "STOP" "STOP_READY_ISSUE_NOT_FOUND" $gitSummary @(
@@ -140,6 +180,15 @@ if (!$issue) {
 
 $resultPath = Join-Path $runDir "result.json"
 $result | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 $resultPath
+Write-RunEvent $runDir "executor.result" ([pscustomobject]@{
+  issueId = $result.issueId
+  title = $result.title
+  decision = $result.nextAction
+  status = $result.status
+  stopReason = $result.stopReason
+  failureCategory = $result.failureCategory
+  resultPath = $resultPath
+})
 Write-Host "EXECUTOR_RESULT_WRITTEN"
 Write-Host "runId=$runId"
 Write-Host "resultPath=$resultPath"

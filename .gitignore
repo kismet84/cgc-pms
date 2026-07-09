@@ -75,6 +75,7 @@ admin-state.json
 .codex/
 .codex-autopilot/*.flag
 .codex-autopilot/state.json
+.codex-autopilot/runs/
 !.codex-autopilot/ALLOW_TEST_DATA_RESET
 .omc/
 .omo/

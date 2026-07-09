@@ -160,6 +160,38 @@ function Assert-ResultSchema {
   }
 }
 
+function Get-LatestRunDir {
+  param([string]$Root)
+
+  $runDir = Get-ChildItem -Path (Join-Path $Root ".codex-autopilot\runs") -Directory |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  if (!$runDir) {
+    throw "Expected latest run directory to exist"
+  }
+  return $runDir
+}
+
+function Get-RunEvents {
+  param([string]$Root)
+
+  $eventPath = Join-Path (Get-LatestRunDir $Root).FullName "events.jsonl"
+  if (!(Test-Path $eventPath)) {
+    throw "Expected events.jsonl to exist"
+  }
+  return @(Get-Content -LiteralPath $eventPath | ForEach-Object { $_ | ConvertFrom-Json })
+}
+
+function Assert-EventSchema {
+  param([object]$Event)
+
+  foreach ($field in @("timestamp", "event", "mode", "issueId", "title", "checkpoint", "decision", "status", "stopReason", "dryRun", "apply", "maxIterations")) {
+    if ($Event.PSObject.Properties.Name -notcontains $field) {
+      throw "Missing events.jsonl field: $field"
+    }
+  }
+}
+
 function Get-LatestResult {
   param([string]$Root)
 
@@ -212,6 +244,10 @@ try {
   Assert-Contains $ReadyOutput "maxIssuesPerRun=1"
   Assert-Contains $ReadyOutput "BUSINESS_EXECUTION_DISABLED_M3"
   Assert-Contains $ReadyOutput "executorCommand="
+  $ReadyEvents = Get-RunEvents $ReadyRoot
+  Assert-EventSchema $ReadyEvents[0]
+  if (!($ReadyEvents | Where-Object { $_.event -eq "ready-lint" -and $_.status -eq "pass" })) { throw "Expected ready-lint pass event" }
+  if (!($ReadyEvents | Where-Object { $_.event -eq "decision" -and $_.selectedIssue -like "ISSUE-100-001*" })) { throw "Expected selectedIssue decision event" }
 
   $ExecutorDryRunOutput = Invoke-Executor $ReadyRoot "ISSUE-100-001：Runner ready branch" -DryRun
   Assert-Contains $ExecutorDryRunOutput "EXECUTOR_RESULT_WRITTEN"
@@ -226,6 +262,8 @@ try {
   Assert-Contains $ReadyLimitCompatOutput "iterationLimit=2"
   $ReadyNoopResult = Get-LatestResult $ReadyRoot
   Assert-ResultSchema $ReadyNoopResult
+  $ReadyNoopEvents = Get-RunEvents $ReadyRoot
+  if (!($ReadyNoopEvents | Where-Object { $_.event -eq "executor.result" -and $_.status -eq "noop" })) { throw "Expected executor result event" }
   $ReadyLimitState = Get-Content -Raw (Join-Path $ReadyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($ReadyLimitState.iterationLimit -ne 2) { throw "Expected state.iterationLimit=2" }
   if ($ReadyLimitState.iterationCompleted -ne 0) { throw "Expected state.iterationCompleted=0" }
@@ -235,6 +273,8 @@ try {
   Assert-Contains $ExplainReadyOutput "EXPLAIN_NEXT_ACTION"
   Assert-Contains $ExplainReadyOutput "nextAction=READY_ISSUE"
   Assert-Contains $ExplainReadyOutput "nextReady=ISSUE-100-001"
+  Assert-Contains $ExplainReadyOutput "selectedIssue=ISSUE-100-001"
+  Assert-Contains $ExplainReadyOutput "shouldSplitBacklog=false"
 
   foreach ($NonReadyStatus in @("Draft", "", "Needs Fix")) {
     $NonReadyRoot = New-Fixture -Name ("non-ready-" + ($NonReadyStatus -replace "[^A-Za-z0-9]", "empty")) -Enabled -Ready @"
@@ -274,6 +314,7 @@ try {
   Assert-Contains $MissingFieldOutput "nextAction=STOP"
   Assert-Contains $MissingFieldOutput "stopReason=STOP_READY_LINT_FAILED"
   Assert-Contains $MissingFieldOutput "missingGate=ready-lint"
+  Assert-Contains $MissingFieldOutput "selectedIssue=ISSUE-100-001"
   Assert-Contains $MissingFieldOutput "目标"
 
   $ReadyLint = Join-Path $ScriptDir "ready-lint.ps1"
@@ -324,10 +365,13 @@ try {
   Assert-Contains $SplitOutput "DRY_RUN_NO_BACKLOG_WRITE"
   $SplitReadyAfterDryRun = Get-Content -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterDryRun "状态：Ready"
+  $SplitEvents = Get-RunEvents $SplitRoot
+  if (!($SplitEvents | Where-Object { $_.event -eq "split.dry_run" -and $_.shouldSplitBacklog })) { throw "Expected dry-run split event" }
 
   $ExplainSplitOutput = Invoke-Runner $SplitRoot -Explain
   Assert-Contains $ExplainSplitOutput "EXPLAIN_NEXT_ACTION"
   Assert-Contains $ExplainSplitOutput "nextAction=SPLIT_BACKLOG"
+  Assert-Contains $ExplainSplitOutput "shouldSplitBacklog=true"
   Assert-Contains $ExplainSplitOutput "wouldCreateReadyIssueDrafts=1"
   $SplitReadyAfterExplain = Get-Content -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterExplain "状态：Ready"
@@ -372,6 +416,9 @@ try {
   $ApplyStatusJson = $ApplyStatus | ConvertFrom-Json
   if ($ApplyStatusJson.latestResultStatus -ne "noop") { throw "Expected status to expose latest noop result" }
   if (!$ApplyStatusJson.latestResultPath) { throw "Expected status to expose latestResultPath" }
+  if (!$ApplyStatusJson.latestRunId) { throw "Expected status to expose latestRunId" }
+  if ($ApplyStatusJson.latestEvent -ne "executor.result") { throw "Expected status latestEvent=executor.result" }
+  if ($ApplyStatusJson.latestStopReason -ne "STOP_EXECUTION_DISABLED_M3") { throw "Expected latestStopReason from events.jsonl" }
 
   $ActiveLockRoot = New-Fixture -Name "active-lock" -Enabled -Ready "# Ready Issues`n" -Plan @"
 # Plan

@@ -106,6 +106,31 @@ if (Test-Path $StatePath) {
 }
 
 if (Test-Path $RunsDir) {
+  $LatestRun = Get-ChildItem -Path $RunsDir -Directory -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  if ($LatestRun) {
+    $Summary.latestRunId = $LatestRun.Name
+    $LatestEventPath = Join-Path $LatestRun.FullName "events.jsonl"
+    if (Test-Path $LatestEventPath) {
+      $Summary.latestEventPath = $LatestEventPath
+      $LatestEventLine = Get-Content -LiteralPath $LatestEventPath -Tail 1
+      if ($LatestEventLine) {
+        try {
+          $LatestEvent = $LatestEventLine | ConvertFrom-Json
+          $Summary.latestEvent = $LatestEvent.event
+          $Summary.latestEventStatus = $LatestEvent.status
+          $Summary.latestEventDecision = $LatestEvent.decision
+          $Summary.latestStopReason = $LatestEvent.stopReason
+          $Summary.latestEventAt = $LatestEvent.timestamp
+          $Summary.latestEventIssueId = $LatestEvent.issueId
+          $Summary.latestEventTitle = $LatestEvent.title
+        } catch {
+          $Summary.latestEventUnreadable = $true
+        }
+      }
+    }
+  }
   $LatestResult = Get-ChildItem -Path $RunsDir -Filter result.json -Recurse -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending |
     Select-Object -First 1

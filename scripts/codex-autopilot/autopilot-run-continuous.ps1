@@ -380,6 +380,53 @@ function Write-State {
   $state | ConvertTo-Json | Out-File -Encoding utf8 $statePath
 }
 
+function New-RunContext {
+  param([string]$AutoDir)
+
+  $runsDir = Join-Path $AutoDir "runs"
+  New-Item -ItemType Directory -Path $runsDir -Force | Out-Null
+  $runId = "{0}-{1}" -f (Get-Date -Format "yyyyMMdd-HHmmss-fff"), $PID
+  $runDir = Join-Path $runsDir $runId
+  New-Item -ItemType Directory -Path $runDir -Force | Out-Null
+  return [pscustomobject]@{
+    id = $runId
+    dir = $runDir
+    events = Join-Path $runDir "events.jsonl"
+  }
+}
+
+function Write-RunEvent {
+  param(
+    [string]$Event,
+    [object]$Data = [pscustomobject]@{}
+  )
+
+  if (!$script:RunContext) {
+    return
+  }
+  $payload = [ordered]@{
+    timestamp = Get-Date -Format o
+    event = $Event
+    mode = "continuous-runner"
+    issueId = if ($Data.issueId) { $Data.issueId } else { "" }
+    title = if ($Data.title) { $Data.title } else { "" }
+    checkpoint = if ($Data.checkpoint) { $Data.checkpoint } else { "" }
+    decision = if ($Data.decision) { $Data.decision } else { "" }
+    status = if ($Data.status) { $Data.status } else { "" }
+    stopReason = if ($Data.stopReason) { $Data.stopReason } else { "" }
+    dryRun = [bool]$DryRun
+    apply = [bool]$ApplyBacklogSplit
+    maxIterations = $script:IterationLimit
+  }
+  foreach ($name in @($Data.PSObject.Properties.Name)) {
+    if ($payload.Contains($name)) {
+      continue
+    }
+    $payload[$name] = $Data.$name
+  }
+  ($payload | ConvertTo-Json -Compress -Depth 8) | Add-Content -Encoding utf8 $script:RunContext.events
+}
+
 function Get-IssueBodyByTitle {
   param(
     [string]$ReadyPath,
@@ -487,6 +534,9 @@ function Write-NextActionExplanation {
   if ($Checkpoint -ne "CONTINUE") {
     Write-Host "nextAction=STOP"
     Write-Host "stopReason=$Checkpoint"
+    Write-Host "missingGate=$Checkpoint"
+    Write-Host "shouldSplitBacklog=false"
+    Write-Host "selectedIssue="
     return
   }
 
@@ -495,6 +545,8 @@ function Write-NextActionExplanation {
       Write-Host "nextAction=STOP"
       Write-Host "stopReason=STOP_READY_LINT_FAILED"
       Write-Host "missingGate=ready-lint"
+      Write-Host "shouldSplitBacklog=false"
+      Write-Host "selectedIssue=$($ReadyIssues[0].title)"
       foreach ($errorItem in @($ReadyIssues[0].lint.errors)) {
         Write-Host "lintError=$errorItem"
       }
@@ -502,11 +554,19 @@ function Write-NextActionExplanation {
     }
     Write-Host "nextAction=READY_ISSUE"
     Write-Host "nextReady=$($ReadyIssues[0].title)"
+    Write-Host "stopReason="
+    Write-Host "missingGate="
+    Write-Host "shouldSplitBacklog=false"
+    Write-Host "selectedIssue=$($ReadyIssues[0].title)"
     return
   }
 
   if ($Candidates.Count -gt 0) {
     Write-Host "nextAction=SPLIT_BACKLOG"
+    Write-Host "stopReason="
+    Write-Host "missingGate="
+    Write-Host "shouldSplitBacklog=true"
+    Write-Host "selectedIssue="
     Write-Host "wouldCreateReadyIssueDrafts=$($Candidates.Count)"
     for ($index = 0; $index -lt $Candidates.Count; $index++) {
       Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $Candidates[$index].anchor)
@@ -516,6 +576,9 @@ function Write-NextActionExplanation {
 
   Write-Host "nextAction=STOP"
   Write-Host "stopReason=$StopReason"
+  Write-Host "missingGate=ready-issue"
+  Write-Host "shouldSplitBacklog=false"
+  Write-Host "selectedIssue="
 }
 
 function Get-ExecutorCommand {
@@ -542,7 +605,7 @@ function Invoke-IssueExecutorNoop {
     Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $IssueTitle)"
     return
   }
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $executorPath -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Title $IssueTitle -Noop
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $executorPath -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Title $IssueTitle -RunId $script:RunContext.id -Noop
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -569,6 +632,12 @@ $applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun -and -not [bool]$E
 $dryRunMode = -not $applyMode
 $script:RunLock = $null
 Initialize-IterationProgress $autoDir $readyPath $MaxIterations ([bool]$DryRun -or [bool]$ExplainNextAction)
+$script:RunContext = New-RunContext $autoDir
+Write-RunEvent "runner.start" ([pscustomobject]@{
+  decision = if ($ExplainNextAction) { "EXPLAIN_NEXT_ACTION" } elseif ($applyMode) { "APPLY_BACKLOG_SPLIT" } else { "DRY_RUN" }
+  status = "STARTED"
+  applyMode = $applyMode
+})
 
 Write-Host "CGC-PMS AutoPilot continuous runner"
 Write-Host "repoRoot=$RepoRoot"
@@ -582,9 +651,20 @@ Write-Host "applyBacklogSplit=$applyMode"
 
 if ($ExplainNextAction) {
   $checkpoint = Test-Checkpoint $autoDir
+  Write-RunEvent "checkpoint" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "EXPLAIN" })
   $readyIssues = if ($checkpoint -eq "CONTINUE") { @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir) } else { @() }
   $candidates = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0) { @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit) } else { @() }
   $stopReason = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0 -and $candidates.Count -eq 0) { Get-StopReasonForEmptyPool $readyPath } else { $checkpoint }
+  $decision = if ($checkpoint -ne "CONTINUE") { "STOP" } elseif ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -ne "pass") { "STOP_READY_LINT_FAILED" } elseif ($readyIssues.Count -gt 0) { "READY_ISSUE" } elseif ($candidates.Count -gt 0) { "SPLIT_BACKLOG" } else { "STOP" }
+  Write-RunEvent "decision" ([pscustomobject]@{
+    decision = $decision
+    issueId = if ($readyIssues.Count -gt 0) { $readyIssues[0].lint.issueId } else { "" }
+    title = if ($readyIssues.Count -gt 0) { $readyIssues[0].title } else { "" }
+    stopReason = if ($decision -eq "STOP") { $stopReason } elseif ($decision -eq "STOP_READY_LINT_FAILED") { "STOP_READY_LINT_FAILED" } else { "" }
+    missingGate = if ($decision -eq "STOP_READY_LINT_FAILED") { "ready-lint" } elseif ($decision -eq "STOP") { "ready-issue" } else { "" }
+    shouldSplitBacklog = ($decision -eq "SPLIT_BACKLOG")
+    selectedIssue = if ($readyIssues.Count -gt 0) { $readyIssues[0].title } else { "" }
+  })
   Write-NextActionExplanation $checkpoint $readyIssues $candidates $stopReason
   exit 0
 }
@@ -595,6 +675,7 @@ try {
   }
 
   if ($null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
+    Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = "STOP_ITERATION_LIMIT_REACHED"; stopReason = "STOP_ITERATION_LIMIT_REACHED" })
     Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" ([bool]$DryRun) "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
     Write-Host "STOP_ITERATION_LIMIT_REACHED"
     exit 0
@@ -602,8 +683,10 @@ try {
 
   for ($loop = 1; $loop -le $MaxLoops; $loop++) {
     $checkpoint = Test-Checkpoint $autoDir
+    Write-RunEvent "checkpoint" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "CHECKPOINT"; loop = $loop })
     Write-Host "checkpoint[$loop]=$checkpoint"
     if ($checkpoint -ne "CONTINUE") {
+      Write-RunEvent "stop" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "STOP"; status = $checkpoint; stopReason = $checkpoint; loop = $loop })
       Write-State $autoDir $checkpoint ([bool]$DryRun) "STOP" "" $checkpoint $checkpoint
       Write-Host $checkpoint
       exit 0
@@ -612,6 +695,14 @@ try {
     $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
     if ($readyIssues.Count -gt 0) {
       if ($readyIssues[0].lint.status -ne "pass") {
+        Write-RunEvent "ready-lint" ([pscustomobject]@{
+          issueId = $readyIssues[0].lint.issueId
+          title = $readyIssues[0].title
+          decision = "STOP"
+          status = "fail"
+          stopReason = "STOP_READY_LINT_FAILED"
+          missingGate = "ready-lint"
+        })
         Write-State $autoDir "STOP_READY_LINT_FAILED" ([bool]$DryRun) "STOP" $readyIssues[0].title "STOP_READY_LINT_FAILED" "STOP_READY_LINT_FAILED"
         Write-Host "STOP_READY_LINT_FAILED"
         Write-Host "selected=$($readyIssues[0].title)"
@@ -624,7 +715,20 @@ try {
       if ($script:RunLock) {
         $script:RunLock.issueId = $readyIssues[0].title
       }
+      Write-RunEvent "ready-lint" ([pscustomobject]@{
+        issueId = $readyIssues[0].lint.issueId
+        title = $readyIssues[0].title
+        decision = "PASS"
+        status = "pass"
+      })
       Write-State $autoDir "READY_ISSUE_FOUND" ([bool]$DryRun) "READY_ISSUE_FOUND" $readyIssues[0].title "READY_ISSUE_FOUND" ""
+      Write-RunEvent "decision" ([pscustomobject]@{
+        issueId = $readyIssues[0].lint.issueId
+        title = $readyIssues[0].title
+        decision = "READY_ISSUE_FOUND"
+        status = "READY_ISSUE_FOUND"
+        selectedIssue = $readyIssues[0].title
+      })
       Write-Host "READY_ISSUE_FOUND"
       Write-Host "selected=$($readyIssues[0].title)"
       Write-Host "BUSINESS_EXECUTION_DISABLED_M3"
@@ -641,30 +745,41 @@ try {
     $candidates = @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit)
     if ($candidates.Count -eq 0) {
       $stopReason = Get-StopReasonForEmptyPool $readyPath
+      Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = $stopReason; stopReason = $stopReason })
       Write-State $autoDir $stopReason $dryRunMode "STOP" "" $stopReason $stopReason
       Write-Host $stopReason
       exit 0
     }
 
     Write-Host "splitCandidateCount=$($candidates.Count)"
+    Write-RunEvent "split.candidates" ([pscustomobject]@{
+      decision = "SPLIT_BACKLOG"
+      status = "planned"
+      shouldSplitBacklog = $true
+      splitCandidateCount = $candidates.Count
+    })
     for ($index = 0; $index -lt $candidates.Count; $index++) {
       Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $candidates[$index].anchor)
     }
 
     if ($dryRunMode) {
       Write-State $autoDir "DRY_RUN_SPLIT_PLANNED" $true "SPLIT_BACKLOG" "" "DRY_RUN_SPLIT_PLANNED" ""
+      Write-RunEvent "split.dry_run" ([pscustomobject]@{ decision = "SPLIT_BACKLOG"; status = "DRY_RUN_SPLIT_PLANNED"; shouldSplitBacklog = $true })
       Write-Host "DRY_RUN_NO_BACKLOG_WRITE"
       exit 0
     }
 
     $createdCount = Add-ReadyIssueDrafts $readyPath $candidates
     Write-State $autoDir "BACKLOG_SPLIT_APPLIED" $false "BACKLOG_SPLIT_APPLIED" "" "BACKLOG_SPLIT_APPLIED" ""
+    Write-RunEvent "split.applied" ([pscustomobject]@{ decision = "BACKLOG_SPLIT_APPLIED"; status = "BACKLOG_SPLIT_APPLIED"; shouldSplitBacklog = $true; createdReadyIssueDrafts = $createdCount })
     Write-Host "BACKLOG_SPLIT_APPLIED"
     Write-Host "createdReadyIssueDrafts=$createdCount"
 
     $checkpoint = Test-Checkpoint $autoDir
+    Write-RunEvent "checkpoint" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "POST_SPLIT_CHECKPOINT" })
     Write-Host "postSplitCheckpoint=$checkpoint"
     if ($checkpoint -ne "CONTINUE") {
+      Write-RunEvent "stop" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "STOP"; status = $checkpoint; stopReason = $checkpoint })
       Write-State $autoDir $checkpoint $false "STOP" "" $checkpoint $checkpoint
       Write-Host $checkpoint
       exit 0
@@ -676,11 +791,13 @@ try {
     }
 
     $stopReason = Get-StopReasonForEmptyPool $readyPath
+    Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = $stopReason; stopReason = $stopReason })
     Write-State $autoDir $stopReason $false "STOP" "" $stopReason $stopReason
     Write-Host $stopReason
     exit 0
   }
 
+  Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = "STOP_SESSION_LIMIT"; stopReason = "STOP_SESSION_LIMIT" })
   Write-State $autoDir "STOP_SESSION_LIMIT" $dryRunMode "STOP" "" "STOP_SESSION_LIMIT" "STOP_SESSION_LIMIT"
   Write-Host "STOP_SESSION_LIMIT"
 } finally {
