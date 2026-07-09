@@ -7,17 +7,22 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.dto.ContractSaveRequest;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
+import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
 import com.cgcpms.contract.service.CtContractService;
 import com.cgcpms.contract.vo.ContractApprovalRecordVO;
+import com.cgcpms.contract.vo.ContractPerformanceReportVO;
 import com.cgcpms.contract.vo.CtContractVO;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.system.entity.SysUser;
@@ -67,6 +72,12 @@ class CtContractServiceTest {
 
     @Autowired
     private CtContractMapper contractMapper;
+
+    @Autowired
+    private CtContractChangeMapper contractChangeMapper;
+
+    @Autowired
+    private PayRecordMapper payRecordMapper;
 
     @Autowired
     private CtContractItemMapper itemMapper;
@@ -797,6 +808,77 @@ class CtContractServiceTest {
         // seed 合同 30001 没有审批实例记录
         assertNotNull(records);
         assertEquals(0, records.size());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("履约报表 — 合同金额、变更金额、付款进度与来源合同一致")
+    void testPerformanceReportAggregatesContractChangeAndPayment() {
+        CtContract contract = buildDraftContract("履约报表合同");
+        contract.setContractCode("CT-PERF-" + System.nanoTime());
+        contract.setTenantId(TENANT_ID);
+        contract.setContractAmount(new BigDecimal("1000000.00"));
+        contract.setCurrentAmount(new BigDecimal("1200000.00"));
+        contract.setContractStatus("PERFORMING");
+        contract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
+        contractMapper.insert(contract);
+
+        CtContractChange approvedChange = new CtContractChange();
+        approvedChange.setTenantId(TENANT_ID);
+        approvedChange.setProjectId(PROJECT_ID);
+        approvedChange.setContractId(contract.getId());
+        approvedChange.setChangeCode("CH-PERF-" + System.nanoTime());
+        approvedChange.setChangeName("履约报表审批变更");
+        approvedChange.setChangeType("AMOUNT");
+        approvedChange.setChangeAmount(new BigDecimal("200000.00"));
+        approvedChange.setApprovalStatus("APPROVED");
+        contractChangeMapper.insert(approvedChange);
+
+        CtContractChange draftChange = new CtContractChange();
+        draftChange.setTenantId(TENANT_ID);
+        draftChange.setProjectId(PROJECT_ID);
+        draftChange.setContractId(contract.getId());
+        draftChange.setChangeCode("CH-PERF-DRAFT-" + System.nanoTime());
+        draftChange.setChangeName("未审批变更");
+        draftChange.setChangeType("AMOUNT");
+        draftChange.setChangeAmount(new BigDecimal("300000.00"));
+        draftChange.setApprovalStatus("DRAFT");
+        contractChangeMapper.insert(draftChange);
+
+        PayRecord paid = new PayRecord();
+        paid.setTenantId(TENANT_ID);
+        paid.setProjectId(PROJECT_ID);
+        paid.setContractId(contract.getId());
+        paid.setPayApplicationId(90001L);
+        paid.setPayAmount(new BigDecimal("300000.00"));
+        paid.setPayDate(LocalDate.now());
+        paid.setPayStatus("SUCCESS");
+        payRecordMapper.insert(paid);
+
+        PayRecord pending = new PayRecord();
+        pending.setTenantId(TENANT_ID);
+        pending.setProjectId(PROJECT_ID);
+        pending.setContractId(contract.getId());
+        pending.setPayApplicationId(90002L);
+        pending.setPayAmount(new BigDecimal("100000.00"));
+        pending.setPayDate(LocalDate.now());
+        pending.setPayStatus("PENDING");
+        payRecordMapper.insert(pending);
+
+        ContractPerformanceReportVO report = contractService.getPerformanceReport(PROJECT_ID);
+
+        ContractPerformanceReportVO.Row row = report.getRows().stream()
+                .filter(item -> contract.getId().toString().equals(item.getContractId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("1000000.00", row.getContractAmount());
+        assertEquals("200000.00", row.getChangeAmount());
+        assertEquals("300000.00", row.getPaidAmount());
+        assertEquals("0.2500", row.getPaymentProgress());
+        assertEquals("PERFORMING", row.getContractStatus());
+        assertTrue(new BigDecimal(report.getTotalContractAmount()).compareTo(new BigDecimal("1000000.00")) >= 0);
+        assertTrue(new BigDecimal(report.getTotalChangeAmount()).compareTo(new BigDecimal("200000.00")) >= 0);
+        assertTrue(new BigDecimal(report.getTotalPaidAmount()).compareTo(new BigDecimal("300000.00")) >= 0);
     }
 
     // ═══════════════════════════════════════════════════════════════

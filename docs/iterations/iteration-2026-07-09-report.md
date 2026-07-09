@@ -1,5 +1,34 @@
 # Iteration Report - 2026-07-09
 
+Issue：ISSUE-008-002 合同履约报表口径回归
+
+目标：
+- 回归合同履约报表的合同金额、变更金额、付款进度和履约状态口径。
+- 不改合同业务语义，不新增合同履约专用表。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/contract/vo/ContractPerformanceReportVO.java`：新增合同履约报表 VO。
+- `backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`：新增最小聚合方法，复用合同、已审批变更、SUCCESS 付款记录。
+- `backend/src/test/java/com/cgcpms/contract/CtContractServiceTest.java`：补充合同金额、变更金额、付款进度和履约状态回归断言。
+- `docs/quality/issue-008-002-contract-performance-report.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-002 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=CtContractServiceTest#testPerformanceReportAggregatesContractChangeAndPayment" test`：通过，`1` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过；失败点集中在既有 dashboard、invoice、workflow、purchase、payment、revenue 测试夹具/断言问题，目标测试已通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只新增后端最小聚合方法，不新增前端页面、导出能力或通用报表中心。
+- 后端全量测试仍有既有无关红灯，需后续 Ready Issue 分别治理。
+
+---
+
 Issue：ISSUE-008-001 经营总览报表口径与来源下钻回归
 
 目标：

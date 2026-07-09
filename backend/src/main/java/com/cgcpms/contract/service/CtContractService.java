@@ -9,13 +9,18 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.dto.ContractSaveRequest;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractChange;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
+import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.vo.ContractApprovalRecordVO;
+import com.cgcpms.contract.vo.ContractPerformanceReportVO;
 import com.cgcpms.contract.vo.CtContractVO;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -48,6 +53,8 @@ public class CtContractService {
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final CtContractMapper ctContractMapper;
+    private final CtContractChangeMapper ctContractChangeMapper;
+    private final PayRecordMapper payRecordMapper;
     private final PmProjectMapper pmProjectMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final CtContractItemService itemService;
@@ -151,6 +158,54 @@ public class CtContractService {
                 "paidAmount", paidAmount.toPlainString(),
                 "unpaidAmount", totalAmount.subtract(paidAmount).toPlainString(),
                 "overdueCount", overdueCount);
+    }
+
+    public ContractPerformanceReportVO getPerformanceReport(Long projectId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getTenantId, tenantId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看合同履约报表");
+            wrapper.eq(CtContract::getProjectId, projectId);
+        }
+        List<CtContract> contracts = ctContractMapper.selectList(wrapper);
+        List<Long> contractIds = contracts.stream().map(CtContract::getId).toList();
+
+        Map<Long, BigDecimal> changeByContract = contractIds.isEmpty() ? Map.of()
+                : ctContractChangeMapper.selectList(new LambdaQueryWrapper<CtContractChange>()
+                        .eq(CtContractChange::getTenantId, tenantId)
+                        .in(CtContractChange::getContractId, contractIds)
+                        .eq(CtContractChange::getApprovalStatus, "APPROVED"))
+                .stream()
+                .collect(Collectors.groupingBy(CtContractChange::getContractId,
+                        Collectors.mapping(c -> nullToZero(c.getChangeAmount()),
+                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
+
+        Map<Long, BigDecimal> paidByContract = contractIds.isEmpty() ? Map.of()
+                : payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getTenantId, tenantId)
+                        .in(PayRecord::getContractId, contractIds)
+                        .eq(PayRecord::getPayStatus, "SUCCESS"))
+                .stream()
+                .collect(Collectors.groupingBy(PayRecord::getContractId,
+                        Collectors.mapping(p -> nullToZero(p.getPayAmount()),
+                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
+
+        ContractPerformanceReportVO report = new ContractPerformanceReportVO();
+        List<ContractPerformanceReportVO.Row> rows = contracts.stream()
+                .map(contract -> toPerformanceRow(contract, changeByContract, paidByContract))
+                .toList();
+        report.setRows(rows);
+        BigDecimal totalContractAmount = contracts.stream()
+                .map(c -> nullToZero(c.getContractAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalChangeAmount = changeByContract.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPaidAmount = paidByContract.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        report.setTotalContractAmount(totalContractAmount.toPlainString());
+        report.setTotalChangeAmount(totalChangeAmount.toPlainString());
+        report.setTotalPaidAmount(totalPaidAmount.toPlainString());
+        report.setPaymentProgress(formatRatio(totalPaidAmount, totalContractAmount.add(totalChangeAmount)));
+        return report;
     }
 
     public CtContractVO getById(Long id) {
@@ -476,7 +531,36 @@ public class CtContractService {
         return vo;
     }
 
+    private ContractPerformanceReportVO.Row toPerformanceRow(CtContract contract,
+                                                             Map<Long, BigDecimal> changeByContract,
+                                                             Map<Long, BigDecimal> paidByContract) {
+        ContractPerformanceReportVO.Row row = new ContractPerformanceReportVO.Row();
+        BigDecimal contractAmount = nullToZero(contract.getContractAmount());
+        BigDecimal changeAmount = changeByContract.getOrDefault(contract.getId(), BigDecimal.ZERO);
+        BigDecimal paidAmount = paidByContract.getOrDefault(contract.getId(), BigDecimal.ZERO);
+        BigDecimal currentAmount = contract.getCurrentAmount() != null && contract.getCurrentAmount().compareTo(BigDecimal.ZERO) != 0
+                ? contract.getCurrentAmount()
+                : contractAmount.add(changeAmount);
+
+        row.setContractId(String.valueOf(contract.getId()));
+        row.setContractCode(contract.getContractCode());
+        row.setContractName(contract.getContractName());
+        row.setContractStatus(contract.getContractStatus());
+        row.setContractAmount(contractAmount.toPlainString());
+        row.setChangeAmount(changeAmount.toPlainString());
+        row.setPaidAmount(paidAmount.toPlainString());
+        row.setPaymentProgress(formatRatio(paidAmount, currentAmount));
+        return row;
+    }
+
     private static BigDecimal nullToZero(BigDecimal value) {
         return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private static String formatRatio(BigDecimal numerator, BigDecimal denominator) {
+        if (denominator == null || denominator.compareTo(BigDecimal.ZERO) <= 0) {
+            return "0.0000";
+        }
+        return numerator.divide(denominator, 4, java.math.RoundingMode.HALF_UP).toPlainString();
     }
 }
