@@ -38,6 +38,226 @@
 
 ## P1
 
+### ISSUE-032-001：workflow 全量测试红灯夹具与业务类型注册治理
+
+优先级：P1
+类型：后端 / 测试治理 / workflow
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M2；`docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md`
+是否需要新增 migration：否。
+目标：
+- 收敛 workflow 域全量测试红灯中 `审批业务对象不存在`、`不支持的业务类型`、错误码断言漂移问题。
+- 优先判断是测试夹具债、业务类型注册缺口还是真实审批边界变化，不直接扩大为审批状态机重构。
+允许修改：
+- `backend/src/test/java/com/cgcpms/workflow/**`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 与 workflow 红灯无关的 dashboard / invoice / purchase / revenue 业务代码
+验收标准：
+- `WorkflowEngineIntegrationTest`、`WorkflowCoreServiceTest`、`WorkflowConcurrencyTest`、`WorkflowApproverResolverTest`、`WorkflowTemplateManagementTest` 中当前失败项完成分类并收敛。
+- 不放宽审批权限、租户隔离、审批状态边界。
+- 若确认某项不是夹具债而是真实业务缺陷，必须在质量报告中明确阻塞等级和最小修复范围。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowEngineIntegrationTest,WorkflowCoreServiceTest,WorkflowConcurrencyTest,WorkflowApproverResolverTest,WorkflowTemplateManagementTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-032-001-workflow-full-test-red-governance.md`
+
+### ISSUE-032-002：invoice 与 migration 全量测试红灯项目关系治理
+
+优先级：P1
+类型：后端 / 测试治理 / invoice / migration
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M2；`docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md`
+是否需要新增 migration：否；如确认必须新增表/字段，先转 Blocked 并回报人工裁决。
+目标：
+- 归因 `InvoiceValidationTest` 查询接口 `400` 与 `MigrationSoftDeleteBehaviorTest` 的 `发票缺少项目关系`。
+- 明确是测试夹具未补项目关系、接口契约断言漂移，还是发票项目关系真实约束缺陷。
+允许修改：
+- `backend/src/test/java/com/cgcpms/invoice/**`
+- `backend/src/test/java/com/cgcpms/MigrationSoftDeleteBehaviorTest.java`
+- `backend/src/main/java/com/cgcpms/invoice/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- 已应用 Flyway migration
+- 生产凭据、生产数据库连接、生产发布配置
+- 放宽发票租户、项目或状态校验
+验收标准：
+- `InvoiceValidationTest` 三个当前失败查询用例完成分类并收敛。
+- `MigrationSoftDeleteBehaviorTest#payInvoiceDeleteIsLogicalAndAllowsRecreate` 完成分类并收敛。
+- 质量报告明确项目关系约束是否为真实业务口径，不能只把 `400` 改成测试期望。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=InvoiceValidationTest,MigrationSoftDeleteBehaviorTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-032-002-invoice-migration-full-test-red-governance.md`
+
+### ISSUE-032-003：dashboard、purchase、revenue 全量测试红灯种子数据治理
+
+优先级：P1
+类型：后端 / 测试治理 / dashboard / purchase / revenue
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M2；`docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md`
+是否需要新增 migration：否。
+目标：
+- 归因 `DashboardChiefEngineerServiceTest` 的 `No value present`、`PurchaseRequestServiceTest` 的 `项目不存在`、`ContractRevenueServiceTest` 的提交断言失败。
+- 优先收敛测试种子数据前置，不先改生产查询或审批逻辑。
+允许修改：
+- `backend/src/test/java/com/cgcpms/dashboard/**`
+- `backend/src/test/java/com/cgcpms/purchase/**`
+- `backend/src/test/java/com/cgcpms/revenue/**`
+- `backend/src/main/java/com/cgcpms/dashboard/**`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `backend/src/main/java/com/cgcpms/revenue/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 无证据修改驾驶舱、采购、收入生产口径
+验收标准：
+- 三个失败类当前失败项完成分类并收敛。
+- 如只是种子数据问题，修复应落在测试夹具或测试前置，不改生产代码。
+- 如确认生产逻辑存在真实缺陷，质量报告必须标明影响范围和阻塞等级。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=DashboardChiefEngineerServiceTest,PurchaseRequestServiceTest,ContractRevenueServiceTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-032-003-dashboard-purchase-revenue-full-test-red-governance.md`
+
+### ISSUE-032-004：Phase2 与 Phase4 历史集成链路红灯治理
+
+优先级：P1
+类型：后端 / 测试治理 / 集成链路
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M2；`docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md`
+是否需要新增 migration：否；涉及金额口径或审批状态机变更时先转 Blocked。
+目标：
+- 归因 `Phase2FullChainIntegrationTest` 的合同可用余额、付款审批状态链路失败。
+- 归因 `Phase4IntegrationTest` 的抄送 / 矩阵审批业务对象失败。
+- 在 workflow、invoice、dashboard/purchase/revenue 专项完成或有明确结论后再执行，避免重复修底层夹具问题。
+允许修改：
+- `backend/src/test/java/com/cgcpms/Phase2FullChainIntegrationTest.java`
+- `backend/src/test/java/com/cgcpms/Phase4IntegrationTest.java`
+- 必要时限于相关主链路的 `backend/src/main/java/com/cgcpms/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- 已应用 Flyway migration
+- 生产凭据、生产数据库连接、生产发布配置
+- 未经证据重写金额口径、审批状态机或租户隔离规则
+验收标准：
+- `Phase2FullChainIntegrationTest`、`Phase4IntegrationTest` 当前失败项完成分类并收敛。
+- 若依赖前序专项，应在报告中引用对应结论，不重复引入临时夹具。
+- 明确剩余红灯是否仍阻塞后端全量门禁。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=Phase2FullChainIntegrationTest,Phase4IntegrationTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-032-004-phase-integration-full-test-red-governance.md`
+
+### ISSUE-032-006：Mockito 动态 agent 与 Spring Boot generated password 提示治理
+
+优先级：P1
+类型：构建兼容性 / 运行提示 / 后端治理
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M4；`docs/quality/mainline-30-core-flow-regression-acceptance-2026-07-08.md`；`docs/quality/mainline-32-m4-build-compatibility-debt-2026-07-09.md`
+是否需要新增 migration：否。
+目标：
+- 收敛 Mockito 动态 agent 未来兼容性告警，避免未来 JDK / 安全策略升级时从 warning 演变为测试门禁失败。
+- 收敛 Spring Boot generated password 开发提示，减少开发/验收日志噪音，但不重做当前 JWT / dev-login 鉴权链路。
+允许修改：
+- `backend/pom.xml`
+- `backend/src/main/resources/application*.yml`
+- `backend/src/main/java/com/cgcpms/auth/config/**`
+- `backend/src/test/java/com/cgcpms/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 登录体系重构、权限模型重构、无证据的大范围测试框架迁移
+验收标准：
+- Mockito 动态 agent 告警完成最小治理或被明确降级为可接受观察项，并留下可复验命令。
+- Spring Boot generated password 提示完成最小治理或被明确限定在不影响现有鉴权链路的范围内。
+- 质量报告必须明确两类提示的最终分类、是否阻塞、剩余风险；无明确反证前维持非阻塞。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AuthControllerTest,AuthServiceDevLoginTest,WorkflowCoreServiceTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-032-006-build-compatibility-warning-governance.md`
+
+### ISSUE-032-007：UI / 可访问性 / 登录页品牌 / 440px 移动端复验基线
+
+优先级：P1
+类型：前端 / 质量复验 / UI 基线
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M6；`docs/quality/ui-consistency-audit-2026-06-26.md`；`docs/quality/mainline-32-m6-ui-quality-regression-entry-2026-07-09.md`
+是否需要新增 migration：否。
+目标：
+- 统一复验 UI 一致性、可访问性、登录页品牌和 `440px` 移动端布局四类遗留，形成当前基线。
+- 先分类为设计一致性问题、真实功能风险、环境前置问题或观察项，不直接承诺全站整改。
+允许修改：
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `frontend-admin/src/**`
+- `backend/**`
+- `deploy/**`
+- 运行环境、生产凭据、生产数据库连接、生产发布配置
+- 把本轮扩大为全站 UI 重构、设计系统重写或移动端专项实现
+验收标准：
+- 至少覆盖合同台账、成本汇总、结算列表、项目列表、系统字典、登录页六类页面或入口。
+- 至少留下一轮 `1600 x 1200` 与 `440 x 956` 的正式复验结论或明确前置阻塞。
+- 明确列出 UI 一致性、可访问性、登录页品牌、`440px` 布局四类问题的“通过 / 不通过 / 观察项”。
+- 不把历史截图或旧报告直接当成当前已验证事实。
+验证命令：
+- `git diff --check`
+归档报告：`docs/quality/issue-032-007-ui-accessibility-mobile-baseline.md`
+
+### ISSUE-032-008：覆盖率与 E2E CI 基线复验
+
+优先级：P1
+类型：测试治理 / CI 基线复验
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M6；`docs/quality/quality-hardening-acceptance.md`；`docs/quality/mainline-32-m6-ui-quality-regression-entry-2026-07-09.md`
+是否需要新增 migration：否。
+目标：
+- 复验后端/前端覆盖率与 E2E CI 的当前基线，区分“声明阈值”“当前测量”“CI 实际执行”三层事实。
+- 在没有新基线前，不直接提高阈值，不直接硬上门禁。
+允许修改：
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `.github/workflows/**`
+- 运行环境、生产凭据、生产数据库连接、生产发布配置
+- 在无新基线前直接把覆盖率或 E2E 升级为硬门禁整改任务
+验收标准：
+- 正式报告中明确区分后端覆盖率、前端覆盖率、E2E CI 三类现状。
+- 每类都要写清“当前测量是否已复验”“配置阈值是什么”“CI 是否真阻断”。
+- 若因工具、环境或脚本入口导致无法复验，必须按工具配置类或环境前置类归档，不得直接判业务代码失败。
+- 不把 `docs/quality/quality-hardening-acceptance.md` 的旧数字直接当作当前已验证结论。
+验证命令：
+- `git diff --check`
+归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
+
 ## P2
 
 ### ISSUE-008-001：经营总览报表口径与来源下钻回归
@@ -1137,7 +1357,7 @@
 
 优先级：P2
 类型：生产增强 / 回归 / 最小实现
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图` 节
 是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
@@ -1168,7 +1388,7 @@
 
 优先级：P2
 类型：生产增强 / 回归 / 最小实现
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强` 节
 是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。

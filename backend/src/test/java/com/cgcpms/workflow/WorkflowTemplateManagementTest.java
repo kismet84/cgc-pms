@@ -44,7 +44,8 @@ class WorkflowTemplateManagementTest {
     private static final long TENANT_ID = 0L;
     private static final long USER_ADMIN = 1L;
     private static final long BUSINESS_ID = 230000000000000901L;
-    private static final String BUSINESS_TYPE = "TASK023_APPROVAL";
+    private static final String BUSINESS_TYPE = WorkflowBusinessTypes.CONTRACT_APPROVAL;
+    private static final BigDecimal TEMPLATE_TEST_AMOUNT = new BigDecimal("1000000000.00");
 
     @Autowired private WorkflowTemplateService workflowTemplateService;
     @Autowired private WorkflowEngine workflowEngine;
@@ -177,11 +178,12 @@ class WorkflowTemplateManagementTest {
     @Test
     @DisplayName("模板变更只影响新发起审批实例，不回写旧实例节点快照")
     void templateChangesOnlyAffectNewInstances() {
+        seedContract(BUSINESS_ID);
         WfInstance oldInstance = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_ID,
                 BUSINESS_TYPE, BUSINESS_ID,
-                "模板快照测试-旧实例", new BigDecimal("1000.00"),
-                100L, 100L, "{}", "{}", null);
+                "模板快照测试-旧实例", TEMPLATE_TEST_AMOUNT,
+                null, null, "{}", "{}", null);
 
         WorkflowTemplateNodeRequest createRequest = new WorkflowTemplateNodeRequest();
         createRequest.setNodeName("新增节点");
@@ -192,11 +194,12 @@ class WorkflowTemplateManagementTest {
         createRequest.setAllowAddSign(1);
         workflowTemplateService.createNode(TEMPLATE_ID, createRequest);
 
+        seedContract(BUSINESS_ID + 1);
         WfInstance newInstance = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_ID,
                 BUSINESS_TYPE, BUSINESS_ID + 1,
-                "模板快照测试-新实例", new BigDecimal("1000.00"),
-                100L, 100L, "{}", "{}", null);
+                "模板快照测试-新实例", TEMPLATE_TEST_AMOUNT,
+                null, null, "{}", "{}", null);
 
         List<WfNodeInstance> oldNodes = selectNodeInstances(oldInstance.getId());
         List<WfNodeInstance> newNodes = selectNodeInstances(newInstance.getId());
@@ -222,8 +225,8 @@ class WorkflowTemplateManagementTest {
         template.setTemplateName("测试流程");
         template.setBusinessType(BUSINESS_TYPE);
         template.setEnabled(1);
-        template.setAmountMin(new BigDecimal("0.00"));
-        template.setAmountMax(new BigDecimal("999999.99"));
+        template.setAmountMin(TEMPLATE_TEST_AMOUNT);
+        template.setAmountMax(TEMPLATE_TEST_AMOUNT);
         templateMapper.insert(template);
 
         WfTemplateNode first = new WfTemplateNode();
@@ -272,7 +275,39 @@ class WorkflowTemplateManagementTest {
         jdbcTemplate.update("DELETE FROM wf_task WHERE business_id IN (?, ?)", BUSINESS_ID, BUSINESS_ID + 1);
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id IN (?, ?))", BUSINESS_ID, BUSINESS_ID + 1);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id IN (?, ?)", BUSINESS_ID, BUSINESS_ID + 1);
+        jdbcTemplate.update("DELETE FROM ct_contract WHERE id IN (?, ?)", BUSINESS_ID, BUSINESS_ID + 1);
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
         jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
+    }
+
+    private void seedContract(long businessId) {
+        seedProject();
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract (
+                    id, tenant_id, project_id, contract_code, contract_name, contract_type,
+                    party_a_id, party_b_id, contract_amount, current_amount, paid_amount,
+                    contract_status, approval_status, created_by, updated_by
+                )
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = ?)
+                """,
+                businessId, TENANT_ID, 100L, "WF-TPL-" + businessId, "workflow模板测试合同-" + businessId, "SUB",
+                20001L, 20002L, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
+                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN,
+                businessId);
+    }
+
+    private void seedProject() {
+        jdbcTemplate.update("""
+                INSERT INTO pm_project (
+                    id, tenant_id, project_code, project_name, project_type,
+                    contract_amount, target_cost, status, approval_status,
+                    created_by, updated_by, deleted_flag
+                )
+                SELECT ?, ?, ?, ?, '房建工程', 10000, 8000, 'ACTIVE', 'APPROVED', ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project WHERE id = ?)
+                """,
+                100L, TENANT_ID, "WF-TPL-PRJ-100", "workflow模板测试项目",
+                USER_ADMIN, USER_ADMIN, 100L);
     }
 }

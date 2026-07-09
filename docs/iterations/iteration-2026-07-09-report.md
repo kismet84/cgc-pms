@@ -1,5 +1,35 @@
 # Iteration Report - 2026-07-09
 
+Issue：ISSUE-032-008 覆盖率与 E2E CI 基线复验
+
+目标：
+- 复验后端覆盖率、前端覆盖率与 E2E CI 的当前基线。
+- 明确区分声明阈值、当前测量、CI 实际执行三层事实。
+- 不提高阈值，不修改 CI，不把旧报告数字当作当前已验证结论。
+
+修改范围摘要：
+- `docs/quality/issue-032-008-coverage-e2e-baseline.md`：新增正式基线复验报告。
+- `docs/backlog/ready-issues.md`：将 ISSUE-032-008 状态更新为 Done。
+- `docs/backlog/done-issues.md`：新增 ISSUE-032-008 完成记录。
+
+验证命令摘要：
+- `gh run list --workflow ci.yml --branch master --limit 5`：最新 5 次远端 CI run 均为 failure。
+- `gh run view 29003031520 --json jobs,conclusion,status,headSha,createdAt,updatedAt,url,event,displayTitle`：确认 `backend-test`、`frontend-test`、`e2e` 为失败 job。
+- `gh api repos/kismet84/cgc-pms/branches/master/protection/required_status_checks`：确认 `backend-test`、`frontend-test`、`e2e` 均为 required checks，且 `strict=true`。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类；本轮只做基线事实归档，远端 required checks 红灯需后续下载 artifact / 日志后专项分诊
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮未重新执行覆盖率或 Playwright 命令，因为会写入 `backend/target`、`frontend-admin/coverage*`、`frontend-admin/playwright-report` 或 `frontend-admin/test-results`，超出本 Issue 允许修改范围。
+- 远端 `backend-test`、`frontend-test`、`e2e` 当前真阻断，但细因尚未下载 artifact 或日志分诊，不能直接判业务代码失败。
+- 后端覆盖率阈值保持 `73/53`，前端覆盖率阈值保持 `10/8/10/10`，E2E CI 当前只跑 `ui-refactor-smoke.spec.ts`。
+
+---
+
 Issue：ISSUE-008-005 审批效率报表口径回归
 
 目标：

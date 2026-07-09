@@ -57,6 +57,7 @@ class WorkflowApproverResolverTest {
     private static final long BIZ_NO_APPROVER = 98002L;
     private static final long BIZ_WITHDRAW_RESUBMIT = 98003L;
     private static final long BIZ_REJECT_RESUBMIT = 98004L;
+    private static final BigDecimal TEST_TEMPLATE_AMOUNT = new BigDecimal("1000000000.00");
 
     @Autowired private WorkflowEngine workflowEngine;
     @Autowired private WfTemplateMapper templateMapper;
@@ -164,8 +165,10 @@ class WorkflowApproverResolverTest {
             template.setTenantId(TENANT_0);
             template.setTemplateCode("TPL-TEST-ROLE-001");
             template.setTemplateName("角色审批测试模板");
-            template.setBusinessType("TEST_ROLE_APPROVAL");
+            template.setBusinessType(WorkflowBusinessTypes.CONTRACT_APPROVAL);
             template.setEnabled(1);
+            template.setAmountMin(TEST_TEMPLATE_AMOUNT);
+            template.setAmountMax(TEST_TEMPLATE_AMOUNT);
             templateMapper.insert(template);
         }
 
@@ -194,8 +197,10 @@ class WorkflowApproverResolverTest {
             emptyTemplate.setTenantId(TENANT_0);
             emptyTemplate.setTemplateCode("TPL-TEST-EMPTY-001");
             emptyTemplate.setTemplateName("空审批配置测试模板");
-            emptyTemplate.setBusinessType("TEST_EMPTY_APPROVAL");
+            emptyTemplate.setBusinessType(WorkflowBusinessTypes.CONTRACT_APPROVAL);
             emptyTemplate.setEnabled(1);
+            emptyTemplate.setAmountMin(TEST_TEMPLATE_AMOUNT.add(BigDecimal.ONE));
+            emptyTemplate.setAmountMax(TEST_TEMPLATE_AMOUNT.add(BigDecimal.ONE));
             // INSERT IGNORE style: check before insert
             if (templateMapper.selectById(TEST_TEMPLATE_ID + 1) == null) {
                 templateMapper.insert(emptyTemplate);
@@ -227,11 +232,12 @@ class WorkflowApproverResolverTest {
     @Transactional
     @DisplayName("T1: ROLE-configured approver receives task, not submitter")
     void testRoleConfiguredApproverReceivesTask() {
+        seedContract(BIZ_ROLE_APPROVER);
         WfInstance instance = workflowEngine.submit(
                 USER_SUBMITTER, "admin", TENANT_0,
-                "TEST_ROLE_APPROVAL", BIZ_ROLE_APPROVER,
-                "角色审批测试", new BigDecimal("100000.00"),
-                100L, 100L, "{}", "{}", null);
+                WorkflowBusinessTypes.CONTRACT_APPROVAL, BIZ_ROLE_APPROVER,
+                "角色审批测试", TEST_TEMPLATE_AMOUNT,
+                null, null, "{}", "{}", null);
 
         assertNotNull(instance, "应创建审批实例");
         assertEquals(WorkflowConstants.INSTANCE_RUNNING, instance.getInstanceStatus());
@@ -261,12 +267,13 @@ class WorkflowApproverResolverTest {
     @Transactional
     @DisplayName("T2: empty approverConfig throws NO_APPROVER")
     void testEmptyApproverConfigThrowsNoApprover() {
+        seedContract(BIZ_NO_APPROVER);
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 workflowEngine.submit(
                         USER_SUBMITTER, "admin", TENANT_0,
-                        "TEST_EMPTY_APPROVAL", BIZ_NO_APPROVER,
-                        "空配置测试", new BigDecimal("100000.00"),
-                        100L, 100L, "{}", "{}", null),
+                        WorkflowBusinessTypes.CONTRACT_APPROVAL, BIZ_NO_APPROVER,
+                        "空配置测试", TEST_TEMPLATE_AMOUNT.add(BigDecimal.ONE),
+                        null, null, "{}", "{}", null),
                 "空approverConfig应抛出BusinessException");
 
         assertEquals("NO_APPROVER", ex.getCode(), "错误码应为NO_APPROVER");
@@ -285,12 +292,13 @@ class WorkflowApproverResolverTest {
     @Transactional
     @DisplayName("T3: withdraw → resubmit creates new round with fresh node instances")
     void testWithdrawAndResubmitCreatesNewRound() {
+        seedContract(BIZ_WITHDRAW_RESUBMIT);
         // Submit using existing CONTRACT_APPROVAL template (USER type, userId=1)
         WfInstance instance = workflowEngine.submit(
                 USER_SUBMITTER, "admin", TENANT_0,
-                "CONTRACT_APPROVAL", BIZ_WITHDRAW_RESUBMIT,
+                WorkflowBusinessTypes.CONTRACT_APPROVAL, BIZ_WITHDRAW_RESUBMIT,
                 "撤回重提测试", new BigDecimal("200000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instance);
         assertEquals(1, instance.getCurrentRound());
 
@@ -354,12 +362,13 @@ class WorkflowApproverResolverTest {
     @Transactional
     @DisplayName("T4: reject → resubmit creates new round, old tasks canceled")
     void testRejectAndResubmitCreatesNewRound() {
+        seedContract(BIZ_REJECT_RESUBMIT);
         // Submit
         WfInstance instance = workflowEngine.submit(
                 USER_SUBMITTER, "admin", TENANT_0,
-                "CONTRACT_APPROVAL", BIZ_REJECT_RESUBMIT,
+                WorkflowBusinessTypes.CONTRACT_APPROVAL, BIZ_REJECT_RESUBMIT,
                 "驳回重提测试", new BigDecimal("300000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instance);
         assertEquals(1, instance.getCurrentRound());
 
@@ -412,5 +421,37 @@ class WorkflowApproverResolverTest {
                 + ", 新节点数=" + round2Nodes.size()
                 + ", ACTIVE节点=" + activeCount
                 + ", 新待审批=" + newPending);
+    }
+
+    private void seedContract(long businessId) {
+        seedProject(TENANT_0, 100L);
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract (
+                    id, tenant_id, project_id, contract_code, contract_name, contract_type,
+                    party_a_id, party_b_id, contract_amount, current_amount, paid_amount,
+                    contract_status, approval_status, created_by, updated_by
+                )
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = ?)
+                """,
+                businessId, TENANT_0, 100L, "WF-APR-" + businessId, "workflow审批测试合同-" + businessId, "SUB",
+                20001L, 20002L, new BigDecimal("100000.00"), new BigDecimal("100000.00"), BigDecimal.ZERO,
+                "DRAFT", "DRAFT", USER_SUBMITTER, USER_SUBMITTER,
+                businessId);
+    }
+
+    private void seedProject(long tenantId, long projectId) {
+        jdbcTemplate.update("""
+                INSERT INTO pm_project (
+                    id, tenant_id, project_code, project_name, project_type,
+                    contract_amount, target_cost, status, approval_status,
+                    created_by, updated_by, deleted_flag
+                )
+                SELECT ?, ?, ?, ?, '房建工程', 10000, 8000, 'ACTIVE', 'APPROVED', ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project WHERE id = ?)
+                """,
+                projectId, tenantId, "WF-PRJ-" + tenantId + "-" + projectId,
+                "workflow测试项目-" + tenantId + "-" + projectId,
+                USER_SUBMITTER, USER_SUBMITTER, projectId);
     }
 }

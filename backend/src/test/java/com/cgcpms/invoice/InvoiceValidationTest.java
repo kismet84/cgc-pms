@@ -6,6 +6,8 @@ import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -19,6 +21,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
@@ -47,9 +50,13 @@ class InvoiceValidationTest {
     private PayRecordMapper payRecordMapper;
 
     @Autowired
+    private PmProjectMapper projectMapper;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private static final long SEED_PAY_RECORD_ID = 90001L;
+    private static final long SEED_PROJECT_ID = 90001L;
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
@@ -69,12 +76,26 @@ class InvoiceValidationTest {
                    OR invoice_no LIKE 'INV-FILTER-%'
                 """);
         jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
+        jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", SEED_PROJECT_ID);
+
+        PmProject project = new PmProject();
+        project.setId(SEED_PROJECT_ID);
+        project.setTenantId(0L);
+        project.setProjectCode("PRJ-INVOICE-VAL-90001");
+        project.setProjectName("发票校验测试项目");
+        project.setProjectType("CONSTRUCTION");
+        project.setContractAmount(new BigDecimal("1000000.00"));
+        project.setTargetCost(new BigDecimal("800000.00"));
+        project.setStatus("RUNNING");
+        project.setApprovalStatus("APPROVED");
+        projectMapper.insert(project);
 
         PayRecord seed = new PayRecord();
         seed.setId(SEED_PAY_RECORD_ID);
         seed.setTenantId(0L);
+        seed.setProjectId(SEED_PROJECT_ID);
         seed.setPayApplicationId(SEED_PAY_RECORD_ID);
-        seed.setPayAmount(new java.math.BigDecimal("100000.00"));
+        seed.setPayAmount(new BigDecimal("100000.00"));
         seed.setPayDate(java.time.LocalDate.of(2026, 6, 1));
         seed.setPayStatus("PAID");
         payRecordMapper.insert(seed);

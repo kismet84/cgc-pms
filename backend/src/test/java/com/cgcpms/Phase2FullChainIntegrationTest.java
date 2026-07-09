@@ -588,6 +588,10 @@ class Phase2FullChainIntegrationTest {
                 receiptItems.get(1).getId(), new BigDecimal("114000.00"));
         payApplicationService.saveBasis(appId, List.of(b1, b2));
 
+        app.setId(appId);
+        app.setApprovalStatus("APPROVED");
+        payApplicationMapper.updateById(app);
+
         // 记录合同原有已付金额
         CtContract contractBefore = contractMapper.selectById(CONTRACT_ID);
         BigDecimal paidBefore = contractBefore.getPaidAmount() != null ? contractBefore.getPaidAmount() : BigDecimal.ZERO;

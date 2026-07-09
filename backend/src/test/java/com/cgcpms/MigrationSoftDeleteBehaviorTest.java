@@ -9,6 +9,8 @@ import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.mapper.MatStockMapper;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
@@ -39,6 +41,7 @@ class MigrationSoftDeleteBehaviorTest {
     private static final long TENANT_ID = 1L;
     private static final long USER_ID = 1L;
     private static final long SEED_PAY_RECORD_ID = 92001L;
+    private static final long SEED_PROJECT_ID = 92001L;
 
     @Autowired
     private MatStockMapper matStockMapper;
@@ -58,6 +61,9 @@ class MigrationSoftDeleteBehaviorTest {
     @Autowired
     private PayRecordMapper payRecordMapper;
 
+    @Autowired
+    private PmProjectMapper projectMapper;
+
     @BeforeEach
     void setUp() {
         Claims claims = Jwts.claims()
@@ -71,10 +77,24 @@ class MigrationSoftDeleteBehaviorTest {
 
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
+        jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", SEED_PROJECT_ID);
+
+        PmProject project = new PmProject();
+        project.setId(SEED_PROJECT_ID);
+        project.setTenantId(TENANT_ID);
+        project.setProjectCode("PRJ-MIGRATION-92001");
+        project.setProjectName("迁移软删测试项目");
+        project.setProjectType("CONSTRUCTION");
+        project.setContractAmount(new BigDecimal("1000000.00"));
+        project.setTargetCost(new BigDecimal("800000.00"));
+        project.setStatus("RUNNING");
+        project.setApprovalStatus("APPROVED");
+        projectMapper.insert(project);
 
         PayRecord seed = new PayRecord();
         seed.setId(SEED_PAY_RECORD_ID);
         seed.setTenantId(TENANT_ID);
+        seed.setProjectId(SEED_PROJECT_ID);
         seed.setPayApplicationId(SEED_PAY_RECORD_ID);
         seed.setPayAmount(new BigDecimal("100000.00"));
         seed.setPayDate(LocalDate.of(2026, 6, 1));

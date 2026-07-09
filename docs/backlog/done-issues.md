@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-032-008：覆盖率与 E2E CI 基线复验
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；覆盖率与 E2E CI 基线事实已归档；远端 required checks 红灯需后续专项分诊
+验证结果：通过
+相关报告：docs/quality/issue-032-008-coverage-e2e-baseline.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

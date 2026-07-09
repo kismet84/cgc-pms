@@ -79,6 +79,9 @@ class WorkflowConcurrencyTest {
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, USER_ADMIN);
+        for (long id = BID_FIRST; id <= BID_LAST; id++) {
+            seedContract(id);
+        }
     }
 
     @AfterEach
@@ -95,7 +98,7 @@ class WorkflowConcurrencyTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", BID_FIRST,
                 "并发测试-审批vs撤回", new BigDecimal("100000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instance);
         Long instanceId = instance.getId();
 
@@ -185,7 +188,7 @@ class WorkflowConcurrencyTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", BID_FIRST + 1,
                 "并发测试-转办vs审批", new BigDecimal("200000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instance);
 
         WfTask task = taskMapper.selectList(
@@ -268,7 +271,7 @@ class WorkflowConcurrencyTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", BID_FIRST + 2,
                 "并发测试-冲突错误码", new BigDecimal("300000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instance);
 
         WfTask task = taskMapper.selectList(
@@ -330,7 +333,41 @@ class WorkflowConcurrencyTest {
         // 7. wf_instance
         jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 8. Remove test-seeded users (undo what seedTestUsers() created)
+        // 8. ct_contract fixtures for submit validation
+        jdbcTemplate.update("DELETE FROM ct_contract WHERE id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
+
+        // 9. Remove test-seeded users (undo what seedTestUsers() created)
         jdbcTemplate.update("DELETE FROM sys_user WHERE id BETWEEN 1 AND 5 AND remark = 'test-seed'");
+    }
+
+    private void seedContract(long businessId) {
+        seedProject();
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract (
+                    id, tenant_id, project_id, contract_code, contract_name, contract_type,
+                    party_a_id, party_b_id, contract_amount, current_amount, paid_amount,
+                    contract_status, approval_status, created_by, updated_by
+                )
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = ?)
+                """,
+                businessId, TestUserContext.TENANT_0, 100L, "WF-CAS-" + businessId, "workflow并发测试合同-" + businessId, "SUB",
+                20001L, 20002L, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
+                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN,
+                businessId);
+    }
+
+    private void seedProject() {
+        jdbcTemplate.update("""
+                INSERT INTO pm_project (
+                    id, tenant_id, project_code, project_name, project_type,
+                    contract_amount, target_cost, status, approval_status,
+                    created_by, updated_by, deleted_flag
+                )
+                SELECT ?, ?, ?, ?, '房建工程', 10000, 8000, 'ACTIVE', 'APPROVED', ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project WHERE id = ?)
+                """,
+                100L, TestUserContext.TENANT_0, "WF-CAS-PRJ-100", "workflow并发测试项目",
+                USER_ADMIN, USER_ADMIN, 100L);
     }
 }

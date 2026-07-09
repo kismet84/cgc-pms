@@ -119,6 +119,7 @@ class WorkflowEngineIntegrationTest {
                 .add("tenantId", 0L)
                 .add("roleCodes", java.util.List.of("ADMIN"))
                 .build());
+        seedContracts();
     }
 
     @AfterEach
@@ -134,7 +135,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 1,
                 "集成测试-合同审批", new BigDecimal("1000000.00"),
-                100L, 100L,
+                null, null,
                 "{\"summary\":\"test\"}", "{}", null);
 
         testInstanceId = instance.getId();
@@ -301,7 +302,7 @@ class WorkflowEngineIntegrationTest {
                     USER_ADMIN, "admin", 0L,
                     "CONTRACT_APPROVAL", RUN_ID + 2,
                     "重提测试合同", new BigDecimal("500000.00"),
-                    100L, 100L, "{}", "{}", null);
+                    null, null, "{}", "{}", null);
 
             // 获取任务并驳回
             WfTask task = taskMapper.selectList(
@@ -342,7 +343,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 3,
                 "撤回测试合同", new BigDecimal("300000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         long pendingBefore = taskMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -372,7 +373,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 4,
                 "转办测试合同", new BigDecimal("400000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         WfTask originalTask = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -405,7 +406,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 5,
                 "并发测试合同", new BigDecimal("500000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         WfTask task = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -453,7 +454,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 6,
                 "幂等测试合同", new BigDecimal("600000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         WfTask task = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -474,7 +475,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 7,
                 "幂等测试合同2", new BigDecimal("700000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         WfTask task2 = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -490,7 +491,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 8,
                 "幂等测试合同3", new BigDecimal("800000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         WfTask task3 = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -513,7 +514,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 9,
                 "操作测试合同", new BigDecimal("900000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         // 运行中 + 发起人 → 可撤回。POC模式下审批人=提交者，所以同时有审批权限
         List<String> actions = workflowEngine.getAvailableActions(instance.getTenantId(), instance.getId(), USER_ADMIN);
@@ -536,7 +537,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 10,
                 "驳回重提记录测试合同", new BigDecimal("100000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         WfTask task = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -588,7 +589,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 11,
                 "租户隔离测试合同", new BigDecimal("110000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         WfRecord submitRecord = recordMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfRecord>()
@@ -624,7 +625,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", 0L,
                 "CONTRACT_APPROVAL", RUN_ID + 12,
                 "已处理任务加签测试合同", new BigDecimal("120000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
 
         WfTask task = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
@@ -666,7 +667,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantA,
                 "CONTRACT_APPROVAL", RUN_ID + 13,
                 "租户A-我的已办测试", new BigDecimal("130000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         WfTask taskA = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instanceA.getId())
@@ -693,13 +694,13 @@ class WorkflowEngineIntegrationTest {
                 .add("userId", USER_MANAGER)
                 .add("username", "manager")
                 .add("tenantId", tenantB)
-                .add("roleCodes", java.util.List.of("MANAGER"))
+                .add("roleCodes", java.util.List.of("ADMIN"))
                 .build());
         WfInstance instanceB = workflowEngine.submit(
                 USER_MANAGER, "manager", tenantB,
                 "CONTRACT_APPROVAL", RUN_ID + 14,
                 "租户B-我的已办测试", new BigDecimal("140000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         WfTask taskB = taskMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instanceB.getId())
@@ -746,7 +747,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 15,
                 "通知测试-合同审批", new BigDecimal("150000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instance.getId());
 
         // Verify submit notification → approver (POC: admin = approver)
@@ -785,7 +786,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 16,
                 "通知测试-驳回合同", new BigDecimal("160000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         WfTask task2 = taskMapper.selectList(
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instance2.getId())
@@ -808,7 +809,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 17,
                 "通知测试-撤回合同", new BigDecimal("170000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         workflowEngine.withdraw(instance3.getId(), USER_ADMIN, "admin");
 
         List<SysNotification> withdrawNotifs = notificationMapper.selectList(
@@ -828,7 +829,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 18,
                 "通知测试-转办合同", new BigDecimal("180000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         WfTask task4 = taskMapper.selectList(
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instance4.getId())
@@ -853,7 +854,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 19,
                 "通知测试-加签合同", new BigDecimal("190000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         WfTask task5 = taskMapper.selectList(
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instance5.getId())
@@ -905,7 +906,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 20,
                 "抄送测试-合同审批", new BigDecimal("200000.00"),
-                100L, 100L, "{}", "{}", ccUserIds);
+                null, null, "{}", "{}", ccUserIds);
         assertNotNull(instance.getId());
 
         // 验证 wf_cc 记录已创建
@@ -944,7 +945,7 @@ class WorkflowEngineIntegrationTest {
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", RUN_ID + 21,
                 "无抄送测试", new BigDecimal("210000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         List<WfCc> emptyCc = wfCcMapper.selectList(
                 new LambdaQueryWrapper<WfCc>()
                         .eq(WfCc::getInstanceId, instance2.getId()));
@@ -1035,11 +1036,12 @@ class WorkflowEngineIntegrationTest {
     }
 
     private WfInstance submitTenantContract(long tenantId, long businessId, String title) {
+        seedContract(tenantId, businessId);
         return workflowEngine.submit(
                 USER_ADMIN, "admin", tenantId,
                 "CONTRACT_APPROVAL", businessId,
                 title, new BigDecimal("220000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
     }
 
     private WfTask firstPendingTask(Long instanceId) {
@@ -1047,6 +1049,53 @@ class WorkflowEngineIntegrationTest {
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getInstanceId, instanceId)
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)).get(0);
+    }
+
+    private void seedContracts() {
+        for (long id = RUN_ID + 1; id <= RUN_ID + 10; id++) seedContract(0L, id);
+        seedContract(889L, RUN_ID + 11);
+        seedContract(0L, RUN_ID + 12);
+        seedContract(991L, RUN_ID + 13);
+        seedContract(992L, RUN_ID + 14);
+        for (long id = RUN_ID + 15; id <= RUN_ID + 19; id++) seedContract(777L, id);
+        for (long id = RUN_ID + 20; id <= RUN_ID + 21; id++) seedContract(888L, id);
+        for (long id = RUN_ID + 22; id <= RUN_ID + 25; id++) seedContract(889L, id);
+    }
+
+    private void seedContract(long tenantId, long businessId) {
+        long projectId = projectIdForTenant(tenantId);
+        seedProject(tenantId, projectId);
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract (
+                    id, tenant_id, project_id, contract_code, contract_name, contract_type,
+                    party_a_id, party_b_id, contract_amount, current_amount, paid_amount,
+                    contract_status, approval_status, created_by, updated_by
+                )
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = ?)
+                """,
+                businessId, tenantId, projectId, "WF-ENG-" + businessId, "workflow集成测试合同-" + businessId, "SUB",
+                20001L, 20002L, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
+                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN,
+                businessId);
+    }
+
+    private long projectIdForTenant(long tenantId) {
+        return tenantId == 0L ? 100L : tenantId * 1000 + 100;
+    }
+
+    private void seedProject(long tenantId, long projectId) {
+        jdbcTemplate.update("""
+                INSERT INTO pm_project (
+                    id, tenant_id, project_code, project_name, project_type,
+                    contract_amount, target_cost, status, approval_status,
+                    created_by, updated_by, deleted_flag
+                )
+                SELECT ?, ?, ?, ?, '房建工程', 10000, 8000, 'ACTIVE', 'APPROVED', ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project WHERE id = ?)
+                """,
+                projectId, tenantId, "WF-ENG-PRJ-" + tenantId, "workflow集成测试项目-" + tenantId,
+                USER_ADMIN, USER_ADMIN, projectId);
     }
 
     /**
@@ -1107,7 +1156,10 @@ class WorkflowEngineIntegrationTest {
         // 9. wf_instance — parent table, deleted last
         jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 10. Do NOT delete test-seeded users — other test classes (WorkflowApproverResolverTest,
+        // 10. ct_contract — business fixtures for submit validation
+        jdbcTemplate.update("DELETE FROM ct_contract WHERE id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
+
+        // 11. Do NOT delete test-seeded users — other test classes (WorkflowApproverResolverTest,
         // WorkflowConcurrencyTest) also need them. Each class seeds via WHERE NOT EXISTS;
         // removing them creates cross-class data pollution.
     }

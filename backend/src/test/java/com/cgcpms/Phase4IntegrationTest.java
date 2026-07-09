@@ -26,6 +26,8 @@ import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.purchase.entity.MatPurchaseRequest;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfCc;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -83,6 +85,7 @@ class Phase4IntegrationTest {
     @Autowired private PayInvoiceMapper payInvoiceMapper;
     @Autowired private PayRecordMapper payRecordMapper;
     @Autowired private PayApplicationMapper payApplicationMapper;
+    @Autowired private MatPurchaseRequestMapper purchaseRequestMapper;
 
     // ── NOTIFICATION ──
     @Autowired private NotificationService notificationService;
@@ -342,13 +345,13 @@ class Phase4IntegrationTest {
     @Transactional
     @DisplayName("场景4: CC抄送全链路 → 提交流程(ccUserIds=[999,998])→验证wf_cc行+通知各2条")
     void test04_ccChain() {
-        long fakeBusinessId = System.currentTimeMillis();
+        long businessId = createDraftPurchaseRequest();
 
         // 1. 提交流程（携带 ccUserIds）
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                WorkflowBusinessTypes.PURCHASE_REQUEST, fakeBusinessId,
-                "Phase4-CC测试-" + fakeBusinessId,
+                WorkflowBusinessTypes.PURCHASE_REQUEST, businessId,
+                "Phase4-CC测试-" + businessId,
                 BigDecimal.ONE,
                 PROJECT_ID, CONTRACT_ID,
                 "Phase4集成测试-CC抄送", null,
@@ -693,13 +696,13 @@ class Phase4IntegrationTest {
     void test08_tenantIsolationCcAndMatrix() {
         // ── 8a. CC抄送隔离 ──
 
-        long fakeBusinessId = System.currentTimeMillis();
+        long businessId = createDraftPurchaseRequest();
 
         // tenant 0 提交流程（带 ccUserIds）
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", 0L,
-                WorkflowBusinessTypes.PURCHASE_REQUEST, fakeBusinessId,
-                "Phase4-隔离CC测试-" + fakeBusinessId,
+                WorkflowBusinessTypes.PURCHASE_REQUEST, businessId,
+                "Phase4-隔离CC测试-" + businessId,
                 BigDecimal.ONE,
                 PROJECT_ID, CONTRACT_ID,
                 "Phase4租户隔离-CC", null,
@@ -794,6 +797,20 @@ class Phase4IntegrationTest {
                 new LambdaQueryWrapper<WfInstance>()
                         .eq(WfInstance::getBusinessType, businessType)
                         .eq(WfInstance::getBusinessId, businessId));
+    }
+
+    private Long createDraftPurchaseRequest() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setTenantId(0L);
+        request.setProjectId(PROJECT_ID);
+        request.setContractId(CONTRACT_ID);
+        request.setRequestCode("PR-PHASE4-" + UUID.randomUUID());
+        request.setApprovalStatus("DRAFT");
+        request.setStatus("DRAFT");
+        request.setCreatedBy(USER_ADMIN);
+        request.setUpdatedBy(USER_ADMIN);
+        purchaseRequestMapper.insert(request);
+        return request.getId();
     }
 
     // ═══════════════════════════════════════════════════════════

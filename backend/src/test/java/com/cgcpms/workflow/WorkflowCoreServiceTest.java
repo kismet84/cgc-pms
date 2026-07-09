@@ -54,7 +54,7 @@ class WorkflowCoreServiceTest {
     private static final long NODE_1_ID = 230000000000000101L;
     private static final long NODE_2_ID = 230000000000000102L;
 
-    private static final String BUSINESS_TYPE = "CORE_TEST_APPROVAL";
+    private static final String BUSINESS_TYPE = WorkflowBusinessTypes.CONTRACT_APPROVAL;
 
     @Autowired
     private WorkflowTemplateService workflowTemplateService;
@@ -99,7 +99,7 @@ class WorkflowCoreServiceTest {
     @DisplayName("分页查询审批模板并获取节点详情")
     void listTemplatesAndGetDetail() {
         PageResult<WfTemplateVO> page = workflowTemplateService.listTemplates(
-                1, 20, BUSINESS_TYPE, null, null);
+                1, 20, BUSINESS_TYPE, null, "核心服务测试模板");
 
         assertEquals(1, page.getTotal(), "应该只查到一个已启用的模板");
         WfTemplateVO summary = page.getRecords().get(0);
@@ -144,7 +144,7 @@ class WorkflowCoreServiceTest {
         workflowTemplateService.updateTemplate(TEMPLATE_1_ID, disableRequest);
 
         PageResult<WfTemplateVO> page = workflowTemplateService.listTemplates(
-                1, 20, BUSINESS_TYPE, 1, null);
+                1, 20, BUSINESS_TYPE, 1, "核心服务测试模板");
         assertEquals(0, page.getTotal(), "过滤enabled=1时禁用模板不应出现");
     }
 
@@ -172,11 +172,12 @@ class WorkflowCoreServiceTest {
     @Test
     @DisplayName("金额在范围内可匹配到模板")
     void submitWithMatchingAmountFindsTemplate() {
+        seedContract(88888001L);
         WfInstance instance = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 88888001L,
                 "金额匹配测试", new BigDecimal("3000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instance);
         assertNotNull(instance.getId());
         assertEquals("RUNNING", instance.getInstanceStatus());
@@ -185,31 +186,34 @@ class WorkflowCoreServiceTest {
     @Test
     @DisplayName("金额超出范围时抛出模板未找到异常")
     void submitWithOutOfRangeAmountThrowsTemplateNotFound() {
+        seedContract(88888002L);
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> workflowEngine.submit(
                         USER_ADMIN, "admin", TENANT_0,
                         BUSINESS_TYPE, 88888002L,
-                        "金额超范围测试", new BigDecimal("999999.00"),
-                        100L, 100L, "{}", "{}", null));
+                        "金额超范围测试", new BigDecimal("1000000000.00"),
+                        null, null, "{}", "{}", null));
         assertEquals("TEMPLATE_NOT_FOUND", ex.getCode());
     }
 
     @Test
     @DisplayName("金额正好等于边界值可匹配到模板")
     void submitWithBoundaryAmountMatchesTemplate() {
+        seedContract(88888003L);
         WfInstance instanceMin = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 88888003L,
                 "最小边界金额", new BigDecimal("0.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instanceMin);
         assertEquals("RUNNING", instanceMin.getInstanceStatus());
 
+        seedContract(88888004L);
         WfInstance instanceMax = workflowEngine.submit(
                 USER_ADMIN, "admin", TENANT_0,
                 BUSINESS_TYPE, 88888004L,
                 "最大边界金额", new BigDecimal("10000.00"),
-                100L, 100L, "{}", "{}", null);
+                null, null, "{}", "{}", null);
         assertNotNull(instanceMax);
         assertEquals("RUNNING", instanceMax.getInstanceStatus());
     }
@@ -430,11 +434,43 @@ class WorkflowCoreServiceTest {
                     "DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id = ?)",
                     bizId);
             jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id = ?", bizId);
+            jdbcTemplate.update("DELETE FROM ct_contract WHERE id = ?", bizId);
         }
         // Clean template nodes first (FK to template)
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id IN (?, ?)",
                 TEMPLATE_1_ID, TEMPLATE_2_ID);
         jdbcTemplate.update("DELETE FROM wf_template WHERE id IN (?, ?)",
                 TEMPLATE_1_ID, TEMPLATE_2_ID);
+    }
+
+    private void seedContract(long businessId) {
+        seedProject();
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract (
+                    id, tenant_id, project_id, contract_code, contract_name, contract_type,
+                    party_a_id, party_b_id, contract_amount, current_amount, paid_amount,
+                    contract_status, approval_status, created_by, updated_by
+                )
+                SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = ?)
+                """,
+                businessId, TENANT_0, 100L, "WF-CORE-" + businessId, "workflow核心测试合同-" + businessId, "SUB",
+                20001L, 20002L, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
+                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN,
+                businessId);
+    }
+
+    private void seedProject() {
+        jdbcTemplate.update("""
+                INSERT INTO pm_project (
+                    id, tenant_id, project_code, project_name, project_type,
+                    contract_amount, target_cost, status, approval_status,
+                    created_by, updated_by, deleted_flag
+                )
+                SELECT ?, ?, ?, ?, '房建工程', 10000, 8000, 'ACTIVE', 'APPROVED', ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project WHERE id = ?)
+                """,
+                100L, TENANT_0, "WF-CORE-PRJ-100", "workflow核心测试项目",
+                USER_ADMIN, USER_ADMIN, 100L);
     }
 }
