@@ -1167,3 +1167,33 @@ Issue：ISSUE-008-009 供应商评分与采购增强 最小可行回归
 - 本轮只基于现有采购订单交期字段推导供应商评分，不新增质量合格率、价格偏差、售后响应或黑名单能力。
 - 本轮不新增采购询价、多供应商报价、比价单、定标记录或采购合同增强页面。
 - 后端全量测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
+
+---
+
+Mainline：第33条主线 Codex AutoPilot 插件 MVP 收口
+
+目标：
+- 在 D 复验通过后，为第33条主线补正式质量/收口报告，并给主线程最终裁决与本地提交提供依据。
+- 不改插件实现、不改业务代码、不扩展为 marketplace/MCP/dashboard 新主线。
+
+修改范围摘要：
+- `docs/quality/mainline-33-codex-autopilot-plugin-closeout-2026-07-09.md`：新增正式收口报告，固化 MVP 通过口径、插件边界和剩余风险。
+- `docs/iterations/iteration-2026-07-09-report.md`：追加第33条主线收口摘要。
+
+验证命令摘要：
+- `python C:\Users\L1597\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot`：通过。
+- `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/autopilot-checkpoint.ps1 -RepoRoot D:\projects-test\cgc-pms -AutopilotDir D:\projects-test\cgc-pms\.codex-autopilot -CheckGit`：通过，输出固定字段；当前 `stopFlag=false`、`pauseFlag=false`、`enabledFlag=false`。
+- `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/render-template.ps1 ...`：无 `OutputPath` 渲染通过。
+- `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/test-failure-classifier.ps1 -ExitCode 1 -ErrorText '...ECONNREFUSED ... dev-login...'`：返回 `environment_prereq`。
+- `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/local-commit-closeout.ps1 -IssueId mainline-33 -ExpectedPaths plugins -DryRun`：通过；未误判 `plugins/`，`unexpectedPaths` 仅为 `.serena/*` 与计划书路径。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：非失败分类；第33条主线 MVP 验收项通过，插件边界受控，收口条件成立
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- `test-failure-classifier.ps1` 仍为粗粒度分类，只适合作为最小准入门槛。
+- 当前 AutoPilot 运行态为 `stopFlag=false`、`enabledFlag=false`；若后续要做连续模式演示，需先显式启用。
+- `.serena` 删除痕迹属于工作区外部状态，不纳入本主线提交。

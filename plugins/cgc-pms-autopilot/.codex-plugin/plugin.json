@@ -1,0 +1,33 @@
+{
+  "name": "cgc-pms-autopilot",
+  "version": "0.1.0",
+  "description": "Local Codex plugin for cgc-pms AutoPilot owner workflow and closeout helpers.",
+  "author": {
+    "name": "cgc-pms local team"
+  },
+  "skills": "./skills/",
+  "keywords": [
+    "codex",
+    "autopilot",
+    "cgc-pms",
+    "workflow"
+  ],
+  "interface": {
+    "displayName": "CGC PMS AutoPilot",
+    "shortDescription": "Owner skill plus safe local AutoPilot helpers.",
+    "longDescription": "Provides the cgc-pms AutoPilot owner skill, reusable markdown templates, and safe PowerShell helpers for checkpoint, ready issue generation, closeout, failure classification, and local commit dry-runs.",
+    "developerName": "cgc-pms local team",
+    "category": "Productivity",
+    "capabilities": [
+      "Instructions",
+      "Templates",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Use the cgc-pms AutoPilot owner workflow for this repo.",
+      "Generate a ready issue entry from the plugin template.",
+      "Prepare a closeout summary and dry-run local commit checks."
+    ],
+    "brandColor": "#1F4F99"
+  }
+}
