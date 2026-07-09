@@ -4,7 +4,7 @@
 
 - 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
 - 本文件是当前执行队列，不是任务源全集。
-- 当本文件没有合格 Ready Issue 时，AutoPilot 应先从长期总任务池中按 `current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；该轮只更新 backlog，不直接修改业务代码；后续执行仍按每轮最多处理 1 个 Ready Issue。
+- 当本文件没有合格 Ready Issue 时，AutoPilot 应先从长期总任务池中按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；拆单当轮只更新 backlog，不直接修改业务代码；连续执行模式下拆单完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮，并按每轮最多处理 1 个 Ready Issue 执行。
 
 ## AutoPilot 自动合并门禁
 
