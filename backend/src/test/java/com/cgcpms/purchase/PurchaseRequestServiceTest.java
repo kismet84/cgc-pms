@@ -67,7 +67,10 @@ class PurchaseRequestServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
+        seedProject(PROJECT_ID);
+        seedProject(200L);
     }
 
     @AfterEach
@@ -91,6 +94,20 @@ class PurchaseRequestServiceTest {
                     "UPDATE sys_user SET tenant_id = ?, status = ?, deleted_flag = 0 WHERE id = ?",
                     TENANT_ID, "ENABLE", USER_ADMIN);
         }
+    }
+
+    private void seedProject(long projectId) {
+        jdbcTemplate.update("""
+                INSERT INTO pm_project (
+                    id, tenant_id, project_code, project_name, project_type,
+                    contract_amount, target_cost, status, approval_status,
+                    created_by, updated_by, deleted_flag
+                )
+                SELECT ?, ?, ?, ?, '房建工程', 10000, 8000, 'ACTIVE', 'APPROVED', ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project WHERE id = ?)
+                """,
+                projectId, TENANT_ID, "PR-TDD-PRJ-" + projectId, "采购申请测试项目-" + projectId,
+                USER_ADMIN, USER_ADMIN, projectId);
     }
 
     // ═══════════════════════════════════════════════════════════

@@ -218,6 +218,29 @@ class DashboardChiefEngineerServiceTest extends DashboardServiceTestSupport {
                         .findFirst()
                         .orElseThrow());
 
+        TechItem demoItem = techItemMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<TechItem>()
+                        .eq(TechItem::getTenantId, TENANT_ID)
+                        .eq(TechItem::getItemCode, "TECH-DEMO-105"));
+        boolean exists = demoItem != null;
+        if (!exists) {
+            demoItem = new TechItem();
+        }
+        demoItem.setTenantId(TENANT_ID);
+        demoItem.setProjectId(defaultProject.getId());
+        demoItem.setItemType("TECH_ISSUE");
+        demoItem.setItemCode("TECH-DEMO-105");
+        demoItem.setItemTitle("今日到期技术事项");
+        demoItem.setItemLevel("MAJOR");
+        demoItem.setItemStatus("OPEN");
+        demoItem.setDiscoveredAt(LocalDateTime.now().minusDays(1));
+        demoItem.setDueDate(LocalDate.now().atStartOfDay());
+        if (exists) {
+            techItemMapper.updateById(demoItem);
+        } else {
+            techItemMapper.insert(demoItem);
+        }
+
         ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(defaultProject.getId());
 
         DashboardBusinessItemVO todayDueItem = vo.getOpenIssues().stream()
