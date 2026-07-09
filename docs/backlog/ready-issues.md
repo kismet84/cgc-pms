@@ -1,6 +1,7 @@
 ## Ready 队列状态
 
 - 当前无合格 Ready Issue。
+- `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
 - `ISSUE-008-019` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `8/10` 个实施型 Ready Issue。
 - `ISSUE-008-018：通知平台平台化缺口-M4：同告警重复通知抑制与站内信频控回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `7/10` 个实施型 Ready Issue。
 - `ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `6/10` 个实施型 Ready Issue。
@@ -37,7 +38,7 @@
 ## 执行顺序建议
 
 1. 当前 Ready 队列已空，需由主线程/A 基于长期任务池重新裁决下一条 P2 Ready。
-2. 后续若继续通知平台细化，仍需重新确认与规则治理中心、WBS / 甘特图、供应商评分 / 采购增强等候选的优先级与并行边界。
+2. 后续若继续规则治理中心或切换到 WBS / 甘特图、供应商评分 / 采购增强、通知平台后续题，仍需重新确认优先级与并行边界。
 
 ## P0
 
@@ -234,6 +235,41 @@
 归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
 
 ## P2
+
+### ISSUE-008-020：规则治理中心平台化缺口-M2：阈值/窗口/严重度配置生效回归
+
+优先级：P2
+类型：规则治理中心 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.2 规则治理中心` 节“规则阈值 / 执行周期 / 抑制策略”；`docs/quality/issue-008-006-规则治理中心.md`；`docs/quality/mainline-15-m2-alert-rule-governance-acceptance-2026-07-03.md`
+是否需要新增 migration：否；优先复用现有 `alert_rule_config`、`AlertRuleEvaluator` 与 `AlertEvaluationServiceTest`，不新增规则治理表结构。
+目标：
+- 补齐 `alert_rule_config` 中 `threshold_ratio`、`window_days`、`severity_override` 三类现有字段的最小生效回归，避免当前只有 `enabled=0` 有正式验证、其余配置字段停留在“存在但未证实生效”状态。
+- 验证规则配置生效边界应落在现有告警生成链路，不新增规则设计器、规则详情页、执行日志页、效果分析页或新一轮 migration。
+- 不扩大为完整规则治理中心建设，不串入通知平台、权限模型、项目数据隔离或外部渠道能力。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 新增规则治理表、通用规则设计器、执行日志页、效果分析页
+- 借机放宽告警域、租户、角色、项目边界或把固定字段改造成大范围可配置引擎
+验收标准：
+- 至少一组后端回归证明：`threshold_ratio` 调整后，金额/比例型规则的触发阈值随配置变化而变化，不再只依赖硬编码默认值。
+- 至少一组后端回归证明：`window_days` 调整后，时效类规则的扫描窗口随配置变化而变化，不回退到固定默认天数。
+- 至少一组后端回归证明：`severity_override` 生效后，生成的预警严重度与配置一致，且未配置时仍保留既有默认严重度。
+- 不新增 migration，不修改已应用 migration；既有 `enabled`、`dedup_hours`、订阅偏好、通知分发和告警处理状态口径不回退。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-020-rule-governance-config-effectiveness.md`
 
 ### ISSUE-008-019：通知平台平台化缺口-M5：并发重复分发幂等与发送记录一致性回归
 

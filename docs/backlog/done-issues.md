@@ -116,6 +116,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-019-notification-concurrency-idempotency.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-020：规则治理中心平台化缺口-M2：阈值/窗口/严重度配置生效回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；规则配置字段真实生效边界回归已补齐；后端 58 项测试、D 最终验收、E 最终复审与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-020-rule-governance-config-effectiveness.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

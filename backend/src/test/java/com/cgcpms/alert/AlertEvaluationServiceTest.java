@@ -234,6 +234,7 @@ class AlertEvaluationServiceTest {
     @Transactional
     @DisplayName("TA3: evaluateContractExpiring — 合同 endDate 在 30 天内触发到期告警")
     void testEvaluateContractExpiring_Triggers() {
+        deleteRuleConfig("CONTRACT_EXPIRING");
         // 合同在 15 天后到期
         CtContract contract = contractMapper.selectById(testContractId);
         contract.setEndDate(LocalDate.now().plusDays(15));
@@ -243,6 +244,10 @@ class AlertEvaluationServiceTest {
         List<AlertLog> alerts = alertService.list(TENANT_ID, testProjectId, null, null);
         assertTrue(alerts.stream().anyMatch(a -> "CONTRACT_EXPIRING".equals(a.getRuleType())),
                 "15天后到期应触发 CONTRACT_EXPIRING");
+        assertTrue(alerts.stream()
+                        .filter(a -> "CONTRACT_EXPIRING".equals(a.getRuleType()))
+                        .allMatch(a -> "LOW".equals(a.getSeverity())),
+                "未配置 severity_override 时应保留 CONTRACT_EXPIRING 默认 LOW 严重度");
     }
 
     @Test
@@ -258,6 +263,43 @@ class AlertEvaluationServiceTest {
         List<AlertLog> alerts = alertService.list(TENANT_ID, testProjectId, null, null);
         boolean hasExpiring = alerts.stream().anyMatch(a -> "CONTRACT_EXPIRING".equals(a.getRuleType()));
         assertFalse(hasExpiring, "60天后到期不应触发 CONTRACT_EXPIRING");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA4b: evaluateContractExpiring — window_days 配置扩大扫描窗口后触发")
+    void testEvaluateContractExpiring_UsesConfiguredWindowDays() {
+        deleteRuleConfig("CONTRACT_EXPIRING");
+        deleteAlerts("CONTRACT_EXPIRING");
+        insertRuleConfig("CONTRACT_EXPIRING", null, 60, null);
+
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().plusDays(45));
+        contractMapper.updateById(contract);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        List<AlertLog> alerts = alertsByRuleType("CONTRACT_EXPIRING");
+        assertEquals(1, alerts.size(), "配置 window_days=60 后，45天后到期合同应进入扫描窗口");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA4c: evaluateContractExpiring — severity_override 覆盖生成告警严重度")
+    void testEvaluateContractExpiring_UsesSeverityOverride() {
+        deleteRuleConfig("CONTRACT_EXPIRING");
+        deleteAlerts("CONTRACT_EXPIRING");
+        insertRuleConfig("CONTRACT_EXPIRING", null, 30, "HIGH");
+
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().plusDays(15));
+        contractMapper.updateById(contract);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        List<AlertLog> alerts = alertsByRuleType("CONTRACT_EXPIRING");
+        assertEquals(1, alerts.size());
+        assertEquals("HIGH", alerts.get(0).getSeverity(), "severity_override=HIGH 应覆盖规则默认 LOW");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -314,6 +356,44 @@ class AlertEvaluationServiceTest {
         List<AlertLog> alerts = alertService.list(TENANT_ID, testProjectId, null, null);
         boolean hasDynamicCost = alerts.stream().anyMatch(a -> "DYNAMIC_COST_EXCEEDS_TARGET".equals(a.getRuleType()));
         assertFalse(hasDynamicCost, "动态成本不超目标不应触发告警");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA6b: evaluateDynamicCostExceedsTarget — threshold_ratio 配置改变触发边界")
+    void testDynamicCostExceedsTarget_UsesConfiguredThresholdRatio() {
+        deleteRuleConfig("DYNAMIC_COST_EXCEEDS_TARGET");
+        deleteAlerts("DYNAMIC_COST_EXCEEDS_TARGET");
+        costSummaryMapper.delete(new LambdaQueryWrapper<CostSummary>()
+                .eq(CostSummary::getTenantId, TENANT_ID)
+                .eq(CostSummary::getProjectId, testProjectId));
+
+        CostSummary summary = new CostSummary();
+        summary.setTenantId(TENANT_ID);
+        summary.setProjectId(testProjectId);
+        summary.setSummaryDate(LocalDate.now());
+        summary.setTargetCost(new BigDecimal("100.00"));
+        summary.setDynamicCost(new BigDecimal("105.00"));
+        summary.setContractLockedCost(BigDecimal.ZERO);
+        summary.setActualCost(BigDecimal.ZERO);
+        summary.setPaidAmount(BigDecimal.ZERO);
+        summary.setEstimatedRemainingCost(BigDecimal.ZERO);
+        summary.setContractIncome(BigDecimal.ZERO);
+        summary.setExpectedProfit(BigDecimal.ZERO);
+        summary.setCostDeviation(new BigDecimal("5.00"));
+        costSummaryMapper.insert(summary);
+
+        insertRuleConfig("DYNAMIC_COST_EXCEEDS_TARGET", new BigDecimal("1.10"), null, null);
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+        assertTrue(alertsByRuleType("DYNAMIC_COST_EXCEEDS_TARGET").isEmpty(),
+                "threshold_ratio=1.10 时，105/100 不应触发");
+
+        deleteRuleConfig("DYNAMIC_COST_EXCEEDS_TARGET");
+        insertRuleConfig("DYNAMIC_COST_EXCEEDS_TARGET", new BigDecimal("1.04"), null, null);
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        List<AlertLog> alerts = alertsByRuleType("DYNAMIC_COST_EXCEEDS_TARGET");
+        assertEquals(1, alerts.size(), "threshold_ratio=1.04 时，105/100 应触发");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -824,6 +904,58 @@ class AlertEvaluationServiceTest {
         alert.setProcessStatus(processStatus);
         alert.setDeletedFlag(0);
         return alert;
+    }
+
+    private void insertRuleConfig(String ruleType, BigDecimal thresholdRatio, Integer windowDays, String severityOverride) {
+        AlertRuleConfig config = new AlertRuleConfig();
+        config.setTenantId(TENANT_ID);
+        config.setRuleType(ruleType);
+        config.setAlertDomain(alertDomain(ruleType));
+        config.setAlertCategory(alertCategory(ruleType));
+        config.setEnabled(1);
+        config.setDedupHours(1);
+        config.setThresholdRatio(thresholdRatio);
+        config.setWindowDays(windowDays);
+        config.setSeverityOverride(severityOverride);
+        config.setDeletedFlag(0);
+        alertRuleConfigMapper.insert(config);
+    }
+
+    private String alertDomain(String ruleType) {
+        return switch (ruleType) {
+            case "DYNAMIC_COST_EXCEEDS_TARGET" -> "COST";
+            case "CONTRACT_EXPIRING" -> "CONTRACT";
+            default -> "OTHER";
+        };
+    }
+
+    private String alertCategory(String ruleType) {
+        return switch (ruleType) {
+            case "DYNAMIC_COST_EXCEEDS_TARGET" -> "COST_DYNAMIC";
+            case "CONTRACT_EXPIRING" -> "CONTRACT_TERM";
+            default -> "OTHER";
+        };
+    }
+
+    private void deleteRuleConfig(String ruleType) {
+        jdbcTemplate.update("""
+                delete from alert_rule_config
+                where tenant_id = ? and rule_type = ?
+                """, TENANT_ID, ruleType);
+    }
+
+    private void deleteAlerts(String ruleType) {
+        alertLogMapper.delete(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, testProjectId)
+                .eq(AlertLog::getRuleType, ruleType));
+    }
+
+    private List<AlertLog> alertsByRuleType(String ruleType) {
+        return alertLogMapper.selectList(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, testProjectId)
+                .eq(AlertLog::getRuleType, ruleType));
     }
 
     @Test
