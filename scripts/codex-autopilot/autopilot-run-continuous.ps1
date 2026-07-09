@@ -33,6 +33,135 @@ function Test-Checkpoint {
   return "CONTINUE"
 }
 
+function Read-RunLock {
+  param([string]$LockPath)
+
+  if (!(Test-Path $LockPath)) {
+    return $null
+  }
+  try {
+    return Get-Content -Raw $LockPath | ConvertFrom-Json
+  } catch {
+    return [pscustomobject]@{
+      owner = "unknown"
+      pid = $null
+      startedAt = $null
+      heartbeatAt = $null
+      mode = "unknown"
+      issueId = ""
+      unreadable = $true
+    }
+  }
+}
+
+function Test-RunLockStale {
+  param(
+    [object]$Lock,
+    [int]$MaxRunMinutes
+  )
+
+  if (!$Lock) {
+    return $false
+  }
+  if ($Lock.unreadable) {
+    return $true
+  }
+
+  [datetime]$heartbeat = [datetime]::MinValue
+  if ($Lock.heartbeatAt -and [datetime]::TryParse([string]$Lock.heartbeatAt, [ref]$heartbeat)) {
+    if (((Get-Date) - $heartbeat).TotalMinutes -gt $MaxRunMinutes) {
+      return $true
+    }
+  }
+
+  if ($Lock.pid) {
+    $process = Get-Process -Id ([int]$Lock.pid) -ErrorAction SilentlyContinue
+    if (!$process) {
+      return $true
+    }
+  }
+  return $false
+}
+
+function Write-RunLock {
+  param(
+    [string]$LockPath,
+    [object]$Lock
+  )
+
+  $Lock.heartbeatAt = Get-Date -Format o
+  $Lock | ConvertTo-Json -Depth 5 | Out-File -Encoding utf8 $LockPath
+}
+
+function New-RunLock {
+  param(
+    [string]$AutoDir,
+    [int]$MaxRunMinutes,
+    [string]$Mode
+  )
+
+  if (!(Test-Path $AutoDir)) {
+    New-Item -ItemType Directory -Path $AutoDir -Force | Out-Null
+  }
+
+  $lockPath = Join-Path $AutoDir "run.lock"
+  $existing = Read-RunLock $lockPath
+  if ($existing) {
+    if (Test-RunLockStale $existing $MaxRunMinutes) {
+      Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+      Write-Host "STALE_RUN_LOCK_REMOVED"
+    } else {
+      Write-Host "RUN_LOCK_ACTIVE"
+      Write-Host "lockOwner=$($existing.owner)"
+      Write-Host "lockPid=$($existing.pid)"
+      Write-Host "lockHeartbeatAt=$($existing.heartbeatAt)"
+      throw "Another AutoPilot run is active."
+    }
+  }
+
+  $stream = $null
+  try {
+    $stream = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    $lock = [pscustomobject]@{
+      owner = "$env:USERNAME@$env:COMPUTERNAME"
+      pid = $PID
+      startedAt = Get-Date -Format o
+      heartbeatAt = Get-Date -Format o
+      mode = $Mode
+      issueId = ""
+    }
+    $json = $lock | ConvertTo-Json -Depth 5
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+    $stream.Write($bytes, 0, $bytes.Length)
+    Write-Host "RUN_LOCK_ACQUIRED"
+    return $lock
+  } catch {
+    throw "Failed to acquire run.lock: $($_.Exception.Message)"
+  } finally {
+    if ($stream) {
+      $stream.Dispose()
+    }
+  }
+}
+
+function Remove-RunLock {
+  param(
+    [string]$AutoDir,
+    [object]$Lock
+  )
+
+  if (!$Lock) {
+    return
+  }
+
+  $lockPath = Join-Path $AutoDir "run.lock"
+  $existing = Read-RunLock $lockPath
+  if ($existing -and $existing.pid -eq $Lock.pid -and $existing.startedAt -eq $Lock.startedAt) {
+    Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+    Write-Host "RUN_LOCK_RELEASED"
+  }
+}
+
 function Get-ReadyIssues {
   param([string]$ReadyPath, [string]$RepoRoot, [string]$ScriptDir)
 
@@ -226,6 +355,10 @@ function Write-State {
     return
   }
 
+  if ($script:RunLock) {
+    Write-RunLock (Join-Path $AutoDir "run.lock") $script:RunLock
+  }
+
   $statePath = Join-Path $AutoDir "state.json"
   $now = Get-Date -Format s
   if (Test-Path $statePath) {
@@ -396,6 +529,7 @@ if ($config.repoRoot) {
 
 $autoDir = if ($config.autopilotDir) { $config.autopilotDir } else { Join-Path $RepoRoot ".codex-autopilot" }
 $maxIssuesPerRun = if ($config.maxIssuesPerRun) { [int]$config.maxIssuesPerRun } else { 1 }
+$maxRunMinutes = if ($config.maxRunMinutes) { [int]$config.maxRunMinutes } else { 120 }
 if ($maxIssuesPerRun -ne 1) {
   throw "Continuous runner requires maxIssuesPerRun=1, actual=$maxIssuesPerRun"
 }
@@ -406,6 +540,7 @@ $planPath = Join-Path $RepoRoot "docs\backlog\cgc-pms-production-enhancement-pla
 $splitLimit = 5
 $applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun -and -not [bool]$ExplainNextAction
 $dryRunMode = -not $applyMode
+$script:RunLock = $null
 Initialize-IterationProgress $autoDir $readyPath $MaxIterations ([bool]$DryRun -or [bool]$ExplainNextAction)
 
 Write-Host "CGC-PMS AutoPilot continuous runner"
@@ -427,84 +562,95 @@ if ($ExplainNextAction) {
   exit 0
 }
 
-if ($null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
-  Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" ([bool]$DryRun) "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
-  Write-Host "STOP_ITERATION_LIMIT_REACHED"
-  exit 0
-}
+try {
+  if ($applyMode) {
+    $script:RunLock = New-RunLock $autoDir $maxRunMinutes "apply-backlog-split"
+  }
 
-for ($loop = 1; $loop -le $MaxLoops; $loop++) {
-  $checkpoint = Test-Checkpoint $autoDir
-  Write-Host "checkpoint[$loop]=$checkpoint"
-  if ($checkpoint -ne "CONTINUE") {
-    Write-State $autoDir $checkpoint ([bool]$DryRun) "STOP" "" $checkpoint $checkpoint
-    Write-Host $checkpoint
+  if ($null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
+    Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" ([bool]$DryRun) "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
+    Write-Host "STOP_ITERATION_LIMIT_REACHED"
     exit 0
   }
 
-  $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
-  if ($readyIssues.Count -gt 0) {
-    if ($readyIssues[0].lint.status -ne "pass") {
-      Write-State $autoDir "STOP_READY_LINT_FAILED" ([bool]$DryRun) "STOP" $readyIssues[0].title "STOP_READY_LINT_FAILED" "STOP_READY_LINT_FAILED"
-      Write-Host "STOP_READY_LINT_FAILED"
-      Write-Host "selected=$($readyIssues[0].title)"
-      Write-Host "missingGate=ready-lint"
-      foreach ($errorItem in @($readyIssues[0].lint.errors)) {
-        Write-Host "lintError=$errorItem"
-      }
+  for ($loop = 1; $loop -le $MaxLoops; $loop++) {
+    $checkpoint = Test-Checkpoint $autoDir
+    Write-Host "checkpoint[$loop]=$checkpoint"
+    if ($checkpoint -ne "CONTINUE") {
+      Write-State $autoDir $checkpoint ([bool]$DryRun) "STOP" "" $checkpoint $checkpoint
+      Write-Host $checkpoint
       exit 0
     }
-    Write-State $autoDir "READY_ISSUE_FOUND" ([bool]$DryRun) "READY_ISSUE_FOUND" $readyIssues[0].title "READY_ISSUE_FOUND" ""
-    Write-Host "READY_ISSUE_FOUND"
-    Write-Host "selected=$($readyIssues[0].title)"
-    Write-Host "BUSINESS_EXECUTION_NOT_STARTED"
-    exit 0
-  }
 
-  Write-Host "SPLIT_MODE"
-  Write-Host "focusPath=$focusPath"
-  $candidates = @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit)
-  if ($candidates.Count -eq 0) {
+    $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
+    if ($readyIssues.Count -gt 0) {
+      if ($readyIssues[0].lint.status -ne "pass") {
+        Write-State $autoDir "STOP_READY_LINT_FAILED" ([bool]$DryRun) "STOP" $readyIssues[0].title "STOP_READY_LINT_FAILED" "STOP_READY_LINT_FAILED"
+        Write-Host "STOP_READY_LINT_FAILED"
+        Write-Host "selected=$($readyIssues[0].title)"
+        Write-Host "missingGate=ready-lint"
+        foreach ($errorItem in @($readyIssues[0].lint.errors)) {
+          Write-Host "lintError=$errorItem"
+        }
+        exit 0
+      }
+      if ($script:RunLock) {
+        $script:RunLock.issueId = $readyIssues[0].title
+      }
+      Write-State $autoDir "READY_ISSUE_FOUND" ([bool]$DryRun) "READY_ISSUE_FOUND" $readyIssues[0].title "READY_ISSUE_FOUND" ""
+      Write-Host "READY_ISSUE_FOUND"
+      Write-Host "selected=$($readyIssues[0].title)"
+      Write-Host "BUSINESS_EXECUTION_NOT_STARTED"
+      exit 0
+    }
+
+    Write-Host "SPLIT_MODE"
+    Write-Host "focusPath=$focusPath"
+    $candidates = @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit)
+    if ($candidates.Count -eq 0) {
+      $stopReason = Get-StopReasonForEmptyPool $readyPath
+      Write-State $autoDir $stopReason $dryRunMode "STOP" "" $stopReason $stopReason
+      Write-Host $stopReason
+      exit 0
+    }
+
+    Write-Host "splitCandidateCount=$($candidates.Count)"
+    for ($index = 0; $index -lt $candidates.Count; $index++) {
+      Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $candidates[$index].anchor)
+    }
+
+    if ($dryRunMode) {
+      Write-State $autoDir "DRY_RUN_SPLIT_PLANNED" $true "SPLIT_BACKLOG" "" "DRY_RUN_SPLIT_PLANNED" ""
+      Write-Host "DRY_RUN_NO_BACKLOG_WRITE"
+      exit 0
+    }
+
+    $createdCount = Add-ReadyIssueDrafts $readyPath $candidates
+    Write-State $autoDir "BACKLOG_SPLIT_APPLIED" $false "BACKLOG_SPLIT_APPLIED" "" "BACKLOG_SPLIT_APPLIED" ""
+    Write-Host "BACKLOG_SPLIT_APPLIED"
+    Write-Host "createdReadyIssueDrafts=$createdCount"
+
+    $checkpoint = Test-Checkpoint $autoDir
+    Write-Host "postSplitCheckpoint=$checkpoint"
+    if ($checkpoint -ne "CONTINUE") {
+      Write-State $autoDir $checkpoint $false "STOP" "" $checkpoint $checkpoint
+      Write-Host $checkpoint
+      exit 0
+    }
+
+    $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
+    if ($readyIssues.Count -gt 0) {
+      continue
+    }
+
     $stopReason = Get-StopReasonForEmptyPool $readyPath
-    Write-State $autoDir $stopReason $dryRunMode "STOP" "" $stopReason $stopReason
+    Write-State $autoDir $stopReason $false "STOP" "" $stopReason $stopReason
     Write-Host $stopReason
     exit 0
   }
 
-  Write-Host "splitCandidateCount=$($candidates.Count)"
-  for ($index = 0; $index -lt $candidates.Count; $index++) {
-    Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $candidates[$index].anchor)
-  }
-
-  if ($dryRunMode) {
-    Write-State $autoDir "DRY_RUN_SPLIT_PLANNED" $true "SPLIT_BACKLOG" "" "DRY_RUN_SPLIT_PLANNED" ""
-    Write-Host "DRY_RUN_NO_BACKLOG_WRITE"
-    exit 0
-  }
-
-  $createdCount = Add-ReadyIssueDrafts $readyPath $candidates
-  Write-State $autoDir "BACKLOG_SPLIT_APPLIED" $false "BACKLOG_SPLIT_APPLIED" "" "BACKLOG_SPLIT_APPLIED" ""
-  Write-Host "BACKLOG_SPLIT_APPLIED"
-  Write-Host "createdReadyIssueDrafts=$createdCount"
-
-  $checkpoint = Test-Checkpoint $autoDir
-  Write-Host "postSplitCheckpoint=$checkpoint"
-  if ($checkpoint -ne "CONTINUE") {
-    Write-State $autoDir $checkpoint $false "STOP" "" $checkpoint $checkpoint
-    Write-Host $checkpoint
-    exit 0
-  }
-
-  $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
-  if ($readyIssues.Count -gt 0) {
-    continue
-  }
-
-  $stopReason = Get-StopReasonForEmptyPool $readyPath
-  Write-State $autoDir $stopReason $false "STOP" "" $stopReason $stopReason
-  Write-Host $stopReason
-  exit 0
+  Write-State $autoDir "STOP_SESSION_LIMIT" $dryRunMode "STOP" "" "STOP_SESSION_LIMIT" "STOP_SESSION_LIMIT"
+  Write-Host "STOP_SESSION_LIMIT"
+} finally {
+  Remove-RunLock $autoDir $script:RunLock
 }
-
-Write-State $autoDir "STOP_SESSION_LIMIT" $dryRunMode "STOP" "" "STOP_SESSION_LIMIT" "STOP_SESSION_LIMIT"
-Write-Host "STOP_SESSION_LIMIT"

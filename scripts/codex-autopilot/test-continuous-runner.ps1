@@ -4,6 +4,8 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Runner = Join-Path $ScriptDir "autopilot-run-continuous.ps1"
+$StatusScript = Join-Path $ScriptDir "autopilot-status.ps1"
+$KillScript = Join-Path $ScriptDir "autopilot-kill.ps1"
 $TempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("cgc-pms-autopilot-runner-test-" + [guid]::NewGuid().ToString("N"))
 
 function New-Fixture {
@@ -87,6 +89,23 @@ function Set-IssueStatus {
   $text = Get-Content -Raw $ReadyPath
   $text = $text -replace "(?m)^状态[：:].*$", "状态：$Status"
   $text | Out-File -Encoding utf8 $ReadyPath
+}
+
+function Write-TestRunLock {
+  param(
+    [string]$Root,
+    [int]$ProcessId,
+    [string]$HeartbeatAt
+  )
+
+  [pscustomobject]@{
+    owner = "test"
+    pid = $ProcessId
+    startedAt = $HeartbeatAt
+    heartbeatAt = $HeartbeatAt
+    mode = "apply-backlog-split"
+    issueId = "ISSUE-TEST"
+  } | ConvertTo-Json | Out-File -Encoding utf8 (Join-Path $Root ".codex-autopilot\run.lock")
 }
 
 function Assert-Contains {
@@ -252,6 +271,11 @@ try {
   Assert-Contains $ExplainSplitOutput "wouldCreateReadyIssueDrafts=1"
   $SplitReadyAfterExplain = Get-Content -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterExplain "状态：Ready"
+  if (Test-Path (Join-Path $SplitRoot ".codex-autopilot\run.lock")) { throw "ExplainNextAction should not leave run.lock" }
+
+  $SplitDryRunOutput = Invoke-Runner $SplitRoot
+  Assert-Contains $SplitDryRunOutput "DRY_RUN_NO_BACKLOG_WRITE"
+  if (Test-Path (Join-Path $SplitRoot ".codex-autopilot\run.lock")) { throw "DryRun should not leave run.lock" }
 
   $ApplyRoot = New-Fixture -Name "apply" -Enabled -Ready "# Ready Issues`n" -Plan @"
 # Plan
@@ -280,6 +304,48 @@ try {
   if ($ApplyState.lastReason -ne "READY_ISSUE_FOUND") { throw "Expected state.lastReason=READY_ISSUE_FOUND" }
   if ($ApplyState.stopReason) { throw "Expected state.stopReason to be empty for ready issue handoff" }
   if ($ApplyState.iterationCompleted -ne 0) { throw "Expected split/ready handoff not to increment iterationCompleted" }
+  if (Test-Path (Join-Path $ApplyRoot ".codex-autopilot\run.lock")) { throw "ApplyBacklogSplit should release run.lock" }
+
+  $ActiveLockRoot = New-Fixture -Name "active-lock" -Enabled -Ready "# Ready Issues`n" -Plan @"
+# Plan
+
+### 8.1 报表中心
+建设项目经营总览报表。
+"@
+  Write-TestRunLock $ActiveLockRoot $PID (Get-Date -Format o)
+  $ActiveLockOutput = Invoke-Runner $ActiveLockRoot -Apply
+  Assert-Contains $ActiveLockOutput "RUN_LOCK_ACTIVE"
+  Assert-Contains $ActiveLockOutput "Another AutoPilot run is active"
+  if (!(Test-Path (Join-Path $ActiveLockRoot ".codex-autopilot\run.lock"))) { throw "Active run.lock should be kept" }
+  $ActiveLockStatus = & powershell -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $ActiveLockRoot 2>&1 | Out-String
+  $ActiveLockStatusJson = $ActiveLockStatus | ConvertFrom-Json
+  if (!$ActiveLockStatusJson.lockExists) { throw "Expected status to report lockExists=true" }
+  if ($ActiveLockStatusJson.lockStale) { throw "Expected active lock not to be stale" }
+
+  $StaleLockRoot = New-Fixture -Name "stale-lock" -Enabled -Ready "# Ready Issues`n" -Plan @"
+# Plan
+
+### 8.1 报表中心
+建设项目经营总览报表。
+"@
+  Write-TestRunLock $StaleLockRoot 999999 ((Get-Date).AddMinutes(-180).ToString("o"))
+  $StaleLockOutput = Invoke-Runner $StaleLockRoot -Apply
+  Assert-Contains $StaleLockOutput "STALE_RUN_LOCK_REMOVED"
+  Assert-Contains $StaleLockOutput "RUN_LOCK_ACQUIRED"
+  Assert-Contains $StaleLockOutput "RUN_LOCK_RELEASED"
+  if (Test-Path (Join-Path $StaleLockRoot ".codex-autopilot\run.lock")) { throw "Stale run.lock should be replaced and released" }
+
+  $KillStaleRoot = New-Fixture -Name "kill-stale-lock" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
+  Write-TestRunLock $KillStaleRoot 999999 ((Get-Date).AddMinutes(-180).ToString("o"))
+  $KillStaleOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $KillScript -Repo $KillStaleRoot 2>&1 | Out-String
+  Assert-Contains $KillStaleOutput "run.lock removed."
+  if (Test-Path (Join-Path $KillStaleRoot ".codex-autopilot\run.lock")) { throw "kill should remove stale run.lock" }
+
+  $KillActiveRoot = New-Fixture -Name "kill-active-lock" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
+  Write-TestRunLock $KillActiveRoot $PID (Get-Date -Format o)
+  $KillActiveOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $KillScript -Repo $KillActiveRoot 2>&1 | Out-String
+  Assert-Contains $KillActiveOutput "Active run.lock kept"
+  if (!(Test-Path (Join-Path $KillActiveRoot ".codex-autopilot\run.lock"))) { throw "kill without ForceKill should keep active run.lock" }
 
   $LimitOneRoot = New-Fixture -Name "limit-one" -Enabled -Ready @"
 # Ready Issues
