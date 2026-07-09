@@ -103,12 +103,17 @@ class CostSummaryServiceTest {
         costItemMapper.deleteById(80002L);
         costItemMapper.deleteById(80003L);
         costItemMapper.deleteById(80004L);
+        costItemMapper.deleteById(80005L);
+        costItemMapper.deleteById(80006L);
         costSubjectMapper.deleteById(80001L);
         costSubjectMapper.deleteById(80002L);
         costSubjectMapper.deleteById(80003L);
+        costSubjectMapper.deleteById(80004L);
         payRecordMapper.deleteById(80001L);
         payRecordMapper.deleteById(80002L);
         payApplicationMapper.deleteById(80001L);
+        costSummaryMapper.physicalDeleteByTenantAndProject(TENANT_ID, 80005L);
+        projectMapper.deleteById(80005L);
         TestUserContext.clear();
     }
 
@@ -477,6 +482,76 @@ class CostSummaryServiceTest {
             assertEquals(0, new BigDecimal("25000.00").compareTo(subjectPaid),
                     "每个科目行的 paidAmount 都应为项目级 25000, 实际: " + subjectPaid.toPlainString());
         }
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TC18-1: refreshSummary 固定回归目标成本、实际成本、动态成本和偏差金额")
+    void testRefreshSummaryDynamicCostReportAmounts() {
+        Long reportProjectId = 80005L;
+
+        PmProject project = new PmProject();
+        project.setId(reportProjectId);
+        project.setProjectCode("COST-SUM-REPORT");
+        project.setProjectName("成本动态汇总报表项目");
+        project.setProjectType("CONSTRUCTION");
+        project.setContractAmount(new BigDecimal("5000000.00"));
+        project.setTargetCost(new BigDecimal("4000000.00"));
+        project.setStatus("ACTIVE");
+        project.setApprovalStatus("APPROVED");
+        project.setTenantId(TENANT_ID);
+        project.setProjectManagerId(USER_PROJECT_MANAGER);
+        project.setCreatedBy(USER_PROJECT_CREATOR);
+        projectMapper.insert(project);
+
+        CostSubject subject = new CostSubject();
+        subject.setId(80004L);
+        subject.setSubjectName("报表回归科目");
+        subject.setSubjectCode("REPORT");
+        subject.setTenantId(TENANT_ID);
+        costSubjectMapper.insert(subject);
+
+        CostItem materialCost = new CostItem();
+        materialCost.setId(80005L);
+        materialCost.setTenantId(TENANT_ID);
+        materialCost.setProjectId(reportProjectId);
+        materialCost.setCostSubjectId(80004L);
+        materialCost.setSourceType("MAT_RECEIPT");
+        materialCost.setSourceId(80005L);
+        materialCost.setCostType("MATERIAL_COST");
+        materialCost.setCostStatus("CONFIRMED");
+        materialCost.setCostDate(java.time.LocalDate.now());
+        materialCost.setAmount(new BigDecimal("125000.00"));
+        costItemMapper.insert(materialCost);
+
+        CostItem changeCost = new CostItem();
+        changeCost.setId(80006L);
+        changeCost.setTenantId(TENANT_ID);
+        changeCost.setProjectId(reportProjectId);
+        changeCost.setCostSubjectId(80004L);
+        changeCost.setSourceType("CT_CHANGE");
+        changeCost.setSourceId(80006L);
+        changeCost.setCostType("CHANGE");
+        changeCost.setCostStatus("CONFIRMED");
+        changeCost.setCostDate(java.time.LocalDate.now());
+        changeCost.setAmount(new BigDecimal("75000.00"));
+        costItemMapper.insert(changeCost);
+
+        CostProjectSummaryVO result = costSummaryService.refreshSummary(TENANT_ID, reportProjectId);
+
+        assertEquals(0, new BigDecimal("4000000.00").compareTo(new BigDecimal(result.getTargetCost())));
+        assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(result.getActualCost())));
+        assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(result.getDynamicCost())));
+        assertEquals(0, new BigDecimal("-3800000.00").compareTo(new BigDecimal(result.getCostDeviation())));
+
+        CostSummaryVO subjectSummary = result.getSubjects().stream()
+                .filter(s -> "报表回归科目".equals(s.getCostSubjectName()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(0, new BigDecimal("4000000.00").compareTo(new BigDecimal(subjectSummary.getTargetCost())));
+        assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(subjectSummary.getActualCost())));
+        assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(subjectSummary.getDynamicCost())));
+        assertEquals(0, new BigDecimal("-3800000.00").compareTo(new BigDecimal(subjectSummary.getCostDeviation())));
     }
 
     @Test

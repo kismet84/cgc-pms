@@ -28,6 +28,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-002-contract-performance-report.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-008-003：成本动态汇总报表口径回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-008-003-cost-dynamic-summary-report.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-000-001：搭建本地 Codex AutoPilot 第一轮治理框架
 
 完成日期：2026-07-08  

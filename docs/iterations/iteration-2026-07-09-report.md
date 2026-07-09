@@ -1,5 +1,32 @@
 # Iteration Report - 2026-07-09
 
+Issue：ISSUE-008-003 成本动态汇总报表口径回归
+
+目标：
+- 回归目标成本、实际成本、动态成本和偏差金额的汇总口径。
+- 不新增成本快照表，不扩大为完整成本报表中心。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/cost/CostSummaryServiceTest.java`：新增独立项目种子，稳定断言目标成本、实际成本、动态成本和偏差金额。
+- `docs/quality/issue-008-003-cost-dynamic-summary-report.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-003 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=CostSummaryServiceTest#testRefreshSummaryDynamicCostReportAmounts" test`：通过。
+- `cd backend; .\mvnw.cmd test`：未通过；失败点集中在既有 dashboard、invoice、workflow、purchase、payment、revenue 测试夹具/断言问题，目标测试已通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只补强成本动态汇总报表最小口径回归，不新增报表中心、导出能力或成本快照表。
+- 后端全量测试仍有既有无关红灯，需后续 Ready Issue 分别治理。
+
+---
+
 Issue：ISSUE-008-002 合同履约报表口径回归
 
 目标：
