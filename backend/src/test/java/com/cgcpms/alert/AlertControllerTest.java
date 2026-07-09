@@ -3,6 +3,9 @@ package com.cgcpms.alert;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
+import com.cgcpms.audit.annotation.AuditedOperation;
+import com.cgcpms.audit.entity.OperationAuditLog;
+import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.project.entity.PmProject;
@@ -11,6 +14,7 @@ import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,10 +22,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -31,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AlertControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils; @Autowired private AlertLogMapper alertLogMapper;
+    @Autowired private OperationAuditLogMapper operationAuditLogMapper;
     @Autowired private PmProjectMapper projectMapper; @Autowired private PmProjectMemberMapper projectMemberMapper;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private static final long DIFFERENT_PROJECT_MEMBER_ID = 92001L; private static final long OTHER_PROJECT_ID = 82001L;
@@ -91,6 +102,82 @@ class AlertControllerTest {
         } finally {
             deleteReportControllerAlerts();
         }
+    }
+
+    @Test @Order(12) @DisplayName("POST /alerts/export-audit 契约带下载审计且允许 alert:view 或管理员")
+    void testExportAuditContract() throws Exception {
+        Method method = com.cgcpms.alert.controller.AlertController.class
+                .getMethod("exportAudit", com.cgcpms.alert.dto.AlertExportAuditRequest.class);
+        AuditedOperation audited = method.getAnnotation(AuditedOperation.class);
+        assertNotNull(audited);
+        assertEquals("DOWNLOAD", audited.type());
+        assertEquals("ALERT_EXPORT", audited.businessType());
+        assertEquals("#request.filterSignature", audited.businessIdExpression());
+
+        PreAuthorize preAuthorize = method.getAnnotation(PreAuthorize.class);
+        assertNotNull(preAuthorize);
+        assertEquals("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')", preAuthorize.value());
+    }
+
+    @Test @Order(12) @DisplayName("POST /alerts/export-audit -> 200 and persists minimal audit log")
+    void testExportAuditPersistsAuditLog() throws Exception {
+        String path = "/api/alerts/export-audit";
+        String filterSignature = "alert-export-a1b2c3";
+        long before = countAuditLogs("DOWNLOAD", path);
+
+        mockMvc.perform(p("/alerts/export-audit").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "filterSignature": "%s",
+                                  "recordCount": 2
+                                }
+                                """.formatted(filterSignature)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        OperationAuditLog log = waitForAuditLog("DOWNLOAD", path, filterSignature, before + 1);
+        assertEquals(TENANT_ID, log.getTenantId());
+        assertEquals(ADMIN_ID, log.getUserId());
+        assertEquals("POST", log.getHttpMethod());
+        assertEquals("ALERT_EXPORT", log.getBusinessType());
+        assertEquals(filterSignature, log.getBusinessId());
+        assertEquals(1, log.getSuccessFlag());
+        assertEquals(path, log.getRequestPath());
+        assertTrue(log.getErrorCode() == null || log.getErrorCode().isBlank());
+    }
+
+    @Test @Order(12) @DisplayName("POST /alerts/export-audit 非白名单筛选签名 -> 400 且不新增成功审计日志")
+    void testExportAuditRejectsUnsafeFilterSignature() throws Exception {
+        String path = "/api/alerts/export-audit";
+        long before = countSuccessfulAlertExportAuditLogs(path);
+
+        assertExportAuditBadRequest("""
+                {
+                  "filterSignature": "project=10001|rule=TEST_EXPORT_AUDIT|severity=HIGH",
+                  "recordCount": 2
+                }
+                """);
+        assertExportAuditBadRequest("""
+                {
+                  "filterSignature": "alert-export-tokenkeyword",
+                  "recordCount": 2
+                }
+                """);
+        assertExportAuditBadRequest("""
+                {
+                  "filterSignature": "{\"keyword\":\"budget\"}",
+                  "recordCount": 2
+                }
+                """);
+        assertExportAuditBadRequest("""
+                {
+                  "filterSignature": "alert-export-abcdefghijklmnopqrstuvwxyz123456",
+                  "recordCount": 2
+                }
+                """);
+
+        assertEquals(before, countSuccessfulAlertExportAuditLogs(path));
     }
 
     @Test @Order(13) @DisplayName("GET /alerts/processing-report same-tenant different-project member -> denied")
@@ -396,6 +483,50 @@ class AlertControllerTest {
         alertLogMapper.delete(new LambdaQueryWrapper<AlertLog>()
                 .eq(AlertLog::getTenantId, TENANT_ID)
                 .eq(AlertLog::getRuleType, ruleType));
+    }
+
+    private long countAuditLogs(String operationType, String requestPath) {
+        return operationAuditLogMapper.selectCount(new LambdaQueryWrapper<OperationAuditLog>()
+                .eq(OperationAuditLog::getTenantId, TENANT_ID)
+                .eq(OperationAuditLog::getOperationType, operationType)
+                .eq(OperationAuditLog::getRequestPath, requestPath));
+    }
+
+    private long countSuccessfulAlertExportAuditLogs(String requestPath) {
+        return operationAuditLogMapper.selectCount(new LambdaQueryWrapper<OperationAuditLog>()
+                .eq(OperationAuditLog::getTenantId, TENANT_ID)
+                .eq(OperationAuditLog::getOperationType, "DOWNLOAD")
+                .eq(OperationAuditLog::getBusinessType, "ALERT_EXPORT")
+                .eq(OperationAuditLog::getRequestPath, requestPath)
+                .eq(OperationAuditLog::getSuccessFlag, 1));
+    }
+
+    private void assertExportAuditBadRequest(String body) throws Exception {
+        mockMvc.perform(p("/alerts/export-audit").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    private OperationAuditLog waitForAuditLog(String operationType, String requestPath, String businessId, long expectedCount)
+            throws InterruptedException {
+        for (int i = 0; i < 30; i++) {
+            long count = countAuditLogs(operationType, requestPath);
+            if (count >= expectedCount) {
+                List<OperationAuditLog> logs = operationAuditLogMapper.selectList(new LambdaQueryWrapper<OperationAuditLog>()
+                        .eq(OperationAuditLog::getTenantId, TENANT_ID)
+                        .eq(OperationAuditLog::getOperationType, operationType)
+                        .eq(OperationAuditLog::getRequestPath, requestPath)
+                        .eq(OperationAuditLog::getBusinessId, businessId)
+                        .orderByDesc(OperationAuditLog::getId)
+                        .last("LIMIT 1"));
+                if (!logs.isEmpty()) {
+                    return logs.get(0);
+                }
+            }
+            Thread.sleep(100L);
+        }
+        throw new AssertionError("未等到审计日志落库: " + operationType + " " + requestPath + " businessId=" + businessId);
     }
 
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }

@@ -18,6 +18,7 @@ const alertPageSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8
 const downloadUtilSource = readFileSync(resolve(currentDir, '../../../utils/download.ts'), 'utf-8')
 
 const {
+  mockExportAlertAudit,
   mockGetAlertList,
   mockGetAlertSubscription,
   mockUpdateAlertSubscription,
@@ -28,6 +29,7 @@ const {
   mockMessage,
 } = vi.hoisted(
   () => ({
+    mockExportAlertAudit: vi.fn(),
     mockGetAlertList: vi.fn(),
     mockGetAlertSubscription: vi.fn(),
     mockUpdateAlertSubscription: vi.fn(),
@@ -152,6 +154,7 @@ vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
 }))
 vi.mock('@/api/modules/alert', () => ({
+  exportAlertAudit: mockExportAlertAudit,
   getAlertList: mockGetAlertList,
   getAlertSubscription: mockGetAlertSubscription,
   updateAlertSubscription: mockUpdateAlertSubscription,
@@ -439,6 +442,7 @@ beforeEach(() => {
   mockRoute.query = {}
   mockRoute.meta = {}
   mockGetAlertList.mockResolvedValue(createPagedAlertResponse([]))
+  mockExportAlertAudit.mockResolvedValue(undefined)
   mockGetAlertSubscription.mockResolvedValue(buildSubscriptionResponse())
   mockUpdateAlertSubscription.mockResolvedValue(
     buildSubscriptionResponse({
@@ -692,6 +696,13 @@ describe('alert/index.vue', () => {
       }),
     )
     expect(mockDownloadBlobFile).toHaveBeenCalledTimes(1)
+    expect(mockExportAlertAudit).toHaveBeenCalledTimes(1)
+    expect(mockExportAlertAudit).toHaveBeenCalledWith({
+      filterSignature: expect.stringMatching(/^alert-export-[a-f0-9]{1,19}$/),
+      recordCount: 2,
+    })
+    expect(mockExportAlertAudit.mock.calls[0]?.[0]?.filterSignature).not.toContain('关键字')
+    expect(mockExportAlertAudit.mock.calls[0]?.[0]?.filterSignature).not.toContain('首条导出消息')
     const [blob, filename] = mockDownloadBlobFile.mock.calls[0] as [Blob, string]
     const csv = await blob.text()
     expect(filename).toMatch(/^alerts-\d{4}-\d{2}-\d{2}\.csv$/)
@@ -709,6 +720,42 @@ describe('alert/index.vue', () => {
       .find((item) => item.text() === '导出')
     expect(emptyExportButton).toBeTruthy()
     expect(emptyExportButton!.attributes('disabled')).toBeDefined()
+  })
+
+  it('审计确认失败时不阻断已完成下载，并给出非阻塞提示', async () => {
+    mockAlertStore.alerts = [createAlertRecord()]
+    mockAlertStore.total = 1
+    mockGetAlertList.mockResolvedValueOnce(
+      createPagedAlertResponse([
+        createAlertRecord({
+          id: 'ALERT-020',
+          message: '导出仍应成功',
+        }),
+      ]),
+    )
+    mockExportAlertAudit.mockRejectedValueOnce(new Error('audit failed'))
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const wrapper = mountAlertPage()
+    await flushPromises()
+
+    const exportButton = wrapper
+      .findAll('.alert-toolbar-left button')
+      .find((item) => item.text() === '导出')
+    expect(exportButton).toBeTruthy()
+
+    await exportButton!.trigger('click')
+    await flushPromises()
+
+    expect(mockDownloadBlobFile).toHaveBeenCalledTimes(1)
+    expect(mockMessage.success).toHaveBeenCalledWith('已导出当前筛选结果')
+    expect(mockMessage.warning).toHaveBeenCalledWith('导出已完成，审计确认补记失败')
+    expect(warnSpy).toHaveBeenCalledWith(
+      'alert export audit confirm failed',
+      expect.any(Error),
+    )
+
+    warnSpy.mockRestore()
   })
 
   it('导出总量超过阈值时提示收窄筛选，不继续请求后续分页也不下载', async () => {
@@ -1040,6 +1087,9 @@ describe('alert 子组件 DOM/结构证据', () => {
     expect(alertPageSource).toContain('const EXPORT_MAX_RECORDS = 1000')
     expect(alertPageSource).toContain("getAlertList(buildAlertListParams(1, 200))")
     expect(alertPageSource).toContain('downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)')
+    expect(alertPageSource).toContain('buildAlertExportFilterSignature')
+    expect(alertPageSource).toContain("keyword=${params.keyword ? 'present' : 'empty'}")
+    expect(alertPageSource).toContain('void confirmExportAudit(exportParams, exportAlerts.length)')
   })
 
   it('详情面板保持详情/订阅结构，备注双向更新和业务按钮条件', async () => {

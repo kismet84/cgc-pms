@@ -76,6 +76,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-014-report-center-cross-page-export-filter-consistency.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-015：报表中心平台化缺口-M6：导出审计留痕与目录一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；导出审计留痕与目录一致性已补齐；后端白名单补修、前端十六进制筛选签名、D 最终验收、E 最终复审与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-015-report-center-export-audit-trail.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

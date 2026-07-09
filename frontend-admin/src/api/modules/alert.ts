@@ -60,6 +60,11 @@ export interface BatchEvaluateResult {
   tenantId: string
 }
 
+export interface AlertExportAuditPayload {
+  filterSignature: string
+  recordCount: number
+}
+
 export type UpdateAlertSubscriptionPayload = Partial<AlertSubscriptionConfig>
 
 /** 预警列表（按项目/严重度/已读状态筛选） */
@@ -119,6 +124,14 @@ export function batchEvaluate() {
   return request<BatchEvaluateResult>({
     url: '/alerts/batch-evaluate',
     method: 'post',
+  })
+}
+
+export function exportAlertAudit(data: AlertExportAuditPayload) {
+  return request<void>({
+    url: '/alerts/export-audit',
+    method: 'post',
+    data,
   })
 }
 

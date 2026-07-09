@@ -3,6 +3,7 @@ package com.cgcpms.alert.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.alert.dto.AlertBatchReadRequest;
 import com.cgcpms.alert.dto.AlertBatchStatusUpdateRequest;
+import com.cgcpms.alert.dto.AlertExportAuditRequest;
 import com.cgcpms.alert.dto.AlertOperationResponse;
 import com.cgcpms.alert.dto.AlertProcessingReportVO;
 import com.cgcpms.alert.dto.AlertStatusUpdateRequest;
@@ -68,6 +69,13 @@ public class AlertController {
         Long tenantId = UserContext.getCurrentTenantId();
         return ApiResponse.success(alertEvaluationService.processingReport(tenantId, projectId,
                 ruleType, alertDomain, severity, isRead, triggeredStart, triggeredEnd, processStatus));
+    }
+
+    @PostMapping("/export-audit")
+    @AuditedOperation(type = "DOWNLOAD", businessType = "ALERT_EXPORT", businessIdExpression = "#request.filterSignature")
+    @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> exportAudit(@Valid @RequestBody AlertExportAuditRequest request) {
+        return ApiResponse.success();
     }
 
     @PutMapping("/{id}/read")

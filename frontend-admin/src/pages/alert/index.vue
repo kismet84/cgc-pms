@@ -14,6 +14,7 @@ import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { useUserStore } from '@/stores/user'
 import {
+  exportAlertAudit,
   getAlertList,
   getAlertSubscription,
   updateAlertSubscription,
@@ -313,6 +314,42 @@ function buildAlertListParams(page = pageNo.value, size = pageSize.value): Alert
     triggeredEnd: filter.triggeredAtRange?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss'),
     onlyDefaultScope: filter.onlyDefaultScope || undefined,
   }
+}
+
+function normalizeAuditField(value: unknown) {
+  return String(value ?? '').trim() || '-'
+}
+
+function buildAlertExportFilterSignature(params: AlertListParams) {
+  const canonical = [
+    'v1',
+    `keyword=${params.keyword ? 'present' : 'empty'}`,
+    `projectId=${normalizeAuditField(params.projectId)}`,
+    `alertDomain=${normalizeAuditField(params.alertDomain)}`,
+    `ruleType=${normalizeAuditField(params.ruleType)}`,
+    `severity=${normalizeAuditField(params.severity)}`,
+    `isRead=${normalizeAuditField(params.isRead)}`,
+    `processStatus=${normalizeAuditField(params.processStatus)}`,
+    `triggeredStart=${normalizeAuditField(params.triggeredStart)}`,
+    `triggeredEnd=${normalizeAuditField(params.triggeredEnd)}`,
+    `onlyDefaultScope=${params.onlyDefaultScope ? '1' : '0'}`,
+  ].join('|')
+  let hash = 2166136261
+  for (let index = 0; index < canonical.length; index += 1) {
+    hash ^= canonical.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `alert-export-${(hash >>> 0).toString(16)}`
+}
+
+function confirmExportAudit(params: AlertListParams, recordCount: number) {
+  return exportAlertAudit({
+    filterSignature: buildAlertExportFilterSignature(params),
+    recordCount,
+  }).catch((error) => {
+    console.warn('alert export audit confirm failed', error)
+    message.warning('导出已完成，审计确认补记失败')
+  })
 }
 
 async function fetchData() {
@@ -803,6 +840,7 @@ async function exportCurrentView() {
   }
   exportLoading.value = true
   try {
+    const exportParams = buildAlertListParams()
     const exportAlerts = await loadAlertsForExport()
     if (!exportAlerts.length) {
       message.info('当前筛选条件下无可导出的预警数据')
@@ -838,6 +876,7 @@ async function exportCurrentView() {
     const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
     downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)
     message.success('已导出当前筛选结果')
+    void confirmExportAudit(exportParams, exportAlerts.length)
   } catch (error) {
     if (error === EXPORT_LIMIT_REACHED) {
       return
