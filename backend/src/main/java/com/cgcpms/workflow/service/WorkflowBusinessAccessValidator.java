@@ -16,6 +16,8 @@ import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.revenue.entity.ContractRevenue;
+import com.cgcpms.revenue.mapper.ContractRevenueMapper;
 import com.cgcpms.requisition.entity.MatRequisition;
 import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
@@ -45,6 +47,7 @@ public class WorkflowBusinessAccessValidator {
     private final CtContractChangeMapper contractChangeMapper;
     private final StlSettlementMapper settlementMapper;
     private final CostTargetMapper costTargetMapper;
+    private final ContractRevenueMapper contractRevenueMapper;
     private final MatRequisitionMapper requisitionMapper;
 
     public ValidationResult validateSubmit(String businessType, Long businessId, Long tenantId,
@@ -123,6 +126,13 @@ public class WorkflowBusinessAccessValidator {
                         null, requestContractId,
                         entity == null ? null : entity.getApprovalStatus(), "COST_TARGET_NOT_FOUND");
             }
+            case WorkflowBusinessTypes.CONTRACT_REVENUE -> {
+                ContractRevenue entity = contractRevenueMapper.selectById(businessId);
+                return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
+                        entity == null ? null : entity.getProjectId(), requestProjectId,
+                        entity == null ? null : entity.getContractId(), requestContractId,
+                        entity == null ? null : entity.getApprovalStatus(), "REVENUE_NOT_FOUND", "PENDING");
+            }
             case WorkflowBusinessTypes.MATERIAL_REQUISITION -> {
                 MatRequisition entity = requisitionMapper.selectById(businessId);
                 return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
@@ -137,6 +147,13 @@ public class WorkflowBusinessAccessValidator {
     private ValidationResult validate(boolean exists, Long tenantId, Long realTenantId, Long realProjectId,
                                       Long requestProjectId, Long realContractId, Long requestContractId,
                                       String approvalStatus, String notFoundCode) {
+        return validate(exists, tenantId, realTenantId, realProjectId, requestProjectId,
+                realContractId, requestContractId, approvalStatus, notFoundCode, "DRAFT", "APPROVING");
+    }
+
+    private ValidationResult validate(boolean exists, Long tenantId, Long realTenantId, Long realProjectId,
+                                      Long requestProjectId, Long realContractId, Long requestContractId,
+                                      String approvalStatus, String notFoundCode, String... allowedStatuses) {
         if (!exists || !Objects.equals(realTenantId, tenantId)) {
             throw new BusinessException(notFoundCode, "审批业务对象不存在");
         }
@@ -150,10 +167,19 @@ public class WorkflowBusinessAccessValidator {
             throw new BusinessException("WORKFLOW_CONTRACT_MISMATCH", "审批请求合同与业务对象不一致");
         }
         projectAccessChecker.checkAccess(realProjectId, "提交审批");
-        if (!"DRAFT".equals(approvalStatus) && !"APPROVING".equals(approvalStatus)) {
+        if (!isAllowedStatus(approvalStatus, allowedStatuses)) {
             throw new BusinessException("WORKFLOW_STATUS_NOT_SUBMITTABLE", "业务状态不允许提交审批");
         }
         return new ValidationResult(realProjectId, realContractId, approvalStatus);
+    }
+
+    private boolean isAllowedStatus(String approvalStatus, String... allowedStatuses) {
+        for (String allowedStatus : allowedStatuses) {
+            if (Objects.equals(allowedStatus, approvalStatus)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static final class ValidationResult {

@@ -48,10 +48,12 @@ class WorkflowControllerAuthTest {
     private WorkflowQueryService workflowQueryService;
 
     private WorkflowController controller;
+    private WorkflowEngine permissionEngine;
 
     @BeforeEach
     void setUp() {
         controller = new WorkflowController(workflowEngine, workflowQueryService);
+        permissionEngine = new WorkflowEngine(null, null, null, null, null, null, null, null);
         // clear any lingering context from other tests
         SecurityContextHolder.clearContext();
     }
@@ -127,6 +129,31 @@ class WorkflowControllerAuthTest {
         }
 
         @Test
+        @DisplayName("CONTRACT_REVENUE 使用生产权限映射允许 revenue:submit")
+        void contractRevenueUsesProductionPermissionMapping() {
+            assertEquals("revenue:submit",
+                    permissionEngine.getRequiredPermission(WorkflowBusinessTypes.CONTRACT_REVENUE),
+                    "CONTRACT_REVENUE 应映射到 revenue:submit");
+
+            setAuthentication("revenue:submit");
+
+            assertDoesNotThrow(() -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_REVENUE),
+                    "具有 revenue:submit 权限的用户应通过 CONTRACT_REVENUE 提交校验");
+        }
+
+        @Test
+        @DisplayName("CONTRACT_REVENUE 错误权限被拒绝")
+        void contractRevenueWrongPermissionIsRejected() {
+            setAuthentication("contract:submit");
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> invokeCheckSubmitPermission(WorkflowBusinessTypes.CONTRACT_REVENUE),
+                    "错误权限不应通过 CONTRACT_REVENUE 提交校验");
+            assertEquals("WORKFLOW_PERMISSION_DENIED", ex.getCode(),
+                    "错误码应为 WORKFLOW_PERMISSION_DENIED");
+        }
+
+        @Test
         @DisplayName("ADMIN 绕过所有业务类型的提交权限")
         void adminBypassesAllBusinessTypes() {
             setAuthentication("ROLE_ADMIN");
@@ -141,7 +168,8 @@ class WorkflowControllerAuthTest {
                     WorkflowBusinessTypes.VAR_ORDER,
                     WorkflowBusinessTypes.CT_CHANGE,
                     WorkflowBusinessTypes.SETTLEMENT,
-                    WorkflowBusinessTypes.COST_TARGET
+                    WorkflowBusinessTypes.COST_TARGET,
+                    WorkflowBusinessTypes.CONTRACT_REVENUE
             };
 
             for (String type : types) {
@@ -165,7 +193,8 @@ class WorkflowControllerAuthTest {
                     WorkflowBusinessTypes.VAR_ORDER,
                     WorkflowBusinessTypes.CT_CHANGE,
                     WorkflowBusinessTypes.SETTLEMENT,
-                    WorkflowBusinessTypes.COST_TARGET
+                    WorkflowBusinessTypes.COST_TARGET,
+                    WorkflowBusinessTypes.CONTRACT_REVENUE
             };
 
             for (String type : types) {
@@ -193,6 +222,18 @@ class WorkflowControllerAuthTest {
             BusinessException ex = assertThrows(BusinessException.class,
                     () -> invokeCheckSubmitPermission("UNKNOWN_TYPE"),
                     "不支持的业务类型应抛出 BusinessException");
+            assertEquals("UNSUPPORTED_BUSINESS_TYPE", ex.getCode(),
+                    "错误码应为 UNSUPPORTED_BUSINESS_TYPE");
+        }
+
+        @Test
+        @DisplayName("TECH_ITEM 未支持时抛出商务异常")
+        void techItemUnsupportedThrowsBusinessException() {
+            setAuthentication("ROLE_ADMIN");
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> invokeCheckSubmitPermission(WorkflowBusinessTypes.TECH_ITEM),
+                    "TECH_ITEM 当前未支持，应抛出 BusinessException");
             assertEquals("UNSUPPORTED_BUSINESS_TYPE", ex.getCode(),
                     "错误码应为 UNSUPPORTED_BUSINESS_TYPE");
         }
@@ -281,42 +322,7 @@ class WorkflowControllerAuthTest {
                 new UsernamePasswordAuthenticationToken("testUser", null, authList));
     }
 
-    /**
-     * Inline version of WorkflowEngine.checkSubmitPermission for isolated testing.
-     * The real method only reads from SecurityContextHolder (no injected dependencies),
-     * so we can test its logic without a real WorkflowEngine instance.
-     */
     private void invokeCheckSubmitPermission(String businessType) {
-        String requiredPermission = getRequiredPermission(businessType);
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) {
-            throw new BusinessException("UNAUTHORIZED", "未认证");
-        }
-        for (var authority : auth.getAuthorities()) {
-            String authStr = authority.getAuthority();
-            if ("ROLE_ADMIN".equals(authStr) || "ROLE_SUPER_ADMIN".equals(authStr)) {
-                return;
-            }
-            if (requiredPermission.equals(authStr)) {
-                return;
-            }
-        }
-        throw new BusinessException("WORKFLOW_PERMISSION_DENIED", "缺少权限: " + requiredPermission);
-    }
-
-    private String getRequiredPermission(String businessType) {
-        return switch (businessType) {
-            case WorkflowBusinessTypes.CONTRACT_APPROVAL -> "contract:submit";
-            case WorkflowBusinessTypes.PURCHASE_ORDER -> "purchase:order:submit";
-            case WorkflowBusinessTypes.PURCHASE_REQUEST -> "purchase:request:submit";
-            case WorkflowBusinessTypes.MATERIAL_RECEIPT -> "receipt:submit";
-            case WorkflowBusinessTypes.SUB_MEASURE -> "subcontract:measure:submit";
-            case WorkflowBusinessTypes.PAY_REQUEST -> "payment:app:submit";
-            case WorkflowBusinessTypes.VAR_ORDER -> "variation:order:submit";
-            case WorkflowBusinessTypes.CT_CHANGE -> "contract:change:submit";
-            case WorkflowBusinessTypes.SETTLEMENT -> "settlement:submit";
-            case WorkflowBusinessTypes.COST_TARGET -> "cost:target:submit";
-            default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
-        };
+        permissionEngine.checkSubmitPermission(businessType);
     }
 }

@@ -20,6 +20,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-032-005-finance-role-blocked-closeout.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-032-001：workflow 全量测试红灯夹具与业务类型注册治理
+
+完成日期：2026-07-09
+合并方式：not-merged/doc-closeout-only
+失败分类或非失败分类：真实代码质量问题已修复；历史 workflow 红灯入口已转为当前已绿；`CONTRACT_REVENUE` 业务类型注册缺口已治理；E 审查与 D 验收通过
+验证结果：通过
+相关报告：docs/quality/issue-032-001-workflow-business-type-registration-closeout.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-032-008：覆盖率与 E2E CI 基线复验
 
 完成日期：2026-07-09

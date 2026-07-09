@@ -4,13 +4,13 @@
 
 由项目总负责人按长期计划、当前项目状态和最新约束动态选择下一批 Ready Issue。
 
-截至 2026-07-09，当前唯一 Ready 已锁定为 `ISSUE-032-001`：workflow 全量测试红灯夹具与业务类型注册治理。本轮按 mainline-32 M2 后端全量测试红灯治理顺序串行推进，先 workflow，再视收口结果依次进入 `ISSUE-032-002`、`ISSUE-032-003`、`ISSUE-032-004`。
+截至 2026-07-09，`ISSUE-032-001` 已完成正式收口。当前不再保留“唯一 Ready=workflow 红灯治理”的状态；下一条 Ready 需由项目总负责人结合最新 done/blocked/长期任务池重新拆题。
 
 ## 当前 Ready 状态
 
-- 当前唯一可直接启动的 Ready Issue：`ISSUE-032-001`。
-- 候选顺序保留为 `ISSUE-032-001 -> ISSUE-032-002 -> ISSUE-032-003 -> ISSUE-032-004`，依据是 `docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md` 的分组与依赖关系。
-- 本轮不并行启动后续候选，避免 workflow 底层夹具与业务类型问题未收敛前，把链式失败扩散到 invoice、dashboard/purchase/revenue、phase 集成链路。
+- 当前无可直接启动的 Ready Issue。
+- `ISSUE-032-001` 已从 Ready 队列移除，并以 `docs/quality/issue-032-001-workflow-business-type-registration-closeout.md` 完成正式归档。
+- 如需继续推进第32条主线 M2/M5/M6 或长期任务池事项，应由主线程按最新依赖和风险重新分档、重新拆题。
 
 ## 第32条主线 M5 分层冻结
 

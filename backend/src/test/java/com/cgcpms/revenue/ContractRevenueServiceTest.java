@@ -112,7 +112,7 @@ class ContractRevenueServiceTest {
         assertThrows(BusinessException.class, () -> service.update(upd));
     }
 
-    @Test @Transactional @DisplayName("submitForApproval → DRAFT→APPROVING")
+    @Test @Transactional @DisplayName("submitForApproval → DRAFT→PENDING")
     void testSubmitForApproval() {
         ContractRevenue rev = new ContractRevenue();
         rev.setProjectId(PROJECT_ID); rev.setContractId(CONTRACT_ID);
@@ -124,12 +124,11 @@ class ContractRevenueServiceTest {
         // May throw if no workflow template — test that submit path is reachable
         try {
             service.submitForApproval(id);
-            assertEquals("APPROVING", service.getById(id).getApprovalStatus());
+            assertEquals("PENDING", service.getById(id).getApprovalStatus());
         } catch (BusinessException e) {
             // Workflow precondition/configuration failures are acceptable here.
             assertTrue(e.getCode().contains("TEMPLATE")
-                    || e.getCode().contains("NOT_FOUND")
-                    || "UNSUPPORTED_BUSINESS_TYPE".equals(e.getCode()));
+                    || e.getCode().contains("NOT_FOUND"));
         }
     }
 

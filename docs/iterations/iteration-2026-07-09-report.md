@@ -2,6 +2,40 @@
 
 ---
 
+Issue：ISSUE-032-001 workflow 全量测试红灯夹具与业务类型注册治理
+
+目标：
+- 在 C 实现、D/E 验收审查、阻塞解除均通过后，完成 `ISSUE-032-001` 的正式归档与 backlog 状态收口。
+- 将该 Issue 从 `Ready` 队列移除，写入 `Done`，并同步 `current-focus` 与正式质量报告。
+- 不改业务代码、不重跑测试、不把历史 workflow 红灯继续写成当前未收敛事实。
+
+修改范围摘要：
+- `docs/quality/issue-032-001-workflow-business-type-registration-closeout.md`：新增正式收口报告，明确本包真实修复对象是 `CONTRACT_REVENUE` workflow 业务类型注册缺口，而不是继续维持“现存 workflow 红灯”口径。
+- `docs/backlog/ready-issues.md`：移除 `ISSUE-032-001` 当前 Ready 入口，并将队列状态更新为“当前无合格 Ready Issue”。
+- `docs/backlog/done-issues.md`：新增 `ISSUE-032-001` 完成记录。
+- `docs/backlog/current-focus.md`：移除“当前唯一 Ready=ISSUE-032-001”的描述，改为等待主线程重新拆题。
+- `docs/iterations/iteration-2026-07-09-report.md`：记录本次正式收口动作。
+
+验证命令摘要：
+- `git status --short`：确认工作区已有 4 个后端实现/测试文件的既有未提交改动；本轮只追加允许范围内文档收口。
+- E 审查结论引用：未发现阻塞级权限/租户/项目/合同/状态越权，`revenue:submit` 与 `ContractRevenueController submit` 入口一致，`TECH_ITEM` 未扩大 scope。
+- D/阻塞解除结论引用：`cd backend; .\mvnw.cmd "-Dtest=ContractRevenueServiceTest,WorkflowControllerAuthTest" test` 通过，`29 tests`、`0 failures/errors`。
+- D/阻塞解除结论引用：`cd backend; .\mvnw.cmd "-Dtest=WorkflowEngineIntegrationTest,WorkflowCoreServiceTest,WorkflowTemplateManagementTest" test` 通过，`43 tests`、`0 failures/errors`。
+- `git diff --check`：通过。
+- 旧 `testCompile` 阻塞：本轮已无法复现，归类为瞬时/前置已解除，不挂 blocked。
+
+失败分类或非失败分类：真实代码质量问题已修复；历史 workflow 红灯入口已转为当前已绿；`CONTRACT_REVENUE` 业务类型注册缺口已完成治理；E 审查与 D 验收通过
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 模板/测试数据前置类风险仍需后续专项观察。
+- `MockBean`、Prometheus 既有 warning 仍是观察项，不构成当前阻塞。
+- `TECH_ITEM` 是否真实接入 workflow 需另题确认，不能从本轮收口外推为已完成。
+
+---
+
 Backlog 拆解：ISSUE-032-001 workflow 全量测试红灯夹具与业务类型注册治理
 
 目标：
