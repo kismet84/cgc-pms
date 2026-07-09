@@ -121,6 +121,26 @@ class WorkflowPermissionMatrixDemoSeedTest {
         assertEquals(0L, workflowQueryService.getMyCc(userId, TENANT_ID, 1, 20).getTotal());
     }
 
+    @Test
+    @DisplayName("FINANCE 角色仅具备付款与结算只读查询权限")
+    void financeRoleHasReadonlyPaymentAndSettlementPermissionsOnly() {
+        List<String> permissions = jdbcTemplate.queryForList("""
+                SELECT m.perms
+                FROM sys_role_menu rm
+                JOIN sys_menu m ON m.id = rm.menu_id
+                WHERE rm.role_id = 6
+                  AND m.perms IS NOT NULL
+                  AND m.perms <> ''
+                """, String.class);
+
+        assertTrue(permissions.contains("payment:app:query"));
+        assertTrue(permissions.contains("payment:record:query"));
+        assertTrue(permissions.contains("settlement:query"));
+        assertFalse(permissions.contains("payment:record:writeback"));
+        assertFalse(permissions.contains("payment:app:submit"));
+        assertFalse(permissions.contains("settlement:submit"));
+    }
+
     private long findUserId(String username) {
         Long userId = jdbcTemplate.queryForObject("""
                 SELECT id

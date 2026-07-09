@@ -6,6 +6,11 @@
 - 本文件是当前执行队列，不是任务源全集。
 - 当本文件没有合格 Ready Issue 时，AutoPilot 应先从长期总任务池中按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；拆单当轮只更新 backlog，不直接修改业务代码；连续执行模式下拆单完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮；系统允许最多 3 个完全无关联、无任何代码关联的 Ready Issue 并行，不能证明完全无关联时按串行处理。
 
+## 当前队列状态
+
+- `ISSUE-032-005` 已依据 `docs/quality/issue-032-005-finance-role-blocked-closeout.md` 从 blocked 收口，不进入 Ready 队列。
+- 后续若需新增实施项，由 A 按 `docs/backlog/current-focus.md` 和长期任务池重新拆 Ready。
+
 ## AutoPilot 自动合并门禁
 
 - Ready Issue 在允许修改范围内完成实现与自审后，允许自动合并；`autoPush=false`，不自动推送。

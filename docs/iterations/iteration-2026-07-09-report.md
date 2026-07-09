@@ -1,5 +1,39 @@
 # Iteration Report - 2026-07-09
 
+Issue：ISSUE-032-005 M3 财务真实角色缺失导致真实角色抽样无法完成
+
+目标：
+- 基于阻塞解除、权限整改和 D 验收结果，完成 `ISSUE-032-005` 的 blocked 收口。
+- 同步 `blocked/ready/done/current-focus` 队列状态，为后续 A 重新拆 Ready 提供干净状态。
+- 不改业务代码、不重跑测试、不把未刷新运行态写成已完成 live 复验。
+
+修改范围摘要：
+- `docs/quality/issue-032-005-finance-role-blocked-closeout.md`：新增正式收口报告，记录阻塞解除、权限整改与 D 验收口径。
+- `docs/backlog/blocked-issues.md`：移除 `ISSUE-032-005` 阻塞项。
+- `docs/backlog/ready-issues.md`：补充当前队列状态，明确 `ISSUE-032-005` 不再占用 Ready/Blocked 队列。
+- `docs/backlog/done-issues.md`：新增 `ISSUE-032-005` 完成记录。
+- `docs/backlog/current-focus.md`：补充当前阶段说明，明确后续由 A 重新拆 Ready。
+
+验证命令摘要：
+- `git status --short`：确认工作区已有与本轮权限整改相关的既有改动；本轮只追加文档收口。
+- `.codex-autopilot/stop.flag`：absent。
+- `.codex-autopilot/pause.flag`：absent。
+- `.codex-autopilot/enabled.flag`：present。
+- `git diff -- backend/src/main/resources/db/migration/V135__fix_finance_readonly_payment_settlement_permissions.sql backend/src/main/resources/db/migration-h2/V135__fix_finance_readonly_payment_settlement_permissions.sql frontend-admin/src/router/index.ts backend/src/test/java/com/cgcpms/workflow/WorkflowPermissionMatrixDemoSeedTest.java`：确认本轮权限整改落点为 V135、前端路由权限码修正，以及只读权限矩阵断言补强。
+- D 验收结论引用：后端测试通过、前端 `type-check` 通过、`git diff --check` 通过；本轮未重跑，只做正式归档。
+
+失败分类或非失败分类：环境前置类已恢复；权限配置缺陷已修复；运行态未刷新，未在本轮重做真实财务角色浏览器抽样
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮收口基于阻塞解除和 D 验收结果，不等于重新执行一次 M3 live 浏览器/API 财务角色抽样。
+- 本轮未刷新运行态；若后续 A 要拆财务角色 live 复验或扩展财务域 Ready，应重新定义验证口径。
+- 文档收口外的代码与 migration 改动仍处于未提交状态，需由对应实现/验收线程继续处理。
+
+---
+
 Issue：ISSUE-032-008 覆盖率与 E2E CI 基线复验
 
 目标：

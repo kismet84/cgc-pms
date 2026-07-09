@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-032-005：M3 财务真实角色缺失导致真实角色抽样无法完成
+
+完成日期：2026-07-09
+合并方式：not-merged/doc-closeout-only
+失败分类或非失败分类：环境前置类已恢复；权限配置缺陷已通过 V135 与前端路由权限码修复；D 验收通过
+验证结果：通过
+相关报告：docs/quality/issue-032-005-finance-role-blocked-closeout.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-032-008：覆盖率与 E2E CI 基线复验
 
 完成日期：2026-07-09
