@@ -1,10 +1,10 @@
 ## Ready 队列状态
 
 - 当前合格 Ready Issue：无。
-- `ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `5/10` 个实施型 Ready Issue。
+- `ISSUE-008-018：通知平台平台化缺口-M4：同告警重复通知抑制与站内信频控回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `7/10` 个实施型 Ready Issue。
 - `ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `6/10` 个实施型 Ready Issue。
+- `ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `5/10` 个实施型 Ready Issue。
 - `ISSUE-008-015：报表中心平台化缺口-M6：导出审计留痕与目录一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `4/10` 个实施型 Ready Issue。
-- 当前 `Ready` 队列已清空；仍按串行执行，待主线程/A 重新裁决下一条 P2 平台化题。
 - 未证明完全无关联前，仍不并行续接其他 P2 平台化题。
 
 ## 任务来源
@@ -35,8 +35,8 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-008-017` 已完成正式收口；下一步由主线程/A 重新裁决是否继续沿通知平台细化，或切到规则治理中心、WBS / 甘特图、供应商评分 / 采购增强等其它串行候选。
-2. 新一条 Ready 形成前，本文件维持 `当前合格 Ready Issue：无`。
+1. 当前 Ready 队列已空，先由主线程/A 基于长期总任务池与当前阻塞现状裁决下一条串行 Ready。
+2. 后续若继续通知平台细化，需重新确认与规则治理中心、WBS / 甘特图、供应商评分 / 采购增强等候选的优先级与并行边界。
 
 ## P0
 
@@ -234,6 +234,42 @@
 
 ## P2
 
+### ISSUE-008-018：通知平台平台化缺口-M4：同告警重复通知抑制与站内信频控回归
+
+优先级：P2
+类型：通知平台 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节“同类通知不会重复轰炸”；`docs/quality/issue-008-007-通知平台.md`；`docs/quality/issue-008-016-notification-status-subscription-consistency.md`；`docs/quality/issue-008-017-notification-channel-visibility-send-record-semantics.md`
+是否需要新增 migration：否；优先复用现有 `AlertLog.dedupKey`、`AlertNotificationDispatcher`、`AlertNotificationSendRecord` 与 `NotificationService`，不新增通知平台表结构。
+目标：
+- 补齐同一用户、同一告警、同一事件类型在短时间内被重复分发时的最小抑制语义，避免站内通知和发送记录对同一条告警连续轰炸。
+- 回归“规则侧已做告警去重，但分发侧仍可能重复发送”的边界，确保通知平台最小能力从“能发、有记录”推进到“不会对同一告警重复刷屏”。
+- 不扩大为邮件、短信、企业微信、钉钉真实接入，不建设模板中心、失败重试队列、全局频控配置或新表结构。
+- 允许修改：
+- `backend/src/main/java/com/cgcpms/alert/**`
+- `backend/src/main/java/com/cgcpms/notification/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/notification/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+- 禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 邮件、短信、企业微信、钉钉等外部渠道真实接入
+- 通知模板中心、失败重试队列、全局可配置频控、权限模型重构
+- 验收标准：
+- 至少一组后端回归证明：同一 `alertId + targetUserId + eventType + IN_APP` 在一次串行操作中重复触发时，只保留一条有效站内通知，不产生重复刷屏。
+- 至少一组后端回归证明：发送记录对被抑制的重复分发写明明确状态或原因，不能把被抑制记录误记为 `SENT`。
+- 至少一组后端/服务回归证明：不同事件类型（如 `ALERT_CREATED` 与 `STATUS_CHANGED`）或不同告警 ID 不会被错误合并，既有通知链路不回退。
+- 不放宽预警域、角色、租户和项目边界；既有订阅偏好、占位渠道跳过语义和发送记录留痕不回退。
+- 验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest,AlertEvaluationServiceTest,AlertControllerTest" test`
+- `git diff --check`
+- 归档报告：`docs/quality/issue-008-018-notification-dedup-frequency-guard.md`
 ### ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归
 
 优先级：P2

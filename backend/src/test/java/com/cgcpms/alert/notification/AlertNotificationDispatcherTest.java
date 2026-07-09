@@ -129,6 +129,107 @@ class AlertNotificationDispatcherTest {
         assertSkipped(recordCaptor.getValue(), "EMAIL", "CHANNEL_NOT_IMPLEMENTED");
     }
 
+    @Test
+    @DisplayName("同一次分发内同告警同用户同事件重复站内通知应记录为跳过")
+    void skipsDuplicateInAppWithinSameDispatch() {
+        AlertNotificationSender duplicateInAppSender = org.mockito.Mockito.mock(AlertNotificationSender.class);
+        AlertNotificationDispatcher dispatcher =
+                new AlertNotificationDispatcher(recordMapper, List.of(inAppSender, duplicateInAppSender));
+        AlertLog alert = alert();
+        when(inAppSender.channel()).thenReturn(AlertNotificationChannel.IN_APP);
+        when(duplicateInAppSender.channel()).thenReturn(AlertNotificationChannel.IN_APP);
+        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("ALERT_CREATED"),
+                eq("ALERT"), eq("采购逾期"), eq("采购订单逾期")))
+                .thenReturn(AlertNotificationSendResult.sent(7001L));
+
+        dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP"));
+
+        verify(inAppSender).send(eq(10L), eq(21L), eq(alert), eq("ALERT_CREATED"),
+                eq("ALERT"), eq("采购逾期"), eq("采购订单逾期"));
+        verify(duplicateInAppSender, times(0)).send(any(), any(), any(), any(), any(), any(), any());
+        ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
+                ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
+        verify(recordMapper, times(2)).insert(recordCaptor.capture());
+        List<AlertNotificationSendRecord> records = recordCaptor.getAllValues();
+        assertEquals("SENT", records.get(0).getSendStatus());
+        assertEquals(7001L, records.get(0).getBizNotificationId());
+        assertEquals("SKIPPED", records.get(1).getSendStatus());
+        assertEquals("DUPLICATE_IN_APP_SUPPRESSED", records.get(1).getFailReason());
+        assertEquals("ALERT_CREATED", records.get(1).getEventType());
+        assertEquals("IN_APP", records.get(1).getChannel());
+        assertEquals(9001L, records.get(1).getAlertId());
+        assertEquals(21L, records.get(1).getTargetUserId());
+    }
+
+    @Test
+    @DisplayName("连续两次同告警同用户同事件站内通知应抑制第二次有效通知")
+    void skipsDuplicateInAppAcrossSequentialDispatches() {
+        AlertNotificationDispatcher dispatcher =
+                new AlertNotificationDispatcher(recordMapper, List.of(inAppSender));
+        AlertLog alert = alert();
+        when(inAppSender.channel()).thenReturn(AlertNotificationChannel.IN_APP);
+        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("ALERT_CREATED"),
+                eq("ALERT"), eq("采购逾期"), eq("采购订单逾期")))
+                .thenReturn(AlertNotificationSendResult.sent(7001L));
+        when(recordMapper.selectCount(any())).thenReturn(0L, 1L);
+
+        dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP"));
+        dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP"));
+
+        verify(inAppSender).send(eq(10L), eq(21L), eq(alert), eq("ALERT_CREATED"),
+                eq("ALERT"), eq("采购逾期"), eq("采购订单逾期"));
+        ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
+                ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
+        verify(recordMapper, times(2)).insert(recordCaptor.capture());
+        List<AlertNotificationSendRecord> records = recordCaptor.getAllValues();
+        assertEquals("SENT", records.get(0).getSendStatus());
+        assertEquals(7001L, records.get(0).getBizNotificationId());
+        assertEquals("SKIPPED", records.get(1).getSendStatus());
+        assertEquals("DUPLICATE_IN_APP_SUPPRESSED", records.get(1).getFailReason());
+        assertEquals("ALERT_CREATED", records.get(1).getEventType());
+        assertEquals("IN_APP", records.get(1).getChannel());
+        assertEquals(9001L, records.get(1).getAlertId());
+        assertEquals(21L, records.get(1).getTargetUserId());
+    }
+
+    @Test
+    @DisplayName("不同事件类型和不同告警不应被站内通知抑制合并")
+    void doesNotSuppressDifferentEventTypeOrAlert() {
+        AlertNotificationDispatcher dispatcher =
+                new AlertNotificationDispatcher(recordMapper, List.of(inAppSender));
+        AlertLog alert = alert();
+        AlertLog anotherAlert = alert();
+        anotherAlert.setId(9002L);
+        when(inAppSender.channel()).thenReturn(AlertNotificationChannel.IN_APP);
+        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("ALERT_CREATED"),
+                eq("ALERT"), eq("采购逾期"), eq("采购订单逾期")))
+                .thenReturn(AlertNotificationSendResult.sent(7001L));
+        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED"),
+                eq("ALERT_STATUS"), eq("预警已归档"), eq("采购订单逾期")))
+                .thenReturn(AlertNotificationSendResult.sent(7002L));
+        when(inAppSender.send(eq(10L), eq(21L), eq(anotherAlert), eq("ALERT_CREATED"),
+                eq("ALERT"), eq("另一个采购逾期"), eq("采购订单逾期")))
+                .thenReturn(AlertNotificationSendResult.sent(7003L));
+
+        dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP"));
+        dispatcher.dispatchStatusChanged(10L, 21L, alert, "预警已归档", null, Set.of("IN_APP"));
+        dispatcher.dispatchAlertCreated(10L, 21L, anotherAlert, "另一个采购逾期", Set.of("IN_APP"));
+
+        ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
+                ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
+        verify(recordMapper, times(3)).insert(recordCaptor.capture());
+        List<AlertNotificationSendRecord> records = recordCaptor.getAllValues();
+        assertEquals("SENT", records.get(0).getSendStatus());
+        assertEquals("ALERT_CREATED", records.get(0).getEventType());
+        assertEquals(9001L, records.get(0).getAlertId());
+        assertEquals("SENT", records.get(1).getSendStatus());
+        assertEquals("STATUS_CHANGED", records.get(1).getEventType());
+        assertEquals(9001L, records.get(1).getAlertId());
+        assertEquals("SENT", records.get(2).getSendStatus());
+        assertEquals("ALERT_CREATED", records.get(2).getEventType());
+        assertEquals(9002L, records.get(2).getAlertId());
+    }
+
     private void assertSkipped(AlertNotificationSendRecord record, String channel, String failReason) {
         assertEquals(10L, record.getTenantId());
         assertEquals(9001L, record.getAlertId());

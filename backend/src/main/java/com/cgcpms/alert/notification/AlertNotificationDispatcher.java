@@ -1,5 +1,6 @@
 package com.cgcpms.alert.notification;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.entity.AlertNotificationSendRecord;
 import com.cgcpms.alert.mapper.AlertNotificationSendRecordMapper;
@@ -10,6 +11,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -45,22 +47,35 @@ public class AlertNotificationDispatcher {
 
     private void dispatch(Long tenantId, Long userId, AlertLog alert, String eventType,
                           String bizType, String title, String content, Set<String> channels) {
+        Set<DispatchKey> sentInAppKeys = new HashSet<>();
         for (AlertNotificationSender sender : senders.stream()
                 .sorted(Comparator.comparingInt(item -> item.channel().ordinal()))
                 .toList()) {
-            if (!isChannelRequested(channels, sender.channel())) {
+            AlertNotificationChannel channel = sender.channel();
+            if (!isChannelRequested(channels, channel)) {
+                continue;
+            }
+            DispatchKey key = new DispatchKey(tenantId, alert.getId(), userId, eventType, channel);
+            if (channel == AlertNotificationChannel.IN_APP
+                    && (sentInAppKeys.contains(key)
+                    || hasSentInAppRecord(tenantId, userId, alert.getId(), eventType))) {
+                record(tenantId, userId, alert.getId(), eventType, channel.name(), null,
+                        "SKIPPED", "DUPLICATE_IN_APP_SUPPRESSED");
                 continue;
             }
             try {
                 AlertNotificationSendResult result = sender.send(tenantId, userId, alert, eventType,
                         bizType, title, content);
-                record(tenantId, userId, alert.getId(), eventType, sender.channel().name(),
+                record(tenantId, userId, alert.getId(), eventType, channel.name(),
                         result.notificationId(), result.status(), result.reason());
+                if (channel == AlertNotificationChannel.IN_APP && "SENT".equals(result.status())) {
+                    sentInAppKeys.add(key);
+                }
             } catch (Exception e) {
-                record(tenantId, userId, alert.getId(), eventType, sender.channel().name(), null,
+                record(tenantId, userId, alert.getId(), eventType, channel.name(), null,
                         "FAILED", e.getMessage());
                 log.warn("Failed to dispatch alert notification: alertId={}, channel={}, eventType={}",
-                        alert.getId(), sender.channel().name(), eventType, e);
+                        alert.getId(), channel.name(), eventType, e);
             }
         }
     }
@@ -90,5 +105,20 @@ public class AlertNotificationDispatcher {
         record.setRequestedAt(now);
         record.setCompletedAt(now);
         recordMapper.insert(record);
+    }
+
+    private boolean hasSentInAppRecord(Long tenantId, Long userId, Long alertId, String eventType) {
+        Long count = recordMapper.selectCount(new LambdaQueryWrapper<AlertNotificationSendRecord>()
+                .eq(AlertNotificationSendRecord::getTenantId, tenantId)
+                .eq(AlertNotificationSendRecord::getAlertId, alertId)
+                .eq(AlertNotificationSendRecord::getTargetUserId, userId)
+                .eq(AlertNotificationSendRecord::getEventType, eventType)
+                .eq(AlertNotificationSendRecord::getChannel, AlertNotificationChannel.IN_APP.name())
+                .eq(AlertNotificationSendRecord::getSendStatus, "SENT"));
+        return count != null && count > 0;
+    }
+
+    private record DispatchKey(Long tenantId, Long alertId, Long userId, String eventType,
+                               AlertNotificationChannel channel) {
     }
 }
