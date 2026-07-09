@@ -25,7 +25,12 @@ function New-Fixture {
   $AutoDir = Join-Path $Root ".codex-autopilot"
   $BacklogDir = Join-Path $Root "docs\backlog"
   $ScriptDir = Join-Path $Root "scripts\codex-autopilot"
-  New-Item -ItemType Directory -Path $AutoDir, $BacklogDir, $ScriptDir -Force | Out-Null
+  $BackendDir = Join-Path $Root "backend"
+  $FrontendDir = Join-Path $Root "frontend-admin"
+  $QualityDir = Join-Path $Root "docs\quality"
+  New-Item -ItemType Directory -Path $AutoDir, $BacklogDir, $ScriptDir, $BackendDir, $FrontendDir, $QualityDir -Force | Out-Null
+  "" | Out-File -Encoding ascii (Join-Path $BackendDir "mvnw.cmd")
+  "{}" | Out-File -Encoding utf8 (Join-Path $FrontendDir "package.json")
   if ($Enabled) {
     "enabled" | Out-File -Encoding utf8 (Join-Path $AutoDir "enabled.flag")
   }
@@ -121,9 +126,19 @@ try {
 
 ### ISSUE-100-001：Runner ready branch
 
+目标：
+- Select this issue.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Can be selected only after lint passes.
 状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
 验证命令：
 - ``git diff --check``
+归档报告：``docs/quality/issue-100-001.md``
 "@ -Plan "# Plan`n"
   $ReadyOutput = Invoke-Runner $ReadyRoot
   Assert-Contains $ReadyOutput "READY_ISSUE_FOUND"
@@ -141,6 +156,76 @@ try {
   Assert-Contains $ExplainReadyOutput "EXPLAIN_NEXT_ACTION"
   Assert-Contains $ExplainReadyOutput "nextAction=READY_ISSUE"
   Assert-Contains $ExplainReadyOutput "nextReady=ISSUE-100-001"
+
+  foreach ($NonReadyStatus in @("Draft", "", "Needs Fix")) {
+    $NonReadyRoot = New-Fixture -Name ("non-ready-" + ($NonReadyStatus -replace "[^A-Za-z0-9]", "empty")) -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner non ready branch
+
+目标：
+- Do not select this issue.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Must not be selected.
+状态：$NonReadyStatus
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/issue-100-001.md``
+"@ -Plan "# Plan`n"
+    $NonReadyOutput = Invoke-Runner $NonReadyRoot -Explain
+    Assert-NotContains $NonReadyOutput "nextAction=READY_ISSUE"
+    Assert-NotContains $NonReadyOutput "nextReady=ISSUE-100-001"
+  }
+
+  $MissingFieldRoot = New-Fixture -Name "ready-missing-field" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner missing field
+
+状态：Ready
+验证命令：
+- ``git diff --check``
+"@ -Plan "# Plan`n"
+  $MissingFieldOutput = Invoke-Runner $MissingFieldRoot -Explain
+  Assert-Contains $MissingFieldOutput "nextAction=STOP"
+  Assert-Contains $MissingFieldOutput "stopReason=STOP_READY_LINT_FAILED"
+  Assert-Contains $MissingFieldOutput "missingGate=ready-lint"
+  Assert-Contains $MissingFieldOutput "目标"
+
+  $ReadyLint = Join-Path $ScriptDir "ready-lint.ps1"
+  $ReadyLintOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $ReadyLint -RepoRoot $ReadyRoot -IssueTitle "ISSUE-100-001：Runner ready branch" 2>&1 | Out-String
+  $ReadyLintJson = $ReadyLintOutput | ConvertFrom-Json
+  if ($ReadyLintJson.status -ne "pass") { throw "Expected ready-lint status=pass. Actual: $ReadyLintOutput" }
+  if ($ReadyLintJson.issueId -ne "ISSUE-100-001") { throw "Expected ready-lint issueId=ISSUE-100-001. Actual: $ReadyLintOutput" }
+
+  $MissingCommandRoot = New-Fixture -Name "ready-missing-command-entry" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner missing command entry
+
+目标：
+- Lint must reject missing command entries.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Missing command entry is reported.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
+验证命令：
+- ``cd missing-backend; .\mvnw.cmd test``
+归档报告：``docs/quality/issue-100-001.md``
+"@ -Plan "# Plan`n"
+  $MissingCommandOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $ReadyLint -RepoRoot $MissingCommandRoot -IssueTitle "ISSUE-100-001：Runner missing command entry" 2>&1 | Out-String
+  $MissingCommandJson = $MissingCommandOutput | ConvertFrom-Json
+  if ($MissingCommandJson.status -ne "fail") { throw "Expected missing command entry to fail. Actual: $MissingCommandOutput" }
+  Assert-Contains ($MissingCommandJson.errors -join "`n") "验证命令入口不存在"
 
   $BadZeroOutput = Invoke-Runner $ReadyRoot -MaxIterations 0
   Assert-Contains $BadZeroOutput "MaxIterations must be a positive integer between 1 and 50"
@@ -201,9 +286,19 @@ try {
 
 ### ISSUE-100-001：Runner limit one
 
+目标：
+- Count this issue.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Can be selected only after lint passes.
 状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
 验证命令：
 - ``git diff --check``
+归档报告：``docs/quality/issue-100-001.md``
 "@ -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $LimitOneRoot -Apply -MaxIterations 1) "READY_ISSUE_FOUND"
   Set-IssueStatus $LimitOneRoot "Done"
@@ -219,9 +314,19 @@ try {
 
 ### ISSUE-100-001：Runner limit two
 
+目标：
+- Count this issue.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Can be selected only after lint passes.
 状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
 验证命令：
 - ``git diff --check``
+归档报告：``docs/quality/issue-100-001.md``
 "@ -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $LimitTwoRoot -Apply -MaxIterations 2) "READY_ISSUE_FOUND"
   Set-IssueStatus $LimitTwoRoot "Blocked"

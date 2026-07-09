@@ -34,7 +34,7 @@ function Test-Checkpoint {
 }
 
 function Get-ReadyIssues {
-  param([string]$ReadyPath)
+  param([string]$ReadyPath, [string]$RepoRoot, [string]$ScriptDir)
 
   if (!(Test-Path $ReadyPath)) {
     return @()
@@ -47,15 +47,50 @@ function Get-ReadyIssues {
     $body = $match.Groups[2].Value
     $statusMatch = [regex]::Match($body, "(?m)^状态[：:]\s*(.+?)\s*$")
     $status = if ($statusMatch.Success) { $statusMatch.Groups[1].Value.Trim() } else { "" }
-    $hasValidation = $body -match "(?m)^验证命令[：:]"
-    if ($status -notmatch "^(Done|Blocked|已完成|阻塞)" -and $hasValidation) {
+    if ($status -ceq "Ready") {
+      $title = $match.Groups[1].Value.Trim()
+      $lint = Invoke-ReadyLint $RepoRoot $ReadyPath $ScriptDir $title
       $issues += [pscustomobject]@{
-        title = $match.Groups[1].Value.Trim()
+        title = $title
         status = $status
+        lint = $lint
       }
     }
   }
   return $issues
+}
+
+function Invoke-ReadyLint {
+  param(
+    [string]$RepoRoot,
+    [string]$ReadyPath,
+    [string]$ScriptDir,
+    [string]$IssueTitle
+  )
+
+  $lintPath = Join-Path $ScriptDir "ready-lint.ps1"
+  if (!(Test-Path $lintPath)) {
+    return [pscustomobject]@{
+      status = "fail"
+      issueId = ""
+      title = $IssueTitle
+      errors = @("ready-lint.ps1 不存在")
+      warnings = @()
+    }
+  }
+
+  $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath -RepoRoot $RepoRoot -ReadyPath $ReadyPath -IssueTitle $IssueTitle 2>&1 | Out-String
+  try {
+    return $output | ConvertFrom-Json
+  } catch {
+    return [pscustomobject]@{
+      status = "fail"
+      issueId = ""
+      title = $IssueTitle
+      errors = @("ready-lint 输出不是 JSON：$output")
+      warnings = @()
+    }
+  }
 }
 
 function Get-SplitCandidates {
@@ -323,6 +358,15 @@ function Write-NextActionExplanation {
   }
 
   if ($ReadyIssues.Count -gt 0) {
+    if ($ReadyIssues[0].lint.status -ne "pass") {
+      Write-Host "nextAction=STOP"
+      Write-Host "stopReason=STOP_READY_LINT_FAILED"
+      Write-Host "missingGate=ready-lint"
+      foreach ($errorItem in @($ReadyIssues[0].lint.errors)) {
+        Write-Host "lintError=$errorItem"
+      }
+      return
+    }
     Write-Host "nextAction=READY_ISSUE"
     Write-Host "nextReady=$($ReadyIssues[0].title)"
     return
@@ -376,7 +420,7 @@ Write-Host "applyBacklogSplit=$applyMode"
 
 if ($ExplainNextAction) {
   $checkpoint = Test-Checkpoint $autoDir
-  $readyIssues = if ($checkpoint -eq "CONTINUE") { @(Get-ReadyIssues $readyPath) } else { @() }
+  $readyIssues = if ($checkpoint -eq "CONTINUE") { @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir) } else { @() }
   $candidates = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0) { @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit) } else { @() }
   $stopReason = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0 -and $candidates.Count -eq 0) { Get-StopReasonForEmptyPool $readyPath } else { $checkpoint }
   Write-NextActionExplanation $checkpoint $readyIssues $candidates $stopReason
@@ -398,8 +442,18 @@ for ($loop = 1; $loop -le $MaxLoops; $loop++) {
     exit 0
   }
 
-  $readyIssues = @(Get-ReadyIssues $readyPath)
+  $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
   if ($readyIssues.Count -gt 0) {
+    if ($readyIssues[0].lint.status -ne "pass") {
+      Write-State $autoDir "STOP_READY_LINT_FAILED" ([bool]$DryRun) "STOP" $readyIssues[0].title "STOP_READY_LINT_FAILED" "STOP_READY_LINT_FAILED"
+      Write-Host "STOP_READY_LINT_FAILED"
+      Write-Host "selected=$($readyIssues[0].title)"
+      Write-Host "missingGate=ready-lint"
+      foreach ($errorItem in @($readyIssues[0].lint.errors)) {
+        Write-Host "lintError=$errorItem"
+      }
+      exit 0
+    }
     Write-State $autoDir "READY_ISSUE_FOUND" ([bool]$DryRun) "READY_ISSUE_FOUND" $readyIssues[0].title "READY_ISSUE_FOUND" ""
     Write-Host "READY_ISSUE_FOUND"
     Write-Host "selected=$($readyIssues[0].title)"
@@ -441,7 +495,7 @@ for ($loop = 1; $loop -le $MaxLoops; $loop++) {
     exit 0
   }
 
-  $readyIssues = @(Get-ReadyIssues $readyPath)
+  $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
   if ($readyIssues.Count -gt 0) {
     continue
   }
