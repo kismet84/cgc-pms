@@ -4,7 +4,7 @@
   "phase": "verify",
   "actorRole": "D",
   "inputArtifacts": [
-    "docs/plans/第33-1条主线-Codex AutoPilot Loop Engineering增强改进任务计划书.md",
+    "plugins/cgc-pms-autopilot/artifacts/plans/第33-1条主线-Codex AutoPilot Loop Engineering增强改进任务计划书.md",
     "plugins/cgc-pms-autopilot/scripts/validate-loop-artifacts.ps1"
   ],
   "outputArtifacts": [

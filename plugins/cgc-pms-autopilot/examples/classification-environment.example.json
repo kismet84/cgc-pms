@@ -1,0 +1,12 @@
+{
+  "category": "environment_prereq",
+  "subcategory": "vite_proxy_stale_backend",
+  "confidence": "high",
+  "evidence": [
+    "ECONNREFUSED 172.19.0.8:8080",
+    "exitCode=1"
+  ],
+  "suggestedNextAction": "refresh_frontend_runtime",
+  "retryPolicy": "rerun_after_refresh",
+  "reason": "Frontend dev server is likely still proxying to an old backend container address."
+}

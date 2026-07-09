@@ -14,9 +14,9 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 ## Do first
 
 1. 先确认仓库级规则文件和当前派工边界。
-2. 只把本插件当成规则、模板、脚本工具箱，不当成项目真实 backlog 或 quality 仓库。
+2. 只把本插件当成规则、模板、脚本工具箱与插件自有归档目录，不当成项目真实 backlog 或业务 quality 仓库；项目业务任务正式文档仍留在项目 `docs/**`。
 3. 进入实施前先跑 `scripts/autopilot-checkpoint.ps1`，至少看 `branch`、`gitStatus`、`stopFlag`、`pauseFlag`、`enabledFlag`。
-4. 需要 loop 协议时，优先参考 `../../schemas/loop-state.schema.json`、`../../schemas/loop-event.schema.json` 和 `../../scripts/validate-loop-artifacts.ps1`。
+4. 需要 loop 协议时，优先参考 `../../schemas/loop-state.schema.json`、`../../schemas/loop-event.schema.json`、`../../schemas/classification-result.schema.json`、`../../scripts/autopilot-loop-runner.ps1` 和 `../../scripts/validate-loop-artifacts.ps1`。
 
 ## Core flow
 
@@ -24,8 +24,8 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 2. 判定当前阶段属于实现、验收、运维还是审计。
 3. 按 A-F 拆角色并给出 `model`、`thinking`、`reason`。
 4. 实施前执行 checkpoint。
-5. 需要正式文本时，用模板和脚本生成草稿，正式落点仍写回项目 `docs/**`。
-6. 验收时先做失败分类，再给通过/不通过、阻塞/非阻塞结论。
+5. 需要正式文本时，用模板和脚本生成草稿；插件自有计划书、质量报告、迭代摘要、run summary 默认落到 `../../artifacts/**`；独立项目业务任务的计划书、质量报告、iteration、backlog 更新仍写回项目 `docs/**`。
+6. 验收时先做失败分类，再给通过/不通过、阻塞/非阻塞结论；分类结果至少看 `category/subcategory/confidence/evidence/suggestedNextAction/retryPolicy`。
 7. F 收口后先做 `local-commit-closeout.ps1 -DryRun`，确认 `git diff --check` 和文件范围，再决定是否本地 commit。
 8. D/E 不通过时，优先用 `../../templates/repair-request.md` 生成结构化补修请求；沉淀稳定经验时用 `../../templates/reflection-entry.md`。
 
@@ -40,6 +40,7 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 
 - `../../references/owner-boundary.md`
 - `../../references/failure-classification.md`
+- `../../references/classifier-rules.md`
 - `../../references/output-contract.md`
 - `../../references/artifact-governance.md`
 - `../../references/loop-budget-policy.md`
@@ -67,6 +68,7 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 5. `unknown`
 
 若不能稳定归类，输出 `unknown` 并要求人工复核，不得直接判业务代码失败。
+若需要串联一轮最小闭环，先用 `../../scripts/autopilot-loop-runner.ps1 -DryRun` 跑 `checkpoint -> classify -> repair-request/closeout -> next` 预演。
 
 ## Output contract
 
@@ -85,10 +87,25 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 - `../../templates/repair-request.md`
 - `../../templates/reflection-entry.md`
 
+插件自有产物默认目录：
+
+- `../../artifacts/plans/`
+- `../../artifacts/quality/`
+- `../../artifacts/iterations/`
+- `../../artifacts/runs/`
+
+项目业务任务正式目录：
+
+- `docs/plans`
+- `docs/quality`
+- `docs/iterations`
+- `docs/backlog`
+
 ## Safety rules
 
 - 不 push。
 - 不删除仓库外文件。
 - 不读取默认禁止私有目录。
 - 不把 run id、临时日志名、截图名写进正式模板。
-- 插件内只放模板、脚本、说明、示例；项目真实事实留在项目仓库。
+- 插件内只放模板、脚本、说明、示例和插件自有归档；项目真实事实留在项目仓库。
+- 插件运行可以读取项目 `docs/**` 作为事实源与参考，但不默认复制进 `../../artifacts/**`。

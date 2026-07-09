@@ -11,7 +11,11 @@ $ErrorActionPreference = 'Stop'
 function Normalize-RepoPath {
     param([string]$Value)
 
-    $normalized = $Value.Replace('\', '/').Trim()
+    $normalized = $Value.Trim()
+    if ($normalized.Length -ge 2 -and $normalized.StartsWith('"') -and $normalized.EndsWith('"')) {
+        $normalized = $normalized.Substring(1, $normalized.Length - 2)
+    }
+    $normalized = $normalized.Replace('\', '/').Trim()
     return $normalized.TrimEnd('/')
 }
 
@@ -36,7 +40,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 Push-Location $repoRoot
 try {
     $statusLines = @((& git status --short))
-    $diffCheck = & git diff --check 2>&1
+    $diffCheck = @(& git -c core.autocrlf=false -c core.safecrlf=false diff --check 2>&1)
     $diffExit = $LASTEXITCODE
 
     $unexpected = @()

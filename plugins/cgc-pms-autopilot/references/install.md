@@ -6,6 +6,7 @@
 2. 校验 manifest：
    `python C:\Users\L1597\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot`
 3. 验证 PowerShell 脚本最小 dry-run
+4. 插件自有计划书、收口报告、迭代摘要、run summary 默认归档到 `plugins/cgc-pms-autopilot/artifacts/**`
 
 ## 当前 MVP 不做
 

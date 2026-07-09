@@ -1,0 +1,12 @@
+{
+  "category": "real_quality_or_security",
+  "subcategory": "real_test_failure",
+  "confidence": "high",
+  "evidence": [
+    "expected:<APPROVED> but was:<DRAFT>",
+    "exitCode=1"
+  ],
+  "suggestedNextAction": "open_repair_request",
+  "retryPolicy": "manual_review_required",
+  "reason": "Assertions failed with reproducible evidence."
+}

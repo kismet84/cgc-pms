@@ -1,0 +1,11 @@
+{
+  "category": "none",
+  "subcategory": "preview",
+  "confidence": "high",
+  "evidence": [
+    "No ready issue evidence provided."
+  ],
+  "suggestedNextAction": "wait_for_owner_decision",
+  "retryPolicy": "no_retry",
+  "reason": "Preview only; no failure evidence supplied yet."
+}

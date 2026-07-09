@@ -18,7 +18,7 @@
 ## D 测试/回归
 
 - 输入：目标测试、实现结果、既定验收命令
-- 输出：通过/不通过、失败分类、阻塞/非阻塞、repair-request 或通过证据
+- 输出：通过/不通过、失败分类、`category/subcategory/confidence/evidence/suggestedNextAction/retryPolicy`、阻塞/非阻塞、repair-request 或通过证据
 
 ## E 代码审查/安全审查
 
@@ -35,3 +35,4 @@
 1. 实现角色不得自评最终通过。
 2. D/E/F 输出必须短、稳定、可复核，不复制真实长日志。
 3. 若输入边界不清，先补 repair-request 或任务说明，不直接扩 scope。
+4. loop runner 只负责串联 phase 和建议动作，不替代主线程最终裁决。

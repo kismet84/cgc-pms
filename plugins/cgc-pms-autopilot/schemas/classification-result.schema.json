@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cgc-pms.local/plugins/cgc-pms-autopilot/schemas/classification-result.schema.json",
+  "title": "CGC PMS AutoPilot Classification Result",
+  "description": "Structured failure classification output consumed by the local AutoPilot loop runner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "category",
+    "subcategory",
+    "confidence",
+    "evidence",
+    "suggestedNextAction",
+    "retryPolicy",
+    "reason"
+  ],
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": [
+        "none",
+        "tool_config",
+        "environment_prereq",
+        "ready_issue_config",
+        "real_quality_or_security",
+        "unknown"
+      ]
+    },
+    "subcategory": {
+      "type": "string",
+      "enum": [
+        "preview",
+        "powershell_parser_error",
+        "command_or_entrypoint_missing",
+        "maven_test_compile",
+        "maven_surefire",
+        "test_selector_missing_or_invalid",
+        "vite_proxy_stale_backend",
+        "dev_login_unreachable",
+        "docker_not_ready",
+        "backend_not_ready",
+        "frontend_not_ready",
+        "ready_issue_verification_config",
+        "real_test_failure",
+        "real_build_failure",
+        "real_permission_or_security_failure",
+        "unknown"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "suggestedNextAction": {
+      "type": "string",
+      "enum": [
+        "wait_for_owner_decision",
+        "fix_command_syntax",
+        "verify_script_entrypoint",
+        "refresh_runtime_state",
+        "refresh_frontend_runtime",
+        "restore_dev_login_path",
+        "wait_and_retry_backend_health",
+        "wait_and_retry_frontend_health",
+        "fix_ready_selector",
+        "fix_ready_issue_metadata",
+        "open_repair_request",
+        "mark_blocked",
+        "collect_more_evidence"
+      ]
+    },
+    "retryPolicy": {
+      "type": "string",
+      "enum": [
+        "no_retry",
+        "rerun_once",
+        "rerun_after_refresh",
+        "retry_after_ready_fix",
+        "manual_review_required"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Compatibility field retained from the earlier classifier output."
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "category": "ready_issue_config",
+  "subcategory": "test_selector_missing_or_invalid",
+  "confidence": "high",
+  "evidence": [
+    "No tests matching pattern \"FileServiceTest#missingMethod\" were executed",
+    "exitCode=1"
+  ],
+  "suggestedNextAction": "fix_ready_selector",
+  "retryPolicy": "retry_after_ready_fix",
+  "reason": "Verification selector does not point to a valid existing test target."
+}

@@ -19,6 +19,13 @@ different failure -> collect stronger evidence
 4. 可稳定复现的断言失败、编译错误与当前 diff 相关、越权或安全断言失败：`real_quality_or_security`
 5. 编译失败但证据无法指向当前 diff、错误模式冲突、日志不充分：`unknown`
 
+## 结构化输出约定
+
+1. `category` 决定大类路由。
+2. `subcategory` 决定更细的处理手势，例如 `powershell_parser_error`、`vite_proxy_stale_backend`、`test_selector_missing_or_invalid`。
+3. `suggestedNextAction` 只返回短动作，如 `rerun_once`、`refresh_frontend_runtime`、`fix_ready_selector`、`open_repair_request`、`mark_blocked`。
+4. `retryPolicy` 只返回有限集合：`no_retry`、`rerun_once`、`rerun_after_refresh`、`retry_after_ready_fix`、`manual_review_required`。
+
 ## 保守约束
 
 1. Maven `testCompile`、代理抖动、启动竞态只按疑似瞬时问题处理一次，不允许无限复跑。

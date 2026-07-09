@@ -8,4 +8,4 @@
 - 禁止路径：scripts/codex-autopilot/**, backend/**, frontend-admin/**
 - 验收标准：manifest 可验证，Skill 覆盖边界、A-F、失败分类、收口口径
 - 验证命令：python validate_plugin.py plugins/cgc-pms-autopilot
-- 报告落点：docs/quality/code-audit-YYYY-MM-DD-autopilot-plugin-m1.md
+- 报告落点：plugins/cgc-pms-autopilot/artifacts/quality/code-audit-YYYY-MM-DD-autopilot-plugin-m1.md

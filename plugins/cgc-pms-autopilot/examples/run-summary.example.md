@@ -6,4 +6,4 @@
 - 结果：本轮完成插件脚本复验并生成正式收口建议
 - 下一步：进入 F 归档或按 stop/pause 状态安全收口
 - 停止原因：无
-- 产物：quality-closeout.example.md, blocked-issue.example.md
+- 产物：plugins/cgc-pms-autopilot/artifacts/quality/quality-closeout-YYYY-MM-DD.md, plugins/cgc-pms-autopilot/artifacts/runs/run-summary-YYYY-MM-DD.md
