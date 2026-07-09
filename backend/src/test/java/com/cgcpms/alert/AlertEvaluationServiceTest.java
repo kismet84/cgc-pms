@@ -1146,6 +1146,30 @@ class AlertEvaluationServiceTest {
         assertTrue(alerts.isEmpty(), "windowDays=10 时，15天后的合同不应触发到期预警");
     }
 
+    @Test
+    @Transactional
+    @DisplayName("TA15b: 规则治理 — enabled=0 的规则即使命中条件也不生成告警")
+    void testRuleGovernance_DisabledRuleDoesNotTrigger() {
+        AlertRuleConfig config = alertRuleConfigMapper.selectOne(new LambdaQueryWrapper<AlertRuleConfig>()
+                .eq(AlertRuleConfig::getTenantId, TENANT_ID)
+                .eq(AlertRuleConfig::getRuleType, "CONTRACT_OVERDUE"));
+        assertNotNull(config);
+        config.setEnabled(0);
+        alertRuleConfigMapper.updateById(config);
+
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().minusDays(1));
+        contractMapper.updateById(contract);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
+        Long disabledRuleAlerts = alertLogMapper.selectCount(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getProjectId, testProjectId)
+                .eq(AlertLog::getRuleType, "CONTRACT_OVERDUE"));
+        assertEquals(0L, disabledRuleAlerts, "规则关闭后不能生成 CONTRACT_OVERDUE 预警");
+    }
+
     private void seedProject(Long projectId, String projectCode, Long createdBy) {
         if (projectMapper.selectById(projectId) != null) {
             return;

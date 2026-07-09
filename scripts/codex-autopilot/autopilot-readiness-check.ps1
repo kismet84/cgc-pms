@@ -109,10 +109,23 @@ if ($config.autoPush -eq $false) {
   Add-Gate $gates "config.autoPush" "fail" "autoPush must remain false before full unattended mode." @{ autoPush = $config.autoPush }
 }
 
-if ($config.maxIssuesPerRun -eq 1) {
-  Add-Gate $gates "config.maxIssuesPerRun" "pass" "maxIssuesPerRun=1." @{ maxIssuesPerRun = $config.maxIssuesPerRun }
+$maxIssuesPerRun = if ($config.maxIssuesPerRun) { [int]$config.maxIssuesPerRun } else { 1 }
+$maxParallelIssues = if ($config.maxParallelIssues) { [int]$config.maxParallelIssues } else { 3 }
+$parallelSafetyMode = if ($config.parallelSafetyMode) { [string]$config.parallelSafetyMode } else { "strict-independent-only" }
+if ($maxIssuesPerRun -ge 1 -and $maxIssuesPerRun -le 3) {
+  Add-Gate $gates "config.maxIssuesPerRun" "pass" "maxIssuesPerRun is within 1..3." @{ maxIssuesPerRun = $maxIssuesPerRun }
 } else {
-  Add-Gate $gates "config.maxIssuesPerRun" "fail" "maxIssuesPerRun must be 1." @{ maxIssuesPerRun = $config.maxIssuesPerRun }
+  Add-Gate $gates "config.maxIssuesPerRun" "fail" "maxIssuesPerRun must be between 1 and 3." @{ maxIssuesPerRun = $maxIssuesPerRun }
+}
+if ($maxParallelIssues -ge 1 -and $maxParallelIssues -le 3) {
+  Add-Gate $gates "config.maxParallelIssues" "pass" "maxParallelIssues is within 1..3." @{ maxParallelIssues = $maxParallelIssues }
+} else {
+  Add-Gate $gates "config.maxParallelIssues" "fail" "maxParallelIssues must be between 1 and 3." @{ maxParallelIssues = $maxParallelIssues }
+}
+if ($parallelSafetyMode -eq "strict-independent-only") {
+  Add-Gate $gates "config.parallelSafetyMode" "pass" "parallelSafetyMode=strict-independent-only." @{ parallelSafetyMode = $parallelSafetyMode }
+} else {
+  Add-Gate $gates "config.parallelSafetyMode" "fail" "parallelSafetyMode must be strict-independent-only." @{ parallelSafetyMode = $parallelSafetyMode }
 }
 
 if ($config.worktreeRoot) {
@@ -234,9 +247,9 @@ if ($explain.ok) {
 }
 
 $testPath = Join-Path $scriptDir "test-continuous-runner.ps1"
-$testMissing = Test-FileContains $testPath @("Assert-ResultSchema", "Assert-EventSchema", "RUN_LOCK_ACTIVE", "STALE_RUN_LOCK_REMOVED", "EXPLAIN_NEXT_ACTION")
+$testMissing = Test-FileContains $testPath @("Assert-ResultSchema", "Assert-EventSchema", "RUN_LOCK_ACTIVE", "STALE_RUN_LOCK_REMOVED", "EXPLAIN_NEXT_ACTION", "maxParallelIssues", "parallelBatchSize=3", "SERIAL_UNPROVEN_INDEPENDENCE")
 if ($testMissing.Count -eq 0) {
-  Add-Gate $gates "selfTest.coverage" "pass" "Runner self-test covers result, event, lock, stale lock, and explain paths." @{ path = $testPath }
+  Add-Gate $gates "selfTest.coverage" "pass" "Runner self-test covers result, event, lock, stale lock, explain, and parallel safety paths." @{ path = $testPath }
 } else {
   Add-Gate $gates "selfTest.coverage" "fail" "Runner self-test coverage is incomplete." @{ missing = $testMissing }
 }

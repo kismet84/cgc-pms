@@ -858,3 +858,123 @@ Issue：ISSUE-004-011 驾驶舱汇总指标来源单据下钻回归
 剩余风险：
 - 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
 - 本轮只补齐成本驾驶舱台账来源标识和前端跳转参数，不新增报表中心或更细粒度来源列表。
+
+---
+
+Issue：ISSUE-008-006 规则治理中心 最小可行回归
+
+目标：
+- 基于现有架构补齐“规则治理中心”的一轮最小可验收能力或回归断言。
+- 不扩大为完整平台化改造，不连接生产环境。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/alert/AlertEvaluationServiceTest.java`：新增 `testRuleGovernance_DisabledRuleDoesNotTrigger`，覆盖关闭 `CONTRACT_OVERDUE` 规则后不生成告警的回归断言。
+- `docs/quality/issue-008-006-规则治理中心.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-006 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest#testRuleGovernance_DisabledRuleDoesNotTrigger" test`：通过，`1` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest" test`：通过，`37` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过，失败类集中在既有 `dashboard`、`invoice`、`workflow`、`purchase`、`revenue` 等测试，不属于本 Issue 引入。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `git diff --check`：通过，仅有既有工作区文件换行符转换提示。
+
+失败分类或非失败分类：现有生产实现满足目标；规则启停回归断言已补齐；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮按最小回归收口，未建设完整规则治理中心页面、规则执行日志、效果分析或平台化规则引擎。
+- 后端全量测试仍有既有无关红灯，需由对应 Ready Issue 分别治理。
+
+---
+
+Issue：ISSUE-008-007 通知平台 最小可行回归
+
+目标：
+- 基于现有架构补齐“通知平台”的一轮最小可验收能力或回归断言。
+- 不扩大为完整平台化改造，不连接生产环境。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/alert/notification/AlertNotificationDispatcher.java`：订阅渠道匹配改为 `trim + upper-case` 归一化，避免 `in_app` 或 ` IN_APP ` 被静默跳过。
+- `backend/src/test/java/com/cgcpms/alert/notification/AlertNotificationDispatcherTest.java`：新增通知平台分发回归单测，覆盖站内通知发送和发送记录落库口径。
+- `docs/quality/issue-008-007-通知平台.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-007 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest" test`：先失败，红灯原因为旧逻辑只调用 `channel()`、未调用 `send()`；实现后通过，`1` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过，Surefire 报告汇总 `1545` 个测试、`11` 个 failures、`29` 个 errors、`1` 个 skipped；失败类集中在既有 `DashboardChiefEngineerServiceTest`、`InvoiceValidationTest`、`MigrationSoftDeleteBehaviorTest`、`Phase2FullChainIntegrationTest`、`Phase4IntegrationTest`、`PurchaseRequestServiceTest`、`ContractRevenueServiceTest` 和旧 `workflow` 测试类；新增通知平台分发测试不在失败列表。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `git diff --check`：通过，仅有换行符转换提示。
+
+失败分类或非失败分类：真实代码质量问题已修复；通知平台分发渠道归一化已补齐；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
+- 本轮只补齐站内通知分发渠道归一化，不新增外部通知渠道、表结构或平台化配置中心。
+
+---
+
+Issue：ISSUE-008-008 WBS、进度计划与甘特图 最小可行回归
+
+目标：
+- 基于现有架构补齐“WBS、进度计划与甘特图”的一轮最小可验收能力或回归断言。
+- 不扩大为完整平台化改造，不连接生产环境。
+
+修改范围摘要：
+- `backend/src/test/java/com/cgcpms/subcontract/SubTaskControllerTest.java`：复用现有 `sub_task` 接口补齐 WBS 编码、计划开始 / 完成、实际开始、进度百分比、状态、项目过滤返回进度行的回归断言。
+- `docs/quality/issue-008-008-wbs-进度计划与甘特图.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-008 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest" test`：通过，`8` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过，Surefire 汇总 `1565` 个测试、`11` 个 failures、`29` 个 errors、`1` 个 skipped；失败类集中在既有 `DashboardChiefEngineerServiceTest`、`InvoiceValidationTest`、`MigrationSoftDeleteBehaviorTest`、`Phase2FullChainIntegrationTest`、`Phase4IntegrationTest`、`PurchaseRequestServiceTest`、`ContractRevenueServiceTest` 和旧 `workflow` 测试类；新增 `SubTaskControllerTest` 不在失败列表。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `git diff --check`：通过，仅有既有工作区文件换行符转换提示。
+
+失败分类或非失败分类：非失败分类；复用现有分包任务接口补齐最小回归断言；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮不新增 `schedule` 模块、任务依赖表、基线、计划变更审计或拖拽排程。
+- 甘特图能力当前只验证后端可返回项目内任务行所需字段，不新增前端甘特组件。
+- 后端全量测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
+
+---
+
+Issue：ISSUE-008-009 供应商评分与采购增强 最小可行回归
+
+目标：
+- 基于现有采购经理驾驶舱补齐供应商评分的一轮最小可验收能力。
+- 不新增表字段，不修改已应用 Flyway migration，不扩大为完整询价 / 比价 / 定标平台。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/dashboard/vo/DashboardSupplierScoreVO.java`：新增供应商评分最小 VO。
+- `backend/src/main/java/com/cgcpms/dashboard/vo/PurchaseManagerDashboardVO.java`：新增 `supplierScores` 字段。
+- `backend/src/main/java/com/cgcpms/dashboard/service/DashboardMaterialRoleService.java`：复用当前采购订单聚合供应商订单数、逾期未完成订单数、交期达成率和绩效分。
+- `backend/src/test/java/com/cgcpms/dashboard/service/DashboardMaterialRoleServiceTest.java`：新增供应商评分回归断言。
+- `frontend-admin/src/types/dashboard.ts`：同步采购经理驾驶舱供应商评分类型。
+- `docs/quality/issue-008-009-供应商评分与采购增强.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-009 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=DashboardMaterialRoleServiceTest#testPurchaseView_SupplierScores" test`：先失败，红灯原因为 `DashboardSupplierScoreVO` 与 `PurchaseManagerDashboardVO#getSupplierScores` 尚不存在；实现后通过，`1` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd backend; .\mvnw.cmd test`：未通过，失败类集中在既有 `DashboardChiefEngineerServiceTest`、`InvoiceValidationTest`、`MigrationSoftDeleteBehaviorTest`、`Phase2FullChainIntegrationTest`、`Phase4IntegrationTest`、`PurchaseRequestServiceTest`、`ContractRevenueServiceTest` 和旧 `workflow` 测试类；新增供应商评分目标用例已通过。
+- `git diff --check`：通过，仅有既有工作区文件换行符转换提示。
+
+失败分类或非失败分类：非失败分类；供应商评分最小回归已补齐；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只基于现有采购订单交期字段推导供应商评分，不新增质量合格率、价格偏差、售后响应或黑名单能力。
+- 本轮不新增采购询价、多供应商报价、比价单、定标记录或采购合同增强页面。
+- 后端全量测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。

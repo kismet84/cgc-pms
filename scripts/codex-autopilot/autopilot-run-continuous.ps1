@@ -182,11 +182,151 @@ function Get-ReadyIssues {
       $issues += [pscustomobject]@{
         title = $title
         status = $status
+        body = $body
         lint = $lint
       }
     }
   }
   return $issues
+}
+
+function Get-SectionLines {
+  param([string]$Body, [string]$Name)
+
+  $match = [regex]::Match($Body, "(?ms)^$([regex]::Escape($Name))[：:].*?\r?\n(.*?)(?=^[^\r\n：:]{2,20}[：:]|^###\s+ISSUE-|\z)")
+  if (!$match.Success) {
+    return @()
+  }
+  return @($match.Groups[1].Value -split "\r?\n" | Where-Object { $_.Trim() })
+}
+
+function Get-BacktickValues {
+  param([string]$Text)
+
+  $values = @()
+  foreach ($match in [regex]::Matches($Text, '``([^``]+)``|`([^`]+)`')) {
+    $value = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
+    if ($value.Trim()) {
+      $values += $value.Trim()
+    }
+  }
+  return $values
+}
+
+function Get-ConflictKey {
+  param([string]$Path)
+
+  $normalized = ($Path -replace "\\", "/").Trim().Trim("/")
+  if (!$normalized -or $normalized -match "[*?]") {
+    return ""
+  }
+
+  $parts = @($normalized -split "/" | Where-Object { $_ })
+  if ($parts.Count -eq 0) {
+    return ""
+  }
+
+  if ($parts[0] -eq "backend") {
+    $cgcpmsIndex = [Array]::IndexOf($parts, "cgcpms")
+    if ($cgcpmsIndex -ge 0 -and $parts.Count -gt ($cgcpmsIndex + 1)) {
+      return "backend/$($parts[$cgcpmsIndex + 1])"
+    }
+    return ($parts[0..([Math]::Min(2, $parts.Count - 1))] -join "/")
+  }
+
+  if ($parts[0] -eq "frontend-admin") {
+    if ($parts.Count -ge 4 -and $parts[2] -eq "pages") {
+      return "frontend-admin/pages/$($parts[3])"
+    }
+    if ($parts.Count -ge 5 -and $parts[2] -eq "api" -and $parts[3] -eq "modules") {
+      return "frontend-admin/api/modules/$($parts[4])"
+    }
+    return ($parts[0..([Math]::Min(3, $parts.Count - 1))] -join "/")
+  }
+
+  return $normalized.ToLowerInvariant()
+}
+
+function Get-ParallelIssueInfo {
+  param([pscustomobject]$Issue)
+
+  $body = [string]$Issue.body
+  $riskPattern = "数据库|migration|Flyway|权限|安全|租户|金额|审批|状态机"
+  $paths = @()
+  $paths += Get-BacktickValues ((Get-SectionLines $body "允许修改") -join "`n")
+  $paths += Get-BacktickValues ((Get-SectionLines $body "归档报告") -join "`n")
+  $paths = @($paths | Where-Object { $_ -match "^(backend|frontend-admin|docs|scripts)/|^(backend|frontend-admin|docs|scripts)\\" } | Select-Object -Unique)
+  $concretePaths = @($paths | Where-Object { $_ -notmatch "[*?]" })
+  $keys = @($concretePaths | ForEach-Object { Get-ConflictKey $_ } | Where-Object { $_ } | Select-Object -Unique)
+  $hasBroadScope = @($paths | Where-Object { $_ -match "[*?]" }).Count -gt 0
+
+  $reason = ""
+  $canParallel = $true
+  if ($body -match $riskPattern) {
+    $canParallel = $false
+    $reason = "SERIAL_HIGH_RISK_DOMAIN"
+  } elseif ($hasBroadScope -or $keys.Count -eq 0) {
+    $canParallel = $false
+    $reason = "SERIAL_UNPROVEN_INDEPENDENCE"
+  }
+
+  return [pscustomobject]@{
+    issue = $Issue
+    canParallel = $canParallel
+    reason = $reason
+    keys = @($keys)
+    paths = @($concretePaths)
+  }
+}
+
+function Get-ReadyIssueBatchPlan {
+  param(
+    [object[]]$ReadyIssues,
+    [int]$MaxParallelIssues,
+    [string]$ParallelSafetyMode
+  )
+
+  if ($ReadyIssues.Count -eq 0) {
+    return [pscustomobject]@{ issues = [object[]]@(); decision = "EMPTY"; reason = ""; parallel = $false }
+  }
+  if ($ParallelSafetyMode -ne "strict-independent-only" -or $MaxParallelIssues -le 1) {
+    return [pscustomobject]@{ issues = [object[]]@($ReadyIssues[0]); decision = "READY_ISSUE"; reason = "SERIAL_CONFIG"; parallel = $false }
+  }
+
+  $batch = @()
+  $usedKeys = @{}
+  foreach ($issue in $ReadyIssues) {
+    if ($issue.lint.status -ne "pass") {
+      break
+    }
+
+    $info = Get-ParallelIssueInfo $issue
+    if (!$info.canParallel) {
+      $reason = if ($batch.Count -eq 0) { $info.reason } else { "SERIAL_CONFLICT" }
+      $issues = if ($batch.Count -eq 0) { [object[]]@($ReadyIssues[0]) } else { [object[]]@($batch) }
+      return [pscustomobject]@{ issues = $issues; decision = "READY_ISSUE"; reason = $reason; parallel = $false }
+    }
+
+    foreach ($key in @($info.keys)) {
+      if ($usedKeys.ContainsKey($key)) {
+        $issues = if ($batch.Count -eq 0) { [object[]]@($ReadyIssues[0]) } else { [object[]]@($batch) }
+        return [pscustomobject]@{ issues = $issues; decision = "READY_ISSUE"; reason = "SERIAL_CONFLICT"; parallel = $false }
+      }
+    }
+
+    $batch += $issue
+    foreach ($key in @($info.keys)) {
+      $usedKeys[$key] = $true
+    }
+    if ($batch.Count -ge $MaxParallelIssues) {
+      break
+    }
+  }
+
+  if ($batch.Count -gt 1) {
+    return [pscustomobject]@{ issues = [object[]]@($batch); decision = "READY_ISSUE_BATCH"; reason = "STRICT_INDEPENDENT"; parallel = $true }
+  }
+  return [pscustomobject]@{ issues = [object[]]@($ReadyIssues[0]); decision = "READY_ISSUE"; reason = "SERIAL_SINGLE"; parallel = $false }
 }
 
 function Invoke-ReadyLint {
@@ -465,6 +605,61 @@ function Test-IssueCompleted {
   return $statusMatch.Groups[1].Value.Trim() -match "^(Done|Blocked|已完成|阻塞|Iteration|Iterated|已迭代|迭代完成)\b"
 }
 
+function Get-IterationProgressFromRuns {
+  param(
+    [string]$AutoDir,
+    [datetime]$StartedAt
+  )
+
+  $runsDir = Join-Path $AutoDir "runs"
+  if (!(Test-Path $runsDir)) {
+    return [pscustomobject]@{
+      completedCount = 0
+      latestIssueRef = ""
+    }
+  }
+
+  $completed = @{}
+  $latestCreatedAt = [datetime]::MinValue
+  $latestIssueRef = ""
+
+  Get-ChildItem -Path $runsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+    $resultPath = Join-Path $_.FullName "result.json"
+    if (!(Test-Path $resultPath)) {
+      return
+    }
+
+    try {
+      $result = Get-Content -Raw $resultPath | ConvertFrom-Json
+    } catch {
+      return
+    }
+
+    if (!$result.issueId -or @("done", "blocked") -notcontains [string]$result.status) {
+      return
+    }
+
+    [datetime]$createdAt = [datetime]::MinValue
+    if (![datetime]::TryParse([string]$result.createdAt, [ref]$createdAt)) {
+      $createdAt = [datetime]::MinValue
+    }
+    if ($createdAt -lt $StartedAt) {
+      return
+    }
+
+    $completed[[string]$result.issueId] = if ($result.title) { [string]$result.title } else { [string]$result.issueId }
+    if ($createdAt -ge $latestCreatedAt) {
+      $latestCreatedAt = $createdAt
+      $latestIssueRef = if ($result.title) { [string]$result.title } else { [string]$result.issueId }
+    }
+  }
+
+  return [pscustomobject]@{
+    completedCount = $completed.Count
+    latestIssueRef = $latestIssueRef
+  }
+}
+
 function Initialize-IterationProgress {
   param(
     [string]$AutoDir,
@@ -495,6 +690,17 @@ function Initialize-IterationProgress {
     }
     if ($state.iterationLastCountedIssue) {
       $script:IterationLastCountedIssue = $state.iterationLastCountedIssue
+    }
+
+    [datetime]$startedAt = [datetime]::MinValue
+    if ($state.startedAt -and [datetime]::TryParse([string]$state.startedAt, [ref]$startedAt)) {
+      $runProgress = Get-IterationProgressFromRuns $AutoDir $startedAt
+      if ($runProgress.completedCount -gt $script:IterationCompleted) {
+        $script:IterationCompleted = $runProgress.completedCount
+        if ($runProgress.latestIssueRef) {
+          $script:IterationLastCountedIssue = $runProgress.latestIssueRef
+        }
+      }
     }
 
     if (!$ReadOnlyMode -and $state.lastAction -eq "READY_ISSUE_FOUND" -and $state.lastIssue -and $state.iterationLastCountedIssue -ne $state.lastIssue) {
@@ -552,12 +758,20 @@ function Write-NextActionExplanation {
       }
       return
     }
-    Write-Host "nextAction=READY_ISSUE"
-    Write-Host "nextReady=$($ReadyIssues[0].title)"
+    $batchPlan = Get-ReadyIssueBatchPlan $ReadyIssues $script:MaxParallelIssues $script:ParallelSafetyMode
+    $batchIssues = @($batchPlan.issues)
+    Write-Host "nextAction=$($batchPlan.decision)"
+    Write-Host "nextReady=$($batchIssues[0].title)"
     Write-Host "stopReason="
     Write-Host "missingGate="
     Write-Host "shouldSplitBacklog=false"
-    Write-Host "selectedIssue=$($ReadyIssues[0].title)"
+    Write-Host "selectedIssue=$($batchIssues[0].title)"
+    Write-Host "parallelSafetyMode=$script:ParallelSafetyMode"
+    Write-Host "parallelBatchSize=$($batchIssues.Count)"
+    Write-Host "parallelDecision=$($batchPlan.reason)"
+    for ($index = 0; $index -lt $batchIssues.Count; $index++) {
+      Write-Host ("parallelIssue[{0}]={1}" -f ($index + 1), $batchIssues[$index].title)
+    }
     return
   }
 
@@ -619,10 +833,17 @@ if ($config.repoRoot) {
 
 $autoDir = if ($config.autopilotDir) { $config.autopilotDir } else { Join-Path $RepoRoot ".codex-autopilot" }
 $maxIssuesPerRun = if ($config.maxIssuesPerRun) { [int]$config.maxIssuesPerRun } else { 1 }
+$maxParallelIssues = if ($config.maxParallelIssues) { [int]$config.maxParallelIssues } else { 3 }
+$parallelSafetyMode = if ($config.parallelSafetyMode) { [string]$config.parallelSafetyMode } else { "strict-independent-only" }
 $maxRunMinutes = if ($config.maxRunMinutes) { [int]$config.maxRunMinutes } else { 120 }
-if ($maxIssuesPerRun -ne 1) {
-  throw "Continuous runner requires maxIssuesPerRun=1, actual=$maxIssuesPerRun"
+if ($maxParallelIssues -lt 1 -or $maxParallelIssues -gt 3) {
+  throw "maxParallelIssues must be between 1 and 3, actual=$maxParallelIssues"
 }
+if ($parallelSafetyMode -ne "strict-independent-only") {
+  throw "parallelSafetyMode must be strict-independent-only, actual=$parallelSafetyMode"
+}
+$script:MaxParallelIssues = $maxParallelIssues
+$script:ParallelSafetyMode = $parallelSafetyMode
 
 $readyPath = Join-Path $RepoRoot "docs\backlog\ready-issues.md"
 $focusPath = Join-Path $RepoRoot "docs\backlog\current-focus.md"
@@ -642,6 +863,8 @@ Write-RunEvent "runner.start" ([pscustomobject]@{
 Write-Host "CGC-PMS AutoPilot continuous runner"
 Write-Host "repoRoot=$RepoRoot"
 Write-Host "maxIssuesPerRun=$maxIssuesPerRun"
+Write-Host "maxParallelIssues=$maxParallelIssues"
+Write-Host "parallelSafetyMode=$parallelSafetyMode"
 Write-Host "iterationLimit=$script:IterationLimit"
 Write-Host "iterationCompleted=$script:IterationCompleted"
 Write-Host "remainingIterations=$script:RemainingIterations"
@@ -655,7 +878,8 @@ if ($ExplainNextAction) {
   $readyIssues = if ($checkpoint -eq "CONTINUE") { @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir) } else { @() }
   $candidates = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0) { @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit) } else { @() }
   $stopReason = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0 -and $candidates.Count -eq 0) { Get-StopReasonForEmptyPool $readyPath } else { $checkpoint }
-  $decision = if ($checkpoint -ne "CONTINUE") { "STOP" } elseif ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -ne "pass") { "STOP_READY_LINT_FAILED" } elseif ($readyIssues.Count -gt 0) { "READY_ISSUE" } elseif ($candidates.Count -gt 0) { "SPLIT_BACKLOG" } else { "STOP" }
+  $batchPlan = if ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -eq "pass") { Get-ReadyIssueBatchPlan $readyIssues $maxParallelIssues $parallelSafetyMode } else { $null }
+  $decision = if ($checkpoint -ne "CONTINUE") { "STOP" } elseif ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -ne "pass") { "STOP_READY_LINT_FAILED" } elseif ($readyIssues.Count -gt 0) { $batchPlan.decision } elseif ($candidates.Count -gt 0) { "SPLIT_BACKLOG" } else { "STOP" }
   Write-RunEvent "decision" ([pscustomobject]@{
     decision = $decision
     issueId = if ($readyIssues.Count -gt 0) { $readyIssues[0].lint.issueId } else { "" }
@@ -664,6 +888,8 @@ if ($ExplainNextAction) {
     missingGate = if ($decision -eq "STOP_READY_LINT_FAILED") { "ready-lint" } elseif ($decision -eq "STOP") { "ready-issue" } else { "" }
     shouldSplitBacklog = ($decision -eq "SPLIT_BACKLOG")
     selectedIssue = if ($readyIssues.Count -gt 0) { $readyIssues[0].title } else { "" }
+    parallelBatchSize = if ($batchPlan) { @($batchPlan.issues).Count } else { 0 }
+    parallelDecision = if ($batchPlan) { $batchPlan.reason } else { "" }
   })
   Write-NextActionExplanation $checkpoint $readyIssues $candidates $stopReason
   exit 0
@@ -721,20 +947,45 @@ try {
         decision = "PASS"
         status = "pass"
       })
-      Write-State $autoDir "READY_ISSUE_FOUND" ([bool]$DryRun) "READY_ISSUE_FOUND" $readyIssues[0].title "READY_ISSUE_FOUND" ""
+      $batchPlan = Get-ReadyIssueBatchPlan $readyIssues $maxParallelIssues $parallelSafetyMode
+      $batchIssues = @($batchPlan.issues)
+      $selectedIssue = $batchIssues[0]
+      $readyStatus = if ($batchPlan.parallel) { "READY_ISSUE_BATCH_FOUND" } else { "READY_ISSUE_FOUND" }
+      Write-State $autoDir $readyStatus ([bool]$DryRun) $readyStatus $selectedIssue.title $readyStatus ""
       Write-RunEvent "decision" ([pscustomobject]@{
-        issueId = $readyIssues[0].lint.issueId
-        title = $readyIssues[0].title
-        decision = "READY_ISSUE_FOUND"
-        status = "READY_ISSUE_FOUND"
-        selectedIssue = $readyIssues[0].title
+        issueId = $selectedIssue.lint.issueId
+        title = $selectedIssue.title
+        decision = $readyStatus
+        status = $readyStatus
+        selectedIssue = $selectedIssue.title
+        parallelBatchSize = $batchIssues.Count
+        parallelDecision = $batchPlan.reason
+        parallelSafetyMode = $parallelSafetyMode
       })
-      Write-Host "READY_ISSUE_FOUND"
-      Write-Host "selected=$($readyIssues[0].title)"
-      if ($DryRun) {
-        Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $readyIssues[0].title)"
+      Write-Host $readyStatus
+      Write-Host "selected=$($selectedIssue.title)"
+      Write-Host "parallelSafetyMode=$parallelSafetyMode"
+      Write-Host "parallelBatchSize=$($batchIssues.Count)"
+      Write-Host "parallelDecision=$($batchPlan.reason)"
+      for ($index = 0; $index -lt $batchIssues.Count; $index++) {
+        $issue = $batchIssues[$index]
+        Write-Host ("parallelIssue[{0}]={1}" -f ($index + 1), $issue.title)
+      }
+      if ($DryRun -or $batchPlan.parallel) {
+        for ($index = 0; $index -lt $batchIssues.Count; $index++) {
+          $issue = $batchIssues[$index]
+          $commandText = Get-ExecutorCommand $RepoRoot $ConfigPath $issue.title
+          if ($batchIssues.Count -eq 1) {
+            Write-Host "executorCommand=$commandText"
+          } else {
+            Write-Host ("executorCommand[{0}]={1}" -f ($index + 1), $commandText)
+          }
+        }
+        if ($batchPlan.parallel -and !$DryRun) {
+          Write-Host "PARALLEL_BATCH_PLAN_ONLY"
+        }
       } else {
-        Invoke-IssueExecutor $RepoRoot $ConfigPath $readyIssues[0].title
+        Invoke-IssueExecutor $RepoRoot $ConfigPath $selectedIssue.title
       }
       exit 0
     }

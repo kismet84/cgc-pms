@@ -4,7 +4,7 @@
 
 - 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
 - 本文件是当前执行队列，不是任务源全集。
-- 当本文件没有合格 Ready Issue 时，AutoPilot 应先从长期总任务池中按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；拆单当轮只更新 backlog，不直接修改业务代码；连续执行模式下拆单完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮，并按每轮最多处理 1 个 Ready Issue 执行。
+- 当本文件没有合格 Ready Issue 时，AutoPilot 应先从长期总任务池中按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；拆单当轮只更新 backlog，不直接修改业务代码；连续执行模式下拆单完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮；系统允许最多 3 个完全无关联、无任何代码关联的 Ready Issue 并行，不能证明完全无关联时按串行处理。
 
 ## AutoPilot 自动合并门禁
 
@@ -1070,3 +1070,127 @@
 状态：Done
 自动合并：auto-merge/local-commit-only
 归档报告：`docs/quality/issue-006-001-file-upload-invoice-recognition.md`
+
+### ISSUE-008-006：规则治理中心 最小可行回归
+
+优先级：P2
+类型：生产增强 / 回归 / 最小实现
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.2 规则治理中心` 节
+是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
+目标：
+- 基于现有架构补齐“规则治理中心”的一轮最小可验收能力或回归断言。
+- 不扩大为完整平台化改造，不连接生产环境。
+允许修改：
+- `backend/**`
+- `frontend-admin/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- 已应用 Flyway migration
+- 生产凭据、生产数据库连接、生产发布配置
+- 与本 Issue 无关的大范围重构或新依赖
+验收标准：
+- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
+- 不放宽现有鉴权、租户、项目边界。
+- 更新 iteration 或 quality 报告，并同步 backlog 状态。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-006-规则治理中心.md`
+
+### ISSUE-008-007：通知平台 最小可行回归
+
+优先级：P2
+类型：生产增强 / 回归 / 最小实现
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节
+是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
+目标：
+- 基于现有架构补齐“通知平台”的一轮最小可验收能力或回归断言。
+- 不扩大为完整平台化改造，不连接生产环境。
+允许修改：
+- `backend/**`
+- `frontend-admin/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- 已应用 Flyway migration
+- 生产凭据、生产数据库连接、生产发布配置
+- 与本 Issue 无关的大范围重构或新依赖
+验收标准：
+- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
+- 不放宽现有鉴权、租户、项目边界。
+- 更新 iteration 或 quality 报告，并同步 backlog 状态。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-007-通知平台.md`
+
+### ISSUE-008-008：WBS、进度计划与甘特图 最小可行回归
+
+优先级：P2
+类型：生产增强 / 回归 / 最小实现
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图` 节
+是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
+目标：
+- 基于现有架构补齐“WBS、进度计划与甘特图”的一轮最小可验收能力或回归断言。
+- 不扩大为完整平台化改造，不连接生产环境。
+允许修改：
+- `backend/**`
+- `frontend-admin/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- 已应用 Flyway migration
+- 生产凭据、生产数据库连接、生产发布配置
+- 与本 Issue 无关的大范围重构或新依赖
+验收标准：
+- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
+- 不放宽现有鉴权、租户、项目边界。
+- 更新 iteration 或 quality 报告，并同步 backlog 状态。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-008-wbs-进度计划与甘特图.md`
+
+### ISSUE-008-009：供应商评分与采购增强 最小可行回归
+
+优先级：P2
+类型：生产增强 / 回归 / 最小实现
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强` 节
+是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
+目标：
+- 基于现有架构补齐“供应商评分与采购增强”的一轮最小可验收能力或回归断言。
+- 不扩大为完整平台化改造，不连接生产环境。
+允许修改：
+- `backend/**`
+- `frontend-admin/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- 已应用 Flyway migration
+- 生产凭据、生产数据库连接、生产发布配置
+- 与本 Issue 无关的大范围重构或新依赖
+验收标准：
+- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
+- 不放宽现有鉴权、租户、项目边界。
+- 更新 iteration 或 quality 报告，并同步 backlog 状态。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-009-供应商评分与采购增强.md`

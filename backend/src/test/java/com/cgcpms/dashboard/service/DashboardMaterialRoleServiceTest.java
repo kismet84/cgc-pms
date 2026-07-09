@@ -530,6 +530,25 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
 
     @Test
     @Transactional
+    @DisplayName("8.5 Purchase view: exposes supplier delivery score from existing purchase orders")
+    void testPurchaseView_SupplierScores() {
+        SeedResult sr = seed("PUR_SUPPLIER_SCORE");
+
+        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(sr.projectId);
+
+        DashboardSupplierScoreVO score = vo.getSupplierScores().stream()
+                .filter(i -> sr.partnerId.toString().equals(i.getPartnerId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("供应商-PUR_SUPPLIER_SCORE", score.getPartnerName());
+        assertEquals(1L, score.getOrderCount());
+        assertEquals(1L, score.getOverdueOrderCount());
+        assertEquals("0.00", score.getOnTimeDeliveryRate());
+        assertEquals("0", score.getPerformanceScore());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("8.3 Production view: accepts month parameter and filters receipts/requisitions/measures")
     void testProductionView_WithMonthParameter() {
         SeedResult sr = seed("PROD_MONTH");

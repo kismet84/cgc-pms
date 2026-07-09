@@ -75,7 +75,89 @@ function Get-GitSummary {
 function Get-BusinessGitStatus {
   param([string[]]$StatusLines)
 
-  return @($StatusLines | Where-Object { $_ -notmatch "^\S\S\s+\.codex-autopilot/" })
+  return @($StatusLines | Where-Object {
+    $paths = @(Get-BusinessPathsFromStatusLine $_)
+    $paths.Count -gt 0
+  })
+}
+
+function Test-ExcludedBusinessPath {
+  param([string]$Path)
+
+  if (!$Path) {
+    return $true
+  }
+
+  $normalized = $Path.Replace('\', '/')
+  if ($normalized.StartsWith("./")) {
+    $normalized = $normalized.Substring(2)
+  }
+  return $normalized -match '^(?:\.codex-autopilot/|\.omc/|\.omo/|\.opencode/|\.claude/|\.mimocode/|graphify-out/|\.sisyphus/|\.archive/)'
+}
+
+function Get-BusinessPathsFromStatusLine {
+  param([string]$StatusLine)
+
+  if (!$StatusLine -or $StatusLine.Length -lt 4) {
+    return @()
+  }
+
+  $rawPath = $StatusLine.Substring(3).Trim()
+  if (!$rawPath) {
+    return @()
+  }
+
+  $paths = @()
+  if ($rawPath -match '\s+->\s+') {
+    $paths += $rawPath -split '\s+->\s+'
+  } else {
+    $paths += $rawPath
+  }
+
+  return @($paths | ForEach-Object { $_.Trim('"') } | Where-Object { $_ -and -not (Test-ExcludedBusinessPath $_) } | Select-Object -Unique)
+}
+
+function Get-BusinessFileFingerprints {
+  param(
+    [string]$Root,
+    [string[]]$StatusLines
+  )
+
+  $fingerprints = @{}
+  foreach ($path in @($StatusLines | ForEach-Object { Get-BusinessPathsFromStatusLine $_ } | Select-Object -Unique)) {
+    $fullPath = Join-Path $Root $path
+    if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+      $item = Get-Item -LiteralPath $fullPath
+      $hash = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash
+      $fingerprints[$path] = "$hash`:$($item.Length)"
+    } else {
+      $fingerprints[$path] = "__MISSING__"
+    }
+  }
+  return $fingerprints
+}
+
+function Get-ChangedBusinessArtifacts {
+  param(
+    [string[]]$BeforeStatus,
+    [string[]]$AfterStatus,
+    [hashtable]$BeforeFingerprints,
+    [hashtable]$AfterFingerprints
+  )
+
+  $statusChanges = @($AfterStatus | Where-Object { $BeforeStatus -notcontains $_ })
+  $contentChanges = @()
+  foreach ($path in @($beforeFingerprints.Keys + $afterFingerprints.Keys | Select-Object -Unique)) {
+    if ($beforeFingerprints[$path] -ne $afterFingerprints[$path]) {
+      $contentChanges += "content:$path"
+    }
+  }
+
+  return [pscustomobject]@{
+    statusChanges = $statusChanges
+    contentChanges = $contentChanges
+    artifacts = @($statusChanges + $contentChanges)
+  }
 }
 
 function Test-CommandAvailable {
@@ -88,6 +170,20 @@ function Test-CommandAvailable {
     return $true
   }
   return $null -ne (Get-Command $Command -ErrorAction SilentlyContinue)
+}
+
+function Resolve-ExecutorCommand {
+  param([string]$Command)
+
+  if ((Split-Path -Leaf $Command) -ne $Command -and (Test-Path -LiteralPath $Command)) {
+    return (Resolve-Path -LiteralPath $Command).Path
+  }
+
+  $resolved = Get-Command $Command -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($resolved -and $resolved.Source) {
+    return $resolved.Source
+  }
+  return $Command
 }
 
 function Expand-ExecutorToken {
@@ -130,6 +226,93 @@ $($Issue.body)
   return $promptPath
 }
 
+function Invoke-ExecutorProcess {
+  param(
+    [string]$Command,
+    [string[]]$Arguments,
+    [string]$WorkingDirectory,
+    [string]$StdinPath,
+    [string]$LogPath,
+    [int]$TimeoutSeconds
+  )
+
+  function Quote-ProcessArgument {
+    param([string]$Argument)
+
+    if ($Argument -notmatch '[\s"]') {
+      return $Argument
+    }
+    return '"' + ($Argument.Replace('"', '\"')) + '"'
+  }
+
+  $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+  $startInfo.FileName = Resolve-ExecutorCommand $Command
+  $startInfo.Arguments = (@($Arguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
+  $startInfo.WorkingDirectory = $WorkingDirectory
+  $startInfo.UseShellExecute = $false
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $startInfo.RedirectStandardInput = [bool]$StdinPath
+
+  $process = [System.Diagnostics.Process]::new()
+  $process.StartInfo = $startInfo
+
+  $startedAt = Get-Date -Format o
+  [void]$process.Start()
+  $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+  $stderrTask = $process.StandardError.ReadToEndAsync()
+
+  if ($StdinPath) {
+    $process.StandardInput.Write((Get-Content -Raw -LiteralPath $StdinPath))
+    $process.StandardInput.Close()
+  }
+
+  $waitMs = if ($TimeoutSeconds -gt 0) { $TimeoutSeconds * 1000 } else { -1 }
+  $timedOut = $false
+  if (!$process.WaitForExit($waitMs)) {
+    $timedOut = $true
+    $process.Kill($true)
+  }
+  $process.WaitForExit()
+
+  $stdout = $stdoutTask.GetAwaiter().GetResult()
+  $stderr = $stderrTask.GetAwaiter().GetResult()
+  $logLines = @(
+    "executor.startedAt=$startedAt"
+    "executor.command=$($startInfo.FileName)"
+    "executor.args=$($Arguments -join ' ')"
+    "executor.cwd=$WorkingDirectory"
+    "executor.timeoutSeconds=$TimeoutSeconds"
+    "executor.timedOut=$timedOut"
+    "executor.exitCode=$($process.ExitCode)"
+    ""
+    "[stdout]"
+    $stdout
+    ""
+    "[stderr]"
+    $stderr
+  )
+  $logLines | Out-File -Encoding utf8 $LogPath
+
+  return [pscustomobject]@{
+    exitCode = if ($timedOut) { 124 } else { [int]$process.ExitCode }
+    timedOut = $timedOut
+  }
+}
+
+function Get-ExecutorFailureCategory {
+  param(
+    [string]$Command,
+    [string]$LogText
+  )
+
+  $leaf = Split-Path -Leaf $Command
+  if ($leaf -match "^codex(\.exe)?$" -and $LogText -notmatch "OpenAI Codex v") {
+    return "tool_config"
+  }
+  return "quality_security"
+}
+
 function Invoke-ConfiguredIssueExecutor {
   param(
     [object]$Issue,
@@ -164,22 +347,24 @@ function Invoke-ConfiguredIssueExecutor {
   $promptPath = New-IssuePromptFile $Issue $RunDir
   $logPath = Join-Path $RunDir "executor.log"
   $before = @(Get-BusinessGitStatus @((Get-GitSummary $RepoRoot).statusShort))
+  $beforeFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $before
   $args = @()
   foreach ($arg in @($executor.args)) {
     $args += (Expand-ExecutorToken ([string]$arg) $Issue $promptPath $RunDir)
   }
   $stdinPath = if ($executor.stdinFile) { Expand-ExecutorToken ([string]$executor.stdinFile) $Issue $promptPath $RunDir } else { "" }
 
+  $timeoutSeconds = if ($executor.timeoutSeconds) { [int]$executor.timeoutSeconds } else { 7200 }
   $exitCode = 0
   try {
-    if ($stdinPath) {
-      Get-Content -Raw -LiteralPath $stdinPath | & $command @args 2>&1 | Tee-Object -FilePath $logPath | Out-Null
-    } else {
-      & $command @args 2>&1 | Tee-Object -FilePath $logPath | Out-Null
-    }
-    if ($null -ne $LASTEXITCODE) {
-      $exitCode = [int]$LASTEXITCODE
-    }
+    $processResult = Invoke-ExecutorProcess `
+      -Command $command `
+      -Arguments @($args) `
+      -WorkingDirectory $RepoRoot `
+      -StdinPath $stdinPath `
+      -LogPath $logPath `
+      -TimeoutSeconds $timeoutSeconds
+    $exitCode = [int]$processResult.exitCode
   } catch {
     $_.Exception.Message | Out-File -Encoding utf8 $logPath
     $exitCode = 1
@@ -187,16 +372,23 @@ function Invoke-ConfiguredIssueExecutor {
 
   $afterSummary = Get-GitSummary $RepoRoot
   $after = @(Get-BusinessGitStatus @($afterSummary.statusShort))
-  $newChanges = @($after | Where-Object { $before -notcontains $_ })
+  $afterFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $after
+  $artifactChanges = Get-ChangedBusinessArtifacts `
+    -BeforeStatus $before `
+    -AfterStatus $after `
+    -BeforeFingerprints $beforeFingerprints `
+    -AfterFingerprints $afterFingerprints
   $requireChangedFiles = if ($null -ne $executor.requireChangedFiles) { [bool]$executor.requireChangedFiles } else { $true }
-  $logTail = if (Test-Path $logPath) { @((Get-Content -Tail 20 -LiteralPath $logPath) -join "`n") } else { @() }
+  $logText = if (Test-Path $logPath) { Get-Content -Raw -LiteralPath $logPath } else { "" }
+  $logTail = if (Test-Path $logPath) { @((Get-Content -Tail 40 -LiteralPath $logPath) -join "`n") } else { @() }
 
   if ($exitCode -ne 0) {
+    $failureCategory = Get-ExecutorFailureCategory $command $logText
     return [pscustomobject]@{
       status = "failed"
-      failureCategory = "quality_security"
+      failureCategory = $failureCategory
       nextAction = "STOP"
-      stopReason = "STOP_EXECUTOR_FAILED"
+      stopReason = if ($failureCategory -eq "tool_config") { "STOP_EXECUTOR_TOOLCHAIN_FAILED" } else { "STOP_EXECUTOR_FAILED" }
       validation = @(
         [pscustomobject]@{ name = "executor-command"; status = "fail"; message = "exitCode=$exitCode" },
         [pscustomobject]@{ name = "executor-log-tail"; status = "info"; message = ($logTail -join "`n") }
@@ -205,7 +397,7 @@ function Invoke-ConfiguredIssueExecutor {
     }
   }
 
-  if ($requireChangedFiles -and $newChanges.Count -eq 0) {
+  if ($requireChangedFiles -and $artifactChanges.artifacts.Count -eq 0) {
     return [pscustomobject]@{
       status = "blocked"
       failureCategory = "quality_security"
@@ -226,7 +418,7 @@ function Invoke-ConfiguredIssueExecutor {
     stopReason = ""
     validation = @(
       [pscustomobject]@{ name = "executor-command"; status = "pass"; message = "exitCode=0" },
-      [pscustomobject]@{ name = "execution-artifacts"; status = "pass"; message = ($newChanges -join "`n") }
+      [pscustomobject]@{ name = "execution-artifacts"; status = "pass"; message = ($artifactChanges.artifacts -join "`n") }
     )
     artifacts = @($promptPath, $logPath)
   }

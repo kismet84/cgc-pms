@@ -224,6 +224,7 @@ abstract class DashboardSharedSupport {
         vo.setPurchaseOrders(Collections.emptyList());
         vo.setOverdueOrders(Collections.emptyList());
         vo.setPendingReceipts(Collections.emptyList());
+        vo.setSupplierScores(Collections.emptyList());
     }
 
     protected void applyEmptyProductionManager(ProductionManagerDashboardVO vo) {

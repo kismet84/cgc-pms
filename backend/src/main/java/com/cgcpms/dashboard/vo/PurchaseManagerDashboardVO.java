@@ -18,4 +18,5 @@ public class PurchaseManagerDashboardVO {
     private List<DashboardBusinessItemVO> purchaseOrders;
     private List<DashboardBusinessItemVO> overdueOrders;
     private List<DashboardBusinessItemVO> pendingReceipts;
+    private List<DashboardSupplierScoreVO> supplierScores;
 }

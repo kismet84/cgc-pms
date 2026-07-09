@@ -11,6 +11,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Slf4j
@@ -47,7 +48,7 @@ public class AlertNotificationDispatcher {
         for (AlertNotificationSender sender : senders.stream()
                 .sorted(Comparator.comparingInt(item -> item.channel().ordinal()))
                 .toList()) {
-            if (channels != null && !channels.contains(sender.channel().name())) {
+            if (!isChannelRequested(channels, sender.channel())) {
                 continue;
             }
             try {
@@ -62,6 +63,16 @@ public class AlertNotificationDispatcher {
                         alert.getId(), sender.channel().name(), eventType, e);
             }
         }
+    }
+
+    private boolean isChannelRequested(Set<String> channels, AlertNotificationChannel channel) {
+        if (channels == null) {
+            return true;
+        }
+        return channels.stream()
+                .filter(StringUtils::hasText)
+                .map(item -> item.trim().toUpperCase(Locale.ROOT))
+                .anyMatch(channel.name()::equals);
     }
 
     private void record(Long tenantId, Long userId, Long alertId, String eventType, String channel,

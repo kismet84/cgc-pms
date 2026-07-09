@@ -8,7 +8,7 @@
 
 - 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
 - 当前执行队列：`docs/backlog/ready-issues.md`
-- 当前执行队列没有合格 Ready Issue 时，只允许由项目总负责人结合长期总任务池、`done/ready/blocked` 现状、当前项目状态、用户最新约束、风险和依赖关系，拆出最多 5 个一轮可执行 Ready Issue；该轮只更新 backlog，不直接修改业务代码；后续执行仍按每轮最多处理 1 个 Ready Issue。
+- 当前执行队列没有合格 Ready Issue 时，只允许由项目总负责人结合长期总任务池、`done/ready/blocked` 现状、当前项目状态、用户最新约束、风险和依赖关系，拆出最多 5 个一轮可执行 Ready Issue；该轮只更新 backlog，不直接修改业务代码；后续执行允许最多 3 个完全无关联、无任何代码关联的 Ready Issue 并行，不能证明完全无关联时按串行处理。
 
 ## 动态候选范围与选择原则
 
@@ -41,7 +41,7 @@
 
 ## 每轮上限
 
-- 每轮最多处理 1 个 Ready Issue
+- 每轮最多处理 3 个 Ready Issue；仅限完全无关联、无任何代码关联的任务并行，不能证明完全无关联时按串行处理
 - 每轮最多修改 20 个文件
 - 无 Ready Issue 不写代码
 

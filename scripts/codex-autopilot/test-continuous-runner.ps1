@@ -4,6 +4,7 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Runner = Join-Path $ScriptDir "autopilot-run-continuous.ps1"
+$StartScript = Join-Path $ScriptDir "autopilot-start.ps1"
 $Executor = Join-Path $ScriptDir "autopilot-exec-issue.ps1"
 $StatusScript = Join-Path $ScriptDir "autopilot-status.ps1"
 $KillScript = Join-Path $ScriptDir "autopilot-kill.ps1"
@@ -21,7 +22,9 @@ function New-Fixture {
 允许进入下一阶段的候选范围：
 - P2 报表中心、规则治理中心、通知平台、WBS / 进度计划 / 甘特图、供应商评分 / 采购增强。
 "@,
-    [int]$MaxIssuesPerRun = 1,
+    [int]$MaxIssuesPerRun = 3,
+    [int]$MaxParallelIssues = 3,
+    [string]$ParallelSafetyMode = "strict-independent-only",
     [string]$ExecutorMode = "success",
     [switch]$Enabled
   )
@@ -44,6 +47,8 @@ function New-Fixture {
   "repoRoot": "$($Root -replace '\\', '\\')",
   "autopilotDir": "$(($AutoDir) -replace '\\', '\\')",
   "maxIssuesPerRun": $MaxIssuesPerRun,
+  "maxParallelIssues": $MaxParallelIssues,
+  "parallelSafetyMode": "$ParallelSafetyMode",
   "autoPush": false,
   "issueExecutor": {
     "command": "powershell",
@@ -179,10 +184,40 @@ function Write-TestRunLock {
   } | ConvertTo-Json | Out-File -Encoding utf8 (Join-Path $Root ".codex-autopilot\run.lock")
 }
 
+function Add-MockRunResult {
+  param(
+    [string]$Root,
+    [string]$RunId,
+    [string]$IssueId,
+    [string]$Title,
+    [string]$Status,
+    [string]$CreatedAt
+  )
+
+  $runDir = Join-Path $Root ".codex-autopilot\runs\$RunId"
+  New-Item -ItemType Directory -Path $runDir -Force | Out-Null
+  [ordered]@{
+    issueId = $IssueId
+    title = $Title
+    status = $Status
+    failureCategory = "none"
+    artifacts = @()
+    gitSummary = @{
+      branch = "master"
+      isClean = $false
+      statusShort = @()
+    }
+    validation = @()
+    nextAction = "VALIDATE_AND_MERGE"
+    stopReason = ""
+    createdAt = $CreatedAt
+  } | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 (Join-Path $runDir "result.json")
+}
+
 function Assert-Contains {
   param([string]$Text, [string]$Expected)
 
-  if ($Text -notlike "*$Expected*") {
+  if (!$Text.Contains($Expected)) {
     throw "Expected output to contain '$Expected'. Actual:`n$Text"
   }
 }
@@ -190,7 +225,7 @@ function Assert-Contains {
 function Assert-NotContains {
   param([string]$Text, [string]$Unexpected)
 
-  if ($Text -like "*$Unexpected*") {
+  if ($Text.Contains($Unexpected)) {
     throw "Expected output not to contain '$Unexpected'. Actual:`n$Text"
   }
 }
@@ -267,9 +302,9 @@ try {
   "stop" | Out-File -Encoding utf8 (Join-Path $StopRoot ".codex-autopilot\stop.flag")
   Assert-Contains (Invoke-Runner $StopRoot) "STOP_STOP_FLAG"
 
-  $BadLimitRoot = New-Fixture -Name "bad-limit" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n" -MaxIssuesPerRun 2
+  $BadLimitRoot = New-Fixture -Name "bad-limit" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n" -MaxParallelIssues 4
   $BadLimitOutput = Invoke-Runner $BadLimitRoot
-  Assert-Contains $BadLimitOutput "Continuous runner requires maxIssuesPerRun=1"
+  Assert-Contains $BadLimitOutput "maxParallelIssues must be between 1 and 3"
 
   $ReadyRoot = New-Fixture -Name "ready" -Enabled -Ready @"
 # Ready Issues
@@ -292,7 +327,8 @@ try {
 "@ -Plan "# Plan`n"
   $ReadyOutput = Invoke-Runner $ReadyRoot
   Assert-Contains $ReadyOutput "READY_ISSUE_FOUND"
-  Assert-Contains $ReadyOutput "maxIssuesPerRun=1"
+  Assert-Contains $ReadyOutput "maxIssuesPerRun=3"
+  Assert-Contains $ReadyOutput "maxParallelIssues=3"
   Assert-Contains $ReadyOutput "executorCommand="
   $ReadyEvents = Get-RunEvents $ReadyRoot
   Assert-EventSchema $ReadyEvents[0]
@@ -328,6 +364,218 @@ try {
   Assert-Contains $ExplainReadyOutput "nextReady=ISSUE-100-001"
   Assert-Contains $ExplainReadyOutput "selectedIssue=ISSUE-100-001"
   Assert-Contains $ExplainReadyOutput "shouldSplitBacklog=false"
+  Assert-Contains $ExplainReadyOutput "parallelBatchSize=1"
+
+  $ParallelRoot = New-Fixture -Name "parallel-safe" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Docs independent
+
+目标：
+- Update docs-only report A.
+允许修改：
+- ``docs/quality/issue-a.md``
+禁止修改：
+- 生产发布
+验收标准：
+- Report A is updated.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/issue-a.md``
+
+### ISSUE-100-002：Frontend independent
+
+目标：
+- Update one isolated frontend page.
+允许修改：
+- ``frontend-admin/src/pages/rules/RulePage.vue``
+禁止修改：
+- 生产发布
+验收标准：
+- Page check is updated.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.2 规则治理中心`` 节
+验证命令：
+- ``cd frontend-admin; pnpm type-check``
+归档报告：``docs/quality/issue-b.md``
+
+### ISSUE-100-003：Backend independent
+
+目标：
+- Update one isolated backend domain.
+允许修改：
+- ``backend/src/main/java/com/cgcpms/supplier/SupplierScoreService.java``
+禁止修改：
+- 生产发布
+验收标准：
+- Backend check is updated.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.5 供应商评分`` 节
+验证命令：
+- ``cd backend; .\mvnw.cmd test``
+归档报告：``docs/quality/issue-c.md``
+"@ -Plan "# Plan`n"
+  $ParallelOutput = Invoke-Runner $ParallelRoot -Explain
+  Assert-Contains $ParallelOutput "nextAction=READY_ISSUE_BATCH"
+  Assert-Contains $ParallelOutput "parallelBatchSize=3"
+  Assert-Contains $ParallelOutput "parallelSafetyMode=strict-independent-only"
+  Assert-Contains $ParallelOutput "parallelIssue[1]=ISSUE-100-001"
+  Assert-Contains $ParallelOutput "parallelIssue[2]=ISSUE-100-002"
+  Assert-Contains $ParallelOutput "parallelIssue[3]=ISSUE-100-003"
+
+  $ParallelLimitRoot = New-Fixture -Name "parallel-limit" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：One
+
+目标：
+- One.
+允许修改：
+- ``docs/quality/one.md``
+禁止修改：
+- 生产发布
+验收标准：
+- One.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 One`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/one.md``
+
+### ISSUE-100-002：Two
+
+目标：
+- Two.
+允许修改：
+- ``frontend-admin/src/pages/two/TwoPage.vue``
+禁止修改：
+- 生产发布
+验收标准：
+- Two.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.2 Two`` 节
+验证命令：
+- ``cd frontend-admin; pnpm type-check``
+归档报告：``docs/quality/two.md``
+
+### ISSUE-100-003：Three
+
+目标：
+- Three.
+允许修改：
+- ``backend/src/main/java/com/cgcpms/three/ThreeService.java``
+禁止修改：
+- 生产发布
+验收标准：
+- Three.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.3 Three`` 节
+验证命令：
+- ``cd backend; .\mvnw.cmd test``
+归档报告：``docs/quality/three.md``
+
+### ISSUE-100-004：Four
+
+目标：
+- Four.
+允许修改：
+- ``frontend-admin/src/api/modules/four.ts``
+禁止修改：
+- 生产发布
+验收标准：
+- Four.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.4 Four`` 节
+验证命令：
+- ``cd frontend-admin; pnpm type-check``
+归档报告：``docs/quality/four.md``
+"@ -Plan "# Plan`n"
+  $ParallelLimitOutput = Invoke-Runner $ParallelLimitRoot -Explain
+  Assert-Contains $ParallelLimitOutput "nextAction=READY_ISSUE_BATCH"
+  Assert-Contains $ParallelLimitOutput "parallelBatchSize=3"
+  Assert-NotContains $ParallelLimitOutput "parallelIssue[4]="
+
+  $SharedModuleRoot = New-Fixture -Name "parallel-shared-module" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Report page A
+
+目标：
+- Update report page A.
+允许修改：
+- ``frontend-admin/src/pages/report/A.vue``
+禁止修改：
+- 生产发布
+验收标准：
+- A.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 A`` 节
+验证命令：
+- ``cd frontend-admin; pnpm type-check``
+归档报告：``docs/quality/a.md``
+
+### ISSUE-100-002：Report page B
+
+目标：
+- Update report page B.
+允许修改：
+- ``frontend-admin/src/pages/report/B.vue``
+禁止修改：
+- 生产发布
+验收标准：
+- B.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 B`` 节
+验证命令：
+- ``cd frontend-admin; pnpm type-check``
+归档报告：``docs/quality/b.md``
+"@ -Plan "# Plan`n"
+  $SharedModuleOutput = Invoke-Runner $SharedModuleRoot -Explain
+  Assert-Contains $SharedModuleOutput "nextAction=READY_ISSUE"
+  Assert-Contains $SharedModuleOutput "parallelBatchSize=1"
+  Assert-Contains $SharedModuleOutput "parallelDecision=SERIAL_CONFLICT"
+
+  $UncertainRoot = New-Fixture -Name "parallel-uncertain" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Uncertain scope
+
+目标：
+- Scope is too broad.
+允许修改：
+- ``backend/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Must fall back to serial.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 Unknown`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/uncertain.md``
+
+### ISSUE-100-002：Other scope
+
+目标：
+- Other.
+允许修改：
+- ``frontend-admin/src/pages/other/Other.vue``
+禁止修改：
+- 生产发布
+验收标准：
+- Other.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.2 Other`` 节
+验证命令：
+- ``cd frontend-admin; pnpm type-check``
+归档报告：``docs/quality/other.md``
+"@ -Plan "# Plan`n"
+  $UncertainOutput = Invoke-Runner $UncertainRoot -Explain
+  Assert-Contains $UncertainOutput "nextAction=READY_ISSUE"
+  Assert-Contains $UncertainOutput "parallelBatchSize=1"
+  Assert-Contains $UncertainOutput "parallelDecision=SERIAL_UNPROVEN_INDEPENDENCE"
 
   foreach ($NonReadyStatus in @("Draft", "", "Needs Fix")) {
     $NonReadyRoot = New-Fixture -Name ("non-ready-" + ($NonReadyStatus -replace "[^A-Za-z0-9]", "empty")) -Enabled -Ready @"
@@ -523,6 +771,35 @@ try {
   if ($NoChangeResult.status -ne "blocked") { throw "Expected no-change executor status blocked" }
   if ($NoChangeResult.stopReason -ne "STOP_NO_EXECUTION_ARTIFACTS") { throw "Expected STOP_NO_EXECUTION_ARTIFACTS" }
 
+  $DirtyBeforeRoot = New-Fixture -Name "executor-dirty-before-change" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner executor modifies pre-dirty file
+
+目标：
+- Executor success should pass when it changes an already dirty business file.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Pre-dirty file content change is treated as execution artifact.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/issue-100-001.md``
+"@ -Plan "# Plan`n"
+  "before" | Out-File -Encoding utf8 (Join-Path $DirtyBeforeRoot "docs\quality\mock-execution.txt")
+  Assert-Contains (Invoke-Runner $DirtyBeforeRoot -Apply) "EXECUTOR_RESULT_WRITTEN"
+  $DirtyBeforeResult = Get-LatestResult $DirtyBeforeRoot
+  Assert-ResultSchema $DirtyBeforeResult
+  if ($DirtyBeforeResult.status -ne "done") { throw "Expected pre-dirty executor status done. Actual: $($DirtyBeforeResult | ConvertTo-Json -Compress -Depth 8)" }
+  if ($DirtyBeforeResult.failureCategory -ne "none") { throw "Expected pre-dirty executor failureCategory none. Actual: $($DirtyBeforeResult | ConvertTo-Json -Compress -Depth 8)" }
+  if (!(($DirtyBeforeResult.validation | Where-Object { $_.name -eq "execution-artifacts" }).message -like "*content:docs/quality/mock-execution.txt*")) {
+    throw "Expected execution-artifacts to record content fingerprint change for pre-dirty file"
+  }
+
   $NoExecutorConfig = Join-Path $TempRoot "no-executor.config.json"
   $ActualConfig = Get-Content -Raw (Join-Path $ScriptDir "codex-autopilot.config.json") | ConvertFrom-Json
   $ActualConfig.PSObject.Properties.Remove("issueExecutor")
@@ -629,6 +906,81 @@ try {
   $LimitTwoState = Get-Content -Raw (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($LimitTwoState.iterationCompleted -ne 1) { throw "Expected MaxIterations=2 to count one blocked issue" }
   if ($LimitTwoState.remainingIterations -ne 1) { throw "Expected MaxIterations=2 remainingIterations=1" }
+
+  $RepairRoot = New-Fixture -Name "repair-undercount" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-008-009：Runner repair target
+
+目标：
+- Must not dispatch after three completed issues were already counted from runs.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Runner should stop at iteration limit before selecting this issue.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/issue-008-009.md``
+"@ -Plan "# Plan`n"
+  $RepairStartedAt = "2026-07-09T13:29:13"
+  @"
+{
+  "enabled": false,
+  "startedAt": "$RepairStartedAt",
+  "stopRequested": true,
+  "autoMerge": true,
+  "autoPush": false,
+  "allowTestDataReset": true,
+  "status": "STOPPING",
+  "mode": "continuous-runner",
+  "lastAction": "READY_ISSUE_FOUND",
+  "lastIssue": "ISSUE-008-008：WBS、进度计划与甘特图 最小可行回归",
+  "lastReason": "READY_ISSUE_FOUND",
+  "stopReason": "",
+  "iterationLimit": 3,
+  "iterationCompleted": 1,
+  "remainingIterations": 2,
+  "iterationLastCountedIssue": "ISSUE-008-006：规则治理中心 最小可行回归",
+  "lastHeartbeatAt": "2026-07-09T14:01:35"
+}
+"@ | Out-File -Encoding utf8 (Join-Path $RepairRoot ".codex-autopilot\state.json")
+  Add-MockRunResult $RepairRoot "20260709-133500-001" "ISSUE-008-006" "ISSUE-008-006：规则治理中心 最小可行回归" "done" "2026-07-09T13:35:00"
+  Add-MockRunResult $RepairRoot "20260709-134500-002" "ISSUE-008-007" "ISSUE-008-007：通知平台 最小可行回归" "done" "2026-07-09T13:45:00"
+  Add-MockRunResult $RepairRoot "20260709-135500-003" "ISSUE-008-008" "ISSUE-008-008：WBS、进度计划与甘特图 最小可行回归" "done" "2026-07-09T13:55:00"
+  Remove-Item -LiteralPath (Join-Path $RepairRoot ".codex-autopilot\stop.flag") -ErrorAction SilentlyContinue
+  "enabled" | Out-File -Encoding utf8 (Join-Path $RepairRoot ".codex-autopilot\enabled.flag")
+  $RepairOutput = Invoke-Runner $RepairRoot -Apply -MaxIterations 3
+  Assert-Contains $RepairOutput "iterationCompleted=3"
+  Assert-Contains $RepairOutput "remainingIterations=0"
+  Assert-Contains $RepairOutput "STOP_ITERATION_LIMIT_REACHED"
+  Assert-NotContains $RepairOutput "READY_ISSUE_FOUND"
+  $RepairState = Get-Content -Raw (Join-Path $RepairRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($RepairState.iterationCompleted -ne 3) { throw "Expected repaired state.iterationCompleted=3" }
+  if ($RepairState.remainingIterations -ne 0) { throw "Expected repaired state.remainingIterations=0" }
+
+  $StartStateRoot = New-Fixture -Name "start-preserve" -Ready "# Ready Issues`n" -Plan "# Plan`n"
+  @"
+{
+  "enabled": false,
+  "startedAt": "2026-07-09T13:29:13",
+  "stopRequested": true,
+  "status": "STOPPING",
+  "mode": "continuous-runner",
+  "iterationLimit": 3,
+  "iterationCompleted": 2,
+  "remainingIterations": 1,
+  "iterationLastCountedIssue": "ISSUE-008-007：通知平台 最小可行回归"
+}
+"@ | Out-File -Encoding utf8 (Join-Path $StartStateRoot ".codex-autopilot\state.json")
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $StartStateRoot 2>&1 | Out-String | Out-Null
+  $StartState = Get-Content -Raw (Join-Path $StartStateRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($StartState.iterationCompleted -ne 2) { throw "Expected start to preserve iterationCompleted" }
+  if ($StartState.remainingIterations -ne 1) { throw "Expected start to preserve remainingIterations" }
+  if ($StartState.startedAt -ne "2026-07-09T13:29:13") { throw "Expected start to preserve startedAt" }
 
   $EmptyRoot = New-Fixture -Name "empty" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
   $EmptyOutput = Invoke-Runner $EmptyRoot

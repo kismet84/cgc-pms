@@ -136,6 +136,16 @@ export interface PurchaseManagerDashboardVO {
   purchaseOrders: DashboardBusinessItemVO[]
   overdueOrders: DashboardBusinessItemVO[]
   pendingReceipts: DashboardBusinessItemVO[]
+  supplierScores: DashboardSupplierScoreVO[]
+}
+
+export interface DashboardSupplierScoreVO {
+  partnerId: string
+  partnerName: string
+  orderCount: number
+  overdueOrderCount: number
+  onTimeDeliveryRate: string
+  performanceScore: string
 }
 
 /** ── Production Manager View (MVP) ── */

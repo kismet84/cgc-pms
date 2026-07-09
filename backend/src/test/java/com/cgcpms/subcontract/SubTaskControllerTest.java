@@ -12,6 +12,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.util.List;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -40,7 +41,10 @@ class SubTaskControllerTest {
 
     @Test @Order(3) @DisplayName("POST /sub-tasks -> 200 creates task")
     void testCreate() throws Exception {
-        String body = "{\"projectId\":10001,\"contractId\":30001,\"taskCode\":\"ST-TEST-" + System.nanoTime() + "\",\"taskName\":\"测试分包任务\"}";
+        String body = "{\"projectId\":10001,\"contractId\":30001,\"taskName\":\"测试分包任务\","
+                + "\"workArea\":\"1.1 地基施工\",\"plannedStartDate\":\"2026-07-01\","
+                + "\"plannedEndDate\":\"2026-07-15\",\"actualStartDate\":\"2026-07-02\","
+                + "\"progressPercent\":35.50,\"status\":\"IN_PROGRESS\"}";
         String resp = mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();
@@ -58,10 +62,35 @@ class SubTaskControllerTest {
     void testGetById() throws Exception {
         Assertions.assertNotNull(taskId);
         mockMvc.perform(g("/sub-tasks/" + taskId).cookie(adminCookie()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data.id").exists());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").exists())
+                .andExpect(jsonPath("$.data.taskCode", startsWith("SUB-")))
+                .andExpect(jsonPath("$.data.workArea").value("1.1 地基施工"))
+                .andExpect(jsonPath("$.data.plannedStartDate").value("2026-07-01"))
+                .andExpect(jsonPath("$.data.plannedEndDate").value("2026-07-15"))
+                .andExpect(jsonPath("$.data.actualStartDate").value("2026-07-02"))
+                .andExpect(jsonPath("$.data.progressPercent").value("35.50"))
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
     }
 
-    @Test @Order(6) @DisplayName("PUT /sub-tasks/{id} -> 200")
+    @Test @Order(6) @DisplayName("GET /sub-tasks filters project schedule rows for gantt")
+    void testListScheduleRowsByProject() throws Exception {
+        Assertions.assertNotNull(taskId);
+        mockMvc.perform(g("/sub-tasks").cookie(adminCookie())
+                        .param("projectId", "10001")
+                        .param("taskName", "测试分包任务")
+                        .param("pageNo", "1")
+                        .param("pageSize", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.records[0].projectId").value("10001"))
+                .andExpect(jsonPath("$.data.records[0].taskCode", startsWith("SUB-")))
+                .andExpect(jsonPath("$.data.records[0].plannedStartDate").value("2026-07-01"))
+                .andExpect(jsonPath("$.data.records[0].plannedEndDate").value("2026-07-15"))
+                .andExpect(jsonPath("$.data.records[0].progressPercent").value("35.50"));
+    }
+
+    @Test @Order(7) @DisplayName("PUT /sub-tasks/{id} -> 200")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(taskId);
         String body = "{\"projectId\":10001,\"contractId\":30001,\"taskCode\":\"ST-UPD-" + System.nanoTime() + "\",\"taskName\":\"更新分包任务\"}";
@@ -69,7 +98,7 @@ class SubTaskControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(7) @DisplayName("DELETE /sub-tasks/{id} -> 200")
+    @Test @Order(8) @DisplayName("DELETE /sub-tasks/{id} -> 200")
     void testDelete() throws Exception {
         Assertions.assertNotNull(taskId);
         mockMvc.perform(d("/sub-tasks/" + taskId).cookie(adminCookie()))

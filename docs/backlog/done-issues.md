@@ -20,6 +20,22 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-005-workflow-efficiency-report.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-008-006：规则治理中心 最小可行回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：现有生产实现满足目标；规则启停回归断言已补齐；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-008-006-规则治理中心.md；docs/iterations/iteration-2026-07-09-report.md
+
+### ISSUE-008-007：通知平台 最小可行回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；通知平台分发渠道归一化已补齐；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-008-007-通知平台.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-008-001：经营总览报表口径与来源下钻回归
 
 完成日期：2026-07-09
@@ -421,3 +437,19 @@
 失败分类或非失败分类：真实代码质量问题已修复；通知异常预警兜底已补齐；全量测试存在既有无关失败；用户已请求停止自动迭代，已阻断下一任务派发
 验证结果：通过
 相关报告：docs/quality/issue-004-010-workflow-notification-alert-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
+### ISSUE-008-008：WBS、进度计划与甘特图 最小可行回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；复用现有分包任务接口补齐 WBS / 计划日期 / 实际进度 / 项目过滤回归断言；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-008-008-wbs-进度计划与甘特图.md；docs/iterations/iteration-2026-07-09-report.md
+
+### ISSUE-008-009：供应商评分与采购增强 最小可行回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；复用采购经理驾驶舱现有采购订单补齐供应商交期评分最小回归；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-008-009-供应商评分与采购增强.md；docs/iterations/iteration-2026-07-09-report.md

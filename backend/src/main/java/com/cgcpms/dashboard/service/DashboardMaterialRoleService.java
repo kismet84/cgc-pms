@@ -238,7 +238,39 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                 .limit(5)
                 .map(r -> toBusinessItem("MATERIAL_RECEIPT", r, projectNameMap, partnerNameMap, receiptSummaryMap))
                 .collect(Collectors.toList()));
+        vo.setSupplierScores(supplierScores(orders, partnerNameMap));
         return vo;
+    }
+
+    private List<DashboardSupplierScoreVO> supplierScores(List<MatPurchaseOrder> orders, Map<Long, String> partnerNameMap) {
+        return orders.stream()
+                .filter(o -> o.getPartnerId() != null)
+                .collect(Collectors.groupingBy(MatPurchaseOrder::getPartnerId))
+                .entrySet().stream()
+                .map(entry -> {
+                    long orderCount = entry.getValue().size();
+                    long overdueCount = entry.getValue().stream()
+                            .filter(o -> o.getDeliveryDate() != null && o.getDeliveryDate().isBefore(LocalDate.now()))
+                            .filter(o -> !"COMPLETED".equals(o.getOrderStatus()) && !"CANCELLED".equals(o.getOrderStatus()))
+                            .count();
+                    BigDecimal onTimeRate = BigDecimal.valueOf(orderCount - overdueCount)
+                            .multiply(BigDecimal.valueOf(100))
+                            .divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP);
+
+                    DashboardSupplierScoreVO score = new DashboardSupplierScoreVO();
+                    score.setPartnerId(String.valueOf(entry.getKey()));
+                    score.setPartnerName(partnerNameMap.get(entry.getKey()));
+                    score.setOrderCount(orderCount);
+                    score.setOverdueOrderCount(overdueCount);
+                    score.setOnTimeDeliveryRate(onTimeRate.toPlainString());
+                    score.setPerformanceScore(onTimeRate.setScale(0, RoundingMode.HALF_UP).toPlainString());
+                    return score;
+                })
+                .sorted(Comparator
+                        .comparing((DashboardSupplierScoreVO s) -> new BigDecimal(s.getPerformanceScore())).reversed()
+                        .thenComparing(DashboardSupplierScoreVO::getPartnerName, Comparator.nullsLast(String::compareTo)))
+                .limit(5)
+                .collect(Collectors.toList());
     }
 
     // ========================================================================

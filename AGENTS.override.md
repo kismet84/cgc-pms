@@ -177,7 +177,7 @@ CI 与验收失败分类规则：
 
 - 业务或治理变更前必须先确认任务来自 `docs/backlog/ready-issues.md`
 - AutoPilot 任务来源采用两级队列：`docs/backlog/cgc-pms-production-enhancement-plan.md` 是长期总任务池，`docs/backlog/ready-issues.md` 是当前执行队列
-- 当 `docs/backlog/ready-issues.md` 没有合格 Ready Issue 时，只能先读取长期总任务池，并按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；拆单当轮只更新 backlog，不直接修改业务代码；连续执行模式下拆单完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮并按每轮最多处理 1 个 Ready Issue 执行
+- 当 `docs/backlog/ready-issues.md` 没有合格 Ready Issue 时，只能先读取长期总任务池，并按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；拆单当轮只更新 backlog，不直接修改业务代码；连续执行模式下拆单完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮；系统允许最多 3 个完全无关联、无任何代码关联的 Ready Issue 并行，不能证明完全无关联时按串行处理
 - 每个关键 checkpoint 都要检查 `.codex-autopilot/stop.flag` 和 `.codex-autopilot/pause.flag`；若是在当前任务开始前发现，则不得启动下一个任务；若是在当前任务执行中发现，则只做安全收口，不强制中断
 - 至少在开始前、选任务后、改代码前、跑验证前、自动合并前、更新报告后检查一次 stop/pause
 - 运行前置或浏览器验收前必须先做 health gate：检查 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`；任一不通先归类为环境前置类并执行 runtime refresh，稳定等待 `180秒` 后再复验
@@ -204,7 +204,7 @@ CI 与验收失败分类规则：
 ### 项目级关键词协议
 
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动连续自动迭代系统` 时，视为请求进入连续执行模式：先确保 AutoPilot 已启动（必要时先执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`），然后在当前会话中基于 `docs/backlog/ready-issues.md` 串行执行多轮；每轮最多只处理 1 个 Ready Issue；每轮结束后必须检查 `stop.flag`、`pause.flag`、`enabled.flag`；若当前 Ready 队列为空，则先从长期总任务池按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue，拆单当轮只更新 backlog、不直接修改业务代码；只要仍允许继续且 Ready 队列中存在合格 Ready Issue，就必须进入下一轮
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动连续自动迭代系统` 时，视为请求进入连续执行模式：先确保 AutoPilot 已启动（必要时先执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`），然后在当前会话中基于 `docs/backlog/ready-issues.md` 连续执行多轮；每轮最多允许 3 个完全无关联、无任何代码关联的 Ready Issue 并行；不能证明完全无关联时按串行处理；涉及同一文件、同一目录模块、同一后端域、同一前端页面、数据库、权限、安全、租户、金额口径或审批状态机的任务一律不得并行；每轮结束后必须检查 `stop.flag`、`pause.flag`、`enabled.flag`；若当前 Ready 队列为空，则先从长期总任务池按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue，拆单当轮只更新 backlog、不直接修改业务代码；只要仍允许继续且 Ready 队列中存在合格 Ready Issue，就必须进入下一轮
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动连续自动迭代系统-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。拆单轮、health gate、runtime refresh、dry-run、ExplainNextAction 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-stop.ps1`；其语义是设置停止标记并关闭 `enabled.flag`，用于阻断下一任务启动，不强制中断已启动的当前任务
 - 连续执行模式的停止条件包括：收到 `停止自动迭代系统` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 队列为空且长期总任务池按 `docs/backlog/current-focus.md` 也无可拆任务或无法形成合格 Ready Issue、当前 Issue 连续自修后仍失败且已写入 blocked、带 `-N` 参数时已触达实施型 Ready Issue 完成上限、或触达系统/会话限制
