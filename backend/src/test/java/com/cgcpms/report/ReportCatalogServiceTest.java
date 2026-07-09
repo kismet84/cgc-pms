@@ -121,6 +121,21 @@ class ReportCatalogServiceTest {
         assertEquals(Set.of("workflow-efficiency"), visibleCodes);
     }
 
+    @Test
+    void nonAdminWithoutAlertPermissionDoesNotSeeAlertExportEntriesEvenWithScope() {
+        when(accessScopeResolver.allowedDomains()).thenReturn(Set.of("CONTRACT", "PURCHASE"));
+        when(accessScopeResolver.accessibleProjectIds(0L)).thenReturn(Set.of(10001L));
+        authenticate("cost:ledger:query");
+        bindUserContext(3002L, 0L, "PROJECT_MANAGER");
+
+        List<ReportCatalogItem> catalog = service.listVisibleCatalog();
+        Set<String> visibleCodes = catalog.stream().map(ReportCatalogItem::code).collect(Collectors.toSet());
+
+        assertEquals(Set.of("cost-ledger", "workflow-efficiency"), visibleCodes);
+        assertFalse(visibleCodes.contains("alert-center"));
+        assertFalse(visibleCodes.contains("alerts-processing-report"));
+    }
+
     private ReportCatalogItem find(List<ReportCatalogItem> catalog, String code) {
         return catalog.stream()
                 .filter(item -> code.equals(item.code()))

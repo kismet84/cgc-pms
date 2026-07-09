@@ -34,7 +34,7 @@ class AlertControllerTest {
     @Autowired private PmProjectMapper projectMapper; @Autowired private PmProjectMemberMapper projectMemberMapper;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private static final long DIFFERENT_PROJECT_MEMBER_ID = 92001L; private static final long OTHER_PROJECT_ID = 82001L;
-    private static final long NO_ACCESS_MEMBER_ID = 92002L;
+    private static final long NO_ACCESS_MEMBER_ID = 92002L; private static final long PURCHASE_MANAGER_ID = 92003L;
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
@@ -181,6 +181,77 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.data.records").isArray());
     }
 
+    @Test @Order(7) @DisplayName("GET /alerts 跨页查询仍受项目筛选和成员权限约束")
+    void testList_CrossPageFilteringStaysWithinAuthorizedProject() throws Exception {
+        seedProjectIfAbsent(OTHER_PROJECT_ID, "ALERT-CTRL-OTHER");
+        seedMemberIfAbsent(10001L, DIFFERENT_PROJECT_MEMBER_ID, "PM");
+        deleteAlertsByRuleType("TEST_PAGE_SCOPE");
+        try {
+            AlertLog newestOwnAlert = newAlert("TEST_PAGE_SCOPE", 10001L);
+            newestOwnAlert.setSeverity("HIGH");
+            newestOwnAlert.setTriggeredAt(LocalDateTime.now().minusMinutes(1));
+            alertLogMapper.insert(newestOwnAlert);
+
+            AlertLog olderOwnAlert = newAlert("TEST_PAGE_SCOPE", 10001L);
+            olderOwnAlert.setSeverity("HIGH");
+            olderOwnAlert.setTriggeredAt(LocalDateTime.now().minusMinutes(2));
+            alertLogMapper.insert(olderOwnAlert);
+
+            AlertLog otherProjectAlert = newAlert("TEST_PAGE_SCOPE", OTHER_PROJECT_ID);
+            otherProjectAlert.setSeverity("HIGH");
+            otherProjectAlert.setTriggeredAt(LocalDateTime.now());
+            alertLogMapper.insert(otherProjectAlert);
+
+            mockMvc.perform(g("/alerts?pageNum=1&pageSize=1&projectId=10001&ruleType=TEST_PAGE_SCOPE&severity=HIGH")
+                            .cookie(memberCookie(DIFFERENT_PROJECT_MEMBER_ID, "alert:view")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data.total").value(2))
+                    .andExpect(jsonPath("$.data.records.length()").value(1))
+                    .andExpect(jsonPath("$.data.records[0].id").value(newestOwnAlert.getId()))
+                    .andExpect(jsonPath("$.data.records[0].projectId").value(10001));
+
+            mockMvc.perform(g("/alerts?pageNum=2&pageSize=1&projectId=10001&ruleType=TEST_PAGE_SCOPE&severity=HIGH")
+                            .cookie(memberCookie(DIFFERENT_PROJECT_MEMBER_ID, "alert:view")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data.total").value(2))
+                    .andExpect(jsonPath("$.data.records.length()").value(1))
+                    .andExpect(jsonPath("$.data.records[0].id").value(olderOwnAlert.getId()))
+                    .andExpect(jsonPath("$.data.records[0].projectId").value(10001));
+        } finally {
+            deleteAlertsByRuleType("TEST_PAGE_SCOPE");
+        }
+    }
+
+    @Test @Order(7) @DisplayName("GET /alerts 未授权域在不同分页参数下仍返回空结果")
+    void testList_UnauthorizedDomainRemainsEmptyAcrossPagination() throws Exception {
+        seedMemberIfAbsent(10001L, PURCHASE_MANAGER_ID, "PURCHASE_MANAGER");
+        deleteAlertsByRuleType("TEST_DOMAIN_SCOPE");
+        try {
+            AlertLog purchaseAlert = newAlert("TEST_DOMAIN_SCOPE", 10001L);
+            purchaseAlert.setAlertDomain("PURCHASE");
+            purchaseAlert.setAlertCategory("PURCHASE_DELIVERY");
+            purchaseAlert.setTriggeredAt(LocalDateTime.now().minusMinutes(1));
+            alertLogMapper.insert(purchaseAlert);
+
+            AlertLog contractAlert = newAlert("TEST_DOMAIN_SCOPE", 10001L);
+            contractAlert.setAlertDomain("CONTRACT");
+            contractAlert.setAlertCategory("CONTRACT_TERM");
+            contractAlert.setTriggeredAt(LocalDateTime.now());
+            alertLogMapper.insert(contractAlert);
+
+            mockMvc.perform(g("/alerts?pageNum=2&pageSize=1&projectId=10001&ruleType=TEST_DOMAIN_SCOPE&alertDomain=CONTRACT")
+                            .cookie(roleCookie(PURCHASE_MANAGER_ID, List.of("PURCHASE_MANAGER"), "alert:view")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data.total").value(0))
+                    .andExpect(jsonPath("$.data.records.length()").value(0));
+        } finally {
+            deleteAlertsByRuleType("TEST_DOMAIN_SCOPE");
+        }
+    }
+
     @Test @Order(8) @DisplayName("GET /alerts/subscription purchase manager -> 返回受限域")
     void testGetSubscription() throws Exception {
         mockMvc.perform(g("/alerts/subscription")
@@ -319,6 +390,12 @@ class AlertControllerTest {
         alertLogMapper.delete(new LambdaQueryWrapper<AlertLog>()
                 .eq(AlertLog::getTenantId, TENANT_ID)
                 .eq(AlertLog::getRuleType, "TEST_REPORT_CTRL"));
+    }
+
+    private void deleteAlertsByRuleType(String ruleType) {
+        alertLogMapper.delete(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getRuleType, ruleType));
     }
 
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }

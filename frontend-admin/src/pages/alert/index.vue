@@ -14,8 +14,10 @@ import { useReferenceStore } from '@/stores/reference'
 import { useAlertStore } from '@/stores/alert'
 import { useUserStore } from '@/stores/user'
 import {
+  getAlertList,
   getAlertSubscription,
   updateAlertSubscription,
+  type AlertListParams,
   type AlertProcessStatus,
   type BatchAlertOperationResult,
 } from '@/api/modules/alert'
@@ -47,6 +49,9 @@ const referenceStore = useReferenceStore()
 const subscriptionVisible = ref(false)
 const subscriptionLoading = ref(false)
 const subscriptionSaving = ref(false)
+const exportLoading = ref(false)
+const EXPORT_MAX_RECORDS = 1000
+const EXPORT_LIMIT_REACHED = Symbol('alert-export-limit-reached')
 const subscriptionState = ref<AlertSubscriptionResponse | null>(null)
 const subscriptionForm = reactive<AlertSubscriptionConfig>({
   enabled: false,
@@ -81,6 +86,9 @@ const roleDefaultApplied = ref(false)
 const projectOptions = computed(() => referenceStore.projects ?? [])
 const total = computed(() => store.total)
 const alerts = computed(() => store.alerts)
+const exportDisabled = computed(
+  () => store.loading || exportLoading.value || Number(total.value ?? 0) === 0,
+)
 const processStatusOptions = computed(() =>
   Object.entries(ALERT_PROCESS_STATUS_LABELS).map(([value, label]) => ({ value, label })),
 )
@@ -289,25 +297,29 @@ function syncActiveRecordFromList() {
   activeRecord.value = { ...(matched ?? list[0]) }
 }
 
+function buildAlertListParams(page = pageNo.value, size = pageSize.value): AlertListParams {
+  return {
+    keyword: filter.keyword.trim() || undefined,
+    pageNo: page,
+    pageNum: page,
+    pageSize: size,
+    projectId: filter.projectId,
+    severity: filter.severity,
+    isRead: filter.isRead,
+    processStatus: filter.processStatus,
+    ruleType: filter.ruleType,
+    alertDomain: resolveSearchAlertDomain(),
+    triggeredStart: filter.triggeredAtRange?.[0]?.startOf('day').format('YYYY-MM-DD HH:mm:ss'),
+    triggeredEnd: filter.triggeredAtRange?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss'),
+    onlyDefaultScope: filter.onlyDefaultScope || undefined,
+  }
+}
+
 async function fetchData() {
   listError.value = null
   await syncRouteQuery()
   try {
-    await store.fetchAlerts({
-      keyword: filter.keyword.trim() || undefined,
-      pageNo: pageNo.value,
-      pageNum: pageNo.value,
-      pageSize: pageSize.value,
-      projectId: filter.projectId,
-      severity: filter.severity,
-      isRead: filter.isRead,
-      processStatus: filter.processStatus,
-      ruleType: filter.ruleType,
-      alertDomain: resolveSearchAlertDomain(),
-      triggeredStart: filter.triggeredAtRange?.[0]?.startOf('day').format('YYYY-MM-DD HH:mm:ss'),
-      triggeredEnd: filter.triggeredAtRange?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss'),
-      onlyDefaultScope: filter.onlyDefaultScope || undefined,
-    })
+    await store.fetchAlerts(buildAlertListParams())
     syncActiveRecordFromList()
   } catch (error) {
     console.error(error)
@@ -753,42 +765,88 @@ async function handleSaveSubscription() {
   }
 }
 
-function exportCurrentView() {
+async function loadAlertsForExport(): Promise<AlertLogVO[]> {
+  const firstPage = await getAlertList(buildAlertListParams(1, 200))
+  if (Array.isArray(firstPage)) {
+    if (firstPage.length > EXPORT_MAX_RECORDS) {
+      message.warning('导出条数过多，请先收窄筛选条件后重试')
+      throw EXPORT_LIMIT_REACHED
+    }
+    return firstPage
+  }
+  const records = Array.isArray(firstPage.records) ? [...firstPage.records] : []
+  const totalCount = Number(firstPage.total ?? records.length)
+  if (totalCount > EXPORT_MAX_RECORDS) {
+    message.warning('导出条数过多，请先收窄筛选条件后重试')
+    throw EXPORT_LIMIT_REACHED
+  }
+  const pageSizeValue = Math.max(Number(firstPage.pageSize ?? 200), 1)
+  const totalPages = Math.ceil(totalCount / pageSizeValue)
+  for (let page = 2; page <= totalPages; page += 1) {
+    const nextPage = await getAlertList(buildAlertListParams(page, pageSizeValue))
+    if (Array.isArray(nextPage)) {
+      return nextPage
+    }
+    if (Array.isArray(nextPage.records)) {
+      records.push(...nextPage.records)
+    }
+  }
+  return records.slice(0, totalCount)
+}
+
+async function exportCurrentView() {
   if (!canExportAlerts.value) return
-  if (!alerts.value.length) {
-    message.info('当前没有可导出的预警数据')
+  if (exportDisabled.value) return
+  if (Number(total.value ?? 0) > EXPORT_MAX_RECORDS) {
+    message.warning('导出条数过多，请先收窄筛选条件后重试')
     return
   }
-  const rows = alerts.value.map((item) => [
-    item.id,
-    getProjectName(item.projectId),
-    getAlertDomainLabel(item),
-    RULE_TYPE_LABELS[item.ruleType] || item.ruleType,
-    getAlertTagLabel(item),
-    formatSeverityText(item.severity),
-    getProcessStatusLabel(item),
-    item.isRead === 0 ? '未读' : '已读',
-    formatDateTime(item.triggeredAt),
-    getAlertMessageText(item.message).replace(/\r?\n/g, ' '),
-  ])
-  const header = [
-    '告警ID',
-    '项目',
-    '规则域',
-    '规则类型',
-    '细分类',
-    '严重度',
-    '处理状态',
-    '已读',
-    '触发时间',
-    '消息摘要',
-  ]
-  const csv = [header, ...rows]
-    .map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
-  downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)
-  message.success('已导出当前列表')
+  exportLoading.value = true
+  try {
+    const exportAlerts = await loadAlertsForExport()
+    if (!exportAlerts.length) {
+      message.info('当前筛选条件下无可导出的预警数据')
+      return
+    }
+    const rows = exportAlerts.map((item) => [
+      item.id,
+      getProjectName(item.projectId),
+      getAlertDomainLabel(item),
+      RULE_TYPE_LABELS[item.ruleType] || item.ruleType,
+      getAlertTagLabel(item),
+      formatSeverityText(item.severity),
+      getProcessStatusLabel(item),
+      item.isRead === 0 ? '未读' : '已读',
+      formatDateTime(item.triggeredAt),
+      getAlertMessageText(item.message).replace(/\r?\n/g, ' '),
+    ])
+    const header = [
+      '告警ID',
+      '项目',
+      '规则域',
+      '规则类型',
+      '细分类',
+      '严重度',
+      '处理状态',
+      '已读',
+      '触发时间',
+      '消息摘要',
+    ]
+    const csv = [header, ...rows]
+      .map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+    downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)
+    message.success('已导出当前筛选结果')
+  } catch (error) {
+    if (error === EXPORT_LIMIT_REACHED) {
+      return
+    }
+    console.error(error)
+    message.error('导出预警失败，请稍后重试')
+  } finally {
+    exportLoading.value = false
+  }
 }
 
 watch(
@@ -882,6 +940,7 @@ onMounted(async () => {
           :has-active-filters="hasActiveFilters"
           :can-manage-alerts="canManageAlerts"
           :can-export-alerts="canExportAlerts"
+          :export-disabled="exportDisabled"
           :toggle-col="toggleCol"
           :toggle-page-selection="togglePageSelection"
           :is-row-selected="isRowSelected"

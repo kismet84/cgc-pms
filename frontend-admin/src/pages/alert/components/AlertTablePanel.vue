@@ -23,6 +23,7 @@ defineProps<{
   hasActiveFilters: boolean
   canManageAlerts: boolean
   canExportAlerts: boolean
+  exportDisabled: boolean
   toggleCol: (key: string) => void
   togglePageSelection: (checked: boolean) => void
   isRowSelected: (id: string | number) => boolean
@@ -71,7 +72,7 @@ defineProps<{
           @click="handleBatchStatus('ARCHIVED')"
           >归档</a-button
         >
-        <a-button v-if="canExportAlerts" :disabled="alerts.length === 0" @click="exportCurrentView"
+        <a-button v-if="canExportAlerts" :disabled="exportDisabled" @click="exportCurrentView"
           >导出</a-button
         >
         <span v-if="canManageAlerts" class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>

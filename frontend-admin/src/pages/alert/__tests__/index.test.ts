@@ -5,6 +5,7 @@ import { defineComponent, reactive } from 'vue'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { PageResult } from '@/types/api'
 import type { AlertLogVO, AlertSubscriptionResponse } from '@/types/alert'
 import AlertPage from '../index.vue'
 import AlertDetailPanel from '../components/AlertDetailPanel.vue'
@@ -17,6 +18,7 @@ const alertPageSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8
 const downloadUtilSource = readFileSync(resolve(currentDir, '../../../utils/download.ts'), 'utf-8')
 
 const {
+  mockGetAlertList,
   mockGetAlertSubscription,
   mockUpdateAlertSubscription,
   mockDownloadBlobFile,
@@ -26,6 +28,7 @@ const {
   mockMessage,
 } = vi.hoisted(
   () => ({
+    mockGetAlertList: vi.fn(),
     mockGetAlertSubscription: vi.fn(),
     mockUpdateAlertSubscription: vi.fn(),
     mockDownloadBlobFile: vi.fn(),
@@ -97,6 +100,19 @@ function createAlertRecord(overrides: Partial<AlertLogVO> = {}): AlertLogVO {
   } as AlertLogVO
 }
 
+function createPagedAlertResponse(
+  records: AlertLogVO[],
+  overrides: Partial<PageResult<AlertLogVO>> = {},
+): PageResult<AlertLogVO> {
+  return {
+    records,
+    total: records.length,
+    pageNo: 1,
+    pageSize: records.length || 20,
+    ...overrides,
+  }
+}
+
 const mockAlertStore = {
   alerts: [] as AlertLogVO[],
   total: 0,
@@ -136,6 +152,7 @@ vi.mock('vue-router', () => ({
   useRoute: () => mockRoute,
 }))
 vi.mock('@/api/modules/alert', () => ({
+  getAlertList: mockGetAlertList,
   getAlertSubscription: mockGetAlertSubscription,
   updateAlertSubscription: mockUpdateAlertSubscription,
 }))
@@ -421,6 +438,7 @@ beforeEach(() => {
   mockRoute.path = '/alert'
   mockRoute.query = {}
   mockRoute.meta = {}
+  mockGetAlertList.mockResolvedValue(createPagedAlertResponse([]))
   mockGetAlertSubscription.mockResolvedValue(buildSubscriptionResponse())
   mockUpdateAlertSubscription.mockResolvedValue(
     buildSubscriptionResponse({
@@ -572,7 +590,7 @@ describe('alert/index.vue', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/purchase/order?businessId=PO-9')
   })
 
-  it('导出仅使用当前列表快照，空列表时按钮禁用', async () => {
+  it('导出复用当前筛选条件跨页抓取全量结果，空列表时按钮禁用', async () => {
     mockAlertStore.alerts = [
       createAlertRecord({
         id: 'ALERT-001',
@@ -598,6 +616,43 @@ describe('alert/index.vue', () => {
       }),
     ]
     mockAlertStore.total = 2
+    mockGetAlertList
+      .mockResolvedValueOnce(
+        createPagedAlertResponse(
+          [
+            createAlertRecord({
+              id: 'ALERT-010',
+              projectId: 'P-01',
+              alertDomain: 'PURCHASE',
+              ruleType: 'CONTRACT_OVERDUE',
+              alertCategory: 'PURCHASE_DELIVERY',
+              severity: 'HIGH',
+              processStatus: 'OPEN',
+              message: '首条导出消息\n包含换行',
+            }),
+          ],
+          { total: 2, pageNo: 1, pageSize: 1 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        createPagedAlertResponse(
+          [
+            createAlertRecord({
+              id: 'ALERT-011',
+              projectId: 'P-02',
+              alertDomain: 'CONTRACT',
+              ruleType: 'CONTRACT_EXPIRING',
+              alertCategory: 'OTHER',
+              severity: 'LOW',
+              processStatus: 'ARCHIVED',
+              isRead: 1,
+              triggeredAt: '2026-07-08 09:00:00',
+              message: '第二条导出消息',
+            }),
+          ],
+          { total: 2, pageNo: 2, pageSize: 1 },
+        ),
+      )
     mockReferenceStore.projects = [
       { id: 'P-01', projectCode: 'PRJ-01', projectName: '测试项目一' },
       { id: 'P-02', projectCode: 'PRJ-02', projectName: '测试项目二' },
@@ -613,15 +668,37 @@ describe('alert/index.vue', () => {
     expect(exportButton!.attributes('disabled')).toBeUndefined()
 
     await exportButton!.trigger('click')
+    await flushPromises()
 
+    expect(mockGetAlertList).toHaveBeenCalledTimes(2)
+    expect(mockGetAlertList).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        alertDomain: 'PURCHASE',
+        onlyDefaultScope: true,
+        pageNo: 1,
+        pageNum: 1,
+        pageSize: 200,
+      }),
+    )
+    expect(mockGetAlertList).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        alertDomain: 'PURCHASE',
+        onlyDefaultScope: true,
+        pageNo: 2,
+        pageNum: 2,
+        pageSize: 1,
+      }),
+    )
     expect(mockDownloadBlobFile).toHaveBeenCalledTimes(1)
     const [blob, filename] = mockDownloadBlobFile.mock.calls[0] as [Blob, string]
     const csv = await blob.text()
     expect(filename).toMatch(/^alerts-\d{4}-\d{2}-\d{2}\.csv$/)
     expect(csv).toContain('"告警ID","项目","规则域","规则类型","细分类","严重度","处理状态","已读","触发时间","消息摘要"')
-    expect(csv).toContain('"ALERT-001","PRJ-01 测试项目一","采购类","合同超期","采购交付","高","待处理","未读","2026-07-07 10:00:00","首条消息 包含换行"')
-    expect(csv).toContain('"ALERT-002","PRJ-02 测试项目二","合同类","合同到期","其他","低","已归档","已读","2026-07-08 09:00:00","第二条消息"')
-    expect(mockMessage.success).toHaveBeenCalledWith('已导出当前列表')
+    expect(csv).toContain('"ALERT-010","PRJ-01 测试项目一","采购类","合同超期","采购交付","高","待处理","未读","2026-07-07 10:00:00","首条导出消息 包含换行"')
+    expect(csv).toContain('"ALERT-011","PRJ-02 测试项目二","合同类","合同到期","其他","低","已归档","已读","2026-07-08 09:00:00","第二条导出消息"')
+    expect(mockMessage.success).toHaveBeenCalledWith('已导出当前筛选结果')
 
     mockAlertStore.alerts = []
     mockAlertStore.total = 0
@@ -632,6 +709,83 @@ describe('alert/index.vue', () => {
       .find((item) => item.text() === '导出')
     expect(emptyExportButton).toBeTruthy()
     expect(emptyExportButton!.attributes('disabled')).toBeDefined()
+  })
+
+  it('导出总量超过阈值时提示收窄筛选，不继续请求后续分页也不下载', async () => {
+    mockAlertStore.alerts = [
+      createAlertRecord({
+        id: 'ALERT-001',
+        projectId: 'P-01',
+        alertDomain: 'PURCHASE',
+        ruleType: 'CONTRACT_OVERDUE',
+      }),
+    ]
+    mockAlertStore.total = 1001
+    const wrapper = mountAlertPage()
+    await flushPromises()
+
+    const exportButton = wrapper
+      .findAll('.alert-toolbar-left button')
+      .find((item) => item.text() === '导出')
+    expect(exportButton).toBeTruthy()
+    expect(exportButton!.attributes('disabled')).toBeUndefined()
+
+    await exportButton!.trigger('click')
+    await flushPromises()
+
+    expect(mockGetAlertList).not.toHaveBeenCalled()
+    expect(mockDownloadBlobFile).not.toHaveBeenCalled()
+    expect(mockMessage.warning).toHaveBeenCalledWith('导出条数过多，请先收窄筛选条件后重试')
+    expect(mockMessage.success).not.toHaveBeenCalled()
+  })
+
+  it('导出时以第一页真实 total 为准做阈值保护，不继续请求后续分页也不下载', async () => {
+    mockAlertStore.alerts = [
+      createAlertRecord({
+        id: 'ALERT-001',
+        projectId: 'P-01',
+        alertDomain: 'PURCHASE',
+        ruleType: 'CONTRACT_OVERDUE',
+      }),
+    ]
+    mockAlertStore.total = 2
+    mockGetAlertList.mockResolvedValueOnce(
+      createPagedAlertResponse(
+        [
+          createAlertRecord({
+            id: 'ALERT-010',
+            projectId: 'P-01',
+            alertDomain: 'PURCHASE',
+            ruleType: 'CONTRACT_OVERDUE',
+          }),
+        ],
+        { total: 1001, pageNo: 1, pageSize: 200 },
+      ),
+    )
+
+    const wrapper = mountAlertPage()
+    await flushPromises()
+
+    const exportButton = wrapper
+      .findAll('.alert-toolbar-left button')
+      .find((item) => item.text() === '导出')
+    expect(exportButton).toBeTruthy()
+    expect(exportButton!.attributes('disabled')).toBeUndefined()
+
+    await exportButton!.trigger('click')
+    await flushPromises()
+
+    expect(mockGetAlertList).toHaveBeenCalledTimes(1)
+    expect(mockGetAlertList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageNo: 1,
+        pageNum: 1,
+        pageSize: 200,
+      }),
+    )
+    expect(mockDownloadBlobFile).not.toHaveBeenCalled()
+    expect(mockMessage.warning).toHaveBeenCalledWith('导出条数过多，请先收窄筛选条件后重试')
+    expect(mockMessage.success).not.toHaveBeenCalled()
   })
 
   it('入口文件只保留编排，关键结构拆到子组件', () => {
@@ -781,6 +935,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         listError: null,
         showEmptyState: false,
         hasActiveFilters: false,
+        exportDisabled: false,
         toggleCol: vi.fn(),
         togglePageSelection: vi.fn(),
         isRowSelected: vi.fn(() => false),
@@ -840,6 +995,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         listError: null,
         showEmptyState: false,
         hasActiveFilters: false,
+        exportDisabled: false,
         toggleCol: vi.fn(),
         togglePageSelection: vi.fn(),
         isRowSelected: vi.fn(() => false),
@@ -881,6 +1037,8 @@ describe('alert 子组件 DOM/结构证据', () => {
     expect(downloadUtilSource).toContain('document.body.appendChild(link)')
     expect(downloadUtilSource).toContain('setTimeout(() => URL.revokeObjectURL(url), 1000)')
     expect(alertPageSource).toContain("import { downloadBlobFile } from '@/utils/download'")
+    expect(alertPageSource).toContain('const EXPORT_MAX_RECORDS = 1000')
+    expect(alertPageSource).toContain("getAlertList(buildAlertListParams(1, 200))")
     expect(alertPageSource).toContain('downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)')
   })
 

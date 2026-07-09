@@ -68,6 +68,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-013-report-center-export-filter-snapshot.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-014：报表中心平台化缺口-M5：跨页全量导出与筛选语义一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；原 P1/P2 阻塞已关闭；前端 Ready 命令按同一 Vitest 入口做最小等价替换并归类为工具配置类；D 最终验收、E 最终复审与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-014-report-center-cross-page-export-filter-consistency.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09
