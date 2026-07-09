@@ -16,6 +16,11 @@ if (Test-Path $StatePath) {
   $State = Get-Content -Raw $StatePath | ConvertFrom-Json
   $Summary.stateExists = $true
   $Summary.status = $State.status
+  $Summary.mode = $State.mode
+  $Summary.lastAction = $State.lastAction
+  $Summary.lastIssue = $State.lastIssue
+  $Summary.lastReason = $State.lastReason
+  $Summary.stopReason = $State.stopReason
   $Summary.enabled = $State.enabled
   $Summary.stopRequested = $State.stopRequested
   $Summary.autoMerge = $State.autoMerge

@@ -46,12 +46,15 @@ function New-Fixture {
 function Invoke-Runner {
   param(
     [string]$Root,
-    [switch]$Apply
+    [switch]$Apply,
+    [switch]$Explain
   )
 
   $Config = Join-Path $Root "scripts\codex-autopilot\codex-autopilot.config.json"
   $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $Runner, "-RepoRoot", $Root, "-ConfigPath", $Config, "-MaxLoops", "3")
-  if ($Apply) {
+  if ($Explain) {
+    $args += "-ExplainNextAction"
+  } elseif ($Apply) {
     $args += "-ApplyBacklogSplit"
   } else {
     $args += "-DryRun"
@@ -87,11 +90,11 @@ try {
 
   $PauseRoot = New-Fixture -Name "paused" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
   "pause" | Out-File -Encoding utf8 (Join-Path $PauseRoot ".codex-autopilot\pause.flag")
-  Assert-Contains (Invoke-Runner $PauseRoot) "STOP_PAUSED"
+  Assert-Contains (Invoke-Runner $PauseRoot) "STOP_PAUSE_FLAG"
 
   $StopRoot = New-Fixture -Name "stopped" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
   "stop" | Out-File -Encoding utf8 (Join-Path $StopRoot ".codex-autopilot\stop.flag")
-  Assert-Contains (Invoke-Runner $StopRoot) "STOP_REQUESTED"
+  Assert-Contains (Invoke-Runner $StopRoot) "STOP_STOP_FLAG"
 
   $BadLimitRoot = New-Fixture -Name "bad-limit" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n" -MaxIssuesPerRun 2
   $BadLimitOutput = Invoke-Runner $BadLimitRoot
@@ -110,6 +113,11 @@ try {
   Assert-Contains $ReadyOutput "READY_ISSUE_FOUND"
   Assert-Contains $ReadyOutput "maxIssuesPerRun=1"
 
+  $ExplainReadyOutput = Invoke-Runner $ReadyRoot -Explain
+  Assert-Contains $ExplainReadyOutput "EXPLAIN_NEXT_ACTION"
+  Assert-Contains $ExplainReadyOutput "nextAction=READY_ISSUE"
+  Assert-Contains $ExplainReadyOutput "nextReady=ISSUE-100-001"
+
   $SplitRoot = New-Fixture -Name "split" -Enabled -Ready "# Ready Issues`n" -Plan @"
 # Plan
 
@@ -121,6 +129,13 @@ try {
   Assert-Contains $SplitOutput "DRY_RUN_NO_BACKLOG_WRITE"
   $SplitReadyAfterDryRun = Get-Content -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterDryRun "状态：Ready"
+
+  $ExplainSplitOutput = Invoke-Runner $SplitRoot -Explain
+  Assert-Contains $ExplainSplitOutput "EXPLAIN_NEXT_ACTION"
+  Assert-Contains $ExplainSplitOutput "nextAction=SPLIT_BACKLOG"
+  Assert-Contains $ExplainSplitOutput "wouldCreateReadyIssueDrafts=1"
+  $SplitReadyAfterExplain = Get-Content -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
+  Assert-NotContains $SplitReadyAfterExplain "状态：Ready"
 
   $ApplyRoot = New-Fixture -Name "apply" -Enabled -Ready "# Ready Issues`n" -Plan @"
 # Plan
@@ -142,9 +157,21 @@ try {
   Assert-Contains $ApplyReady "状态：Ready"
   Assert-Contains $ApplyReady "验证命令："
   Assert-Contains $ApplyReady "来源锚点："
+  $ApplyState = Get-Content -Raw (Join-Path $ApplyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($ApplyState.mode -ne "continuous-runner") { throw "Expected state.mode=continuous-runner" }
+  if ($ApplyState.lastAction -ne "READY_ISSUE_FOUND") { throw "Expected state.lastAction=READY_ISSUE_FOUND" }
+  if ($ApplyState.lastIssue -notlike "ISSUE-008-001*") { throw "Expected state.lastIssue to record selected issue" }
+  if ($ApplyState.lastReason -ne "READY_ISSUE_FOUND") { throw "Expected state.lastReason=READY_ISSUE_FOUND" }
+  if ($ApplyState.stopReason) { throw "Expected state.stopReason to be empty for ready issue handoff" }
 
   $EmptyRoot = New-Fixture -Name "empty" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
-  Assert-Contains (Invoke-Runner $EmptyRoot) "STOP_NO_READY_OR_SPLIT_CANDIDATE"
+  $EmptyOutput = Invoke-Runner $EmptyRoot
+  Assert-Contains $EmptyOutput "STOP_READY_AND_POOL_EMPTY"
+  if (Test-Path (Join-Path $EmptyRoot ".codex-autopilot\state.json")) { throw "Dry-run should not write state.json" }
+  $EmptyApplyOutput = Invoke-Runner $EmptyRoot -Apply
+  Assert-Contains $EmptyApplyOutput "STOP_READY_AND_POOL_EMPTY"
+  $EmptyState = Get-Content -Raw (Join-Path $EmptyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($EmptyState.stopReason -ne "STOP_READY_AND_POOL_EMPTY") { throw "Expected state.stopReason=STOP_READY_AND_POOL_EMPTY" }
 
   Write-Host "continuous runner self-test passed"
 } finally {

@@ -3,6 +3,7 @@ param(
   [string]$ConfigPath = "",
   [switch]$DryRun,
   [switch]$ApplyBacklogSplit,
+  [switch]$ExplainNextAction,
   [int]$MaxLoops = 20
 )
 
@@ -23,10 +24,10 @@ function Test-Checkpoint {
     return "STOP_DISABLED"
   }
   if (Test-Path (Join-Path $AutoDir "pause.flag")) {
-    return "STOP_PAUSED"
+    return "STOP_PAUSE_FLAG"
   }
   if (Test-Path (Join-Path $AutoDir "stop.flag")) {
-    return "STOP_REQUESTED"
+    return "STOP_STOP_FLAG"
   }
   return "CONTINUE"
 }
@@ -178,7 +179,11 @@ function Write-State {
   param(
     [string]$AutoDir,
     [string]$Status,
-    [bool]$DryRunMode
+    [bool]$DryRunMode,
+    [string]$LastAction = $Status,
+    [string]$LastIssue = "",
+    [string]$LastReason = $Status,
+    [string]$StopReason = ""
   )
 
   if ($DryRunMode) {
@@ -193,8 +198,61 @@ function Write-State {
     $state = [pscustomobject]@{}
   }
   $state | Add-Member -NotePropertyName status -NotePropertyValue $Status -Force
+  $state | Add-Member -NotePropertyName mode -NotePropertyValue "continuous-runner" -Force
+  $state | Add-Member -NotePropertyName lastAction -NotePropertyValue $LastAction -Force
+  $state | Add-Member -NotePropertyName lastIssue -NotePropertyValue $LastIssue -Force
+  $state | Add-Member -NotePropertyName lastReason -NotePropertyValue $LastReason -Force
+  $state | Add-Member -NotePropertyName stopReason -NotePropertyValue $StopReason -Force
   $state | Add-Member -NotePropertyName lastHeartbeatAt -NotePropertyValue $now -Force
   $state | ConvertTo-Json | Out-File -Encoding utf8 $statePath
+}
+
+function Get-StopReasonForEmptyPool {
+  param([string]$ReadyPath)
+
+  if (!(Test-Path $ReadyPath)) {
+    return "STOP_READY_AND_POOL_EMPTY"
+  }
+
+  $text = Get-Content -Raw $ReadyPath
+  if ($text -match "(?m)^状态[：:]\s*(Blocked|阻塞)\b") {
+    return "STOP_CURRENT_ISSUE_BLOCKED"
+  }
+  return "STOP_READY_AND_POOL_EMPTY"
+}
+
+function Write-NextActionExplanation {
+  param(
+    [string]$Checkpoint,
+    [object[]]$ReadyIssues,
+    [object[]]$Candidates,
+    [string]$StopReason
+  )
+
+  Write-Host "EXPLAIN_NEXT_ACTION"
+  if ($Checkpoint -ne "CONTINUE") {
+    Write-Host "nextAction=STOP"
+    Write-Host "stopReason=$Checkpoint"
+    return
+  }
+
+  if ($ReadyIssues.Count -gt 0) {
+    Write-Host "nextAction=READY_ISSUE"
+    Write-Host "nextReady=$($ReadyIssues[0].title)"
+    return
+  }
+
+  if ($Candidates.Count -gt 0) {
+    Write-Host "nextAction=SPLIT_BACKLOG"
+    Write-Host "wouldCreateReadyIssueDrafts=$($Candidates.Count)"
+    for ($index = 0; $index -lt $Candidates.Count; $index++) {
+      Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $Candidates[$index].anchor)
+    }
+    return
+  }
+
+  Write-Host "nextAction=STOP"
+  Write-Host "stopReason=$StopReason"
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -216,7 +274,7 @@ $readyPath = Join-Path $RepoRoot "docs\backlog\ready-issues.md"
 $focusPath = Join-Path $RepoRoot "docs\backlog\current-focus.md"
 $planPath = Join-Path $RepoRoot "docs\backlog\cgc-pms-production-enhancement-plan.md"
 $splitLimit = 5
-$applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun
+$applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun -and -not [bool]$ExplainNextAction
 $dryRunMode = -not $applyMode
 
 Write-Host "CGC-PMS AutoPilot continuous runner"
@@ -226,18 +284,27 @@ Write-Host "autoPush=$($config.autoPush)"
 Write-Host "dryRun=$dryRunMode"
 Write-Host "applyBacklogSplit=$applyMode"
 
+if ($ExplainNextAction) {
+  $checkpoint = Test-Checkpoint $autoDir
+  $readyIssues = if ($checkpoint -eq "CONTINUE") { @(Get-ReadyIssues $readyPath) } else { @() }
+  $candidates = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0) { @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit) } else { @() }
+  $stopReason = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0 -and $candidates.Count -eq 0) { Get-StopReasonForEmptyPool $readyPath } else { $checkpoint }
+  Write-NextActionExplanation $checkpoint $readyIssues $candidates $stopReason
+  exit 0
+}
+
 for ($loop = 1; $loop -le $MaxLoops; $loop++) {
   $checkpoint = Test-Checkpoint $autoDir
   Write-Host "checkpoint[$loop]=$checkpoint"
   if ($checkpoint -ne "CONTINUE") {
-    Write-State $autoDir $checkpoint ([bool]$DryRun)
+    Write-State $autoDir $checkpoint ([bool]$DryRun) "STOP" "" $checkpoint $checkpoint
     Write-Host $checkpoint
     exit 0
   }
 
   $readyIssues = @(Get-ReadyIssues $readyPath)
   if ($readyIssues.Count -gt 0) {
-    Write-State $autoDir "READY_ISSUE_FOUND" ([bool]$DryRun)
+    Write-State $autoDir "READY_ISSUE_FOUND" ([bool]$DryRun) "READY_ISSUE_FOUND" $readyIssues[0].title "READY_ISSUE_FOUND" ""
     Write-Host "READY_ISSUE_FOUND"
     Write-Host "selected=$($readyIssues[0].title)"
     Write-Host "BUSINESS_EXECUTION_NOT_STARTED"
@@ -248,8 +315,9 @@ for ($loop = 1; $loop -le $MaxLoops; $loop++) {
   Write-Host "focusPath=$focusPath"
   $candidates = @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit)
   if ($candidates.Count -eq 0) {
-    Write-State $autoDir "STOP_NO_READY_OR_SPLIT_CANDIDATE" $dryRunMode
-    Write-Host "STOP_NO_READY_OR_SPLIT_CANDIDATE"
+    $stopReason = Get-StopReasonForEmptyPool $readyPath
+    Write-State $autoDir $stopReason $dryRunMode "STOP" "" $stopReason $stopReason
+    Write-Host $stopReason
     exit 0
   }
 
@@ -259,19 +327,20 @@ for ($loop = 1; $loop -le $MaxLoops; $loop++) {
   }
 
   if ($dryRunMode) {
-    Write-State $autoDir "DRY_RUN_SPLIT_PLANNED" $true
+    Write-State $autoDir "DRY_RUN_SPLIT_PLANNED" $true "SPLIT_BACKLOG" "" "DRY_RUN_SPLIT_PLANNED" ""
     Write-Host "DRY_RUN_NO_BACKLOG_WRITE"
     exit 0
   }
 
   $createdCount = Add-ReadyIssueDrafts $readyPath $candidates
-  Write-State $autoDir "BACKLOG_SPLIT_APPLIED" $false
+  Write-State $autoDir "BACKLOG_SPLIT_APPLIED" $false "BACKLOG_SPLIT_APPLIED" "" "BACKLOG_SPLIT_APPLIED" ""
   Write-Host "BACKLOG_SPLIT_APPLIED"
   Write-Host "createdReadyIssueDrafts=$createdCount"
 
   $checkpoint = Test-Checkpoint $autoDir
   Write-Host "postSplitCheckpoint=$checkpoint"
   if ($checkpoint -ne "CONTINUE") {
+    Write-State $autoDir $checkpoint $false "STOP" "" $checkpoint $checkpoint
     Write-Host $checkpoint
     exit 0
   }
@@ -281,8 +350,11 @@ for ($loop = 1; $loop -le $MaxLoops; $loop++) {
     continue
   }
 
-  Write-Host "STOP_NO_READY_OR_SPLIT_CANDIDATE"
+  $stopReason = Get-StopReasonForEmptyPool $readyPath
+  Write-State $autoDir $stopReason $false "STOP" "" $stopReason $stopReason
+  Write-Host $stopReason
   exit 0
 }
 
-Write-Host "STOP_MAX_LOOPS"
+Write-State $autoDir "STOP_SESSION_LIMIT" $dryRunMode "STOP" "" "STOP_SESSION_LIMIT" "STOP_SESSION_LIMIT"
+Write-Host "STOP_SESSION_LIMIT"

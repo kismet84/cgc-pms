@@ -4,6 +4,7 @@
   "worktreeRoot": "D:\\projects-test\\cgc-pms\\.worktrees",
   "autopilotDir": "D:\\projects-test\\cgc-pms\\.codex-autopilot",
   "mode": "codex-desktop-automation",
+  "continuousRunnerEntry": "scripts\\codex-autopilot\\autopilot-run-continuous.ps1",
   "autoMerge": true,
   "autoPush": false,
   "allowTestDataMutation": true,
