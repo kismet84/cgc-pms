@@ -2,6 +2,35 @@
 
 ---
 
+Backlog 拆解：ISSUE-032-001 workflow 全量测试红灯夹具与业务类型注册治理
+
+目标：
+- 根据 A 需求/架构分析结论，将下一轮唯一 Ready Issue 写入队列，锁定为 `ISSUE-032-001`。
+- 同步 `ready-issues.md`、`current-focus.md`、`iteration-2026-07-09-report.md`，保留后续候选顺序说明。
+- 本轮只更新 backlog / iteration，不修改业务代码，不运行测试。
+
+修改范围摘要：
+- `docs/backlog/ready-issues.md`：将 `ISSUE-032-001` 调整为唯一 Ready，并补充目标、范围、禁止事项、验收口径和串行边界。
+- `docs/backlog/current-focus.md`：锁定当前唯一 Ready 和 `ISSUE-032-002 -> ISSUE-032-003 -> ISSUE-032-004` 的后续候选顺序。
+- `docs/iterations/iteration-2026-07-09-report.md`：记录本次 F 队列拆单动作。
+
+验证命令摘要：
+- `git branch --show-current`：`master`。
+- `git status --short`：执行前工作区干净。
+- `Get-Content docs/backlog/ready-issues.md`、`docs/backlog/current-focus.md`、`docs/backlog/done-issues.md`、`docs/backlog/blocked-issues.md`：已核对现状，确认 `ISSUE-032-001` 具备正式质量报告且未写入 Done/Blocked。
+- `rg -n "ISSUE-032-001|mainline-32 M2|workflow 全量测试红灯" docs/backlog docs/iterations docs/quality`：已核对 mainline-32 M2 分诊依据与既有质量报告。
+
+失败分类或非失败分类：非失败分类；本轮为 backlog 正式拆题与队列纠偏，不涉及实现验收
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- `ready-issues.md` 中仍保留历史 `Done` 条目作为上下文，不影响“本轮仅 1 条 Ready”结论；如后续要做队列文件清理，应另立文档治理任务。
+- `ISSUE-032-001` 只是正式入队，workflow 红灯本身仍待后续实现、验收、审查和归档线程闭环。
+
+---
+
 Issue：ISSUE-008-010 报表中心平台化缺口-M1：统一报表目录与定义元数据最小落地
 
 目标：

@@ -8,8 +8,8 @@
 
 ## 当前队列状态
 
-- 当前无合格 Ready Issue。
-- `ISSUE-008-010` 已完成并转入 `Done`；下一轮由项目总负责人按长期总任务池与 `current-focus` 重新拆出 Ready。
+- 当前唯一合格 Ready Issue：`ISSUE-032-001`。
+- 本轮只写入 1 条 Ready，按串行执行；`ISSUE-032-002`、`ISSUE-032-003`、`ISSUE-032-004` 仅保留为后续候选顺序，不在本轮同时启动。
 
 ## AutoPilot 自动合并门禁
 
@@ -33,7 +33,8 @@
 
 ## 执行顺序建议
 
-1. 当前无可启动 Ready；待项目总负责人按长期总任务池重新拆题。
+1. 先执行 `ISSUE-032-001`，收敛 workflow 夹具与业务类型注册红灯。
+2. `ISSUE-032-001` 收口后，再按 `ISSUE-032-002 -> ISSUE-032-003 -> ISSUE-032-004` 的候选顺序串行推进，不并行启动。
 
 ## P0
 
@@ -43,13 +44,20 @@
 
 优先级：P1
 类型：后端 / 测试治理 / workflow
-状态：Done
+状态：Ready
 自动合并：auto-merge/local-commit-only
+来源：mainline-32 M2 后端全量测试红灯治理
 来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M2；`docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md`
 是否需要新增 migration：否。
 目标：
+- 让目标 workflow 失败类从 surefire 失败清单中消失，或完成真实分类收敛并留下正式归因。
 - 收敛 workflow 域全量测试红灯中 `审批业务对象不存在`、`不支持的业务类型`、错误码断言漂移问题。
 - 优先判断是测试夹具债、业务类型注册缺口还是真实审批边界变化，不直接扩大为审批状态机重构。
+范围：
+- backend workflow 测试夹具
+- workflow 业务类型注册
+- 必要最小生产修正
+- 质量归档
 允许修改：
 - `backend/src/test/java/com/cgcpms/workflow/**`
 - `backend/src/main/java/com/cgcpms/workflow/**`
@@ -60,10 +68,16 @@
 - `backend/src/main/resources/db/migration/**`
 - 生产凭据、生产数据库连接、生产发布配置
 - 与 workflow 红灯无关的 dashboard / invoice / purchase / revenue 业务代码
+- 不放宽审批权限、租户隔离、业务类型边界
+- 不为过测跳过测试
+- 不改生产口径绕过失败
 验收标准：
+- 目标测试通过；必要时执行相关或全量复验并保留质量报告归因。
 - `WorkflowEngineIntegrationTest`、`WorkflowCoreServiceTest`、`WorkflowConcurrencyTest`、`WorkflowApproverResolverTest`、`WorkflowTemplateManagementTest` 中当前失败项完成分类并收敛。
 - 不放宽审批权限、租户隔离、审批状态边界。
 - 若确认某项不是夹具债而是真实业务缺陷，必须在质量报告中明确阻塞等级和最小修复范围。
+- D/E/F 分别完成验收 / 审查 / 归档。
+并行策略：本轮不并行，按串行执行。
 验证命令：
 - `cd backend; .\mvnw.cmd "-Dtest=WorkflowEngineIntegrationTest,WorkflowCoreServiceTest,WorkflowConcurrencyTest,WorkflowApproverResolverTest,WorkflowTemplateManagementTest" test`
 - `git diff --check`

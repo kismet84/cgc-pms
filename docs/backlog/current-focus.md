@@ -4,13 +4,13 @@
 
 由项目总负责人按长期计划、当前项目状态和最新约束动态选择下一批 Ready Issue。
 
-截至 2026-07-09，`ISSUE-032-005` 已完成 blocked 收口；`ISSUE-008-010` 也已完成正式归档并转入 `Done`。当前 Ready 队列为空，待项目总负责人基于长期总任务池、`done/blocked` 现状和最新约束重新拆出下一条 Ready。
+截至 2026-07-09，当前唯一 Ready 已锁定为 `ISSUE-032-001`：workflow 全量测试红灯夹具与业务类型注册治理。本轮按 mainline-32 M2 后端全量测试红灯治理顺序串行推进，先 workflow，再视收口结果依次进入 `ISSUE-032-002`、`ISSUE-032-003`、`ISSUE-032-004`。
 
 ## 当前 Ready 状态
 
-- 当前无可直接启动的 Ready Issue。
-- `ISSUE-008-010` 已完成收口，说明报表中心“统一目录与定义元数据最小落地”这一轮平台化缺口已形成正式归档，但不等于报表中心完整平台化完成。
-- 下一轮仍应保持串行拆题，优先从长期总任务池中选择依赖清晰、风险可控且可在本地闭环的单题 Ready。
+- 当前唯一可直接启动的 Ready Issue：`ISSUE-032-001`。
+- 候选顺序保留为 `ISSUE-032-001 -> ISSUE-032-002 -> ISSUE-032-003 -> ISSUE-032-004`，依据是 `docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md` 的分组与依赖关系。
+- 本轮不并行启动后续候选，避免 workflow 底层夹具与业务类型问题未收敛前，把链式失败扩散到 invoice、dashboard/purchase/revenue、phase 集成链路。
 
 ## 第32条主线 M5 分层冻结
 
