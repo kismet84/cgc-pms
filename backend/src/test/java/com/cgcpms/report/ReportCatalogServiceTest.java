@@ -43,6 +43,8 @@ class ReportCatalogServiceTest {
         assertFalse(costLedger.exportSupport());
         ReportCatalogItem costSummary = find(catalog, "cost-summary");
         assertFalse(costSummary.exportSupport());
+        ReportCatalogItem alertCenter = find(catalog, "alert-center");
+        assertTrue(alertCenter.exportSupport());
         assertTrue(catalog.stream().anyMatch(item -> "alerts-processing-report".equals(item.code())));
         assertTrue(catalog.stream().anyMatch(item -> "workflow-efficiency".equals(item.code())));
         assertTrue(catalog.stream().anyMatch(item -> "contracts-kpi".equals(item.code())));
@@ -73,7 +75,7 @@ class ReportCatalogServiceTest {
                 "workflow-efficiency"
         ), visibleCodes);
         assertNotNull(find(catalog, "cost-ledger"));
-        assertNotNull(find(catalog, "alert-center"));
+        assertTrue(find(catalog, "alert-center").exportSupport());
         assertNotNull(find(catalog, "alerts-processing-report"));
         ReportCatalogItem workflowEfficiency = find(catalog, "workflow-efficiency");
         assertEquals("api", workflowEfficiency.sourceType());

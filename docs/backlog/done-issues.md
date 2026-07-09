@@ -52,6 +52,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-011-report-center-permission-target-consistency.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-012：报表中心平台化缺口-M3：导出能力映射与元数据一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；原 P1 阻塞已关闭；导出能力映射与元数据一致性回归已补齐；D 最终验收、E 复审与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-012-report-center-export-metadata-consistency.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

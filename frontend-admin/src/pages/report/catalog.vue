@@ -5,7 +5,7 @@ import { ApiOutlined, ExportOutlined, LinkOutlined, ReloadOutlined } from '@ant-
 import { useRouter } from 'vue-router'
 import { getReportCatalog, type ReportCatalogItem } from '@/api/modules/report'
 import { useUserStore } from '@/stores/user'
-import { canOpenReportCatalogPage } from './catalog-entry'
+import { canOpenReportCatalogPage, hasReportCatalogExportEntry } from './catalog-entry'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -92,6 +92,10 @@ function getCatalogLabel(value: string) {
 
 function canOpenPage(item: ReportCatalogItem) {
   return canOpenReportCatalogPage(item, router.resolve)
+}
+
+function hasExportEntry(item: ReportCatalogItem) {
+  return hasReportCatalogExportEntry(item, router.resolve)
 }
 
 function openTarget(item: ReportCatalogItem) {
@@ -195,9 +199,12 @@ onMounted(fetchCatalog)
           </template>
 
           <template v-else-if="column.key === 'exportSupport'">
-            <span class="report-export-flag" :class="{ supported: record.exportSupport }">
+            <span
+              class="report-export-flag"
+              :class="{ supported: hasExportEntry(record), muted: !hasExportEntry(record) }"
+            >
               <ExportOutlined />
-              {{ record.exportSupport ? '支持' : '不支持' }}
+              {{ hasExportEntry(record) ? '支持导出' : '无导出入口' }}
             </span>
           </template>
 
@@ -335,6 +342,10 @@ onMounted(fetchCatalog)
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.report-export-flag.muted {
+  opacity: 0.72;
 }
 
 .report-export-flag.supported {

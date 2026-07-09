@@ -1,0 +1,19 @@
+{
+  "autoMerge": true,
+  "autoPush": false,
+  "allowTestDataReset": true,
+  "startedAt": "2026-07-09T17:26:29",
+  "mode": "continuous-runner",
+  "lastAction": "ISSUE_CLOSED",
+  "lastIssue": "ISSUE-008-012：报表中心平台化缺口-M3：导出能力映射与元数据一致性回归",
+  "lastReason": "READY_ISSUE_CLOSED",
+  "stopReason": "",
+  "iterationLimit": 10,
+  "iterationCompleted": 1,
+  "remainingIterations": 9,
+  "iterationLastCountedIssue": "ISSUE-008-012",
+  "enabled": true,
+  "status": "RUNNING",
+  "lastHeartbeatAt": "2026-07-10T01:50:00+08:00",
+  "stopRequested": false
+}
