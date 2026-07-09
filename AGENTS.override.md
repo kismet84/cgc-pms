@@ -206,6 +206,16 @@ CI 与验收失败分类规则：
 - `pause.flag` 默认比 `stop.flag` 更严格：新任务不得启动，已启动任务只允许安全收口；除非 Ready Issue 明确要求更严格中断策略，否则不得强杀当前任务
 - 不满足前置条件时禁止自动合并
 
+### 连续执行效率与收口优化规则
+
+- 连续模式下每个 Ready Issue 默认按 `checkpoint -> A 拆解 -> C/B 最小实现 -> D 回归 -> E 审查 -> 必要时 C/B 补修 -> D 最终复验 -> F 归档 -> 本地 commit -> stop/pause/ready 检查` 流转；角色可裁剪，但不得把实现、验收、审查、归档长期混成单一长跑子智能体
+- F 归档通过后，若尚未检测到 `stop.flag` 或 `pause.flag`，必须先本地 commit 当前 Issue 成果，再判断是否进入下一轮；若已检测到 `stop.flag` 或 `pause.flag`，只做安全收口说明，不启动新任务
+- 命令首次失败时必须先做失败分类；对疑似瞬时波动、代理抖动、Maven `testCompile` 或其他前置状态问题，优先复跑一次或用最小等价验证确认稳定复现，再升级为阻塞，不得把一次性失败直接定性为业务代码失败
+- D 验收可以参考 C/B 已跑结果，但只复跑裁决必需项，不做无意义全量重复；至少覆盖目标测试、关键静态核对、`git diff --check`、以及权限/数据边界相关断言
+- E 提出的非阻塞建议，只有在属于当前 diff 的低成本测试补强且能直接保护本轮风险点时才纳入本轮；涉及生产结构调整、扩大范围或非当前根因的建议，归档为后续项
+- checkpoint 固定最小输出为 `branch`、`git status`、`stop.flag`、`pause.flag`、`enabled.flag`；如怀疑需清理工作区，只能先执行 `git clean -fdn` 预览，不得直接清理
+- 可后续沉淀为脚本或技能的候选资产仅记录为：`autopilot-checkpoint`、`ready-issue-writer`、`issue-closeout`、`test-failure-classifier`、`local-commit-closeout`；未明确立项前不要求实现
+
 ### 项目级关键词协议
 
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`
