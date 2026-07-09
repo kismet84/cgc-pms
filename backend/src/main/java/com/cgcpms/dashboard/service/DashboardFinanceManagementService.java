@@ -277,6 +277,9 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 r -> new BigDecimal(r.getExpectedProfit() != null ? r.getExpectedProfit() : "0"),
                 Comparator.reverseOrder()));
         vo.setProjectRankings(rankings);
+        vo.setMetricSources(rankings.stream()
+                .map(this::toManagementMetricSource)
+                .collect(Collectors.toList()));
 
         // Pending tasks count (tenant-wide)
         Long currentUserId = UserContext.getCurrentUserId();
@@ -317,6 +320,19 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
     }
 
     // ========================================================================
+
+    private ManagementDashboardVO.MetricSourceVO toManagementMetricSource(DashboardProjectSummaryVO project) {
+        ManagementDashboardVO.MetricSourceVO source = new ManagementDashboardVO.MetricSourceVO();
+        source.setProjectId(project.getProjectId());
+        source.setProjectName(project.getProjectName());
+        source.setSourceType("PROJECT_SUMMARY");
+        source.setSourceId(project.getProjectId());
+        source.setContractAmount(project.getContractAmount());
+        source.setDynamicCost(project.getDynamicCost());
+        source.setExpectedProfit(project.getExpectedProfit());
+        source.setPaidAmount(project.getPaidAmount());
+        return source;
+    }
 
     private FinanceDashboardVO getFinanceViewAllProjects(Long tenantId) {
         List<PmProject> activeProjects = projectMapper.selectList(

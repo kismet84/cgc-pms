@@ -112,7 +112,7 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
     @Transactional
     @DisplayName("5.1 Management view: returns project rankings and aggregates")
     void testManagementView() {
-        seed("MGMT1");
+        SeedResult sr = seed("MGMT1");
         ManagementDashboardVO vo = dashboardService.getManagementView();
 
         assertNotNull(vo);
@@ -123,6 +123,12 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNotNull(vo.getTotalPaidAmount());
         assertNotNull(vo.getProjectRankings());
         assertTrue(vo.getProjectRankings().size() >= 1);
+        assertNotNull(vo.getMetricSources());
+        assertEquals(vo.getProjectRankings().size(), vo.getMetricSources().size());
+        assertTrue(vo.getMetricSources().stream()
+                        .anyMatch(source -> sr.projectId.toString().equals(source.getSourceId())
+                                && "PROJECT_SUMMARY".equals(source.getSourceType())),
+                "经营总览指标应能下钻到项目汇总来源");
 
         // Rankings sorted by expectedProfit DESC
         List<DashboardProjectSummaryVO> rankings = vo.getProjectRankings();

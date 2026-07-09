@@ -270,8 +270,20 @@ export interface ManagementDashboardVO {
   totalPendingTaskCount: number
   totalRiskCount: number
   projectRankings: DashboardProjectSummaryVO[]
+  metricSources: ManagementMetricSourceVO[]
   majorRisks: DashboardAlertItemVO[]
   overdueItems: DashboardTaskItemVO[]
+}
+
+export interface ManagementMetricSourceVO {
+  projectId: string
+  projectName: string
+  sourceType: 'PROJECT_SUMMARY'
+  sourceId: string
+  contractAmount: string
+  dynamicCost: string
+  expectedProfit: string
+  paidAmount: string
 }
 
 /** ── Cost Breakdown Drill-down (max 2 level) ── */

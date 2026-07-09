@@ -44,7 +44,7 @@
 
 优先级：P2
 类型：报表中心 / 后端 / 前端 / 测试
-状态：Ready
+状态：Done
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“项目经营总览报表”
 是否需要新增 migration：否；优先复用现有 dashboard / cost / revenue / contract 数据与接口，不新增报表定义表。

@@ -1,5 +1,36 @@
 # Iteration Report - 2026-07-09
 
+Issue：ISSUE-008-001 经营总览报表口径与来源下钻回归
+
+目标：
+- 建立项目经营总览报表的最小可用口径，确保汇总指标能追溯到现有来源单据或下钻数据。
+- 不扩大为完整报表中心、异步导出平台或报表定义模型。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/dashboard/vo/ManagementDashboardVO.java`：新增 `metricSources` 最小来源列表。
+- `backend/src/main/java/com/cgcpms/dashboard/service/DashboardFinanceManagementService.java`：由已有管理视图项目排名派生 `PROJECT_SUMMARY` 来源，不新增查询或表结构。
+- `backend/src/test/java/com/cgcpms/dashboard/service/DashboardFinanceManagementServiceTest.java`：补充经营总览指标可下钻到项目汇总来源的断言。
+- `frontend-admin/src/types/dashboard.ts`：同步管理视图来源类型。
+- `docs/quality/issue-008-001-management-report-source-drilldown.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-001 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=DashboardFinanceManagementServiceTest#testManagementView" test`：首次因测试代码未保存 `SeedResult` 返回值编译失败；修正后通过，`1` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd backend; .\mvnw.cmd test`：未通过；失败点集中在既有 dashboard、invoice、workflow、purchase、payment、revenue 测试夹具/断言问题，目标测试已通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只覆盖管理驾驶舱经营总览的最小来源下钻，不新增完整报表中心或导出能力。
+- 后端全量测试仍有既有无关红灯，需后续 Ready Issue 分别治理。
+
+---
+
 Issue：ISSUE-005-007 列表页导出与批量操作权限态回归
 
 目标：

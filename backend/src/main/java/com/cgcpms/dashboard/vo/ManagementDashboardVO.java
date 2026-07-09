@@ -20,6 +20,19 @@ public class ManagementDashboardVO {
     private Long totalRiskCount;
     /** Detail lists */
     private List<DashboardProjectSummaryVO> projectRankings;
+    private List<MetricSourceVO> metricSources;
     private List<DashboardAlertItemVO> majorRisks;
     private List<DashboardTaskItemVO> overdueItems;
+
+    @Data
+    public static class MetricSourceVO {
+        private String projectId;
+        private String projectName;
+        private String sourceType;
+        private String sourceId;
+        private String contractAmount;
+        private String dynamicCost;
+        private String expectedProfit;
+        private String paidAmount;
+    }
 }
