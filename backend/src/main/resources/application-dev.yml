@@ -1,4 +1,8 @@
 spring:
+  security:
+    user:
+      name: dev
+      password: ${SPRING_SECURITY_USER_PASSWORD:dev-only-not-used-by-jwt}
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3307/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true

@@ -1,6 +1,10 @@
 # ⚠️ 此文件覆盖 main/resources/application.yml 的全局默认值（classpath 优先级更高）。
 #   仅包含测试环境需要的覆盖项，其余配置继承 main 版本。
 spring:
+  security:
+    user:
+      name: test
+      password: test-only-not-used-by-jwt
   main:
     allow-circular-references: true
   autoconfigure:

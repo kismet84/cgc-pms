@@ -1,4 +1,8 @@
 spring:
+  security:
+    user:
+      name: local
+      password: ${SPRING_SECURITY_USER_PASSWORD:local-only-not-used-by-jwt}
   main:
     # NOTE: allow-circular-references is intentionally NOT set here.
     # Circular dependencies must be fixed in production code.
