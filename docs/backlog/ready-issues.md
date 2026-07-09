@@ -28,11 +28,190 @@
 
 ## 执行顺序建议
 
-1. 暂无合格 Ready Issue
+1. ISSUE-008-001：经营总览报表口径与来源下钻回归
+2. ISSUE-008-002：合同履约报表口径回归
+3. ISSUE-008-003：成本动态汇总报表口径回归
+4. ISSUE-008-004：预警处理报表口径回归
+5. ISSUE-008-005：审批效率报表口径回归
 
 ## P0
 
 ## P1
+
+## P2
+
+### ISSUE-008-001：经营总览报表口径与来源下钻回归
+
+优先级：P2
+类型：报表中心 / 后端 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“项目经营总览报表”
+是否需要新增 migration：否；优先复用现有 dashboard / cost / revenue / contract 数据与接口，不新增报表定义表。
+目标：
+- 建立项目经营总览报表的最小可用口径，确保汇总指标能追溯到现有来源单据或下钻数据。
+- 不扩大为完整报表中心、异步导出平台或报表定义模型。
+允许修改：
+- `backend/src/main/java/com/cgcpms/dashboard/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- `backend/src/main/java/com/cgcpms/revenue/**`
+- `backend/src/main/java/com/cgcpms/contract/**`
+- `backend/src/test/java/com/cgcpms/dashboard/**`
+- `backend/src/test/java/com/cgcpms/cost/**`
+- `backend/src/test/java/com/cgcpms/revenue/**`
+- `backend/src/test/java/com/cgcpms/contract/**`
+- `frontend-admin/src/pages/dashboard/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、外部报表平台
+- 新增通用报表中心、异步导出任务表、报表定义表
+验收标准：
+- 经营总览核心金额、成本、利润、付款或风险指标至少一组有稳定回归断言。
+- 合法下钻能定位到现有来源数据；缺失来源时不伪造明细。
+- 不放宽 dashboard 现有鉴权、租户与项目边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-001-management-report-source-drilldown.md`
+
+### ISSUE-008-002：合同履约报表口径回归
+
+优先级：P2
+类型：报表中心 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“合同履约报表”
+是否需要新增 migration：否；优先复用现有 contract / payment 数据结构。
+目标：
+- 回归合同履约报表的合同金额、变更金额、付款进度和履约状态口径。
+- 不改合同业务语义，不新增合同履约专用表。
+允许修改：
+- `backend/src/main/java/com/cgcpms/contract/**`
+- `backend/src/main/java/com/cgcpms/payment/**`
+- `backend/src/test/java/com/cgcpms/contract/**`
+- `backend/src/test/java/com/cgcpms/payment/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 合同状态机重构、生产数据库连接、通用报表中心新增表
+验收标准：
+- 合同金额、变更金额和付款进度之间有稳定断言。
+- 履约状态与来源合同、付款记录一致，不出现静默漏算或重复累计。
+- 不放宽合同查询的租户、项目和角色边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-002-contract-performance-report.md`
+
+### ISSUE-008-003：成本动态汇总报表口径回归
+
+优先级：P2
+类型：报表中心 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“成本动态汇总报表”
+是否需要新增 migration：否；优先复用现有 cost / dashboard 成本汇总口径。
+目标：
+- 回归目标成本、实际成本、动态成本和偏差金额的汇总口径。
+- 不新增成本快照表，不扩大为完整成本报表中心。
+允许修改：
+- `backend/src/main/java/com/cgcpms/cost/**`
+- `backend/src/main/java/com/cgcpms/dashboard/**`
+- `backend/src/test/java/com/cgcpms/cost/**`
+- `backend/src/test/java/com/cgcpms/dashboard/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 成本核算模型重构、生产数据库连接、通用报表中心新增表
+验收标准：
+- 至少覆盖一组目标成本、实际成本、动态成本、偏差金额的稳定断言。
+- 汇总值与现有成本来源数据一致，不重复累计、不漏计。
+- 不放宽成本数据的租户、项目和角色边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-003-cost-dynamic-summary-report.md`
+
+### ISSUE-008-004：预警处理报表口径回归
+
+优先级：P2
+类型：报表中心 / 后端 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“预警处理报表”
+是否需要新增 migration：否；优先复用现有 alert 列表、状态和统计口径。
+目标：
+- 回归预警数量、严重度、处理状态和处理结果的报表口径。
+- 不扩大为规则治理中心 M2，不新增预警规则表。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `frontend-admin/src/pages/alert/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/types/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 规则治理中心新增表、预警规则引擎重构、生产数据库连接
+验收标准：
+- 预警总数、严重度分布、已读/处理状态至少一组有稳定断言。
+- 报表口径与预警列表筛选结果一致。
+- 不放宽预警域、角色、租户和项目边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-004-alert-processing-report.md`
+
+### ISSUE-008-005：审批效率报表口径回归
+
+优先级：P2
+类型：报表中心 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“审批效率报表”
+是否需要新增 migration：否；优先复用现有 workflow 任务、实例和状态数据。
+目标：
+- 回归审批效率报表的待办数量、已办数量、超时/耗时和审批状态口径。
+- 不改审批状态机，不新增审批分析专用表。
+允许修改：
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- `backend/src/test/java/com/cgcpms/workflow/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 审批状态机重构、生产数据库连接、通用报表中心新增表
+验收标准：
+- 待办、已办、超时或平均耗时至少一组有稳定断言。
+- 报表统计与审批中心列表口径一致。
+- 不放宽审批数据的租户、项目、发起人和处理人边界。
+验证命令：
+- `cd backend; .\mvnw.cmd test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-005-workflow-efficiency-report.md`
 
 ### ISSUE-004-007：合同清单金额与付款条件回归
 
