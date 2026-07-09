@@ -4,6 +4,7 @@ $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Runner = Join-Path $ScriptDir "autopilot-run-continuous.ps1"
+$Executor = Join-Path $ScriptDir "autopilot-exec-issue.ps1"
 $StatusScript = Join-Path $ScriptDir "autopilot-status.ps1"
 $KillScript = Join-Path $ScriptDir "autopilot-kill.ps1"
 $TempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("cgc-pms-autopilot-runner-test-" + [guid]::NewGuid().ToString("N"))
@@ -79,6 +80,25 @@ function Invoke-Runner {
   }
 }
 
+function Invoke-Executor {
+  param(
+    [string]$Root,
+    [string]$IssueTitle,
+    [switch]$DryRun,
+    [switch]$Noop
+  )
+
+  $Config = Join-Path $Root "scripts\codex-autopilot\codex-autopilot.config.json"
+  $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $Executor, "-RepoRoot", $Root, "-ConfigPath", $Config, "-Title", $IssueTitle)
+  if ($DryRun) {
+    $args += "-DryRun"
+  }
+  if ($Noop) {
+    $args += "-Noop"
+  }
+  & powershell @args 2>&1 | Out-String
+}
+
 function Set-IssueStatus {
   param(
     [string]$Root,
@@ -124,6 +144,34 @@ function Assert-NotContains {
   }
 }
 
+function Assert-ResultSchema {
+  param([object]$Result)
+
+  foreach ($field in @("issueId", "title", "status", "failureCategory", "artifacts", "gitSummary", "validation", "nextAction", "stopReason", "createdAt")) {
+    if ($Result.PSObject.Properties.Name -notcontains $field) {
+      throw "Missing result.json field: $field"
+    }
+  }
+  if (@("done", "blocked", "failed", "noop") -notcontains $Result.status) {
+    throw "Invalid result status: $($Result.status)"
+  }
+  if (@("none", "tool_config", "environment", "quality_security", "ready_issue_config", "execution_disabled") -notcontains $Result.failureCategory) {
+    throw "Invalid failureCategory: $($Result.failureCategory)"
+  }
+}
+
+function Get-LatestResult {
+  param([string]$Root)
+
+  $resultPath = Get-ChildItem -Path (Join-Path $Root ".codex-autopilot\runs") -Filter result.json -Recurse |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  if (!$resultPath) {
+    throw "Expected result.json to exist"
+  }
+  return Get-Content -Raw $resultPath.FullName | ConvertFrom-Json
+}
+
 try {
   $DisabledRoot = New-Fixture -Name "disabled" -Ready "# Ready Issues`n" -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $DisabledRoot) "STOP_DISABLED"
@@ -162,10 +210,22 @@ try {
   $ReadyOutput = Invoke-Runner $ReadyRoot
   Assert-Contains $ReadyOutput "READY_ISSUE_FOUND"
   Assert-Contains $ReadyOutput "maxIssuesPerRun=1"
+  Assert-Contains $ReadyOutput "BUSINESS_EXECUTION_DISABLED_M3"
+  Assert-Contains $ReadyOutput "executorCommand="
+
+  $ExecutorDryRunOutput = Invoke-Executor $ReadyRoot "ISSUE-100-001：Runner ready branch" -DryRun
+  Assert-Contains $ExecutorDryRunOutput "EXECUTOR_RESULT_WRITTEN"
+  $ExecutorDryRunResult = Get-LatestResult $ReadyRoot
+  Assert-ResultSchema $ExecutorDryRunResult
+  if ($ExecutorDryRunResult.status -ne "noop") { throw "Expected dry-run result status noop" }
+  if ($ExecutorDryRunResult.failureCategory -ne "execution_disabled") { throw "Expected execution_disabled failureCategory" }
 
   $ReadyLimitCompatOutput = Invoke-Runner $ReadyRoot -Apply -MaxIterations 2
   Assert-Contains $ReadyLimitCompatOutput "READY_ISSUE_FOUND"
+  Assert-Contains $ReadyLimitCompatOutput "EXECUTOR_RESULT_WRITTEN"
   Assert-Contains $ReadyLimitCompatOutput "iterationLimit=2"
+  $ReadyNoopResult = Get-LatestResult $ReadyRoot
+  Assert-ResultSchema $ReadyNoopResult
   $ReadyLimitState = Get-Content -Raw (Join-Path $ReadyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($ReadyLimitState.iterationLimit -ne 2) { throw "Expected state.iterationLimit=2" }
   if ($ReadyLimitState.iterationCompleted -ne 0) { throw "Expected state.iterationCompleted=0" }
@@ -292,7 +352,8 @@ try {
   Assert-Contains $ApplyOutput "BACKLOG_SPLIT_APPLIED"
   Assert-Contains $ApplyOutput "postSplitCheckpoint=CONTINUE"
   Assert-Contains $ApplyOutput "READY_ISSUE_FOUND"
-  Assert-Contains $ApplyOutput "BUSINESS_EXECUTION_NOT_STARTED"
+  Assert-Contains $ApplyOutput "BUSINESS_EXECUTION_DISABLED_M3"
+  Assert-Contains $ApplyOutput "EXECUTOR_RESULT_WRITTEN"
   $ApplyReady = Get-Content -Raw (Join-Path $ApplyRoot "docs\backlog\ready-issues.md")
   Assert-Contains $ApplyReady "状态：Ready"
   Assert-Contains $ApplyReady "验证命令："
@@ -305,6 +366,12 @@ try {
   if ($ApplyState.stopReason) { throw "Expected state.stopReason to be empty for ready issue handoff" }
   if ($ApplyState.iterationCompleted -ne 0) { throw "Expected split/ready handoff not to increment iterationCompleted" }
   if (Test-Path (Join-Path $ApplyRoot ".codex-autopilot\run.lock")) { throw "ApplyBacklogSplit should release run.lock" }
+  $ApplyResult = Get-LatestResult $ApplyRoot
+  Assert-ResultSchema $ApplyResult
+  $ApplyStatus = & powershell -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $ApplyRoot 2>&1 | Out-String
+  $ApplyStatusJson = $ApplyStatus | ConvertFrom-Json
+  if ($ApplyStatusJson.latestResultStatus -ne "noop") { throw "Expected status to expose latest noop result" }
+  if (!$ApplyStatusJson.latestResultPath) { throw "Expected status to expose latestResultPath" }
 
   $ActiveLockRoot = New-Fixture -Name "active-lock" -Enabled -Ready "# Ready Issues`n" -Plan @"
 # Plan

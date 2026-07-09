@@ -518,6 +518,33 @@ function Write-NextActionExplanation {
   Write-Host "stopReason=$StopReason"
 }
 
+function Get-ExecutorCommand {
+  param(
+    [string]$RepoRoot,
+    [string]$ConfigPath,
+    [string]$IssueTitle
+  )
+
+  $executorPath = Join-Path $scriptDir "autopilot-exec-issue.ps1"
+  return "powershell -NoProfile -ExecutionPolicy Bypass -File `"$executorPath`" -RepoRoot `"$RepoRoot`" -ConfigPath `"$ConfigPath`" -Title `"$IssueTitle`" -Noop"
+}
+
+function Invoke-IssueExecutorNoop {
+  param(
+    [string]$RepoRoot,
+    [string]$ConfigPath,
+    [string]$IssueTitle
+  )
+
+  $executorPath = Join-Path $scriptDir "autopilot-exec-issue.ps1"
+  if (!(Test-Path $executorPath)) {
+    Write-Host "EXECUTOR_NOT_FOUND"
+    Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $IssueTitle)"
+    return
+  }
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $executorPath -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Title $IssueTitle -Noop
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if (!$ConfigPath) {
   $ConfigPath = Join-Path $scriptDir "codex-autopilot.config.json"
@@ -600,7 +627,12 @@ try {
       Write-State $autoDir "READY_ISSUE_FOUND" ([bool]$DryRun) "READY_ISSUE_FOUND" $readyIssues[0].title "READY_ISSUE_FOUND" ""
       Write-Host "READY_ISSUE_FOUND"
       Write-Host "selected=$($readyIssues[0].title)"
-      Write-Host "BUSINESS_EXECUTION_NOT_STARTED"
+      Write-Host "BUSINESS_EXECUTION_DISABLED_M3"
+      if ($DryRun) {
+        Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $readyIssues[0].title)"
+      } else {
+        Invoke-IssueExecutorNoop $RepoRoot $ConfigPath $readyIssues[0].title
+      }
       exit 0
     }
 

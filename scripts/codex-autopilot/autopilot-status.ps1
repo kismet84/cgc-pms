@@ -5,6 +5,7 @@ param(
 $AutoDir = Join-Path $Repo ".codex-autopilot"
 $StatePath = Join-Path $AutoDir "state.json"
 $LockPath = Join-Path $AutoDir "run.lock"
+$RunsDir = Join-Path $AutoDir "runs"
 $ConfigPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "codex-autopilot.config.json"
 $MaxRunMinutes = 120
 if (Test-Path $ConfigPath) {
@@ -102,6 +103,28 @@ if (Test-Path $StatePath) {
   $Summary.stateExists = $false
   $Summary.status = "STOPPED"
   $Summary.message = "No AutoPilot state found."
+}
+
+if (Test-Path $RunsDir) {
+  $LatestResult = Get-ChildItem -Path $RunsDir -Filter result.json -Recurse -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  if ($LatestResult) {
+    try {
+      $Result = Get-Content -Raw $LatestResult.FullName | ConvertFrom-Json
+      $Summary.latestResultPath = $LatestResult.FullName
+      $Summary.latestResultIssueId = $Result.issueId
+      $Summary.latestResultTitle = $Result.title
+      $Summary.latestResultStatus = $Result.status
+      $Summary.latestResultFailureCategory = $Result.failureCategory
+      $Summary.latestResultNextAction = $Result.nextAction
+      $Summary.latestResultStopReason = $Result.stopReason
+      $Summary.latestResultCreatedAt = $Result.createdAt
+    } catch {
+      $Summary.latestResultPath = $LatestResult.FullName
+      $Summary.latestResultUnreadable = $true
+    }
+  }
 }
 
 $Summary | ConvertTo-Json
