@@ -1,8 +1,9 @@
 ## Ready 队列状态
 
 - 当前合格 Ready Issue：无。
+- `ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `5/10` 个实施型 Ready Issue。
 - `ISSUE-008-015：报表中心平台化缺口-M6：导出审计留痕与目录一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `4/10` 个实施型 Ready Issue。
-- 当前 Ready 队列为空；下一轮若继续执行，需由主线程/A 基于长期总任务池与当前阻塞现状重新拆题。
+- 当前 `Ready` 队列已清空；下一轮需由主线程/A 基于长期任务池、`current-focus` 与阻塞现状重新拆题。
 - 未证明完全无关联前，仍不并行续接其他 P2 平台化题。
 
 ## 任务来源
@@ -33,8 +34,8 @@
 
 ## 执行顺序建议
 
-1. 当前 Ready 队列已有 `ISSUE-008-015`；下一轮应先由实施型子智能体按该 Issue 的允许修改范围执行，不再重复拆题。
-2. 规则治理中心、通知平台、WBS / 甘特图、供应商评分 / 采购增强与报表中心后续平台化题未证明“完全无关联、无任何代码关联”，仍不建议直接并行拆分。
+1. `ISSUE-008-016` 已完成正式收口并从当前执行队列出清。
+2. 下一轮若继续执行，需先由主线程/A 重新拆出合格 Ready Issue；报表中心后续缺口、规则治理中心、WBS / 甘特图、供应商评分 / 采购增强题仍保持串行候选。
 
 ## P0
 
@@ -231,6 +232,45 @@
 归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
 
 ## P2
+
+### ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归
+
+优先级：P2
+类型：通知平台 / 后端 / 前端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节；`docs/quality/issue-008-007-通知平台.md`
+是否需要新增 migration：否；优先复用现有 `AlertEvaluationService`、`AlertSubscriptionService`、`AlertNotificationDispatcher` 与预警页订阅弹窗，不新增通知平台表结构。
+目标：
+- 补齐“预警状态变更通知”这一段平台化最小闭环，确保 `PROCESSED / ARCHIVED / INVALID` 通知链路与订阅偏好保持一致。
+- 回归 `notifyOnStatusChanged`、`minSeverity`、预警域和通知渠道配置在 API、分发与前端展示上的一致性。
+- 不扩大为邮件、短信、企业微信、钉钉或 WebSocket / SSE 外部渠道接入，不重做通知模板中心。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `frontend-admin/src/pages/alert/**`
+- `frontend-admin/src/api/modules/alert.ts`
+- `frontend-admin/src/types/alert.ts`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 邮件、短信、企业微信、钉钉等外部渠道接入
+- 通知中心大范围重构、模板系统重构、权限模型重构
+验收标准：
+- 至少一组后端回归证明：当用户关闭 `notifyOnStatusChanged` 或提高 `minSeverity` 后，状态变更通知不会越过订阅偏好发送。
+- 至少一组后端回归证明：允许接收状态变更通知的用户在 `PROCESSED / ARCHIVED / INVALID` 场景下能收到符合当前渠道配置的通知，且不因渠道大小写/空白差异被静默跳过。
+- 订阅 API 与预警页订阅弹窗对有效配置的展示和保存保持一致；用户覆盖仍只能收窄默认范围，不能放大角色默认域/渠道边界。
+- 不放宽预警域、角色、租户和项目边界；既有“预警创建通知”路径不回退。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest,AlertNotificationDispatcherTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/alert/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-016-notification-status-subscription-consistency.md`
 
 ### ISSUE-008-001：经营总览报表口径与来源下钻回归
 

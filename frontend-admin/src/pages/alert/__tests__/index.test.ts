@@ -343,6 +343,9 @@ const AlertSubscriptionModalHarness = defineComponent({
   props: {
     open: { type: Boolean, default: false },
     form: { type: Object, required: true },
+    availableSubscriptionChannels: { type: Array, default: () => [] },
+    availableSubscriptionDomains: { type: Array, default: () => [] },
+    availableSeverityOptions: { type: Array, default: () => [] },
     handleSaveSubscription: { type: Function, required: true },
   },
   emits: ['update:open'],
@@ -355,11 +358,11 @@ const AlertSubscriptionModalHarness = defineComponent({
         minSeverity: string
         notifyOnStatusChanged: boolean
       }
-      form.enabled = false
-      form.channels = ['IN_APP']
-      form.domains = ['PURCHASE']
-      form.minSeverity = 'MEDIUM'
-      form.notifyOnStatusChanged = false
+      form.enabled = true
+      form.channels = ['IN_APP', 'EMAIL']
+      form.domains = ['PURCHASE', 'CONTRACT']
+      form.minSeverity = 'LOW'
+      form.notifyOnStatusChanged = true
     }
     const close = () => emit('update:open', false)
     return { tweakForm, close }
@@ -582,16 +585,71 @@ describe('alert/index.vue', () => {
     await flushPromises()
 
     expect(mockUpdateAlertSubscription).toHaveBeenCalledWith({
-      enabled: false,
+      enabled: true,
       channels: ['IN_APP'],
       domains: ['PURCHASE'],
-      minSeverity: 'MEDIUM',
-      notifyOnStatusChanged: false,
+      minSeverity: 'LOW',
+      notifyOnStatusChanged: true,
     })
     expect(wrapper.get('.modal-open').text()).toBe('false')
 
     await wrapper.get('.open-business-entry').trigger('click')
     expect(mockRouterPush).toHaveBeenCalledWith('/purchase/order?businessId=PO-9')
+  })
+
+  it('订阅弹窗展示与保存都会收敛到默认边界内，不放大渠道/域/严重度/状态变更范围', async () => {
+    mockAlertStore.alerts = [createAlertRecord()]
+    mockAlertStore.total = 1
+    mockGetAlertSubscription.mockResolvedValue(
+      buildSubscriptionResponse({
+        defaultSubscription: {
+          enabled: true,
+          channels: ['IN_APP'],
+          domains: ['PURCHASE'],
+          minSeverity: 'MEDIUM',
+          notifyOnStatusChanged: false,
+        },
+        effectiveSubscription: {
+          enabled: true,
+          channels: ['IN_APP'],
+          domains: ['PURCHASE'],
+          minSeverity: 'MEDIUM',
+          notifyOnStatusChanged: false,
+        },
+        availableOptions: {
+          channels: ['IN_APP', 'EMAIL'],
+          domains: ['PURCHASE', 'CONTRACT'],
+          minSeverityOptions: ['LOW', 'MEDIUM', 'HIGH'],
+        },
+      }),
+    )
+
+    const wrapper = mountAlertPage({
+      AlertFilterPanel: AlertFilterPanelHarness,
+      AlertTablePanel: AlertTablePanelHarness,
+      AlertDetailPanel: AlertDetailPanelHarness,
+      AlertSubscriptionModal: AlertSubscriptionModalHarness,
+    })
+
+    await flushPromises()
+
+    const modal = wrapper.findComponent(AlertSubscriptionModalHarness)
+    expect(modal.props('availableSubscriptionChannels')).toEqual(['IN_APP'])
+    expect(modal.props('availableSubscriptionDomains')).toEqual(['PURCHASE'])
+    expect(modal.props('availableSeverityOptions')).toEqual(['MEDIUM', 'HIGH'])
+
+    await wrapper.get('.open-subscription').trigger('click')
+    await wrapper.get('.tweak-form').trigger('click')
+    await wrapper.get('.save-subscription').trigger('click')
+    await flushPromises()
+
+    expect(mockUpdateAlertSubscription).toHaveBeenCalledWith({
+      enabled: true,
+      channels: ['IN_APP'],
+      domains: ['PURCHASE'],
+      minSeverity: 'MEDIUM',
+      notifyOnStatusChanged: false,
+    })
   })
 
   it('导出复用当前筛选条件跨页抓取全量结果，空列表时按钮禁用', async () => {

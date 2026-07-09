@@ -61,6 +61,7 @@ const subscriptionForm = reactive<AlertSubscriptionConfig>({
   minSeverity: 'HIGH',
   notifyOnStatusChanged: false,
 })
+const SEVERITY_ORDER = ['LOW', 'MEDIUM', 'HIGH'] as const
 
 const filter = reactive({
   keyword: '',
@@ -140,14 +141,75 @@ function applyRoleDefaultView(force = false) {
 
 const activeRolePreset = computed(() => resolveRoleDefaultPreset())
 const hasDefaultScopeDomain = computed(() => Boolean(activeRolePreset.value.alertDomain))
-const availableSubscriptionDomains = computed(
-  () => subscriptionState.value?.availableOptions.domains ?? [],
+function uniqStrings(values: string[] | undefined) {
+  return [...new Set((values ?? []).map((item) => String(item ?? '').trim()).filter(Boolean))]
+}
+
+function resolveAllowedScope(defaults: string[] | undefined, available: string[] | undefined) {
+  const normalizedDefaults = uniqStrings(defaults)
+  const normalizedAvailable = uniqStrings(available)
+  if (!normalizedDefaults.length) return normalizedAvailable
+  if (!normalizedAvailable.length) return normalizedDefaults
+  const allowedSet = new Set(normalizedAvailable)
+  return normalizedDefaults.filter((item) => allowedSet.has(item))
+}
+
+function normalizeSeverity(
+  value: string | undefined,
+  fallback: AlertSubscriptionConfig['minSeverity'] = 'LOW',
+): AlertSubscriptionConfig['minSeverity'] {
+  const normalized = String(value ?? '').trim().toUpperCase() as AlertSubscriptionConfig['minSeverity']
+  return SEVERITY_ORDER.includes(normalized) ? normalized : fallback
+}
+
+function clampSeverity(
+  value: string | undefined,
+  floor: AlertSubscriptionConfig['minSeverity'],
+): AlertSubscriptionConfig['minSeverity'] {
+  const normalized = normalizeSeverity(value, floor)
+  return SEVERITY_ORDER.indexOf(normalized) < SEVERITY_ORDER.indexOf(floor) ? floor : normalized
+}
+
+function resolveSubscriptionBoundaries(state: AlertSubscriptionResponse | null) {
+  const defaultSubscription = state?.defaultSubscription
+  const availableOptions = state?.availableOptions
+  const minSeverityFloor = normalizeSeverity(defaultSubscription?.minSeverity, 'LOW')
+  return {
+    channels: resolveAllowedScope(defaultSubscription?.channels, availableOptions?.channels),
+    domains: resolveAllowedScope(defaultSubscription?.domains, availableOptions?.domains),
+    severityOptions: (availableOptions?.minSeverityOptions ?? [...SEVERITY_ORDER]).filter(
+      (item) => SEVERITY_ORDER.indexOf(item) >= SEVERITY_ORDER.indexOf(minSeverityFloor),
+    ),
+    minSeverityFloor,
+    defaultEnabled: Boolean(defaultSubscription?.enabled),
+    defaultStatusChangeEnabled: Boolean(defaultSubscription?.notifyOnStatusChanged),
+  }
+}
+
+function normalizeSubscriptionConfig(
+  data: Partial<AlertSubscriptionConfig> | null | undefined,
+): AlertSubscriptionConfig {
+  const boundaries = resolveSubscriptionBoundaries(subscriptionState.value)
+  const allowedChannels = new Set(boundaries.channels)
+  const allowedDomains = new Set(boundaries.domains)
+  return {
+    enabled: boundaries.defaultEnabled && Boolean(data?.enabled),
+    channels: uniqStrings(data?.channels).filter((item) => allowedChannels.has(item)),
+    domains: uniqStrings(data?.domains).filter((item) => allowedDomains.has(item)),
+    minSeverity: clampSeverity(data?.minSeverity, boundaries.minSeverityFloor),
+    notifyOnStatusChanged:
+      boundaries.defaultStatusChangeEnabled && Boolean(data?.notifyOnStatusChanged),
+  }
+}
+
+const availableSubscriptionDomains = computed(() =>
+  resolveSubscriptionBoundaries(subscriptionState.value).domains,
 )
-const availableSubscriptionChannels = computed(
-  () => subscriptionState.value?.availableOptions.channels ?? [],
+const availableSubscriptionChannels = computed(() =>
+  resolveSubscriptionBoundaries(subscriptionState.value).channels,
 )
-const availableSeverityOptions = computed(
-  () => subscriptionState.value?.availableOptions.minSeverityOptions ?? ['LOW', 'MEDIUM', 'HIGH'],
+const availableSeverityOptions = computed(() =>
+  resolveSubscriptionBoundaries(subscriptionState.value).severityOptions,
 )
 const defaultSubscriptionEnabled = computed(() =>
   Boolean(subscriptionState.value?.defaultSubscription.enabled),
@@ -630,21 +692,25 @@ const checkboxColumn = {
 }
 
 const subscriptionRows = computed(() => {
-  const effective = subscriptionState.value?.effectiveSubscription
+  const effective = normalizeSubscriptionConfig(subscriptionState.value?.effectiveSubscription)
   const channels = availableSubscriptionChannels.value.length
     ? availableSubscriptionChannels.value
     : ['IN_APP', 'EMAIL', 'WECHAT', 'SMS']
   return channels.map((channel) => ({
     channel,
     label: ALERT_CHANNEL_LABELS[channel] ?? channel,
-    enabled: Boolean(effective?.enabled && effective.channels.includes(channel)),
-    minSeverity:
-      effective?.minSeverity === 'HIGH'
-        ? 'HIGH'
-        : effective?.minSeverity === 'MEDIUM'
-          ? 'MEDIUM'
-          : 'LOW',
+    enabled: Boolean(effective.enabled && effective.channels.includes(channel)),
+    minSeverity: effective.minSeverity,
   }))
+})
+
+const subscriptionSummaryText = computed(() => {
+  const effective = normalizeSubscriptionConfig(subscriptionState.value?.effectiveSubscription)
+  if (!effective.enabled) return '已关闭通知'
+  const domains = effective.domains.length
+    ? effective.domains.map((item) => RULE_CATEGORY_LABELS[item] ?? item).join('、')
+    : '无预警域'
+  return `${domains} / ${effective.notifyOnStatusChanged ? '含状态变更' : '不含状态变更'} / 最低${formatSeverityText(effective.minSeverity)}`
 })
 
 const gridColumns = computed(() => [
@@ -750,11 +816,12 @@ function openBusinessEntry(record: AlertLogVO) {
 }
 
 function applySubscriptionForm(data: AlertSubscriptionConfig) {
-  subscriptionForm.enabled = Boolean(data.enabled)
-  subscriptionForm.channels = [...(data.channels ?? [])]
-  subscriptionForm.domains = [...(data.domains ?? [])]
-  subscriptionForm.minSeverity = data.minSeverity ?? 'HIGH'
-  subscriptionForm.notifyOnStatusChanged = Boolean(data.notifyOnStatusChanged)
+  const normalized = normalizeSubscriptionConfig(data)
+  subscriptionForm.enabled = normalized.enabled
+  subscriptionForm.channels = normalized.channels
+  subscriptionForm.domains = normalized.domains
+  subscriptionForm.minSeverity = normalized.minSeverity
+  subscriptionForm.notifyOnStatusChanged = normalized.notifyOnStatusChanged
 }
 
 async function loadSubscription() {
@@ -783,13 +850,8 @@ function openSubscriptionModal() {
 async function handleSaveSubscription() {
   subscriptionSaving.value = true
   try {
-    const result = await updateAlertSubscription({
-      enabled: subscriptionForm.enabled,
-      channels: subscriptionForm.channels,
-      domains: subscriptionForm.domains,
-      minSeverity: subscriptionForm.minSeverity,
-      notifyOnStatusChanged: subscriptionForm.notifyOnStatusChanged,
-    })
+    const payload = normalizeSubscriptionConfig(subscriptionForm)
+    const result = await updateAlertSubscription(payload)
     subscriptionState.value = result
     applySubscriptionForm(result.effectiveSubscription)
     subscriptionVisible.value = false
@@ -1009,6 +1071,7 @@ onMounted(async () => {
         :status-remark-draft="statusRemarkDraft"
         :current-operator="activeOperator"
         :subscription-rows="subscriptionRows"
+        :subscription-summary-text="subscriptionSummaryText"
         :format-severity-text="formatSeverityText"
         :format-date-time="formatDateTime"
         :get-alert-domain-label="getAlertDomainLabel"

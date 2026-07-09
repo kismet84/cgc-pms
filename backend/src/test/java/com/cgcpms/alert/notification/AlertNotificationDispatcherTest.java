@@ -57,6 +57,34 @@ class AlertNotificationDispatcherTest {
         assertEquals("SENT", record.getSendStatus());
     }
 
+    @Test
+    @DisplayName("状态变更通知渠道大小写和空白不应导致站内通知被静默跳过")
+    void dispatchesStatusChangedWhenSubscribedChannelHasWhitespaceAndDifferentCase() {
+        AlertNotificationDispatcher dispatcher =
+                new AlertNotificationDispatcher(recordMapper, List.of(inAppSender));
+        AlertLog alert = alert();
+        when(inAppSender.channel()).thenReturn(AlertNotificationChannel.IN_APP);
+        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED"),
+                eq("ALERT_STATUS"), eq("预警已归档"), eq("采购订单逾期\n处理说明：done")))
+                .thenReturn(AlertNotificationSendResult.sent(7002L));
+
+        dispatcher.dispatchStatusChanged(10L, 21L, alert, "预警已归档", " done ", Set.of(" in_app "));
+
+        verify(inAppSender).send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED"),
+                eq("ALERT_STATUS"), eq("预警已归档"), eq("采购订单逾期\n处理说明：done"));
+        ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
+                ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
+        verify(recordMapper).insert(recordCaptor.capture());
+        AlertNotificationSendRecord record = recordCaptor.getValue();
+        assertEquals(10L, record.getTenantId());
+        assertEquals(9001L, record.getAlertId());
+        assertEquals("STATUS_CHANGED", record.getEventType());
+        assertEquals("IN_APP", record.getChannel());
+        assertEquals(21L, record.getTargetUserId());
+        assertEquals(7002L, record.getBizNotificationId());
+        assertEquals("SENT", record.getSendStatus());
+    }
+
     private AlertLog alert() {
         AlertLog alert = new AlertLog();
         alert.setId(9001L);

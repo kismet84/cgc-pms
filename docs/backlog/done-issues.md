@@ -84,6 +84,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-015-report-center-export-audit-trail.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；状态变更通知、订阅默认边界与前端订阅弹窗一致性回归已补齐；后端 57 项测试、前端 17 项测试、type-check、D 验收、E 审查与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-016-notification-status-subscription-consistency.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

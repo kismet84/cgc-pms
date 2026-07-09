@@ -766,47 +766,48 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("TA11c: updateStatus — 状态流转也受订阅约束")
+    @DisplayName("TA11c: updateStatus — 状态流转严格遵守订阅偏好和域角色边界")
     void testUpdateStatus_DispatchesStatusNotificationBySubscription() {
+        seedMember(testProjectId, USER_ADMIN, "PM");
         seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
         seedMember(testProjectId, USER_COMMERCIAL_MANAGER, "COMMERCIAL_MANAGER");
-        AlertLog alert = new AlertLog();
-        alert.setTenantId(TENANT_ID);
-        alert.setProjectId(testProjectId);
-        alert.setRuleType("TEST_STATUS_NOTIFY");
-        alert.setAlertDomain("CONTRACT");
-        alert.setAlertCategory("CONTRACT_TERM");
-        alert.setSeverity("LOW");
-        alert.setMessage("状态通知测试");
-        alert.setTriggeredAt(LocalDateTime.now());
-        alert.setIsRead(0);
-        alert.setProcessStatus("OPEN");
-        alert.setCreatedBy(USER_CREATOR);
-        alert.setDeletedFlag(0);
-        alertLogMapper.insert(alert);
+        seedMember(testProjectId, USER_PURCHASE_MANAGER, "PURCHASE_MANAGER");
 
         TestUserContext.setUser(TENANT_ID, USER_COMMERCIAL_MANAGER, "commercial", List.of("COMMERCIAL_MANAGER"));
         alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_COMMERCIAL_MANAGER,
                 List.of("COMMERCIAL_MANAGER"), java.util.Map.of("notifyOnStatusChanged", false));
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+        alertSubscriptionService.updateCurrentUserSubscription(TENANT_ID, USER_PROJECT_MANAGER,
+                List.of("PROJECT_MANAGER"), java.util.Map.of("minSeverity", "HIGH"));
         TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
 
-        assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "PROCESSED", "已处理"));
+        AlertLog processedAlert = insertStatusAlert("TEST_STATUS_NOTIFY_PROCESSED");
+        AlertLog archivedAlert = insertStatusAlert("TEST_STATUS_NOTIFY_ARCHIVED");
+        AlertLog invalidAlert = insertStatusAlert("TEST_STATUS_NOTIFY_INVALID");
 
+        assertTrue(alertService.updateStatus(TENANT_ID, processedAlert.getId(), "PROCESSED", "已处理"));
+        assertTrue(alertService.updateStatus(TENANT_ID, archivedAlert.getId(), "ARCHIVED", "已归档"));
+        assertTrue(alertService.updateStatus(TENANT_ID, invalidAlert.getId(), "INVALID", "已失效"));
+
+        List<Long> alertIds = List.of(processedAlert.getId(), archivedAlert.getId(), invalidAlert.getId());
         List<SysNotification> notifications = notificationMapper.selectList(new LambdaQueryWrapper<SysNotification>()
                 .eq(SysNotification::getTenantId, TENANT_ID)
                 .eq(SysNotification::getBizType, "ALERT_STATUS")
-                .eq(SysNotification::getBizId, alert.getId()));
+                .in(SysNotification::getBizId, alertIds));
         Set<Long> recipients = notifications.stream().map(SysNotification::getUserId)
                 .collect(java.util.stream.Collectors.toSet());
-        assertEquals(Set.of(USER_ADMIN, USER_PROJECT_MANAGER), recipients);
-        assertTrue(notifications.stream().allMatch(item -> item.getTitle().contains("已处理")));
+        assertEquals(Set.of(USER_ADMIN), recipients,
+                "状态通知不能越过 notifyOnStatusChanged、minSeverity 或角色域边界");
+        Set<String> titles = notifications.stream().map(SysNotification::getTitle)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of("预警已处理", "预警已归档", "预警已失效"), titles);
 
         Integer sent = jdbcTemplate.queryForObject("""
                 select count(*) from alert_notification_send_record
-                where tenant_id = ? and alert_id = ? and channel = 'IN_APP'
+                where tenant_id = ? and alert_id in (?, ?, ?) and channel = 'IN_APP'
                   and event_type = 'STATUS_CHANGED' and send_status = 'SENT'
-                """, Integer.class, TENANT_ID, alert.getId());
-        assertEquals(2, sent);
+                """, Integer.class, TENANT_ID, processedAlert.getId(), archivedAlert.getId(), invalidAlert.getId());
+        assertEquals(3, sent);
     }
 
     private AlertLog reportAlert(String severity, int isRead, String processStatus) {
@@ -1189,6 +1190,14 @@ class AlertEvaluationServiceTest {
     }
 
     private void seedMember(Long projectId, Long userId, String roleCode) {
+        Long existing = projectMemberMapper.selectCount(new LambdaQueryWrapper<PmProjectMember>()
+                .eq(PmProjectMember::getTenantId, TENANT_ID)
+                .eq(PmProjectMember::getProjectId, projectId)
+                .eq(PmProjectMember::getUserId, userId)
+                .eq(PmProjectMember::getStatus, "ACTIVE"));
+        if (existing != null && existing > 0) {
+            return;
+        }
         PmProjectMember member = new PmProjectMember();
         member.setTenantId(TENANT_ID);
         member.setProjectId(projectId);
@@ -1209,6 +1218,24 @@ class AlertEvaluationServiceTest {
         alert.setTriggeredAt(LocalDateTime.now());
         alert.setIsRead(0);
         alert.setProcessStatus("OPEN");
+        alert.setDeletedFlag(0);
+        alertLogMapper.insert(alert);
+        return alert;
+    }
+
+    private AlertLog insertStatusAlert(String ruleType) {
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(testProjectId);
+        alert.setRuleType(ruleType);
+        alert.setAlertDomain("CONTRACT");
+        alert.setAlertCategory("CONTRACT_TERM");
+        alert.setSeverity("LOW");
+        alert.setMessage("状态通知测试");
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setCreatedBy(USER_CREATOR);
         alert.setDeletedFlag(0);
         alertLogMapper.insert(alert);
         return alert;
