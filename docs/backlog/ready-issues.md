@@ -1,15 +1,13 @@
-# Ready Issues
+## Ready 队列状态
+
+- 当前无合格 Ready Issue。
+- `ISSUE-008-011` 已完成正式收口并移出 Ready 队列；下一条 Ready 需由主线程按最新阶段、依赖和风险重新拆题。
 
 ## 任务来源
 
 - 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
 - 本文件是当前执行队列，不是任务源全集。
 - 当本文件没有合格 Ready Issue 时，AutoPilot 应先从长期总任务池中按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；拆单当轮只更新 backlog，不直接修改业务代码；连续执行模式下拆单完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮；系统允许最多 3 个完全无关联、无任何代码关联的 Ready Issue 并行，不能证明完全无关联时按串行处理。
-
-## 当前队列状态
-
-- 当前无合格 Ready Issue。
-- `ISSUE-032-001` 已完成正式收口并移出 Ready 队列；下一条 Ready 需由主线程按最新阶段、依赖和风险重新拆题。
 
 ## AutoPilot 自动合并门禁
 
@@ -33,7 +31,7 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-032-001` 已完成正式收口，本文件当前不再保留可直接执行的 Ready Issue。
+1. `ISSUE-008-011` 已完成正式收口，本文件当前不再保留可直接执行的 Ready Issue。
 2. 下一轮执行顺序需由主线程结合 `done/blocked/current-focus` 和长期任务池重新拆题，不沿用本段旧的 workflow 串行入口。
 
 ## P0

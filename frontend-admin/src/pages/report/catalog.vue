@@ -5,6 +5,7 @@ import { ApiOutlined, ExportOutlined, LinkOutlined, ReloadOutlined } from '@ant-
 import { useRouter } from 'vue-router'
 import { getReportCatalog, type ReportCatalogItem } from '@/api/modules/report'
 import { useUserStore } from '@/stores/user'
+import { canOpenReportCatalogPage } from './catalog-entry'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -90,11 +91,7 @@ function getCatalogLabel(value: string) {
 }
 
 function canOpenPage(item: ReportCatalogItem) {
-  if (item.sourceType !== 'page' || !item.target) {
-    return false
-  }
-  const resolved = router.resolve(item.target)
-  return resolved.matched.length > 0 && resolved.name !== 'NotFound'
+  return canOpenReportCatalogPage(item, router.resolve)
 }
 
 function openTarget(item: ReportCatalogItem) {

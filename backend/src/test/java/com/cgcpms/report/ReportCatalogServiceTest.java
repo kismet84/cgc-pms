@@ -9,6 +9,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -57,16 +59,33 @@ class ReportCatalogServiceTest {
         authenticate("cost:ledger:query", "alert:view");
 
         List<ReportCatalogItem> catalog = service.listVisibleCatalog();
+        Set<String> visibleCodes = catalog.stream().map(ReportCatalogItem::code).collect(Collectors.toSet());
 
         assertFalse(catalog.isEmpty());
         assertTrue(catalog.stream().allMatch(item ->
                 item.permissionCode().isEmpty()
                         || item.permissionCode().equals("cost:ledger:query")
                         || item.permissionCode().equals("alert:view")));
+        assertEquals(Set.of(
+                "cost-ledger",
+                "alert-center",
+                "alerts-processing-report",
+                "workflow-efficiency"
+        ), visibleCodes);
         assertNotNull(find(catalog, "cost-ledger"));
+        assertNotNull(find(catalog, "alert-center"));
         assertNotNull(find(catalog, "alerts-processing-report"));
-        assertNotNull(find(catalog, "workflow-efficiency"));
-        assertTrue(catalog.stream().noneMatch(item -> item.permissionCode().equals("dashboard:view")));
+        ReportCatalogItem workflowEfficiency = find(catalog, "workflow-efficiency");
+        assertEquals("api", workflowEfficiency.sourceType());
+        assertEquals("", workflowEfficiency.permissionCode());
+        assertTrue(visibleCodes.stream().noneMatch(code -> Set.of(
+                "dashboard-management",
+                "cost-summary",
+                "workflow-todo",
+                "workflow-cc",
+                "contracts-kpi",
+                "contract-revenue"
+        ).contains(code)));
     }
 
     private ReportCatalogItem find(List<ReportCatalogItem> catalog, String code) {

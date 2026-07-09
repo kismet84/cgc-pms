@@ -44,6 +44,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-010-report-center-catalog-closeout.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-008-011：报表中心平台化缺口-M2：目录权限过滤与入口一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；目录权限过滤与入口一致性回归已补齐；后端测试、前端测试、type-check、build 与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-011-report-center-permission-target-consistency.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09
