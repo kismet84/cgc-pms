@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
@@ -236,6 +237,87 @@ public class WorkflowQueryService {
         });
     }
 
+    public WfEfficiencyVO getMyEfficiency(Long tenantId, Long userId,
+                                          String keyword, String businessType, String instanceStatus,
+                                          LocalDateTime startTime, LocalDateTime endTime,
+                                          int overdueHours, LocalDateTime now) {
+        WfEfficiencyVO vo = new WfEfficiencyVO();
+        int effectiveOverdueHours = Math.max(1, overdueHours);
+        vo.setOverdueHours(effectiveOverdueHours);
+        if (isUnsupportedBusinessType(businessType) || isUnsupportedInstanceStatus(instanceStatus)) {
+            return vo;
+        }
+
+        String normalizedBusinessType = trimToNull(businessType);
+        Set<Long> instanceIds = resolveInstanceIds(tenantId, keyword, normalizedBusinessType, instanceStatus);
+        if (instanceIds != null && instanceIds.isEmpty()) {
+            return vo;
+        }
+
+        Set<Long> runningInstanceIds = wfInstanceMapper.selectList(
+                        new LambdaQueryWrapper<WfInstance>()
+                                .select(WfInstance::getId)
+                                .eq(WfInstance::getTenantId, tenantId)
+                                .eq(WfInstance::getInstanceStatus, WorkflowConstants.INSTANCE_RUNNING))
+                .stream().map(WfInstance::getId).collect(Collectors.toSet());
+
+        LambdaQueryWrapper<WfTask> pendingWrapper = new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getTenantId, tenantId)
+                .eq(WfTask::getApproverId, userId)
+                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING);
+        if (runningInstanceIds.isEmpty()) {
+            pendingWrapper.eq(WfTask::getId, -1L);
+        } else {
+            pendingWrapper.in(WfTask::getInstanceId, runningInstanceIds);
+        }
+        applyTaskFilters(pendingWrapper, normalizedBusinessType, instanceIds, startTime, endTime);
+        vo.setPendingCount(wfTaskMapper.selectCount(pendingWrapper));
+
+        LambdaQueryWrapper<WfTask> overdueWrapper = new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getTenantId, tenantId)
+                .eq(WfTask::getApproverId, userId)
+                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
+                .lt(WfTask::getReceivedAt, now.minusHours(effectiveOverdueHours));
+        if (runningInstanceIds.isEmpty()) {
+            overdueWrapper.eq(WfTask::getId, -1L);
+        } else {
+            overdueWrapper.in(WfTask::getInstanceId, runningInstanceIds);
+        }
+        applyTaskFilters(overdueWrapper, normalizedBusinessType, instanceIds, startTime, endTime);
+        vo.setOverduePendingCount(wfTaskMapper.selectCount(overdueWrapper));
+
+        LambdaQueryWrapper<WfRecord> doneWrapper = buildDoneWrapper(userId, tenantId,
+                normalizedBusinessType, instanceIds, startTime, endTime);
+        vo.setDoneCount(wfRecordMapper.selectCount(doneWrapper));
+
+        List<WfTask> handledTasks = wfTaskMapper.selectList(new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getTenantId, tenantId)
+                .eq(WfTask::getApproverId, userId)
+                .isNotNull(WfTask::getReceivedAt)
+                .isNotNull(WfTask::getHandledAt)
+                .in(WfTask::getTaskStatus,
+                        WorkflowConstants.TASK_APPROVED,
+                        WorkflowConstants.TASK_REJECTED,
+                        WorkflowConstants.TASK_TRANSFERRED));
+        List<WfTask> filteredHandledTasks = handledTasks.stream()
+                .filter(task -> normalizedBusinessType == null || normalizedBusinessType.equals(task.getBusinessType()))
+                .filter(task -> instanceIds == null || instanceIds.contains(task.getInstanceId()))
+                .filter(task -> startTime == null || !task.getHandledAt().isBefore(startTime))
+                .filter(task -> endTime == null || !task.getHandledAt().isAfter(endTime))
+                .toList();
+        long totalMinutes = filteredHandledTasks.stream()
+                .mapToLong(task -> Math.max(0, Duration.between(task.getReceivedAt(), task.getHandledAt()).toMinutes()))
+                .sum();
+        vo.setHandledTaskCount(filteredHandledTasks.size());
+        if (!filteredHandledTasks.isEmpty()) {
+            vo.setAverageHandleMinutes(totalMinutes / filteredHandledTasks.size());
+        }
+
+        vo.setInstanceStatusCounts(countMyStartedByStatus(tenantId, userId,
+                keyword, normalizedBusinessType, instanceStatus, startTime, endTime));
+        return vo;
+    }
+
     // ── 实例详情 ──
 
     public WfInstanceVO getInstanceDetail(Long tenantId, Long instanceId, Long currentUserId) {
@@ -372,6 +454,77 @@ public class WorkflowQueryService {
         page.setRecords(Collections.emptyList());
         page.setTotal(0);
         return page;
+    }
+
+    private void applyTaskFilters(LambdaQueryWrapper<WfTask> wrapper, String businessType,
+                                  Set<Long> instanceIds, LocalDateTime startTime, LocalDateTime endTime) {
+        if (businessType != null) {
+            wrapper.eq(WfTask::getBusinessType, businessType);
+        }
+        if (instanceIds != null) {
+            wrapper.in(WfTask::getInstanceId, instanceIds);
+        }
+        if (startTime != null) {
+            wrapper.ge(WfTask::getReceivedAt, startTime);
+        }
+        if (endTime != null) {
+            wrapper.le(WfTask::getReceivedAt, endTime);
+        }
+    }
+
+    private LambdaQueryWrapper<WfRecord> buildDoneWrapper(Long userId, Long tenantId, String businessType,
+                                                          Set<Long> instanceIds,
+                                                          LocalDateTime startTime, LocalDateTime endTime) {
+        LambdaQueryWrapper<WfRecord> wrapper = new LambdaQueryWrapper<WfRecord>()
+                .eq(WfRecord::getTenantId, tenantId)
+                .eq(WfRecord::getOperatorId, userId)
+                .in(WfRecord::getActionType,
+                        WorkflowConstants.ACTION_APPROVE,
+                        WorkflowConstants.ACTION_REJECT,
+                        WorkflowConstants.ACTION_TRANSFER,
+                        WorkflowConstants.ACTION_ADD_SIGN);
+        if (businessType != null) {
+            wrapper.eq(WfRecord::getBusinessType, businessType);
+        }
+        if (instanceIds != null) {
+            wrapper.in(WfRecord::getInstanceId, instanceIds);
+        }
+        if (startTime != null) {
+            wrapper.ge(WfRecord::getCreatedAt, startTime);
+        }
+        if (endTime != null) {
+            wrapper.le(WfRecord::getCreatedAt, endTime);
+        }
+        return wrapper;
+    }
+
+    private Map<String, Long> countMyStartedByStatus(Long tenantId, Long userId, String keyword,
+                                                     String businessType, String instanceStatus, LocalDateTime startTime,
+                                                     LocalDateTime endTime) {
+        String normalizedKeyword = trimToNull(keyword);
+        String normalizedStatus = trimToNull(instanceStatus);
+        LambdaQueryWrapper<WfInstance> wrapper = new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getTenantId, tenantId)
+                .eq(WfInstance::getInitiatorId, userId);
+        if (normalizedKeyword != null) {
+            wrapper.and(w -> w.like(WfInstance::getTitle, normalizedKeyword)
+                    .or()
+                    .like(WfInstance::getBusinessSummary, normalizedKeyword));
+        }
+        if (businessType != null) {
+            wrapper.eq(WfInstance::getBusinessType, businessType);
+        }
+        if (normalizedStatus != null) {
+            wrapper.eq(WfInstance::getInstanceStatus, normalizedStatus);
+        }
+        if (startTime != null) {
+            wrapper.ge(WfInstance::getCreatedAt, startTime);
+        }
+        if (endTime != null) {
+            wrapper.le(WfInstance::getCreatedAt, endTime);
+        }
+        return wfInstanceMapper.selectList(wrapper).stream()
+                .collect(Collectors.groupingBy(WfInstance::getInstanceStatus, LinkedHashMap::new, Collectors.counting()));
     }
 
     private boolean isAuthorized(WfInstance instance, Long tenantId, Long instanceId, Long currentUserId) {

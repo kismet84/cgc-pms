@@ -1,5 +1,36 @@
 # Iteration Report - 2026-07-09
 
+Issue：ISSUE-008-005 审批效率报表口径回归
+
+目标：
+- 回归审批效率报表的待办数量、已办数量、超时/耗时和审批状态口径。
+- 不改审批状态机，不新增审批分析专用表。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/workflow/vo/WfEfficiencyVO.java`：新增审批效率统计 VO。
+- `backend/src/main/java/com/cgcpms/workflow/controller/WorkflowController.java`：新增 `GET /workflow/statistics/efficiency` 只读报表接口。
+- `backend/src/main/java/com/cgcpms/workflow/service/WorkflowQueryService.java`：复用待办、已办和我发起列表边界聚合待办数、已办数、超时待办、平均耗时和状态分布。
+- `backend/src/test/java/com/cgcpms/workflow/WorkflowQueryServiceTest.java`：补充报表与审批中心列表口径一致的稳定断言。
+- `docs/quality/issue-008-005-workflow-efficiency-report.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-005 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowQueryServiceTest#getMyEfficiencyUsesWorkflowListSemantics" test`：通过，`1` 个用例通过。
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowQueryServiceTest" test`：通过，`32` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过；失败点集中在既有 dashboard、invoice、migration、workflow、purchase、payment、revenue 测试夹具/断言问题，目标测试已通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前 `wf_task` 无独立截止时间字段，超时统计基于 `receivedAt + overdueHours` 推导；如需 SLA 到期时间，需要另立 schema 任务。
+- 后端全量测试仍有既有无关红灯，需后续 Ready Issue 分别治理。
+
+---
+
 Issue：ISSUE-008-004 预警处理报表口径回归
 
 目标：

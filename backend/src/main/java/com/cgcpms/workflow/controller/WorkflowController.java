@@ -13,6 +13,7 @@ import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.service.WorkflowQueryService;
 import com.cgcpms.workflow.vo.WfCcVO;
+import com.cgcpms.workflow.vo.WfEfficiencyVO;
 import com.cgcpms.workflow.vo.WfInstanceVO;
 import com.cgcpms.workflow.vo.WfMyInstanceVO;
 import com.cgcpms.workflow.vo.WfRecordVO;
@@ -186,6 +187,22 @@ public class WorkflowController {
         IPage<WfCcVO> page = workflowQueryService.getMyCc(userId, tenantId,
                 keyword, businessType, instanceStatus, startTime, endTime, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/statistics/efficiency")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<WfEfficiencyVO> myEfficiency(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String businessType,
+            @RequestParam(required = false) String instanceStatus,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
+            @RequestParam(defaultValue = "48") int overdueHours) {
+        Long userId = UserContext.getCurrentUserId();
+        Long tenantId = UserContext.getCurrentTenantId();
+        WfEfficiencyVO stat = workflowQueryService.getMyEfficiency(tenantId, userId,
+                keyword, businessType, instanceStatus, startTime, endTime, overdueHours, LocalDateTime.now());
+        return ApiResponse.success(stat);
     }
 
     @GetMapping("/instances/{instanceId}")

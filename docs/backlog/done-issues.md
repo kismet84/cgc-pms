@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-005：审批效率报表口径回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；审批效率报表口径已补齐；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-008-005-workflow-efficiency-report.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-008-001：经营总览报表口径与来源下钻回归
 
 完成日期：2026-07-09

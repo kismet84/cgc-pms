@@ -11,6 +11,7 @@ import com.cgcpms.workflow.mapper.*;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.service.WorkflowQueryService;
 import com.cgcpms.workflow.vo.WfCcVO;
+import com.cgcpms.workflow.vo.WfEfficiencyVO;
 import com.cgcpms.workflow.vo.WfInstanceVO;
 import com.cgcpms.workflow.vo.WfMyInstanceVO;
 import com.cgcpms.workflow.vo.WfRecordVO;
@@ -562,6 +563,40 @@ class WorkflowQueryServiceTest {
         assertEquals(0, noHit.getTotal());
     }
 
+    @Test
+    @DisplayName("ISSUE-008-005: getMyEfficiency 复用待办已办状态和耗时口径")
+    void getMyEfficiencyUsesWorkflowListSemantics() {
+        LocalDateTime base = LocalDateTime.of(2099, 7, 1, 10, 0, 0);
+        Long pendingInstanceId = insertStartedInstance(33333023L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_ADMIN,
+                WorkflowConstants.INSTANCE_RUNNING, "效率统计合同待办", "合同审批节点", base.minusDays(4), base.minusDays(4));
+        Long doneInstanceId = insertStartedInstance(33333024L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_ADMIN,
+                WorkflowConstants.INSTANCE_APPROVED, "效率统计合同已办", "合同审批节点", base.minusDays(3), base.minusDays(3));
+        Long otherTenantInstanceId = insertStartedInstance(33333025L, WorkflowBusinessTypes.CONTRACT_APPROVAL, USER_ADMIN,
+                WorkflowConstants.INSTANCE_RUNNING, "效率统计其他租户待办", "合同审批节点", base.minusDays(2), base.minusDays(2));
+        jdbcTemplate.update("UPDATE wf_instance SET tenant_id = 99 WHERE id = ?", otherTenantInstanceId);
+
+        insertTask(pendingInstanceId, 33333023L, WorkflowBusinessTypes.CONTRACT_APPROVAL,
+                USER_ADMIN, base.minusHours(50));
+        insertHandledTask(doneInstanceId, 33333024L, WorkflowBusinessTypes.CONTRACT_APPROVAL,
+                USER_ADMIN, base.minusHours(3), base.minusHours(1), WorkflowConstants.TASK_APPROVED);
+        insertRecord(doneInstanceId, 33333024L, WorkflowBusinessTypes.CONTRACT_APPROVAL,
+                WorkflowConstants.ACTION_APPROVE, USER_ADMIN, base.minusHours(1));
+        insertTask(otherTenantInstanceId, 33333025L, WorkflowBusinessTypes.CONTRACT_APPROVAL,
+                USER_ADMIN, base.minusHours(60));
+
+        WfEfficiencyVO stat = queryService.getMyEfficiency(TENANT_0, USER_ADMIN,
+                "效率统计", WorkflowBusinessTypes.CONTRACT_APPROVAL, null,
+                base.minusDays(5), base, 48, base);
+
+        assertEquals(1, stat.getPendingCount());
+        assertEquals(1, stat.getOverduePendingCount());
+        assertEquals(1, stat.getDoneCount());
+        assertEquals(1, stat.getHandledTaskCount());
+        assertEquals(120, stat.getAverageHandleMinutes());
+        assertEquals(1L, stat.getInstanceStatusCounts().get(WorkflowConstants.INSTANCE_RUNNING));
+        assertEquals(1L, stat.getInstanceStatusCounts().get(WorkflowConstants.INSTANCE_APPROVED));
+    }
+
     // ── getInstanceDetail ──
 
     @Test
@@ -1076,6 +1111,27 @@ class WorkflowQueryServiceTest {
         task.setRoundNo(1);
         task.setTaskVersion(0);
         task.setReceivedAt(receivedAt);
+        taskMapper.insert(task);
+    }
+
+    private void insertHandledTask(Long instanceId, Long businessId, String businessType,
+                                   Long approverId, LocalDateTime receivedAt, LocalDateTime handledAt,
+                                   String taskStatus) {
+        WfNodeInstance node = nodeInstanceMapper.selectOne(new LambdaQueryWrapper<WfNodeInstance>()
+                .eq(WfNodeInstance::getInstanceId, instanceId));
+        WfTask task = new WfTask();
+        task.setTenantId(TENANT_0);
+        task.setInstanceId(instanceId);
+        task.setNodeInstanceId(node == null ? null : node.getId());
+        task.setBusinessType(businessType);
+        task.setBusinessId(businessId);
+        task.setApproverId(approverId);
+        task.setApproverName("filter-user");
+        task.setTaskStatus(taskStatus);
+        task.setRoundNo(1);
+        task.setTaskVersion(0);
+        task.setReceivedAt(receivedAt);
+        task.setHandledAt(handledAt);
         taskMapper.insert(task);
     }
 
