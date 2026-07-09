@@ -10,8 +10,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -193,8 +201,59 @@ class AlertNotificationDispatcherTest {
     }
 
     @Test
-    @DisplayName("不同事件类型和不同告警不应被站内通知抑制合并")
-    void doesNotSuppressDifferentEventTypeOrAlert() {
+    @DisplayName("并发重复站内通知分发只允许一条有效发送记录")
+    void suppressesConcurrentDuplicateInAppDispatches() throws Exception {
+        List<AlertNotificationSendRecord> records = Collections.synchronizedList(new ArrayList<>());
+        CountDownLatch sendEntered = new CountDownLatch(2);
+        AtomicLong notificationId = new AtomicLong(7000L);
+        AlertNotificationSender slowInAppSender = new AlertNotificationSender() {
+            @Override
+            public AlertNotificationChannel channel() {
+                return AlertNotificationChannel.IN_APP;
+            }
+
+            @Override
+            public AlertNotificationSendResult send(Long tenantId, Long userId, AlertLog alert,
+                                                    String eventType, String bizType, String title, String content) {
+                sendEntered.countDown();
+                try {
+                    sendEntered.await(200, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return AlertNotificationSendResult.sent(notificationId.incrementAndGet());
+            }
+        };
+        AlertNotificationDispatcher dispatcher =
+                new AlertNotificationDispatcher(recordMapper, List.of(slowInAppSender));
+        AlertLog alert = alert();
+        when(recordMapper.selectCount(any())).thenAnswer(invocation -> countSent(records));
+        when(recordMapper.insert(any(AlertNotificationSendRecord.class))).thenAnswer(invocation -> {
+            records.add(invocation.getArgument(0));
+            return 1;
+        });
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> first = executor.submit(() ->
+                    dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP")));
+            Future<?> second = executor.submit(() ->
+                    dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP")));
+
+            first.get(5, TimeUnit.SECONDS);
+            second.get(5, TimeUnit.SECONDS);
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertEquals(1, countStatus(records, "SENT"));
+        assertEquals(1, countStatus(records, "SKIPPED"));
+        assertEquals(1, countReason(records, "DUPLICATE_IN_APP_SUPPRESSED"));
+    }
+
+    @Test
+    @DisplayName("不同事件类型、不同告警和不同目标用户不应被站内通知抑制合并")
+    void doesNotSuppressDifferentEventTypeAlertOrTargetUser() {
         AlertNotificationDispatcher dispatcher =
                 new AlertNotificationDispatcher(recordMapper, List.of(inAppSender));
         AlertLog alert = alert();
@@ -210,14 +269,18 @@ class AlertNotificationDispatcherTest {
         when(inAppSender.send(eq(10L), eq(21L), eq(anotherAlert), eq("ALERT_CREATED"),
                 eq("ALERT"), eq("另一个采购逾期"), eq("采购订单逾期")))
                 .thenReturn(AlertNotificationSendResult.sent(7003L));
+        when(inAppSender.send(eq(10L), eq(22L), eq(alert), eq("ALERT_CREATED"),
+                eq("ALERT"), eq("采购逾期"), eq("采购订单逾期")))
+                .thenReturn(AlertNotificationSendResult.sent(7004L));
 
         dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP"));
         dispatcher.dispatchStatusChanged(10L, 21L, alert, "预警已归档", null, Set.of("IN_APP"));
         dispatcher.dispatchAlertCreated(10L, 21L, anotherAlert, "另一个采购逾期", Set.of("IN_APP"));
+        dispatcher.dispatchAlertCreated(10L, 22L, alert, "采购逾期", Set.of("IN_APP"));
 
         ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
                 ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
-        verify(recordMapper, times(3)).insert(recordCaptor.capture());
+        verify(recordMapper, times(4)).insert(recordCaptor.capture());
         List<AlertNotificationSendRecord> records = recordCaptor.getAllValues();
         assertEquals("SENT", records.get(0).getSendStatus());
         assertEquals("ALERT_CREATED", records.get(0).getEventType());
@@ -228,6 +291,34 @@ class AlertNotificationDispatcherTest {
         assertEquals("SENT", records.get(2).getSendStatus());
         assertEquals("ALERT_CREATED", records.get(2).getEventType());
         assertEquals(9002L, records.get(2).getAlertId());
+        assertEquals("SENT", records.get(3).getSendStatus());
+        assertEquals("ALERT_CREATED", records.get(3).getEventType());
+        assertEquals(9001L, records.get(3).getAlertId());
+        assertEquals(22L, records.get(3).getTargetUserId());
+    }
+
+    private long countSent(List<AlertNotificationSendRecord> records) {
+        synchronized (records) {
+            return records.stream()
+                    .filter(record -> "SENT".equals(record.getSendStatus()))
+                    .count();
+        }
+    }
+
+    private long countStatus(List<AlertNotificationSendRecord> records, String status) {
+        synchronized (records) {
+            return records.stream()
+                    .filter(record -> status.equals(record.getSendStatus()))
+                    .count();
+        }
+    }
+
+    private long countReason(List<AlertNotificationSendRecord> records, String reason) {
+        synchronized (records) {
+            return records.stream()
+                    .filter(record -> reason.equals(record.getFailReason()))
+                    .count();
+        }
     }
 
     private void assertSkipped(AlertNotificationSendRecord record, String channel, String failReason) {

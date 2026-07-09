@@ -14,7 +14,9 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -23,6 +25,7 @@ public class AlertNotificationDispatcher {
 
     private final AlertNotificationSendRecordMapper recordMapper;
     private final List<AlertNotificationSender> senders;
+    private final Map<DispatchKey, Object> inAppLocks = new ConcurrentHashMap<>();
 
     public void dispatchAlertCreated(Long tenantId, Long userId, AlertLog alert, String title) {
         dispatchAlertCreated(tenantId, userId, alert, title, Set.of(AlertNotificationChannel.IN_APP.name()));
@@ -56,27 +59,44 @@ public class AlertNotificationDispatcher {
                 continue;
             }
             DispatchKey key = new DispatchKey(tenantId, alert.getId(), userId, eventType, channel);
-            if (channel == AlertNotificationChannel.IN_APP
-                    && (sentInAppKeys.contains(key)
-                    || hasSentInAppRecord(tenantId, userId, alert.getId(), eventType))) {
-                record(tenantId, userId, alert.getId(), eventType, channel.name(), null,
-                        "SKIPPED", "DUPLICATE_IN_APP_SUPPRESSED");
+            if (channel == AlertNotificationChannel.IN_APP) {
+                Object lock = inAppLocks.computeIfAbsent(key, ignored -> new Object());
+                try {
+                    synchronized (lock) {
+                        if (sentInAppKeys.contains(key)
+                                || hasSentInAppRecord(tenantId, userId, alert.getId(), eventType)) {
+                            record(tenantId, userId, alert.getId(), eventType, channel.name(), null,
+                                    "SKIPPED", "DUPLICATE_IN_APP_SUPPRESSED");
+                            continue;
+                        }
+                        if (sendAndRecord(sender, tenantId, userId, alert, eventType, bizType, title, content, channel)) {
+                            sentInAppKeys.add(key);
+                        }
+                    }
+                } finally {
+                    inAppLocks.remove(key, lock);
+                }
                 continue;
             }
-            try {
-                AlertNotificationSendResult result = sender.send(tenantId, userId, alert, eventType,
-                        bizType, title, content);
-                record(tenantId, userId, alert.getId(), eventType, channel.name(),
-                        result.notificationId(), result.status(), result.reason());
-                if (channel == AlertNotificationChannel.IN_APP && "SENT".equals(result.status())) {
-                    sentInAppKeys.add(key);
-                }
-            } catch (Exception e) {
-                record(tenantId, userId, alert.getId(), eventType, channel.name(), null,
-                        "FAILED", e.getMessage());
-                log.warn("Failed to dispatch alert notification: alertId={}, channel={}, eventType={}",
-                        alert.getId(), channel.name(), eventType, e);
-            }
+            sendAndRecord(sender, tenantId, userId, alert, eventType, bizType, title, content, channel);
+        }
+    }
+
+    private boolean sendAndRecord(AlertNotificationSender sender, Long tenantId, Long userId, AlertLog alert,
+                                  String eventType, String bizType, String title, String content,
+                                  AlertNotificationChannel channel) {
+        try {
+            AlertNotificationSendResult result = sender.send(tenantId, userId, alert, eventType,
+                    bizType, title, content);
+            record(tenantId, userId, alert.getId(), eventType, channel.name(),
+                    result.notificationId(), result.status(), result.reason());
+            return "SENT".equals(result.status());
+        } catch (Exception e) {
+            record(tenantId, userId, alert.getId(), eventType, channel.name(), null,
+                    "FAILED", e.getMessage());
+            log.warn("Failed to dispatch alert notification: alertId={}, channel={}, eventType={}",
+                    alert.getId(), channel.name(), eventType, e);
+            return false;
         }
     }
 

@@ -1,6 +1,7 @@
 ## Ready 队列状态
 
-- 当前合格 Ready Issue：无。
+- 当前无合格 Ready Issue。
+- `ISSUE-008-019` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `8/10` 个实施型 Ready Issue。
 - `ISSUE-008-018：通知平台平台化缺口-M4：同告警重复通知抑制与站内信频控回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `7/10` 个实施型 Ready Issue。
 - `ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `6/10` 个实施型 Ready Issue。
 - `ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `5/10` 个实施型 Ready Issue。
@@ -35,8 +36,8 @@
 
 ## 执行顺序建议
 
-1. 当前 Ready 队列已空，先由主线程/A 基于长期总任务池与当前阻塞现状裁决下一条串行 Ready。
-2. 后续若继续通知平台细化，需重新确认与规则治理中心、WBS / 甘特图、供应商评分 / 采购增强等候选的优先级与并行边界。
+1. 当前 Ready 队列已空，需由主线程/A 基于长期任务池重新裁决下一条 P2 Ready。
+2. 后续若继续通知平台细化，仍需重新确认与规则治理中心、WBS / 甘特图、供应商评分 / 采购增强等候选的优先级与并行边界。
 
 ## P0
 
@@ -233,6 +234,43 @@
 归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
 
 ## P2
+
+### ISSUE-008-019：通知平台平台化缺口-M5：并发重复分发幂等与发送记录一致性回归
+
+优先级：P2
+类型：通知平台 / 后端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节“同类通知不会重复轰炸 / 所有通知有发送记录”；`docs/quality/issue-008-018-notification-dedup-frequency-guard.md`
+是否需要新增 migration：否；优先复用现有 `AlertNotificationDispatcher`、`AlertNotificationSendRecord`、`NotificationService` 与既有测试基座，不新增通知平台表结构。
+目标：
+- 补齐同一 `tenantId + alertId + targetUserId + eventType + IN_APP` 在并发重复触发时的最小幂等语义，避免串行场景已抑制、并发场景仍重复落站内信或重复记 `SENT`。
+- 约束并发竞争下的发送记录一致性：允许留下明确 `SKIPPED`/抑制原因，但不能让同一并发批次产生多条有效 `SENT` 记录。
+- 不扩大为模板中心、失败重试队列、全局频控配置、外部渠道真实接入或通知平台新表设计。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/notification/**`
+- `backend/src/main/java/com/cgcpms/notification/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/notification/**`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 邮件、短信、企业微信、钉钉、WebSocket 等外部渠道真实接入
+- 模板中心、失败重试队列、全局可配置频控、权限模型重构
+验收标准：
+- 至少一组后端并发回归证明：同一 `alertId + targetUserId + eventType + IN_APP` 在并发重复分发时，最终只产生一条有效站内通知或一条有效 `SENT` 发送记录。
+- 至少一组后端并发回归证明：被抑制的并发重复分发必须留下明确 `SKIPPED`/原因，不能误记为第二条 `SENT`。
+- 至少一组后端回归证明：不同事件类型、不同告警 ID 或不同目标用户不会被错误串并，既有串行抑制语义不回退。
+- 不放宽预警域、租户、角色和项目边界；既有订阅偏好、占位渠道语义、SSE 通知链路与发送记录留痕不回退。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest,NotificationServiceTest,AlertEvaluationServiceTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-019-notification-concurrency-idempotency.md`
 
 ### ISSUE-008-018：通知平台平台化缺口-M4：同告警重复通知抑制与站内信频控回归
 

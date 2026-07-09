@@ -108,6 +108,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-018-notification-dedup-frequency-guard.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-019：通知平台平台化缺口-M5：并发重复分发幂等与发送记录一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；并发重复分发幂等与发送记录一致性回归已补齐；后端 63 项测试、D 最终验收、E 最终复审与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-019-notification-concurrency-idempotency.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09
