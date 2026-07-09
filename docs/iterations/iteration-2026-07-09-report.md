@@ -674,3 +674,38 @@ Issue：ISSUE-004-010 审批流转通知与预警联动回归
 - 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
 - 本轮只复用站内通知和应用内 `alert_log` 预警信号，不验证外部通知平台、短信、邮件或企业微信渠道。
 - 用户已发出 `停止自动迭代系统`，当前观察到 stopRequested=true 且 enabled=false；本轮完成当前 Issue 安全收口后不得启动 ISSUE-004-011。
+
+---
+
+Issue：ISSUE-004-011 驾驶舱汇总指标来源单据下钻回归
+
+目标：
+- 回归驾驶舱汇总指标与来源单据下钻链路，确保指标可解释、来源可定位。
+- 不扩大为驾驶舱重设计或新增报表中心能力。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/dashboard/vo/CostManagerDashboardVO.java`：成本经理驾驶舱台账行增加 `sourceType/sourceId`。
+- `backend/src/main/java/com/cgcpms/dashboard/service/DashboardCostService.java`：成本、合同、资金三类台账行返回可定位来源标识；单合同成本科目汇总行可定位到合同来源。
+- `backend/src/test/java/com/cgcpms/dashboard/service/DashboardCostServiceTest.java`：补充来源标识回归断言。
+- `frontend-admin/src/types/dashboard.ts`、`frontend-admin/src/pages/dashboard/components/DashboardCostView.vue`：补齐前端类型，并复用既有合同详情、付款申请、成本台账页面进行下钻。
+- `docs/quality/issue-004-011-dashboard-source-drilldown-regression.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-004-011 收口为 Done；当前 Ready 队列暂无合格 Ready Issue。
+
+验证命令摘要：
+- `http://localhost:8080/api/actuator/health`：通过，HTTP 200。
+- `http://localhost:5173/`：通过，HTTP 200。
+- `http://localhost:5173/api/auth/dev-login?redirect=/dashboard`：通过，跟随重定向后 HTTP 200。
+- `cd backend; .\mvnw.cmd "-Dtest=DashboardCostServiceTest" test`：通过，`11` 个用例通过。
+- `cd backend; .\mvnw.cmd test`：未通过，失败类集中在既有 `DashboardChiefEngineerServiceTest`、`InvoiceValidationTest`、`MigrationSoftDeleteBehaviorTest`、`Phase2FullChainIntegrationTest`、`Phase4IntegrationTest`、`PurchaseRequestServiceTest`、`ContractRevenueServiceTest` 和旧 `workflow` 测试夹具/断言问题；本轮目标类已通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 全量后端测试仍有既有无关红灯，需按对应 Ready Issue 分别治理。
+- 本轮只补齐成本驾驶舱台账来源标识和前端跳转参数，不新增报表中心或更细粒度来源列表。

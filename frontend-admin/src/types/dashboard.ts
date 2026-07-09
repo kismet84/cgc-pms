@@ -232,6 +232,8 @@ export interface CostManagerPendingPayment {
 
 export interface CostManagerLedgerRow {
   rowType?: 'cost' | 'contract' | 'fund'
+  sourceType?: 'CONTRACT' | 'PAY_RECORD' | 'COST_SUBJECT'
+  sourceId?: string
   costSubjectId: string
   costSubjectName: string
   contractCode: string

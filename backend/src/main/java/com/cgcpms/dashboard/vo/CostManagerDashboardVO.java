@@ -86,6 +86,8 @@ public class CostManagerDashboardVO {
     @Data
     public static class LedgerRow {
         private String rowType;
+        private String sourceType;
+        private String sourceId;
         private String costSubjectId;
         private String costSubjectName;
         private String contractCode;

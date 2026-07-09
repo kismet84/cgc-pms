@@ -729,13 +729,13 @@ public class DashboardCostService extends DashboardSharedSupport {
                 .filter(Objects::nonNull)
                 .toList();
         if (matchedContracts.isEmpty()) {
-            return new ContractDisplay("", "");
+            return new ContractDisplay("", "", null);
         }
         if (matchedContracts.size() == 1) {
             CtContract contract = matchedContracts.get(0);
-            return new ContractDisplay(contract.getContractCode(), contract.getContractName());
+            return new ContractDisplay(contract.getContractCode(), contract.getContractName(), contract.getId());
         }
-        return new ContractDisplay("多合同汇总", matchedContracts.size() + "个合同");
+        return new ContractDisplay("多合同汇总", matchedContracts.size() + "个合同", null);
     }
 
     private CostManagerDashboardVO.LedgerRow toCostLedgerRow(CostManagerDashboardVO.SubjectRanking ranking, ContractDisplay contractDisplay) {
@@ -751,6 +751,10 @@ public class DashboardCostService extends DashboardSharedSupport {
 
         CostManagerDashboardVO.LedgerRow row = new CostManagerDashboardVO.LedgerRow();
         row.setRowType("cost");
+        row.setSourceType(contractDisplay != null && contractDisplay.id() != null ? "CONTRACT" : "COST_SUBJECT");
+        row.setSourceId(contractDisplay != null && contractDisplay.id() != null
+                ? String.valueOf(contractDisplay.id())
+                : ranking.getCostSubjectId());
         row.setCostSubjectId(ranking.getCostSubjectId());
         row.setCostSubjectName(ranking.getCostSubjectName());
         row.setContractCode(contractDisplay != null ? contractDisplay.code() : "");
@@ -765,7 +769,7 @@ public class DashboardCostService extends DashboardSharedSupport {
         return row;
     }
 
-    private record ContractDisplay(String code, String name) {
+    private record ContractDisplay(String code, String name, Long id) {
     }
 
     private CostManagerDashboardVO.LedgerRow toContractLedgerRow(CtContract contract) {
@@ -782,6 +786,8 @@ public class DashboardCostService extends DashboardSharedSupport {
 
         CostManagerDashboardVO.LedgerRow row = new CostManagerDashboardVO.LedgerRow();
         row.setRowType("contract");
+        row.setSourceType("CONTRACT");
+        row.setSourceId(String.valueOf(contract.getId()));
         row.setCostSubjectId("");
         row.setCostSubjectName(contract.getContractType());
         row.setContractCode(contract.getContractCode());
@@ -803,6 +809,8 @@ public class DashboardCostService extends DashboardSharedSupport {
 
         CostManagerDashboardVO.LedgerRow row = new CostManagerDashboardVO.LedgerRow();
         row.setRowType("fund");
+        row.setSourceType("PAY_RECORD");
+        row.setSourceId(String.valueOf(payRecord.getId()));
         row.setCostSubjectId("");
         row.setCostSubjectName("资金支付");
         row.setContractCode(payRecord.getVoucherNo() != null ? payRecord.getVoucherNo() : String.valueOf(payRecord.getId()));

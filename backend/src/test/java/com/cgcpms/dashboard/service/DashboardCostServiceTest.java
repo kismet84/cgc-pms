@@ -146,9 +146,19 @@ class DashboardCostServiceTest extends DashboardServiceTestSupport {
                 .findFirst()
                 .orElseThrow();
         assertEquals("人工费", costRow.getCostSubjectName());
+        assertEquals("CONTRACT", costRow.getSourceType());
+        assertNotNull(costRow.getSourceId());
         assertEquals("CT-COST_FULL", costRow.getContractCode());
         assertEquals("Contract COST_FULL", costRow.getContractName());
         assertEquals("正常", costRow.getStatus());
+        assertTrue(vo.getLedgerRows().stream()
+                .anyMatch(row -> "contract".equals(row.getRowType())
+                        && "CONTRACT".equals(row.getSourceType())
+                        && row.getSourceId() != null));
+        assertTrue(vo.getLedgerRows().stream()
+                .anyMatch(row -> "fund".equals(row.getRowType())
+                        && "PAY_RECORD".equals(row.getSourceType())
+                        && row.getSourceId() != null));
         assertEquals((long) vo.getLedgerRows().size(), vo.getLedgerTotal());
     }
 

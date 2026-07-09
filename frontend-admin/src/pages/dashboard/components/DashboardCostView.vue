@@ -417,6 +417,7 @@ function exportLedgerCsv() {
 }
 
 function ledgerRoute(row: CostManagerLedgerRow) {
+  if (row.sourceType === 'CONTRACT' && row.sourceId) return `/contract/${row.sourceId}`
   if (row.rowType === 'contract') return '/contract/ledger'
   if (row.rowType === 'fund') return '/payment/application'
   return '/cost/ledger'
@@ -426,6 +427,8 @@ function viewLedgerRow(row: CostManagerLedgerRow | undefined) {
   if (!row) return
   const query: Record<string, string> = {}
   if (props.data.projectId) query.projectId = props.data.projectId
+  if (row.sourceType) query.sourceType = row.sourceType
+  if (row.sourceId) query.sourceId = row.sourceId
   if (row.rowType === 'cost' && row.costSubjectId) query.costSubjectId = row.costSubjectId
   router.push({ path: ledgerRoute(row), query })
 }

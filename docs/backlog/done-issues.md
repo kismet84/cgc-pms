@@ -19,6 +19,14 @@
 验证结果：通过  
 相关报告：docs/iterations/iteration-2026-07-08-report.md
 
+### ISSUE-004-011：驾驶舱汇总指标来源单据下钻回归
+
+完成日期：2026-07-09
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+验证结果：通过
+相关报告：docs/quality/issue-004-011-dashboard-source-drilldown-regression.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-004-007：合同清单金额与付款条件回归
 
 完成日期：2026-07-09
