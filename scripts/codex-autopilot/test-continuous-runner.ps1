@@ -7,6 +7,7 @@ $Runner = Join-Path $ScriptDir "autopilot-run-continuous.ps1"
 $Executor = Join-Path $ScriptDir "autopilot-exec-issue.ps1"
 $StatusScript = Join-Path $ScriptDir "autopilot-status.ps1"
 $KillScript = Join-Path $ScriptDir "autopilot-kill.ps1"
+$ReadinessScript = Join-Path $ScriptDir "autopilot-readiness-check.ps1"
 $TempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("cgc-pms-autopilot-runner-test-" + [guid]::NewGuid().ToString("N"))
 
 function New-Fixture {
@@ -21,6 +22,7 @@ function New-Fixture {
 - P2 报表中心、规则治理中心、通知平台、WBS / 进度计划 / 甘特图、供应商评分 / 采购增强。
 "@,
     [int]$MaxIssuesPerRun = 1,
+    [string]$ExecutorMode = "success",
     [switch]$Enabled
   )
 
@@ -42,12 +44,49 @@ function New-Fixture {
   "repoRoot": "$($Root -replace '\\', '\\')",
   "autopilotDir": "$(($AutoDir) -replace '\\', '\\')",
   "maxIssuesPerRun": $MaxIssuesPerRun,
-  "autoPush": false
+  "autoPush": false,
+  "issueExecutor": {
+    "command": "powershell",
+    "args": [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "{repoRoot}\\scripts\\codex-autopilot\\mock-issue-executor.ps1",
+      "-RepoRoot",
+      "{repoRoot}",
+      "-IssueId",
+      "{issueId}",
+      "-PromptPath",
+      "{promptFile}"
+    ],
+    "timeoutSeconds": 30,
+    "requireChangedFiles": true
+  }
 }
 "@ | Out-File -Encoding utf8 (Join-Path $ScriptDir "codex-autopilot.config.json")
+  @"
+param(
+  [string]`$RepoRoot,
+  [string]`$IssueId,
+  [string]`$PromptPath
+)
+if ("$ExecutorMode" -eq "missing") {
+  exit 9
+}
+if ("$ExecutorMode" -eq "fail") {
+  Write-Host "mock executor failed for `$IssueId"
+  exit 7
+}
+if ("$ExecutorMode" -ne "no-change") {
+  "executed `$IssueId with `$PromptPath" | Out-File -Encoding utf8 (Join-Path `$RepoRoot "docs\quality\mock-execution.txt")
+}
+Write-Host "mock executor completed for `$IssueId"
+"@ | Out-File -Encoding utf8 (Join-Path $ScriptDir "mock-issue-executor.ps1")
   $Ready | Out-File -Encoding utf8 (Join-Path $BacklogDir "ready-issues.md")
   $Focus | Out-File -Encoding utf8 (Join-Path $BacklogDir "current-focus.md")
   $Plan | Out-File -Encoding utf8 (Join-Path $BacklogDir "cgc-pms-production-enhancement-plan.md")
+  & git -C $Root init -q 2>$null
   return $Root
 }
 
@@ -97,6 +136,18 @@ function Invoke-Executor {
     $args += "-Noop"
   }
   & powershell @args 2>&1 | Out-String
+}
+
+function Invoke-Readiness {
+  param(
+    [string]$Root,
+    [string]$Config = ""
+  )
+
+  if (!$Config) {
+    $Config = Join-Path $Root "scripts\codex-autopilot\codex-autopilot.config.json"
+  }
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $ReadinessScript -RepoRoot $Root -ConfigPath $Config -AllowStopped 2>&1 | Out-String
 }
 
 function Set-IssueStatus {
@@ -242,7 +293,6 @@ try {
   $ReadyOutput = Invoke-Runner $ReadyRoot
   Assert-Contains $ReadyOutput "READY_ISSUE_FOUND"
   Assert-Contains $ReadyOutput "maxIssuesPerRun=1"
-  Assert-Contains $ReadyOutput "BUSINESS_EXECUTION_DISABLED_M3"
   Assert-Contains $ReadyOutput "executorCommand="
   $ReadyEvents = Get-RunEvents $ReadyRoot
   Assert-EventSchema $ReadyEvents[0]
@@ -254,16 +304,19 @@ try {
   $ExecutorDryRunResult = Get-LatestResult $ReadyRoot
   Assert-ResultSchema $ExecutorDryRunResult
   if ($ExecutorDryRunResult.status -ne "noop") { throw "Expected dry-run result status noop" }
-  if ($ExecutorDryRunResult.failureCategory -ne "execution_disabled") { throw "Expected execution_disabled failureCategory" }
+  if ($ExecutorDryRunResult.failureCategory -ne "none") { throw "Expected dry-run failureCategory none" }
 
   $ReadyLimitCompatOutput = Invoke-Runner $ReadyRoot -Apply -MaxIterations 2
   Assert-Contains $ReadyLimitCompatOutput "READY_ISSUE_FOUND"
   Assert-Contains $ReadyLimitCompatOutput "EXECUTOR_RESULT_WRITTEN"
+  Assert-NotContains $ReadyLimitCompatOutput "BUSINESS_EXECUTION_DISABLED_M3"
   Assert-Contains $ReadyLimitCompatOutput "iterationLimit=2"
-  $ReadyNoopResult = Get-LatestResult $ReadyRoot
-  Assert-ResultSchema $ReadyNoopResult
+  $ReadyDoneResult = Get-LatestResult $ReadyRoot
+  Assert-ResultSchema $ReadyDoneResult
+  if ($ReadyDoneResult.status -ne "done") { throw "Expected real executor status done. Actual: $($ReadyDoneResult | ConvertTo-Json -Compress -Depth 8)" }
+  if ($ReadyDoneResult.failureCategory -ne "none") { throw "Expected real executor failureCategory none. Actual: $($ReadyDoneResult | ConvertTo-Json -Compress -Depth 8)" }
   $ReadyNoopEvents = Get-RunEvents $ReadyRoot
-  if (!($ReadyNoopEvents | Where-Object { $_.event -eq "executor.result" -and $_.status -eq "noop" })) { throw "Expected executor result event" }
+  if (!($ReadyNoopEvents | Where-Object { $_.event -eq "executor.result" -and $_.status -eq "done" })) { throw "Expected executor result event" }
   $ReadyLimitState = Get-Content -Raw (Join-Path $ReadyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($ReadyLimitState.iterationLimit -ne 2) { throw "Expected state.iterationLimit=2" }
   if ($ReadyLimitState.iterationCompleted -ne 0) { throw "Expected state.iterationCompleted=0" }
@@ -396,7 +449,6 @@ try {
   Assert-Contains $ApplyOutput "BACKLOG_SPLIT_APPLIED"
   Assert-Contains $ApplyOutput "postSplitCheckpoint=CONTINUE"
   Assert-Contains $ApplyOutput "READY_ISSUE_FOUND"
-  Assert-Contains $ApplyOutput "BUSINESS_EXECUTION_DISABLED_M3"
   Assert-Contains $ApplyOutput "EXECUTOR_RESULT_WRITTEN"
   $ApplyReady = Get-Content -Raw (Join-Path $ApplyRoot "docs\backlog\ready-issues.md")
   Assert-Contains $ApplyReady "状态：Ready"
@@ -412,13 +464,74 @@ try {
   if (Test-Path (Join-Path $ApplyRoot ".codex-autopilot\run.lock")) { throw "ApplyBacklogSplit should release run.lock" }
   $ApplyResult = Get-LatestResult $ApplyRoot
   Assert-ResultSchema $ApplyResult
+  if ($ApplyResult.status -ne "done") { throw "Expected split handoff to run real executor" }
   $ApplyStatus = & powershell -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $ApplyRoot 2>&1 | Out-String
   $ApplyStatusJson = $ApplyStatus | ConvertFrom-Json
-  if ($ApplyStatusJson.latestResultStatus -ne "noop") { throw "Expected status to expose latest noop result" }
+  if ($ApplyStatusJson.latestResultStatus -ne "done") { throw "Expected status to expose latest done result" }
   if (!$ApplyStatusJson.latestResultPath) { throw "Expected status to expose latestResultPath" }
   if (!$ApplyStatusJson.latestRunId) { throw "Expected status to expose latestRunId" }
   if ($ApplyStatusJson.latestEvent -ne "executor.result") { throw "Expected status latestEvent=executor.result" }
-  if ($ApplyStatusJson.latestStopReason -ne "STOP_EXECUTION_DISABLED_M3") { throw "Expected latestStopReason from events.jsonl" }
+  if ($ApplyStatusJson.latestStopReason) { throw "Expected empty latestStopReason for successful execution" }
+
+  $FailRoot = New-Fixture -Name "executor-fail" -Enabled -ExecutorMode "fail" -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner executor fail branch
+
+目标：
+- Executor failures must block the run.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Failure is reported.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/issue-100-001.md``
+"@ -Plan "# Plan`n"
+  Assert-Contains (Invoke-Runner $FailRoot -Apply) "EXECUTOR_RESULT_WRITTEN"
+  $FailResult = Get-LatestResult $FailRoot
+  Assert-ResultSchema $FailResult
+  if ($FailResult.status -ne "failed") { throw "Expected failed executor status failed" }
+  if ($FailResult.failureCategory -ne "quality_security") { throw "Expected failed executor failureCategory quality_security" }
+
+  $NoChangeRoot = New-Fixture -Name "executor-no-change" -Enabled -ExecutorMode "no-change" -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner executor no change branch
+
+目标：
+- Executor success without artifacts must block the run.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- No-change execution is blocked.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/issue-100-001.md``
+"@ -Plan "# Plan`n"
+  Assert-Contains (Invoke-Runner $NoChangeRoot -Apply) "EXECUTOR_RESULT_WRITTEN"
+  $NoChangeResult = Get-LatestResult $NoChangeRoot
+  Assert-ResultSchema $NoChangeResult
+  if ($NoChangeResult.status -ne "blocked") { throw "Expected no-change executor status blocked" }
+  if ($NoChangeResult.stopReason -ne "STOP_NO_EXECUTION_ARTIFACTS") { throw "Expected STOP_NO_EXECUTION_ARTIFACTS" }
+
+  $NoExecutorConfig = Join-Path $TempRoot "no-executor.config.json"
+  $ActualConfig = Get-Content -Raw (Join-Path $ScriptDir "codex-autopilot.config.json") | ConvertFrom-Json
+  $ActualConfig.PSObject.Properties.Remove("issueExecutor")
+  $ActualConfig | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 $NoExecutorConfig
+  $NoExecutorReadiness = Invoke-Readiness (Split-Path -Parent (Split-Path -Parent $ScriptDir)) $NoExecutorConfig | ConvertFrom-Json
+  if ($NoExecutorReadiness.unattendedModeAllowed) { throw "Expected readiness to reject noop-only executor capability" }
+  if (!($NoExecutorReadiness.gates | Where-Object { $_.name -eq "executor.realExecution" -and $_.status -eq "fail" })) {
+    throw "Expected readiness executor.realExecution gate to fail"
+  }
 
   $ActiveLockRoot = New-Fixture -Name "active-lock" -Enabled -Ready "# Ready Issues`n" -Plan @"
 # Plan

@@ -76,6 +76,18 @@ function Test-FileContains {
   return @($Patterns | Where-Object { $text -notmatch [regex]::Escape($_) })
 }
 
+function Test-CommandAvailable {
+  param([string]$Command)
+
+  if (!$Command) {
+    return $false
+  }
+  if ((Split-Path -Leaf $Command) -ne $Command -and (Test-Path -LiteralPath $Command)) {
+    return $true
+  }
+  return $null -ne (Get-Command $Command -ErrorAction SilentlyContinue)
+}
+
 if (!$ConfigPath) {
   $ConfigPath = Join-Path $RepoRoot "scripts\codex-autopilot\codex-autopilot.config.json"
 }
@@ -154,7 +166,7 @@ if (!(Test-Path $lockPath)) {
 }
 
 $runnerPath = Join-Path $scriptDir "autopilot-run-continuous.ps1"
-$runnerMissing = Test-FileContains $runnerPath @("New-RunLock", "Read-RunLock", "Test-RunLockStale", "Write-RunEvent", "Invoke-IssueExecutorNoop", "ExplainNextAction")
+$runnerMissing = Test-FileContains $runnerPath @("New-RunLock", "Read-RunLock", "Test-RunLockStale", "Write-RunEvent", "Invoke-IssueExecutor", "ExplainNextAction")
 if ($runnerMissing.Count -eq 0) {
   Add-Gate $gates "runner.capabilities" "pass" "Continuous runner contains lock, JSONL, executor handoff, and explain support." @{ path = $runnerPath }
 } else {
@@ -167,6 +179,21 @@ if ($executorMissing.Count -eq 0) {
   Add-Gate $gates "executor.result" "pass" "Executor writes structured result.json." @{ path = $executorPath }
 } else {
   Add-Gate $gates "executor.result" "fail" "Executor result contract is incomplete." @{ missing = $executorMissing }
+}
+
+$realExecutorMissing = Test-FileContains $executorPath @("Invoke-ConfiguredIssueExecutor", "STOP_NO_EXECUTION_ARTIFACTS", "STOP_EXECUTOR_COMMAND_MISSING")
+$issueExecutor = $config.issueExecutor
+if ($realExecutorMissing.Count -gt 0) {
+  Add-Gate $gates "executor.realExecution" "fail" "Executor script does not expose a real configured execution path." @{ missing = $realExecutorMissing }
+} elseif (!$issueExecutor -or !$issueExecutor.command) {
+  Add-Gate $gates "executor.realExecution" "fail" "issueExecutor.command is required; noop-only execution cannot enter unattended mode." $null
+} elseif (!(Test-CommandAvailable ([string]$issueExecutor.command))) {
+  Add-Gate $gates "executor.realExecution" "fail" "Configured issueExecutor command is not available." @{ command = $issueExecutor.command }
+} else {
+  Add-Gate $gates "executor.realExecution" "pass" "Executor has a configured real command path." @{
+    command = $issueExecutor.command
+    requireChangedFiles = if ($null -ne $issueExecutor.requireChangedFiles) { [bool]$issueExecutor.requireChangedFiles } else { $true }
+  }
 }
 
 $statusPath = Join-Path $scriptDir "autopilot-status.ps1"

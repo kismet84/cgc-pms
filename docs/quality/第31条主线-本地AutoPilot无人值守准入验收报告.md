@@ -4,9 +4,9 @@
 
 ## 结论
 
-第31主线 M1-M5 的最小闭环能力已具备：Ready 队列门禁、单实例锁、结构化 `result.json`、JSONL 事件、状态摘要、worktree/主工作区分档策略、blocked/WIP/rollback 收口模板均有可核验落点。
+第31主线 M1-M6 的最小闭环能力已具备：Ready 队列门禁、单实例锁、结构化 `result.json`、JSONL 事件、状态摘要、worktree/主工作区分档策略、blocked/WIP/rollback 收口模板、真实 executor handoff 与 readiness 准入门禁均有可核验落点。
 
-准入结论：允许进入完整无人值守模式，但当前只允许在 `autoPush=false`、每轮 1 个 Ready Issue、不连接生产、不发布生产、不执行仓库外删除的边界内运行。当前 `ready-issues.md` 没有 `Ready` 任务时，只允许先进入拆单轮，不得伪造真实业务执行已完成。
+准入结论：允许进入完整无人值守模式，但当前只允许在 `autoPush=false`、每轮 1 个 Ready Issue、不连接生产、不发布生产、不执行仓库外删除的边界内运行。Ready Issue 命中后必须走配置化真实 executor；`noop/execution_disabled` 不再满足准入。当前 `ready-issues.md` 没有 `Ready` 任务，只允许先进入拆单轮，不得伪造真实业务执行已完成。
 
 阻塞：非阻塞。
 
@@ -19,6 +19,7 @@
 | M3 Executor 与结构化结果 | 完成 | `autopilot-exec-issue.ps1` 输出 `result.json`，包含 `status`、`failureCategory`、`artifacts`、`gitSummary`、`validation`、`nextAction`、`stopReason`。 |
 | M4 JSONL 日志与状态可观测性 | 完成 | runner/executor 写入 `events.jsonl`；status 输出最新 event/result 摘要；ExplainNextAction 输出 `nextAction`、`stopReason`、`missingGate`、`selectedIssue`、`shouldSplitBacklog`。 |
 | M5 隔离策略、回滚与准入裁决 | 完成 | 新增 `autopilot-readiness-check.ps1` 作为只读准入检查；本报告固定 worktree 分档、blocked/WIP/rollback 模板和最终准入结论。 |
+| M6 真实执行闭环缺口修复 | 完成 | runner 在真实模式下调用 executor 不再传 `-Noop`；executor 通过 `issueExecutor` 配置执行 Codex CLI 或测试 mock，非零退出、缺命令、无业务产物均写入 blocked/failed；readiness 新增 `executor.realExecution` gate，缺真实执行配置时 `unattendedModeAllowed=false`。 |
 
 ## Worktree 与主工作区分档策略
 
@@ -63,14 +64,15 @@ nextAction=STOP / SPLIT_BACKLOG / RETRY_AFTER_FIX
 - `.codex-autopilot/stop.flag`、`.codex-autopilot/pause.flag` 不存在。
 - `ready-lint.ps1` 存在且能阻断不合格 Ready Issue。
 - runner 具备 `run.lock`、JSONL、ExplainNextAction、executor handoff。
-- executor 必产出结构化 `result.json`。
+- executor 必产出结构化 `result.json`，且真实模式必须执行 `issueExecutor.command`；仅有 `noop/execution_disabled` 时不得通过准入。
+- executor 成功退出但未产生 git 可见业务产物时必须 `blocked`，不得把运行态日志或 prompt 当作业务完成证据。
 - status 能输出锁、最近 JSONL event、最近 result 摘要。
 - 测试数据 reset 只允许 dev/test/demo + localhost/127.0.0.1 + `ALLOW_TEST_DATA_RESET` marker。
-- `test-continuous-runner.ps1` 覆盖 lock、event、result、explain 关键路径。
+- `test-continuous-runner.ps1` 覆盖 lock、event、result、explain、真实 executor 成功/失败/无产物、readiness 拒绝 noop-only 关键路径。
 
 ## 验收证据
 
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/autopilot-readiness-check.ps1`：通过，输出 JSON，`status=pass`、`unattendedModeAllowed=true`。
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/autopilot-readiness-check.ps1`：通过，输出 JSON，`status=pass`、`unattendedModeAllowed=true`、`executor.realExecution=pass`；当前无 Ready Issue，`readyLint.currentReady=warn`，非阻塞，只允许先进入拆单轮。
 - `powershell -NoProfile -Command "[System.Management.Automation.Language.Parser]::ParseFile('D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-readiness-check.ps1',[ref]$null,[ref]$null) | Out-Null"`：通过。
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-continuous-runner.ps1`：通过，`continuous runner self-test passed`。
 - `git diff --check`：通过。
@@ -78,6 +80,6 @@ nextAction=STOP / SPLIT_BACKLOG / RETRY_AFTER_FIX
 ## 剩余风险
 
 - 当前完整无人值守准入不等于生产发布准入；仍禁止生产发布和生产数据库连接。
-- 当前无 Ready Issue 时只能先拆单，不能直接声称完成真实业务 Issue。
+- 当前无 Ready Issue 时只能先拆单，不能直接声称完成真实业务 Issue；该项为 warn/非阻塞。
 - worktree 清理仍以人工或后续固定脚本为主；本轮只固化准入与分档策略，不实现 daemon。
 - JSONL 查询仍是文件级读取，没有单独检索工具；不阻塞本地无人值守闭环。

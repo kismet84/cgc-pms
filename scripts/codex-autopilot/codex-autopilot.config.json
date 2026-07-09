@@ -14,6 +14,23 @@
   "maxFilesChangedPerIssue": 20,
   "maxRunMinutes": 90,
   "cycleIntervalMinutes": 30,
+  "issueExecutor": {
+    "command": "codex",
+    "args": [
+      "exec",
+      "--skip-git-repo-check",
+      "--sandbox",
+      "danger-full-access",
+      "--model",
+      "gpt-5.5",
+      "--cd",
+      "{repoRoot}",
+      "-"
+    ],
+    "stdinFile": "{promptFile}",
+    "timeoutSeconds": 7200,
+    "requireChangedFiles": true
+  },
   "allowedEpics": [
     "EPIC-000",
     "EPIC-001",

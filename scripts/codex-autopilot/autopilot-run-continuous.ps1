@@ -589,10 +589,10 @@ function Get-ExecutorCommand {
   )
 
   $executorPath = Join-Path $scriptDir "autopilot-exec-issue.ps1"
-  return "powershell -NoProfile -ExecutionPolicy Bypass -File `"$executorPath`" -RepoRoot `"$RepoRoot`" -ConfigPath `"$ConfigPath`" -Title `"$IssueTitle`" -Noop"
+  return "powershell -NoProfile -ExecutionPolicy Bypass -File `"$executorPath`" -RepoRoot `"$RepoRoot`" -ConfigPath `"$ConfigPath`" -Title `"$IssueTitle`""
 }
 
-function Invoke-IssueExecutorNoop {
+function Invoke-IssueExecutor {
   param(
     [string]$RepoRoot,
     [string]$ConfigPath,
@@ -605,7 +605,7 @@ function Invoke-IssueExecutorNoop {
     Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $IssueTitle)"
     return
   }
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $executorPath -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Title $IssueTitle -RunId $script:RunContext.id -Noop
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $executorPath -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Title $IssueTitle -RunId $script:RunContext.id
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -731,11 +731,10 @@ try {
       })
       Write-Host "READY_ISSUE_FOUND"
       Write-Host "selected=$($readyIssues[0].title)"
-      Write-Host "BUSINESS_EXECUTION_DISABLED_M3"
       if ($DryRun) {
         Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $readyIssues[0].title)"
       } else {
-        Invoke-IssueExecutorNoop $RepoRoot $ConfigPath $readyIssues[0].title
+        Invoke-IssueExecutor $RepoRoot $ConfigPath $readyIssues[0].title
       }
       exit 0
     }
