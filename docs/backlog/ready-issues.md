@@ -2,8 +2,9 @@
 
 - 当前合格 Ready Issue：无。
 - `ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `5/10` 个实施型 Ready Issue。
+- `ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `6/10` 个实施型 Ready Issue。
 - `ISSUE-008-015：报表中心平台化缺口-M6：导出审计留痕与目录一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `4/10` 个实施型 Ready Issue。
-- 当前 `Ready` 队列已清空；下一轮需由主线程/A 基于长期任务池、`current-focus` 与阻塞现状重新拆题。
+- 当前 `Ready` 队列已清空；仍按串行执行，待主线程/A 重新裁决下一条 P2 平台化题。
 - 未证明完全无关联前，仍不并行续接其他 P2 平台化题。
 
 ## 任务来源
@@ -34,8 +35,8 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-008-016` 已完成正式收口并从当前执行队列出清。
-2. 下一轮若继续执行，需先由主线程/A 重新拆出合格 Ready Issue；报表中心后续缺口、规则治理中心、WBS / 甘特图、供应商评分 / 采购增强题仍保持串行候选。
+1. `ISSUE-008-017` 已完成正式收口；下一步由主线程/A 重新裁决是否继续沿通知平台细化，或切到规则治理中心、WBS / 甘特图、供应商评分 / 采购增强等其它串行候选。
+2. 新一条 Ready 形成前，本文件维持 `当前合格 Ready Issue：无`。
 
 ## P0
 
@@ -232,6 +233,45 @@
 归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
 
 ## P2
+
+### ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归
+
+优先级：P2
+类型：通知平台 / 后端 / 前端 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节“用户可配置接收渠道 / 所有通知有发送记录”；`docs/quality/issue-008-007-通知平台.md`；`docs/quality/issue-008-016-notification-status-subscription-consistency.md`
+是否需要新增 migration：否；优先复用现有 `AlertNotificationDispatcher`、`AlertNotificationChannelProperties`、`AlertSubscriptionService`、`AlertController` 与预警页订阅弹窗，不新增通知平台表结构。
+目标：
+- 补齐当前“只有 `IN_APP` 真正可达，`EMAIL / WECHAT / SMS` 仍是未配置或未实现占位渠道”这一事实，在后端发送记录与前端订阅可见性上的最小一致性闭环。
+- 回归未配置/未实现渠道的发送记录语义，确保不会被误记为已发送成功，也不会在预警页把占位渠道误展示成当前可用能力。
+- 不扩大为邮件、短信、企业微信、钉钉真实接入，不新增模板中心、重试队列、频控或新表结构。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/**`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `frontend-admin/src/pages/alert/**`
+- `frontend-admin/src/api/modules/alert.ts`
+- `frontend-admin/src/types/alert.ts`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 邮件、短信、企业微信、钉钉等外部渠道真实接入
+- 通知模板中心、重试队列、频控策略、权限模型重构
+验收标准：
+- 至少一组后端回归证明：当订阅中请求 `EMAIL / WECHAT / SMS` 等占位渠道时，`alert_notification_send_record` 会保留明确的 `sendStatus/failReason`，不会被误记为 `SENT`。
+- 至少一组后端/接口回归证明：订阅接口返回的“可选渠道/有效渠道”与当前真实可达能力一致，不把未配置或未实现渠道冒充为当前可用渠道。
+- 至少一组前端回归证明：预警页订阅弹窗和订阅摘要/明细对占位渠道的展示与保存保持一致；当前仅支持站内信时，不把 `EMAIL / WECHAT / SMS` 展示成用户可直接生效的能力。
+- 不放宽预警域、角色、租户和项目边界；既有“预警创建通知”和“状态变更通知”路径不回退。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest,AlertControllerTest,AlertEvaluationServiceTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/alert/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-017-notification-channel-visibility-send-record-semantics.md`
 
 ### ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归
 

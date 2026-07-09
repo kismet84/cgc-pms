@@ -346,7 +346,11 @@ class AlertControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.effectiveSubscription.enabled").value(true))
+                .andExpect(jsonPath("$.data.effectiveSubscription.channels.length()").value(1))
+                .andExpect(jsonPath("$.data.effectiveSubscription.channels[0]").value("IN_APP"))
                 .andExpect(jsonPath("$.data.effectiveSubscription.domains[0]").value("PURCHASE"))
+                .andExpect(jsonPath("$.data.availableOptions.channels.length()").value(1))
+                .andExpect(jsonPath("$.data.availableOptions.channels[0]").value("IN_APP"))
                 .andExpect(jsonPath("$.data.availableOptions.domains[0]").value("PURCHASE"));
     }
 
@@ -368,7 +372,12 @@ class AlertControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.rawUserOverrides.channels.length()").value(1))
+                .andExpect(jsonPath("$.data.rawUserOverrides.channels[0]").value("IN_APP"))
+                .andExpect(jsonPath("$.data.effectiveSubscription.channels.length()").value(1))
                 .andExpect(jsonPath("$.data.effectiveSubscription.channels[0]").value("IN_APP"))
+                .andExpect(jsonPath("$.data.availableOptions.channels.length()").value(1))
+                .andExpect(jsonPath("$.data.availableOptions.channels[0]").value("IN_APP"))
                 .andExpect(jsonPath("$.data.effectiveSubscription.domains.length()").value(1))
                 .andExpect(jsonPath("$.data.effectiveSubscription.domains[0]").value("CONTRACT"))
                 .andExpect(jsonPath("$.data.effectiveSubscription.minSeverity").value("HIGH"))

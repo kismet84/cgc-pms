@@ -1,6 +1,8 @@
 package com.cgcpms.alert.service;
 
 import com.cgcpms.alert.auth.AlertAccessScopeResolver;
+import com.cgcpms.alert.notification.AlertNotificationChannel;
+import com.cgcpms.alert.notification.AlertNotificationChannelProperties;
 import com.cgcpms.system.service.PreferenceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,11 +15,11 @@ import java.util.*;
 public class AlertSubscriptionService {
 
     private static final String PREFERENCE_KEY = "alertSubscription";
-    private static final List<String> DEFAULT_CHANNELS = List.of("IN_APP");
     private static final List<String> SEVERITY_ORDER = List.of("LOW", "MEDIUM", "HIGH");
 
     private final PreferenceService preferenceService;
     private final AlertAccessScopeResolver accessScopeResolver;
+    private final AlertNotificationChannelProperties channelProperties;
 
     public Map<String, Object> getCurrentUserSubscription(Long tenantId, Long userId, Collection<String> roleCodes) {
         Subscription defaults = buildDefaults(roleCodes);
@@ -57,10 +59,11 @@ public class AlertSubscriptionService {
 
     private Subscription buildDefaults(Collection<String> roleCodes) {
         Set<String> domains = accessScopeResolver.allowedDomainsForRoles(roleCodes);
-        boolean enabled = !domains.isEmpty();
+        List<String> channels = availableChannels();
+        boolean enabled = !domains.isEmpty() && !channels.isEmpty();
         return new Subscription(
                 enabled,
-                DEFAULT_CHANNELS,
+                channels,
                 new ArrayList<>(domains),
                 enabled ? "LOW" : "HIGH",
                 enabled
@@ -173,6 +176,13 @@ public class AlertSubscriptionService {
     private List<String> availableSeverities(String minSeverity) {
         int minIndex = Math.max(0, SEVERITY_ORDER.indexOf(minSeverity));
         return SEVERITY_ORDER.subList(minIndex, SEVERITY_ORDER.size());
+    }
+
+    private List<String> availableChannels() {
+        return Arrays.stream(AlertNotificationChannel.values())
+                .filter(channelProperties::isConfigured)
+                .map(AlertNotificationChannel::name)
+                .toList();
     }
 
     private record Subscription(Boolean enabled, List<String> channels, List<String> domains,

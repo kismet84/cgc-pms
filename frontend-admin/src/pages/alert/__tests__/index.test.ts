@@ -652,6 +652,34 @@ describe('alert/index.vue', () => {
     })
   })
 
+  it('订阅明细在订阅数据未返回前不回退展示占位渠道', async () => {
+    mockAlertStore.alerts = [createAlertRecord()]
+    mockAlertStore.total = 1
+    let resolveSubscription: ((value: AlertSubscriptionResponse) => void) | null = null
+    mockGetAlertSubscription.mockReturnValue(
+      new Promise<AlertSubscriptionResponse>((resolve) => {
+        resolveSubscription = resolve
+      }),
+    )
+
+    const wrapper = mountAlertPage()
+
+    const channelLines = wrapper.findAll('.alert-subscription-line').map((item) => item.text())
+
+    expect(channelLines).toEqual([])
+    expect(wrapper.text()).not.toContain('邮件')
+    expect(wrapper.text()).not.toContain('企业微信')
+    expect(wrapper.text()).not.toContain('短信')
+
+    resolveSubscription?.(buildSubscriptionResponse())
+    await flushPromises()
+
+    expect(wrapper.findAll('.alert-subscription-line').map((item) => item.text())).toEqual([
+      expect.stringContaining('站内信'),
+    ])
+    expect(alertPageSource).not.toContain("['IN_APP', 'EMAIL', 'WECHAT', 'SMS']")
+  })
+
   it('导出复用当前筛选条件跨页抓取全量结果，空列表时按钮禁用', async () => {
     mockAlertStore.alerts = [
       createAlertRecord({

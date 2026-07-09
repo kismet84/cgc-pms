@@ -92,6 +92,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-016-notification-status-subscription-consistency.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；占位渠道可见性、发送记录跳过语义与前端订阅展示一致性回归已补齐；后端 59 项测试、前端 18 项测试、type-check、D 验收、E 审查与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-017-notification-channel-visibility-send-record-semantics.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

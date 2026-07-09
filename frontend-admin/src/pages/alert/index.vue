@@ -695,7 +695,7 @@ const subscriptionRows = computed(() => {
   const effective = normalizeSubscriptionConfig(subscriptionState.value?.effectiveSubscription)
   const channels = availableSubscriptionChannels.value.length
     ? availableSubscriptionChannels.value
-    : ['IN_APP', 'EMAIL', 'WECHAT', 'SMS']
+    : effective.channels
   return channels.map((channel) => ({
     channel,
     label: ALERT_CHANNEL_LABELS[channel] ?? channel,
