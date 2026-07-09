@@ -1,0 +1,14 @@
+{
+  "time": "2026-07-09T12:00:00+08:00",
+  "loopId": "LOOP-33-1-M1",
+  "issueId": "READY-33-1-M5",
+  "phase": "classify",
+  "role": "D",
+  "eventType": "classification",
+  "summary": "One retry is allowed only for transient environment failures.",
+  "evidence": [
+    "test-failure-classifier.ps1 output category=environment_prereq",
+    "references/rerun-policy.md"
+  ],
+  "nextAction": "If the same environment failure repeats, stop retrying and open repair or blocked flow."
+}

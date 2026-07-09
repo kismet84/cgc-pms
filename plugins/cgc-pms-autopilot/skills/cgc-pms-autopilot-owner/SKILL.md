@@ -16,6 +16,7 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 1. 先确认仓库级规则文件和当前派工边界。
 2. 只把本插件当成规则、模板、脚本工具箱，不当成项目真实 backlog 或 quality 仓库。
 3. 进入实施前先跑 `scripts/autopilot-checkpoint.ps1`，至少看 `branch`、`gitStatus`、`stopFlag`、`pauseFlag`、`enabledFlag`。
+4. 需要 loop 协议时，优先参考 `../../schemas/loop-state.schema.json`、`../../schemas/loop-event.schema.json` 和 `../../scripts/validate-loop-artifacts.ps1`。
 
 ## Core flow
 
@@ -26,6 +27,7 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 5. 需要正式文本时，用模板和脚本生成草稿，正式落点仍写回项目 `docs/**`。
 6. 验收时先做失败分类，再给通过/不通过、阻塞/非阻塞结论。
 7. F 收口后先做 `local-commit-closeout.ps1 -DryRun`，确认 `git diff --check` 和文件范围，再决定是否本地 commit。
+8. D/E 不通过时，优先用 `../../templates/repair-request.md` 生成结构化补修请求；沉淀稳定经验时用 `../../templates/reflection-entry.md`。
 
 ## Role boundaries
 
@@ -40,6 +42,10 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 - `../../references/failure-classification.md`
 - `../../references/output-contract.md`
 - `../../references/artifact-governance.md`
+- `../../references/loop-budget-policy.md`
+- `../../references/rerun-policy.md`
+- `../../references/role-contracts.md`
+- `../../references/forward-test-scenarios.md`
 
 ## A-F routing
 
@@ -76,6 +82,8 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 - `../../templates/quality-closeout.md`
 - `../../templates/iteration-report-entry.md`
 - `../../templates/run-summary.md`
+- `../../templates/repair-request.md`
+- `../../templates/reflection-entry.md`
 
 ## Safety rules
 

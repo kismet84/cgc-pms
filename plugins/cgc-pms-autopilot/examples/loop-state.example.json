@@ -1,0 +1,22 @@
+{
+  "loopId": "LOOP-33-1-M1",
+  "issueId": "READY-33-1-M5",
+  "phase": "verify",
+  "actorRole": "D",
+  "inputArtifacts": [
+    "docs/plans/第33-1条主线-Codex AutoPilot Loop Engineering增强改进任务计划书.md",
+    "plugins/cgc-pms-autopilot/scripts/validate-loop-artifacts.ps1"
+  ],
+  "outputArtifacts": [
+    "plugins/cgc-pms-autopilot/examples/loop-state.example.json",
+    "plugins/cgc-pms-autopilot/examples/loop-event.example.json"
+  ],
+  "verification": [
+    "powershell -NoProfile -ExecutionPolicy Bypass -File plugins\\cgc-pms-autopilot\\scripts\\validate-loop-artifacts.ps1",
+    "git diff --check"
+  ],
+  "failureCategory": "none",
+  "decision": "continue",
+  "nextAction": "Run plugin validation and template renders.",
+  "stopReason": "none"
+}

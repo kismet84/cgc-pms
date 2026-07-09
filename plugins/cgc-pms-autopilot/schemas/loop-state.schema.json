@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cgc-pms.local/plugins/cgc-pms-autopilot/schemas/loop-state.schema.json",
+  "title": "CGC PMS AutoPilot Loop State",
+  "description": "Minimal state contract for one AutoPilot loop turn.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "loopId",
+    "issueId",
+    "phase",
+    "actorRole",
+    "inputArtifacts",
+    "outputArtifacts",
+    "verification",
+    "failureCategory",
+    "decision",
+    "nextAction",
+    "stopReason"
+  ],
+  "properties": {
+    "loopId": {
+      "type": "string",
+      "description": "Stable loop identifier without embedding run logs or transient paths.",
+      "minLength": 1
+    },
+    "issueId": {
+      "type": "string",
+      "description": "Ready issue or planned task identifier.",
+      "minLength": 1
+    },
+    "phase": {
+      "type": "string",
+      "description": "Current loop phase in the owner state machine.",
+      "enum": [
+        "select",
+        "plan",
+        "act",
+        "observe",
+        "classify",
+        "repair",
+        "verify",
+        "closeout",
+        "learn",
+        "next"
+      ]
+    },
+    "actorRole": {
+      "type": "string",
+      "description": "Role currently responsible for this phase.",
+      "enum": [
+        "owner",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "ops"
+      ]
+    },
+    "inputArtifacts": {
+      "type": "array",
+      "description": "Short artifact references used as input for this phase.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "outputArtifacts": {
+      "type": "array",
+      "description": "Short artifact references produced by this phase.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "verification": {
+      "type": "array",
+      "description": "Minimal verification evidence or commands tied to the current state.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "failureCategory": {
+      "type": "string",
+      "description": "Failure classification aligned with the existing classifier output.",
+      "enum": [
+        "tool_config",
+        "environment_prereq",
+        "ready_issue_config",
+        "real_quality_or_security",
+        "unknown",
+        "none"
+      ]
+    },
+    "decision": {
+      "type": "string",
+      "description": "Loop decision after observing current evidence.",
+      "enum": [
+        "continue",
+        "repair",
+        "blocked",
+        "done",
+        "stop",
+        "pause"
+      ]
+    },
+    "nextAction": {
+      "type": "string",
+      "description": "Immediate next step in one short sentence.",
+      "minLength": 1
+    },
+    "stopReason": {
+      "type": "string",
+      "description": "Reason for stop or pause; use 'none' when not stopping.",
+      "minLength": 1
+    }
+  }
+}

@@ -1197,3 +1197,33 @@ Mainline：第33条主线 Codex AutoPilot 插件 MVP 收口
 - `test-failure-classifier.ps1` 仍为粗粒度分类，只适合作为最小准入门槛。
 - 当前 AutoPilot 运行态为 `stopFlag=false`、`enabledFlag=false`；若后续要做连续模式演示，需先显式启用。
 - `.serena` 删除痕迹属于工作区外部状态，不纳入本主线提交。
+
+---
+
+Mainline：第33-1条主线 Codex AutoPilot Loop Engineering 增强收口
+
+目标：
+- 在 D 验收通过后，为第33-1条主线补正式质量/收口报告，并给主线程最终裁决与本地提交提供依据。
+- 不改插件实现、不改业务代码、不扩展为 dashboard、数据库、MCP、常驻服务或默认 commit/push 新主线。
+
+修改范围摘要：
+- `docs/quality/mainline-33-1-codex-autopilot-loop-engineering-closeout-2026-07-09.md`：新增正式收口报告，固化 Loop Engineering 增强通过口径、交付清单、边界和剩余风险。
+- `docs/iterations/iteration-2026-07-09-report.md`：追加第33-1条主线收口摘要。
+
+验证命令摘要：
+- `powershell -NoProfile -ExecutionPolicy Bypass -File plugins\cgc-pms-autopilot\scripts\validate-loop-artifacts.ps1`：通过，返回 `ok=true`，`missing=[]`，`invalidJson=[]`。
+- `python C:\Users\L1597\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot`：通过。
+- `powershell -NoProfile -ExecutionPolicy Bypass -File plugins\cgc-pms-autopilot\scripts\render-template.ps1 ... templates\repair-request.md ...`：通过。
+- `powershell -NoProfile -ExecutionPolicy Bypass -File plugins\cgc-pms-autopilot\scripts\render-template.ps1 ... templates\reflection-entry.md ...`：通过。
+- `ConvertFrom-Json`：`schemas/loop-state.schema.json`、`schemas/loop-event.schema.json`、`examples/loop-state.example.json`、`examples/loop-event.example.json` 均解析通过。
+- `git diff --check`：通过，仅有工作区换行符转换提示。
+
+失败分类或非失败分类：非失败分类；第33-1 Loop Engineering 增强验收项通过，M1-M6 已完成，边界受控，收口条件成立
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- `test-failure-classifier.ps1` 仍是粗粒度分类，后续如需细粒度根因定位应另立任务。
+- 示例中的 `READY` / `LOOP` 编号仍是占位，不代表真实运行实例。
+- 真实 loop 执行器尚未接入当前运行主链；本轮交付仍是受控 MVP，不构成阻塞。
