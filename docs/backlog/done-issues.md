@@ -28,6 +28,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-032-008-coverage-e2e-baseline.md；docs/iterations/iteration-2026-07-09-report.md
 
+### ISSUE-008-010：报表中心平台化缺口-M1：统一报表目录与定义元数据最小落地
+
+完成日期：2026-07-09
+合并方式：not-merged/doc-closeout-only
+失败分类或非失败分类：真实代码质量问题已修复；统一报表目录与定义元数据最小闭环已归档；D 复验通过
+验证结果：通过
+相关报告：docs/quality/issue-008-010-report-center-catalog-closeout.md；docs/iterations/iteration-2026-07-09-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

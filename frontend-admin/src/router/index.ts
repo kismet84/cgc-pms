@@ -26,6 +26,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '首页', icon: 'HomeOutlined' },
       },
       {
+        path: 'dashboard/reports',
+        name: 'ReportCatalog',
+        component: () => import('@/pages/report/catalog.vue'),
+        meta: { title: '报表目录', hidden: true },
+      },
+      {
         path: 'contract',
         name: 'Contract',
         redirect: '/contract/ledger',

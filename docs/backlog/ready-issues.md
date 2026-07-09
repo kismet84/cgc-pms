@@ -8,8 +8,8 @@
 
 ## 当前队列状态
 
-- `ISSUE-032-005` 已依据 `docs/quality/issue-032-005-finance-role-blocked-closeout.md` 从 blocked 收口，不进入 Ready 队列。
-- 后续若需新增实施项，由 A 按 `docs/backlog/current-focus.md` 和长期任务池重新拆 Ready。
+- 当前无合格 Ready Issue。
+- `ISSUE-008-010` 已完成并转入 `Done`；下一轮由项目总负责人按长期总任务池与 `current-focus` 重新拆出 Ready。
 
 ## AutoPilot 自动合并门禁
 
@@ -33,11 +33,7 @@
 
 ## 执行顺序建议
 
-1. ISSUE-008-001：经营总览报表口径与来源下钻回归
-2. ISSUE-008-002：合同履约报表口径回归
-3. ISSUE-008-003：成本动态汇总报表口径回归
-4. ISSUE-008-004：预警处理报表口径回归
-5. ISSUE-008-005：审批效率报表口径回归
+1. 当前无可启动 Ready；待项目总负责人按长期总任务池重新拆题。
 
 ## P0
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
+  AppstoreOutlined,
   DollarOutlined,
   FullscreenOutlined,
   InboxOutlined,
@@ -10,6 +11,7 @@ import {
   ToolOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue'
+import { useRouter } from 'vue-router'
 import { ALL_PROJECT_ID, useDashboardData } from './composables/useDashboardData'
 import { fmtWan, fmtDeviation, devColor, devSign } from './utils/formatUtils'
 import { drillCols } from './utils/tableColumns'
@@ -48,6 +50,7 @@ const {
   closeDrill,
   fetchViewData,
 } = useDashboardData()
+const router = useRouter()
 
 const roleTabOrder: DashboardRole[] = ['cost', 'pm', 'purchase', 'production', 'chiefEngineer']
 const roleDisplayLabel: Record<DashboardRole, string> = {
@@ -86,6 +89,10 @@ function toggleFullscreen() {
   }
   document.exitFullscreen()
 }
+
+function openReportCatalog() {
+  router.push('/dashboard/reports')
+}
 </script>
 
 <template>
@@ -117,6 +124,10 @@ function toggleFullscreen() {
         <a-button type="text" :loading="loading" @click="fetchViewData">
           <template #icon><ReloadOutlined /></template>
           刷新
+        </a-button>
+        <a-button type="text" @click="openReportCatalog">
+          <template #icon><AppstoreOutlined /></template>
+          报表目录
         </a-button>
         <a-button type="text" @click="toggleFullscreen">
           <template #icon><FullscreenOutlined /></template>

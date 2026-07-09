@@ -1,5 +1,67 @@
 # Iteration Report - 2026-07-09
 
+---
+
+Issue：ISSUE-008-010 报表中心平台化缺口-M1：统一报表目录与定义元数据最小落地
+
+目标：
+- 在 D 复验通过后，完成 `ISSUE-008-010` 的正式归档与 backlog 状态收口。
+- 将该 Issue 从 `Ready` 队列移除，写入 `Done`，并同步 `current-focus` 与正式质量报告。
+- 不改业务代码、不重跑测试、不覆盖当前工作区已有实现改动。
+
+修改范围摘要：
+- `docs/quality/issue-008-010-report-center-catalog-closeout.md`：新增正式收口报告。
+- `docs/backlog/ready-issues.md`：移除 `ISSUE-008-010` 的当前 Ready 状态。
+- `docs/backlog/done-issues.md`：新增 `ISSUE-008-010` 完成记录。
+- `docs/backlog/current-focus.md`：将当前状态更新为“Ready 队列为空，待重新拆题”。
+- `docs/iterations/iteration-2026-07-09-report.md`：记录本次正式归档动作。
+
+验证命令摘要：
+- `git status --short`：确认工作区已有实现线程的既有改动；本轮只追加文档收口。
+- D 复验结论引用：`ReportCatalogServiceTest` 通过，`pnpm type-check` 通过，`pnpm build` 通过，`git diff --check` 通过，仅有 LF/CRLF 规范化告警。
+- D 口径结论引用：两个原阻塞已解除，目录 `10` 项，字段完整，`page/API-only` 不混淆，导出口径真实，空 `permissionCode` 前端不异常，权限不放宽。
+
+失败分类或非失败分类：真实代码质量问题已修复；D 复验通过；本轮为正式归档与队列状态同步
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮结论基于 D 的正式复验结果做文档收口，不替代新的 live 浏览器复验。
+- 当前工作区仍保留未提交的实现改动，需由主线程或对应实现/验收线程继续处理 Git 收口。
+
+---
+
+Backlog 拆解：ISSUE-008-010 报表中心平台化缺口-M1：统一报表目录与定义元数据最小落地
+
+目标：
+- 在当前 Ready 队列为空后，为下一轮补入唯一一条可执行 Ready Issue。
+- 将报表中心后续推进从“已有局部最小回归”切换到“明确的平台化缺口治理”，避免把历史 Done 项重复包装为整个平台完成。
+- 只更新 `ready/current-focus/iteration` 最小状态，不修改业务代码、不运行测试。
+
+修改范围摘要：
+- `docs/backlog/ready-issues.md`：新增 `ISSUE-008-010`，并把当前队列状态改为唯一 Ready 串行模式。
+- `docs/backlog/current-focus.md`：锁定 `ISSUE-008-010` 为当前唯一 Ready，并补充串行执行边界。
+- `docs/iterations/iteration-2026-07-09-report.md`：记录本次 backlog 正式拆题动作。
+
+验证命令摘要：
+- `git status -sb`：`master...origin/master [ahead 1]`，未见本轮新增未跟踪文件。
+- `.codex-autopilot/stop.flag`：absent。
+- `.codex-autopilot/pause.flag`：absent。
+- `.codex-autopilot/enabled.flag`：present。
+- `Get-Content docs/backlog/ready-issues.md`、`current-focus.md`、`cgc-pms-production-enhancement-plan.md`、`done-issues.md`、`blocked-issues.md`：已核对现有格式、阶段边界和 Done/Blocked 现状。
+
+失败分类或非失败分类：非失败分类；本轮为 backlog 正式拆题与状态同步，不涉及实现验收
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当时 `ISSUE-008-010` 仅完成文档级 Ready 拆题，后续是否采用“静态注册”还是“最小 migration”路径，需要由实现线程验证后再裁决。
+- 当前工作区 `ahead 1` 为既有状态，本轮未处理提交或推送。
+
+---
+
 Issue：ISSUE-032-005 M3 财务真实角色缺失导致真实角色抽样无法完成
 
 目标：
