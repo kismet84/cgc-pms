@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.alert.dto.AlertBatchReadRequest;
 import com.cgcpms.alert.dto.AlertBatchStatusUpdateRequest;
 import com.cgcpms.alert.dto.AlertOperationResponse;
+import com.cgcpms.alert.dto.AlertProcessingReportVO;
 import com.cgcpms.alert.dto.AlertStatusUpdateRequest;
 import com.cgcpms.alert.dto.AlertSubscriptionUpdateRequest;
 import com.cgcpms.alert.entity.AlertLog;
@@ -49,6 +50,24 @@ public class AlertController {
         IPage<AlertLog> page = alertEvaluationService.page(tenantId, pageNum, pageSize, projectId,
                 ruleType, alertDomain, severity, isRead, triggeredStart, triggeredEnd, processStatus);
         return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/processing-report")
+    @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<AlertProcessingReportVO> processingReport(
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String ruleType,
+            @RequestParam(required = false) String alertDomain,
+            @RequestParam(required = false) String severity,
+            @RequestParam(required = false) Integer isRead,
+            @RequestParam(required = false) String processStatus,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime triggeredStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime triggeredEnd) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        return ApiResponse.success(alertEvaluationService.processingReport(tenantId, projectId,
+                ruleType, alertDomain, severity, isRead, triggeredStart, triggeredEnd, processStatus));
     }
 
     @PutMapping("/{id}/read")

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.alert.auth.AlertAccessScopeResolver;
+import com.cgcpms.alert.dto.AlertProcessingReportVO;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.entity.AlertRuleConfig;
 import com.cgcpms.alert.mapper.AlertLogMapper;
@@ -152,16 +153,49 @@ public class AlertEvaluationService {
     public IPage<AlertLog> page(Long tenantId, long pageNum, long pageSize, Long projectId,
                                 String ruleType, String alertDomain, String severity, Integer isRead,
                                 LocalDateTime triggeredStart, LocalDateTime triggeredEnd, String processStatus) {
+        LambdaQueryWrapper<AlertLog> wrapper = buildAlertQuery(tenantId, projectId, ruleType, alertDomain,
+                severity, isRead, triggeredStart, triggeredEnd, processStatus);
+        if (wrapper == null) {
+            return emptyPage(pageNum, pageSize);
+        }
+        wrapper.orderByDesc(AlertLog::getTriggeredAt);
+        return alertLogMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+    }
+
+    public AlertProcessingReportVO processingReport(Long tenantId, Long projectId,
+                                                    String ruleType, String alertDomain, String severity, Integer isRead,
+                                                    LocalDateTime triggeredStart, LocalDateTime triggeredEnd,
+                                                    String processStatus) {
+        LambdaQueryWrapper<AlertLog> wrapper = buildAlertQuery(tenantId, projectId, ruleType, alertDomain,
+                severity, isRead, triggeredStart, triggeredEnd, processStatus);
+        if (wrapper == null) {
+            return new AlertProcessingReportVO();
+        }
+        List<AlertLog> alerts = alertLogMapper.selectList(wrapper);
+
+        AlertProcessingReportVO report = new AlertProcessingReportVO();
+        report.setTotalCount(alerts.size());
+        report.setUnreadCount(alerts.stream().filter(a -> Objects.equals(a.getIsRead(), 0)).count());
+        report.setReadCount(alerts.stream().filter(a -> Objects.equals(a.getIsRead(), 1)).count());
+        report.setSeverityCounts(groupBy(alerts, AlertLog::getSeverity));
+        report.setProcessStatusCounts(groupBy(alerts, AlertLog::getProcessStatus));
+        return report;
+    }
+
+    private LambdaQueryWrapper<AlertLog> buildAlertQuery(Long tenantId, Long projectId,
+                                                         String ruleType, String alertDomain, String severity,
+                                                         Integer isRead, LocalDateTime triggeredStart,
+                                                         LocalDateTime triggeredEnd, String processStatus) {
         Set<String> allowedDomains = accessScopeResolver.allowedDomains();
         if (!accessScopeResolver.isAdmin()) {
             if (projectId != null) {
                 accessScopeResolver.assertProjectAccess(tenantId, projectId);
             }
             if (StringUtils.hasText(alertDomain) && !allowedDomains.contains(alertDomain)) {
-                return emptyPage(pageNum, pageSize);
+                return null;
             }
             if (allowedDomains.isEmpty()) {
-                return emptyPage(pageNum, pageSize);
+                return null;
             }
         }
 
@@ -172,7 +206,7 @@ public class AlertEvaluationService {
         } else if (!accessScopeResolver.isAdmin()) {
             Set<Long> accessibleProjectIds = accessScopeResolver.accessibleProjectIds(tenantId);
             if (accessibleProjectIds.isEmpty()) {
-                return emptyPage(pageNum, pageSize);
+                return null;
             }
             wrapper.in(AlertLog::getProjectId, accessibleProjectIds);
         }
@@ -208,12 +242,21 @@ public class AlertEvaluationService {
         if (triggeredEnd != null) {
             wrapper.le(AlertLog::getTriggeredAt, triggeredEnd);
         }
-        wrapper.orderByDesc(AlertLog::getTriggeredAt);
-        return alertLogMapper.selectPage(new Page<>(pageNum, pageSize), wrapper);
+        return wrapper;
     }
 
     private IPage<AlertLog> emptyPage(long pageNum, long pageSize) {
         return new Page<>(pageNum, pageSize);
+    }
+
+    private Map<String, Long> groupBy(List<AlertLog> alerts, java.util.function.Function<AlertLog, String> classifier) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        alerts.stream()
+                .map(classifier)
+                .filter(StringUtils::hasText)
+                .sorted()
+                .forEach(value -> counts.merge(value, 1L, Long::sum));
+        return counts;
     }
 
     private void applyDomainScope(LambdaQueryWrapper<AlertLog> wrapper, Set<String> allowedDomains) {

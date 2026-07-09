@@ -60,6 +60,38 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.data.records").isArray());
     }
 
+    @Test @Order(12) @DisplayName("GET /alerts/processing-report -> 200 with aggregate metrics")
+    void testProcessingReport() throws Exception {
+        deleteReportControllerAlerts();
+        try {
+            AlertLog open = newAlert("TEST_REPORT_CTRL", 10001L);
+            open.setSeverity("HIGH");
+            open.setIsRead(0);
+            open.setProcessStatus("OPEN");
+            alertLogMapper.insert(open);
+
+            AlertLog processed = newAlert("TEST_REPORT_CTRL", 10001L);
+            processed.setSeverity("MEDIUM");
+            processed.setIsRead(1);
+            processed.setProcessStatus("PROCESSED");
+            alertLogMapper.insert(processed);
+
+            mockMvc.perform(g("/alerts/processing-report?projectId=10001&ruleType=TEST_REPORT_CTRL")
+                            .cookie(adminCookie()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data.totalCount").value(2))
+                    .andExpect(jsonPath("$.data.unreadCount").value(1))
+                    .andExpect(jsonPath("$.data.readCount").value(1))
+                    .andExpect(jsonPath("$.data.severityCounts.HIGH").value(1))
+                    .andExpect(jsonPath("$.data.severityCounts.MEDIUM").value(1))
+                    .andExpect(jsonPath("$.data.processStatusCounts.OPEN").value(1))
+                    .andExpect(jsonPath("$.data.processStatusCounts.PROCESSED").value(1));
+        } finally {
+            deleteReportControllerAlerts();
+        }
+    }
+
     @Test @Order(3) @DisplayName("PUT /alerts/{id}/read non-existent -> still returns ok")
     void testMarkRead_NotFound() throws Exception {
         mockMvc.perform(u("/alerts/999999/read").cookie(adminCookie()))
@@ -268,6 +300,12 @@ class AlertControllerTest {
         alert.setProcessStatus("OPEN");
         alert.setDeletedFlag(0);
         return alert;
+    }
+
+    private void deleteReportControllerAlerts() {
+        alertLogMapper.delete(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, TENANT_ID)
+                .eq(AlertLog::getRuleType, "TEST_REPORT_CTRL"));
     }
 
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }

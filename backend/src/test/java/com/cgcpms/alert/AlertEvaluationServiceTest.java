@@ -5,6 +5,7 @@ import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.entity.AlertRuleConfig;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.mapper.AlertRuleConfigMapper;
+import com.cgcpms.alert.dto.AlertProcessingReportVO;
 import com.cgcpms.alert.service.AlertEvaluationService;
 import com.cgcpms.alert.service.AlertSubscriptionService;
 import com.cgcpms.common.TestUserContext;
@@ -454,6 +455,37 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("TA8b-3: processingReport — 预警总数、严重度、已读和处理状态与列表口径一致")
+    void testProcessingReportAggregatesListFilters() {
+        AlertLog highOpenUnread = reportAlert("HIGH", 0, "OPEN");
+        alertLogMapper.insert(highOpenUnread);
+        AlertLog highProcessedUnread = reportAlert("HIGH", 0, "PROCESSED");
+        alertLogMapper.insert(highProcessedUnread);
+        AlertLog mediumProcessedRead = reportAlert("MEDIUM", 1, "PROCESSED");
+        alertLogMapper.insert(mediumProcessedRead);
+
+        AlertLog missDomain = reportAlert("LOW", 0, "OPEN");
+        missDomain.setAlertDomain("CONTRACT");
+        alertLogMapper.insert(missDomain);
+
+        var page = alertService.page(TENANT_ID, 1, 10, testProjectId,
+                "REPORT_TEST", "PURCHASE", null, null, null, null, null);
+        AlertProcessingReportVO report = alertService.processingReport(TENANT_ID, testProjectId,
+                "REPORT_TEST", "PURCHASE", null, null, null, null, null);
+
+        assertEquals(page.getTotal(), report.getTotalCount(), "报表总数应与同筛选条件列表一致");
+        assertEquals(3, report.getTotalCount());
+        assertEquals(2, report.getUnreadCount());
+        assertEquals(1, report.getReadCount());
+        assertEquals(2L, report.getSeverityCounts().get("HIGH"));
+        assertEquals(1L, report.getSeverityCounts().get("MEDIUM"));
+        assertFalse(report.getSeverityCounts().containsKey("LOW"), "不同域预警不应进入报表");
+        assertEquals(1L, report.getProcessStatusCounts().get("OPEN"));
+        assertEquals(2L, report.getProcessStatusCounts().get("PROCESSED"));
+    }
+
+    @Test
+    @Transactional
     @DisplayName("TA8c: evaluatePurchaseDeliveryOverdue — 逾期未完成采购订单触发可跳转预警")
     void testEvaluatePurchaseDeliveryOverdue_TriggersWithSource() {
         MatPurchaseOrder order = new MatPurchaseOrder();
@@ -775,6 +807,22 @@ class AlertEvaluationServiceTest {
                   and event_type = 'STATUS_CHANGED' and send_status = 'SENT'
                 """, Integer.class, TENANT_ID, alert.getId());
         assertEquals(2, sent);
+    }
+
+    private AlertLog reportAlert(String severity, int isRead, String processStatus) {
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(testProjectId);
+        alert.setRuleType("REPORT_TEST");
+        alert.setAlertDomain("PURCHASE");
+        alert.setAlertCategory("PURCHASE_DELIVERY");
+        alert.setSeverity(severity);
+        alert.setMessage("预警报表测试");
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(isRead);
+        alert.setProcessStatus(processStatus);
+        alert.setDeletedFlag(0);
+        return alert;
     }
 
     @Test

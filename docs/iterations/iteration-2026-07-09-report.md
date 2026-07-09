@@ -1,5 +1,36 @@
 # Iteration Report - 2026-07-09
 
+Issue：ISSUE-008-004 预警处理报表口径回归
+
+目标：
+- 回归预警数量、严重度、处理状态和处理结果的报表口径。
+- 不扩大为规则治理中心 M2，不新增预警规则表。
+
+修改范围摘要：
+- `backend/src/main/java/com/cgcpms/alert/dto/AlertProcessingReportVO.java`：新增预警处理报表 VO。
+- `backend/src/main/java/com/cgcpms/alert/controller/AlertController.java`：新增 `GET /alerts/processing-report` 只读报表接口。
+- `backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`：复用列表查询边界聚合预警总数、严重度、已读和处理状态。
+- `backend/src/test/java/com/cgcpms/alert/AlertEvaluationServiceTest.java`、`backend/src/test/java/com/cgcpms/alert/AlertControllerTest.java`：补充报表和列表口径一致的稳定断言。
+- `docs/quality/issue-008-004-alert-processing-report.md`：新增正式质量报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`：将 ISSUE-008-004 收口为 Done。
+
+验证命令摘要：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest#testProcessingReportAggregatesListFilters,AlertControllerTest#testProcessingReport" test`：通过，`2` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd backend; .\mvnw.cmd test`：未通过；失败点集中在既有 dashboard、invoice、workflow、purchase、payment、revenue 测试夹具/断言问题，目标测试已通过。
+- `git diff --check`：通过。
+
+失败分类或非失败分类：真实代码质量问题已修复；全量测试存在既有无关失败
+是否自动合并：auto-merge/local-commit-only
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 本轮只新增预警处理报表最小只读接口，不新增规则治理中心、导出能力或预警规则表。
+- 后端全量测试仍有既有无关红灯，需后续 Ready Issue 分别治理。
+
+---
+
 Issue：ISSUE-008-003 成本动态汇总报表口径回归
 
 目标：
