@@ -71,7 +71,9 @@ defineProps<{
           @click="handleBatchStatus('ARCHIVED')"
           >归档</a-button
         >
-        <a-button v-if="canExportAlerts" @click="exportCurrentView">导出</a-button>
+        <a-button v-if="canExportAlerts" :disabled="alerts.length === 0" @click="exportCurrentView"
+          >导出</a-button
+        >
         <span v-if="canManageAlerts" class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>
       </div>
       <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />

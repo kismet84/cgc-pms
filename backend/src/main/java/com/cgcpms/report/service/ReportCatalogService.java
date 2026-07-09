@@ -1,6 +1,9 @@
 package com.cgcpms.report.service;
 
+import com.cgcpms.alert.auth.AlertAccessScopeResolver;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.report.dto.ReportCatalogItem;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -11,7 +14,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class ReportCatalogService {
+
+    private final AlertAccessScopeResolver alertAccessScopeResolver;
 
     private static final List<ReportCatalogItem> CATALOG = List.of(
             item("dashboard-management", "管理驾驶舱", "dashboard", "page", "/dashboard",
@@ -48,9 +54,21 @@ public class ReportCatalogService {
             return CATALOG;
         }
         return CATALOG.stream()
-                .filter(item -> !StringUtils.hasText(item.permissionCode())
-                        || authorities.contains(item.permissionCode()))
+                .filter(item -> isVisibleTo(authorities, item))
                 .toList();
+    }
+
+    private boolean isVisibleTo(Set<String> authorities, ReportCatalogItem item) {
+        if (StringUtils.hasText(item.permissionCode()) && !authorities.contains(item.permissionCode())) {
+            return false;
+        }
+        if (!"alert".equals(item.catalog())) {
+            return true;
+        }
+        Long tenantId = UserContext.getCurrentTenantId();
+        return tenantId != null
+                && !alertAccessScopeResolver.allowedDomains().isEmpty()
+                && !alertAccessScopeResolver.accessibleProjectIds(tenantId).isEmpty();
     }
 
     private static ReportCatalogItem item(String code, String name, String catalog, String sourceType,

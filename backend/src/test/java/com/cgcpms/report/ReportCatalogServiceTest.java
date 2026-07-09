@@ -1,7 +1,12 @@
 package com.cgcpms.report;
 
+import com.cgcpms.alert.auth.AlertAccessScopeResolver;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.report.dto.ReportCatalogItem;
 import com.cgcpms.report.service.ReportCatalogService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -13,18 +18,23 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class ReportCatalogServiceTest {
 
-    private final ReportCatalogService service = new ReportCatalogService();
+    private final AlertAccessScopeResolver accessScopeResolver = mock(AlertAccessScopeResolver.class);
+    private final ReportCatalogService service = new ReportCatalogService(accessScopeResolver);
 
     @AfterEach
     void clearSecurityContext() {
         SecurityContextHolder.clearContext();
+        UserContext.clear();
     }
 
     @Test
     void adminSeesFullStaticCatalogWithRequiredFields() {
+        when(accessScopeResolver.isAdmin()).thenReturn(true);
         authenticate("ROLE_ADMIN");
 
         List<ReportCatalogItem> catalog = service.listVisibleCatalog();
@@ -58,7 +68,10 @@ class ReportCatalogServiceTest {
 
     @Test
     void nonAdminSeesAuthorizedReportsAndAuthenticatedWorkflowEfficiency() {
+        when(accessScopeResolver.allowedDomains()).thenReturn(Set.of("CONTRACT", "PURCHASE"));
+        when(accessScopeResolver.accessibleProjectIds(0L)).thenReturn(Set.of(10001L));
         authenticate("cost:ledger:query", "alert:view");
+        bindUserContext(3000L, 0L, "PROJECT_MANAGER");
 
         List<ReportCatalogItem> catalog = service.listVisibleCatalog();
         Set<String> visibleCodes = catalog.stream().map(ReportCatalogItem::code).collect(Collectors.toSet());
@@ -90,6 +103,24 @@ class ReportCatalogServiceTest {
         ).contains(code)));
     }
 
+    @Test
+    void nonAdminWithoutAccessibleAlertScopeDoesNotSeeAlertCatalogEntries() {
+        AlertAccessScopeResolver accessScopeResolver = mock(AlertAccessScopeResolver.class);
+        when(accessScopeResolver.isAdmin()).thenReturn(false);
+        when(accessScopeResolver.allowedDomains()).thenReturn(Set.of("PURCHASE"));
+        when(accessScopeResolver.accessibleProjectIds(0L)).thenReturn(Set.of());
+        ReportCatalogService scopedService = new ReportCatalogService(accessScopeResolver);
+        authenticate("alert:view");
+        bindUserContext(3001L, 0L, "PROJECT_MANAGER");
+
+        List<ReportCatalogItem> catalog = scopedService.listVisibleCatalog();
+        Set<String> visibleCodes = catalog.stream().map(ReportCatalogItem::code).collect(Collectors.toSet());
+
+        assertFalse(visibleCodes.contains("alert-center"));
+        assertFalse(visibleCodes.contains("alerts-processing-report"));
+        assertEquals(Set.of("workflow-efficiency"), visibleCodes);
+    }
+
     private ReportCatalogItem find(List<ReportCatalogItem> catalog, String code) {
         return catalog.stream()
                 .filter(item -> code.equals(item.code()))
@@ -102,5 +133,16 @@ class ReportCatalogServiceTest {
                 "tester",
                 null,
                 List.of(authorities).stream().map(SimpleGrantedAuthority::new).toList()));
+    }
+
+    private void bindUserContext(long userId, long tenantId, String... roles) {
+        Claims claims = Jwts.claims()
+                .subject("tester")
+                .add(JwtUtils.CLAIM_USER_ID, userId)
+                .add(JwtUtils.CLAIM_USERNAME, "tester")
+                .add(JwtUtils.CLAIM_TENANT_ID, tenantId)
+                .add(JwtUtils.CLAIM_ROLES, List.of(roles))
+                .build();
+        UserContext.set(claims);
     }
 }

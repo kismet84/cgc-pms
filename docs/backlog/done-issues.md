@@ -60,6 +60,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-012-report-center-export-metadata-consistency.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-013：报表中心平台化缺口-M4：导出入口与筛选快照一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；目录入口、导出快照与权限边界一致性回归已补齐；D 验收、E 审查与 git diff --check 通过
+验证结果：通过
+相关报告：docs/quality/issue-008-013-report-center-export-filter-snapshot.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-005：审批效率报表口径回归
 
 完成日期：2026-07-09

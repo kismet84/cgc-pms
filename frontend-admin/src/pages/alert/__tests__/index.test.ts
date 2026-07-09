@@ -19,19 +19,28 @@ const downloadUtilSource = readFileSync(resolve(currentDir, '../../../utils/down
 const {
   mockGetAlertSubscription,
   mockUpdateAlertSubscription,
+  mockDownloadBlobFile,
   mockRouterPush,
   mockRouterReplace,
   mockRoute,
+  mockMessage,
 } = vi.hoisted(
   () => ({
     mockGetAlertSubscription: vi.fn(),
     mockUpdateAlertSubscription: vi.fn(),
+    mockDownloadBlobFile: vi.fn(),
     mockRouterPush: vi.fn(),
     mockRouterReplace: vi.fn(),
     mockRoute: {
       path: '/alert',
       query: {},
       meta: {},
+    },
+    mockMessage: {
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warning: vi.fn(),
     },
   }),
 )
@@ -130,12 +139,15 @@ vi.mock('@/api/modules/alert', () => ({
   getAlertSubscription: mockGetAlertSubscription,
   updateAlertSubscription: mockUpdateAlertSubscription,
 }))
+vi.mock('@/utils/download', () => ({
+  downloadBlobFile: mockDownloadBlobFile,
+}))
 
 vi.mock('ant-design-vue', async () => {
   const actual = await vi.importActual('ant-design-vue')
   return {
     ...actual,
-    message: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
+    message: mockMessage,
   }
 })
 
@@ -421,6 +433,7 @@ beforeEach(() => {
       },
     }),
   )
+  mockDownloadBlobFile.mockReset()
 })
 
 describe('alert/index.vue', () => {
@@ -557,6 +570,68 @@ describe('alert/index.vue', () => {
 
     await wrapper.get('.open-business-entry').trigger('click')
     expect(mockRouterPush).toHaveBeenCalledWith('/purchase/order?businessId=PO-9')
+  })
+
+  it('导出仅使用当前列表快照，空列表时按钮禁用', async () => {
+    mockAlertStore.alerts = [
+      createAlertRecord({
+        id: 'ALERT-001',
+        projectId: 'P-01',
+        alertDomain: 'PURCHASE',
+        ruleType: 'CONTRACT_OVERDUE',
+        alertCategory: 'PURCHASE_DELIVERY',
+        severity: 'HIGH',
+        processStatus: 'OPEN',
+        message: '首条消息\n包含换行',
+      }),
+      createAlertRecord({
+        id: 'ALERT-002',
+        projectId: 'P-02',
+        alertDomain: 'CONTRACT',
+        ruleType: 'CONTRACT_EXPIRING',
+        alertCategory: 'OTHER',
+        severity: 'LOW',
+        processStatus: 'ARCHIVED',
+        isRead: 1,
+        triggeredAt: '2026-07-08 09:00:00',
+        message: '第二条消息',
+      }),
+    ]
+    mockAlertStore.total = 2
+    mockReferenceStore.projects = [
+      { id: 'P-01', projectCode: 'PRJ-01', projectName: '测试项目一' },
+      { id: 'P-02', projectCode: 'PRJ-02', projectName: '测试项目二' },
+    ]
+
+    const wrapper = mountAlertPage()
+    await flushPromises()
+
+    const exportButton = wrapper
+      .findAll('.alert-toolbar-left button')
+      .find((item) => item.text() === '导出')
+    expect(exportButton).toBeTruthy()
+    expect(exportButton!.attributes('disabled')).toBeUndefined()
+
+    await exportButton!.trigger('click')
+
+    expect(mockDownloadBlobFile).toHaveBeenCalledTimes(1)
+    const [blob, filename] = mockDownloadBlobFile.mock.calls[0] as [Blob, string]
+    const csv = await blob.text()
+    expect(filename).toMatch(/^alerts-\d{4}-\d{2}-\d{2}\.csv$/)
+    expect(csv).toContain('"告警ID","项目","规则域","规则类型","细分类","严重度","处理状态","已读","触发时间","消息摘要"')
+    expect(csv).toContain('"ALERT-001","PRJ-01 测试项目一","采购类","合同超期","采购交付","高","待处理","未读","2026-07-07 10:00:00","首条消息 包含换行"')
+    expect(csv).toContain('"ALERT-002","PRJ-02 测试项目二","合同类","合同到期","其他","低","已归档","已读","2026-07-08 09:00:00","第二条消息"')
+    expect(mockMessage.success).toHaveBeenCalledWith('已导出当前列表')
+
+    mockAlertStore.alerts = []
+    mockAlertStore.total = 0
+    const emptyWrapper = mountAlertPage()
+    await flushPromises()
+    const emptyExportButton = emptyWrapper
+      .findAll('.alert-toolbar-left button')
+      .find((item) => item.text() === '导出')
+    expect(emptyExportButton).toBeTruthy()
+    expect(emptyExportButton!.attributes('disabled')).toBeDefined()
   })
 
   it('入口文件只保留编排，关键结构拆到子组件', () => {

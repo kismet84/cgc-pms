@@ -34,6 +34,7 @@ class AlertControllerTest {
     @Autowired private PmProjectMapper projectMapper; @Autowired private PmProjectMemberMapper projectMemberMapper;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private static final long DIFFERENT_PROJECT_MEMBER_ID = 92001L; private static final long OTHER_PROJECT_ID = 82001L;
+    private static final long NO_ACCESS_MEMBER_ID = 92002L;
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
@@ -90,6 +91,18 @@ class AlertControllerTest {
         } finally {
             deleteReportControllerAlerts();
         }
+    }
+
+    @Test @Order(13) @DisplayName("GET /alerts/processing-report same-tenant different-project member -> denied")
+    void testProcessingReport_SameTenantDifferentProjectMemberDenied() throws Exception {
+        seedProjectIfAbsent(OTHER_PROJECT_ID, "ALERT-CTRL-OTHER");
+        seedMemberIfAbsent(OTHER_PROJECT_ID, NO_ACCESS_MEMBER_ID, "PM");
+
+        mockMvc.perform(g("/alerts/processing-report?projectId=10001&ruleType=TEST_REPORT_CTRL")
+                        .cookie(memberCookie(NO_ACCESS_MEMBER_ID, "alert:view")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ALERT_ACCESS_DENIED"))
+                .andExpect(jsonPath("$.message").value("无权访问该预警"));
     }
 
     @Test @Order(3) @DisplayName("PUT /alerts/{id}/read non-existent -> still returns ok")
