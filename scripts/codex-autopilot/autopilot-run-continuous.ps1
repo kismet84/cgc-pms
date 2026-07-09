@@ -2,6 +2,7 @@ param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [switch]$DryRun,
+  [switch]$ApplyBacklogSplit,
   [int]$MaxLoops = 20
 )
 
@@ -57,22 +58,33 @@ function Get-ReadyIssues {
 
 function Get-SplitCandidates {
   param(
+    [string]$FocusPath,
     [string]$PlanPath,
+    [string]$ReadyPath,
     [int]$Limit
   )
 
-  if (!(Test-Path $PlanPath)) {
+  if (!(Test-Path $FocusPath) -or !(Test-Path $PlanPath)) {
     return @()
   }
 
+  $focus = Get-Content -Raw $FocusPath
+  $ready = if (Test-Path $ReadyPath) { Get-Content -Raw $ReadyPath } else { "" }
   $forbidden = "财务|生产数据库|生产发布|总工程师|BIM|AI"
   $allowed = "报表|规则治理|通知|WBS|进度|甘特图|供应商|采购增强"
   $candidates = @()
   foreach ($line in Get-Content $PlanPath) {
-    if ($line -match "^#{2,3}\s+(.+)$") {
-      $title = $matches[1].Trim()
-      if ($title -match $allowed -and $title -notmatch $forbidden) {
-        $candidates += $title
+    if ($line -match "^#{2,3}\s+([0-9]+\.[0-9]+)\s+(.+)$") {
+      $section = $matches[1].Trim()
+      $name = $matches[2].Trim()
+      $anchor = "$section $name"
+      $anchorToken = '`' + $anchor + '`'
+      if ($anchor -match $allowed -and $anchor -notmatch $forbidden -and $focus -match $allowed -and $ready -notmatch [regex]::Escape($anchorToken)) {
+        $candidates += [pscustomobject]@{
+          section = $section
+          name = $name
+          anchor = $anchor
+        }
       }
     }
     if ($candidates.Count -ge $Limit) {
@@ -80,6 +92,86 @@ function Get-SplitCandidates {
     }
   }
   return $candidates
+}
+
+function Get-NextIssueId {
+  param(
+    [string]$ReadyText,
+    [string]$Section,
+    [int]$Offset
+  )
+
+  $prefix = "{0:000}" -f [int]($Section.Split(".")[0])
+  $max = 0
+  foreach ($match in [regex]::Matches($ReadyText, "ISSUE-$prefix-([0-9]+)")) {
+    $max = [Math]::Max($max, [int]$match.Groups[1].Value)
+  }
+  $suffix = "{0:000}" -f ($max + $Offset)
+  return "ISSUE-$prefix-$suffix"
+}
+
+function New-ReadyIssueDraft {
+  param(
+    [pscustomobject]$Candidate,
+    [string]$IssueId
+  )
+
+  $slug = ($Candidate.name -replace "[^\p{L}\p{Nd}]+", "-").Trim("-").ToLowerInvariant()
+  @"
+
+### ${IssueId}：$($Candidate.name) 最小可行回归
+
+优先级：P2
+类型：生产增强 / 回归 / 最小实现
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``$($Candidate.anchor)`` 节
+是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
+目标：
+- 基于现有架构补齐“$($Candidate.name)”的一轮最小可验收能力或回归断言。
+- 不扩大为完整平台化改造，不连接生产环境。
+允许修改：
+- ``backend/**``
+- ``frontend-admin/**``
+- ``docs/quality/**``
+- ``docs/iterations/**``
+- ``docs/backlog/**``
+禁止修改：
+- 已应用 Flyway migration
+- 生产凭据、生产数据库连接、生产发布配置
+- 与本 Issue 无关的大范围重构或新依赖
+验收标准：
+- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
+- 不放宽现有鉴权、租户、项目边界。
+- 更新 iteration 或 quality 报告，并同步 backlog 状态。
+验证命令：
+- ``cd backend; .\mvnw.cmd test``
+- ``cd frontend-admin; pnpm type-check``
+- ``git diff --check``
+归档报告：``docs/quality/$($IssueId.ToLowerInvariant())-$slug.md``
+"@
+}
+
+function Add-ReadyIssueDrafts {
+  param(
+    [string]$ReadyPath,
+    [object[]]$Candidates
+  )
+
+  if ($Candidates.Count -eq 0) {
+    return 0
+  }
+
+  $readyText = if (Test-Path $ReadyPath) { Get-Content -Raw $ReadyPath } else { "# Ready Issues`r`n" }
+  $drafts = @()
+  for ($index = 0; $index -lt $Candidates.Count; $index++) {
+    $issueId = Get-NextIssueId $readyText $Candidates[$index].section ($index + 1)
+    $drafts += New-ReadyIssueDraft $Candidates[$index] $issueId
+  }
+
+  $appendText = ($drafts -join "`r`n")
+  Add-Content -Encoding utf8 -Path $ReadyPath -Value $appendText
+  return $Candidates.Count
 }
 
 function Write-State {
@@ -124,12 +216,15 @@ $readyPath = Join-Path $RepoRoot "docs\backlog\ready-issues.md"
 $focusPath = Join-Path $RepoRoot "docs\backlog\current-focus.md"
 $planPath = Join-Path $RepoRoot "docs\backlog\cgc-pms-production-enhancement-plan.md"
 $splitLimit = 5
+$applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun
+$dryRunMode = -not $applyMode
 
 Write-Host "CGC-PMS AutoPilot continuous runner"
 Write-Host "repoRoot=$RepoRoot"
 Write-Host "maxIssuesPerRun=$maxIssuesPerRun"
 Write-Host "autoPush=$($config.autoPush)"
-Write-Host "dryRun=$([bool]$DryRun)"
+Write-Host "dryRun=$dryRunMode"
+Write-Host "applyBacklogSplit=$applyMode"
 
 for ($loop = 1; $loop -le $MaxLoops; $loop++) {
   $checkpoint = Test-Checkpoint $autoDir
@@ -151,27 +246,28 @@ for ($loop = 1; $loop -le $MaxLoops; $loop++) {
 
   Write-Host "SPLIT_MODE"
   Write-Host "focusPath=$focusPath"
-  $candidates = @(Get-SplitCandidates $planPath $splitLimit)
+  $candidates = @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit)
   if ($candidates.Count -eq 0) {
-    Write-State $autoDir "STOP_NO_READY_OR_SPLIT_CANDIDATE" ([bool]$DryRun)
+    Write-State $autoDir "STOP_NO_READY_OR_SPLIT_CANDIDATE" $dryRunMode
     Write-Host "STOP_NO_READY_OR_SPLIT_CANDIDATE"
     exit 0
   }
 
   Write-Host "splitCandidateCount=$($candidates.Count)"
   for ($index = 0; $index -lt $candidates.Count; $index++) {
-    Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $candidates[$index])
+    Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $candidates[$index].anchor)
   }
 
-  if ($DryRun) {
+  if ($dryRunMode) {
     Write-State $autoDir "DRY_RUN_SPLIT_PLANNED" $true
     Write-Host "DRY_RUN_NO_BACKLOG_WRITE"
     exit 0
   }
 
-  Write-State $autoDir "SPLIT_REQUIRED_MANUAL_OWNER" $false
-  Write-Host "SPLIT_REQUIRED_MANUAL_OWNER"
-  Write-Host "No Ready Issue was generated automatically; project owner must write docs/backlog/ready-issues.md."
+  $createdCount = Add-ReadyIssueDrafts $readyPath $candidates
+  Write-State $autoDir "BACKLOG_SPLIT_APPLIED" $false
+  Write-Host "BACKLOG_SPLIT_APPLIED"
+  Write-Host "createdReadyIssueDrafts=$createdCount"
 
   $checkpoint = Test-Checkpoint $autoDir
   Write-Host "postSplitCheckpoint=$checkpoint"

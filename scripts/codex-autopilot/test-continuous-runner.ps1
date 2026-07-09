@@ -11,6 +11,13 @@ function New-Fixture {
     [string]$Name,
     [string]$Ready,
     [string]$Plan,
+    [string]$Focus = @"
+# Current Focus
+
+允许进入下一阶段的候选范围：
+- P2 报表中心、规则治理中心、通知平台、WBS / 进度计划 / 甘特图、供应商评分 / 采购增强。
+"@,
+    [int]$MaxIssuesPerRun = 1,
     [switch]$Enabled
   )
 
@@ -26,21 +33,36 @@ function New-Fixture {
 {
   "repoRoot": "$($Root -replace '\\', '\\')",
   "autopilotDir": "$(($AutoDir) -replace '\\', '\\')",
-  "maxIssuesPerRun": 1,
+  "maxIssuesPerRun": $MaxIssuesPerRun,
   "autoPush": false
 }
 "@ | Out-File -Encoding utf8 (Join-Path $ScriptDir "codex-autopilot.config.json")
   $Ready | Out-File -Encoding utf8 (Join-Path $BacklogDir "ready-issues.md")
-  "# Current Focus`n" | Out-File -Encoding utf8 (Join-Path $BacklogDir "current-focus.md")
+  $Focus | Out-File -Encoding utf8 (Join-Path $BacklogDir "current-focus.md")
   $Plan | Out-File -Encoding utf8 (Join-Path $BacklogDir "cgc-pms-production-enhancement-plan.md")
   return $Root
 }
 
 function Invoke-Runner {
-  param([string]$Root)
+  param(
+    [string]$Root,
+    [switch]$Apply
+  )
 
   $Config = Join-Path $Root "scripts\codex-autopilot\codex-autopilot.config.json"
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $Runner -RepoRoot $Root -ConfigPath $Config -DryRun -MaxLoops 3 | Out-String
+  $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $Runner, "-RepoRoot", $Root, "-ConfigPath", $Config, "-MaxLoops", "3")
+  if ($Apply) {
+    $args += "-ApplyBacklogSplit"
+  } else {
+    $args += "-DryRun"
+  }
+  $oldErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    & powershell @args 2>&1 | Out-String
+  } finally {
+    $ErrorActionPreference = $oldErrorActionPreference
+  }
 }
 
 function Assert-Contains {
@@ -51,9 +73,29 @@ function Assert-Contains {
   }
 }
 
+function Assert-NotContains {
+  param([string]$Text, [string]$Unexpected)
+
+  if ($Text -like "*$Unexpected*") {
+    throw "Expected output not to contain '$Unexpected'. Actual:`n$Text"
+  }
+}
+
 try {
   $DisabledRoot = New-Fixture -Name "disabled" -Ready "# Ready Issues`n" -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $DisabledRoot) "STOP_DISABLED"
+
+  $PauseRoot = New-Fixture -Name "paused" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
+  "pause" | Out-File -Encoding utf8 (Join-Path $PauseRoot ".codex-autopilot\pause.flag")
+  Assert-Contains (Invoke-Runner $PauseRoot) "STOP_PAUSED"
+
+  $StopRoot = New-Fixture -Name "stopped" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
+  "stop" | Out-File -Encoding utf8 (Join-Path $StopRoot ".codex-autopilot\stop.flag")
+  Assert-Contains (Invoke-Runner $StopRoot) "STOP_REQUESTED"
+
+  $BadLimitRoot = New-Fixture -Name "bad-limit" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n" -MaxIssuesPerRun 2
+  $BadLimitOutput = Invoke-Runner $BadLimitRoot
+  Assert-Contains $BadLimitOutput "Continuous runner requires maxIssuesPerRun=1"
 
   $ReadyRoot = New-Fixture -Name "ready" -Enabled -Ready @"
 # Ready Issues
@@ -77,6 +119,29 @@ try {
   $SplitOutput = Invoke-Runner $SplitRoot
   Assert-Contains $SplitOutput "SPLIT_MODE"
   Assert-Contains $SplitOutput "DRY_RUN_NO_BACKLOG_WRITE"
+  $SplitReadyAfterDryRun = Get-Content -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
+  Assert-NotContains $SplitReadyAfterDryRun "状态：Ready"
+
+  $ApplyRoot = New-Fixture -Name "apply" -Enabled -Ready "# Ready Issues`n" -Plan @"
+# Plan
+
+## 8. 中期开发计划
+
+### 8.1 报表中心
+建设项目经营总览报表。
+
+### 8.2 规则治理中心
+建设预警规则版本、启停和回归。
+"@
+  $ApplyOutput = Invoke-Runner $ApplyRoot -Apply
+  Assert-Contains $ApplyOutput "BACKLOG_SPLIT_APPLIED"
+  Assert-Contains $ApplyOutput "postSplitCheckpoint=CONTINUE"
+  Assert-Contains $ApplyOutput "READY_ISSUE_FOUND"
+  Assert-Contains $ApplyOutput "BUSINESS_EXECUTION_NOT_STARTED"
+  $ApplyReady = Get-Content -Raw (Join-Path $ApplyRoot "docs\backlog\ready-issues.md")
+  Assert-Contains $ApplyReady "状态：Ready"
+  Assert-Contains $ApplyReady "验证命令："
+  Assert-Contains $ApplyReady "来源锚点："
 
   $EmptyRoot = New-Fixture -Name "empty" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $EmptyRoot) "STOP_NO_READY_OR_SPLIT_CANDIDATE"
