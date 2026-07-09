@@ -10,6 +10,7 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 - 用户要求按 `cgc-pms` AutoPilot 规则做主线程编排、拆 Ready、判阻塞、验收或收口。
 - 需要把连续自动迭代的 Owner 规则迁移到另一个本地仓库，但仍保持项目事实文件在目标仓库。
 - 需要统一 A-F 角色边界、失败分类、正式输出口径。
+- 用户直接使用项目级触发短语 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代` 或对应 legacy 兼容短语。
 
 ## Do first
 
@@ -17,6 +18,32 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 2. 只把本插件当成规则、模板、脚本工具箱与插件自有归档目录，不当成项目真实 backlog 或业务 quality 仓库；项目业务任务正式文档仍留在项目 `docs/**`。
 3. 进入实施前先跑 `scripts/autopilot-checkpoint.ps1`，至少看 `branch`、`gitStatus`、`stopFlag`、`pauseFlag`、`enabledFlag`。
 4. 需要 loop 协议时，优先参考 `../../schemas/loop-state.schema.json`、`../../schemas/loop-event.schema.json`、`../../schemas/classification-result.schema.json`、`../../scripts/autopilot-loop-runner.ps1` 和 `../../scripts/validate-loop-artifacts.ps1`。
+
+## Trigger protocol
+
+1. `启动预演`
+   - 只做插件 dry-run
+   - 目标命令语义：`autopilot-loop-runner.ps1 -DryRun -ReadyIssuePath docs/backlog/ready-issues.md`
+   - 不启动下一任务、不提交、不 push
+2. `启动迭代`
+   - 进入连续迭代模式
+   - 优先走插件 runner / checkpoint / classifier
+   - 仍受主线程/子智能体边界、Ready 队列、stop/pause/enabled、A-F 分工、no push 约束
+3. `启动迭代-N`
+   - `N=1..50`
+   - 最多完成 N 个实施型 Ready Issue 后退出
+   - dry-run、拆单、health gate、runtime refresh 不计入 N
+4. `停止迭代`
+   - 安全停止
+   - 等价于 legacy `停止自动迭代系统`
+   - 设置停止标记并关闭 `enabled.flag`，不强杀当前任务
+
+Legacy 兼容短语继续有效：
+
+- `启动自动迭代系统`
+- `启动连续自动迭代系统`
+- `启动连续自动迭代系统-N`
+- `停止自动迭代系统`
 
 ## Core flow
 

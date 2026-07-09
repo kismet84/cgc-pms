@@ -218,13 +218,17 @@ CI 与验收失败分类规则：
 
 ### 项目级关键词协议
 
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动连续自动迭代系统` 时，视为请求进入连续执行模式：先确保 AutoPilot 已启动（必要时先执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`），然后在当前会话中基于 `docs/backlog/ready-issues.md` 连续执行多轮；连续模式默认采用多角色子智能体架构，主线程只负责规划、拆任务、验收、决策，执行侧按 A 需求/架构分析、B 前端/UI 实现、C 后端/API 实现、D 测试/用例/回归、E 代码审查/安全审查、F 文档/上线清单拆分，不得把多轮任务长期交给单一长跑子智能体包办；每轮最多允许 3 个完全无关联、无任何代码关联的 Ready Issue 并行；不能证明完全无关联时按串行处理；涉及同一文件、同一目录模块、同一后端域、同一前端页面、数据库、权限、安全、租户、金额口径或审批状态机的任务一律不得并行；每轮结束后必须检查 `stop.flag`、`pause.flag`、`enabled.flag`；若当前 Ready 队列为空，则先从长期总任务池按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue，拆单当轮只更新 backlog、不直接修改业务代码；若拆单后仍无 Ready，但 `blocked` 中存在当前 `focus/阶段` 的前置阻塞，则必须优先进入“阻塞解除型”子智能体处理分支，不得直接停机；只要仍允许继续且 Ready 队列中存在合格 Ready Issue，就必须进入下一轮
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动连续自动迭代系统-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。拆单轮、health gate、runtime refresh、dry-run、ExplainNextAction 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-stop.ps1`；其语义是设置停止标记并关闭 `enabled.flag`，用于阻断下一任务启动，不强制中断已启动的当前任务
-- 连续执行模式的停止条件包括：收到 `停止自动迭代系统` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 队列为空且长期总任务池按 `docs/backlog/current-focus.md` 也无可拆任务或无法形成合格 Ready Issue，且不存在可继续核实/解除的当前 `focus/阶段` 前置阻塞、当前 Issue 连续自修后仍失败且已写入 blocked、当前前置阻塞已被核实无法解除并已安全写入 blocked、带 `-N` 参数时已触达实施型 Ready Issue 完成上限、或触达系统/会话限制
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动预演` 时，视为请求执行插件 dry-run 预演：`powershell -NoProfile -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -ReadyIssuePath D:\projects-test\cgc-pms\docs\backlog\ready-issues.md`；该语义只做受控预演，不启动下一任务、不提交、不 push。
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求进入连续迭代模式：优先走插件 runner / checkpoint / classifier 链路，并在当前会话中基于 `docs/backlog/ready-issues.md` 连续执行多轮；连续模式默认采用多角色子智能体架构，主线程只负责规划、拆任务、验收、决策，执行侧按 A 需求/架构分析、B 前端/UI 实现、C 后端/API 实现、D 测试/用例/回归、E 代码审查/安全审查、F 文档/上线清单拆分，不得把多轮任务长期交给单一长跑子智能体包办；每轮最多允许 3 个完全无关联、无任何代码关联的 Ready Issue 并行；不能证明完全无关联时按串行处理；涉及同一文件、同一目录模块、同一后端域、同一前端页面、数据库、权限、安全、租户、金额口径或审批状态机的任务一律不得并行；每轮结束后必须检查 `stop.flag`、`pause.flag`、`enabled.flag`；若当前 Ready 队列为空，则先从长期总任务池按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue，拆单当轮只更新 backlog、不直接修改业务代码；若拆单后仍无 Ready，但 `blocked` 中存在当前 `focus/阶段` 的前置阻塞，则必须优先进入“阻塞解除型”子智能体处理分支，不得直接停机；只要仍允许继续且 Ready 队列中存在合格 Ready Issue，就必须进入下一轮。整个过程仍遵守主线程/子智能体边界、Ready 队列、stop/pause/enabled、A-F 分工与 `no push` 约束。
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动迭代-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。dry-run、拆单、health gate、runtime refresh 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止迭代` 时，视为请求执行安全停止：设置停止标记并关闭 `enabled.flag`，语义等价于旧 `停止自动迭代系统`，用于阻断下一任务启动，不强杀当前任务。
+- 连续执行模式的停止条件包括：收到 `停止迭代` 或 legacy 兼容短语 `停止自动迭代系统` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 队列为空且长期总任务池按 `docs/backlog/current-focus.md` 也无可拆任务或无法形成合格 Ready Issue，且不存在可继续核实/解除的当前 `focus/阶段` 前置阻塞、当前 Issue 连续自修后仍失败且已写入 blocked、当前前置阻塞已被核实无法解除并已安全写入 blocked、带 `-N` 参数时已触达实施型 Ready Issue 完成上限、或触达系统/会话限制
 - 连续执行模式仍保持以下边界：`autoPush=false`、不发布生产、不连接生产库、不删除仓库外文件；若涉及自动合并，仍必须先通过既有门禁与前置校验
-- 普通 `启动自动迭代系统` 仍只表示打开开关并恢复轮询，不等同于连续长跑执行多轮
-- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动自动迭代系统`、`启动连续自动迭代系统`、`启动连续自动迭代系统-N`、`停止自动迭代系统` 才能触发对应动作，避免误触发
+- legacy 兼容入口保留如下：
+  - `启动自动迭代系统`：兼容旧“打开开关并恢复轮询”语义
+  - `启动连续自动迭代系统`：兼容旧“启动迭代”语义
+  - `启动连续自动迭代系统-N`：兼容旧“启动迭代-N”语义
+  - `停止自动迭代系统`：兼容旧“停止迭代”语义
+- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代` 及上述 legacy 兼容短语才能触发对应动作，避免误触发
 - 触发前仍需遵守主线程/子智能体边界；若当前会话是项目总负责人主线程，应派运维型子智能体执行，或仅在用户明确授权下执行
 - 执行完成后必须回报 AutoPilot 的 flag/state 检查结果，至少说明 `stop.flag`、`pause.flag`、`enabled.flag` 与相关运行状态，并明确是否停止了下一任务派发

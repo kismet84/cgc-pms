@@ -71,7 +71,8 @@ function Resolve-ReadyIssueSelection {
 
         $content = Get-Content -LiteralPath $RequestedPath -Raw
         $looksReady = ($content -match '^##\s+') -and ($content -match '验证命令：')
-        $matchesIssue = ($content -match [regex]::Escape($RequestedIssueId))
+        $isDryRunMarker = ($RequestedIssueId -eq 'READY-DRY-RUN')
+        $matchesIssue = $isDryRunMarker -or ($content -match [regex]::Escape($RequestedIssueId))
         if (-not $looksReady) {
             return [ordered]@{
                 issueId = $RequestedIssueId
@@ -88,7 +89,7 @@ function Resolve-ReadyIssueSelection {
             selectedFrom = 'ready_issue_path'
             ready = $true
             gate = 'open'
-            reason = if ($matchesIssue) { 'Ready issue evidence found.' } else { 'Ready issue file exists; issue id mismatch left for owner review.' }
+            reason = if ($isDryRunMarker) { 'Dry-run route marker accepted.' } elseif ($matchesIssue) { 'Ready issue evidence found.' } else { 'Ready issue file exists; issue id mismatch left for owner review.' }
             readyIssuePath = $RequestedPath
         }
     }
