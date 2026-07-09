@@ -47,11 +47,15 @@ function Invoke-Runner {
   param(
     [string]$Root,
     [switch]$Apply,
-    [switch]$Explain
+    [switch]$Explain,
+    [object]$MaxIterations = $null
   )
 
   $Config = Join-Path $Root "scripts\codex-autopilot\codex-autopilot.config.json"
   $args = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $Runner, "-RepoRoot", $Root, "-ConfigPath", $Config, "-MaxLoops", "3")
+  if ($null -ne $MaxIterations) {
+    $args += @("-MaxIterations", $MaxIterations)
+  }
   if ($Explain) {
     $args += "-ExplainNextAction"
   } elseif ($Apply) {
@@ -66,6 +70,18 @@ function Invoke-Runner {
   } finally {
     $ErrorActionPreference = $oldErrorActionPreference
   }
+}
+
+function Set-IssueStatus {
+  param(
+    [string]$Root,
+    [string]$Status
+  )
+
+  $ReadyPath = Join-Path $Root "docs\backlog\ready-issues.md"
+  $text = Get-Content -Raw $ReadyPath
+  $text = $text -replace "(?m)^状态[：:].*$", "状态：$Status"
+  $text | Out-File -Encoding utf8 $ReadyPath
 }
 
 function Assert-Contains {
@@ -113,10 +129,25 @@ try {
   Assert-Contains $ReadyOutput "READY_ISSUE_FOUND"
   Assert-Contains $ReadyOutput "maxIssuesPerRun=1"
 
+  $ReadyLimitCompatOutput = Invoke-Runner $ReadyRoot -Apply -MaxIterations 2
+  Assert-Contains $ReadyLimitCompatOutput "READY_ISSUE_FOUND"
+  Assert-Contains $ReadyLimitCompatOutput "iterationLimit=2"
+  $ReadyLimitState = Get-Content -Raw (Join-Path $ReadyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($ReadyLimitState.iterationLimit -ne 2) { throw "Expected state.iterationLimit=2" }
+  if ($ReadyLimitState.iterationCompleted -ne 0) { throw "Expected state.iterationCompleted=0" }
+  if ($ReadyLimitState.remainingIterations -ne 2) { throw "Expected state.remainingIterations=2" }
+
   $ExplainReadyOutput = Invoke-Runner $ReadyRoot -Explain
   Assert-Contains $ExplainReadyOutput "EXPLAIN_NEXT_ACTION"
   Assert-Contains $ExplainReadyOutput "nextAction=READY_ISSUE"
   Assert-Contains $ExplainReadyOutput "nextReady=ISSUE-100-001"
+
+  $BadZeroOutput = Invoke-Runner $ReadyRoot -MaxIterations 0
+  Assert-Contains $BadZeroOutput "MaxIterations must be a positive integer between 1 and 50"
+  $BadOverOutput = Invoke-Runner $ReadyRoot -MaxIterations 51
+  Assert-Contains $BadOverOutput "MaxIterations must be a positive integer between 1 and 50"
+  $BadTextOutput = Invoke-Runner $ReadyRoot -MaxIterations "abc"
+  Assert-Contains $BadTextOutput "MaxIterations"
 
   $SplitRoot = New-Fixture -Name "split" -Enabled -Ready "# Ready Issues`n" -Plan @"
 # Plan
@@ -163,6 +194,43 @@ try {
   if ($ApplyState.lastIssue -notlike "ISSUE-008-001*") { throw "Expected state.lastIssue to record selected issue" }
   if ($ApplyState.lastReason -ne "READY_ISSUE_FOUND") { throw "Expected state.lastReason=READY_ISSUE_FOUND" }
   if ($ApplyState.stopReason) { throw "Expected state.stopReason to be empty for ready issue handoff" }
+  if ($ApplyState.iterationCompleted -ne 0) { throw "Expected split/ready handoff not to increment iterationCompleted" }
+
+  $LimitOneRoot = New-Fixture -Name "limit-one" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner limit one
+
+状态：Ready
+验证命令：
+- ``git diff --check``
+"@ -Plan "# Plan`n"
+  Assert-Contains (Invoke-Runner $LimitOneRoot -Apply -MaxIterations 1) "READY_ISSUE_FOUND"
+  Set-IssueStatus $LimitOneRoot "Done"
+  $LimitOneDoneOutput = Invoke-Runner $LimitOneRoot -Apply -MaxIterations 1
+  Assert-Contains $LimitOneDoneOutput "STOP_ITERATION_LIMIT_REACHED"
+  $LimitOneState = Get-Content -Raw (Join-Path $LimitOneRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($LimitOneState.iterationCompleted -ne 1) { throw "Expected MaxIterations=1 to count one completed issue" }
+  if ($LimitOneState.remainingIterations -ne 0) { throw "Expected MaxIterations=1 remainingIterations=0" }
+  if ($LimitOneState.stopReason -ne "STOP_ITERATION_LIMIT_REACHED") { throw "Expected STOP_ITERATION_LIMIT_REACHED stopReason" }
+
+  $LimitTwoRoot = New-Fixture -Name "limit-two" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner limit two
+
+状态：Ready
+验证命令：
+- ``git diff --check``
+"@ -Plan "# Plan`n"
+  Assert-Contains (Invoke-Runner $LimitTwoRoot -Apply -MaxIterations 2) "READY_ISSUE_FOUND"
+  Set-IssueStatus $LimitTwoRoot "Blocked"
+  $LimitTwoDoneOutput = Invoke-Runner $LimitTwoRoot -Apply -MaxIterations 2
+  Assert-Contains $LimitTwoDoneOutput "STOP_CURRENT_ISSUE_BLOCKED"
+  Assert-NotContains $LimitTwoDoneOutput "STOP_ITERATION_LIMIT_REACHED"
+  $LimitTwoState = Get-Content -Raw (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($LimitTwoState.iterationCompleted -ne 1) { throw "Expected MaxIterations=2 to count one blocked issue" }
+  if ($LimitTwoState.remainingIterations -ne 1) { throw "Expected MaxIterations=2 remainingIterations=1" }
 
   $EmptyRoot = New-Fixture -Name "empty" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
   $EmptyOutput = Invoke-Runner $EmptyRoot

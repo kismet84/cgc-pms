@@ -21,6 +21,9 @@ if (Test-Path $StatePath) {
   $Summary.lastIssue = $State.lastIssue
   $Summary.lastReason = $State.lastReason
   $Summary.stopReason = $State.stopReason
+  $Summary.iterationLimit = $State.iterationLimit
+  $Summary.iterationCompleted = $State.iterationCompleted
+  $Summary.remainingIterations = $State.remainingIterations
   $Summary.enabled = $State.enabled
   $Summary.stopRequested = $State.stopRequested
   $Summary.autoMerge = $State.autoMerge

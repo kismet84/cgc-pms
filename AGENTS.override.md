@@ -205,10 +205,11 @@ CI 与验收失败分类规则：
 
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动连续自动迭代系统` 时，视为请求进入连续执行模式：先确保 AutoPilot 已启动（必要时先执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1`），然后在当前会话中基于 `docs/backlog/ready-issues.md` 串行执行多轮；每轮最多只处理 1 个 Ready Issue；每轮结束后必须检查 `stop.flag`、`pause.flag`、`enabled.flag`；若当前 Ready 队列为空，则先从长期总任务池按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue，拆单当轮只更新 backlog、不直接修改业务代码；只要仍允许继续且 Ready 队列中存在合格 Ready Issue，就必须进入下一轮
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动连续自动迭代系统-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。拆单轮、health gate、runtime refresh、dry-run、ExplainNextAction 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止自动迭代系统` 时，视为请求执行 `powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-stop.ps1`；其语义是设置停止标记并关闭 `enabled.flag`，用于阻断下一任务启动，不强制中断已启动的当前任务
-- 连续执行模式的停止条件包括：收到 `停止自动迭代系统` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 队列为空且长期总任务池按 `docs/backlog/current-focus.md` 也无可拆任务或无法形成合格 Ready Issue、当前 Issue 连续自修后仍失败且已写入 blocked、或触达系统/会话限制
+- 连续执行模式的停止条件包括：收到 `停止自动迭代系统` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 队列为空且长期总任务池按 `docs/backlog/current-focus.md` 也无可拆任务或无法形成合格 Ready Issue、当前 Issue 连续自修后仍失败且已写入 blocked、带 `-N` 参数时已触达实施型 Ready Issue 完成上限、或触达系统/会话限制
 - 连续执行模式仍保持以下边界：`autoPush=false`、不发布生产、不连接生产库、不删除仓库外文件；若涉及自动合并，仍必须先通过既有门禁与前置校验
 - 普通 `启动自动迭代系统` 仍只表示打开开关并恢复轮询，不等同于连续长跑执行多轮
-- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动自动迭代系统`、`启动连续自动迭代系统`、`停止自动迭代系统` 才能触发对应动作，避免误触发
+- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动自动迭代系统`、`启动连续自动迭代系统`、`启动连续自动迭代系统-N`、`停止自动迭代系统` 才能触发对应动作，避免误触发
 - 触发前仍需遵守主线程/子智能体边界；若当前会话是项目总负责人主线程，应派运维型子智能体执行，或仅在用户明确授权下执行
 - 执行完成后必须回报 AutoPilot 的 flag/state 检查结果，至少说明 `stop.flag`、`pause.flag`、`enabled.flag` 与相关运行状态，并明确是否停止了下一任务派发

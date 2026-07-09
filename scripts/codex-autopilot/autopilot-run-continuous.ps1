@@ -4,6 +4,7 @@ param(
   [switch]$DryRun,
   [switch]$ApplyBacklogSplit,
   [switch]$ExplainNextAction,
+  [Nullable[int]]$MaxIterations = $null,
   [int]$MaxLoops = 20
 )
 
@@ -203,8 +204,93 @@ function Write-State {
   $state | Add-Member -NotePropertyName lastIssue -NotePropertyValue $LastIssue -Force
   $state | Add-Member -NotePropertyName lastReason -NotePropertyValue $LastReason -Force
   $state | Add-Member -NotePropertyName stopReason -NotePropertyValue $StopReason -Force
+  $state | Add-Member -NotePropertyName iterationLimit -NotePropertyValue $script:IterationLimit -Force
+  $state | Add-Member -NotePropertyName iterationCompleted -NotePropertyValue $script:IterationCompleted -Force
+  $state | Add-Member -NotePropertyName remainingIterations -NotePropertyValue $script:RemainingIterations -Force
+  $state | Add-Member -NotePropertyName iterationLastCountedIssue -NotePropertyValue $script:IterationLastCountedIssue -Force
   $state | Add-Member -NotePropertyName lastHeartbeatAt -NotePropertyValue $now -Force
   $state | ConvertTo-Json | Out-File -Encoding utf8 $statePath
+}
+
+function Get-IssueBodyByTitle {
+  param(
+    [string]$ReadyPath,
+    [string]$Title
+  )
+
+  if (!$Title -or !(Test-Path $ReadyPath)) {
+    return ""
+  }
+
+  $text = Get-Content -Raw $ReadyPath
+  $pattern = "(?ms)^###\s+" + [regex]::Escape($Title) + "\r?\n(.*?)(?=^###\s+ISSUE-|\z)"
+  $match = [regex]::Match($text, $pattern)
+  if (!$match.Success) {
+    return ""
+  }
+  return $match.Groups[1].Value
+}
+
+function Test-IssueCompleted {
+  param(
+    [string]$ReadyPath,
+    [string]$Title
+  )
+
+  $body = Get-IssueBodyByTitle $ReadyPath $Title
+  if (!$body) {
+    return $false
+  }
+
+  $statusMatch = [regex]::Match($body, "(?m)^状态[：:]\s*(.+?)\s*$")
+  if (!$statusMatch.Success) {
+    return $false
+  }
+
+  return $statusMatch.Groups[1].Value.Trim() -match "^(Done|Blocked|已完成|阻塞|Iteration|Iterated|已迭代|迭代完成)\b"
+}
+
+function Initialize-IterationProgress {
+  param(
+    [string]$AutoDir,
+    [string]$ReadyPath,
+    [Nullable[int]]$Limit,
+    [bool]$ReadOnlyMode
+  )
+
+  $script:IterationLimit = $null
+  $script:IterationCompleted = 0
+  $script:RemainingIterations = $null
+  $script:IterationLastCountedIssue = ""
+
+  if ($null -eq $Limit) {
+    return
+  }
+
+  if ($Limit -lt 1 -or $Limit -gt 50) {
+    throw "MaxIterations must be a positive integer between 1 and 50."
+  }
+
+  $script:IterationLimit = [int]$Limit
+  $statePath = Join-Path $AutoDir "state.json"
+  if (Test-Path $statePath) {
+    $state = Get-Content -Raw $statePath | ConvertFrom-Json
+    if ($null -ne $state.iterationCompleted) {
+      $script:IterationCompleted = [int]$state.iterationCompleted
+    }
+    if ($state.iterationLastCountedIssue) {
+      $script:IterationLastCountedIssue = $state.iterationLastCountedIssue
+    }
+
+    if (!$ReadOnlyMode -and $state.lastAction -eq "READY_ISSUE_FOUND" -and $state.lastIssue -and $state.iterationLastCountedIssue -ne $state.lastIssue) {
+      if (Test-IssueCompleted $ReadyPath $state.lastIssue) {
+        $script:IterationCompleted += 1
+        $script:IterationLastCountedIssue = $state.lastIssue
+      }
+    }
+  }
+
+  $script:RemainingIterations = [Math]::Max(0, $script:IterationLimit - $script:IterationCompleted)
 }
 
 function Get-StopReasonForEmptyPool {
@@ -276,10 +362,14 @@ $planPath = Join-Path $RepoRoot "docs\backlog\cgc-pms-production-enhancement-pla
 $splitLimit = 5
 $applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun -and -not [bool]$ExplainNextAction
 $dryRunMode = -not $applyMode
+Initialize-IterationProgress $autoDir $readyPath $MaxIterations ([bool]$DryRun -or [bool]$ExplainNextAction)
 
 Write-Host "CGC-PMS AutoPilot continuous runner"
 Write-Host "repoRoot=$RepoRoot"
 Write-Host "maxIssuesPerRun=$maxIssuesPerRun"
+Write-Host "iterationLimit=$script:IterationLimit"
+Write-Host "iterationCompleted=$script:IterationCompleted"
+Write-Host "remainingIterations=$script:RemainingIterations"
 Write-Host "autoPush=$($config.autoPush)"
 Write-Host "dryRun=$dryRunMode"
 Write-Host "applyBacklogSplit=$applyMode"
@@ -290,6 +380,12 @@ if ($ExplainNextAction) {
   $candidates = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0) { @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit) } else { @() }
   $stopReason = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0 -and $candidates.Count -eq 0) { Get-StopReasonForEmptyPool $readyPath } else { $checkpoint }
   Write-NextActionExplanation $checkpoint $readyIssues $candidates $stopReason
+  exit 0
+}
+
+if ($null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
+  Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" ([bool]$DryRun) "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
+  Write-Host "STOP_ITERATION_LIMIT_REACHED"
   exit 0
 }
 
