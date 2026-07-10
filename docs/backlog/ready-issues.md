@@ -1,6 +1,7 @@
 ## Ready 队列状态
 
-- 当前有 0 条合格 Ready：`ISSUE-008-025` 已完成并转 Done；`ISSUE-008-022`、`ISSUE-008-023` 与 `ISSUE-008-024` 已完成并转 Done。
+- 当前有 5 条合格 Ready：`ISSUE-008-023` 经核对未找到 Done 归档与正式质量报告，已从误标 Done 纠正为 Ready；本轮新增 `ISSUE-008-026`、`ISSUE-008-027`、`ISSUE-008-028`、`ISSUE-008-029`。
+- `ISSUE-008-022`、`ISSUE-008-024`、`ISSUE-008-025` 已完成并转 Done；`ISSUE-008-023` 不计入已完成，待执行收口后再计数。
 - 用户于 2026-07-10 再次触发 `启动迭代-10`，新一轮计数已初始化为 `0/10`；上一轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
 - `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
 - `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
@@ -47,10 +48,11 @@
 
 ## 执行顺序建议
 
-1. 默认先执行 `ISSUE-008-022`，完成后执行 `ISSUE-008-023`。
-2. `ISSUE-008-024` 与 `ISSUE-008-022` 的代码域、测试类和业务域独立，资源允许时可双路并行；`ISSUE-008-025` 必须等待 `ISSUE-008-024` 收口。
-3. 多路实现可以并行，但 iteration report、quality 归档、backlog 更新与本地 commit 必须串行，避免共享文档冲突。
-4. 本轮达到 `10/10` 上限、stop/pause 或无 Ready 时，F 必须补最小总验收；未补不得视为完整收口。
+1. 默认先执行 `ISSUE-008-023`，完成 WBS 只读甘特展示误标纠正后的正式收口。
+2. `ISSUE-008-026` 依赖 `ISSUE-008-023`；`ISSUE-008-027` 依赖 `ISSUE-008-025`，可与 WBS 链路串行错峰。
+3. `ISSUE-008-028` 与 `ISSUE-008-029` 分别属于报表中心、通知平台真实渲染验收治理；未证明完全无关联前按串行处理。
+4. 多路实现可以并行，但 iteration report、quality 归档、backlog 更新与本地 commit 必须串行，避免共享文档冲突。
+5. 本轮达到 `10/10` 上限、stop/pause 或无 Ready 时，F 必须补最小总验收；未补不得视为完整收口。
 
 ## P0
 
@@ -288,7 +290,7 @@
 优先级：P2
 任务性质：能力新增
 类型：WBS / 甘特展示 / 前端 / 后端契约回归
-状态：Done（2026-07-10；计入本轮第 2 个实施型 Ready Issue）
+状态：Ready（2026-07-10 核对纠正：未找到 Done 归档与正式质量报告，不计入本轮完成数）
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图`；`docs/quality/issue-008-008-wbs-进度计划与甘特图.md`
 依赖：必须等待 `ISSUE-008-022` 收口；不得与 `008-022` 并行修改同域文件。
@@ -392,6 +394,142 @@
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
 归档报告：`docs/quality/issue-008-025-supplier-score-ranking-visibility.md`
+
+### ISSUE-008-026：WBS 平台化缺口-M4：只读甘特真实渲染与降级态验收治理
+
+优先级：P2
+任务性质：回归证明
+类型：WBS / 甘特展示 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图`；`ISSUE-008-023` 的只读甘特展示收口
+依赖：必须等待 `ISSUE-008-023` 完成并转 Done；不得与 `008-023` 并行修改同一前端页面或类型文件。
+是否需要新增 migration：否；只验证现有只读展示、空态、缺失日期和跨期任务降级，不新增任务依赖、基线或里程碑模型。
+目标：
+- 用最小真实渲染验收补齐 WBS 只读甘特展示的浏览器/组件层证据，避免只停留在源码字符串或类型检查。
+- 覆盖空数据、缺失计划日期、跨期任务、进度边界和状态展示的稳定降级。
+- 不扩展为拖拽排程、依赖线编辑、计划变更审计或完整 schedule 模块。
+允许修改：
+- `frontend-admin/src/**` 中现有分包任务 / WBS 展示页面、类型和对应测试；最多 6 个前端文件
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 新增 npm 依赖、拖拽排程、任务依赖编辑、基线管理、计划变更审计、完整 schedule 模块
+验收标准：
+- 至少一组前端真实渲染或组件测试证明：有数据时展示 WBS 编码、任务名、计划起止、实际起止、进度和状态。
+- 至少一组降级断言证明：空数据、缺失计划日期、跨期任务不触发脚本异常，页面给出可理解空态或降级展示。
+- 不绕过现有后端项目/租户过滤，不把只读展示包装为完整甘特平台。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-026-wbs-gantt-rendering-regression.md`
+
+### ISSUE-008-027：供应商评分平台化缺口-M4：采购驾驶舱评分排名真实渲染验收治理
+
+优先级：P2
+任务性质：回归证明
+类型：供应商评分 / 采购驾驶舱 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强`；`docs/quality/issue-008-025-supplier-score-ranking-visibility.md`
+依赖：`ISSUE-008-025` 已完成；不得与供应商评分后端契约改动并行。
+是否需要新增 migration：否；只验证现有 `PurchaseManagerDashboardVO.supplierScores` 的前端可见性。
+目标：
+- 补齐采购驾驶舱供应商交期表现排名的真实渲染验收，消除仅靠源码字符串断言的非阻塞观察。
+- 验证有数据、空数据和字段缺失/零值时的展示稳定性。
+- 不新增综合评分模型，不新增询价/比价/定标/黑名单/补货页面。
+允许修改：
+- `frontend-admin/src/**` 中现有采购经理驾驶舱页面、类型和对应测试；最多 6 个前端文件
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 新增 npm 依赖、询价/比价/定标页面、黑名单、综合评分配置器
+验收标准：
+- 至少一组前端真实渲染或组件测试证明：排名表展示供应商、订单数、逾期数、交期达成率/评分。
+- 空数据时展示明确空态；字段缺失或零订单不出现 NaN、脚本异常或误导性综合评级文案。
+- 页面不自行重新计算评分，不扩展后端契约。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-027-supplier-score-rendering-regression.md`
+
+### ISSUE-008-028：报表中心平台化缺口-M7：报表入口真实渲染与空态验收治理
+
+优先级：P2
+任务性质：回归证明
+类型：报表中心 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心`；`docs/quality/issue-008-010~015-*`
+依赖：报表中心 M1-M6 已完成并转 Done；不得与新的报表定义表、异步导出平台或权限模型改动并行。
+是否需要新增 migration：否；只验证既有报表入口、目录、导出入口和空态，不新增通用报表中心表。
+目标：
+- 对已落地的报表目录/入口做一轮真实渲染与空态验收，确认用户能稳定看到当前已有报表能力。
+- 覆盖无数据、无权限/受限权限和导出入口不可用时的降级展示。
+- 不扩大为完整报表中心建设或异步导出平台。
+允许修改：
+- `frontend-admin/src/**` 中现有报表/驾驶舱入口、类型和对应测试；最多 6 个前端文件
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/**` 中新增通用报表定义/导出任务模型
+- `deploy/**`
+- 生产凭据、生产数据库连接、外部报表平台
+验收标准：
+- 至少一组前端真实渲染或组件测试证明：现有报表入口/目录可见，关键标题、筛选入口或导出入口不丢失。
+- 空数据、无权限或入口不可用时有明确空态/禁用态，不出现脚本异常。
+- 不新增报表定义表、不新增异步导出任务表、不放宽现有数据权限。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-028-report-entry-rendering-regression.md`
+
+### ISSUE-008-029：通知平台平台化缺口-M6：订阅弹窗与渠道可见性真实渲染验收治理
+
+优先级：P2
+任务性质：回归证明
+类型：通知平台 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台`；`docs/quality/issue-008-016~019-*`
+依赖：通知平台 M2-M5 已完成并转 Done；不得与通知后端发送链路、渠道配置或规则治理改动并行。
+是否需要新增 migration：否；只验证现有预警订阅弹窗、渠道可见性和发送记录语义展示，不新增通知平台表结构。
+目标：
+- 补齐订阅弹窗和渠道可见性的真实渲染验收，确认 `IN_APP` 与占位渠道的当前能力边界在页面上可理解。
+- 验证未配置/未实现渠道不会被展示成已生效能力，订阅摘要/明细与后端语义一致。
+- 不接入邮件、短信、企微、钉钉、WebSocket/SSE 等真实外部渠道。
+允许修改：
+- `frontend-admin/src/**` 中现有预警订阅弹窗、预警页渠道展示、类型和对应测试；最多 6 个前端文件
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 外部渠道真实接入、模板中心、失败重试队列、全局频控配置、通知平台新表设计
+验收标准：
+- 至少一组前端真实渲染或组件测试证明：订阅弹窗正确区分当前可用渠道与占位渠道。
+- 未配置/未实现渠道不会显示为已发送成功或可直接生效；保存/摘要/明细展示一致。
+- 不放宽预警域、租户、角色、项目边界；不把前端展示回归包装为通知平台完整建设完成。
+验证命令：
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-029-notification-channel-rendering-regression.md`
 
 ### ISSUE-008-021：规则治理中心平台化缺口-M3：规则侧去重时窗与重复预警抑制生效回归
 
