@@ -56,6 +56,14 @@ const purchaseRequestCols = [
   { title: '紧急程度', key: 'urgency', width: 88 },
 ]
 
+const supplierScoreCols = [
+  { title: '供应商', dataIndex: 'partnerName', width: 160, ellipsis: true },
+  { title: '订单数', dataIndex: 'orderCount', width: 96, align: 'right' as const },
+  { title: '逾期未完成数', dataIndex: 'overdueOrderCount', width: 128, align: 'right' as const },
+  { title: '交期达成率', dataIndex: 'onTimeDeliveryRate', width: 116, align: 'right' as const },
+  { title: '交期表现评分', dataIndex: 'performanceScore', width: 128, align: 'right' as const },
+]
+
 type PurchaseBottomTab = 'requests' | 'orders'
 
 const activeBottomTab = ref<PurchaseBottomTab>('requests')
@@ -201,6 +209,7 @@ const recentRequests = computed(() =>
 )
 
 const purchaseOrders = computed(() => props.data.purchaseOrders ?? [])
+const supplierScores = computed(() => props.data.supplierScores ?? [])
 
 const purchaseBottomRows = computed(() =>
   activeBottomTab.value === 'requests' ? recentRequests.value : purchaseOrders.value,
@@ -421,6 +430,39 @@ function receiptTimeliness(record: DashboardBusinessItemVO) {
     </section>
 
     <section class="role-reference-panel role-reference-bottom-panel">
+      <div class="purchase-supplier-head">
+        <strong>供应商采购订单交期表现</strong>
+        <span>仅展示采购订单交期表现，不代表供应商综合评级</span>
+      </div>
+      <a-table
+        :columns="supplierScoreCols"
+        :data-source="supplierScores"
+        :loading="loading"
+        :locale="{ emptyText: '暂无供应商采购订单交期表现数据' }"
+        :pagination="false"
+        :scroll="{ x: 628, y: 200 }"
+        size="small"
+        row-key="partnerId"
+        class="role-reference-table purchase-reference-table"
+      >
+        <template #bodyCell="{ column, text }">
+          <span v-if="column.dataIndex === 'partnerName'" class="purchase-muted">
+            <a-tooltip :title="displayText(text)">
+              <span class="purchase-ellipsis purchase-muted">{{ displayText(text) }}</span>
+            </a-tooltip>
+          </span>
+          <span v-else-if="column.dataIndex === 'onTimeDeliveryRate'" class="purchase-amount">
+            {{ displayText(text) }}%
+          </span>
+          <span v-else-if="column.dataIndex === 'performanceScore'" class="purchase-days">
+            {{ displayText(text) }}
+          </span>
+          <span v-else class="purchase-amount">{{ displayText(text) }}</span>
+        </template>
+      </a-table>
+    </section>
+
+    <section class="role-reference-panel role-reference-bottom-panel">
       <div class="purchase-bottom-tabs" role="tablist" aria-label="采购底部表格">
         <button
           v-for="tab in purchaseBottomTabs"
@@ -582,6 +624,19 @@ function receiptTimeliness(record: DashboardBusinessItemVO) {
   height: 2px;
   background: #2563eb;
   content: '';
+}
+
+.purchase-supplier-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.purchase-supplier-head span {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .purchase-amount,

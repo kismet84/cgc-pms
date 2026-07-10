@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-025：供应商评分平台化缺口-M3：采购驾驶舱评分排名可见性最小落地
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；采购驾驶舱供应商交期表现排名可见性已补齐；D 验收与 E 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-025-supplier-score-ranking-visibility.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-024：供应商评分平台化缺口-M2：交期评分范围、排序与空值一致性回归
 
 完成日期：2026-07-10
