@@ -496,3 +496,34 @@ Issue：ISSUE-008-027 供应商评分排名真实渲染验收治理
 剩余风险：
 - 当前证据为组件级 mount 测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
 - 当前只验证采购驾驶舱已有 `supplierScores` 可见性，不代表询价、比价、定标、黑名单、综合评分配置器或补货页面已完成。
+
+---
+
+Issue：ISSUE-008-028 报表入口真实渲染与空态验收治理
+
+目标：
+- 在 B 实现、D 验收与 E 审查通过后，完成 `ISSUE-008-028` 的正式归档、backlog 状态同步与 AutoPilot 计数收口。
+- 将该 Issue 计入本轮 `启动迭代-10` 的第 `7/10` 个实施型 Ready Issue。
+- 严格隔离白名单外脏改动，不做 push，不声称浏览器 E2E 已完成。
+
+修改范围摘要：
+- `frontend-admin/src/pages/report/__tests__/catalog.test.ts`：新增报表目录组件 mount 测试，覆盖管理员可见入口、API-only fallback、导出状态、空态和受限权限过滤。
+- `docs/quality/issue-008-028-report-entry-rendering-regression.md`：新增正式收口报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/current-focus.md`、`docs/backlog/done-issues.md`：完成 Ready -> Done 与当前焦点同步。
+- `.codex-autopilot/state.json`：将本轮计入 `启动迭代-10` 的第 `7/10` 个实施型 Ready Issue。
+
+验证命令摘要：
+- D 验收：已通过 `pnpm exec vitest run src/pages/report/__tests__/catalog.test.ts`，`2 files / 8 tests` 通过。
+- `pnpm type-check`：通过。
+- `pnpm build`：通过。
+- `git diff --check`：通过。
+- E 审查：PASS，无阻塞。
+
+失败分类或非失败分类：非失败分类；报表目录组件级真实渲染与空态验收证据已补齐
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前证据为组件级 mount 测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
+- 本轮只验证既有报表目录/入口可见性与空态，不代表完整报表中心、异步导出平台或外部报表平台已完成。

@@ -1,7 +1,7 @@
 ## Ready 队列状态
 
-- 当前有 2 条合格 Ready：`ISSUE-008-028`、`ISSUE-008-029`。
-- `ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-026`、`ISSUE-008-027` 已完成并转 Done；`ISSUE-008-027` 已于 2026-07-10 完成正式收口并计入本轮第 `6/10` 个实施型 Ready Issue。
+- 当前有 1 条合格 Ready：`ISSUE-008-029`。
+- `ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-026`、`ISSUE-008-027`、`ISSUE-008-028` 已完成并转 Done；`ISSUE-008-028` 已于 2026-07-10 完成正式收口并计入本轮第 `7/10` 个实施型 Ready Issue。
 - 用户于 2026-07-10 再次触发 `启动迭代-10`，新一轮计数已初始化为 `0/10`；上一轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
 - `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
 - `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
@@ -48,8 +48,8 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-008-027` 已完成，下一项默认执行 `ISSUE-008-028`，补齐报表入口真实渲染与空态验收证据。
-2. `ISSUE-008-028` 与 `ISSUE-008-029` 分别属于报表中心、通知平台真实渲染验收治理。
+1. `ISSUE-008-028` 已完成，下一项默认执行 `ISSUE-008-029`，补齐通知平台订阅弹窗与渠道可见性验收证据。
+2. `ISSUE-008-029` 属于通知平台真实渲染验收治理。
 3. 未证明完全无关联前，剩余 Ready 按串行处理。
 4. 多路实现可以并行，但 iteration report、quality 归档、backlog 更新与本地 commit 必须串行，避免共享文档冲突。
 5. 本轮达到 `10/10` 上限、stop/pause 或无 Ready 时，F 必须补最小总验收；未补不得视为完整收口。
@@ -428,40 +428,6 @@
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
 归档报告：`docs/quality/issue-008-026-wbs-gantt-rendering-regression.md`
-
-### ISSUE-008-028：报表中心平台化缺口-M7：报表入口真实渲染与空态验收治理
-
-优先级：P2
-任务性质：回归证明
-类型：报表中心 / 前端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心`；`docs/quality/issue-008-010~015-*`
-依赖：报表中心 M1-M6 已完成并转 Done；不得与新的报表定义表、异步导出平台或权限模型改动并行。
-是否需要新增 migration：否；只验证既有报表入口、目录、导出入口和空态，不新增通用报表中心表。
-目标：
-- 对已落地的报表目录/入口做一轮真实渲染与空态验收，确认用户能稳定看到当前已有报表能力。
-- 覆盖无数据、无权限/受限权限和导出入口不可用时的降级展示。
-- 不扩大为完整报表中心建设或异步导出平台。
-允许修改：
-- `frontend-admin/src/**` 中现有报表/驾驶舱入口、类型和对应测试；最多 6 个前端文件
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `backend/src/main/java/**` 中新增通用报表定义/导出任务模型
-- `deploy/**`
-- 生产凭据、生产数据库连接、外部报表平台
-验收标准：
-- 至少一组前端真实渲染或组件测试证明：现有报表入口/目录可见，关键标题、筛选入口或导出入口不丢失。
-- 空数据、无权限或入口不可用时有明确空态/禁用态，不出现脚本异常。
-- 不新增报表定义表、不新增异步导出任务表、不放宽现有数据权限。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-028-report-entry-rendering-regression.md`
 
 ### ISSUE-008-029：通知平台平台化缺口-M6：订阅弹窗与渠道可见性真实渲染验收治理
 
