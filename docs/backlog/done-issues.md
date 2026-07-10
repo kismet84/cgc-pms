@@ -20,6 +20,14 @@
 验证结果：通过
 相关报告：docs/quality/issue-008-026-wbs-gantt-rendering-regression.md；docs/iterations/iteration-2026-07-10-report.md
 
+### ISSUE-008-027：供应商评分平台化缺口-M4：采购驾驶舱评分排名真实渲染验收治理
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；供应商交期表现排名组件级真实渲染与降级态验收证据已补齐；D 验收与 E 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-027-supplier-score-rendering-regression.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-023：WBS 平台化缺口-M3：项目内 WBS 树与只读甘特展示最小落地
 
 完成日期：2026-07-10

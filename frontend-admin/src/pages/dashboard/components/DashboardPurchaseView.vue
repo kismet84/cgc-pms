@@ -94,6 +94,11 @@ function displayText(value?: string | number) {
   return value === undefined || value === null || value === '' ? '-' : String(value)
 }
 
+function percentageText(value?: string | number) {
+  const text = displayText(value)
+  return text === '-' ? '-' : `${text}%`
+}
+
 function amountText(value?: string | number) {
   const text = displayText(value)
   return text === '-' ? '-' : fmtWan(text)
@@ -452,7 +457,7 @@ function receiptTimeliness(record: DashboardBusinessItemVO) {
             </a-tooltip>
           </span>
           <span v-else-if="column.dataIndex === 'onTimeDeliveryRate'" class="purchase-amount">
-            {{ displayText(text) }}%
+            {{ percentageText(text) }}
           </span>
           <span v-else-if="column.dataIndex === 'performanceScore'" class="purchase-days">
             {{ displayText(text) }}

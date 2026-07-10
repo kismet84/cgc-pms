@@ -1,7 +1,7 @@
 ## Ready 队列状态
 
-- 当前有 3 条合格 Ready：`ISSUE-008-027`、`ISSUE-008-028`、`ISSUE-008-029`。
-- `ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-026` 已完成并转 Done；`ISSUE-008-026` 已于 2026-07-10 完成正式收口并计入本轮第 `5/10` 个实施型 Ready Issue。
+- 当前有 2 条合格 Ready：`ISSUE-008-028`、`ISSUE-008-029`。
+- `ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-026`、`ISSUE-008-027` 已完成并转 Done；`ISSUE-008-027` 已于 2026-07-10 完成正式收口并计入本轮第 `6/10` 个实施型 Ready Issue。
 - 用户于 2026-07-10 再次触发 `启动迭代-10`，新一轮计数已初始化为 `0/10`；上一轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
 - `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
 - `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
@@ -48,8 +48,8 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-008-026` 已完成，下一项默认执行 `ISSUE-008-027`，补齐供应商评分排名真实渲染验收证据。
-2. `ISSUE-008-027` 依赖的 `ISSUE-008-025` 已完成；`ISSUE-008-028` 与 `ISSUE-008-029` 分别属于报表中心、通知平台真实渲染验收治理。
+1. `ISSUE-008-027` 已完成，下一项默认执行 `ISSUE-008-028`，补齐报表入口真实渲染与空态验收证据。
+2. `ISSUE-008-028` 与 `ISSUE-008-029` 分别属于报表中心、通知平台真实渲染验收治理。
 3. 未证明完全无关联前，剩余 Ready 按串行处理。
 4. 多路实现可以并行，但 iteration report、quality 归档、backlog 更新与本地 commit 必须串行，避免共享文档冲突。
 5. 本轮达到 `10/10` 上限、stop/pause 或无 Ready 时，F 必须补最小总验收；未补不得视为完整收口。
@@ -428,40 +428,6 @@
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
 归档报告：`docs/quality/issue-008-026-wbs-gantt-rendering-regression.md`
-
-### ISSUE-008-027：供应商评分平台化缺口-M4：采购驾驶舱评分排名真实渲染验收治理
-
-优先级：P2
-任务性质：回归证明
-类型：供应商评分 / 采购驾驶舱 / 前端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强`；`docs/quality/issue-008-025-supplier-score-ranking-visibility.md`
-依赖：`ISSUE-008-025` 已完成；不得与供应商评分后端契约改动并行。
-是否需要新增 migration：否；只验证现有 `PurchaseManagerDashboardVO.supplierScores` 的前端可见性。
-目标：
-- 补齐采购驾驶舱供应商交期表现排名的真实渲染验收，消除仅靠源码字符串断言的非阻塞观察。
-- 验证有数据、空数据和字段缺失/零值时的展示稳定性。
-- 不新增综合评分模型，不新增询价/比价/定标/黑名单/补货页面。
-允许修改：
-- `frontend-admin/src/**` 中现有采购经理驾驶舱页面、类型和对应测试；最多 6 个前端文件
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/java/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 新增 npm 依赖、询价/比价/定标页面、黑名单、综合评分配置器
-验收标准：
-- 至少一组前端真实渲染或组件测试证明：排名表展示供应商、订单数、逾期数、交期达成率/评分。
-- 空数据时展示明确空态；字段缺失或零订单不出现 NaN、脚本异常或误导性综合评级文案。
-- 页面不自行重新计算评分，不扩展后端契约。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-027-supplier-score-rendering-regression.md`
 
 ### ISSUE-008-028：报表中心平台化缺口-M7：报表入口真实渲染与空态验收治理
 

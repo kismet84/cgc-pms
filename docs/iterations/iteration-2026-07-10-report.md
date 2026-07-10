@@ -464,3 +464,35 @@ Issue：ISSUE-008-026 WBS 只读甘特真实渲染与降级态验收治理
 剩余风险：
 - 当前证据为组件级 mount 测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
 - WBS 仍复用现有分包任务字段，不代表完整 schedule 平台、拖拽排程或依赖网络已完成。
+
+---
+
+Issue：ISSUE-008-027 供应商评分排名真实渲染验收治理
+
+目标：
+- 在 B 实现、D 验收与 E 审查通过后，完成 `ISSUE-008-027` 的正式归档、backlog 状态同步与 AutoPilot 计数收口。
+- 将该 Issue 计入本轮 `启动迭代-10` 的第 `6/10` 个实施型 Ready Issue。
+- 严格隔离白名单外脏改动，不做 push，不声称浏览器 E2E 已完成。
+
+修改范围摘要：
+- `frontend-admin/src/pages/dashboard/components/DashboardPurchaseView.vue`：补齐供应商交期达成率缺字段时的稳定显示，避免 `-%`。
+- `frontend-admin/src/pages/dashboard/__tests__/DashboardPurchaseView.test.ts`：新增采购驾驶舱供应商交期表现组件 mount 测试，覆盖有数据、空态、零值和缺字段降级态。
+- `docs/quality/issue-008-027-supplier-score-rendering-regression.md`：新增正式收口报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/current-focus.md`、`docs/backlog/done-issues.md`：完成 Ready -> Done 与当前焦点同步。
+- `.codex-autopilot/state.json`：将本轮计入 `启动迭代-10` 的第 `6/10` 个实施型 Ready Issue。
+
+验证命令摘要：
+- D 验收：已通过 `pnpm exec vitest run src/pages/dashboard/__tests__/DashboardPurchaseView.test.ts`，`3/3` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+- E 审查：PASS，无阻塞。
+
+失败分类或非失败分类：非失败分类；供应商交期表现排名组件级真实渲染与降级态验收证据已补齐
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前证据为组件级 mount 测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
+- 当前只验证采购驾驶舱已有 `supplierScores` 可见性，不代表询价、比价、定标、黑名单、综合评分配置器或补货页面已完成。
