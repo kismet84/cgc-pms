@@ -164,6 +164,47 @@ describe('ReportCatalogPage', () => {
     expect(text).toContain('当前暂无可见报表')
   })
 
+  it('renders a stable empty state when permissions hide every report', async () => {
+    const wrapper = await mountCatalog([
+      item({ name: '管理驾驶舱', permissionCode: 'dashboard:view' }),
+      item({
+        code: 'alerts-processing-report',
+        name: '预警处理统计',
+        catalog: 'alert',
+        sourceType: 'api',
+        target: '/alerts/processing-report',
+        permissionCode: 'alert:view',
+        status: 'api_only',
+      }),
+    ])
+
+    const text = wrapper.text()
+    expect(text).toContain('可见报表0')
+    expect(text).toContain('当前暂无可见报表')
+    expect(text).not.toContain('管理驾驶舱')
+    expect(text).not.toContain('预警处理统计')
+  })
+
+  it('shows a retry entry after catalog load fails and clears it after retry succeeds', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    mocks.userStore.permissions = new Set(['dashboard:view'])
+    mocks.getReportCatalog
+      .mockRejectedValueOnce(new Error('catalog failed'))
+      .mockResolvedValueOnce([item({ name: '管理驾驶舱', target: '/dashboard' })])
+
+    const wrapper = mount(ReportCatalogPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('加载报表目录失败，请稍后重试。')
+    await wrapper.find('.report-retry-button').trigger('click')
+    await flushPromises()
+
+    expect(mocks.getReportCatalog).toHaveBeenCalledTimes(2)
+    expect(wrapper.text()).not.toContain('加载报表目录失败，请稍后重试。')
+    expect(wrapper.text()).toContain('管理驾驶舱')
+    consoleError.mockRestore()
+  })
+
   it('filters restricted entries and keeps API-only fallback non-clickable', async () => {
     mocks.userStore.permissions = new Set(['dashboard:view'])
 

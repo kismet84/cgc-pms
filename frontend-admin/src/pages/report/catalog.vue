@@ -158,6 +158,13 @@ onMounted(fetchCatalog)
       </article>
     </section>
 
+    <div v-if="loadError" class="report-catalog-error" role="alert">
+      <span>{{ loadError }}</span>
+      <button type="button" class="report-retry-button" :disabled="loading" @click="fetchCatalog">
+        重试
+      </button>
+    </div>
+
     <section class="report-catalog-table">
       <a-table
         :columns="columns"
@@ -300,6 +307,30 @@ onMounted(fetchCatalog)
   border: 1px solid #e4eaf3;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.report-catalog-error {
+  padding: 12px 14px;
+  color: #b42318;
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.report-retry-button {
+  color: #1677ff;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.report-retry-button:disabled {
+  color: var(--text-secondary);
+  cursor: not-allowed;
 }
 
 .report-name-cell {

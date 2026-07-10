@@ -595,3 +595,35 @@ Issue：READY_SPLIT 剩余 2 个实施型额度拆单
 剩余风险：
 - 新增两条 Ready 仍需后续 B/C 实现、D 验收、E 审查与 F 归档后才可计入 `9/10`、`10/10`。
 - 两条 Ready 均不代表完整报表中心或完整通知平台完成。
+
+---
+
+Issue：ISSUE-008-030 报表目录异常态、重试入口与权限过滤回归
+
+目标：
+- 在 B 实现、D 验收与 E 审查通过后，完成 `ISSUE-008-030` 的正式归档、backlog 状态同步与 AutoPilot 计数收口。
+- 将该 Issue 计入本轮 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
+- 严格隔离白名单外脏改动，不做 push，不声称浏览器 E2E 或完整报表中心已完成。
+
+修改范围摘要：
+- `frontend-admin/src/pages/report/catalog.vue`：新增报表目录加载失败提示与复用 `fetchCatalog` 的重试按钮。
+- `frontend-admin/src/pages/report/__tests__/catalog.test.ts`：新增失败后重试成功、权限过滤空态回归，保留 API-only fallback 约束。
+- `docs/quality/issue-008-030-report-catalog-error-retry-permission.md`：新增正式收口报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/current-focus.md`、`docs/backlog/done-issues.md`：完成 Ready -> Done 与当前焦点同步；当前仅剩 `ISSUE-008-031`。
+- `.codex-autopilot/state.json`：将本轮计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
+
+验证命令摘要：
+- D 验收：目标单测通过，`5 passed`。
+- `pnpm type-check`：exit 0。
+- `pnpm build`：exit 0。
+- 限定 `git diff --check`：exit 0。
+- E 审查：PASS，无阻塞。
+
+失败分类或非失败分类：非失败分类；报表目录异常态、重试入口与权限过滤回归已完成
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前证据为组件级单元测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
+- 本轮只完成既有报表目录入口治理，不代表完整报表中心、异步导出平台或外部报表平台已完成。
