@@ -1,6 +1,6 @@
 ## Ready 队列状态
 
-- 当前没有合格 Ready；本轮剩余实施型额度 `2/10`，需由主线程结合 current focus 与长期总任务池重新拆单后再继续。
+- 当前新增 2 条合格 Ready：`ISSUE-008-030`、`ISSUE-008-031`；本轮剩余实施型额度仍为 `2/10`，拆单轮不计入完成数。
 - `ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-026`、`ISSUE-008-027`、`ISSUE-008-028`、`ISSUE-008-029` 已完成并转 Done；`ISSUE-008-029` 已于 2026-07-10 完成正式收口并计入本轮第 `8/10` 个实施型 Ready Issue。
 - 用户于 2026-07-10 再次触发 `启动迭代-10`，新一轮计数已初始化为 `0/10`；上一轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
 - `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
@@ -48,8 +48,8 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-008-029` 已完成并转 Done，当前 Ready 队列清空。
-2. 下一步不得由本轮 F 归档自行拆新 Ready；需由主线程按 `current-focus.md` 与长期总任务池重新裁决。
+1. `ISSUE-008-030` 先执行：报表目录异常态、重试入口与权限过滤回归。
+2. `ISSUE-008-031` 后执行：通知占位渠道发送记录、跳过原因与前端可见性回归。
 3. 未证明完全无关联前，后续新增 Ready 按串行处理。
 4. 多路实现可以并行，但 iteration report、quality 归档、backlog 更新与本地 commit 必须串行，避免共享文档冲突。
 5. 本轮达到 `10/10` 上限、stop/pause 或无 Ready 时，F 必须补最小总验收；未补不得视为完整收口。
@@ -249,6 +249,88 @@
 归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
 
 ## P2
+
+### ISSUE-008-030：报表中心平台化缺口-M8：目录异常态、重试入口与权限过滤回归
+
+优先级：P2
+任务性质：缺口修复
+类型：报表中心 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心`；`docs/quality/issue-008-028-report-entry-rendering-regression.md`
+依赖：`ISSUE-008-028` 已完成；本 Issue 只补报表目录异常态与重试可达性，不重做报表定义、异步导出或权限模型。
+是否需要新增 migration：否。
+目标：
+- 基于现有 `report/catalog` 页面与 `getReportCatalog` 接口，补齐加载失败、重试、空数据、权限过滤后的稳定展示回归。
+- 明确 API-only 报表与无权限报表在异常态下不出现误导性“可打开/可导出”入口。
+- 只声明报表目录入口治理，不表述为完整报表中心、异步导出平台或外部报表平台完成。
+允许修改：
+- `frontend-admin/src/pages/report/catalog.vue`
+- `frontend-admin/src/pages/report/catalog-entry.ts`
+- `frontend-admin/src/pages/report/__tests__/catalog.test.ts`
+- `frontend-admin/src/api/modules/report.ts`
+- `frontend-admin/src/types/report.ts`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/**`
+- `deploy/**`
+- 新增 npm 依赖、引入报表设计器、异步导出任务、字段级权限模型或外部报表平台
+验收标准：
+- 报表目录接口失败时页面有稳定错误提示与可触发的重试入口，重试成功后错误态清空。
+- 空目录、权限过滤后空目录、API-only 目录项均有稳定降级展示，不出现脚本异常。
+- 无权限报表不展示可打开或可导出的误导入口；管理员与有权限用户既有入口不回退。
+- 组件级测试覆盖失败 -> 重试成功、权限过滤、API-only fallback 与空态。
+验证命令：
+- `cd frontend-admin; pnpm test:unit src/pages/report/__tests__/catalog.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-030-report-catalog-error-retry-permission.md`
+
+### ISSUE-008-031：通知平台平台化缺口-M7：占位渠道发送记录与跳过原因可见性回归
+
+优先级：P2
+任务性质：缺口修复
+类型：通知平台 / 后端 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台`；`docs/quality/issue-008-029-notification-channel-rendering-regression.md`
+依赖：`ISSUE-008-029` 已完成；必须等待 `ISSUE-008-030` 收口后串行执行，避免共享 backlog / iteration 文档冲突。
+是否需要新增 migration：否；复用现有通知发送记录与预警页订阅展示，不新增 `notification_*` 表。
+目标：
+- 基于现有通知分发器和预警页订阅弹窗，补齐邮件、企业微信、短信等占位渠道的发送记录状态、跳过原因和前端可见性回归。
+- 确保未配置、已配置但未实现、重复抑制三类跳过不会被误记为发送成功。
+- 只声明现有通知平台占位渠道治理，不表述为外部渠道真实打通。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/notification/**`
+- `backend/src/test/java/com/cgcpms/alert/notification/AlertNotificationDispatcherTest.java`
+- `frontend-admin/src/pages/alert/index.vue`
+- `frontend-admin/src/pages/alert/__tests__/index.test.ts`
+- `frontend-admin/src/api/modules/alert.ts`
+- `frontend-admin/src/types/alert.ts`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据与外部平台配置
+- 新增邮件、短信、企业微信、钉钉、WebSocket/SSE 真实外部发送能力
+验收标准：
+- 未配置占位渠道写入 `SKIPPED` 记录并带可识别跳过原因，不误记为 `SENT`。
+- 已配置但未实现的占位渠道写入 `SKIPPED` 记录并带可识别跳过原因，不触发真实外部发送。
+- 同告警同用户同事件重复站内通知仍只允许一条有效发送记录，重复项可追踪为跳过。
+- 前端订阅弹窗或通知记录可见文案不把占位渠道包装成已打通外部渠道。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/alert/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-031-notification-placeholder-send-record-visibility.md`
 
 ### ISSUE-008-022：WBS 平台化缺口-M2：计划/实际日期、进度与状态一致性回归
 
