@@ -678,7 +678,7 @@ Issue：ISSUE-008-032 后端业务接口与前端入口治理
 
 - 收口：通过，无阻塞；计入新的 `启动迭代-3` 第 `1/3` 条，下一条为 `ISSUE-008-033`。
 - 分类：50 个 Controller 中 39 个已有入口、4 个合法复用、1 个运维专用、6 个高置信缺口；项目成员入口已修复，剩余 5 个无现成承载页接口转非阻塞后续。
-- 修复：项目成员路由权限对齐 `project:member:list`；复用 `/system/users`；新增、编辑、删除控件分别使用既有 `hasPermission` 权限判断，后端继续由 `ProjectAccessChecker` 约束项目范围。
+- 修复：项目成员路由权限对齐 `project:member:list`；复用 `/system/users`；新增、编辑、删除控件分别使用既有 `hasPermission` 权限判断；后端成员服务当前仍校验同租户项目归属，但未接入 `ProjectAccessChecker`，项目级访问范围需后续专项复核与治理。
 - 验收：D2 三文件 `27/27`，type-check、build、diff-check 均 exit 0；E 首轮发现 list-only 控件暴露后由 B2 补修，E2 最终 PASS。
 - 剩余风险：`/accounting-entry`、`/audit-logs`、`/bid-cost`、`/overhead-allocation`、`/contract-revenue` 尚无承载页；权限正向显示测试未补齐，均为非阻塞后续。
 
@@ -707,6 +707,6 @@ Issue：ISSUE-008-034 供应商交期表现摘要与采购订单下钻
 
 - 已完成：`ISSUE-008-032`（commit `50cbef41a`）、`ISSUE-008-033`（commit `44de035b7`）、`ISSUE-008-034`（本次本地提交）。
 - 阻塞：无。
-- 非阻塞观察：032 保留 5 个无承载接口、`/system/users` 降级边界、`ProjectAccessChecker` 范围与权限正向显示测试；033 保留前置依赖网络、本地日历与跨午夜刷新边界；034 保留浏览器视觉与真实低权限点击 E2E。
+- 非阻塞观察：032 保留 5 个无承载接口、`/system/users` 降级边界、未接入 `ProjectAccessChecker` 的项目级访问范围风险与权限正向显示测试；033 保留前置依赖网络、本地日历与跨午夜刷新边界；034 保留浏览器视觉与真实低权限点击 E2E。
 - 当前 focus：达到 `启动迭代-3` 上限，停止下一任务派发；状态原因=`ITERATION_LIMIT_REACHED`。
 - 总结论：通过；本轮三项均完成收口，但局部能力不等于相关能力域完整平台化。

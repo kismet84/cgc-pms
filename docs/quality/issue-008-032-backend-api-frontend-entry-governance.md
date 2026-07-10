@@ -16,7 +16,7 @@
 | 运维专用接口 | 1 | Prometheus `/actuator` 保持运维入口，不进入业务导航 |
 | 高置信入口缺口 | 6 | 项目成员入口已修复；其余 5 项转为非阻塞后续治理 |
 
-本轮将项目成员路由权限由不存在的 `project:member:query` 对齐为后端 `project:member:list`，继续复用现有 `/system/users` 用户选择数据源，不新增 API 封装或占位页面。成员新增、角色编辑和移除分别由 `project:member:add`、`project:member:edit`、`project:member:delete` 控制；后端项目范围继续由既有 `ProjectAccessChecker` 约束。
+本轮将项目成员路由权限由不存在的 `project:member:query` 对齐为后端 `project:member:list`，继续复用现有 `/system/users` 用户选择数据源，不新增 API 封装或占位页面。成员新增、角色编辑和移除分别由 `project:member:add`、`project:member:edit`、`project:member:delete` 控制；后端成员服务当前仍校验同租户项目归属，但未接入 `ProjectAccessChecker`，项目级访问范围需作为既存非阻塞后端数据范围风险后续专项复核与治理。
 
 ## 验收证据
 

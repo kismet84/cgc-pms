@@ -15,7 +15,7 @@
 - `blocked-issues.md` 当前为空，不存在必须先解阻的当前 focus 前置项。
 - 依赖顺序：`ISSUE-008-032`、`ISSUE-008-033`、`ISSUE-008-034` 均已完成。
 - 派发边界：已达到 `3/3` 上限，停止下一任务派发。
-- `ISSUE-008-032` 治理结果：50 个 Controller 中 39 个已有入口、4 个合法复用、1 个 Prometheus `/actuator` 运维专用、6 个高置信缺口；项目成员入口已修复，复用 `/system/users`，后端项目范围继续由 `ProjectAccessChecker` 约束。
+- `ISSUE-008-032` 治理结果：50 个 Controller 中 39 个已有入口、4 个合法复用、1 个 Prometheus `/actuator` 运维专用、6 个高置信缺口；项目成员入口已修复，复用 `/system/users`；后端成员服务当前仍校验同租户项目归属，但未接入 `ProjectAccessChecker`，项目级访问范围需后续专项复核与治理。
 - `ISSUE-008-032` 非阻塞后续：`/accounting-entry`、`/audit-logs`、`/bid-cost`、`/overhead-allocation`、`/contract-revenue` 5 个接口无现成承载页；add/edit/delete 权限正向显示测试尚未补齐。
 - `ISSUE-008-033` 非阻塞后续：前置任务依赖网络未实施；延期判断使用浏览器本地日历；页面跨午夜需重新加载或刷新数据后更新当天基准。
 - `ISSUE-008-034` 非阻塞后续：未执行浏览器视觉验收与真实低权限账号点击 E2E。
@@ -33,7 +33,7 @@
 
 - 已完成：`ISSUE-008-032`、`ISSUE-008-033`、`ISSUE-008-034`。
 - 阻塞：无。
-- 非阻塞观察：`ISSUE-008-032` 尚有 5 个无现成承载页接口、`/system/users` 复用降级边界、`ProjectAccessChecker` 范围约束与权限正向显示测试补强项；`ISSUE-008-033` 未实施前置依赖网络、使用浏览器本地日历且跨午夜需刷新；`ISSUE-008-034` 无浏览器视觉与真实低权限点击 E2E。
+- 非阻塞观察：`ISSUE-008-032` 尚有 5 个无现成承载页接口、`/system/users` 复用降级边界、未接入 `ProjectAccessChecker` 的项目级访问范围风险与权限正向显示测试补强项；`ISSUE-008-033` 未实施前置依赖网络、使用浏览器本地日历且跨午夜需刷新；`ISSUE-008-034` 无浏览器视觉与真实低权限点击 E2E。
 - 当前 focus：达到 `启动迭代-3` 上限，停止下一任务派发。
 - 总结论：通过；三项均完成局部能力治理或缺口修复，但不代表接口治理、WBS 预警或供应商履约相关能力域整体平台化完成。
 
