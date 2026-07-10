@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { computed, defineComponent, h } from 'vue'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,7 +9,192 @@ const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../task.vue'), 'utf-8')
 const configSource = readFileSync(resolve(currentDir, '../pageConfig.ts'), 'utf-8')
 
+const { mockGetSubTaskList, mockRouterReplace, mockFetchProjects, mockFetchContracts, mockFetchPartners } =
+  vi.hoisted(() => ({
+    mockGetSubTaskList: vi.fn(),
+    mockRouterReplace: vi.fn(),
+    mockFetchProjects: vi.fn(),
+    mockFetchContracts: vi.fn(),
+    mockFetchPartners: vi.fn(),
+  }))
+
+vi.mock('@/api/modules/subcontract', () => ({
+  getSubTaskList: mockGetSubTaskList,
+  createSubTask: vi.fn(),
+  updateSubTask: vi.fn(),
+  deleteSubTask: vi.fn(),
+}))
+
+vi.mock('@/stores/reference', () => ({
+  useReferenceStore: () => ({
+    projects: [],
+    contracts: [],
+    fetchProjects: mockFetchProjects,
+    fetchContracts: mockFetchContracts,
+    fetchPartners: mockFetchPartners,
+  }),
+}))
+
+vi.mock('pinia', () => ({
+  storeToRefs: () => ({
+    projects: computed(() => []),
+    contracts: computed(() => []),
+  }),
+}))
+
+vi.mock('@/composables/useColumnSettings', () => ({
+  useColumnSettings: () => ({
+    visibleColumns: computed(() => []),
+    columnSettings: [],
+    colVisible: {},
+    toggleCol: vi.fn(),
+  }),
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ path: '/subcontract/task', query: {} }),
+  useRouter: () => ({ replace: mockRouterReplace }),
+}))
+
+vi.mock('ant-design-vue', async () => {
+  const actual = await vi.importActual('ant-design-vue')
+  return {
+    ...actual,
+    message: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+    Modal: { confirm: vi.fn() },
+  }
+})
+
+import SubcontractTaskPage from '../task.vue'
+
+const BasicStub = defineComponent({
+  name: 'BasicStub',
+  setup(_, { slots }) {
+    return () => h('div', slots.default?.())
+  },
+})
+
+const ButtonStub = defineComponent({
+  name: 'ButtonStub',
+  emits: ['click'],
+  setup(_, { emit, slots }) {
+    return () => h('button', { type: 'button', onClick: () => emit('click') }, slots.default?.())
+  },
+})
+
+const ProgressStub = defineComponent({
+  name: 'ProgressStub',
+  props: { percent: { type: Number, default: 0 } },
+  setup(props) {
+    return () => h('span', { class: 'stub-progress' }, `${props.percent}%`)
+  },
+})
+
+const WbsStubs = {
+  'a-breadcrumb': BasicStub,
+  'a-breadcrumb-item': BasicStub,
+  'a-input': BasicStub,
+  'a-select': BasicStub,
+  'a-select-option': BasicStub,
+  'a-button': ButtonStub,
+  'a-tag': BasicStub,
+  'a-dropdown': BasicStub,
+  'a-menu': BasicStub,
+  'a-menu-item': BasicStub,
+  'a-pagination': BasicStub,
+  'a-modal': BasicStub,
+  'a-form': BasicStub,
+  'a-form-item': BasicStub,
+  'a-date-picker': BasicStub,
+  'a-input-number': BasicStub,
+  'a-textarea': BasicStub,
+  'a-result': BasicStub,
+  'a-progress': ProgressStub,
+  'vxe-grid': BasicStub,
+  ColumnSettingsButton: BasicStub,
+  LgEmptyState: BasicStub,
+  CheckCircleOutlined: BasicStub,
+  ClockCircleOutlined: BasicStub,
+  FileDoneOutlined: BasicStub,
+  MoreOutlined: BasicStub,
+  PauseCircleOutlined: BasicStub,
+  PlusOutlined: BasicStub,
+  ReloadOutlined: BasicStub,
+  SearchOutlined: BasicStub,
+  SyncOutlined: BasicStub,
+}
+
 describe('subcontract task page quality guardrails', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRouterReplace.mockResolvedValue(undefined)
+    mockFetchProjects.mockResolvedValue(undefined)
+    mockFetchContracts.mockResolvedValue(undefined)
+    mockFetchPartners.mockResolvedValue(undefined)
+  })
+
+  it('renders read-only WBS/gantt rows and empty fallback from API data', async () => {
+    mockGetSubTaskList
+      .mockResolvedValueOnce({
+        records: [
+          {
+            id: '1',
+            taskCode: '1.1',
+            taskName: '土方开挖',
+            plannedStartDate: '2026-07-01',
+            plannedEndDate: '2026-07-10',
+            actualStartDate: '2026-07-02',
+            actualEndDate: '2026-07-09',
+            progressPercent: '35.50',
+            status: 'IN_PROGRESS',
+          },
+          {
+            id: '2',
+            taskCode: '1.2',
+            taskName: '支护施工',
+            actualStartDate: '2026-07-11',
+            progressPercent: '0',
+            status: 'NOT_STARTED',
+          },
+          {
+            id: '3',
+            taskCode: '1.3',
+            taskName: '反向计划样例',
+            plannedStartDate: '2026-08-10',
+            plannedEndDate: '2026-08-01',
+            actualStartDate: '2026-08-03',
+            actualEndDate: '2026-08-08',
+            progressPercent: '80',
+            status: 'SUSPENDED',
+          },
+        ],
+        total: 3,
+      })
+      .mockResolvedValueOnce({ records: [], total: 0 })
+
+    const wrapper = mount(SubcontractTaskPage, { global: { stubs: WbsStubs } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('1.1')
+    expect(wrapper.text()).toContain('土方开挖')
+    expect(wrapper.text()).toContain('计划：2026-07-01 ~ 2026-07-10')
+    expect(wrapper.text()).toContain('实际：2026-07-02 ~ 2026-07-09')
+    expect(wrapper.text()).toContain('35.5%')
+    expect(wrapper.text()).toContain('进行中')
+    expect(wrapper.text()).toContain('1.2')
+    expect(wrapper.text()).toContain('支护施工')
+    expect(wrapper.text()).toContain('未设置计划日期')
+    expect(wrapper.text()).toContain('1.3')
+    expect(wrapper.text()).toContain('反向计划样例')
+    expect(wrapper.text()).toContain('计划：2026-08-10 ~ 2026-08-01')
+    expect(wrapper.text()).toContain('已暂停')
+
+    await wrapper.findAll('button').find((button) => button.text().includes('刷新'))!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('暂无任务可生成 WBS/甘特概览')
+  })
+
   it('extracts static status and grid config out of the giant component', () => {
     expect(source).toContain("from './pageConfig'")
     expect(configSource).toContain('export const SUBCONTRACT_TASK_STATUS_LABEL')

@@ -433,3 +433,34 @@ Issue：ISSUE-008-023 WBS 只读甘特视图回归
 阻塞：无
 剩余风险：
 - 真实浏览器渲染证据不在本 Issue 内补写，由 `ISSUE-008-026` 承接。
+
+---
+
+Issue：ISSUE-008-026 WBS 只读甘特真实渲染与降级态验收治理
+
+目标：
+- 在 B 实现、D 验收与 E 审查通过后，完成 `ISSUE-008-026` 的正式归档、backlog 状态同步与 AutoPilot 计数收口。
+- 将该 Issue 计入本轮 `启动迭代-10` 的第 `5/10` 个实施型 Ready Issue。
+- 严格隔离白名单外脏改动，不做 push，不声称浏览器 E2E 已完成。
+
+修改范围摘要：
+- `frontend-admin/src/pages/subcontract/__tests__/task.test.ts`：新增 WBS 只读甘特组件 mount 测试，覆盖有数据渲染与空态、缺失计划日期、跨期任务等降级态。
+- `docs/quality/issue-008-026-wbs-gantt-rendering-regression.md`：新增正式收口报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/current-focus.md`、`docs/backlog/done-issues.md`：完成 Ready -> Done 与当前焦点同步。
+- `.codex-autopilot/state.json`：将本轮计入 `启动迭代-10` 的第 `5/10` 个实施型 Ready Issue。
+
+验证命令摘要：
+- D 验收：已通过 `pnpm vitest run src/pages/subcontract/__tests__/task.test.ts`，`7/7` 个用例通过。
+- `cd frontend-admin; pnpm type-check`：通过。
+- `cd frontend-admin; pnpm build`：通过。
+- `git diff --check`：通过。
+- E 审查：PASS，无阻塞。
+
+失败分类或非失败分类：非失败分类；WBS 只读甘特组件级真实渲染与降级态验收证据已补齐
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前证据为组件级 mount 测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
+- WBS 仍复用现有分包任务字段，不代表完整 schedule 平台、拖拽排程或依赖网络已完成。
