@@ -63,15 +63,16 @@
 
 ## 任务来源
 
-- 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
 - 当前执行队列：`docs/backlog/ready-issues.md`
-- 当前执行队列没有合格 Ready Issue 时，只允许由项目总负责人结合长期总任务池、`done/ready/blocked` 现状、当前项目状态、用户最新约束、风险和依赖关系，拆出最多 5 个一轮可执行 Ready Issue；该轮只更新 backlog，不直接修改业务代码；后续执行允许最多 3 个完全无关联、无任何代码关联的 Ready Issue 并行，不能证明完全无关联时按串行处理。
+- 临时计划书：`docs/backlog/ad-hoc-plan.md`
+- 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
+- Ready 队列少于 3 条或用户要求切换方向时，先读临时计划书 `docs/backlog/ad-hoc-plan.md`，再读长期计划书 `docs/backlog/cgc-pms-production-enhancement-plan.md`；只允许由项目总负责人结合两类候选来源、`done/ready/blocked` 现状、当前项目状态、用户最新约束、风险和依赖关系补货，目标形成 3–5 条合格 Ready；若已有未执行 Ready，补货后总数不得超过 5。3–5 条不代表允许并行，存在关联仍按串行处理；无法形成至少 3 条时必须记录具体原因。补货轮只更新 backlog，不直接修改业务代码。
 
 ## 动态候选范围与选择原则
 
-- 候选任务默认来自长期总任务池，不再固定绑定 `EPIC-004~007` 样例范围。
+- 候选任务默认先来自临时计划书，再来自长期总任务池，不再固定绑定 `EPIC-004~007` 样例范围。
 - 由项目总负责人根据当前项目状态动态判断优先级，优先选择依赖清晰、风险可控、可在本地测试环境收口的任务。
-- 选题依据至少包括：长期总任务池、`docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`、`docs/backlog/blocked-issues.md`、当前项目状态、用户最新约束、任务风险与前置依赖。
+- 选题依据至少包括：临时计划书、长期总任务池、`docs/backlog/ready-issues.md`、`docs/backlog/done-issues.md`、`docs/backlog/blocked-issues.md`、当前项目状态、用户最新约束、任务风险与前置依赖。
 - 默认跳过：已 Done 的任务、Blocked 且未解除阻塞的任务、超出当前禁止范围的任务、需要生产环境/生产数据库连接的任务、未满足下方“阶段切换条件”的数据库 migration 任务。
 - 当用户明确要求串行且只写 1 条 Ready 时，优先锁定单一平台化缺口题，不保留并行候选。
 
@@ -84,7 +85,7 @@
 - P2 报表中心、规则治理中心、通知平台、WBS / 进度计划 / 甘特图、供应商评分 / 采购增强。
 - 上述 P2 能力即使已有最小回归或局部入口，也只代表具备继续治理的基础，不代表完整平台化完成。
 - 任务必须能在本地 dev/test 环境闭环，不依赖生产环境、生产数据库或外部生产平台。
-- 第一轮只拆出最多 5 个 Ready Issue；每个 Ready Issue 必须写清允许修改范围、禁止事项、验证命令、归档报告和是否需要新增 migration。
+- 每次补货目标形成 3–5 条合格 Ready；若已有未执行 Ready，补货后总数不得超过 5。每个 Ready Issue 必须写清允许修改范围、禁止事项、验证命令、归档报告和是否需要新增 migration；3–5 条不代表并行，存在关联仍串行，无法形成至少 3 条时必须记录具体原因。
 - 如果涉及数据库结构，只允许新增版本化 Flyway migration，不得修改已应用 migration；Ready Issue 必须包含表/字段最小范围、回滚口径和本地验证命令。
 - 若新增 migration 同时触达权限、安全、租户隔离、金额口径、审批状态机或生产集成，默认不自动执行，先进入人工裁决。
 

@@ -14,9 +14,10 @@
 
 ## 任务来源
 
+- 临时计划书：`docs/backlog/ad-hoc-plan.md`
 - 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
 - 本文件是当前执行队列，不是任务源全集。
-- 当本文件没有合格 Ready Issue 时，AutoPilot 应先从长期总任务池中按 `docs/backlog/current-focus.md` 拆出最多 5 个一轮可执行 Ready Issue；拆单当轮只更新 backlog，不直接修改业务代码；连续执行模式下拆单完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮；系统允许最多 3 个完全无关联、无任何代码关联的 Ready Issue 并行，不能证明完全无关联时按串行处理。
+- 当本文件合格 Ready 少于 3 条时，AutoPilot 应先读取临时计划书中的 `ReadyToSplit` / 高优先级 `Candidate`，再读取长期总任务池，并按 `docs/backlog/current-focus.md` 补货，目标形成 3–5 条合格 Ready；若已有未执行 Ready，补货后总数不得超过 5。临时计划条目不得直接实施，必须先进入本文件成为合格 Ready Issue；无法形成至少 3 条时必须写明具体原因。3–5 条不代表允许并行，只有完全无关联、无任何代码关联的 Ready Issue 才可并行，不能证明完全无关联时按串行处理。补货轮只更新 backlog，不直接修改业务代码；连续执行模式补货完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮。
 
 ## Ready 编写约束
 
