@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ArrowLeftOutlined, MoreOutlined } from '@ant-design/icons-vue'
 import { useProjectStore } from '@/stores/project'
+import { useUserStore } from '@/stores/user'
 import { getUserList, type SysUserBrief } from '@/api/modules/system'
 import type { MemberVO, MemberFormParams } from '@/types/project'
 import type { SelectOption } from '@/types/ui'
@@ -13,6 +14,11 @@ import { useColumnSettings } from '@/composables/useColumnSettings'
 const route = useRoute()
 const router = useRouter()
 const store = useProjectStore()
+const userStore = useUserStore()
+
+const canAdd = computed(() => userStore.hasPermission('project:member:add'))
+const canEdit = computed(() => userStore.hasPermission('project:member:edit'))
+const canDelete = computed(() => userStore.hasPermission('project:member:delete'))
 
 const projectId = route.params.projectId as string
 
@@ -193,7 +199,7 @@ const {
           <ArrowLeftOutlined />
           返回项目
         </a-button>
-        <a-button type="primary" @click="openAddModal">
+        <a-button v-if="canAdd" type="primary" @click="openAddModal">
           <PlusOutlined />
           添加成员
         </a-button>
@@ -242,12 +248,14 @@ const {
 
             <template v-else-if="column.dataIndex === 'roleCode'">
               <a-select
+                v-if="canEdit"
                 :value="record.roleCode"
                 size="small"
                 style="width: 130px"
                 :options="ROLE_OPTIONS"
                 @change="(val: string) => handleRoleChange(record, val)"
               />
+              <span v-else>{{ ROLE_MAP[record.roleCode] ?? record.roleCode }}</span>
             </template>
 
             <template v-else-if="column.dataIndex === 'status'">
@@ -257,7 +265,7 @@ const {
             </template>
 
             <template v-else-if="column.dataIndex === 'ops'">
-              <a-dropdown :trigger="['click']">
+              <a-dropdown v-if="canDelete" :trigger="['click']">
                 <a-button class="lg-row-action-trigger" size="small" type="text">
                   <MoreOutlined />
                 </a-button>
@@ -307,6 +315,7 @@ const {
 
     <!-- Add Member Modal -->
     <a-modal
+      v-if="canAdd"
       v-model:open="addVisible"
       title="添加项目成员"
       :width="800"

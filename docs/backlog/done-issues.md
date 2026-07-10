@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-032：后端接口无前端入口治理-M1：业务接口与路由/API 模块映射基线
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；项目成员入口权限映射及 add/edit/delete 控件可见性已对齐；D2 验收与 E2 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-032-backend-api-frontend-entry-governance.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-031：通知平台平台化缺口-M7：占位渠道发送记录与跳过原因可见性回归
 
 完成日期：2026-07-10

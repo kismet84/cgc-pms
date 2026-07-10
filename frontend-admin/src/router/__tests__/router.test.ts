@@ -123,6 +123,14 @@ describe('router lazy loading', () => {
     expect(transactionRoute?.meta?.permission).toBe('inventory:transaction:list')
   })
 
+  it('uses the backend list authority for the project members entry', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const projectRoute = rootRoute?.children?.find((c) => c.name === 'Project')
+    const membersRoute = projectRoute?.children?.find((c) => c.name === 'ProjectMembers')
+
+    expect(membersRoute?.meta?.permission).toBe('project:member:list')
+  })
+
   it('registers dedicated approval done, cc and mine routes', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')

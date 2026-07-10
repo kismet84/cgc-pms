@@ -1,8 +1,8 @@
 ## Ready 队列状态
 
-- 当前无合格 Ready；本轮 `启动迭代-10` 已达到 `10/10` 上限，不派发下一任务。
-- `ISSUE-008-022` 至 `ISSUE-008-031` 已完成并转 Done；`ISSUE-008-031` 以现有能力回归证明（no-op）于 2026-07-10 完成正式收口并计入本轮第 `10/10` 个实施型 Ready Issue。
-- 用户于 2026-07-10 再次触发 `启动迭代-10`，新一轮计数已初始化为 `0/10`；上一轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
+- 当前有 2 条合格 Ready：`ISSUE-008-033`、`ISSUE-008-034`；`ISSUE-008-032` 已完成并计入新的 `启动迭代-3` 第 `1/3` 条。
+- 后续 Ready 必须按 `008-033 -> 008-034` 串行执行；补货轮只更新 backlog/state，不计入实施型完成数。
+- `ISSUE-008-022` 至 `ISSUE-008-031` 已完成并转 Done；既有两轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
 - `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
 - `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
 - `ISSUE-008-019` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `8/10` 个实施型 Ready Issue。
@@ -49,10 +49,10 @@
 
 ## 执行顺序建议
 
-1. 本轮已达到 `10/10` 上限，不派发下一任务。
-2. 未证明完全无关联前，后续新增 Ready 按串行处理。
-3. 多路实现可以并行，但 iteration report、quality 归档、backlog 更新与本地 commit 必须串行，避免共享文档冲突。
-4. 本轮达到 `10/10` 上限、stop/pause 或无 Ready 时，F 必须补最小总验收；未补不得视为完整收口。
+1. `ISSUE-008-032` 已完成接口/前端入口映射治理并转 Done。
+2. 下一条执行 `ISSUE-008-033`；只做现有 WBS 日期字段派生的延期风险可见性，不建设前置任务依赖网络。
+3. 最后执行 `ISSUE-008-034`；复用现有供应商交期表现摘要和采购订单筛选，不新增履约档案表。
+4. 三条未证明完全无关联，统一串行；达到 `3/3`、stop/pause 或无 Ready 时，F 必须补最小总验收。
 
 ## P0
 
@@ -249,6 +249,128 @@
 归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
 
 ## P2
+
+### ISSUE-008-032：后端接口无前端入口治理-M1：业务接口与路由/API 模块映射基线
+
+优先级：P2
+任务性质：运维治理
+类型：接口治理 / 前端路由 / 导航 / API 模块 / 测试
+状态：Done
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/ad-hoc-plan.md` 高优先级 Candidate `后端接口无前端入口治理`
+依赖：无；本轮第 1 条，已完成，下一条串行执行 `ISSUE-008-033`。
+是否需要新增 migration：否；不得新增或修改数据库结构。
+目标：
+- 以现有非 dev/test 后端业务 Controller、前端 API modules、router 和 navigation 为事实源，形成“已有前端入口 / 合法后台复用接口 / 运维专用接口 / 高置信缺口”映射基线。
+- 只修复能复用现有页面、API 模块和路由的高置信入口缺口；不存在高置信缺口时允许 no-op，但必须留下可复验的分类证据，不得把治理回归表述为新业务能力。
+- 避免为了清零清单新增占位页面、重复 API 封装或新的入口注册抽象。
+允许修改：
+- `frontend-admin/src/router/index.ts`
+- `frontend-admin/src/router/navigation.ts`
+- `frontend-admin/src/router/__tests__/router.test.ts`
+- `frontend-admin/src/layouts/components/__tests__/SidebarMenu.test.ts`
+- `frontend-admin/src/api/modules/**`
+- 与已存在页面直接相关的前端测试；前端业务文件总计不超过 6 个
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/**`
+- `frontend-admin/src/pages/**` 中新增业务页面或占位页
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 把内部回调、文件下载、聚合子接口、dev/test/actuator 接口强行注册成侧边栏菜单
+验收标准：
+- 正式报告列出本轮纳入范围及四类分类结果，明确每个高置信缺口的后端路径、现有前端承载页、权限和处理结论。
+- router、navigation 与现有 API module 的入口映射保持一致；修复项不得造成无权限用户可见或可达。
+- 若结论为 no-op，必须证明未发现可在本范围内直接修复的高置信缺口，并把需要新页面/新业务裁决的项留在 backlog，而不是伪装成已完成入口建设。
+验证命令：
+- `cd frontend-admin; pnpm test:unit src/router/__tests__/router.test.ts src/layouts/components/__tests__/SidebarMenu.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-032-backend-api-frontend-entry-governance.md`
+
+### ISSUE-008-033：WBS 平台化缺口-M5：现有任务日期派生的延期风险可见性
+
+优先级：P2
+任务性质：缺口修复
+类型：WBS / 分包任务 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/ad-hoc-plan.md` 高优先级 Candidate `WBS 任务依赖与延期预警`；`ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-026`
+依赖：`ISSUE-008-032` 已完成；下一条串行执行，无技术依赖。
+是否需要新增 migration：否；只复用 `sub_task.planned_end_date`、`actual_end_date`、`progress_percent`、`status` 等现有字段。
+目标：
+- 在现有分包任务/WBS 页面按计划完成日期、实际完成日期、进度和状态派生延期风险提示，让逾期未完成任务可见并可复验。
+- 本轮不实现前置任务依赖；当前模型无 predecessor/dependency 字段，若必须依赖持久化才能完成目标则转 Blocked，不得临时新增字段。
+- 只声明“现有任务日期派生的延期风险可见性”，不表述为自动排程、依赖网络或完整预警平台完成。
+允许修改：
+- `frontend-admin/src/pages/subcontract/task.vue`
+- `frontend-admin/src/pages/subcontract/__tests__/task.test.ts`
+- 与现有任务展示直接相关的前端类型或小组件；前端业务文件总计不超过 4 个
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 新建 `schedule_*`、依赖关系或预警持久化表
+- 新增拖拽排程、关键路径、基线版本、依赖网络编辑器
+验收标准：
+- 计划完成日期早于当前日期且未完成的任务展示明确延期状态；完成态或 `100%` 进度不误报。
+- 缺少计划完成日期时保持可理解的降级展示，不猜测截止日期；日期边界使用可控时钟或等价稳定断言。
+- 现有 WBS 编码、计划/实际日期、进度和状态展示不回退，项目/租户过滤仍由现有后端链路负责。
+- 报告明确前置任务依赖未实施及原因，不把局部提示包装成完整延期预警能力。
+验证命令：
+- `cd frontend-admin; pnpm test:unit src/pages/subcontract/__tests__/task.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-033-wbs-derived-delay-visibility.md`
+
+### ISSUE-008-034：供应商履约档案-M1：交期表现摘要与采购订单下钻
+
+优先级：P2
+任务性质：缺口修复
+类型：供应商履约 / 采购驾驶舱 / 前端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/ad-hoc-plan.md` 高优先级 Candidate `供应商履约档案`；`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-027`
+依赖：`ISSUE-008-033` 完成后串行执行；无技术依赖。
+是否需要新增 migration：否；复用现有 `supplierScores`、合作方 `partnerId` 与采购订单 `partnerId` 查询参数，不新增履约档案或评分事实表。
+目标：
+- 将采购驾驶舱现有供应商交期表现摘要补成可下钻入口，按 `partnerId` 进入已存在的采购订单列表筛选结果。
+- 保持现有订单数、逾期未完成数、交期达成率和表现评分口径，不扩展质量、价格、服务或综合评级。
+- 只声明“采购订单交期履约摘要与下钻”，不表述为完整供应商履约档案平台完成。
+允许修改：
+- `frontend-admin/src/pages/dashboard/components/DashboardPurchaseView.vue`
+- `frontend-admin/src/pages/dashboard/__tests__/DashboardPurchaseView.test.ts`
+- `frontend-admin/src/pages/purchase/order.vue`
+- `frontend-admin/src/pages/purchase/__tests__/order.test.ts`
+- `frontend-admin/src/types/dashboard.ts`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 新增供应商履约、评分、黑名单或档案表
+- 新增询价、比价、定标、质量/价格/服务综合评分或外部供应商平台集成
+验收标准：
+- 每条供应商交期表现可使用现有 `partnerId` 下钻到采购订单页，目标页正确恢复 `partnerId` 筛选且不丢失权限守卫。
+- 无 `partnerId` 或无评分数据时保持现有空态/降级态，不生成不可达链接。
+- 现有供应商名称、订单数、逾期数、交期达成率和表现评分展示不回退；下钻不改变既有评分口径。
+- 报告明确本轮不形成独立供应商档案，不把订单交期摘要包装成综合供应商评级。
+验证命令：
+- `cd frontend-admin; pnpm test:unit src/pages/dashboard/__tests__/DashboardPurchaseView.test.ts src/pages/purchase/__tests__/order.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-034-supplier-delivery-summary-drilldown.md`
 
 ### ISSUE-008-031：通知平台平台化缺口-M7：占位渠道发送记录与跳过原因可见性回归
 

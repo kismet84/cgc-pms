@@ -451,7 +451,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   Project: 'project:query',
   ProjectList: 'project:query',
   ProjectOverview: 'project:query',
-  ProjectMembers: 'project:member:query',
+  ProjectMembers: 'project:member:list',
   ProjectEdit: 'project:edit',
   Partner: 'partner:query',
   Org: 'org:query',
