@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-029：通知平台平台化缺口-M6：订阅弹窗与渠道可见性真实渲染验收治理
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；通知订阅弹窗与渠道可见性的组件级真实渲染证据已补齐；D 验收与 E 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-029-notification-channel-rendering-regression.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-026：WBS 平台化缺口-M4：只读甘特真实渲染与降级态验收治理
 
 完成日期：2026-07-10

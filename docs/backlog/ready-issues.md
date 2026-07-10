@@ -1,7 +1,7 @@
 ## Ready 队列状态
 
-- 当前有 1 条合格 Ready：`ISSUE-008-029`。
-- `ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-026`、`ISSUE-008-027`、`ISSUE-008-028` 已完成并转 Done；`ISSUE-008-028` 已于 2026-07-10 完成正式收口并计入本轮第 `7/10` 个实施型 Ready Issue。
+- 当前没有合格 Ready；本轮剩余实施型额度 `2/10`，需由主线程结合 current focus 与长期总任务池重新拆单后再继续。
+- `ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-026`、`ISSUE-008-027`、`ISSUE-008-028`、`ISSUE-008-029` 已完成并转 Done；`ISSUE-008-029` 已于 2026-07-10 完成正式收口并计入本轮第 `8/10` 个实施型 Ready Issue。
 - 用户于 2026-07-10 再次触发 `启动迭代-10`，新一轮计数已初始化为 `0/10`；上一轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
 - `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
 - `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
@@ -48,9 +48,9 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-008-028` 已完成，下一项默认执行 `ISSUE-008-029`，补齐通知平台订阅弹窗与渠道可见性验收证据。
-2. `ISSUE-008-029` 属于通知平台真实渲染验收治理。
-3. 未证明完全无关联前，剩余 Ready 按串行处理。
+1. `ISSUE-008-029` 已完成并转 Done，当前 Ready 队列清空。
+2. 下一步不得由本轮 F 归档自行拆新 Ready；需由主线程按 `current-focus.md` 与长期总任务池重新裁决。
+3. 未证明完全无关联前，后续新增 Ready 按串行处理。
 4. 多路实现可以并行，但 iteration report、quality 归档、backlog 更新与本地 commit 必须串行，避免共享文档冲突。
 5. 本轮达到 `10/10` 上限、stop/pause 或无 Ready 时，F 必须补最小总验收；未补不得视为完整收口。
 
@@ -428,40 +428,6 @@
 - `cd frontend-admin; pnpm build`
 - `git diff --check`
 归档报告：`docs/quality/issue-008-026-wbs-gantt-rendering-regression.md`
-
-### ISSUE-008-029：通知平台平台化缺口-M6：订阅弹窗与渠道可见性真实渲染验收治理
-
-优先级：P2
-任务性质：回归证明
-类型：通知平台 / 前端 / 测试
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台`；`docs/quality/issue-008-016~019-*`
-依赖：通知平台 M2-M5 已完成并转 Done；不得与通知后端发送链路、渠道配置或规则治理改动并行。
-是否需要新增 migration：否；只验证现有预警订阅弹窗、渠道可见性和发送记录语义展示，不新增通知平台表结构。
-目标：
-- 补齐订阅弹窗和渠道可见性的真实渲染验收，确认 `IN_APP` 与占位渠道的当前能力边界在页面上可理解。
-- 验证未配置/未实现渠道不会被展示成已生效能力，订阅摘要/明细与后端语义一致。
-- 不接入邮件、短信、企微、钉钉、WebSocket/SSE 等真实外部渠道。
-允许修改：
-- `frontend-admin/src/**` 中现有预警订阅弹窗、预警页渠道展示、类型和对应测试；最多 6 个前端文件
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/java/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 外部渠道真实接入、模板中心、失败重试队列、全局频控配置、通知平台新表设计
-验收标准：
-- 至少一组前端真实渲染或组件测试证明：订阅弹窗正确区分当前可用渠道与占位渠道。
-- 未配置/未实现渠道不会显示为已发送成功或可直接生效；保存/摘要/明细展示一致。
-- 不放宽预警域、租户、角色、项目边界；不把前端展示回归包装为通知平台完整建设完成。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-029-notification-channel-rendering-regression.md`
 
 ### ISSUE-008-021：规则治理中心平台化缺口-M3：规则侧去重时窗与重复预警抑制生效回归
 

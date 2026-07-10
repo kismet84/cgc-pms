@@ -611,13 +611,13 @@ describe('alert/index.vue', () => {
         },
         effectiveSubscription: {
           enabled: true,
-          channels: ['IN_APP'],
+          channels: ['IN_APP', 'EMAIL', 'WECHAT', 'SMS'],
           domains: ['PURCHASE'],
           minSeverity: 'MEDIUM',
           notifyOnStatusChanged: false,
         },
         availableOptions: {
-          channels: ['IN_APP', 'EMAIL'],
+          channels: ['IN_APP', 'EMAIL', 'WECHAT', 'SMS'],
           domains: ['PURCHASE', 'CONTRACT'],
           minSeverityOptions: ['LOW', 'MEDIUM', 'HIGH'],
         },
@@ -678,6 +678,38 @@ describe('alert/index.vue', () => {
       expect.stringContaining('站内信'),
     ])
     expect(alertPageSource).not.toContain("['IN_APP', 'EMAIL', 'WECHAT', 'SMS']")
+  })
+
+  it('订阅明细只展示默认允许的站内信，不展示占位渠道', async () => {
+    mockAlertStore.alerts = [createAlertRecord()]
+    mockAlertStore.total = 1
+    mockGetAlertSubscription.mockResolvedValue(
+      buildSubscriptionResponse({
+        effectiveSubscription: {
+          enabled: true,
+          channels: ['IN_APP', 'EMAIL', 'WECHAT', 'SMS'],
+          domains: ['PURCHASE'],
+          minSeverity: 'LOW',
+          notifyOnStatusChanged: true,
+        },
+        availableOptions: {
+          domains: ['PURCHASE'],
+          channels: ['IN_APP', 'EMAIL', 'WECHAT', 'SMS'],
+          minSeverityOptions: ['LOW', 'MEDIUM', 'HIGH'],
+        },
+      }),
+    )
+
+    const wrapper = mountAlertPage()
+
+    await flushPromises()
+
+    expect(wrapper.findAll('.alert-subscription-line').map((item) => item.text())).toEqual([
+      expect.stringContaining('站内信'),
+    ])
+    expect(wrapper.text()).not.toContain('邮件')
+    expect(wrapper.text()).not.toContain('企业微信')
+    expect(wrapper.text()).not.toContain('短信')
   })
 
   it('导出复用当前筛选条件跨页抓取全量结果，空列表时按钮禁用', async () => {
@@ -1268,7 +1300,7 @@ describe('alert 子组件 DOM/结构证据', () => {
     const handleSaveSubscription = vi.fn()
     const form = reactive({
       enabled: true,
-      channels: ['IN_APP'],
+      channels: ['IN_APP', 'EMAIL', 'WECHAT', 'SMS'],
       domains: ['PURCHASE'],
       minSeverity: 'LOW',
       notifyOnStatusChanged: true,
@@ -1297,6 +1329,10 @@ describe('alert 子组件 DOM/结构证据', () => {
     expect(wrapper.findAll('.alert-subscription-row.is-block')).toHaveLength(3)
     expect(wrapper.text()).toContain('接收通知')
     expect(wrapper.text()).toContain('通知渠道')
+    expect(wrapper.text()).toContain('站内信')
+    expect(wrapper.text()).not.toContain('邮件')
+    expect(wrapper.text()).not.toContain('企业微信')
+    expect(wrapper.text()).not.toContain('短信')
     expect(wrapper.text()).toContain('预警域')
     expect(wrapper.text()).toContain('最低严重度')
     expect(wrapper.text()).toContain('状态变更通知')

@@ -527,3 +527,34 @@ Issue：ISSUE-008-028 报表入口真实渲染与空态验收治理
 剩余风险：
 - 当前证据为组件级 mount 测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
 - 本轮只验证既有报表目录/入口可见性与空态，不代表完整报表中心、异步导出平台或外部报表平台已完成。
+
+---
+
+Issue：ISSUE-008-029 通知订阅弹窗与渠道可见性真实渲染验收治理
+
+目标：
+- 在 B 实现、D 验收与 E 审查通过后，完成 `ISSUE-008-029` 的正式归档、backlog 状态同步与 AutoPilot 计数收口。
+- 将该 Issue 计入本轮 `启动迭代-10` 的第 `8/10` 个实施型 Ready Issue。
+- 严格隔离白名单外脏改动，不做 push，不声称浏览器 E2E 或外部渠道正式打通。
+
+修改范围摘要：
+- `frontend-admin/src/pages/alert/__tests__/index.test.ts`：新增预警订阅明细与订阅弹窗组件级渲染断言，覆盖站内信与邮件、企业微信、短信占位渠道的可见性边界。
+- `docs/quality/issue-008-029-notification-channel-rendering-regression.md`：新增正式收口报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/current-focus.md`、`docs/backlog/done-issues.md`：完成 Ready -> Done 与当前焦点同步；当前 Ready 队列清空。
+- `.codex-autopilot/state.json`：将本轮计入 `启动迭代-10` 的第 `8/10` 个实施型 Ready Issue。
+
+验证命令摘要：
+- D 验收：已通过 `pnpm test:unit src/pages/alert/__tests__/index.test.ts`，`19/19` 个用例通过。
+- `pnpm type-check`：通过。
+- `pnpm build`：通过。
+- `git diff --check`：通过。
+- E 审查：PASS，无阻塞。
+
+失败分类或非失败分类：非失败分类；通知订阅弹窗与渠道可见性的组件级真实渲染证据已补齐
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 当前证据为组件级 mount / 单元测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
+- 当前只验证既有预警页订阅弹窗与渠道可见性，不代表邮件、短信、企业微信、钉钉、WebSocket/SSE、模板中心、失败重试队列或完整通知平台已完成。
