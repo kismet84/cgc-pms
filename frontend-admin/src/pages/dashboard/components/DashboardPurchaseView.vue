@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   AuditOutlined,
   InboxOutlined,
@@ -13,6 +14,7 @@ const props = defineProps<{
   data: PurchaseManagerDashboardVO
   loading: boolean
 }>()
+const router = useRouter()
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
@@ -450,10 +452,21 @@ function receiptTimeliness(record: DashboardBusinessItemVO) {
         row-key="partnerId"
         class="role-reference-table purchase-reference-table"
       >
-        <template #bodyCell="{ column, text }">
+        <template #bodyCell="{ column, text, record }">
           <span v-if="column.dataIndex === 'partnerName'" class="purchase-muted">
             <a-tooltip :title="displayText(text)">
-              <span class="purchase-ellipsis purchase-muted">{{ displayText(text) }}</span>
+              <a-button
+                v-if="record.partnerId"
+                type="link"
+                class="supplier-order-drilldown purchase-ellipsis purchase-muted"
+                :aria-label="`查看${displayText(text)}的采购订单`"
+                @click="
+                  router.push({ path: '/purchase/order', query: { partnerId: record.partnerId } })
+                "
+              >
+                {{ displayText(text) }}
+              </a-button>
+              <span v-else class="purchase-ellipsis purchase-muted">{{ displayText(text) }}</span>
             </a-tooltip>
           </span>
           <span v-else-if="column.dataIndex === 'onTimeDeliveryRate'" class="purchase-amount">

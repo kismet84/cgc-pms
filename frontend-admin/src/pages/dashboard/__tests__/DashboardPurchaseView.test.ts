@@ -1,7 +1,13 @@
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DashboardPurchaseView from '../components/DashboardPurchaseView.vue'
+
+const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }))
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: routerPush }),
+}))
 
 const ATableStub = defineComponent({
   name: 'ATableStub',
@@ -47,6 +53,11 @@ const ATableStub = defineComponent({
 
 const stubs = {
   ATable: ATableStub,
+  AButton: defineComponent({
+    setup(_, { attrs, slots }) {
+      return () => h('button', attrs, slots.default?.())
+    },
+  }),
   ATooltip: { template: '<span><slot /></span>' },
   AuditOutlined: true,
   ShoppingCartOutlined: true,
@@ -81,6 +92,10 @@ function mountPurchaseView(data: Record<string, unknown>) {
 }
 
 describe('DashboardPurchaseView', () => {
+  beforeEach(() => {
+    routerPush.mockReset()
+  })
+
   it('renders supplier delivery score rows from the dashboard payload', () => {
     const wrapper = mountPurchaseView(
       baseData({
@@ -111,6 +126,49 @@ describe('DashboardPurchaseView', () => {
     const wrapper = mountPurchaseView(baseData())
 
     expect(wrapper.text()).toContain('暂无供应商采购订单交期表现数据')
+  })
+
+  it('drills a supplier score into purchase orders with the existing partner filter', async () => {
+    const wrapper = mountPurchaseView(
+      baseData({
+        supplierScores: [
+          {
+            partnerId: 'supplier-1',
+            partnerName: '华北钢材',
+            orderCount: 8,
+            overdueOrderCount: 1,
+            onTimeDeliveryRate: '87.50',
+            performanceScore: '88',
+          },
+        ],
+      }),
+    )
+
+    await wrapper.get('.supplier-order-drilldown').trigger('click')
+
+    expect(routerPush).toHaveBeenCalledWith({
+      path: '/purchase/order',
+      query: { partnerId: 'supplier-1' },
+    })
+  })
+
+  it('does not create an unreachable drilldown without partnerId', () => {
+    const wrapper = mountPurchaseView(
+      baseData({
+        supplierScores: [
+          {
+            partnerName: '缺少标识供应商',
+            orderCount: 1,
+            overdueOrderCount: 0,
+            onTimeDeliveryRate: '100.00',
+            performanceScore: '100',
+          },
+        ],
+      }),
+    )
+
+    expect(wrapper.find('.supplier-order-drilldown').exists()).toBe(false)
+    expect(routerPush).not.toHaveBeenCalled()
   })
 
   it('keeps zero and missing supplier score fields stable', () => {

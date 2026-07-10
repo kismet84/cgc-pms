@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-034：供应商履约档案-M1：交期表现摘要与采购订单下钻
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；供应商交期表现摘要与采购订单 `partnerId` 下钻已落地；D 验收与 E 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-034-supplier-delivery-summary-drilldown.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-033：WBS 平台化缺口-M5：现有任务日期派生的延期风险可见性
 
 完成日期：2026-07-10

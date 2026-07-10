@@ -1,7 +1,55 @@
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import PurchaseOrderPage from '../order.vue'
+
+const mocks = vi.hoisted(() => ({
+  getOrderList: vi.fn(),
+  routerReplace: vi.fn(),
+  route: {
+    path: '/purchase/order',
+    query: {} as Record<string, string>,
+  },
+  fetchPartners: vi.fn(),
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => mocks.route,
+  useRouter: () => ({ replace: mocks.routerReplace }),
+}))
+
+vi.mock('@/api/modules/purchase', () => ({
+  getOrderList: mocks.getOrderList,
+  getOrderDetail: vi.fn(),
+  createOrder: vi.fn(),
+  updateOrder: vi.fn(),
+  deleteOrder: vi.fn(),
+  getOrderItems: vi.fn(),
+  saveOrderItems: vi.fn(),
+  submitOrderForApproval: vi.fn(),
+}))
+
+vi.mock('@/stores/reference', () => ({
+  useReferenceStore: () => ({
+    projects: [],
+    contracts: [],
+    materials: [],
+    fetchProjects: vi.fn(),
+    fetchContracts: vi.fn(),
+    fetchMaterials: vi.fn(),
+    fetchPartners: mocks.fetchPartners,
+  }),
+}))
+
+vi.mock('@/utils/dict', () => ({
+  fetchDictData: vi.fn(),
+  getDictLabelSync: (_dict: string, value: string, fallback: Record<string, string>) =>
+    fallback[value] ?? value,
+  getDictTagColorSync: (_dict: string, value: string, fallback: Record<string, string>) =>
+    fallback[value] ?? 'default',
+}))
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../order.vue'), 'utf-8')
@@ -156,5 +204,49 @@ describe('purchase order page quality guardrails', () => {
 
   it('does not open the modal after detail loading fails', () => {
     expect(source).toMatch(/catch[\s\S]*?message\.error\('加载明细失败'\)[\s\S]*?return/)
+  })
+})
+
+describe('PurchaseOrderPage route filters', () => {
+  beforeEach(() => {
+    mocks.route.query = { partnerId: 'supplier-1' }
+    mocks.getOrderList.mockReset()
+    mocks.getOrderList.mockResolvedValue({ records: [], total: 0 })
+    mocks.routerReplace.mockReset()
+    mocks.routerReplace.mockResolvedValue(undefined)
+    mocks.fetchPartners.mockReset()
+    mocks.fetchPartners.mockResolvedValue([])
+  })
+
+  it('restores partnerId from route query before loading purchase orders', async () => {
+    mount(PurchaseOrderPage, {
+      global: {
+        stubs: {
+          PurchaseOrderSearchBar: true,
+          PurchaseOrderAnalysisRail: true,
+          PurchaseOrderModal: true,
+          ColumnSettingsButton: true,
+          LgEmptyState: true,
+          VxeGrid: true,
+          ClockCircleOutlined: true,
+          DollarOutlined: true,
+          FileDoneOutlined: true,
+          MoreOutlined: true,
+          PlusOutlined: true,
+          ReloadOutlined: true,
+          ShoppingCartOutlined: true,
+          WalletOutlined: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(mocks.getOrderList).toHaveBeenCalledWith(
+      expect.objectContaining({ partnerId: 'supplier-1' }),
+    )
+    expect(mocks.routerReplace).toHaveBeenCalledWith({
+      path: '/purchase/order',
+      query: expect.objectContaining({ partnerId: 'supplier-1' }),
+    })
   })
 })
