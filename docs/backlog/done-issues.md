@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-033：WBS 平台化缺口-M5：现有任务日期派生的延期风险可见性
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；现有 WBS 日期派生延期提示与防误报守卫已落地；D4 验收与 E4 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-033-wbs-derived-delay-visibility.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-032：后端接口无前端入口治理-M1：业务接口与路由/API 模块映射基线
 
 完成日期：2026-07-10

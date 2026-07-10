@@ -681,3 +681,13 @@ Issue：ISSUE-008-032 后端业务接口与前端入口治理
 - 修复：项目成员路由权限对齐 `project:member:list`；复用 `/system/users`；新增、编辑、删除控件分别使用既有 `hasPermission` 权限判断，后端继续由 `ProjectAccessChecker` 约束项目范围。
 - 验收：D2 三文件 `27/27`，type-check、build、diff-check 均 exit 0；E 首轮发现 list-only 控件暴露后由 B2 补修，E2 最终 PASS。
 - 剩余风险：`/accounting-entry`、`/audit-logs`、`/bid-cost`、`/overhead-allocation`、`/contract-revenue` 尚无承载页；权限正向显示测试未补齐，均为非阻塞后续。
+
+---
+
+Issue：ISSUE-008-033 WBS 现有日期派生延期风险可见性
+
+- 收口：通过，无阻塞；计入新的 `启动迭代-3` 第 `2/3` 条，下一条为 `ISSUE-008-034`。
+- 实现：在既有 `wbsTimelineRows` 中按浏览器本地日期派生 `isDelayed`；仅计划日早于当天、无实际完成日期、非 `COMPLETED` 且进度小于 `100%` 时展示“已延期”。
+- 验收：首次 RED `1/8`；负时区旧 UTC mutation、移除 `actualEndDate` 守卫、移除 `COMPLETED` 守卫均能触发 RED；D4 最终 `8/8`，type-check、build、diff-check 均 exit 0，E4 PASS。
+- 边界：无后端、数据模型、依赖或 migration 变更；不声明前置依赖网络、自动排程或完整预警平台完成。
+- 剩余风险：前置任务依赖网络未实施；延期判断使用浏览器本地日历；页面跨午夜需重新加载或刷新数据，均为非阻塞后续。

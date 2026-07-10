@@ -318,6 +318,12 @@ const taskStatusSummary = computed(() => [
 ])
 const recentTasks = computed(() => tableData.value.slice(0, 4))
 const wbsTimelineRows = computed(() => {
+  const today = new Date()
+  const todayKey = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-')
   const rows = [...tableData.value].sort((a, b) =>
     (a.taskCode || a.taskName || '').localeCompare(b.taskCode || b.taskName || '', 'zh-CN', {
       numeric: true,
@@ -335,11 +341,18 @@ const wbsTimelineRows = computed(() => {
   return rows.map((row) => {
     const start = row.plannedStartDate ? new Date(row.plannedStartDate).getTime() : Number.NaN
     const end = row.plannedEndDate ? new Date(row.plannedEndDate).getTime() : Number.NaN
+    const progress = parseFloat(row.progressPercent || '0') || 0
     const hasPlan = Number.isFinite(start) && Number.isFinite(end)
     const left = hasPlan ? clampPercent(((Math.min(start, end) - min) / span) * 100) : 0
     const width = hasPlan ? clampPercent((Math.abs(end - start) / span) * 100 || 4) : 0
+    const isDelayed =
+      Number.isFinite(end) &&
+      row.plannedEndDate! < todayKey &&
+      !row.actualEndDate &&
+      row.status !== 'COMPLETED' &&
+      progress < 100
 
-    return { row, hasPlan, left, width }
+    return { row, hasPlan, left, width, isDelayed }
   })
 })
 
@@ -581,6 +594,7 @@ onMounted(() => {
                   <a-tag :color="STATUS_COLOR[item.row.status]">
                     {{ STATUS_LABEL[item.row.status] ?? item.row.status }}
                   </a-tag>
+                  <a-tag v-if="item.isDelayed" color="error">已延期</a-tag>
                 </div>
                 <div class="subcontract-task-gantt-track">
                   <span
@@ -994,7 +1008,7 @@ onMounted(() => {
 
 .subcontract-task-wbs-progress {
   display: grid;
-  grid-template-columns: minmax(100px, 1fr) auto;
+  grid-template-columns: minmax(100px, 1fr) auto auto;
   gap: 8px;
   align-items: center;
 }

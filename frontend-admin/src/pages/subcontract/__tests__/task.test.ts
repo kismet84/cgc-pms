@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { computed, defineComponent, h } from 'vue'
 import { readFileSync } from 'node:fs'
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../task.vue'), 'utf-8')
 const configSource = readFileSync(resolve(currentDir, '../pageConfig.ts'), 'utf-8')
+const originalTimezone = process.env.TZ
 
 const { mockGetSubTaskList, mockRouterReplace, mockFetchProjects, mockFetchContracts, mockFetchPartners } =
   vi.hoisted(() => ({
@@ -125,12 +126,25 @@ const WbsStubs = {
 }
 
 describe('subcontract task page quality guardrails', () => {
+  beforeAll(() => {
+    process.env.TZ = 'America/Los_Angeles'
+  })
+
+  afterAll(() => {
+    if (originalTimezone === undefined) delete process.env.TZ
+    else process.env.TZ = originalTimezone
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     mockRouterReplace.mockResolvedValue(undefined)
     mockFetchProjects.mockResolvedValue(undefined)
     mockFetchContracts.mockResolvedValue(undefined)
     mockFetchPartners.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('renders read-only WBS/gantt rows and empty fallback from API data', async () => {
@@ -193,6 +207,78 @@ describe('subcontract task page quality guardrails', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('暂无任务可生成 WBS/甘特概览')
+  })
+
+  it('marks only overdue unfinished WBS rows as delayed with a controlled clock', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 15, 23, 30))
+    mockGetSubTaskList.mockResolvedValue({
+      records: [
+        {
+          id: 'overdue',
+          taskCode: '2.1',
+          taskName: '逾期未完成',
+          plannedEndDate: '2026-07-14',
+          progressPercent: '60',
+          status: 'IN_PROGRESS',
+        },
+        {
+          id: 'today',
+          taskCode: '2.2',
+          taskName: '今天到期',
+          plannedEndDate: '2026-07-15',
+          progressPercent: '60',
+          status: 'IN_PROGRESS',
+        },
+        {
+          id: 'actual-end',
+          taskCode: '2.3',
+          taskName: '已有实际完成日期',
+          plannedEndDate: '2026-07-01',
+          actualEndDate: '2026-07-02',
+          progressPercent: '60',
+          status: 'IN_PROGRESS',
+        },
+        {
+          id: 'completed',
+          taskCode: '2.4',
+          taskName: '状态已完成',
+          plannedEndDate: '2026-07-01',
+          progressPercent: '60',
+          status: 'COMPLETED',
+        },
+        {
+          id: 'full-progress',
+          taskCode: '2.5',
+          taskName: '进度已完成',
+          plannedEndDate: '2026-07-01',
+          progressPercent: '100',
+          status: 'IN_PROGRESS',
+        },
+        {
+          id: 'no-plan',
+          taskCode: '2.6',
+          taskName: '无计划日期',
+          progressPercent: '0',
+          status: 'NOT_STARTED',
+        },
+      ],
+      total: 6,
+    })
+
+    const wrapper = mount(SubcontractTaskPage, { global: { stubs: WbsStubs } })
+    await flushPromises()
+
+    const rows = wrapper.findAll('.subcontract-task-wbs-row')
+    expect(rows).toHaveLength(6)
+    expect(rows.find((row) => row.text().includes('逾期未完成'))!.text()).toContain('已延期')
+    expect(rows.find((row) => row.text().includes('今天到期'))!.text()).not.toContain('已延期')
+    expect(rows.find((row) => row.text().includes('已有实际完成日期'))!.text()).not.toContain('已延期')
+    expect(rows.find((row) => row.text().includes('状态已完成'))!.text()).not.toContain('已延期')
+    expect(rows.find((row) => row.text().includes('进度已完成'))!.text()).not.toContain('已延期')
+    const noPlanRow = rows.find((row) => row.text().includes('无计划日期'))!
+    expect(noPlanRow.text()).not.toContain('已延期')
+    expect(noPlanRow.text()).toContain('未设置计划日期')
   })
 
   it('extracts static status and grid config out of the giant component', () => {
