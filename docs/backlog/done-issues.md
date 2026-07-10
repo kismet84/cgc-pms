@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-031：通知平台平台化缺口-M7：占位渠道发送记录与跳过原因可见性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；现有通知占位渠道发送记录、跳过原因与前端可见性回归已得到证明（no-op），无业务代码差异；D 验收与 E 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-031-notification-placeholder-send-record-visibility.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-030：报表中心平台化缺口-M8：目录异常态、重试入口与权限过滤回归
 
 完成日期：2026-07-10

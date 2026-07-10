@@ -627,3 +627,47 @@ Issue：ISSUE-008-030 报表目录异常态、重试入口与权限过滤回归
 剩余风险：
 - 当前证据为组件级单元测试，不是浏览器 E2E；该风险符合 Ready 边界，非阻塞。
 - 本轮只完成既有报表目录入口治理，不代表完整报表中心、异步导出平台或外部报表平台已完成。
+
+---
+
+Issue：ISSUE-008-031 通知占位渠道发送记录与跳过原因可见性回归
+
+目标：
+- 在 D 验收与 E 审查通过后，将现有能力回归证明（no-op）正式归档。
+- 将该 Issue 计入本轮 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue，并在达到上限后停止下一任务派发。
+- 不声称新增能力、外部真实渠道已打通或浏览器 E2E 已完成。
+
+修改范围摘要：
+- 无业务代码与测试差异；复用既有实现和既有测试证据完成回归证明。
+- `docs/quality/issue-008-031-notification-placeholder-send-record-visibility.md`：新增正式收口报告。
+- `docs/backlog/ready-issues.md`、`docs/backlog/current-focus.md`、`docs/backlog/done-issues.md`：完成 Ready -> Done、`10/10` 最小总验收与当前焦点同步。
+- `.codex-autopilot/state.json`：记录 `ITERATION_LIMIT_REACHED`，完成数 `10`、剩余数 `0`。
+
+验证命令摘要：
+- 后端目标测试：`8/8` 通过。
+- 前端目标测试：`19/19` 通过。
+- `pnpm type-check`：exit 0。
+- `pnpm build`：exit 0。
+- 限定 `git diff --check`：exit 0。
+- E 审查：PASS，无阻塞。
+
+覆盖结果：
+- `NOT_CONFIGURED`、`NOT_IMPLEMENTED`、`DUPLICATE_IN_APP_SUPPRESSED` 三类后端行为均为 `SKIPPED`，未误记为发送成功。
+- 前端不展示邮件、企业微信、短信占位渠道，未包装为真实外部渠道已打通。
+
+失败分类或非失败分类：非失败分类；现有能力回归证明（no-op）通过，无业务代码差异
+是否自动合并：否
+是否推送：否
+结论：通过
+阻塞：无
+剩余风险：
+- 邮件、企业微信、短信等外部真实渠道不在本轮目标内，非阻塞。
+- `ISSUE-008-030`、`ISSUE-008-031` 未执行浏览器 E2E，非阻塞。
+
+## 本轮最小总验收（10/10）
+
+- 已完成：`ISSUE-008-022`、`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-023`、`ISSUE-008-026`、`ISSUE-008-027`、`ISSUE-008-028`、`ISSUE-008-029`、`ISSUE-008-030`、`ISSUE-008-031`。
+- 阻塞：无。
+- 非阻塞观察：外部真实通知渠道不在本轮目标内；`ISSUE-008-030`、`ISSUE-008-031` 无浏览器 E2E。
+- 当前 focus：达到 `启动迭代-10` 上限，停止下一任务派发。
+- 总结论：通过；本轮 10 项均已收口，但不代表相关能力域整体平台化完成。
