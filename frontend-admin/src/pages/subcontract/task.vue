@@ -317,11 +317,40 @@ const taskStatusSummary = computed(() => [
   },
 ])
 const recentTasks = computed(() => tableData.value.slice(0, 4))
+const wbsTimelineRows = computed(() => {
+  const rows = [...tableData.value].sort((a, b) =>
+    (a.taskCode || a.taskName || '').localeCompare(b.taskCode || b.taskName || '', 'zh-CN', {
+      numeric: true,
+    }),
+  )
+  const times = rows.flatMap((row) =>
+    [row.plannedStartDate, row.plannedEndDate]
+      .map((date) => (date ? new Date(date).getTime() : Number.NaN))
+      .filter(Number.isFinite),
+  )
+  const min = Math.min(...times)
+  const max = Math.max(...times)
+  const span = Math.max(max - min, 1)
+
+  return rows.map((row) => {
+    const start = row.plannedStartDate ? new Date(row.plannedStartDate).getTime() : Number.NaN
+    const end = row.plannedEndDate ? new Date(row.plannedEndDate).getTime() : Number.NaN
+    const hasPlan = Number.isFinite(start) && Number.isFinite(end)
+    const left = hasPlan ? clampPercent(((Math.min(start, end) - min) / span) * 100) : 0
+    const width = hasPlan ? clampPercent((Math.abs(end - start) / span) * 100 || 4) : 0
+
+    return { row, hasPlan, left, width }
+  })
+})
 
 function statusPct(count: number) {
   const base = tableData.value.length || 0
   if (!base) return 0
   return Math.round((count / base) * 100)
+}
+
+function clampPercent(value: number) {
+  return Math.min(100, Math.max(0, Math.round(value)))
 }
 
 const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tableData.value.length)
@@ -524,6 +553,47 @@ onMounted(() => {
               </template>
             </vxe-grid>
           </div>
+
+          <section class="subcontract-task-wbs-panel" aria-label="项目内 WBS 树与只读甘特展示">
+            <div class="subcontract-task-wbs-head">
+              <div>
+                <strong>项目内 WBS 树与只读甘特展示</strong>
+                <span>按 WBS 编码排序的平铺展示</span>
+              </div>
+              <a-tag color="blue">只读</a-tag>
+            </div>
+            <div v-if="wbsTimelineRows.length" class="subcontract-task-wbs-list">
+              <div v-for="item in wbsTimelineRows" :key="item.row.id" class="subcontract-task-wbs-row">
+                <div class="subcontract-task-wbs-meta">
+                  <strong>{{ item.row.taskCode || '-' }}</strong>
+                  <span>{{ item.row.taskName || '-' }}</span>
+                </div>
+                <div class="subcontract-task-wbs-dates">
+                  <span>计划：{{ item.row.plannedStartDate || '未设置计划日期' }} ~ {{ item.row.plannedEndDate || '未设置计划日期' }}</span>
+                  <span>实际：{{ item.row.actualStartDate || '-' }} ~ {{ item.row.actualEndDate || '-' }}</span>
+                </div>
+                <div class="subcontract-task-wbs-progress">
+                  <a-progress
+                    :percent="parseFloat(item.row.progressPercent || '0') || 0"
+                    size="small"
+                    :stroke-width="6"
+                  />
+                  <a-tag :color="STATUS_COLOR[item.row.status]">
+                    {{ STATUS_LABEL[item.row.status] ?? item.row.status }}
+                  </a-tag>
+                </div>
+                <div class="subcontract-task-gantt-track">
+                  <span
+                    v-if="item.hasPlan"
+                    class="subcontract-task-gantt-bar"
+                    :style="{ left: item.left + '%', width: item.width + '%' }"
+                  ></span>
+                  <em v-else>未设置计划日期</em>
+                </div>
+              </div>
+            </div>
+            <div v-else class="subcontract-task-wbs-empty">暂无任务可生成 WBS/甘特概览</div>
+          </section>
 
           <!-- 分页 -->
           <div class="lg-pagination">
@@ -849,6 +919,114 @@ onMounted(() => {
 .subcontract-task-table-title span {
   font-size: 12px;
   color: #64748b;
+}
+
+.subcontract-task-wbs-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.subcontract-task-wbs-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.subcontract-task-wbs-head strong,
+.subcontract-task-wbs-head span {
+  display: block;
+}
+
+.subcontract-task-wbs-head strong {
+  color: #0f172a;
+}
+
+.subcontract-task-wbs-head span,
+.subcontract-task-wbs-dates,
+.subcontract-task-gantt-track em,
+.subcontract-task-wbs-empty {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.subcontract-task-wbs-list {
+  display: grid;
+  gap: 10px;
+}
+
+.subcontract-task-wbs-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(240px, 1.4fr) minmax(180px, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #edf1f5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.subcontract-task-wbs-meta strong,
+.subcontract-task-wbs-meta span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subcontract-task-wbs-meta strong {
+  color: #2563eb;
+  font-size: 12px;
+}
+
+.subcontract-task-wbs-meta span {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.subcontract-task-wbs-dates {
+  display: grid;
+  gap: 4px;
+}
+
+.subcontract-task-wbs-progress {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.subcontract-task-gantt-track {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 18px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.subcontract-task-gantt-bar {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  min-width: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #2563eb);
+}
+
+.subcontract-task-gantt-track em {
+  display: block;
+  line-height: 18px;
+  text-align: center;
+  font-style: normal;
+}
+
+.subcontract-task-wbs-empty {
+  padding: 18px 0 4px;
+  text-align: center;
 }
 
 .subcontract-task-analysis-rail {

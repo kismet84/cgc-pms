@@ -31,4 +31,29 @@ describe('subcontract task page quality guardrails', () => {
     expect(source).toContain('<LgEmptyState description="暂无符合条件的分包任务">')
     expect(source).toContain('@click="fetchData"')
   })
+
+  it('derives a read-only WBS and gantt overview from current table data', () => {
+    expect(source).toContain('const wbsTimelineRows = computed(() => {')
+    expect(source).toContain('[...tableData.value].sort')
+    expect(source).toContain('按 WBS 编码排序的平铺展示')
+    expect(source).toContain('项目内 WBS 树与只读甘特展示')
+    expect(source).toContain('暂无任务可生成 WBS/甘特概览')
+  })
+
+  it('shows required WBS fields and degrades missing plan dates explicitly', () => {
+    expect(source).toContain("{{ item.row.taskCode || '-' }}")
+    expect(source).toContain("{{ item.row.taskName || '-' }}")
+    expect(source).toContain("{{ item.row.plannedStartDate || '未设置计划日期' }}")
+    expect(source).toContain("{{ item.row.actualStartDate || '-' }}")
+    expect(source).toContain(":percent=\"parseFloat(item.row.progressPercent || '0') || 0\"")
+    expect(source).toContain('STATUS_LABEL[item.row.status]')
+  })
+
+  it('keeps gantt scope minimal without drag, dependency lines, or gantt libraries', () => {
+    expect(source).toContain('function clampPercent(value: number)')
+    expect(source).toContain("left: item.left + '%'")
+    expect(source).toContain("width: item.width + '%'")
+    expect(source).not.toMatch(/dhtmlx|frappe-gantt|gantt-task-react|gantt-elastic/i)
+    expect(source).not.toMatch(/draggable|dragstart|dependency|dependencies|linkLine|依赖线/)
+  })
 })

@@ -12,6 +12,14 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-023：WBS 平台化缺口-M3：项目内 WBS 树与只读甘特展示最小落地
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；WBS 树与只读甘特概览最小可见性已落地；D 验收与 E 审查通过；真实浏览器 / 组件渲染证据由 `ISSUE-008-026` 承接
+验证结果：通过
+相关报告：docs/quality/issue-008-023-wbs-readonly-gantt-view.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-008-025：供应商评分平台化缺口-M3：采购驾驶舱评分排名可见性最小落地
 
 完成日期：2026-07-10
