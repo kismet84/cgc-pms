@@ -1,6 +1,7 @@
 ## Ready 队列状态
 
-- 当前无合格 Ready Issue。
+- 当前有 2 条合格 Ready：`ISSUE-008-023`、`ISSUE-008-025`；`ISSUE-008-022` 与 `ISSUE-008-024` 已完成并转 Done。
+- 用户于 2026-07-10 再次触发 `启动迭代-10`，新一轮计数已初始化为 `0/10`；上一轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
 - `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
 - `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
 - `ISSUE-008-019` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `8/10` 个实施型 Ready Issue。
@@ -46,9 +47,10 @@
 
 ## 执行顺序建议
 
-1. `启动迭代-10` 已达到 `10/10` 上限，当前停止继续派发下一任务。
-2. 后续若继续规则治理中心或切换到 WBS / 甘特图、供应商评分 / 采购增强、通知平台后续题，仍需由主线程/A 重新确认优先级、并行边界、任务性质与启用条件。
-3. 下一轮若达到迭代上限或停止条件，F 必须补一段最小总验收；若未补，当前轮次不得视为完整收口。
+1. 默认先执行 `ISSUE-008-022`，完成后执行 `ISSUE-008-023`。
+2. `ISSUE-008-024` 与 `ISSUE-008-022` 的代码域、测试类和业务域独立，资源允许时可双路并行；`ISSUE-008-025` 必须等待 `ISSUE-008-024` 收口。
+3. 多路实现可以并行，但 iteration report、quality 归档、backlog 更新与本地 commit 必须串行，避免共享文档冲突。
+4. 本轮达到 `10/10` 上限、stop/pause 或无 Ready 时，F 必须补最小总验收；未补不得视为完整收口。
 
 ## P0
 
@@ -245,6 +247,151 @@
 归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
 
 ## P2
+
+### ISSUE-008-022：WBS 平台化缺口-M2：计划/实际日期、进度与状态一致性回归
+
+优先级：P2
+任务性质：缺口修复
+类型：WBS / 分包任务 / 后端 / 测试
+状态：Done（2026-07-10；计入本轮第 1 个实施型 Ready Issue）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图`；`docs/quality/issue-008-008-wbs-进度计划与甘特图.md`
+依赖：无；本轮第一执行项。与 `ISSUE-008-024` 代码域独立，可双路并行。
+是否需要新增 migration：否；必须复用现有 `sub_task` 字段与现有接口。若确认缺少完成目标所需的持久化字段，立即转 Blocked，不得临时新增或修改已应用 migration。
+目标：
+- 在现有分包任务/WBS 载体上补齐计划开始/完成、实际开始/完成、进度百分比和状态之间的最小一致性边界。
+- 从共享写入/更新链路修复根因并留下回归断言，不在单个调用方重复加临时判断。
+- 只声明现有 WBS 载体的一致性闭环，不表述为完整 `schedule` 平台完成。
+允许修改：
+- `backend/src/main/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/subcontract/SubTaskControllerTest.java`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 新建 `schedule_*` 表、引入新排程模块、放宽租户/项目鉴权
+验收标准：
+- 进度百分比保持 `0~100`；无效值被明确拒绝且不落库。
+- 完成态、实际完成时间和 `100%` 进度的关系遵循现有业务口径并有测试保护；不得凭 Ready 猜测新状态机。
+- 计划结束早于开始、实际结束早于开始等非法时间组合有统一校验；合法的未开始/进行中/完成组合不回退。
+- 现有项目、租户过滤与 WBS 编码生成断言继续通过。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-022-wbs-progress-date-status-consistency.md`
+
+### ISSUE-008-023：WBS 平台化缺口-M3：项目内 WBS 树与只读甘特展示最小落地
+
+优先级：P2
+任务性质：能力新增
+类型：WBS / 甘特展示 / 前端 / 后端契约回归
+状态：Done（2026-07-10；计入本轮第 2 个实施型 Ready Issue）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图`；`docs/quality/issue-008-008-wbs-进度计划与甘特图.md`
+依赖：必须等待 `ISSUE-008-022` 收口；不得与 `008-022` 并行修改同域文件。
+是否需要新增 migration：否；只消费现有分包任务字段与接口，不新增任务依赖、基线、里程碑或变更日志表。
+目标：
+- 基于现有项目内任务行，提供最小只读 WBS 层级和时间条展示，让现有 WBS 编码、任务名、计划日期、实际日期、进度和状态可见。
+- 优先复用现有前端组件、CSS 和已安装依赖；不得引入甘特图库或拖拽排程抽象。
+- 不伪造父子关系或依赖线；现有数据没有可靠层级/依赖时，明确以 WBS 编码排序的平铺/分组降级展示。
+允许修改：
+- `frontend-admin/src/**` 中现有分包任务页面、API、类型和对应测试；最多 8 个前端文件
+- `backend/src/test/java/com/cgcpms/subcontract/SubTaskControllerTest.java`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 新增 npm 依赖、拖拽排程、任务依赖编辑、基线管理、计划变更审计、完整 schedule 模块
+验收标准：
+- 用户只能看到当前项目/租户已授权任务；前端不绕过现有后端过滤。
+- 空数据、缺失计划日期和跨期任务均有稳定降级展示，不出现脚本异常。
+- 展示至少覆盖 WBS 编码、任务名、计划起止、实际起止、进度、状态；不把只读展示包装为完整甘特平台。
+- 若新增前端测试入口，先校验测试文件/选择器存在；不存在时以 type-check、build 和最小等价既有测试收口并在报告说明。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest" test`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-023-wbs-readonly-gantt-view.md`
+
+### ISSUE-008-024：供应商评分平台化缺口-M2：交期评分范围、排序与空值一致性回归
+
+优先级：P2
+任务性质：缺口修复
+类型：供应商评分 / 采购驾驶舱 / 后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强`；`docs/quality/issue-008-009-供应商评分与采购增强.md`
+依赖：无；与 `ISSUE-008-022` 代码域独立，可双路并行。
+是否需要新增 migration：否；只复用现有采购订单和当前 `supplierScores` 聚合。若需要新评分事实表、质量/价格/服务字段，立即转 Blocked。
+目标：
+- 固化现有交期达成率的项目/权限范围、逾期判定、空供应商、零订单和同分排序语义。
+- 修复应落在现有共享聚合链路，不增加第二套评分器。
+- 评分仍只代表现有采购订单交期表现，不扩写为质量、价格、服务或综合供应商评级。
+允许修改：
+- `backend/src/main/java/com/cgcpms/dashboard/**`
+- `backend/src/test/java/com/cgcpms/dashboard/DashboardMaterialRoleServiceTest.java`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 新建 supplier_score/询价/报价/比价/定标/黑名单/补货表
+- 使用越权项目订单或伪造不存在的质量、价格、服务数据
+验收标准：
+- 评分只聚合当前用户可访问项目范围内的采购订单，不跨租户、不跨项目泄漏。
+- 空供应商不生成伪评分；零订单不出现除零或 NaN；同分排序有稳定次序。
+- 逾期未完成订单与已完成订单的口径延续现有定义，并由边界测试保护。
+- 原 `testPurchaseView_SupplierScores` 与新增边界断言通过。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=DashboardMaterialRoleServiceTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-024-supplier-delivery-score-boundaries.md`
+
+### ISSUE-008-025：供应商评分平台化缺口-M3：采购驾驶舱评分排名可见性最小落地
+
+优先级：P2
+任务性质：能力新增
+类型：供应商评分 / 采购驾驶舱 / 前端 / 契约回归
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强`；`docs/quality/issue-008-009-供应商评分与采购增强.md`
+依赖：必须等待 `ISSUE-008-024` 收口；不得与 `008-024` 并行修改供应商评分契约。
+是否需要新增 migration：否；只展示现有 `PurchaseManagerDashboardVO.supplierScores`，不新建供应商评分数据模型。
+目标：
+- 在现有采购经理驾驶舱展示交期评分排名，明确订单数、逾期未完成数、交期达成率和当前评分口径。
+- 复用现有驾驶舱卡片/表格样式与类型，不新增通用评分框架或图表依赖。
+- 页面文案必须说明这是“采购订单交期表现”，不得展示为综合供应商评级。
+允许修改：
+- `frontend-admin/src/**` 中现有采购经理驾驶舱页面、类型和对应测试；最多 6 个前端文件
+- `backend/src/test/java/com/cgcpms/dashboard/DashboardMaterialRoleServiceTest.java`
+- `docs/quality/**`
+- `docs/iterations/**`
+- `docs/backlog/**`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- 新增 npm 依赖、询价/比价/定标页面、黑名单、综合评分配置器
+验收标准：
+- 有数据时按后端稳定顺序展示供应商、订单数、逾期数、交期达成率/评分；无数据时显示明确空态。
+- 页面不自行重新计算评分，不扩展后端契约，不暴露无权限项目数据。
+- 文案不把交期评分误称为综合评分；现有采购驾驶舱布局和可访问性不回退。
+- 若新增前端测试入口，先校验存在；不存在时以 type-check、build 和最小等价既有测试收口并在报告说明。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=DashboardMaterialRoleServiceTest" test`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-025-supplier-score-ranking-visibility.md`
 
 ### ISSUE-008-021：规则治理中心平台化缺口-M3：规则侧去重时窗与重复预警抑制生效回归
 

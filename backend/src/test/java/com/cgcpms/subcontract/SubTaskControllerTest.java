@@ -58,7 +58,51 @@ class SubTaskControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test @Order(5) @DisplayName("GET /sub-tasks/{id} -> 200")
+    @Test @Order(5) @DisplayName("POST /sub-tasks rejects inconsistent schedule data without persisting")
+    void testCreate_InvalidScheduleData() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String[] invalidBodies = {
+                "{\"projectId\":10001,\"taskName\":\"invalid-progress-%s\",\"progressPercent\":101,\"status\":\"IN_PROGRESS\"}".formatted(suffix),
+                "{\"projectId\":10001,\"taskName\":\"invalid-plan-dates-%s\",\"plannedStartDate\":\"2026-07-02\",\"plannedEndDate\":\"2026-07-01\"}".formatted(suffix),
+                "{\"projectId\":10001,\"taskName\":\"invalid-actual-dates-%s\",\"actualStartDate\":\"2026-07-02\",\"actualEndDate\":\"2026-07-01\",\"progressPercent\":100,\"status\":\"COMPLETED\"}".formatted(suffix),
+                "{\"projectId\":10001,\"taskName\":\"invalid-completed-%s\",\"actualStartDate\":\"2026-07-01\",\"progressPercent\":99,\"status\":\"COMPLETED\"}".formatted(suffix)
+        };
+        for (String body : invalidBodies) {
+            mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+
+        mockMvc.perform(g("/sub-tasks").cookie(adminCookie()).param("taskName", suffix))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records").isEmpty());
+
+        mockMvc.perform(u("/sub-tasks/" + taskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"invalid-update\",\"progressPercent\":100,\"status\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(g("/sub-tasks/" + taskId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.progressPercent").value("35.50"))
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
+
+    }
+
+    @Test @Order(6) @DisplayName("PUT /sub-tasks/{id} rejects blank status without persisting")
+    void testUpdate_BlankStatus() throws Exception {
+        String createResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"blank-status-test\",\"progressPercent\":20,\"status\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Long id = Long.parseLong(createResponse.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+
+        mockMvc.perform(u("/sub-tasks/" + id).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"blank-status-update\",\"status\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(g("/sub-tasks/" + id).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
+        mockMvc.perform(d("/sub-tasks/" + id).cookie(adminCookie())).andExpect(status().isOk());
+    }
+
+    @Test @Order(7) @DisplayName("GET /sub-tasks/{id} -> 200")
     void testGetById() throws Exception {
         Assertions.assertNotNull(taskId);
         mockMvc.perform(g("/sub-tasks/" + taskId).cookie(adminCookie()))
@@ -73,7 +117,7 @@ class SubTaskControllerTest {
                 .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
     }
 
-    @Test @Order(6) @DisplayName("GET /sub-tasks filters project schedule rows for gantt")
+    @Test @Order(8) @DisplayName("GET /sub-tasks filters project schedule rows for gantt")
     void testListScheduleRowsByProject() throws Exception {
         Assertions.assertNotNull(taskId);
         mockMvc.perform(g("/sub-tasks").cookie(adminCookie())
@@ -90,15 +134,16 @@ class SubTaskControllerTest {
                 .andExpect(jsonPath("$.data.records[0].progressPercent").value("35.50"));
     }
 
-    @Test @Order(7) @DisplayName("PUT /sub-tasks/{id} -> 200")
+    @Test @Order(9) @DisplayName("PUT /sub-tasks/{id} -> 200")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(taskId);
-        String body = "{\"projectId\":10001,\"contractId\":30001,\"taskCode\":\"ST-UPD-" + System.nanoTime() + "\",\"taskName\":\"更新分包任务\"}";
+        String body = "{\"projectId\":10001,\"contractId\":30001,\"taskCode\":\"ST-UPD-" + System.nanoTime()
+                + "\",\"taskName\":\"更新分包任务\",\"actualEndDate\":\"2026-07-14\",\"progressPercent\":100,\"status\":\"COMPLETED\"}";
         mockMvc.perform(u("/sub-tasks/" + taskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(8) @DisplayName("DELETE /sub-tasks/{id} -> 200")
+    @Test @Order(10) @DisplayName("DELETE /sub-tasks/{id} -> 200")
     void testDelete() throws Exception {
         Assertions.assertNotNull(taskId);
         mockMvc.perform(d("/sub-tasks/" + taskId).cookie(adminCookie()))

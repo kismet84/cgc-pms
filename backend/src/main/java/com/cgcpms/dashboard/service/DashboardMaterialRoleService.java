@@ -268,7 +268,8 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                 })
                 .sorted(Comparator
                         .comparing((DashboardSupplierScoreVO s) -> new BigDecimal(s.getPerformanceScore())).reversed()
-                        .thenComparing(DashboardSupplierScoreVO::getPartnerName, Comparator.nullsLast(String::compareTo)))
+                        .thenComparing(DashboardSupplierScoreVO::getPartnerName, Comparator.nullsLast(String::compareTo))
+                        .thenComparingLong(s -> Long.parseLong(s.getPartnerId())))
                 .limit(5)
                 .collect(Collectors.toList());
     }

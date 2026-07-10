@@ -1,10 +1,15 @@
 param(
-  [string]$Repo = "D:\projects-test\cgc-pms"
+  [string]$Repo = "D:\projects-test\cgc-pms",
+  [Nullable[int]]$MaxIterations = $null
 )
 
 $AutoDir = Join-Path $Repo ".codex-autopilot"
 $StatePath = Join-Path $AutoDir "state.json"
 $Now = Get-Date -Format s
+
+if ($null -ne $MaxIterations -and ($MaxIterations -lt 1 -or $MaxIterations -gt 50)) {
+  throw "MaxIterations must be a positive integer between 1 and 50."
+}
 
 if (!(Test-Path $AutoDir)) {
   New-Item -ItemType Directory -Path $AutoDir -Force | Out-Null
@@ -33,7 +38,16 @@ if (Test-Path $StatePath) {
 
 $State | Add-Member -NotePropertyName enabled -NotePropertyValue $true -Force
 $State | Add-Member -NotePropertyName status -NotePropertyValue "STARTING" -Force
-if (!$State.startedAt) {
+if ($null -ne $MaxIterations) {
+  $State | Add-Member -NotePropertyName startedAt -NotePropertyValue $Now -Force
+  $State | Add-Member -NotePropertyName iterationLimit -NotePropertyValue ([int]$MaxIterations) -Force
+  $State | Add-Member -NotePropertyName iterationCompleted -NotePropertyValue 0 -Force
+  $State | Add-Member -NotePropertyName remainingIterations -NotePropertyValue ([int]$MaxIterations) -Force
+  $State | Add-Member -NotePropertyName iterationLastCountedIssue -NotePropertyValue "" -Force
+  $State | Add-Member -NotePropertyName lastAction -NotePropertyValue "STARTED" -Force
+  $State | Add-Member -NotePropertyName lastReason -NotePropertyValue "NEW_ITERATION" -Force
+  $State | Add-Member -NotePropertyName stopReason -NotePropertyValue "" -Force
+} elseif (!$State.startedAt) {
   $State | Add-Member -NotePropertyName startedAt -NotePropertyValue $Now -Force
 }
 $State | Add-Member -NotePropertyName lastHeartbeatAt -NotePropertyValue $Now -Force

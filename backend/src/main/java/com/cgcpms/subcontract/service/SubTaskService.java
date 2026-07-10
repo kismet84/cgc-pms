@@ -100,6 +100,7 @@ public class SubTaskService {
         if (task.getStatus() == null || task.getStatus().isBlank()) {
             task.setStatus("NOT_STARTED");
         }
+        validateScheduleConsistency(task, null);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             task.setTaskCode(nextTaskCode(prefix, attempt));
@@ -139,7 +140,44 @@ public class SubTaskService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("SUB_TASK_NOT_FOUND", "分包任务不存在");
 
+        validateScheduleConsistency(task, existing);
         subTaskMapper.updateById(task);
+    }
+
+    private void validateScheduleConsistency(SubTask task, SubTask existing) {
+        LocalDate plannedStart = task.getPlannedStartDate() != null ? task.getPlannedStartDate()
+                : existing == null ? null : existing.getPlannedStartDate();
+        LocalDate plannedEnd = task.getPlannedEndDate() != null ? task.getPlannedEndDate()
+                : existing == null ? null : existing.getPlannedEndDate();
+        LocalDate actualStart = task.getActualStartDate() != null ? task.getActualStartDate()
+                : existing == null ? null : existing.getActualStartDate();
+        LocalDate actualEnd = task.getActualEndDate() != null ? task.getActualEndDate()
+                : existing == null ? null : existing.getActualEndDate();
+        java.math.BigDecimal progress = task.getProgressPercent() != null ? task.getProgressPercent()
+                : existing == null ? null : existing.getProgressPercent();
+        if (existing != null && task.getStatus() != null && task.getStatus().isBlank())
+            throw new BusinessException("SUB_TASK_STATUS_INVALID", "任务状态不合法");
+        String status = task.getStatus() != null ? task.getStatus()
+                : existing == null ? null : existing.getStatus();
+
+        if (progress != null && (progress.signum() < 0 || progress.compareTo(java.math.BigDecimal.valueOf(100)) > 0))
+            throw new BusinessException("SUB_TASK_PROGRESS_INVALID", "任务进度必须在0到100之间");
+        if (plannedStart != null && plannedEnd != null && plannedEnd.isBefore(plannedStart))
+            throw new BusinessException("SUB_TASK_PLANNED_DATE_INVALID", "计划结束日期不能早于计划开始日期");
+        if (actualEnd != null && actualStart == null)
+            throw new BusinessException("SUB_TASK_ACTUAL_DATE_INVALID", "实际完成日期要求先填写实际开始日期");
+        if (actualStart != null && actualEnd != null && actualEnd.isBefore(actualStart))
+            throw new BusinessException("SUB_TASK_ACTUAL_DATE_INVALID", "实际完成日期不能早于实际开始日期");
+        if (StringUtils.hasText(status) && !Set.of("NOT_STARTED", "IN_PROGRESS", "COMPLETED", "SUSPENDED").contains(status))
+            throw new BusinessException("SUB_TASK_STATUS_INVALID", "任务状态不合法");
+
+        boolean completed = "COMPLETED".equals(status);
+        boolean fullProgress = progress != null && progress.compareTo(java.math.BigDecimal.valueOf(100)) == 0;
+        if (completed != fullProgress || completed != (actualEnd != null))
+            throw new BusinessException("SUB_TASK_COMPLETION_INVALID", "完成状态、100%进度和实际完成日期必须一致");
+        if ("NOT_STARTED".equals(status)
+                && ((progress != null && progress.signum() != 0) || actualStart != null))
+            throw new BusinessException("SUB_TASK_STATUS_PROGRESS_INVALID", "未开始任务不能填写实际进度或实际日期");
     }
 
     @Transactional(rollbackFor = Exception.class)

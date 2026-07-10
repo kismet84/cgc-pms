@@ -549,6 +549,103 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
 
     @Test
     @Transactional
+    @DisplayName("8.5a Purchase view: supplier scores keep project, overdue, empty and stable-order boundaries")
+    void testPurchaseView_SupplierScoreBoundaries() {
+        SeedResult sr = seed("PUR_SUPPLIER_BOUNDARY");
+        SeedResult otherProject = seed("PUR_SUPPLIER_OTHER_PROJECT");
+
+        MdPartner first = new MdPartner();
+        first.setId(4_294_967_327L);
+        first.setTenantId(TENANT_ID);
+        first.setPartnerCode("PT-PUR-SCORE-FIRST");
+        first.setPartnerName("同名供应商");
+        first.setPartnerType("SUPPLIER");
+        first.setStatus("ENABLE");
+        partnerMapper.insert(first);
+
+        MdPartner second = new MdPartner();
+        second.setId(4_294_967_328L);
+        second.setTenantId(TENANT_ID);
+        second.setPartnerCode("PT-PUR-SCORE-SECOND");
+        second.setPartnerName("同名供应商");
+        second.setPartnerType("SUPPLIER");
+        second.setStatus("ENABLE");
+        partnerMapper.insert(second);
+
+        MdPartner noOrders = new MdPartner();
+        noOrders.setTenantId(TENANT_ID);
+        noOrders.setPartnerCode("PT-PUR-SCORE-NO-ORDERS");
+        noOrders.setPartnerName("零订单供应商");
+        noOrders.setPartnerType("SUPPLIER");
+        noOrders.setStatus("ENABLE");
+        partnerMapper.insert(noOrders);
+
+        MatPurchaseOrder completedLate = new MatPurchaseOrder();
+        completedLate.setTenantId(TENANT_ID);
+        completedLate.setProjectId(sr.projectId);
+        completedLate.setPartnerId(first.getId());
+        completedLate.setOrderCode("PO-PUR-SCORE-COMPLETED");
+        completedLate.setOrderDate(LocalDate.now());
+        completedLate.setDeliveryDate(LocalDate.now().minusDays(1));
+        completedLate.setApprovalStatus("APPROVED");
+        completedLate.setOrderStatus("COMPLETED");
+        purchaseOrderMapper.insert(completedLate);
+
+        MatPurchaseOrder firstOnTime = new MatPurchaseOrder();
+        firstOnTime.setTenantId(TENANT_ID);
+        firstOnTime.setProjectId(sr.projectId);
+        firstOnTime.setPartnerId(first.getId());
+        firstOnTime.setOrderCode("PO-PUR-SCORE-FIRST");
+        firstOnTime.setOrderDate(LocalDate.now());
+        firstOnTime.setDeliveryDate(LocalDate.now().plusDays(1));
+        firstOnTime.setApprovalStatus("APPROVED");
+        firstOnTime.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(firstOnTime);
+
+        MatPurchaseOrder secondOnTime = new MatPurchaseOrder();
+        secondOnTime.setTenantId(TENANT_ID);
+        secondOnTime.setProjectId(sr.projectId);
+        secondOnTime.setPartnerId(second.getId());
+        secondOnTime.setOrderCode("PO-PUR-SCORE-SECOND");
+        secondOnTime.setOrderDate(LocalDate.now());
+        secondOnTime.setDeliveryDate(LocalDate.now().plusDays(1));
+        secondOnTime.setApprovalStatus("APPROVED");
+        secondOnTime.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(secondOnTime);
+
+        MatPurchaseOrder emptySupplier = new MatPurchaseOrder();
+        emptySupplier.setTenantId(TENANT_ID);
+        emptySupplier.setProjectId(sr.projectId);
+        emptySupplier.setOrderCode("PO-PUR-SCORE-NO-SUPPLIER");
+        emptySupplier.setOrderDate(LocalDate.now());
+        emptySupplier.setDeliveryDate(LocalDate.now().minusDays(1));
+        emptySupplier.setApprovalStatus("APPROVED");
+        emptySupplier.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(emptySupplier);
+
+        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(sr.projectId);
+        List<DashboardSupplierScoreVO> scores = vo.getSupplierScores();
+
+        assertTrue(scores.stream().noneMatch(i -> otherProject.partnerId.toString().equals(i.getPartnerId())),
+                "Other project supplier must not leak into scores");
+        assertTrue(scores.stream().noneMatch(i -> noOrders.getId().toString().equals(i.getPartnerId())),
+                "Supplier without orders must not create a zero-denominator score");
+        assertTrue(scores.stream().noneMatch(i -> i.getPartnerId() == null),
+                "Order without supplier must not create a synthetic score");
+
+        List<DashboardSupplierScoreVO> tied = scores.stream()
+                .filter(i -> "同名供应商".equals(i.getPartnerName()))
+                .toList();
+        assertEquals(List.of(first.getId().toString(), second.getId().toString()),
+                tied.stream().map(DashboardSupplierScoreVO::getPartnerId).toList(),
+                "Equal score and name must fall back to partner ID order");
+        assertEquals(0L, tied.get(0).getOverdueOrderCount(),
+                "Completed past-delivery order keeps the existing non-overdue definition");
+        assertEquals("100.00", tied.get(0).getOnTimeDeliveryRate());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("8.3 Production view: accepts month parameter and filters receipts/requisitions/measures")
     void testProductionView_WithMonthParameter() {
         SeedResult sr = seed("PROD_MONTH");

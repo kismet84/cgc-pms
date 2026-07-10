@@ -12,6 +12,22 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### ISSUE-008-024：供应商评分平台化缺口-M2：交期评分范围、排序与空值一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：Ready Issue 配置问题已更正；真实代码质量问题已修复；D 验收与 E 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-024-supplier-delivery-score-boundaries.md；docs/iterations/iteration-2026-07-10-report.md
+
+### ISSUE-008-022：WBS 平台化缺口-M2：计划/实际日期、进度与状态一致性回归
+
+完成日期：2026-07-10
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实代码质量问题已修复；D 验收与 E 审查通过
+验证结果：通过
+相关报告：docs/quality/issue-008-022-wbs-progress-date-status-consistency.md；docs/iterations/iteration-2026-07-10-report.md
+
 ### ISSUE-032-005：M3 财务真实角色缺失导致真实角色抽样无法完成
 
 完成日期：2026-07-09
