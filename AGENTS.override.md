@@ -209,10 +209,16 @@ CI 与验收失败分类规则：
 ### 连续执行效率与收口优化规则
 
 - 连续模式下每个 Ready Issue 默认按 `checkpoint -> A 拆解 -> C/B 最小实现 -> D 回归 -> E 审查 -> 必要时 C/B 补修 -> D 最终复验 -> F 归档 -> 本地 commit -> stop/pause/ready 检查` 流转；角色可裁剪，但不得把实现、验收、审查、归档长期混成单一长跑子智能体
+- A 拆 Ready 时必须给每条 Ready 明确标注 `任务性质`，至少属于以下之一：`能力新增`、`缺口修复`、`回归证明`、`运维治理`；若为 `回归证明`，目标、验收标准和收口结论都不得把“已证明现有能力生效”偷换成“新增能力已完成”或“整个平台化已完成”
+- 若同一能力域在同一连续执行轮次中已连续进入 `3` 条 Ready，A 下一次继续拆同域 Ready 前必须先在 `current-focus.md` 写出至少一组候选域对比与未切换原因；若已连续进入 `5` 条 Ready，继续拆同域 Ready 前必须额外写明“为何仍需继续当前域、为何其他候选域不应先做”的明确理由；缺少这些依据时不得继续同域续跑
 - F 归档通过后，若尚未检测到 `stop.flag` 或 `pause.flag`，必须先本地 commit 当前 Issue 成果，再判断是否进入下一轮；若已检测到 `stop.flag` 或 `pause.flag`，只做安全收口说明，不启动新任务
+- 达到 `启动迭代-N` 上限、收到停止指令、或因无 Ready/无法继续而退出当前连续轮次时，F 必须先做一次最小总验收：至少汇总本轮已完成 Issue、阻塞项、非阻塞观察项、当前 `focus` 是否允许继续；若因证据不足无法做总验收，必须明确写明未做原因与缺失前置
 - 命令首次失败时必须先做失败分类；对疑似瞬时波动、代理抖动、Maven `testCompile` 或其他前置状态问题，优先复跑一次或用最小等价验证确认稳定复现，再升级为阻塞，不得把一次性失败直接定性为业务代码失败
 - D 验收可以参考 C/B 已跑结果，但只复跑裁决必需项，不做无意义全量重复；至少覆盖目标测试、关键静态核对、`git diff --check`、以及权限/数据边界相关断言
 - E 提出的非阻塞建议，只有在属于当前 diff 的低成本测试补强且能直接保护本轮风险点时才纳入本轮；涉及生产结构调整、扩大范围或非当前根因的建议，归档为后续项
+- 同一类非阻塞告警、观察项或建议若已连续 `3` 次在正式报告中重复出现，F 不得继续只留在 quality 报告备注；必须二选一：拆成新的治理型 Ready Issue，或按当前前置/范围限制转入 `blocked-issues.md`
+- F 每次写 AutoPilot state / backlog 收口状态时，必须同步刷新 `lastHeartbeatAt`；若未刷新，不得把该次 state 写入视为最新心跳
+- 任何“剩余风险”都必须同步沉淀到 `docs/backlog/ready-issues.md`、`docs/backlog/blocked-issues.md`、`docs/backlog/current-focus.md` 三者之一；禁止只停留在 `docs/quality/**` 报告备注中
 - checkpoint 固定最小输出为 `branch`、`git status`、`stop.flag`、`pause.flag`、`enabled.flag`；如怀疑需清理工作区，只能先执行 `git clean -fdn` 预览，不得直接清理
 - 可后续沉淀为脚本或技能的候选资产仅记录为：`autopilot-checkpoint`、`ready-issue-writer`、`issue-closeout`、`test-failure-classifier`、`local-commit-closeout`；未明确立项前不要求实现
 
