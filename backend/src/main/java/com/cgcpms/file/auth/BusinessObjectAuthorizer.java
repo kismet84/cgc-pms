@@ -24,6 +24,8 @@ import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.site.entity.SiteDailyLog;
+import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.variation.entity.VarOrder;
@@ -62,11 +64,12 @@ public class BusinessObjectAuthorizer {
     private final MdPartnerMapper partnerMapper;
     private final MdMaterialMapper materialMapper;
     private final CashJournalEntryMapper cashJournalEntryMapper;
+    private final SiteDailyLogMapper siteDailyLogMapper;
 
     private static final Set<String> KNOWN_BUSINESS_TYPES = Set.of(
             "PROJECT", "CONTRACT", "INVOICE", "RECEIPT",
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
-            "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL"
+            "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG"
     );
 
     /**
@@ -101,7 +104,12 @@ public class BusinessObjectAuthorizer {
         }
 
         String upperType = businessType.toUpperCase();
-        requireAuthority("CASH_JOURNAL".equals(upperType) ? cashJournalAuthority : genericAuthority);
+        String requiredAuthority = switch (upperType) {
+            case "CASH_JOURNAL" -> cashJournalAuthority;
+            case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
+            default -> genericAuthority;
+        };
+        requireAuthority(requiredAuthority);
 
         switch (upperType) {
             case "PROJECT":
@@ -252,6 +260,22 @@ public class BusinessObjectAuthorizer {
                 if (entry.getProjectId() != null) {
                     projectAccessChecker.checkAccess(entry.getProjectId(), action + "资金流水文件");
                 }
+                break;
+            }
+            case "SITE_DAILY_LOG": {
+                SiteDailyLog dailyLog = write
+                        ? siteDailyLogMapper.selectByIdForUpdate(businessId, UserContext.getCurrentTenantId())
+                        : siteDailyLogMapper.selectById(businessId);
+                if (dailyLog == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "现场日报不存在: " + businessId);
+                }
+                if (!dailyLog.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该现场日报文件");
+                }
+                if (write && "SUBMITTED".equals(dailyLog.getStatus())) {
+                    throw new BusinessException("SITE_DAILY_LOG_SUBMITTED_IMMUTABLE", "已提交日报的附件不可变更");
+                }
+                projectAccessChecker.checkAccess(dailyLog.getProjectId(), action + "现场日报文件");
                 break;
             }
             default:

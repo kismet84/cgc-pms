@@ -23,6 +23,8 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.site.entity.SiteDailyLog;
+import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
@@ -44,8 +46,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class BusinessObjectAuthorizerTest {
@@ -63,6 +67,7 @@ class BusinessObjectAuthorizerTest {
     @Mock MdPartnerMapper partnerMapper;
     @Mock MdMaterialMapper materialMapper;
     @Mock CashJournalEntryMapper cashJournalEntryMapper;
+    @Mock SiteDailyLogMapper siteDailyLogMapper;
 
     private BusinessObjectAuthorizer authorizer;
 
@@ -72,7 +77,8 @@ class BusinessObjectAuthorizerTest {
         setAuthentication("ROLE_ADMIN");
         authorizer = new BusinessObjectAuthorizer(projectAccessChecker, contractMapper, invoiceMapper,
                 receiptMapper, paymentMapper, payRecordMapper, subcontractMapper, settlementMapper,
-                variationMapper, bidCostMapper, partnerMapper, materialMapper, cashJournalEntryMapper);
+                variationMapper, bidCostMapper, partnerMapper, materialMapper, cashJournalEntryMapper,
+                siteDailyLogMapper);
     }
 
     @AfterEach
@@ -275,6 +281,33 @@ class BusinessObjectAuthorizerTest {
         when(partnerMapper.selectById(84002L)).thenReturn(partner);
 
         authorizer.checkDeleteAccess("PARTNER", 84002L);
+    }
+
+    @Test
+    void siteDailyUsesDedicatedAuthoritiesAndSubmittedFilesAreReadOnly() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 8L, "production", List.of("PRODUCTION_MANAGER"));
+        SiteDailyLog draft = new SiteDailyLog();
+        draft.setTenantId(TestUserContext.TENANT_0);
+        draft.setProjectId(10009L);
+        draft.setStatus("DRAFT");
+        when(siteDailyLogMapper.selectById(85001L)).thenReturn(draft);
+        when(siteDailyLogMapper.selectByIdForUpdate(85001L, TestUserContext.TENANT_0)).thenReturn(draft);
+
+        setAuthentication("site:daily:query", "site:daily:edit");
+        authorizer.checkReadAccess("SITE_DAILY_LOG", 85001L);
+        authorizer.checkUploadAccess("SITE_DAILY_LOG", 85001L);
+        verify(projectAccessChecker, times(2)).checkAccess(eq(10009L), anyString());
+
+        SiteDailyLog submitted = new SiteDailyLog();
+        submitted.setTenantId(TestUserContext.TENANT_0);
+        submitted.setProjectId(10009L);
+        submitted.setStatus("SUBMITTED");
+        when(siteDailyLogMapper.selectById(85002L)).thenReturn(submitted);
+        when(siteDailyLogMapper.selectByIdForUpdate(85002L, TestUserContext.TENANT_0)).thenReturn(submitted);
+        authorizer.checkReadAccess("SITE_DAILY_LOG", 85002L);
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("SITE_DAILY_LOG", 85002L));
+        assertEquals("SITE_DAILY_LOG_SUBMITTED_IMMUTABLE", error.getCode());
     }
 
     private void setAuthentication(String... authorities) {

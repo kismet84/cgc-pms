@@ -194,6 +194,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '合作方管理', icon: 'TeamOutlined' },
       },
       {
+        path: 'site/daily-log',
+        name: 'SiteDailyLog',
+        component: () => import('@/pages/site/daily-log.vue'),
+        meta: { title: '现场日报', icon: 'FileTextOutlined' },
+      },
+      {
         path: 'org',
         name: 'Org',
         component: () => import('@/pages/org/index.vue'),
@@ -466,6 +472,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   ProjectOverview: 'project:query',
   ProjectMembers: 'project:member:list',
   ProjectEdit: 'project:edit',
+  SiteDailyLog: 'site:daily:query',
   Partner: 'partner:query',
   Org: 'org:query',
   Subcontract: 'subcontract:task:query',

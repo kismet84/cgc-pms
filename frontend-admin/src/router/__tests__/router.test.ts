@@ -102,6 +102,14 @@ describe('router lazy loading', () => {
     expect(typeof cashJournalRoute?.component).toBe('function')
   })
 
+  it('registers the site daily log route with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const dailyRoute = rootRoute?.children?.find((c) => c.path === 'site/daily-log')
+    expect(dailyRoute?.name).toBe('SiteDailyLog')
+    expect(typeof dailyRoute?.component).toBe('function')
+    expect(router.resolve('/site/daily-log').meta.permission).toBe('site:daily:query')
+  })
+
   it.each([
     ['/cash-journal', 'cashbook:journal:query'],
     ['/contract/ledger', 'contract:query'],
