@@ -188,6 +188,7 @@ describe('SidebarMenu', () => {
       '权限清单',
       '字典管理',
       '数据管理',
+      '操作审计',
     ])
   })
 
@@ -198,6 +199,15 @@ describe('SidebarMenu', () => {
     const wrapper = mountMenu()
 
     expect(wrapper.find('[data-menu-key="/cash-journal"]').exists()).toBe(false)
+  })
+
+  it('shows the operation audit entry only with audit query permission', () => {
+    mockRoles.value = ['USER']
+    mockHasPermission.mockImplementation((code: string) => code === 'audit:query')
+    expect(mountMenu().find('[data-menu-key="/system/audit"]').exists()).toBe(true)
+
+    mockHasPermission.mockReturnValue(false)
+    expect(mountMenu().find('[data-menu-key="/system/audit"]').exists()).toBe(false)
   })
 
   it('shows permission menus to administrators without explicit permission codes', () => {

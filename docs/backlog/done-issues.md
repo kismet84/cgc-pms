@@ -2,6 +2,14 @@
 
 记录已经完成并收口的任务。
 
+### ISSUE-008-037：操作审计日志最小承载页
+
+完成日期：2026-07-11
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实前端承载缺口已修复；首次复跑为测试替身配置问题并已更正
+验证结果：通过；前端定向测试 41/41、type-check、build 通过
+相关报告：docs/quality/issue-008-037-operation-audit-log-page.md；docs/iterations/iteration-2026-07-11-report.md
+
 ### ISSUE-008-036：项目成员操作按钮权限正向显示回归
 
 完成日期：2026-07-11

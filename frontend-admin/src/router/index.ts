@@ -403,6 +403,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/system/permissions/index.vue'),
             meta: { title: '权限清单' },
           },
+          {
+            path: 'audit',
+            name: 'SystemAudit',
+            component: () => import('@/pages/system/audit/index.vue'),
+            meta: { title: '操作审计', adminOnly: false },
+          },
         ],
       },
       {
@@ -494,6 +500,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   SystemData: 'system:data:query',
   RoleManagement: 'system:role:query',
   SystemPermissions: 'system:permission:query',
+  SystemAudit: 'audit:query',
   Profile: 'profile:query',
   Settings: 'settings:query',
   Help: 'help:query',

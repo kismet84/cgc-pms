@@ -109,6 +109,7 @@ export const navigationItems: NavigationItem[] = [
       { key: '/system/permissions', label: '权限清单', adminOnly: true },
       { key: '/system/dict', label: '字典管理', adminOnly: true },
       { key: '/system/data', label: '数据管理', adminOnly: true },
+      { key: '/system/audit', label: '操作审计', permission: 'audit:query' },
     ],
   },
 ]

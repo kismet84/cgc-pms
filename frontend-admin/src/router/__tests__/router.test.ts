@@ -148,6 +148,18 @@ describe('router lazy loading', () => {
     expect(membersRoute?.meta?.permission).toBe('project:member:list')
   })
 
+  it('registers the operation audit route with audit query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const systemRoute = rootRoute?.children?.find((c) => c.name === 'System')
+    const auditRoute = systemRoute?.children?.find((c) => c.name === 'SystemAudit')
+
+    expect(auditRoute?.meta?.permission).toBe('audit:query')
+    expect(auditRoute?.meta?.adminOnly).toBe(false)
+    expect(typeof auditRoute?.component).toBe('function')
+    expect(router.resolve('/system/audit').meta.permission).toBe('audit:query')
+    expect(router.resolve('/system/audit').meta.adminOnly).toBe(false)
+  })
+
   it('registers dedicated approval done, cc and mine routes', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')
