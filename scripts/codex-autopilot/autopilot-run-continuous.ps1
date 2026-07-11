@@ -1069,6 +1069,8 @@ function Invoke-IssueExecutor {
         }
       }
       $result | Add-Member -NotePropertyName evidencePaths -NotePropertyValue @($evidencePaths) -Force
+      $result | Add-Member -NotePropertyName verificationBaseCommit -NotePropertyValue $baseCommit -Force
+      $result | Add-Member -NotePropertyName verifiedDiffHash -NotePropertyValue $(if ($result.status -eq 'done') { Get-AutopilotDiffHash -Worktree $worktree.path -BaseCommit $baseCommit } else { '' }) -Force
       $result | Add-Member -NotePropertyName reviewRequired -NotePropertyValue ([bool]$effectiveRoute.reviewRequired) -Force
       $result | Add-Member -NotePropertyName attempt -NotePropertyValue $Attempt -Force
       $result | Add-Member -NotePropertyName firstPassSuccess -NotePropertyValue ($Attempt -eq 0 -and $result.status -eq 'done') -Force
@@ -1111,7 +1113,7 @@ function Invoke-IssueExecutor {
       }
       if ($result.status -eq 'done' -and $config.closeout -and $config.closeout.enabled -eq $true) {
         Write-State $autoDir 'COMMITTING' $false 'CLOSEOUT_START' $Issue.title 'COMMITTING' ''
-        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge) -BaseBranch $config.baseBranch -ExpectedBaseCommit $baseCommit
+        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge) -BaseBranch $configuredBaseBranch -ExpectedBaseCommit $baseCommit
         $script:LastCommit = $closeout.commit
         $result.gitSummary | Add-Member -NotePropertyName commit -NotePropertyValue $closeout.commit -Force
         $result | Add-Member -NotePropertyName merged -NotePropertyValue $closeout.merged -Force

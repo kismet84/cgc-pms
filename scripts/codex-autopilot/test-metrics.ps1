@@ -34,7 +34,8 @@ try {
     New-Item -ItemType Directory -Path $runDir -Force | Out-Null
     $issueId = "ISSUE-$_"
     $evidencePath = Join-Path $runDir 'evidence.json'
-    [ordered]@{issueId=$issueId;exitCode=0;classification='pass'} | ConvertTo-Json | Set-Content -LiteralPath $evidencePath -Encoding UTF8
+    $baseCommit = "base-$_"; $diffHash = "diff-$_"
+    [ordered]@{issueId=$issueId;exitCode=0;classification='pass';baseCommit=$baseCommit;diffHash=$diffHash} | ConvertTo-Json | Set-Content -LiteralPath $evidencePath -Encoding UTF8
     [ordered]@{
       issueId = $issueId
       createdAt = [datetimeoffset]::Now.AddMinutes(-$_).ToString('o')
@@ -43,6 +44,8 @@ try {
       manualInterventionCount = 0
       scopeViolationCount = 0
       evidencePaths = @($evidencePath)
+      verificationBaseCommit = $baseCommit
+      verifiedDiffHash = $diffHash
       reviewRequired = $false
       gitSummary = @{ commit = "commit-$_" }
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runDir 'result.json') -Encoding UTF8

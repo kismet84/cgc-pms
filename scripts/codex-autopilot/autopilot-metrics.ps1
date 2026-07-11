@@ -42,9 +42,9 @@ function Get-AutopilotQualification {
       try {
         $result = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
         [datetimeoffset]$created = [datetimeoffset]::MinValue
-        if ($result.createdAt -and [datetimeoffset]::TryParse([string]$result.createdAt, [ref]$created)) { [pscustomobject]@{ result=$result; createdAt=$created } }
+        if ($result.createdAt -and [datetimeoffset]::TryParse([string]$result.createdAt, [ref]$created)) { [pscustomobject]@{ result=$result; createdAt=$created; path=$_.FullName } }
       } catch {}
-    } | Where-Object { $_ -and $_.result.status -ne 'noop' } | Sort-Object createdAt -Descending | Select-Object -First $WindowSize | ForEach-Object result)
+    } | Where-Object { $_ -and $_.result.status -ne 'noop' } | Sort-Object @{Expression='createdAt';Descending=$true},@{Expression='path';Descending=$true} | Select-Object -First $WindowSize | ForEach-Object result)
   }
   $reasons = @()
   if ($results.Count -lt $WindowSize) { $reasons += "sample size $($results.Count)/$WindowSize" }
@@ -55,7 +55,7 @@ function Get-AutopilotQualification {
     foreach ($path in @($_.evidencePaths)) {
       if (!(Test-Path -LiteralPath $path -PathType Leaf)) { return $true }
       try { $evidence = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $true }
-      if ($evidence.issueId -ne $_.issueId -or $evidence.exitCode -ne 0 -or $evidence.classification -ne 'pass') { return $true }
+      if ($evidence.issueId -ne $_.issueId -or $evidence.exitCode -ne 0 -or $evidence.classification -ne 'pass' -or !$_.verificationBaseCommit -or !$_.verifiedDiffHash -or $evidence.baseCommit -ne $_.verificationBaseCommit -or $evidence.diffHash -ne $_.verifiedDiffHash) { return $true }
     }
     return $false
   }).Count

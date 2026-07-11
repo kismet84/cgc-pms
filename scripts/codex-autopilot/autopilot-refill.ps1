@@ -65,6 +65,7 @@ function Import-AutopilotReadyPlan {
   $plan = Get-Content -LiteralPath $PlanPath -Raw -Encoding UTF8 | ConvertFrom-Json
   $blocks = @($plan.readyBlocks)
   if ($blocks.Count -lt 1 -or $blocks.Count -gt 5) { throw 'ready planner must return 1..5 blocks' }
+  foreach ($block in $blocks) { if ([regex]::Matches([string]$block, '(?m)^###\s+ISSUE-[0-9-]+').Count -ne 1) { throw 'each planned block must contain exactly one Issue' } }
   $plannedIds = @($blocks | ForEach-Object { $match = [regex]::Match([string]$_, '(?m)^###\s+(ISSUE-[0-9-]+)'); if (!$match.Success) { throw 'planned block is missing an Issue header' }; $match.Groups[1].Value })
   if (@($plannedIds | Select-Object -Unique).Count -ne $blocks.Count) { throw 'planned Ready Issue IDs must be unique' }
   $existing = if (Test-Path -LiteralPath $ReadyPath) { Get-Content -LiteralPath $ReadyPath -Raw -Encoding UTF8 } else { '# Ready Issues' }
