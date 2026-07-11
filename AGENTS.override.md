@@ -47,37 +47,10 @@ D:\projects-test\cgc-pms
   - 私有目录 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/` 及 `archive/v1.0/private/` 继续按禁止区处理：不要默认展开、不要审计、不要清理，除非用户明确点名并明确解除禁止。
   - 应进入版本管理的项目资产包括 `README.md`、`AGENTS.md`、`AGENTS.override.md`、`docs/**`、`skills-lock.json`、`.github/workflows/**`、`deploy/.env.example`。
   - 任务结束可先做只读检查：`git status --short`、`git clean -fdn`、`git check-ignore -v AGENTS.md docs/README.md skills-lock.json deploy/.env`；任何清理动作都必须先预览，不得盲删。
-- 只有实际派工时才要求显式指定 `model`、`thinking` 和 `reason`；未派工不输出这些元数据，也不输出模型分配表。
-- 子智能体模型与推理强度必须按任务复杂度匹配，不得默认统一使用高推理强度。
-- 当前可用模型以工具 schema 实时暴露为准；当前推荐基线为：`gpt-5.6-sol`（默认 `low`，可用 `low/medium/high/xhigh/max/ultra`）、`gpt-5.6-terra`（默认 `medium`，可用 `low/medium/high/xhigh/max/ultra`）、`gpt-5.6-luna`（默认 `medium`，可用 `low/medium/high/xhigh/max`）、`gpt-5.5`（默认 `medium`，可用 `low/medium/high/xhigh`）、`gpt-5.4`（默认 `medium`，可用 `low/medium/high/xhigh`）。
-- 子智能体的 `model` 和 `thinking` 选择必须逐任务单独判断；禁止以下偷懒做法：
-  - 因为主线程当前使用 `gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-5.5` 或 `gpt-5.4`，就把全部子智能体也设为同一模型
-  - 因为上一个子智能体用了某个配置，下一个子智能体就默认沿用
-  - 一个主线下所有子智能体统一使用同一模型、同一推理强度而不区分任务性质
-- 子智能体模型分配优先看“任务类型 + 风险等级 + 产出要求”，而不是看主线程当前模型档位。
-- 默认分配规则如下：
-  - `gpt-5.6-sol + high/xhigh/max/ultra`：用于最高风险或正式裁决任务，例如跨模块实现、复杂后端改动、数据库/权限/安全/并发/数据一致性、高风险生产缺陷定位、复杂代码审计结论收敛、正式上线/阻塞/通过不通过裁决；按风险逐级升档，`ultra` 仅用于少数最高风险场景
-  - `gpt-5.6-terra + medium/high/xhigh`：用于常规复杂实现、真实测试验收、复杂前端状态链路排查、涉及多证据汇总的质量复核
-  - `gpt-5.6-luna + low/medium`：用于运行态刷新、日志核对、环境检查、命令执行型运维动作、简单事实采集、格式整理、backlog 字段归一、固定命令回传
-  - `gpt-5.5 + medium/high/xhigh`：保留为复杂编码/研究任务或 `gpt-5.6-sol` 不可用时的高风险后备
-  - `gpt-5.4 + low/medium`：保留为普通单页前端小改、常规归档整理或 `gpt-5.6-terra` / `gpt-5.6-luna` 不可用时的稳定后备
-  - 如任务只是搬运、整理、格式化、台账更新、证据摘录，优先使用低推理强度，不得滥用高推理
-- 升档条件如下，满足任一条即可提高模型或推理强度：
-  - 需要同时理解 2 个及以上模块的真实调用链
-  - 涉及数据库 schema、Flyway migration、权限模型、安全边界、租户隔离、金额口径、审批状态机
-  - 需要在“多个候选根因”之间做排除式判断，而不是简单执行命令
-  - 需要输出可作为上线、阻塞、通过/不通过裁决依据的正式结论
-- 降档条件如下，满足多数条即可降低模型或推理强度：
-  - 任务步骤固定、判断空间小、主要是执行既定命令
-  - 只需核对单一文件、单一页面、单一接口是否符合既定口径
-  - 输出只是状态回传、截图证据、端口检查、构建结果、日志摘录
-- 前端、后端、测试、运维、审计建议基线如下：
-  - 前端复杂实现：`gpt-5.6-terra` 起步；涉及复杂状态、组件联动、浏览器真实问题归因时可升 `gpt-5.6-sol`
-  - 后端复杂实现：默认 `gpt-5.6-sol / high`；若风险中等且更偏常规实现，可降为 `gpt-5.6-terra / high`
-  - 测试验收：默认 `gpt-5.6-terra / medium`；若输出直接用于正式裁决，可升 `gpt-5.6-sol / high`
-  - 运维刷新与环境核查：默认 `gpt-5.6-luna / low`
-  - 安全/权限/租户隔离复核：默认 `gpt-5.6-sol / high`，必要时升 `xhigh/max`
-  - 质量归档与普通文档整理：默认 `gpt-5.6-luna / low`；如涉及多证据汇总或正式质量复核，可升 `gpt-5.6-terra / medium`
+- 只有实际派工时才记录 `model`、`thinking` 和 `reason`；当前工具支持对应参数时必须真实传入，不支持时写明 `unsupported`，不得声称配置已经生效。未派工不输出这些元数据，也不输出模型分配表。
+- 可用模型、参数名和推理强度只以当前工具 schema 为准；不得在长期规则中维护固定型号清单，也不得声称未被工具接受的配置已经生效。
+- 子智能体配置按“任务类型 + 风险等级 + 产出要求”逐任务判断：跨模块、数据库、权限、安全、租户、金额、审批、数据一致性和正式裁决提高证据与推理强度；机械执行、单文件核对、格式整理和固定命令回传降低强度。
+- 不得因主线程或上一任务使用某个配置，就让后续任务默认沿用；同时派工使用统一配置时必须给出充分理由。
 - 主线程在派工单里必须把模型分配理由写出来，至少一句，格式可简化为：
   - `model=...`
   - `thinking=...`
@@ -133,7 +106,7 @@ D:\projects-test\cgc-pms
   - `验收标准缺失`
   - `执行边界冲突`
 - 主线程做最终裁决时，必须回看本轮执行路由是否合理；若结果依赖临时升档、补派、换模或收回直做，需在总结中明确记录原路由问题和修正动作。
-- 实际派工且用户没有指定模型时，主线程必须自行给出明确配置；不得写“模型按默认”“thinking 按默认”“沿用上次配置”。
+- 实际派工且用户没有指定模型时，如当前工具支持模型和推理参数，主线程必须自行给出明确配置；工具不支持时明确写 `unsupported`，不得写“按默认”“沿用上次配置”或伪造已应用配置。
 - 若用户明确指定模型或推理强度，主线程仍需判断是否明显不匹配；如不匹配，应先指出风险，再按用户指令执行或请求确认。
 - 在需要归档或复盘且本轮实际派工时，主线程应记录该主线的模型分配经验，至少包含：
   - 哪类任务实际需要升档
@@ -165,6 +138,16 @@ CI 与验收失败分类规则：
 - Git/验收收口回报尽量使用最小模板：`正式交付物=...`、`验收证据=...`、`临时产物=...`、`git 状态=...`、`结论=通过/不通过`、`阻塞=...`、`剩余风险=...`。
 - 涉及方案时，优先选择最小可行方案，避免不必要抽象和大范围改造。
 
+## 产品情报与迭代决策规则
+
+- 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
+- 项目事实以当前分支代码、配置、现行规范和当前验证为准；`docs/archive/v1.0/` 只作历史参考，不能替代当前证据，`archive/v1.0/private/` 继续禁止读取。
+- 竞品事实必须来自官方文档、官方产品资料或一手仓库，并记录来源和核验时间；竞品具备某项能力不等于 CGC-PMS 必须实现。
+- 产品 Candidate 必须引用当前 `project-map.md` 和 `evolution-decision.md`，明确用户价值、最小闭环、非目标、依赖、风险和待确认项；前置未核实或证据过期时保持 Candidate，不得强行拆成 Ready。
+- `docs/backlog/cgc-pms-production-enhancement-plan.md` 只作为产品研究和候选输入，不能直接生成 Ready；没有合格 Candidate 时先刷新产品情报，而不是从长期计划凑任务。
+- Ready 以证据和字段完整为准，不设置最低数量；1 条合格 Ready 即可实施，队列上限为 5 条。只有完全无关联且无代码、数据、权限和业务链耦合的任务才可并行。
+- 主线或 Ready Issue 完成后必须回写项目地图；若结果改变差距或优先级，同步刷新竞品分析、迭代决策、Current Focus 和候选状态。
+
 ## Codex Local AutoPilot Rules
 
 本仓库允许 Codex 在本地测试环境中按规则执行 AutoPilot，但边界必须先于效率。
@@ -181,8 +164,8 @@ CI 与验收失败分类规则：
 ### Ready Issue 与 checkpoint
 
 - 进入 AutoPilot 连续迭代的业务或治理变更前，必须先确认任务来自 `docs/backlog/ready-issues.md`；普通交互任务与用户明确指定的其他治理流程按各自授权和载体执行
-- AutoPilot 任务来源采用三级顺序：a. `docs/backlog/ready-issues.md` 中已有合格 Ready；b. `docs/backlog/ad-hoc-plan.md` 中的 `ReadyToSplit` / 高优先级 `Candidate`；c. `docs/backlog/cgc-pms-production-enhancement-plan.md` 长期计划。b、c 仅用于拆题，任务必须先进入 `ready-issues.md` 成为合格 Ready Issue 才能实施
-- 当 `docs/backlog/ready-issues.md` 中合格 Ready 少于 3 条时，先读取临时计划书中的 `ReadyToSplit` / 高优先级 `Candidate`，再读取长期总任务池，并按 `docs/backlog/current-focus.md` 补货，目标形成 3–5 条合格 Ready；若已有未执行 Ready，补货后总数不得超过 5。无法形成至少 3 条时必须记录具体原因。3–5 条不代表允许并行，只有完全无关联、无任何代码关联的 Ready Issue 才可并行，不能证明完全无关联时按串行处理；补货轮只更新 backlog，不直接修改业务代码；连续执行模式补货完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮
+- AutoPilot 任务来源顺序为：a. `docs/backlog/ready-issues.md` 中已有合格 Ready；b. `docs/backlog/ad-hoc-plan.md` 中已引用当前产品情报决策且前置完整的 `ReadyToSplit` / 高优先级 `Candidate`；c. 没有合格候选时先刷新 `docs/product-intelligence/`。长期增强计划只能提供研究输入，不得直接拆 Ready。
+- Ready 队列允许只有 1 条合格任务，最多 5 条；不得为凑数量放宽证据、前置或字段要求。补货轮只更新产品情报与 backlog，不直接修改业务代码；形成至少 1 条合格 Ready 后，若未命中 `stop.flag` / `pause.flag`，才能进入实施轮。
 - 连续执行模式下，若 `Ready` 队列为空且 `blocked` 中存在当前 `focus/阶段` 的前置阻塞，不得直接停止；必须先由主线程按自适应路由直接处理、单派或多派完成阻塞核实或解除，再决定是否继续拆 Ready。阻塞解除任务可属于运维、事实采集、测试数据前置或验收复核，但必须继续遵守测试数据重置边界，以及开始前、执行中、收口前的 `stop.flag` / `pause.flag` checkpoint
 - 若前置阻塞已解除，应先由 F 更新 `backlog/blocked/ready` 状态，再由 A 重新拆 Ready；只有阻塞被确认无法处理、已安全写入 `blocked`，或同时不存在可拆任务时，才允许进入连续模式停止判断
 - 每个关键 checkpoint 都要检查 `.codex-autopilot/stop.flag` 和 `.codex-autopilot/pause.flag`；若是在当前任务开始前发现，则不得启动下一个任务；若是在当前任务执行中发现，则只做安全收口，不强制中断
@@ -227,16 +210,11 @@ CI 与验收失败分类规则：
 ### 项目级关键词协议
 
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动预演` 时，视为请求执行插件 dry-run 预演：`powershell -NoProfile -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -ReadyIssuePath D:\projects-test\cgc-pms\docs\backlog\ready-issues.md`；该语义只做受控预演，不启动下一任务、不提交、不 push。
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求进入连续迭代模式：优先走插件 runner / checkpoint / classifier 链路，并在当前会话中基于 `docs/backlog/ready-issues.md` 连续执行多轮；A–F 作为职责检查表按轮次动态覆盖，由主线程根据净收益选择直接执行、单派或多派，不机械创建六个线程；每轮最多允许 3 个完全无关联、无任何代码关联的 Ready Issue 并行，不能证明完全无关联时按串行处理，涉及同一文件、目录模块、后端域、前端页面、数据库、权限、安全、租户、金额或审批状态机的任务一律不得并行；每轮结束后必须检查 `stop.flag`、`pause.flag`、`enabled.flag`。若当前 Ready 少于 3 条，则先读取 `docs/backlog/ad-hoc-plan.md` 中的 `ReadyToSplit` / 高优先级 `Candidate`，再读取长期总任务池并按 `docs/backlog/current-focus.md` 补货，目标形成 3–5 条合格 Ready，已有未执行 Ready 时补货后总数不得超过 5；无法形成至少 3 条时必须记录具体原因；补货轮只更新 backlog、不直接修改业务代码。若补货后仍无 Ready，但 `blocked` 中存在当前 `focus/阶段` 的前置阻塞，则必须优先按自适应路由核实或解除，不得直接停机；只要仍允许继续且 Ready 队列中存在合格 Ready Issue，就必须进入下一轮。整个过程仍遵守 Ready 队列、checkpoint、stop/pause/enabled、A–F 职责与 `no push` 约束。
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求开启 `enabled.flag` 并进入连续迭代模式：优先走插件 runner / checkpoint / classifier 链路，并基于 `docs/backlog/ready-issues.md` 连续执行。A–F 是职责检查表，由主线程按净收益直接承担、单派或多派，不机械创建六个线程；每轮最多允许 3 个完全无关联的 Ready 并行，不能证明无关联时按串行处理，涉及同一文件、模块、业务域、数据库、权限、安全、租户、金额或审批状态机的任务不得并行。若 Ready 为空，先处理当前 focus 的可解除阻塞，再检查有决策证据的 Ad-hoc Candidate；仍无合格候选时刷新产品情报，不得从长期计划凑 Ready。形成至少 1 条合格 Ready 且未命中 stop/pause 后才能实施；每轮结束后检查 stop/pause/enabled，并保持 `no push` 边界。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动迭代-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。dry-run、拆单、health gate、runtime refresh 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止迭代` 时，视为请求执行安全停止：设置停止标记并关闭 `enabled.flag`，语义等价于旧 `停止自动迭代系统`，用于阻断下一任务启动，不强杀当前任务。
-- 连续执行模式的停止条件包括：收到 `停止迭代` 或 legacy 兼容短语 `停止自动迭代系统` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 队列为空且临时计划书与长期总任务池按 `docs/backlog/current-focus.md` 均无可拆任务或无法形成合格 Ready Issue，且不存在可继续核实/解除的当前 `focus/阶段` 前置阻塞、当前 Issue 连续自修后仍失败且已写入 blocked、当前前置阻塞已被核实无法解除并已安全写入 blocked、带 `-N` 参数时已触达实施型 Ready Issue 完成上限、或触达系统/会话限制
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止迭代` 时，视为请求执行安全停止：设置停止标记并关闭 `enabled.flag`，用于阻断下一任务启动，不强杀当前任务。
+- 连续执行模式的停止条件包括：收到 `停止迭代` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 为空且无合格 Candidate、产品情报无法形成可执行方向且不存在可解除的当前 focus 前置阻塞、当前 Issue 连续自修后仍失败并已写入 blocked、前置阻塞已确认无法解除并已安全写入 blocked、带 `-N` 参数时已触达完成上限、或触达系统/会话限制。
 - 连续执行模式仍保持以下边界：`autoPush=false`、不发布生产、不连接生产库、不删除仓库外文件；若涉及自动合并，仍必须先通过既有门禁与前置校验
-- legacy 兼容入口保留如下：
-  - `启动自动迭代系统`：兼容旧“打开开关并恢复轮询”语义
-  - `启动连续自动迭代系统`：兼容旧“启动迭代”语义
-  - `启动连续自动迭代系统-N`：兼容旧“启动迭代-N”语义
-  - `停止自动迭代系统`：兼容旧“停止迭代”语义
-- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代` 及上述 legacy 兼容短语才能触发对应动作，避免误触发
+- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代` 才能触发对应动作，避免误触发。
 - 触发前仍需通过授权门；项目总负责人主线程默认直接执行，只有运维卸载或独立证据等净收益明确时才派工
 - 执行完成后必须回报 AutoPilot 的 flag/state 检查结果，至少说明 `stop.flag`、`pause.flag`、`enabled.flag` 与相关运行状态，并明确是否停止了下一任务派发

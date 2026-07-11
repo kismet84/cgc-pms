@@ -35,6 +35,7 @@
 - [CI 失败排障手册](runbook/ci-failure-triage.md)
 - [Prompt 索引](prompt/README.md)
 - [当前 backlog](backlog/current-focus.md)
+- [产品情报：项目地图、竞品分析与迭代决策](product-intelligence/README.md)
 - [v1.5 计划书](plans/README.md)
 - [v1.5 质量报告](quality/README.md)
 - [v1.5 迭代记录](iterations/README.md)
