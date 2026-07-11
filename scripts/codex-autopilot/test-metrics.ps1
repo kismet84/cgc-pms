@@ -28,6 +28,29 @@ try {
   $invalid = Get-AutopilotRunMetrics -EventPath $events -RunId 'run-c'
   if ($invalid.valid) { throw 'negative event duration produced valid metrics' }
 
+  $runs = Join-Path $root 'runs'
+  1..20 | ForEach-Object {
+    $runDir = Join-Path $runs ("run-{0:00}" -f $_)
+    New-Item -ItemType Directory -Path $runDir -Force | Out-Null
+    [ordered]@{
+      status = 'done'
+      firstPassSuccess = ($_ -le 18)
+      manualInterventionCount = 0
+      scopeViolationCount = 0
+      evidencePaths = @('evidence.json')
+      reviewRequired = $false
+      gitSummary = @{ commit = "commit-$_" }
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runDir 'result.json') -Encoding UTF8
+  }
+  $qualification = Get-AutopilotQualification -RunsDir $runs -WindowSize 20
+  if (!$qualification.qualified -or $qualification.firstPassRate -ne 0.9) { throw 'valid qualification window was rejected' }
+  $failedResultPath = Join-Path $runs 'run-20\result.json'
+  $failedResult = Get-Content -LiteralPath $failedResultPath -Raw | ConvertFrom-Json
+  $failedResult.manualInterventionCount = 1
+  $failedResult | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $failedResultPath -Encoding UTF8
+  $rejected = Get-AutopilotQualification -RunsDir $runs -WindowSize 20
+  if ($rejected.qualified -or $rejected.reasons -notcontains 'manual intervention count is not zero') { throw 'manual intervention did not fail qualification' }
+
   Write-Host 'metrics self-test passed'
 } finally {
   Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue

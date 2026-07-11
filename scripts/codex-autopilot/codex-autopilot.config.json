@@ -32,7 +32,10 @@
       "-"
     ],
     "stdinFile": "{promptFile}",
-    "timeoutSeconds": 7200,
+    "timeoutSeconds": 2700,
+    "stallInspectSeconds": 300,
+    "stallTerminateSeconds": 600,
+    "heartbeatMilliseconds": 30000,
     "requireChangedFiles": true
   },
   "modelPolicy": {

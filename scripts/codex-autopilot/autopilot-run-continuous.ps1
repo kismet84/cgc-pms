@@ -875,7 +875,23 @@ function Get-ExecutorCommand {
 }
 
 function Invoke-ChildWithHeartbeat {
-  param([string[]]$Arguments, [string]$WorkingDirectory, [int]$TimeoutSeconds)
+  param(
+    [string[]]$Arguments,
+    [string]$WorkingDirectory,
+    [int]$TimeoutSeconds,
+    [int]$StallInspectSeconds = 300,
+    [int]$StallTerminateSeconds = 600,
+    [int]$HeartbeatMilliseconds = 30000
+  )
+  function Get-ProgressFingerprint([string]$Path) {
+    $status = (& git -C $Path status --porcelain=v1 --untracked-files=all 2>$null | Out-String)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($status)))).Replace('-', '') } finally { $sha.Dispose() }
+  }
+  function Stop-ChildProcessTree([Diagnostics.Process]$Child) {
+    & taskkill.exe /PID $Child.Id /T /F 2>$null | Out-Null
+    if (!$Child.HasExited) { $Child.Kill() }
+  }
   function Quote-ChildArgument([string]$Value) { if ($Value -match '[\s"]') { return '"' + $Value.Replace('"','\"') + '"' }; return $Value }
   $startInfo = [Diagnostics.ProcessStartInfo]::new()
   $startInfo.FileName = 'powershell'
@@ -891,16 +907,38 @@ function Invoke-ChildWithHeartbeat {
   $stdoutTask = $process.StandardOutput.ReadToEndAsync(); $stderrTask = $process.StandardError.ReadToEndAsync()
   $deadline = [datetimeoffset]::Now.AddSeconds($TimeoutSeconds)
   $timedOut = $false
-  while (!$process.WaitForExit(30000)) {
+  $stallTimedOut = $false
+  $stallInspected = $false
+  $lastProgressAt = [datetimeoffset]::Now
+  $progressFingerprint = Get-ProgressFingerprint $WorkingDirectory
+  while (!$process.WaitForExit($HeartbeatMilliseconds)) {
     if ($script:RunLock) { Write-RunLock (Join-Path $autoDir 'run.lock') $script:RunLock }
-    if ([datetimeoffset]::Now -ge $deadline) { $timedOut = $true; $process.Kill($true); break }
+    $currentFingerprint = Get-ProgressFingerprint $WorkingDirectory
+    if ($currentFingerprint -ne $progressFingerprint) {
+      $progressFingerprint = $currentFingerprint
+      $lastProgressAt = [datetimeoffset]::Now
+      $stallInspected = $false
+    }
+    $idleSeconds = ([datetimeoffset]::Now - $lastProgressAt).TotalSeconds
+    if (!$stallInspected -and $idleSeconds -ge $StallInspectSeconds) {
+      $stallInspected = $true
+      Write-RunEvent 'executor.stall.inspect' ([pscustomobject]@{ issueId = $script:RunLock.issueId; status = 'INSPECT'; reason = 'no worktree progress'; idleSeconds = [int]$idleSeconds; executorPid = $process.Id })
+    }
+    if ($idleSeconds -ge $StallTerminateSeconds) {
+      $timedOut = $true
+      $stallTimedOut = $true
+      Write-RunEvent 'executor.stall.terminate' ([pscustomobject]@{ issueId = $script:RunLock.issueId; status = 'TERMINATE'; reason = 'no worktree progress'; idleSeconds = [int]$idleSeconds; executorPid = $process.Id })
+      Stop-ChildProcessTree $process
+      break
+    }
+    if ([datetimeoffset]::Now -ge $deadline) { $timedOut = $true; Stop-ChildProcessTree $process; break }
   }
   $process.WaitForExit()
   $script:ExecutorPid = $null
   $stdout = $stdoutTask.GetAwaiter().GetResult(); $stderr = $stderrTask.GetAwaiter().GetResult()
   if ($stdout) { Write-Host $stdout.TrimEnd() }
   if ($stderr) { Write-Warning $stderr.TrimEnd() }
-  return [pscustomobject]@{ exitCode = if ($timedOut) { 124 } else { $process.ExitCode }; timedOut = $timedOut }
+  return [pscustomobject]@{ exitCode = if ($timedOut) { 124 } else { $process.ExitCode }; timedOut = $timedOut; stallTimedOut = $stallTimedOut }
 }
 
 function Invoke-IssueExecutor {
@@ -943,9 +981,17 @@ function Invoke-IssueExecutor {
     '-ExecutorRole',$Route.executorRole
   )
   if ($Route.reviewRequired) { $executorArgs += '-ReviewRequired' }
-  $executorTimeout = if ($config.issueExecutor.timeoutSeconds) { [int]$config.issueExecutor.timeoutSeconds + 120 } else { 7320 }
-  $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout
+  $executorTimeout = if ($config.issueExecutor.timeoutSeconds) { [int]$config.issueExecutor.timeoutSeconds + 120 } else { 2820 }
+  $stallInspectSeconds = if ($config.issueExecutor.stallInspectSeconds) { [int]$config.issueExecutor.stallInspectSeconds } else { 300 }
+  $stallTerminateSeconds = if ($config.issueExecutor.stallTerminateSeconds) { [int]$config.issueExecutor.stallTerminateSeconds } else { 600 }
+  $heartbeatMilliseconds = if ($config.issueExecutor.heartbeatMilliseconds) { [int]$config.issueExecutor.heartbeatMilliseconds } else { 30000 }
+  $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds
   if ($childResult.exitCode -ne 0) {
+    if ($childResult.stallTimedOut -and $config.repair -and $config.repair.enabled -eq $true -and $Attempt -lt 1) {
+      Write-State $autoDir 'REPAIRING' $false 'EXECUTOR_STALL_REPAIR' $Issue.title 'executor timed out without worktree progress' ''
+      Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt ($Attempt + 1) -Phase 'repair' -PreviousSummary 'executor timed out without worktree progress'
+      return
+    }
     Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_PROCESS_FAILED' $Issue.title 'tool_config' 'STOP_EXECUTOR_PROCESS_FAILED'
     return
   }
@@ -989,6 +1035,10 @@ function Invoke-IssueExecutor {
       }
       $result | Add-Member -NotePropertyName evidencePaths -NotePropertyValue @($evidencePaths) -Force
       $result | Add-Member -NotePropertyName reviewRequired -NotePropertyValue ([bool]$Route.reviewRequired) -Force
+      $result | Add-Member -NotePropertyName attempt -NotePropertyValue $Attempt -Force
+      $result | Add-Member -NotePropertyName firstPassSuccess -NotePropertyValue ($Attempt -eq 0 -and $result.status -eq 'done') -Force
+      $result | Add-Member -NotePropertyName manualInterventionCount -NotePropertyValue 0 -Force
+      $result | Add-Member -NotePropertyName scopeViolationCount -NotePropertyValue $(if ($result.stopReason -eq 'STOP_SCOPE_VIOLATION') { 1 } else { 0 }) -Force
       $closed = $false
       if ($result.status -eq 'done') { $script:FailureFingerprint = $null }
       if ($result.status -eq 'done' -and $Route.reviewRequired) {

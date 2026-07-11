@@ -377,7 +377,7 @@ function Invoke-ConfiguredIssueExecutor {
   }
   $stdinPath = if ($executor.stdinFile) { Expand-ExecutorToken ([string]$executor.stdinFile) $Issue $promptPath $RunDir } else { "" }
 
-  $timeoutSeconds = if ($executor.timeoutSeconds) { [int]$executor.timeoutSeconds } else { 7200 }
+  $timeoutSeconds = if ($executor.timeoutSeconds) { [int]$executor.timeoutSeconds } else { 2700 }
   $exitCode = 0
   try {
     $processResult = Invoke-ExecutorProcess `

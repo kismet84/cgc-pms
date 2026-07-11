@@ -75,12 +75,14 @@ New-Item -ItemType Directory -Path $quality -Force | Out-Null
     if ($output -notmatch 'EXECUTOR_RESULT_WRITTEN') { throw "canary $index did not execute: $output" }
     $result = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Filter result.json -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json }
     if ($result.status -ne 'done' -or !$result.gitSummary.commit -or @($result.evidencePaths).Count -eq 0) { throw "canary $index lacks completion integrity" }
+    if (!$result.firstPassSuccess -or $result.manualInterventionCount -ne 0 -or $result.scopeViolationCount -ne 0) { throw "canary $index lacks unattended qualification fields" }
   }
   $limitOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 20 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $ErrorActionPreference = $oldErrorActionPreference
   if ($limitOutput -notmatch 'STOP_ITERATION_LIMIT_REACHED') { throw 'canary did not stop at 20/20' }
   $qualification = Get-AutopilotQualification -RunsDir (Join-Path $autoDir 'runs') -WindowSize 20
   if (!$qualification.qualified) { throw "20-run qualification failed: $($qualification.reasons -join '; ')" }
+  if ($qualification.firstPassRate -lt 0.8 -or $qualification.manualInterventionCount -ne 0 -or $qualification.scopeViolationCount -ne 0) { throw '20-run qualification thresholds were not enforced' }
   Write-Host 'unattended 20-run canary passed'
 } finally {
   if (Test-Path -LiteralPath (Join-Path $root '.git')) { & git -C $root worktree prune 2>$null | Out-Null }

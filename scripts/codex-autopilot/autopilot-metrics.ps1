@@ -48,5 +48,27 @@ function Get-AutopilotQualification {
   if (@($results | Where-Object { !$_.gitSummary -or !$_.gitSummary.commit }).Count -gt 0) { $reasons += 'commit binding is missing' }
   if (@($results | Where-Object { $_.PSObject.Properties.Name -notcontains 'evidencePaths' -or @($_.evidencePaths).Count -eq 0 }).Count -gt 0) { $reasons += 'bound verification evidence is missing' }
   if (@($results | Where-Object { $_.PSObject.Properties.Name -contains 'reviewRequired' -and $_.reviewRequired -and (!$_.review -or $_.review.decision -ne 'pass') }).Count -gt 0) { $reasons += 'required independent review is missing' }
-  return [pscustomobject]@{ qualified = $reasons.Count -eq 0; sampleSize = $results.Count; requiredSampleSize = $WindowSize; reasons = @($reasons) }
+  $missingQualificationFields = @($results | Where-Object {
+    $_.PSObject.Properties.Name -notcontains 'firstPassSuccess' -or
+    $_.PSObject.Properties.Name -notcontains 'manualInterventionCount' -or
+    $_.PSObject.Properties.Name -notcontains 'scopeViolationCount'
+  }).Count
+  if ($missingQualificationFields -gt 0) { $reasons += 'unattended qualification fields are missing' }
+  $firstPassCount = @($results | Where-Object { $_.firstPassSuccess -eq $true }).Count
+  $firstPassRate = if ($results.Count -gt 0) { [Math]::Round($firstPassCount / $results.Count, 4) } else { 0 }
+  if ($results.Count -gt 0 -and $firstPassRate -lt 0.8) { $reasons += 'first pass success rate is below 80 percent' }
+  $manualInterventionCount = [int](($results | Measure-Object -Property manualInterventionCount -Sum).Sum)
+  $scopeViolationCount = [int](($results | Measure-Object -Property scopeViolationCount -Sum).Sum)
+  if ($manualInterventionCount -ne 0) { $reasons += 'manual intervention count is not zero' }
+  if ($scopeViolationCount -ne 0) { $reasons += 'scope violation count is not zero' }
+  return [pscustomobject]@{
+    qualified = $reasons.Count -eq 0
+    sampleSize = $results.Count
+    requiredSampleSize = $WindowSize
+    firstPassCount = $firstPassCount
+    firstPassRate = $firstPassRate
+    manualInterventionCount = $manualInterventionCount
+    scopeViolationCount = $scopeViolationCount
+    reasons = @($reasons)
+  }
 }
