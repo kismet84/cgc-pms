@@ -281,6 +281,45 @@ describe('subcontract task page quality guardrails', () => {
     expect(noPlanRow.text()).toContain('未设置计划日期')
   })
 
+  it('shows single-predecessor FS risk without turning the page into a scheduler', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 15, 12, 0))
+    mockGetSubTaskList.mockResolvedValue({
+      records: [
+        {
+          id: 'waiting', taskCode: '3.1', taskName: '等待前置', plannedStartDate: '2026-07-15',
+          predecessorTaskId: 'p1', predecessorTaskName: '基础施工', predecessorStatus: 'IN_PROGRESS',
+          predecessorPlannedEndDate: '2026-07-14', progressPercent: '0', status: 'NOT_STARTED',
+        },
+        {
+          id: 'late', taskCode: '3.2', taskName: '前置迟交', plannedStartDate: '2026-07-10',
+          predecessorTaskId: 'p2', predecessorTaskName: '结构施工', predecessorStatus: 'COMPLETED',
+          predecessorActualEndDate: '2026-07-12', progressPercent: '0', status: 'NOT_STARTED',
+        },
+        {
+          id: 'missing-date', taskCode: '3.3', taskName: '缺少日期',
+          predecessorTaskId: 'p3', predecessorTaskName: '材料进场', predecessorStatus: 'IN_PROGRESS',
+          progressPercent: '0', status: 'NOT_STARTED',
+        },
+      ],
+      total: 3,
+    })
+
+    const wrapper = mount(SubcontractTaskPage, { global: { stubs: WbsStubs } })
+    await flushPromises()
+    const rows = wrapper.findAll('.subcontract-task-wbs-row')
+
+    expect(rows.find((row) => row.text().includes('等待前置'))!.text()).toContain('前置未完成')
+    expect(rows.find((row) => row.text().includes('前置迟交'))!.text()).toContain('前置迟交')
+    const missingDate = rows.find((row) => row.text().includes('缺少日期'))!.text()
+    expect(missingDate).toContain('前置：材料进场')
+    expect(missingDate).not.toContain('前置未完成')
+    expect(source).toContain('v-model:value="formData.predecessorTaskId"')
+    expect(source).toContain('loadPredecessorOptions(v)')
+    expect(source).toContain('pageSize: 1000, projectId')
+    expect(source).not.toMatch(/draggable|dragstart|dhtmlx|frappe-gantt|criticalPath/i)
+  })
+
   it('extracts static status and grid config out of the giant component', () => {
     expect(source).toContain("from './pageConfig'")
     expect(configSource).toContain('export const SUBCONTRACT_TASK_STATUS_LABEL')

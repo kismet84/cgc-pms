@@ -3,8 +3,10 @@ package com.cgcpms.subcontract.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotBlank;
@@ -31,6 +33,17 @@ public class SubTask extends BaseEntity {
     private Long contractId;
 
     private Long partnerId;
+
+    private Long predecessorTaskId;
+
+    @TableField(exist = false)
+    private boolean predecessorTaskIdSpecified;
+
+    @JsonSetter("predecessorTaskId")
+    public void setPredecessorTaskId(Long predecessorTaskId) {
+        this.predecessorTaskId = predecessorTaskId;
+        this.predecessorTaskIdSpecified = true;
+    }
 
     private String taskCode;
 

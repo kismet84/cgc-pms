@@ -4,7 +4,7 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂空；AutoPilot 正在按 Current Focus 补货，形成合格 Ready 后继续实施。
+当前队列暂空；`ISSUE-037-004` 已完成，AutoPilot 正在按 Current Focus 补货，形成合格 Ready 后继续实施。
 
 ## v1.5 准入要求
 

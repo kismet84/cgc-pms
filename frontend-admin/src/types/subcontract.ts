@@ -4,6 +4,11 @@ export interface SubTaskVO {
   projectId: string
   contractId?: string
   partnerId?: string
+  predecessorTaskId?: string
+  predecessorTaskName?: string
+  predecessorStatus?: SubTaskStatus
+  predecessorPlannedEndDate?: string
+  predecessorActualEndDate?: string
   taskCode: string
   taskName: string
   workArea?: string
