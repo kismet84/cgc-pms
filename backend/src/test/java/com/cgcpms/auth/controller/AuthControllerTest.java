@@ -217,6 +217,43 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("GET /auth/dev-login 允许现场日报直达且拒绝不安全跳转")
+    void testDevLoginRedirectToSiteDailyLogKeepsSecurityBoundary() throws Exception {
+        when(authService.loginByUsernameEnsuringDevAccount(
+                eq("demo_dev_super_admin"),
+                eq("demo_dev_super_admin"))).thenAnswer(invocation -> {
+                    var userInfo = new UserInfo();
+                    userInfo.setUsername("demo_dev_super_admin");
+                    return new LoginResponse("mock-token", "mock-refresh-token", userInfo);
+                });
+
+        mockMvc.perform(get("/api/auth/dev-login")
+                        .servletPath("/auth/dev-login")
+                        .contextPath("/api")
+                        .param("redirect", "/site/daily-log"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/site/daily-log"));
+        mockMvc.perform(get("/api/auth/dev-login")
+                        .servletPath("/auth/dev-login")
+                        .contextPath("/api")
+                        .param("redirect", "//evil.example"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/"));
+        mockMvc.perform(get("/api/auth/dev-login")
+                        .servletPath("/auth/dev-login")
+                        .contextPath("/api")
+                        .param("redirect", "https://evil.example/path"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/"));
+        mockMvc.perform(get("/api/auth/dev-login")
+                        .servletPath("/auth/dev-login")
+                        .contextPath("/api")
+                        .param("redirect", "/site/../system"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/"));
+    }
+
+    @Test
     @DisplayName("POST /auth/login 已锁定 IP 仍返回 RATE_LIMIT_EXCEEDED")
     void testFormalLoginStillBlockedByLockout() throws Exception {
         when(lockoutStore.getRemainingLockoutMillis("10.0.0.88")).thenReturn(120_000L);

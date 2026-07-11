@@ -4,7 +4,7 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂空；`ISSUE-037-007` 已完成，AutoPilot 继续按产品情报机制补货。
+当前队列暂空；`ISSUE-037-008` 已完成，AutoPilot 继续按产品情报机制补货。
 
 ## v1.5 准入要求
 
@@ -70,6 +70,47 @@ Reviewer要求：实现完成后必须独立复核同项目同日唯一、草稿
 - `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogControllerTest,SiteDailyLogServiceTest,TenantBoundaryTask2Test,BusinessObjectAuthorizerTest" test`
 - `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts src/router/__tests__/router.test.ts`
 - `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-008：现场日报 dev-login 直达路由白名单修复
+
+优先级：P1
+任务性质：缺口修复
+类型：本地验收 / dev-login / 路由安全 / 回归测试
+状态：Done（2026-07-12；计入本轮第 8/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md` 的现场日报可达性事实；`docs/product-intelligence/evolution-decision.md` 的 ISSUE-037-007 运行态回写；`docs/backlog/current-focus.md` 的 `/site` 非阻塞观察；`docs/backlog/ad-hoc-plan.md` 的直达路由候选
+Migration：不需要
+依赖：复用现有 `DevAuthController.normalizeRedirect()` 站内前缀白名单和前端 `/site/daily-log` 路由；仅 dev/local 生效。
+风险等级：低
+运行态要求：AuthController 专项通过；真实 dev-login 必须保留 302 Location `/site/daily-log`，前端跟随跳转 200。
+Reviewer要求：实现后必须独立复核只新增 `/site` 站内前缀，`//`、站外 URL、`..` 路径遍历仍回落 `/`，且 dev-login 仍只在 dev/local 启用。
+归档报告：`docs/quality/ISSUE-037-008-现场日报dev-login直达路由验收报告.md`
+目标：
+- 让本地 dev-login 的 `redirect=/site/daily-log` 保留目标路径，支持现场日报真实角色验收直达。
+- 通过现有安全归一化逻辑添加最小 `/site` 站内前缀，不改变 cookie、登录或权限行为。
+非目标：
+- 不放宽任意 URL、协议相对 URL、站外域名或路径遍历，不改为通配符/正则全放行。
+- 不修改正式登录、生产 profile、前端路由、现场日报业务、权限、部署或代理配置。
+- 不为其他未核验路由批量补白名单。
+允许修改：
+- `backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java`
+- `backend/src/test/java/com/cgcpms/auth/controller/AuthControllerTest.java`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/java/com/cgcpms/auth/config/SecurityConfig.java`
+- `backend/src/main/java/com/cgcpms/auth/service/**`
+- `frontend-admin/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- `redirect=/site/daily-log` 返回 302，Location 精确为 `/site/daily-log`，并继续设置现有访问/刷新 cookie。
+- `redirect=//evil.example`、完整站外 URL、含 `..` 的 `/site/../system` 仍安全回落 `/`；不得因新增前缀绕过校验。
+- `@Profile({"dev", "local"})` 和 `auth.dev-login.enabled` 条件不变，生产仍不启用该入口。
+- 只修改一个白名单前缀及对应测试/归档；回滚为移除 `/site` 前缀，不涉及数据迁移。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AuthControllerTest" test`
 - `git diff --check`
 
 ### ISSUE-037-007：现场日报天气摘要与在场人数补强

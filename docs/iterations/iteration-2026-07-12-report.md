@@ -35,3 +35,12 @@
 - 自动合并：本地 commit only；`autoPush=false`。
 - 下一轮：继续产品情报刷新与候选补货；未命中 stop/pause。
 - 正式报告：`docs/quality/ISSUE-037-007-现场日报天气摘要与在场人数补强验收报告.md`。
+
+## ISSUE-037-008：现场日报 dev-login 直达路由白名单修复
+
+- 状态：Done；计入 `启动迭代-10` 第 8 条实施型 Ready Issue。
+- 修改范围：DevAuthController 单一 `/site` 前缀、AuthController 安全回归、产品情报与 backlog。
+- 验证：AuthController 15/15、专项安全用例、`git diff --check`、独立审查、180 秒稳定等待、真实站内 302→200 与站外回落通过。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：恢复产品差距补货；未命中 stop/pause。
+- 正式报告：`docs/quality/ISSUE-037-008-现场日报dev-login直达路由验收报告.md`。
