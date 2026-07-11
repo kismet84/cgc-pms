@@ -663,7 +663,7 @@ function Test-IssueCompleted {
     return $false
   }
 
-  return $statusMatch.Groups[1].Value.Trim() -match "^(Done|Blocked|已完成|阻塞|Iteration|Iterated|已迭代|迭代完成)\b"
+  return $statusMatch.Groups[1].Value.Trim() -match "^(Done|已完成|Iteration|Iterated|已迭代|迭代完成)\b"
 }
 
 function Get-IterationProgressFromRuns {
@@ -698,7 +698,7 @@ function Get-IterationProgressFromRuns {
       return
     }
 
-    if (!$result.issueId -or @("done", "blocked") -notcontains [string]$result.status) {
+    if (!$result.issueId -or [string]$result.status -ne 'done') {
       return
     }
 
@@ -1111,7 +1111,7 @@ function Invoke-IssueExecutor {
       }
       if ($result.status -eq 'done' -and $config.closeout -and $config.closeout.enabled -eq $true) {
         Write-State $autoDir 'COMMITTING' $false 'CLOSEOUT_START' $Issue.title 'COMMITTING' ''
-        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge)
+        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge) -BaseBranch $config.baseBranch -ExpectedBaseCommit $baseCommit
         $script:LastCommit = $closeout.commit
         $result.gitSummary | Add-Member -NotePropertyName commit -NotePropertyValue $closeout.commit -Force
         $result | Add-Member -NotePropertyName merged -NotePropertyValue $closeout.merged -Force
@@ -1155,6 +1155,9 @@ $config = Read-JsonFile $ConfigPath
 if ($config.repoRoot) {
   $RepoRoot = $config.repoRoot
 }
+$configuredBaseBranch = if ($config.baseBranch) { [string]$config.baseBranch } else { 'master' }
+$actualBaseBranch = (& git -C $RepoRoot branch --show-current 2>$null | Select-Object -First 1).Trim()
+if ($actualBaseBranch -ne $configuredBaseBranch) { throw "AutoPilot control plane requires base branch $configuredBaseBranch, actual=$actualBaseBranch" }
 
 $autoDir = if ($config.autopilotDir) { $config.autopilotDir } else { Join-Path $RepoRoot ".codex-autopilot" }
 $maxIssuesPerRun = if ($config.maxIssuesPerRun) { [int]$config.maxIssuesPerRun } else { 1 }
@@ -1230,12 +1233,9 @@ try {
   if ($applyMode) {
     $recovery = Get-AutopilotRecoveryDecision -AutoDir $autoDir
     if ($recovery.action -eq 'REFUSE_SECOND_INSTANCE') { Write-Host 'RUN_LOCK_ACTIVE'; throw 'Another AutoPilot run is active.' }
-    if ($recovery.action -in @('RESUME_FROM_CHECKPOINT','RESUME_CLOSEOUT')) {
+    if ($recovery.action -in @('RESUME_FROM_CHECKPOINT','RESTART_ISSUE')) {
       Remove-Item -LiteralPath (Join-Path $autoDir 'run.lock') -Force -ErrorAction SilentlyContinue
-      if ($recovery.action -eq 'RESUME_CLOSEOUT' -and $recovery.worktree -and $recovery.commit) {
-        $resumedCloseout = Resume-AutopilotCommittedWorktree -RepoRoot $RepoRoot -Worktree $recovery.worktree -Commit $recovery.commit
-        $script:LastCommit = $resumedCloseout.commit
-      }
+      if ($recovery.action -eq 'RESTART_ISSUE' -and $recovery.worktree) { Remove-AutopilotResidualWorktree -RepoRoot $RepoRoot -Worktree $recovery.worktree | Out-Null }
       Write-Host 'STALE_RUN_LOCK_REMOVED'
       Write-RunEvent 'recovery' ([pscustomobject]@{ decision = $recovery.action; status = 'RECOVERED'; reason = $recovery.reason })
     } elseif ($recovery.action -in @('VERIFY_UNCOMMITTED','QUARANTINE')) {

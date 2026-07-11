@@ -30,9 +30,10 @@ try {
   [ordered]@{ pid = 999999; heartbeatAt = [datetimeoffset]::Now.AddMinutes(-11).ToString('o'); runId = 'run-commit'; issueId = 'ISSUE-2' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $autoDir 'run.lock') -Encoding UTF8
   [ordered]@{ status='COMMITTING'; worktree=$worktree; lastCommit=$null } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $autoDir 'state.json') -Encoding UTF8
   $committed = Get-AutopilotRecoveryDecision -AutoDir $autoDir
-  if ($committed.action -ne 'RESUME_CLOSEOUT' -or !$committed.commit) { throw 'clean committed worktree was not routed to closeout recovery' }
-  Resume-AutopilotCommittedWorktree -RepoRoot $root -Worktree $committed.worktree -Commit $committed.commit | Out-Null
-  if (!(Test-Path -LiteralPath (Join-Path $root 'closed.txt'))) { throw 'committed worktree was not fast-forward recovered' }
+  if ($committed.action -ne 'RESTART_ISSUE' -or !$committed.commit) { throw 'uncertain committed worktree was not routed to safe restart' }
+  Remove-AutopilotResidualWorktree -RepoRoot $root -Worktree $committed.worktree | Out-Null
+  if (Test-Path -LiteralPath (Join-Path $root 'closed.txt')) { throw 'uncertain commit was merged without gate evidence' }
+  if (Test-Path -LiteralPath $worktree) { throw 'uncertain worktree was not isolated before restart' }
 
   if ((Get-AutopilotStallLevel -LastProgressAt ([datetimeoffset]::Now.AddMinutes(-6))) -ne 'INSPECT') { throw '5-minute stall was not detected' }
   if ((Get-AutopilotStallLevel -LastProgressAt ([datetimeoffset]::Now.AddMinutes(-11))) -ne 'TERMINATE') { throw '10-minute stall was not detected' }

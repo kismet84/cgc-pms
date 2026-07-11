@@ -18,7 +18,9 @@ function Set-AutopilotReadyDone {
 }
 
 function Complete-AutopilotIssueCloseout {
-  param([string]$RepoRoot, [string]$Worktree, [object]$Issue, [bool]$AutoMerge = $true)
+  param([string]$RepoRoot, [string]$Worktree, [object]$Issue, [bool]$AutoMerge = $true, [string]$BaseBranch = 'master', [string]$ExpectedBaseCommit = '')
+  $currentBranch = (& git -C $RepoRoot branch --show-current).Trim()
+  if ($currentBranch -ne $BaseBranch) { throw "closeout requires base branch $BaseBranch, actual=$currentBranch" }
   $archivePath = Join-Path $Worktree $Issue.archiveReport
   if (!(Test-Path -LiteralPath $archivePath -PathType Leaf)) { throw "formal archive report is missing: $($Issue.archiveReport)" }
   $readyPath = Join-Path $Worktree 'docs\backlog\ready-issues.md'
@@ -28,6 +30,7 @@ function Complete-AutopilotIssueCloseout {
   if ($LASTEXITCODE -eq 0 -and (Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -Raw -Encoding UTF8) -match ('(?ms)^###\s+' + [regex]::Escape($Issue.title) + '.*?^状态：Done\s*$')) {
     return [pscustomobject]@{ commit = $worktreeHead; merged = $true; idempotent = $true }
   }
+  if ($ExpectedBaseCommit -and (& git -C $RepoRoot rev-parse HEAD).Trim() -ne $ExpectedBaseCommit) { throw 'base branch advanced during Issue execution; closeout requires a fresh isolated retry' }
   Set-AutopilotReadyDone -ReadyPath $readyPath -IssueTitle $Issue.title | Out-Null
   if (!(Test-Path -LiteralPath $donePath)) { '# Done Issues' | Set-Content -LiteralPath $donePath -Encoding UTF8 }
   $doneText = Get-Content -LiteralPath $donePath -Raw -Encoding UTF8
@@ -45,6 +48,7 @@ function Complete-AutopilotIssueCloseout {
   if ($AutoMerge) {
     $mainChanges = @(& git -C $RepoRoot status --porcelain=v1)
     if ($mainChanges.Count -gt 0) { throw 'main worktree is dirty; local merge refused' }
+    if ($ExpectedBaseCommit -and (& git -C $RepoRoot rev-parse HEAD).Trim() -ne $ExpectedBaseCommit) { throw 'base branch advanced before merge; local merge refused' }
     & git -C $RepoRoot merge --ff-only $commit | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'local fast-forward merge failed' }
     $merged = $true

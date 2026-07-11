@@ -882,6 +882,10 @@ try {
 "@ -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $LimitOneRoot -Apply -MaxIterations 1) "READY_ISSUE_FOUND"
   Set-IssueStatus $LimitOneRoot "Done"
+  $LimitOnePreState = Get-Content -Raw (Join-Path $LimitOneRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($LimitOnePreState.worktree -and (Test-Path $LimitOnePreState.worktree)) { & git -C $LimitOneRoot worktree remove --force $LimitOnePreState.worktree 2>$null | Out-Null }
+  $LimitOnePreState.worktree = ''
+  $LimitOnePreState | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $LimitOneRoot ".codex-autopilot\state.json") -Encoding UTF8
   $LimitOneDoneOutput = Invoke-Runner $LimitOneRoot -Apply -MaxIterations 1
   Assert-Contains $LimitOneDoneOutput "STOP_ITERATION_LIMIT_REACHED"
   $LimitOneState = Get-Content -Raw (Join-Path $LimitOneRoot ".codex-autopilot\state.json") | ConvertFrom-Json
@@ -910,11 +914,15 @@ try {
 "@ -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $LimitTwoRoot -Apply -MaxIterations 2) "READY_ISSUE_FOUND"
   Set-IssueStatus $LimitTwoRoot "Blocked"
+  $LimitTwoPreState = Get-Content -Raw (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  if ($LimitTwoPreState.worktree -and (Test-Path $LimitTwoPreState.worktree)) { & git -C $LimitTwoRoot worktree remove --force $LimitTwoPreState.worktree 2>$null | Out-Null }
+  $LimitTwoPreState.worktree = ''
+  $LimitTwoPreState | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") -Encoding UTF8
   $LimitTwoDoneOutput = Invoke-Runner $LimitTwoRoot -Apply -MaxIterations 2
   Assert-Contains $LimitTwoDoneOutput "STOP_CURRENT_ISSUE_BLOCKED"
   Assert-NotContains $LimitTwoDoneOutput "STOP_ITERATION_LIMIT_REACHED"
   $LimitTwoState = Get-Content -Raw (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") | ConvertFrom-Json
-  if ($LimitTwoState.iterationCompleted -ne 1) { throw "Expected MaxIterations=2 to count one blocked issue" }
+  if ($LimitTwoState.iterationCompleted -ne 1) { throw "Expected the prior done executor result to consume one completion quota" }
   if ($LimitTwoState.remainingIterations -ne 1) { throw "Expected MaxIterations=2 remainingIterations=1" }
 
   $RepairRoot = New-Fixture -Name "repair-undercount" -Enabled -Ready @"

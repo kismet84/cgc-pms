@@ -24,11 +24,17 @@ try {
   New-Item -ItemType Directory -Path (Join-Path $worktree.path 'docs\quality') -Force | Out-Null
   'accepted' | Set-Content -LiteralPath (Join-Path $worktree.path 'docs\quality\issue-900-040.md') -Encoding UTF8
   $issue = [pscustomobject]@{ issueId = 'ISSUE-900-040'; title = 'ISSUE-900-040：Closeout'; archiveReport = 'docs/quality/issue-900-040.md' }
-  $result = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true
+  $baseBranch = (& git -C $root branch --show-current).Trim()
+  & git -C $root switch -qc wrong-branch
+  $wrongBranchRejected = $false
+  try { Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base | Out-Null } catch { $wrongBranchRejected = $true }
+  if (!$wrongBranchRejected) { throw 'closeout merged into a non-base branch' }
+  & git -C $root switch -q $baseBranch
+  $result = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base
   if (!$result.commit -or !$result.merged) { throw 'closeout did not commit and merge' }
   if ((Get-Content -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Raw) -notmatch '状态：Done') { throw 'Ready was not closed as Done' }
   if ((Get-Content -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Raw) -notmatch 'ISSUE-900-040') { throw 'done ledger was not updated' }
-  $again = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true
+  $again = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base
   if ($again.commit -ne $result.commit -or !$again.idempotent) { throw 'closeout retry was not idempotent' }
   Write-Host 'closeout self-test passed'
 } finally {
