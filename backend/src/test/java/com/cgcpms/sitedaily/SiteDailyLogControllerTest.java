@@ -15,6 +15,7 @@ import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.hamcrest.Matchers.nullValue;
 
 @SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
 @AutoConfigureMockMvc
@@ -32,7 +33,7 @@ class SiteDailyLogControllerTest {
     void draftCanBeEditedAndSubmittedOnlyOnce() throws Exception {
         String body = "{\"projectId\":10001,\"reportDate\":\"2099-01-01\","
                 + "\"constructionContent\":\"完成基础施工\",\"issuesDelays\":\"材料晚到\","
-                + "\"nextDayPlan\":\"开始主体施工\"}";
+                + "\"nextDayPlan\":\"开始主体施工\",\"weatherSummary\":\"晴\",\"onSiteHeadcount\":12}";
         String response = mockMvc.perform(post("/api/site-daily-logs").contextPath("/api")
                         .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").isString())
@@ -44,8 +45,12 @@ class SiteDailyLogControllerTest {
                 .andExpect(status().isBadRequest());
         mockMvc.perform(put("/api/site-daily-logs/" + id).contextPath("/api")
                         .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"projectId\":10001,\"reportDate\":\"2099-01-01\",\"constructionContent\":\"已更新施工内容\"}"))
+                        .content("{\"projectId\":10001,\"reportDate\":\"2099-01-01\",\"constructionContent\":\"已更新施工内容\",\"weatherSummary\":\"晴转多云\",\"onSiteHeadcount\":0}"))
                 .andExpect(status().isOk());
+        mockMvc.perform(get("/api/site-daily-logs/" + id).contextPath("/api").cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.weatherSummary").value("晴转多云"))
+                .andExpect(jsonPath("$.data.onSiteHeadcount").value(0));
         mockMvc.perform(post("/api/site-daily-logs/" + id + "/submit").contextPath("/api")
                         .cookie(adminCookie()))
                 .andExpect(status().isOk());
@@ -65,5 +70,42 @@ class SiteDailyLogControllerTest {
                         .param("projectId", "10001").param("status", "SUBMITTED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].projectName").exists());
+    }
+
+    @Test
+    void weatherAndHeadcountValidationRejectsInvalidInput() throws Exception {
+        String base = "{\"projectId\":10001,\"reportDate\":\"2099-02-01\",\"constructionContent\":\"测试\",";
+        mockMvc.perform(post("/api/site-daily-logs").contextPath("/api")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(base + "\"onSiteHeadcount\":-1}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/site-daily-logs").contextPath("/api")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(base + "\"onSiteHeadcount\":100001}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/site-daily-logs").contextPath("/api")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(base + "\"onSiteHeadcount\":1.5}"))
+                .andExpect(status().isBadRequest());
+        String longWeather = "晴".repeat(201);
+        mockMvc.perform(post("/api/site-daily-logs").contextPath("/api")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content(base + "\"weatherSummary\":\"" + longWeather + "\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void omittedHeadcountRemainsUnknown() throws Exception {
+        String response = mockMvc.perform(post("/api/site-daily-logs").contextPath("/api")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"reportDate\":\"2099-03-01\",\"constructionContent\":\"测试未填写人数\",\"weatherSummary\":\"阴\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String id = response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1");
+
+        mockMvc.perform(get("/api/site-daily-logs/" + id).contextPath("/api").cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.weatherSummary").value("阴"))
+                .andExpect(jsonPath("$.data.onSiteHeadcount").value(nullValue()));
     }
 }

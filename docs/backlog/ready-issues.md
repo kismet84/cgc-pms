@@ -4,7 +4,7 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂空；`ISSUE-037-006` 已完成，AutoPilot 继续按产品情报机制补货。
+当前队列暂空；`ISSUE-037-007` 已完成，AutoPilot 继续按产品情报机制补货。
 
 ## v1.5 准入要求
 
@@ -69,6 +69,56 @@ Reviewer要求：实现完成后必须独立复核同项目同日唯一、草稿
 验证命令：
 - `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogControllerTest,SiteDailyLogServiceTest,TenantBoundaryTask2Test,BusinessObjectAuthorizerTest" test`
 - `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts src/router/__tests__/router.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-007：现场日报天气摘要与在场人数补强
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 状态边界 / 前后端 / Migration / 测试
+状态：Done（2026-07-12；计入本轮第 7/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log 官方事实；`docs/product-intelligence/evolution-decision.md`；`docs/backlog/ad-hoc-plan.md` 的“现场日报天气摘要与在场人数”候选
+Migration：需要
+依赖：复用现有 `site_daily_log`、`SiteDailyLogService` 的项目范围与 DRAFT→SUBMITTED 状态闭环、现有页面和权限；不新增子表。
+风险等级：低
+运行态要求：后端专项、前端单测和类型检查通过；真实 API 验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现完成后必须独立复核 NULL/0 人数语义、整数边界、天气长度、草稿原子更新、提交后不可变、项目/租户范围和旧数据兼容；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-007-现场日报天气摘要与在场人数补强验收报告.md`
+目标：
+- 在现有现场日报草稿中增加人工天气摘要与可选在场人数，补足现场日报最小事实维度。
+- `onSiteHeadcount=NULL` 表示未填写，`0` 表示明确无人；已提交日报继续保持正文和新增字段只读。
+- 在现有创建/编辑/查看表单中维护和展示两字段，不新增入口、权限或工作流。
+非目标：
+- 不接天气 API，不自动采集天气，不建设天气枚举、预报、定位或历史气象服务。
+- 不建立人员名单、班组、考勤、工时、劳务实名制、设备、材料、质量安全子表或统计驾驶舱。
+- 不实现移动端、离线同步，不修改附件授权、日报唯一约束、提交状态机或通用审批。
+允许修改：
+- `backend/src/main/resources/db/migration/V143__add_site_daily_weather_headcount.sql`
+- `backend/src/main/resources/db/migration-h2/V143__add_site_daily_weather_headcount.sql`
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- 已应用的 `backend/src/main/resources/db/migration/V1__*.sql` 至 `V142__*.sql`
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- V143 MySQL/H2 镜像只为 `site_daily_log` 增加 `weather_summary VARCHAR(200) NULL` 与 `on_site_headcount INT NULL`；旧数据升级后保持 NULL，不回填伪造事实。
+- 天气摘要可空且最多 200 字；在场人数可空，只接受 0 至 100000 的整数，负数、超上限或小数请求 fail-close。
+- 创建和修改均保存两字段；修改继续使用现有 `tenant_id + id + status=DRAFT` 原子条件，SUBMITTED 状态不得修改新增字段。
+- 列表/详情返回两字段并继续执行既有项目/租户范围；不新增或放宽 `site:daily:query/edit` 权限。
+- 前端创建、编辑、查看表单显示人工天气摘要和在场人数；未填写人数显示“未填写”，0 显示“0”，不把两者混同。
+- 至少覆盖字段创建/更新/映射、NULL/0、长度/整数边界、提交后只读和前端表单测试；回滚边界为回退应用后移除 V143 两列，不改写 V141。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogControllerTest,SiteDailyLogServiceTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
 - `cd frontend-admin; pnpm type-check`
 - `git diff --check`
 

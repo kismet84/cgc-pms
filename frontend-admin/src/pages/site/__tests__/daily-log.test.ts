@@ -11,9 +11,14 @@ describe('site daily log page', () => {
     expect(source).toContain('constructionContent')
     expect(source).toContain('issuesDelays')
     expect(source).toContain('nextDayPlan')
+    expect(source).toContain('weatherSummary')
+    expect(source).toContain('onSiteHeadcount')
+    expect(source).toContain('人工天气摘要')
+    expect(source).toContain('在场人数')
+    expect(source).toContain("form.onSiteHeadcount == null ? '未填写' : form.onSiteHeadcount")
     expect(source).toContain("record.status === 'DRAFT'")
     expect(source).toContain('submitSiteDailyLog')
-    expect(source).not.toMatch(/weather|equipment|offline|geolocation/i)
+    expect(source).not.toMatch(/equipment|offline|geolocation/i)
   })
 
   it('reuses the file API and renders loading empty and error states', () => {

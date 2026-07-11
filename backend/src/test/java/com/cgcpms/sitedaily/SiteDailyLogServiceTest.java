@@ -30,12 +30,16 @@ class SiteDailyLogServiceTest {
         log.setId(31L); log.setTenantId(11L); log.setProjectId(21L);
         log.setReportDate(LocalDate.of(2099, 1, 1));
         log.setConstructionContent("施工内容");
+        log.setWeatherSummary("晴，午后有风");
+        log.setOnSiteHeadcount(0);
         log.setStatus("DRAFT");
         when(mapper.selectById(31L)).thenReturn(log);
 
-        service.getById(31L);
+        var detail = service.getById(31L);
 
         verify(checker).checkAccess(21L, "访问现场日报");
+        assertEquals("晴，午后有风", detail.getWeatherSummary());
+        assertEquals(0, detail.getOnSiteHeadcount());
     }
 
     @Test

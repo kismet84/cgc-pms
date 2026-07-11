@@ -11,6 +11,8 @@ public class SiteDailyLogVO {
     private String constructionContent;
     private String issuesDelays;
     private String nextDayPlan;
+    private String weatherSummary;
+    private Integer onSiteHeadcount;
     private String status;
     private String submittedBy;
     private String submittedAt;

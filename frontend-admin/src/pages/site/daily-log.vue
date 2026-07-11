@@ -37,7 +37,7 @@ const activeRecord = ref<SiteDailyLogVO | null>(null)
 const saving = ref(false)
 const files = ref<SysFileVO[]>([])
 const filesLoading = ref(false)
-const form = reactive<SiteDailyLogCommand>({ projectId: undefined, reportDate: undefined, constructionContent: '', issuesDelays: '', nextDayPlan: '' })
+const form = reactive<SiteDailyLogCommand>({ projectId: undefined, reportDate: undefined, constructionContent: '', issuesDelays: '', nextDayPlan: '', weatherSummary: '', onSiteHeadcount: null })
 
 const columns = [
   { title: '项目', dataIndex: 'projectName', key: 'projectName' },
@@ -72,6 +72,8 @@ function resetForm(record?: SiteDailyLogVO) {
     constructionContent: record?.constructionContent ?? '',
     issuesDelays: record?.issuesDelays ?? '',
     nextDayPlan: record?.nextDayPlan ?? '',
+    weatherSummary: record?.weatherSummary ?? '',
+    onSiteHeadcount: record?.onSiteHeadcount ?? null,
   })
 }
 
@@ -183,6 +185,11 @@ onMounted(() => { referenceStore.fetchProjects(); fetchData() })
         <a-form-item label="施工内容" required><a-textarea v-model:value="form.constructionContent" :rows="4" /></a-form-item>
         <a-form-item label="问题与延误"><a-textarea v-model:value="form.issuesDelays" :rows="3" /></a-form-item>
         <a-form-item label="次日计划"><a-textarea v-model:value="form.nextDayPlan" :rows="3" /></a-form-item>
+        <a-form-item label="人工天气摘要"><a-textarea v-model:value="form.weatherSummary" :maxlength="200" :rows="2" placeholder="人工填写当日天气，可留空" /></a-form-item>
+        <a-form-item label="在场人数">
+          <span v-if="modalMode === 'view'">{{ form.onSiteHeadcount == null ? '未填写' : form.onSiteHeadcount }}</span>
+          <a-input-number v-else v-model:value="form.onSiteHeadcount" :min="0" :max="100000" :precision="0" placeholder="未填写" style="width:100%" />
+        </a-form-item>
       </a-form>
       <section v-if="activeRecord" class="site-daily-files"><strong>附件</strong><input v-if="canEdit && activeRecord.status === 'DRAFT'" type="file" @change="onFileChange" /><a-spin :spinning="filesLoading"><div v-for="file in files" :key="file.id"><a-button type="link" @click="download(file)">{{ file.originalName }}</a-button><a-button v-if="canEdit && activeRecord.status === 'DRAFT'" danger type="link" @click="removeFile(file)">删除</a-button></div><a-empty v-if="!files.length" description="暂无附件" /></a-spin></section>
       <template #footer><a-button @click="modalOpen = false">关闭</a-button><a-button v-if="modalMode !== 'view'" type="primary" :loading="saving" @click="save">保存草稿</a-button><a-button v-if="canEdit && activeRecord?.status === 'DRAFT'" type="primary" @click="submitRecord(activeRecord)">提交定稿</a-button></template>

@@ -103,7 +103,9 @@ public class SiteDailyLogService {
                     .set(SiteDailyLog::getReportDate, command.getReportDate())
                     .set(SiteDailyLog::getConstructionContent, command.getConstructionContent())
                     .set(SiteDailyLog::getIssuesDelays, command.getIssuesDelays())
-                    .set(SiteDailyLog::getNextDayPlan, command.getNextDayPlan()));
+                    .set(SiteDailyLog::getNextDayPlan, command.getNextDayPlan())
+                    .set(SiteDailyLog::getWeatherSummary, command.getWeatherSummary())
+                    .set(SiteDailyLog::getOnSiteHeadcount, command.getOnSiteHeadcount()));
             if (updated != 1) throw submittedImmutable();
         } catch (DuplicateKeyException e) {
             throw duplicateDate();
@@ -167,6 +169,8 @@ public class SiteDailyLogService {
         vo.setConstructionContent(log.getConstructionContent());
         vo.setIssuesDelays(log.getIssuesDelays());
         vo.setNextDayPlan(log.getNextDayPlan());
+        vo.setWeatherSummary(log.getWeatherSummary());
+        vo.setOnSiteHeadcount(log.getOnSiteHeadcount());
         vo.setStatus(log.getStatus());
         vo.setSubmittedBy(log.getSubmittedBy() == null ? null : log.getSubmittedBy().toString());
         vo.setSubmittedAt(log.getSubmittedAt() == null ? null : log.getSubmittedAt().format(DateTimeUtils.DTF));

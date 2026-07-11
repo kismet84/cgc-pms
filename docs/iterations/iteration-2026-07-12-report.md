@@ -26,3 +26,12 @@
 - 自动合并：本地 commit only；`autoPush=false`。
 - 下一轮：继续产品情报刷新与候选补货；未命中 stop/pause。
 - 正式报告：`docs/quality/ISSUE-037-006-库存项安全库存阈值与补货建议联动验收报告.md`。
+
+## ISSUE-037-007：现场日报天气摘要与在场人数补强
+
+- 状态：Done；计入 `启动迭代-10` 第 7 条实施型 Ready Issue。
+- 修改范围：V143 两个可空字段、严格整数绑定、日报服务/VO/测试、现有日报表单与产品情报/backlog。
+- 验证：后端 6/6、前端 2/2、类型检查、`git diff --check`、独立审查、MySQL V143、health gate 和真实 API NULL→0/提交拒写/清理通过。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：继续产品情报刷新与候选补货；未命中 stop/pause。
+- 正式报告：`docs/quality/ISSUE-037-007-现场日报天气摘要与在场人数补强验收报告.md`。

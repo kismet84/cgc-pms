@@ -8,6 +8,8 @@ export interface SiteDailyLogVO {
   constructionContent: string
   issuesDelays?: string
   nextDayPlan?: string
+  weatherSummary?: string
+  onSiteHeadcount?: number | null
   status: SiteDailyLogStatus
   submittedBy?: string
   submittedAt?: string
@@ -22,4 +24,6 @@ export interface SiteDailyLogCommand {
   constructionContent: string
   issuesDelays?: string
   nextDayPlan?: string
+  weatherSummary?: string
+  onSiteHeadcount?: number | null
 }
