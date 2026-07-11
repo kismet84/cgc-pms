@@ -42,9 +42,9 @@
 ## 项目与运行入口
 
 - 项目目录：`backend/` 后端、`frontend-admin/` 前端、`deploy/` 部署、`docs/` 文档中心。
-- 快速启动、本地访问地址、运行态刷新、常见验证：`docs/01-快速开始.md`
-- 系统分层、模块域、数据与部署架构：`docs/02-系统架构.md`
-- Docker、生产部署、回滚、备份、监控：`docs/10-部署运维手册.md`
+- 快速启动、本地访问地址、运行态刷新、常见验证：`docs/standards/01-快速开始.md`
+- 系统分层、模块域、数据与部署架构：`docs/standards/02-系统架构.md`
+- Docker、生产部署、回滚、备份、监控：`docs/standards/10-部署运维手册.md`
 - 前端本地验收默认入口：`http://localhost:5173`
 - 前后端重启后的统一稳定等待时间按 `180秒` 执行；后端至少等待 `180秒` 后再做 health / Flyway / 接口验收，前端至少等待 `180秒` 并确认 Vite ready 后，再做 Playwright UI 验收。
 - 若 Docker 连续多次不可用（如 `dockerDesktopLinuxEngine` 管道不存在、`docker ps` 无法连接、`5173/8080` 均拒绝连接），在需要运行态验收且用户允许运维动作时，先尝试重启 WSL2 与 Docker Desktop，再等待 `180秒` 后复查 `docker ps`、后端 health、前端入口；不得把 Docker 不可用伪装成业务失败或验收通过。
@@ -53,11 +53,11 @@
 ## 质量与避坑入口
 
 - 高频陷阱索引：`memory/MEMORY.md`。
-- 测试规范与测试数据隔离：`docs/09-测试规范.md`。
-- 后端开发规范：`docs/04-后端开发规范.md`。
-- 前端开发规范与 `lg-*` 设计系统：`docs/05-前端开发规范.md`、`frontend-admin/src/assets/styles/global.css`。
-- 数据库与迁移规范：`docs/07-数据库与迁移规范.md`。
-- UI 基线：`docs/00-UI-Design-Baselines-and-Code-Specifications.md`。
+- 测试规范与测试数据隔离：`docs/standards/09-测试规范.md`。
+- 后端开发规范：`docs/standards/04-后端开发规范.md`。
+- 前端开发规范与 `lg-*` 设计系统：`docs/standards/05-前端开发规范.md`、`frontend-admin/src/assets/styles/global.css`。
+- 数据库与迁移规范：`docs/standards/07-数据库与迁移规范.md`。
+- UI 基线：`docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md`。
 - CI、页面异常、接口失败先分三类再定性：`工具配置/规则加载问题`、`环境前置问题`、`真实质量/安全问题`；不要把所有红灯都直接归因为业务代码缺陷。
 
 ## 触发协议
@@ -83,9 +83,9 @@ docs/prompt/lark-confirmation-flow.md
 ## 文档入口
 
 - 文档索引：`docs/README.md`
-- 快速开始：`docs/01-快速开始.md`
-- 系统架构：`docs/02-系统架构.md`
-- 业务模块说明：`docs/03-业务模块说明.md`
-- API 契约：`docs/06-API契约规范.md`
-- 权限与审批：`docs/08-权限与审批流程.md`
-- 安全规范：`docs/11-安全规范.md`
+- 快速开始：`docs/standards/01-快速开始.md`
+- 系统架构：`docs/standards/02-系统架构.md`
+- 业务模块说明：`docs/standards/03-业务模块说明.md`
+- API 契约：`docs/standards/06-API契约规范.md`
+- 权限与审批：`docs/standards/08-权限与审批流程.md`
+- 安全规范：`docs/standards/11-安全规范.md`

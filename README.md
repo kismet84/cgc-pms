@@ -27,8 +27,8 @@ scripts\start-dev.bat
 
 需要手动启动、运行态刷新或常见故障处理时，直接查看：
 
-- [快速开始](docs/01-快速开始.md)
-- [部署运维手册](docs/10-部署运维手册.md)
+- [快速开始](docs/standards/01-快速开始.md)
+- [部署运维手册](docs/standards/10-部署运维手册.md)
 
 ## 访问地址
 
@@ -42,10 +42,10 @@ scripts\start-dev.bat
 ## 文档入口
 
 - [文档总入口](docs/README.md)
-- [快速开始](docs/01-快速开始.md)
-- [系统架构](docs/02-系统架构.md)
-- [业务模块说明](docs/03-业务模块说明.md)
-- [部署运维手册](docs/10-部署运维手册.md)
+- [快速开始](docs/standards/01-快速开始.md)
+- [系统架构](docs/standards/02-系统架构.md)
+- [业务模块说明](docs/standards/03-业务模块说明.md)
+- [部署运维手册](docs/standards/10-部署运维手册.md)
 
 需要了解更细的模块边界、开发规范、测试规范或上线结论时，从 `docs/README.md` 继续进入对应专题文档，不在此处重复展开。
 

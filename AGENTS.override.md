@@ -38,13 +38,13 @@ D:\projects-test\cgc-pms
 - 子智能体派工正文的第一句必须先单独写出身份边界，不得把角色授权埋在后文说明里。
 - 人工审核修正：CodeGraph 是优先检索入口，不是唯一事实源；若 CodeGraph 未命中预期前端组件、跨语言引用、文件名或已知字段，必须立即用 `rg` 对明确符号/文件名做只读补查，并把结果归类为“工具召回不足”而不是“代码不存在”。
 - 人工审核修正：若子智能体出现不回传、长时间 running 或等待超时，主线程不得继续复用同一悬挂线程硬等；先做只读状态核验，再按剩余任务的风险与净收益中断后收回直接执行、补充上下文后继续或重派。仍需派工时优先使用短生命周期、最小上下文任务，并写明超时后的最小回报证据。
-- 其他智能体私有目录 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/` 默认禁止读取、递归扫描、审计、清理或总结；即使用户要求查看所有配置文件也默认排除；只有用户明确点名并明确解除禁止后才能读取。
+- 其他智能体私有目录 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/` 及本地私有封存 `archive/v1.0/private/` 默认禁止读取、递归扫描、审计、清理或总结；即使用户要求查看所有配置文件也默认排除；只有用户明确点名并明确解除禁止后才能读取。
 - `docs/quality/` 仅用于正式质量报告、代码审计报告、验收报告、上线裁决/收口报告；不得存放临时日志、截图、缓存、过程草稿或自动化中间产物。写入 `docs/quality/` 与 `docs/plans/` 同样按授权门和自适应路由执行，主线程始终负责最终结论和验收。
 - 临时产物治理规则：
   - 正式交付物与长期规则只包括仓库规则、计划书、正式质量报告、流程文档、工作流配置等可复用资产；一次性 run id、截图名、临时日志路径、会话草稿不得写进长期规则。
   - 验收证据只保留能支撑“通过/不通过、阻塞/非阻塞”结论的正式报告、关键命令结果摘要和必要链接；原始日志、截图、缓存、调试脚本输出默认不作为正式交付物入库。
   - 可忽略或可清理的临时产物包括构建产物、前端缓存、测试产物、日志、临时文件、本地运行态等，例如 `backend/target`、`frontend-admin/dist`、`frontend-admin/coverage`、`playwright-report`、`test-results`、`*.log`、`*.tmp`、`.agent-runtime`。
-  - 私有目录 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/` 继续按禁止区处理：不要默认展开、不要审计、不要清理，除非用户明确点名并明确解除禁止。
+  - 私有目录 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/` 及 `archive/v1.0/private/` 继续按禁止区处理：不要默认展开、不要审计、不要清理，除非用户明确点名并明确解除禁止。
   - 应进入版本管理的项目资产包括 `README.md`、`AGENTS.md`、`AGENTS.override.md`、`docs/**`、`skills-lock.json`、`.github/workflows/**`、`deploy/.env.example`。
   - 任务结束可先做只读检查：`git status --short`、`git clean -fdn`、`git check-ignore -v AGENTS.md docs/README.md skills-lock.json deploy/.env`；任何清理动作都必须先预览，不得盲删。
 - 只有实际派工时才要求显式指定 `model`、`thinking` 和 `reason`；未派工不输出这些元数据，也不输出模型分配表。

@@ -97,7 +97,7 @@ function Test-ExcludedBusinessPath {
   if ($normalized.StartsWith("./")) {
     $normalized = $normalized.Substring(2)
   }
-  return $normalized -match '^(?:\.codex-autopilot/|\.omc/|\.omo/|\.opencode/|\.claude/|\.mimocode/|graphify-out/|\.sisyphus/|\.archive/)'
+  return $normalized -match '^(?:\.codex-autopilot/|\.omc/|\.omo/|\.opencode/|\.claude/|\.mimocode/|graphify-out/|\.sisyphus/|\.archive/|archive/v1\.0/private/)'
 }
 
 function Get-BusinessPathsFromStatusLine {

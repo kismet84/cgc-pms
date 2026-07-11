@@ -31,3 +31,4 @@
 - `graphify-out/`
 - `.sisyphus/`
 - `.archive/`
+- `archive/v1.0/private/`

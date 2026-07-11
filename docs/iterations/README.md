@@ -1,6 +1,8 @@
-# Iterations
+# v1.5 Iterations
 
 本目录用于保存每轮 AutoPilot 的正式迭代记录。
+
+v1.0 及更早记录见 [`docs/archive/v1.0/iterations/`](../archive/v1.0/iterations/)。
 
 建议命名：
 
