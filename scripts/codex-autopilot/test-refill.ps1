@@ -23,14 +23,17 @@ try {
   '# Blocked Issues' | Set-Content -LiteralPath (Join-Path $backlog 'blocked-issues.md') -Encoding UTF8
 
   $decision = Get-AutopilotRefillDecision -RepoRoot $root
-  if ($decision.action -ne 'PLAN_READY' -or $decision.targetReadyCount -ne 3 -or $decision.candidates.Count -ne 3) { throw 'refill candidate order/count is wrong' }
+  if ($decision.action -ne 'PLAN_READY' -or $decision.targetReadyCount -ne 1 -or $decision.candidates.Count -ne 1) { throw 'refill must select only the highest-priority candidate' }
+  if ($decision.candidates[0].name -ne 'Candidate A') { throw 'refill did not keep candidate priority' }
 
   'pause' | Set-Content -LiteralPath (Join-Path $autoDir 'pause.flag') -Encoding UTF8
   if ((Get-AutopilotRefillDecision -RepoRoot $root).action -ne 'PAUSE') { throw 'pause flag did not stop refill' }
   Remove-Item -LiteralPath (Join-Path $autoDir 'pause.flag')
 
   "# Blocked Issues`n### ISSUE-1：Candidate A prerequisite`n状态：Blocked" | Set-Content -LiteralPath (Join-Path $backlog 'blocked-issues.md') -Encoding UTF8
-  if ((Get-AutopilotRefillDecision -RepoRoot $root).action -ne 'UNBLOCK_FIRST') { throw 'current focus blocker was not prioritized' }
+  $unblockDecision = Get-AutopilotRefillDecision -RepoRoot $root
+  if ($unblockDecision.action -ne 'UNBLOCK_FIRST') { throw 'current focus blocker was not prioritized' }
+  if ($unblockDecision.targetReadyCount -ne 1) { throw 'blocked prerequisite still forced a three-item target' }
   if (Test-AutopilotReadyPlanningAllowed -Action 'UNBLOCK_FIRST') { throw 'blocked prerequisite was allowed into Ready Planner' }
   if (!(Test-AutopilotReadyPlanningAllowed -Action 'PLAN_READY')) { throw 'normal candidate refill was rejected' }
 
@@ -66,6 +69,11 @@ Migration：不需要
 Reviewer要求：不需要
 "@
   }
+  (New-PlannedBlock 'ISSUE-901-000') | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
+  $sufficientDecision = Get-AutopilotRefillDecision -RepoRoot $root
+  if ($sufficientDecision.action -ne 'READY_SUFFICIENT' -or $sufficientDecision.targetReadyCount -ne 1) { throw 'one valid Ready issue was not treated as sufficient' }
+  '# Ready Issues' | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
+
   $planPath = Join-Path $root 'ready-plan.json'
   [ordered]@{ readyBlocks = @((New-PlannedBlock 'ISSUE-901-001'),(New-PlannedBlock 'ISSUE-901-002'),(New-PlannedBlock 'ISSUE-901-003')) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $planPath -Encoding UTF8
   $imported = Import-AutopilotReadyPlan -PlanPath $planPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root

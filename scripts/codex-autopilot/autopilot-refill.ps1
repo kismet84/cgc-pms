@@ -25,14 +25,14 @@ function Get-AutopilotRefillDecision {
   $readyPath = Join-Path $backlog 'ready-issues.md'
   $readyText = if (Test-Path -LiteralPath $readyPath) { Get-Content -LiteralPath $readyPath -Raw -Encoding UTF8 } else { '' }
   $readyCount = if (Test-Path -LiteralPath $readyPath) { @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $RepoRoot).Count } else { 0 }
-  if ($readyCount -ge 3) { return [pscustomobject]@{ action = 'READY_SUFFICIENT'; targetReadyCount = $readyCount; candidates = @(); reason = 'Ready queue already has at least three items' } }
+  if ($readyCount -ge 1) { return [pscustomobject]@{ action = 'READY_SUFFICIENT'; targetReadyCount = $readyCount; candidates = @(); reason = 'Ready queue already has at least one item' } }
 
   $focusPath = Join-Path $backlog 'current-focus.md'; $blockedPath = Join-Path $backlog 'blocked-issues.md'
   $focusText = if (Test-Path -LiteralPath $focusPath) { Get-Content -LiteralPath $focusPath -Raw -Encoding UTF8 } else { '' }
   $blockedText = if (Test-Path -LiteralPath $blockedPath) { Get-Content -LiteralPath $blockedPath -Raw -Encoding UTF8 } else { '' }
   $focusMatch = [regex]::Match($focusText, '(?im)当前\s*focus[：:]\s*([^\r\n]+)')
   if ($focusMatch.Success -and $blockedText -match [regex]::Escape($focusMatch.Groups[1].Value.Trim())) {
-    return [pscustomobject]@{ action = 'UNBLOCK_FIRST'; targetReadyCount = [Math]::Min(5, [Math]::Max(3, $readyCount)); candidates = @([pscustomobject]@{ name = $focusMatch.Groups[1].Value.Trim(); status = 'BlockedPrerequisite'; source = 'blocked-issues.md' }); reason = 'current focus prerequisite is blocked' }
+    return [pscustomobject]@{ action = 'UNBLOCK_FIRST'; targetReadyCount = 1; candidates = @([pscustomobject]@{ name = $focusMatch.Groups[1].Value.Trim(); status = 'BlockedPrerequisite'; source = 'blocked-issues.md' }); reason = 'current focus prerequisite is blocked' }
   }
 
   $adHocPath = Join-Path $backlog 'ad-hoc-plan.md'
@@ -44,7 +44,7 @@ function Get-AutopilotRefillDecision {
     }
     $candidates = @($candidates | Sort-Object @{Expression={ if ($_.status -eq 'ReadyToSplit') { 0 } else { 1 } }} | Select-Object -Unique name,status,source)
   }
-  $needed = [Math]::Max(0, 3 - $readyCount)
+  $needed = [Math]::Max(0, 1 - $readyCount)
   if ($candidates.Count -lt $needed) {
     $planPath = Join-Path $backlog 'cgc-pms-production-enhancement-plan.md'
     if (Test-Path -LiteralPath $planPath) {
