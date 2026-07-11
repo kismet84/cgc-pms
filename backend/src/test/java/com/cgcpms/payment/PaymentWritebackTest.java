@@ -155,7 +155,7 @@ class PaymentWritebackTest {
         assertNotNull(vo1.getId(), "首次写回应返回 ID");
 
         // 同流水号再次写回
-        PayRecord input2 = buildPayRecord(new BigDecimal("200000.00"), "TXN-WB-UNIQUE");
+        PayRecord input2 = buildPayRecord(new BigDecimal("100000.00"), "TXN-WB-UNIQUE");
         PayRecordVO vo2 = payRecordService.writeback(input2);
 
         // 应返回同一记录 ID
@@ -335,19 +335,18 @@ class PaymentWritebackTest {
 
     @Test
     @Transactional
-    @DisplayName("T-WB-10: writeback — 付款金额为 null 时抛 NPE（接口未做 null 保护）")
-    void testWriteback_NullPayAmount_ThrowsNPE() {
+    @DisplayName("T-WB-10: writeback — 付款金额为 null 时明确拒绝")
+    void testWriteback_NullPayAmountRejected() {
         PayRecord input = new PayRecord();
         input.setPayApplicationId(testPayAppId);
         input.setPayAmount(null);
         input.setPayDate(LocalDate.now());
         input.setExternalTxnNo("TXN-ZERO-001");
 
-        // payAmount 为 null 时 writeback 会在 compareTo 处抛 NPE
-        // 这是当前接口契约的一部分 — 调用方需保证 payAmount 非 null
-        assertThrows(NullPointerException.class,
+        BusinessException ex = assertThrows(BusinessException.class,
                 () -> payRecordService.writeback(input),
-                "payAmount 为 null 时 writeback 应直接抛 NullPointerException");
+                "payAmount 为 null 时 writeback 应明确拒绝");
+        assertEquals("PAY_AMOUNT_INVALID", ex.getCode());
     }
 
     @ParameterizedTest

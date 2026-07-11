@@ -1,12 +1,18 @@
 package com.cgcpms.payment;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.cashbook.constant.CashbookConstants;
+import com.cgcpms.cashbook.entity.CashJournalEntry;
+import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
+import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.service.PayApplicationService;
 import com.cgcpms.payment.service.PayRecordService;
 import io.jsonwebtoken.Claims;
@@ -17,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -56,6 +63,18 @@ class PayRecordControllerTest {
 
     @Autowired
     private PayRecordService payRecordService;
+
+    @Autowired
+    private PayRecordMapper payRecordMapper;
+
+    @Autowired
+    private CashJournalEntryMapper cashJournalEntryMapper;
+
+    @Autowired
+    private CostSummaryService costSummaryService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
@@ -121,6 +140,93 @@ class PayRecordControllerTest {
         } finally {
             clearUserContext();
         }
+    }
+
+    @AfterAll
+    void cleanupData() {
+        try {
+            setUserContext();
+            Assertions.assertAll("cleanup PayRecordControllerTest data",
+                    this::deleteDerivedCashJournalEntries,
+                    () -> payRecordMapper.delete(new LambdaQueryWrapper<PayRecord>()
+                            .eq(PayRecord::getPayApplicationId, payApplicationId)),
+                    () -> payApplicationMapper.deleteById(payApplicationId),
+                    this::recalculateContractPaidAmount,
+                    () -> costSummaryService.updatePaidAmount(PROJECT_ID),
+                    this::assertCleanupComplete);
+        } finally {
+            clearUserContext();
+        }
+    }
+
+    private void deleteDerivedCashJournalEntries() {
+        List<Long> payRecordIds = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                        .select(PayRecord::getId)
+                        .eq(PayRecord::getPayApplicationId, payApplicationId))
+                .stream()
+                .map(PayRecord::getId)
+                .toList();
+        if (!payRecordIds.isEmpty()) {
+            cashJournalEntryMapper.delete(new LambdaQueryWrapper<CashJournalEntry>()
+                    .eq(CashJournalEntry::getTenantId, TENANT_ID)
+                    .eq(CashJournalEntry::getSourceType, CashbookConstants.SourceType.PAY_RECORD)
+                    .in(CashJournalEntry::getSourceId, payRecordIds));
+        }
+    }
+
+    private void recalculateContractPaidAmount() {
+        jdbcTemplate.update("""
+                UPDATE ct_contract
+                SET paid_amount = (
+                    SELECT COALESCE(SUM(pay_amount), 0)
+                    FROM pay_record
+                    WHERE tenant_id = ? AND contract_id = ?
+                      AND pay_status = 'SUCCESS' AND deleted_flag = 0
+                )
+                WHERE tenant_id = ? AND id = ? AND deleted_flag = 0
+                """, TENANT_ID, CONTRACT_ID, TENANT_ID, CONTRACT_ID);
+    }
+
+    private void assertCleanupComplete() {
+        BigDecimal contractPaid = amount("SELECT paid_amount FROM ct_contract WHERE id = ?", CONTRACT_ID);
+        BigDecimal expectedContractPaid = amount("""
+                SELECT COALESCE(SUM(pay_amount), 0) FROM pay_record
+                WHERE tenant_id = ? AND contract_id = ? AND pay_status = 'SUCCESS' AND deleted_flag = 0
+                """, TENANT_ID, CONTRACT_ID);
+        BigDecimal expectedProjectPaid = amount("""
+                SELECT COALESCE(SUM(pay_amount), 0) FROM pay_record
+                WHERE tenant_id = ? AND project_id = ? AND pay_status = 'SUCCESS' AND deleted_flag = 0
+                """, TENANT_ID, PROJECT_ID);
+
+        Assertions.assertAll("verify PayRecordControllerTest cleanup",
+                () -> assertEquals(0, count("""
+                        SELECT COUNT(*) FROM pay_application
+                        WHERE id = ? AND deleted_flag = 0
+                        """, payApplicationId)),
+                () -> assertEquals(0, count("""
+                        SELECT COUNT(*) FROM pay_record
+                        WHERE pay_application_id = ? AND deleted_flag = 0
+                        """, payApplicationId)),
+                () -> assertEquals(0, count("""
+                        SELECT COUNT(*) FROM cash_journal_entry cj
+                        JOIN pay_record pr ON pr.id = cj.source_id
+                        WHERE pr.pay_application_id = ? AND cj.source_type = 'PAY_RECORD'
+                          AND cj.deleted_flag = 0
+                        """, payApplicationId)),
+                () -> assertEquals(0, expectedContractPaid.compareTo(contractPaid)),
+                () -> assertEquals(0, count("""
+                        SELECT COUNT(*) FROM cost_summary
+                        WHERE tenant_id = ? AND project_id = ? AND deleted_flag = 0
+                          AND (paid_amount IS NULL OR paid_amount <> ?)
+                        """, TENANT_ID, PROJECT_ID, expectedProjectPaid)));
+    }
+
+    private int count(String sql, Object... args) {
+        return jdbcTemplate.queryForObject(sql, Integer.class, args);
+    }
+
+    private BigDecimal amount(String sql, Object... args) {
+        return jdbcTemplate.queryForObject(sql, BigDecimal.class, args);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -243,6 +349,45 @@ class PayRecordControllerTest {
 
     @Test
     @Order(7)
+    @DisplayName("POST /pay-records/writeback with 3-decimal amount -> 400")
+    void testWriteback_RejectsThreeDecimalAmount() throws Exception {
+        String body = """
+                {
+                    "payApplicationId": %d,
+                    "payAmount": 1.001,
+                    "payDate": "2026-06-22",
+                    "externalTxnNo": "TXN-SCALE-%d"
+                }
+                """.formatted(payApplicationId, System.nanoTime());
+
+        mockMvc.perform(postWithApi("/pay-records/writeback")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("POST /pay-records/writeback without payDate -> 400")
+    void testWriteback_RejectsMissingPayDate() throws Exception {
+        String body = """
+                {
+                    "payApplicationId": %d,
+                    "payAmount": 1.00,
+                    "externalTxnNo": "TXN-NO-DATE-%d"
+                }
+                """.formatted(payApplicationId, System.nanoTime());
+
+        mockMvc.perform(postWithApi("/pay-records/writeback")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Order(9)
     @DisplayName("writeback 带审计注解")
     void testWritebackAuditedOperationPresent() throws Exception {
         Method method = com.cgcpms.payment.controller.PayRecordController.class

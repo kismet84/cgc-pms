@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cashbook.service.CashJournalService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostSummaryService;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,6 +35,7 @@ public class PayRecordService {
     private final CtContractMapper ctContractMapper;
     private final PayApplicationService payApplicationService;
     private final CostSummaryService costSummaryService;
+    private final CashJournalService cashJournalService;
 
     // ---- Query ----
 
@@ -62,11 +65,8 @@ public class PayRecordService {
      */
     @Transactional(rollbackFor = Exception.class)
     public PayRecordVO writeback(PayRecord input) {
+        validateWriteback(input);
         Long payApplicationId = input.getPayApplicationId();
-        if (payApplicationId == null)
-            throw new BusinessException("MISSING_APP_ID", "付款申请ID不能为空");
-        if (input.getExternalTxnNo() == null || input.getExternalTxnNo().isBlank())
-            throw new BusinessException("EXTERNAL_TXN_NO_REQUIRED", "外部交易流水号不能为空");
 
         // Lookup and lock the pay application to prevent concurrent writeback TOCTOU
         PayApplication app = payApplicationMapper.selectByIdForUpdate(payApplicationId, UserContext.getCurrentTenantId());
@@ -80,9 +80,16 @@ public class PayRecordService {
                 .eq(PayRecord::getTenantId, UserContext.getCurrentTenantId())
                 .eq(PayRecord::getExternalTxnNo, input.getExternalTxnNo()));
         if (!existing.isEmpty()) {
+            PayRecord duplicate = existing.get(0);
+            if (!Objects.equals(duplicate.getPayApplicationId(), payApplicationId)
+                    || !sameAmount(duplicate.getPayAmount(), input.getPayAmount())
+                    || !Objects.equals(duplicate.getPayDate(), input.getPayDate())) {
+                throw new BusinessException("PAY_WRITEBACK_IDEMPOTENCY_CONFLICT",
+                        "外部交易流水号已被不同付款数据使用");
+            }
             log.info("Idempotent writeback hit: duplicate external transaction detected, returning existing record id={}",
-                existing.get(0).getId());
-            return toVO(existing.get(0));
+                duplicate.getId());
+            return toVO(duplicate);
         }
 
         // Check contract balance before payment — include pendingAmount to prevent concurrent overpay
@@ -121,6 +128,8 @@ public class PayRecordService {
         log.info("Authoritative writeback: pay_record created, id={}, amount={}",
             record.getId(), record.getPayAmount());
 
+        cashJournalService.createPendingFromPayRecord(record);
+
         // D4 linkage: cascade updates
         updateContractPaidAmount(app.getContractId());
         payApplicationService.updatePayStatus(payApplicationId);
@@ -155,6 +164,30 @@ public class PayRecordService {
     }
 
     // ---- CRUD removed — all writes MUST go through authoritative writeback() ----
+
+    private boolean sameAmount(BigDecimal left, BigDecimal right) {
+        return left != null && right != null && left.compareTo(right) == 0;
+    }
+
+    private void validateWriteback(PayRecord input) {
+        if (input == null) {
+            throw new BusinessException("PAY_WRITEBACK_REQUIRED", "付款回写信息不能为空");
+        }
+        if (input.getPayApplicationId() == null) {
+            throw new BusinessException("MISSING_APP_ID", "付款申请ID不能为空");
+        }
+        BigDecimal amount = input.getPayAmount();
+        int integerDigits = amount == null ? 0 : Math.max(0, amount.precision() - amount.scale());
+        if (amount == null || amount.signum() <= 0 || amount.scale() > 2 || integerDigits > 16) {
+            throw new BusinessException("PAY_AMOUNT_INVALID", "付款金额必须大于0且最多16位整数、2位小数");
+        }
+        if (input.getPayDate() == null) {
+            throw new BusinessException("PAY_DATE_REQUIRED", "付款日期不能为空");
+        }
+        if (input.getExternalTxnNo() == null || input.getExternalTxnNo().isBlank()) {
+            throw new BusinessException("EXTERNAL_TXN_NO_REQUIRED", "外部交易流水号不能为空");
+        }
+    }
 
     // ---- VO conversion ----
 

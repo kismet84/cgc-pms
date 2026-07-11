@@ -19,8 +19,10 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.net.ConnectException;
@@ -51,7 +53,7 @@ class FileServiceTest {
     @Autowired
     private FileService fileService;
 
-    @Autowired
+    @SpyBean
     private SysFileMapper sysFileMapper;
 
     @Autowired
@@ -207,7 +209,7 @@ class FileServiceTest {
                 fileService.upload(file, "CONTRACT/../etc", 1L));
 
         assertEquals("FILE_PARAM_INVALID", ex.getCode());
-        verify(authorizer, never()).checkWriteAccess(any(), any());
+        verify(authorizer, never()).checkUploadAccess(any(), any());
         verifyNoInteractions(minioClient);
     }
 
@@ -239,7 +241,7 @@ class FileServiceTest {
         String businessType = "CONTRACT";
         long businessId = Math.abs(System.nanoTime());
         doThrow(new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "合同不存在: " + businessId))
-                .when(authorizer).checkWriteAccess(businessType, businessId);
+                .when(authorizer).checkUploadAccess(businessType, businessId);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> fileService.upload(file, businessType, businessId));
@@ -257,7 +259,7 @@ class FileServiceTest {
         String businessType = "CONTRACT";
         long businessId = Math.abs(System.nanoTime());
         doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权访问该合同文件"))
-                .when(authorizer).checkWriteAccess(businessType, businessId);
+                .when(authorizer).checkUploadAccess(businessType, businessId);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> fileService.upload(file, businessType, businessId));
@@ -324,7 +326,7 @@ class FileServiceTest {
         assertEquals("FILE_DUPLICATE", ex.getCode());
         assertTrue(ex.getMessage().contains("文件已存在"));
         assertEquals(1L, fileCountFor(businessType, businessId));
-        verify(authorizer, times(2)).checkWriteAccess(businessType, businessId);
+        verify(authorizer, times(2)).checkUploadAccess(businessType, businessId);
         verify(minioClient, times(1)).putObject(any(PutObjectArgs.class));
     }
 
@@ -517,7 +519,7 @@ class FileServiceTest {
 
         assertEquals("FILE_NOT_FOUND", ex.getCode());
         assertEquals(1, countRawFileRows(file.getId(), 0));
-        verify(authorizer, never()).checkWriteAccess(any(), any());
+        verify(authorizer, never()).checkDeleteAccess(any(), any());
         verifyNoInteractions(minioClient);
     }
 
@@ -527,7 +529,7 @@ class FileServiceTest {
         SysFile file = insertFile("CONTRACT", 30005L, TestUserContext.TENANT_0,
                 "contract-denied.pdf", "application/pdf");
         doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权删除该合同文件"))
-                .when(authorizer).checkWriteAccess("CONTRACT", 30005L);
+                .when(authorizer).checkDeleteAccess("CONTRACT", 30005L);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> fileService.delete(file.getId()));
@@ -538,8 +540,8 @@ class FileServiceTest {
     }
 
     @Test
-    @DisplayName("delete removes object from MinIO then logically deletes record")
-    void testDeleteRemovesObjectThenDeletesRecord() throws Exception {
+    @DisplayName("delete removes object from MinIO only after transaction commit")
+    void testDeleteRemovesObjectAfterTransactionCommit() throws Exception {
         SysFile file = insertFile("CONTRACT", 30006L, TestUserContext.TENANT_0,
                 "contract-ok.pdf", "application/pdf");
 
@@ -550,6 +552,51 @@ class FileServiceTest {
         assertEquals("test-bucket", args.getValue().bucket());
         assertEquals("CONTRACT/30006/contract-ok.pdf", args.getValue().object());
         assertNull(sysFileMapper.selectById(file.getId()));
+    }
+
+    @Test
+    @DisplayName("delete keeps physical object and metadata when logical delete affects no row")
+    void testDeleteKeepsObjectWhenLogicalDeleteFails() throws Exception {
+        SysFile file = insertFile("CONTRACT", 30009L, TestUserContext.TENANT_0,
+                "contract-db-fail.pdf", "application/pdf");
+        doReturn(0).when(sysFileMapper).deleteById(file.getId());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.delete(file.getId()));
+
+        assertEquals("FILE_DELETE_FAILED", ex.getCode());
+        assertNotNull(sysFileMapper.selectById(file.getId()));
+        verify(minioClient, never()).removeObject(any(RemoveObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("delete without transaction synchronization fails before any side effect")
+    void testDeleteWithoutTransactionFailsSafe() throws Exception {
+        SysFile file = insertFile("CONTRACT", 30010L, TestUserContext.TENANT_0,
+                "contract-no-tx.pdf", "application/pdf");
+        FileService target = AopTestUtils.getTargetObject(fileService);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> target.delete(file.getId()));
+
+        assertEquals("FILE_DELETE_FAILED", ex.getCode());
+        assertNotNull(sysFileMapper.selectById(file.getId()));
+        verify(sysFileMapper, never()).deleteById(file.getId());
+        verify(minioClient, never()).removeObject(any(RemoveObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("delete commit succeeds even when post-commit MinIO cleanup fails")
+    void testDeleteDoesNotFailAfterCommitWhenMinioCleanupFails() throws Exception {
+        SysFile file = insertFile("CONTRACT", 30011L, TestUserContext.TENANT_0,
+                "contract-cleanup-fail.pdf", "application/pdf");
+        doThrow(new RuntimeException("minio unavailable; accessKey=must-not-leak"))
+                .when(minioClient).removeObject(any(RemoveObjectArgs.class));
+
+        assertDoesNotThrow(() -> fileService.delete(file.getId()));
+
+        assertNull(sysFileMapper.selectById(file.getId()));
+        verify(minioClient).removeObject(any(RemoveObjectArgs.class));
     }
 
     @Test

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { getUserInfo } from '@/api/modules/auth'
-import { routes, handleAuthGuard } from '@/router'
+import router, { routes, handleAuthGuard } from '@/router'
 import { useUserStore } from '@/stores/user'
 import type { UserInfo } from '@/types/user'
 
@@ -90,6 +90,23 @@ describe('router lazy loading', () => {
     expect(partnerRoute?.meta?.title).toBe('合作方管理')
     expect(partnerRoute?.meta?.icon).toBe('TeamOutlined')
     expect(typeof partnerRoute!.component).toBe('function')
+  })
+
+  it('registers the cash journal route with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const cashJournalRoute = rootRoute?.children?.find((c) => c.path === 'cash-journal')
+
+    expect(cashJournalRoute?.name).toBe('CashJournal')
+    expect(cashJournalRoute?.meta?.title).toBe('资金日记账')
+    expect(cashJournalRoute?.meta?.permission).toBe('cashbook:journal:query')
+    expect(typeof cashJournalRoute?.component).toBe('function')
+  })
+
+  it.each([
+    ['/cash-journal', 'cashbook:journal:query'],
+    ['/contract/ledger', 'contract:query'],
+  ])('injects %s permission into the actual normalized route', (path, permission) => {
+    expect(router.resolve(path).meta.permission).toBe(permission)
   })
 
   it('approval process route is admin-only and lazily loaded', () => {
@@ -249,6 +266,60 @@ describe('router lazy loading', () => {
     } as never)
 
     expect(mockGetUserInfo).not.toHaveBeenCalled()
-    expect(result).toBe(false)
+    expect(result).toEqual({ path: '/403' })
+  })
+
+  it('redirects direct cash journal access when query permission is missing', async () => {
+    const userStore = useUserStore()
+    userStore.setUserInfo(buildUserInfo({ roles: ['USER'], permissions: ['payment:app:query'] }))
+
+    const result = await handleAuthGuard({
+      path: '/cash-journal',
+      fullPath: '/cash-journal',
+      meta: { permission: 'cashbook:journal:query' },
+    } as never)
+
+    expect(result).toEqual({ path: '/403' })
+  })
+
+  it.each([
+    ['/cash-journal', ['payment:app:query']],
+    ['/approval/process', ['workflow:task:query']],
+    ['/dashboard', ['alert:view']],
+  ])('navigates a logged-in unauthorized user from %s to the Forbidden route', async (path, permissions) => {
+    const userStore = useUserStore()
+    userStore.setUserInfo(buildUserInfo({ roles: ['USER'], permissions }))
+    const testRouter = createRouter({ history: createMemoryHistory(), routes })
+    testRouter.beforeEach(handleAuthGuard)
+
+    await testRouter.push(path)
+
+    expect(testRouter.currentRoute.value.name).toBe('Forbidden')
+    expect(testRouter.currentRoute.value.path).toBe('/403')
+  })
+
+  it('allows a logged-in user to enter the permission-free Forbidden route without a redirect loop', async () => {
+    const userStore = useUserStore()
+    userStore.setUserInfo(buildUserInfo({ roles: ['USER'], permissions: [] }))
+    const testRouter = createRouter({ history: createMemoryHistory(), routes })
+    testRouter.beforeEach(handleAuthGuard)
+
+    await testRouter.push('/403')
+
+    expect(testRouter.currentRoute.value.name).toBe('Forbidden')
+    expect(testRouter.currentRoute.value.meta.permission).toBeUndefined()
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])('allows %s through a protected route without a duplicated permission grant', async (role) => {
+    const userStore = useUserStore()
+    userStore.setUserInfo(buildUserInfo({ roles: [role], permissions: [] }))
+
+    const result = await handleAuthGuard({
+      path: '/cash-journal',
+      fullPath: '/cash-journal',
+      meta: { permission: 'cashbook:journal:query' },
+    } as never)
+
+    expect(result).toBe(true)
   })
 })

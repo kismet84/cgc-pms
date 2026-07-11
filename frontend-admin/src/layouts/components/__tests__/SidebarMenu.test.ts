@@ -6,6 +6,7 @@ import SidebarMenu from '@/layouts/components/SidebarMenu.vue'
 const mockPush = vi.fn()
 const mockRoles = vi.hoisted(() => ({ value: ['ADMIN'] as string[] }))
 const mockPath = vi.hoisted(() => ({ value: '/dashboard' }))
+const mockHasPermission = vi.hoisted(() => vi.fn(() => true))
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -24,6 +25,7 @@ vi.mock('vue-router', async () => {
 vi.mock('@/stores/user', () => ({
   useUserStore: () => ({
     roles: mockRoles.value,
+    hasPermission: mockHasPermission,
   }),
 }))
 
@@ -105,6 +107,7 @@ describe('SidebarMenu', () => {
     mockRoles.value = ['ADMIN']
     mockPath.value = '/dashboard'
     mockPush.mockClear()
+    mockHasPermission.mockReset().mockReturnValue(true)
   })
 
   it('uses full paths for nested menu item keys', () => {
@@ -174,6 +177,7 @@ describe('SidebarMenu', () => {
     expect(findSubmenuLabels(wrapper, '/settlement-domain')).toEqual([
       '结算台账',
       '付款申请',
+      '资金日记账',
       '发票管理',
     ])
 
@@ -185,6 +189,24 @@ describe('SidebarMenu', () => {
       '字典管理',
       '数据管理',
     ])
+  })
+
+  it('hides the cash journal entry without query permission', () => {
+    mockRoles.value = ['USER']
+    mockHasPermission.mockImplementation((code: string) => code !== 'cashbook:journal:query')
+
+    const wrapper = mountMenu()
+
+    expect(wrapper.find('[data-menu-key="/cash-journal"]').exists()).toBe(false)
+  })
+
+  it('shows permission menus to administrators without explicit permission codes', () => {
+    mockRoles.value = ['ADMIN']
+    mockHasPermission.mockReturnValue(false)
+
+    const wrapper = mountMenu()
+
+    expect(wrapper.find('[data-menu-key="/cash-journal"]').exists()).toBe(true)
   })
 
   it('navigates to the first visible child when a root section title is clicked', async () => {

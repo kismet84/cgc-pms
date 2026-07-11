@@ -2,6 +2,7 @@ package com.cgcpms.system;
 
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.ratelimit.FallbackRateLimitCounterStore;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,8 +22,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SysRoleControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
+    @Autowired private FallbackRateLimitCounterStore counterStore;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private Long roleId;
+
+    @BeforeEach
+    void setUp() {
+        counterStore.clear();
+    }
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,

@@ -15,6 +15,7 @@ import {
   submitForApproval,
   updateApplication,
 } from '@/api/modules/payment'
+import { getCashJournalList } from '@/api/modules/cashbook'
 import { getReceiptItems, getReceiptList } from '@/api/modules/receipt'
 import { getMeasureItems, getMeasureList } from '@/api/modules/subcontract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
@@ -22,8 +23,10 @@ import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/compo
 import { formatWanAmount } from '@/composables/listTablePresets'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useReferenceStore } from '@/stores/reference'
+import { useUserStore } from '@/stores/user'
 import { PAY_STATUS_COLOR, PAY_STATUS_LABEL, PAY_TYPE_COLOR, PAY_TYPE_LABEL } from '@/types/payment'
 import type { PayApplicationBasisVO, PayApplicationVO } from '@/types/payment'
+import type { CashJournalEntryVO } from '@/types/cashbook'
 import type { MatReceiptVO } from '@/types/receipt'
 import type { SubMeasureVO } from '@/types/subcontract'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
@@ -60,7 +63,14 @@ const route = useRoute()
 const router = useRouter()
 const queryReady = ref(false)
 const referenceStore = useReferenceStore()
+const userStore = useUserStore()
 const { projects, contracts } = storeToRefs(referenceStore)
+const canViewCashJournal = computed(
+  () =>
+    userStore.roles.includes('ADMIN') ||
+    userStore.roles.includes('SUPER_ADMIN') ||
+    userStore.hasPermission('cashbook:journal:query'),
+)
 const hasActiveFilters = computed(
   () =>
     Boolean(
@@ -124,11 +134,13 @@ const basisList = ref<(Partial<PayApplicationBasisVO> & { key: number })[]>([])
 let basisKeyCounter = 0
 const writebackVisible = ref(false)
 const writebackTargetId = ref('')
+const linkedCashJournal = ref<CashJournalEntryVO | null>(null)
 const writebackForm = reactive({
   payAmount: undefined as number | undefined,
   payDate: undefined as string | undefined,
   payMethod: 'BANK_TRANSFER',
   voucherNo: '',
+  externalTxnNo: '',
 })
 
 const PAY_STATUS_DICT = 'pay_status'
@@ -392,19 +404,76 @@ function openWriteback(record: PayApplicationVO) {
   writebackForm.payDate = undefined
   writebackForm.payMethod = 'BANK_TRANSFER'
   writebackForm.voucherNo = ''
+  writebackForm.externalTxnNo = ''
   writebackVisible.value = true
 }
 
 async function handleWritebackOk() {
+  if (!writebackForm.payAmount || !writebackForm.payDate || !writebackForm.payMethod) {
+    message.warning('请完整填写支付金额、日期和方式')
+    return
+  }
+  if (!writebackForm.externalTxnNo.trim()) {
+    message.warning('请输入外部交易流水号')
+    return
+  }
+  let payRecord: Awaited<ReturnType<typeof doWriteback>>
   try {
-    await doWriteback(writebackTargetId.value, writebackForm)
-    message.success('回写成功')
-    writebackVisible.value = false
-    fetchData()
+    payRecord = await doWriteback({
+      payApplicationId: writebackTargetId.value,
+      payAmount: writebackForm.payAmount,
+      payDate: writebackForm.payDate,
+      payMethod: writebackForm.payMethod,
+      voucherNo: writebackForm.voucherNo || undefined,
+      externalTxnNo: writebackForm.externalTxnNo.trim(),
+    })
   } catch (e: unknown) {
     console.error(e)
     message.error(getErrorMessage(e, '回写失败，请稍后重试'))
+    return
   }
+
+  linkedCashJournal.value = null
+  message.success('回写成功')
+  writebackVisible.value = false
+  Object.assign(writebackForm, {
+    payAmount: undefined,
+    payDate: undefined,
+    payMethod: 'BANK_TRANSFER',
+    voucherNo: '',
+    externalTxnNo: '',
+  })
+  fetchData()
+
+  if (canViewCashJournal.value) {
+    await tryLoadLinkedCashJournal(payRecord.id, '付款成功，关联日记账暂不可查看')
+  }
+}
+
+async function loadLinkedCashJournal(payRecordId: string) {
+  const result = await getCashJournalList({
+    pageNo: 1,
+    pageSize: 1,
+    sourceType: 'PAY_RECORD',
+    sourceId: payRecordId,
+  })
+  linkedCashJournal.value = result.records?.[0] ?? null
+}
+
+async function tryLoadLinkedCashJournal(payRecordId: string, warningText: string) {
+  linkedCashJournal.value = null
+  try {
+    await loadLinkedCashJournal(payRecordId)
+  } catch (e: unknown) {
+    console.warn('关联日记账加载失败', e)
+    linkedCashJournal.value = null
+    message.warning(warningText)
+  }
+}
+
+function openLinkedCashJournal() {
+  if (!linkedCashJournal.value) return
+  void router.push({ path: '/cash-journal', query: { entryId: linkedCashJournal.value.id } })
 }
 
 function handleWritebackCancel() {
@@ -588,11 +657,22 @@ onMounted(() => {
   fetchData()
   fetchReceipts()
   fetchMeasures()
+  const payRecordId = readStringQuery(route.query.payRecordId)
+  if (payRecordId && canViewCashJournal.value) {
+    void tryLoadLinkedCashJournal(payRecordId, '关联日记账暂不可查看')
+  }
 })
 </script>
 
 <template>
   <div class="lg-list-page lg-page app-page payment-page">
+    <div v-if="linkedCashJournal" class="linked-cash-journal-banner">
+      <div>
+        <strong>关联资金流水 {{ linkedCashJournal.entryNo }}</strong>
+        <span>状态：{{ linkedCashJournal.status === 'PENDING_ARCHIVE' ? '待选择账户、上传附件并归档' : linkedCashJournal.status }}</span>
+      </div>
+      <a-button type="primary" @click="openLinkedCashJournal">进入资金日记账</a-button>
+    </div>
     <PaymentOverviewPanel
       :filter="filter"
       :projects="projects ?? []"
@@ -794,6 +874,9 @@ onMounted(() => {
         <a-form-item label="凭证号">
           <a-input v-model:value="writebackForm.voucherNo" placeholder="请输入凭证号" />
         </a-form-item>
+        <a-form-item label="外部交易流水号" required>
+          <a-input v-model:value="writebackForm.externalTxnNo" placeholder="银行或支付渠道唯一流水号" />
+        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -803,6 +886,20 @@ onMounted(() => {
 .payment-page {
   gap: 14px;
 }
+
+.linked-cash-journal-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid #b7d6ff;
+  border-radius: 10px;
+  background: #f0f7ff;
+}
+
+.linked-cash-journal-banner > div { display: grid; gap: 4px; }
+.linked-cash-journal-banner span { color: var(--text-secondary); font-size: 13px; }
 
 .payment-table-panel {
   min-height: 754px;

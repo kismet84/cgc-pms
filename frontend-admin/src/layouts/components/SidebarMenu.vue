@@ -46,8 +46,15 @@ const isAdmin = computed(() => {
   return userStore.roles.includes('ADMIN') || userStore.roles.includes('SUPER_ADMIN')
 })
 
-function isMenuVisible(item: Pick<NavigationItem, 'adminOnly'>) {
+function isMenuVisible(item: Pick<NavigationItem, 'adminOnly' | 'permission'>) {
   if (item.adminOnly && userStore.roles.length > 0 && !isAdmin.value) return false
+  if (
+    item.permission &&
+    userStore.roles.length > 0 &&
+    !isAdmin.value &&
+    !userStore.hasPermission(item.permission)
+  )
+    return false
   return true
 }
 

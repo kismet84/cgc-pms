@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 
+import com.cgcpms.common.util.SensitiveDataUtils;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -58,6 +60,20 @@ class SensitiveDataMaskingTest {
     }
 
     // ===== Regex pattern tests (core masking logic) =====
+
+    @Test
+    void fieldMaskingKeepsOnlyBankAccountLastFourDigits() {
+        assertEquals("****7890", SensitiveDataUtils.maskFieldValue(
+                "bankAccountNo", "6222021234567890"));
+        assertEquals("****7890", SensitiveDataUtils.maskFieldValue(
+                "BANKACCOUNT", "6222021234567890"));
+    }
+
+    @Test
+    void shortBankAccountIsNotReturnedVerbatim() {
+        assertEquals("****123", SensitiveDataUtils.maskFieldValue("bankAccountNo", "123"));
+        assertNotEquals("123", SensitiveDataUtils.maskFieldValue("bankAccountNo", "123"));
+    }
 
     @Test
     void masksPasswordEqualsValue() {

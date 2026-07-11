@@ -597,6 +597,33 @@ describe('alert/index.vue', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/purchase/order?businessId=PO-9')
   })
 
+  it('资金日记账逾期预警跳转到对应流水', async () => {
+    mockAlertStore.alerts = [
+      createAlertRecord({
+        alertDomain: 'FINANCE',
+        alertCategory: 'CASH_JOURNAL_CLOSURE',
+        ruleType: 'CASH_JOURNAL_ARCHIVE_OVERDUE',
+        sourceType: 'CASH_JOURNAL',
+        sourceId: '101',
+        businessType: 'CASH_JOURNAL',
+        businessId: '101',
+      }),
+    ]
+    mockAlertStore.total = 1
+
+    const wrapper = mountAlertPage({
+      AlertFilterPanel: AlertFilterPanelHarness,
+      AlertTablePanel: AlertTablePanelHarness,
+      AlertDetailPanel: AlertDetailPanelHarness,
+      AlertSubscriptionModal: AlertSubscriptionModalHarness,
+    })
+    await flushPromises()
+    await wrapper.get('.open-first').trigger('click')
+    await wrapper.get('.open-business-entry').trigger('click')
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/cash-journal?entryId=101')
+  })
+
   it('订阅弹窗展示与保存都会收敛到默认边界内，不放大渠道/域/严重度/状态变更范围', async () => {
     mockAlertStore.alerts = [createAlertRecord()]
     mockAlertStore.total = 1

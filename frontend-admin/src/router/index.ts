@@ -26,6 +26,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '首页', icon: 'HomeOutlined' },
       },
       {
+        path: '403',
+        name: 'Forbidden',
+        component: () => import('@/pages/error/403.vue'),
+        meta: { title: '无权访问', hidden: true },
+      },
+      {
         path: 'dashboard/reports',
         name: 'ReportCatalog',
         component: () => import('@/pages/report/catalog.vue'),
@@ -248,6 +254,12 @@ export const routes: RouteRecordRaw[] = [
         ],
       },
       {
+        path: 'cash-journal',
+        name: 'CashJournal',
+        component: () => import('@/pages/cash-journal/index.vue'),
+        meta: { title: '资金日记账', icon: 'AccountBookOutlined' },
+      },
+      {
         path: 'inventory',
         name: 'Inventory',
         redirect: '/inventory/warehouse',
@@ -421,11 +433,6 @@ export const routes: RouteRecordRaw[] = [
   },
 ]
 
-const router = createRouter({
-  history: createWebHistory(),
-  routes,
-})
-
 const WHITE_LIST = ['/login']
 
 const ROUTE_PERMISSION_MAP: Record<string, string> = {
@@ -463,6 +470,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   PurchaseReceipt: 'receipt:query',
   Payment: 'payment:app:query',
   PaymentApplication: 'payment:app:query',
+  CashJournal: 'cashbook:journal:query',
   Inventory: 'inventory:warehouse:query',
   InventoryWarehouse: 'inventory:warehouse:query',
   InventoryStock: 'inventory:stock:query',
@@ -492,6 +500,11 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
 }
 
 applyRoutePermissions(routes)
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+})
 
 let pendingUserInfoRequest: Promise<boolean> | null = null
 
@@ -534,20 +547,21 @@ export async function handleAuthGuard(to: RouteLocationNormalized) {
     return { path: '/login', query: { redirect: to.fullPath } }
   }
   if (to.meta?.adminOnly && !isAdminRole(userStore.roles)) {
-    return { path: '/dashboard' }
+    return { path: '/403' }
   }
   if (
     to.meta?.permission === 'dashboard:view' &&
     !hasDashboardRouteAccess(userStore.roles, userStore.permissions)
   ) {
-    return false
+    return { path: '/403' }
   }
   if (
     to.meta?.permission !== 'dashboard:view' &&
     to.meta?.permission &&
+    !isAdminRole(userStore.roles) &&
     !userStore.hasPermission(to.meta.permission)
   ) {
-    return { path: '/dashboard' }
+    return { path: '/403' }
   }
   return true
 }

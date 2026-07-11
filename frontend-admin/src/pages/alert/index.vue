@@ -791,6 +791,7 @@ function buildAlertBusinessPath(record: AlertLogVO): string {
       VAR_ORDER: (id) => `/variation/order?businessId=${id}`,
       VARIATION: (id) => `/variation/order?businessId=${id}`,
       PURCHASE: (id) => `/purchase/order?businessId=${id}`,
+      CASH_JOURNAL: (id) => `/cash-journal?entryId=${id}`,
     }
     return dynamicRouteMap[businessType]?.(businessId) ?? ''
   }

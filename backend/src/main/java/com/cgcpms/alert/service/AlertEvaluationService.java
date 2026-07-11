@@ -47,6 +47,7 @@ public class AlertEvaluationService {
     private final AlertAccessScopeResolver accessScopeResolver;
     private final AlertSubscriptionService alertSubscriptionService;
     private final AlertRuleEvaluator ruleEvaluator;
+    private final com.cgcpms.cashbook.service.CashJournalAlertService cashJournalAlertService;
 
     private final AtomicBoolean scheduledEvaluateRunning = new AtomicBoolean(false);
 
@@ -65,13 +66,23 @@ public class AlertEvaluationService {
             LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(PmProject::getStatus, "ACTIVE");
             List<PmProject> activeProjects = projectMapper.selectList(wrapper);
+            Set<Long> cashJournalTenants = new LinkedHashSet<>();
 
             log.info("Found {} active projects for alert evaluation", activeProjects.size());
             for (PmProject project : activeProjects) {
+                cashJournalTenants.add(project.getTenantId());
                 try {
                     ((AlertEvaluationService) AopContext.currentProxy()).evaluateProject(project.getTenantId(), project.getId());
                 } catch (Exception e) {
                     log.error("Failed to evaluate alerts for project {}", project.getId(), e);
+                }
+            }
+            cashJournalTenants.addAll(cashJournalAlertService.pendingTenantIds());
+            for (Long tenantId : cashJournalTenants) {
+                try {
+                    cashJournalAlertService.evaluateOverdue(tenantId);
+                } catch (Exception e) {
+                    log.error("Failed to evaluate cash journal alerts for tenant {}", tenantId, e);
                 }
             }
         } catch (Exception e) {
@@ -92,15 +103,17 @@ public class AlertEvaluationService {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<PmProject>()
                 .eq(PmProject::getTenantId, tenantId)
                 .eq(PmProject::getStatus, "ACTIVE");
+        boolean skipProjects = false;
         if (!accessScopeResolver.isAdmin()) {
             Set<Long> accessibleProjectIds = accessScopeResolver.accessibleProjectIds(tenantId);
             if (accessibleProjectIds.isEmpty()) {
-                return 0;
+                skipProjects = true;
+            } else {
+                wrapper.in(PmProject::getId, accessibleProjectIds);
             }
-            wrapper.in(PmProject::getId, accessibleProjectIds);
         }
-        List<PmProject> activeProjects = projectMapper.selectList(wrapper);
-        int totalAlerts = 0;
+        List<PmProject> activeProjects = skipProjects ? List.of() : projectMapper.selectList(wrapper);
+        int totalAlerts = cashJournalAlertService.evaluateOverdue(tenantId);
         for (PmProject project : activeProjects) {
             totalAlerts += evaluateProject(tenantId, project.getId());
         }
@@ -187,10 +200,8 @@ public class AlertEvaluationService {
                                                          Integer isRead, LocalDateTime triggeredStart,
                                                          LocalDateTime triggeredEnd, String processStatus) {
         Set<String> allowedDomains = accessScopeResolver.allowedDomains();
+        accessScopeResolver.assertProjectAccess(tenantId, projectId);
         if (!accessScopeResolver.isAdmin()) {
-            if (projectId != null) {
-                accessScopeResolver.assertProjectAccess(tenantId, projectId);
-            }
             if (StringUtils.hasText(alertDomain) && !allowedDomains.contains(alertDomain)) {
                 return null;
             }
@@ -205,10 +216,19 @@ public class AlertEvaluationService {
             wrapper.eq(AlertLog::getProjectId, projectId);
         } else if (!accessScopeResolver.isAdmin()) {
             Set<Long> accessibleProjectIds = accessScopeResolver.accessibleProjectIds(tenantId);
-            if (accessibleProjectIds.isEmpty()) {
+            boolean financeAllowed = allowedDomains.contains("FINANCE");
+            if (accessibleProjectIds.isEmpty() && !financeAllowed) {
                 return null;
             }
-            wrapper.in(AlertLog::getProjectId, accessibleProjectIds);
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq(AlertLog::getProjectId, 0L).eq(AlertLog::getAlertDomain, "FINANCE");
+            } else if (financeAllowed) {
+                wrapper.and(w -> w.in(AlertLog::getProjectId, accessibleProjectIds)
+                        .or(finance -> finance.eq(AlertLog::getProjectId, 0L)
+                                .eq(AlertLog::getAlertDomain, "FINANCE")));
+            } else {
+                wrapper.in(AlertLog::getProjectId, accessibleProjectIds);
+            }
         }
         if (StringUtils.hasText(ruleType)) {
             wrapper.eq(AlertLog::getRuleType, ruleType);

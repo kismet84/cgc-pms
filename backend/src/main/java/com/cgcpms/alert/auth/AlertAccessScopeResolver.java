@@ -3,6 +3,7 @@ package com.cgcpms.alert.auth;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.cashbook.service.CashJournalAlertRecipientResolver;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
@@ -19,23 +20,34 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AlertAccessScopeResolver {
 
-    public static final Set<String> ALL_ALERT_DOMAINS = Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE");
+    public static final Set<String> ALL_ALERT_DOMAINS = Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "FINANCE");
 
     private static final Map<String, Set<String>> ROLE_DOMAINS = Map.of(
-            "PROJECT_MANAGER", ALL_ALERT_DOMAINS,
+            "PROJECT_MANAGER", Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE"),
             "COMMERCIAL_MANAGER", Set.of("CONTRACT", "PAYMENT", "VARIATION"),
-            "PURCHASE_MANAGER", Set.of("PURCHASE")
+            "PURCHASE_MANAGER", Set.of("PURCHASE"),
+            "FINANCE", Set.of("PAYMENT")
     );
 
     private final PmProjectMapper projectMapper;
     private final PmProjectMemberMapper projectMemberMapper;
+    private final CashJournalAlertRecipientResolver cashJournalRecipientResolver;
 
     public boolean isAdmin() {
         return UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN");
     }
 
     public Set<String> allowedDomains() {
-        return allowedDomainsForRoles(UserContext.getCurrentRoles());
+        Long tenantId = UserContext.getCurrentTenantId();
+        Long userId = UserContext.getCurrentUserId();
+        if (tenantId == null || userId == null) {
+            return Collections.emptySet();
+        }
+        Set<String> domains = new LinkedHashSet<>(allowedDomainsForRoles(UserContext.getCurrentRoles()));
+        if (!isAdmin() && cashJournalRecipientResolver.isEligible(tenantId, userId)) {
+            domains.add("FINANCE");
+        }
+        return domains;
     }
 
     public Set<String> allowedDomainsForRoles(Collection<String> roles) {
@@ -50,6 +62,9 @@ public class AlertAccessScopeResolver {
     }
 
     public Set<Long> accessibleProjectIds(Long tenantId) {
+        if (tenantId == null || !Objects.equals(tenantId, UserContext.getCurrentTenantId())) {
+            throw accessDenied();
+        }
         if (isAdmin()) {
             return Collections.emptySet();
         }
@@ -89,7 +104,10 @@ public class AlertAccessScopeResolver {
     }
 
     public void assertProjectAccess(Long tenantId, Long projectId) {
-        if (isAdmin() || projectId == null) {
+        if (tenantId == null || !Objects.equals(tenantId, UserContext.getCurrentTenantId())) {
+            throw accessDenied();
+        }
+        if (isAdmin() || projectId == null || projectId == 0L) {
             return;
         }
         if (!accessibleProjectIds(tenantId).contains(projectId)) {
@@ -98,7 +116,8 @@ public class AlertAccessScopeResolver {
     }
 
     public void assertAlertAccess(Long tenantId, AlertLog alert) {
-        if (alert == null || !Objects.equals(alert.getTenantId(), tenantId)) {
+        if (tenantId == null || !Objects.equals(tenantId, UserContext.getCurrentTenantId())
+                || alert == null || !Objects.equals(alert.getTenantId(), tenantId)) {
             throw accessDenied();
         }
         if (isAdmin()) {
@@ -126,6 +145,7 @@ public class AlertAccessScopeResolver {
             case "PAYMENT_EXCEEDS_RATIO" -> "PAYMENT";
             case "VARIATION_UNCONFIRMED" -> "VARIATION";
             case "PURCHASE_DELIVERY_OVERDUE" -> "PURCHASE";
+            case "CASH_JOURNAL_ARCHIVE_OVERDUE" -> "FINANCE";
             default -> "OTHER";
         };
     }

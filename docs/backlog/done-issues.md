@@ -12,6 +12,15 @@
 验证结果：通过 / 部分通过 / 未执行  
 相关报告：docs/iterations/iteration-YYYY-MM-DD-report.md
 
+### MAINLINE-034：资金日记账与付款附件闭环
+
+完成日期：2026-07-11
+合并方式：local-commit-only（待主线程执行）
+失败分类或非失败分类：真实代码质量与安全问题已修复；运行态环境前置已恢复；本地实现、全量门禁、独立审查及真实角色浏览器验收通过
+验证结果：通过
+范围说明：`ISSUE-034-001` 是唯一实际进入 Ready 的条目；计划内 002–006 未单独进入 Ready，本记录按第34主线统一验收口径覆盖 M1–M7，不补造逐条 Ready 历史。
+相关报告：docs/quality/mainline-34-cash-journal-payment-attachment-closeout-acceptance.md；docs/iterations/iteration-2026-07-11-report.md
+
 ### ISSUE-008-034：供应商履约档案-M1：交期表现摘要与采购订单下钻
 
 完成日期：2026-07-10

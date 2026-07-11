@@ -155,7 +155,7 @@ class PaymentFinancialConsistencyTest {
         assertNotNull(vo1.getId());
 
         // Same external_txn_no again — should return existing record
-        PayRecord input2 = buildPayRecord(new BigDecimal("200000.00"), "TXN-UNIQUE-001");
+        PayRecord input2 = buildPayRecord(new BigDecimal("100000.00"), "TXN-UNIQUE-001");
         PayRecordVO vo2 = payRecordService.writeback(input2);
 
         // Should be the same record (idempotent return)

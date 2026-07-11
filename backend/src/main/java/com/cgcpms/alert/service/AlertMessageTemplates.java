@@ -17,7 +17,8 @@ final class AlertMessageTemplates {
             "WARRANTY_EARLY_RELEASE", "合同 %s(%s) 质保金 %.2f 已于 %s 定案，但保修期至 %s 尚未届满，请复核质保金释放。",
             "CONTRACT_EXPIRING", "以下合同即将到期（%d天内）：%s，请提前安排续签或收尾。",
             "VARIATION_UNCONFIRMED", "以下变更签证已审批超%d天仍未获甲方确认：%s，请跟进确认。",
-            "PURCHASE_DELIVERY_OVERDUE", "采购订单 %s 交期已逾期至 %s，请跟进供应商交付。"
+            "PURCHASE_DELIVERY_OVERDUE", "采购订单 %s 交期已逾期至 %s，请跟进供应商交付。",
+            "CASH_JOURNAL_ARCHIVE_OVERDUE", "资金流水 %s 超过24小时未归档，请补齐资金账户、附件并确认归档。"
     );
 
     private AlertMessageTemplates() {
@@ -35,6 +36,7 @@ final class AlertMessageTemplates {
             case "PAYMENT_EXCEEDS_RATIO" -> "PAYMENT";
             case "VARIATION_UNCONFIRMED" -> "VARIATION";
             case "PURCHASE_DELIVERY_OVERDUE" -> "PURCHASE";
+            case "CASH_JOURNAL_ARCHIVE_OVERDUE" -> "FINANCE";
             default -> "OTHER";
         };
     }
@@ -49,6 +51,7 @@ final class AlertMessageTemplates {
             case "PAYMENT_EXCEEDS_RATIO" -> "PAYMENT_RATIO";
             case "VARIATION_UNCONFIRMED" -> "VARIATION_CONFIRM";
             case "PURCHASE_DELIVERY_OVERDUE" -> "PURCHASE_DELIVERY";
+            case "CASH_JOURNAL_ARCHIVE_OVERDUE" -> "CASH_JOURNAL_CLOSURE";
             default -> "OTHER";
         };
     }
@@ -64,6 +67,7 @@ final class AlertMessageTemplates {
             case "CONTRACT_EXPIRING" -> "合同到期预警";
             case "VARIATION_UNCONFIRMED" -> "变更未确认预警";
             case "PURCHASE_DELIVERY_OVERDUE" -> "采购交期逾期预警";
+            case "CASH_JOURNAL_ARCHIVE_OVERDUE" -> "资金流水归档逾期预警";
             default -> "项目预警";
         };
     }

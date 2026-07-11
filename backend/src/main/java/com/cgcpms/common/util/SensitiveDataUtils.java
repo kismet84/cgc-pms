@@ -17,7 +17,7 @@ package com.cgcpms.common.util;
  *       followed by {@code ...}, enough to identify the token without
  *       exposing its full value.</li>
  *   <li>{@link #maskFieldValue(String, String)} — masks a field value if the
- *       field name looks like a password or token field.</li>
+ *       field name looks like a password, token, or bank-account field.</li>
  * </ul>
  *
  * @see SensitiveDataMaskingAspect
@@ -84,6 +84,12 @@ public final class SensitiveDataUtils {
         }
         if (lower.contains("token")) {
             return maskToken(value);
+        }
+        if (lower.equals("bankaccountno") || lower.equals("bankaccount")) {
+            if (value == null) {
+                return "null";
+            }
+            return "****" + value.substring(Math.max(0, value.length() - 4));
         }
         return value;
     }

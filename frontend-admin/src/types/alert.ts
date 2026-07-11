@@ -74,6 +74,7 @@ export const RULE_TYPE_LABELS: Record<string, string> = {
   CONTRACT_EXPIRING: '合同到期',
   VARIATION_UNCONFIRMED: '变更未确认',
   PURCHASE_DELIVERY_OVERDUE: '采购交期逾期',
+  CASH_JOURNAL_ARCHIVE_OVERDUE: '资金流水归档逾期',
 }
 
 /** 规则分类映射 */
@@ -83,6 +84,7 @@ export const RULE_CATEGORY_LABELS: Record<string, string> = {
   PAYMENT: '资金类',
   VARIATION: '变更类',
   PURCHASE: '采购类',
+  FINANCE: '资金日记账',
 }
 
 export const ALERT_CHANNEL_LABELS: Record<string, string> = {
@@ -101,6 +103,7 @@ export const ALERT_CATEGORY_LABELS: Record<string, string> = {
   PAYMENT_RATIO: '付款比例',
   VARIATION_CONFIRM: '变更确认',
   PURCHASE_DELIVERY: '采购交付',
+  CASH_JOURNAL_CLOSURE: '流水归档',
   OTHER: '其他',
 }
 
@@ -128,6 +131,7 @@ export const RULE_TYPE_CATEGORY_MAP: Record<string, keyof typeof RULE_CATEGORY_L
   PAYMENT_EXCEEDS_RATIO: 'PAYMENT',
   WARRANTY_EARLY_RELEASE: 'CONTRACT',
   PURCHASE_DELIVERY_OVERDUE: 'PURCHASE',
+  CASH_JOURNAL_ARCHIVE_OVERDUE: 'FINANCE',
 }
 
 export function getAlertRuleCategory(

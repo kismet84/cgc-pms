@@ -77,11 +77,15 @@ export interface PayApplicationBasisVO {
 /** Payment record view object */
 export interface PayRecordVO {
   id: string
-  applicationId: string
+  tenantId?: string
+  payApplicationId: string
+  contractId?: string
+  partnerId?: string
   payAmount: string
   payDate: string
   payMethod: string
   voucherNo?: string
+  payStatus?: string
   createdBy?: string
   createdAt?: string
 }
@@ -93,4 +97,5 @@ export interface PayWritebackDTO {
   payDate: string
   payMethod: string
   voucherNo?: string
+  externalTxnNo: string
 }

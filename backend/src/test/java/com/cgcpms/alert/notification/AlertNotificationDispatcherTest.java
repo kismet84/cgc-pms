@@ -179,7 +179,8 @@ class AlertNotificationDispatcherTest {
         when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("ALERT_CREATED"),
                 eq("ALERT"), eq("采购逾期"), eq("采购订单逾期")))
                 .thenReturn(AlertNotificationSendResult.sent(7001L));
-        when(recordMapper.selectCount(any())).thenReturn(0L, 1L);
+        when(recordMapper.countSentInApp(10L, 21L, 9001L, "ALERT_CREATED"))
+                .thenReturn(0L, 1L);
 
         dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP"));
         dispatcher.dispatchAlertCreated(10L, 21L, alert, "采购逾期", Set.of("IN_APP"));
@@ -227,7 +228,8 @@ class AlertNotificationDispatcherTest {
         AlertNotificationDispatcher dispatcher =
                 new AlertNotificationDispatcher(recordMapper, List.of(slowInAppSender));
         AlertLog alert = alert();
-        when(recordMapper.selectCount(any())).thenAnswer(invocation -> countSent(records));
+        when(recordMapper.countSentInApp(10L, 21L, 9001L, "ALERT_CREATED"))
+                .thenAnswer(invocation -> countSent(records));
         when(recordMapper.insert(any(AlertNotificationSendRecord.class))).thenAnswer(invocation -> {
             records.add(invocation.getArgument(0));
             return 1;

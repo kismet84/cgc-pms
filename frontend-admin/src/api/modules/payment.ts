@@ -1,6 +1,6 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { PayApplicationVO, PayApplicationBasisVO, PayWritebackDTO } from '@/types/payment'
+import type { PayApplicationVO, PayApplicationBasisVO, PayRecordVO, PayWritebackDTO } from '@/types/payment'
 
 /** 付款申请列表分页查询 */
 export function getApplicationList(params: Record<string, unknown>) {
@@ -72,7 +72,7 @@ export function submitForApproval(id: string) {
 
 /** 付款回写 */
 export function doWriteback(data: PayWritebackDTO) {
-  return request<void>({
+  return request<PayRecordVO>({
     url: '/pay-records/writeback',
     method: 'post',
     data,

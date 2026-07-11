@@ -1168,6 +1168,23 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("TA11f3: PROJECT_MANAGER — projectId=0 不能绕过 FINANCE 域校验")
+    void testAccess_ProjectManagerCannotUseTenantLevelProjectToReadFinanceDomain() {
+        seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
+        insertAlert(0L, "FINANCE", "CASH_JOURNAL_ARCHIVE_OVERDUE");
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+
+        var page = alertService.page(TENANT_ID, 1, 10, 0L,
+                null, null, null, null, null, null, null);
+        var financePage = alertService.page(TENANT_ID, 1, 10, 0L,
+                null, "FINANCE", null, null, null, null, null);
+
+        assertEquals(0, page.getTotal());
+        assertEquals(0, financePage.getTotal());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("TA11g: PRODUCTION_MANAGER / CHIEF_ENGINEER — 预警中心 fail-close")
     void testAccess_FailCloseRoles() {
         seedMember(testProjectId, USER_PRODUCTION_MANAGER, "PRODUCTION_MANAGER");

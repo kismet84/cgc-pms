@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.cgcpms.cashbook.mapper.CashJournalEntryMapper">
+
+    <sql id="filters">
+        e.tenant_id = #{tenantId}
+        AND e.deleted_flag = 0
+        <if test="query.accountId != null">AND e.account_id = #{query.accountId}</if>
+        <if test="query.direction != null and query.direction != ''">AND e.direction = #{query.direction}</if>
+        <if test="query.status != null and query.status != ''">AND e.status = #{query.status}</if>
+        <if test="query.sourceType != null and query.sourceType != ''">AND e.source_type = #{query.sourceType}</if>
+        <if test="query.sourceId != null">AND e.source_id = #{query.sourceId}</if>
+        <if test="query.projectId != null">AND e.project_id = #{query.projectId}</if>
+        <if test="query.contractId != null">AND e.contract_id = #{query.contractId}</if>
+        <if test="query.businessDateStart != null">AND e.business_date &gt;= #{query.businessDateStart}</if>
+        <if test="query.businessDateEnd != null">AND e.business_date &lt;= #{query.businessDateEnd}</if>
+        <if test="query.hasAttachment != null and query.hasAttachment">
+            AND EXISTS (
+                SELECT 1 FROM sys_file f
+                WHERE f.tenant_id = e.tenant_id
+                  AND f.business_type = 'CASH_JOURNAL'
+                  AND f.business_id = e.id
+                  AND f.deleted_flag = 0
+            )
+        </if>
+        <if test="query.hasAttachment != null and !query.hasAttachment">
+            AND NOT EXISTS (
+                SELECT 1 FROM sys_file f
+                WHERE f.tenant_id = e.tenant_id
+                  AND f.business_type = 'CASH_JOURNAL'
+                  AND f.business_id = e.id
+                  AND f.deleted_flag = 0
+            )
+        </if>
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (e.entry_no LIKE CONCAT('%', #{query.keyword}, '%')
+              OR e.summary LIKE CONCAT('%', #{query.keyword}, '%')
+              OR e.counterparty_name LIKE CONCAT('%', #{query.keyword}, '%'))
+        </if>
+    </sql>
+
+    <select id="selectPageWithBalance" resultType="com.cgcpms.cashbook.vo.CashJournalEntryVO">
+        SELECT
+            e.id,
+            e.entry_no,
+            e.account_id,
+            a.account_name,
+            a.account_type,
+            e.direction,
+            e.amount,
+            CASE WHEN e.account_id IS NULL THEN NULL ELSE
+                a.opening_balance + COALESCE((
+                    SELECT SUM(CASE WHEN x.direction = 'IN' THEN x.amount ELSE -x.amount END)
+                    FROM cash_journal_entry x
+                    WHERE x.tenant_id = e.tenant_id
+                      AND x.account_id = e.account_id
+                      AND x.deleted_flag = 0
+                      AND x.status IN ('ARCHIVED', 'REVERSED')
+                      AND x.business_date &gt;= a.opening_date
+                      AND (x.business_date &lt; e.business_date
+                           OR (x.business_date = e.business_date AND x.id &lt;= e.id))
+                ), 0)
+            END AS running_balance,
+            e.business_date,
+            e.counterparty_name,
+            e.summary,
+            e.project_id,
+            e.contract_id,
+            e.source_type,
+            e.source_id,
+            e.status,
+            e.closure_due_at,
+            e.archived_by,
+            e.archived_at,
+            e.reverse_of_entry_id,
+            e.reversal_entry_id,
+            e.version,
+            e.created_at,
+            (
+                SELECT COUNT(*) FROM sys_file f
+                WHERE f.tenant_id = e.tenant_id
+                  AND f.business_type = 'CASH_JOURNAL'
+                  AND f.business_id = e.id
+                  AND f.deleted_flag = 0
+            ) AS attachment_count
+        FROM cash_journal_entry e
+        LEFT JOIN fund_account a
+          ON a.id = e.account_id
+         AND a.tenant_id = e.tenant_id
+         AND a.deleted_flag = 0
+        WHERE <include refid="filters" />
+        ORDER BY e.business_date DESC, e.id DESC
+    </select>
+</mapper>

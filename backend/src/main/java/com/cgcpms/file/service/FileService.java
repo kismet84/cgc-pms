@@ -23,6 +23,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.net.ConnectException;
@@ -105,8 +107,8 @@ public class FileService {
                 file.getOriginalFilename(), file.getContentType(), content);
 
         validateBusinessBindingParams(businessType, businessId);
-        // 业务对象写权限校验
-        authorizer.checkWriteAccess(businessType, businessId);
+        // 业务对象上传权限校验
+        authorizer.checkUploadAccess(businessType, businessId);
 
         try {
             String originalName = vr.sanitizedName();
@@ -171,7 +173,6 @@ public class FileService {
      * Delete a file (logical delete in DB + remove from MinIO).
      */
     @Transactional(rollbackFor = Exception.class)
-    @CircuitBreaker(name = "minio", fallbackMethod = "deleteFallback")
     public void delete(Long fileId) {
         SysFile sysFile = sysFileMapper.selectById(fileId);
         if (sysFile == null) {
@@ -180,23 +181,35 @@ public class FileService {
         if (!sysFile.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
         }
-        // 业务对象写权限校验
-        authorizer.checkWriteAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
+        // 业务对象删除权限校验
+        authorizer.checkDeleteAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
 
-        try {
-            // Remove from MinIO first
-            minioClient.removeObject(RemoveObjectArgs.builder()
-                    .bucket(sysFile.getBucketName())
-                    .object(sysFile.getStoragePath())
-                    .build());
-        } catch (Exception e) {
-            log.error("Failed to remove file from MinIO: fileId={}, storagePath={}",
-                    fileId, sysFile.getStoragePath(), e);
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            log.error("File delete requires active transaction synchronization: fileId={}, storagePath={}",
+                    fileId, sysFile.getStoragePath());
             throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败，请稍后重试");
         }
 
         // Logical delete in DB
-        sysFileMapper.deleteById(fileId);
+        if (sysFileMapper.deleteById(fileId) != 1) {
+            throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败，请稍后重试");
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    minioClient.removeObject(RemoveObjectArgs.builder()
+                            .bucket(sysFile.getBucketName())
+                            .object(sysFile.getStoragePath())
+                            .build());
+                } catch (Exception e) {
+                    log.error("Post-commit file cleanup failed: fileId={}, storagePath={}, errorType={}",
+                            fileId, sysFile.getStoragePath(), e.getClass().getSimpleName());
+                }
+            }
+        });
     }
 
     /**
@@ -234,14 +247,6 @@ public class FileService {
         }
         log.error("MinIO circuit breaker fallback on upload: businessType={}, businessId={}", businessType, businessId, throwable);
         recordUploadFailure("FILE_STORAGE_UNAVAILABLE");
-        throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务暂不可用，请稍后重试");
-    }
-
-    private void deleteFallback(Long fileId, Throwable throwable) {
-        if (throwable instanceof BusinessException businessException) {
-            throw businessException;
-        }
-        log.error("MinIO circuit breaker fallback on delete: fileId={}", fileId, throwable);
         throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务暂不可用，请稍后重试");
     }
 

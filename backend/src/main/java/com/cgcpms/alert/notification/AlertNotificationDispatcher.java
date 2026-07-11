@@ -1,6 +1,5 @@
 package com.cgcpms.alert.notification;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.entity.AlertNotificationSendRecord;
 import com.cgcpms.alert.mapper.AlertNotificationSendRecordMapper;
@@ -128,13 +127,7 @@ public class AlertNotificationDispatcher {
     }
 
     private boolean hasSentInAppRecord(Long tenantId, Long userId, Long alertId, String eventType) {
-        Long count = recordMapper.selectCount(new LambdaQueryWrapper<AlertNotificationSendRecord>()
-                .eq(AlertNotificationSendRecord::getTenantId, tenantId)
-                .eq(AlertNotificationSendRecord::getAlertId, alertId)
-                .eq(AlertNotificationSendRecord::getTargetUserId, userId)
-                .eq(AlertNotificationSendRecord::getEventType, eventType)
-                .eq(AlertNotificationSendRecord::getChannel, AlertNotificationChannel.IN_APP.name())
-                .eq(AlertNotificationSendRecord::getSendStatus, "SENT"));
+        Long count = recordMapper.countSentInApp(tenantId, userId, alertId, eventType);
         return count != null && count > 0;
     }
 

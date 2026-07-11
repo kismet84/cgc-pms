@@ -3,6 +3,7 @@ export interface NavigationItem {
   label: string
   icon?: string
   adminOnly?: boolean
+  permission?: string
   matchPrefixes?: string[]
   children?: NavigationItem[]
 }
@@ -69,10 +70,11 @@ export const navigationItems: NavigationItem[] = [
     key: '/settlement-domain',
     label: '结算收付',
     icon: 'AccountBookOutlined',
-    matchPrefixes: ['/settlement', '/payment', '/invoice'],
+    matchPrefixes: ['/settlement', '/payment', '/cash-journal', '/invoice'],
     children: [
       { key: '/settlement/list', label: '结算台账' },
       { key: '/payment/application', label: '付款申请' },
+      { key: '/cash-journal', label: '资金日记账', permission: 'cashbook:journal:query' },
       { key: '/invoice', label: '发票管理' },
     ],
   },

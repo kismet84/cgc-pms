@@ -1,6 +1,9 @@
 package com.cgcpms.file.auth;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.cashbook.constant.CashbookConstants;
+import com.cgcpms.cashbook.entity.CashJournalEntry;
+import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -27,6 +30,8 @@ import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
@@ -56,34 +61,47 @@ public class BusinessObjectAuthorizer {
     private final CostTargetMapper bidCostMapper;
     private final MdPartnerMapper partnerMapper;
     private final MdMaterialMapper materialMapper;
+    private final CashJournalEntryMapper cashJournalEntryMapper;
 
     private static final Set<String> KNOWN_BUSINESS_TYPES = Set.of(
             "PROJECT", "CONTRACT", "INVOICE", "RECEIPT",
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
-            "BID_COST", "PARTNER", "MATERIAL"
+            "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL"
     );
 
     /**
      * 验证当前用户对指定业务对象拥有读权限。
      */
     public void checkReadAccess(String businessType, Long businessId) {
-        checkAccess(businessType, businessId, "读取");
+        checkAccess(businessType, businessId, "读取", false,
+                "file:query", "cashbook:journal:query");
     }
 
     /**
-     * 验证当前用户对指定业务对象拥有写权限。
+     * 验证当前用户对指定业务对象拥有附件上传权限。
      */
-    public void checkWriteAccess(String businessType, Long businessId) {
-        checkAccess(businessType, businessId, "写入");
+    public void checkUploadAccess(String businessType, Long businessId) {
+        checkAccess(businessType, businessId, "写入", true,
+                "file:upload", "cashbook:journal:maintain");
     }
 
-    private void checkAccess(String businessType, Long businessId, String action) {
+    /**
+     * 验证当前用户对指定业务对象拥有附件删除权限。
+     */
+    public void checkDeleteAccess(String businessType, Long businessId) {
+        checkAccess(businessType, businessId, "删除", true,
+                "file:delete", "cashbook:journal:maintain");
+    }
+
+    private void checkAccess(String businessType, Long businessId, String action, boolean write,
+                             String genericAuthority, String cashJournalAuthority) {
         if (businessType == null || !KNOWN_BUSINESS_TYPES.contains(businessType.toUpperCase())) {
             throw new BusinessException("FILE_BIZ_TYPE_UNKNOWN",
                     "不支持的业务类型: " + businessType);
         }
 
         String upperType = businessType.toUpperCase();
+        requireAuthority("CASH_JOURNAL".equals(upperType) ? cashJournalAuthority : genericAuthority);
 
         switch (upperType) {
             case "PROJECT":
@@ -217,6 +235,25 @@ public class BusinessObjectAuthorizer {
                 }
                 break;
             }
+            case "CASH_JOURNAL": {
+                CashJournalEntry entry = write
+                        ? cashJournalEntryMapper.selectByIdForUpdate(businessId, UserContext.getCurrentTenantId())
+                        : cashJournalEntryMapper.selectById(businessId);
+                if (entry == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "资金流水不存在: " + businessId);
+                }
+                if (!entry.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该资金流水文件");
+                }
+                if (write && !Set.of(CashbookConstants.Status.DRAFT, CashbookConstants.Status.PENDING_ARCHIVE)
+                        .contains(entry.getStatus())) {
+                    throw new BusinessException("CASH_JOURNAL_ARCHIVED_IMMUTABLE", "归档或红冲流水的附件不可变更");
+                }
+                if (entry.getProjectId() != null) {
+                    projectAccessChecker.checkAccess(entry.getProjectId(), action + "资金流水文件");
+                }
+                break;
+            }
             default:
                 throw new BusinessException("FILE_BIZ_TYPE_UNKNOWN",
                         "不支持的业务类型: " + businessType);
@@ -228,6 +265,18 @@ public class BusinessObjectAuthorizer {
             throw new BusinessException("FILE_ACCESS_DENIED", "业务对象缺少项目关系，拒绝访问文件");
         }
         projectAccessChecker.checkAccess(projectId, action);
+    }
+
+    private void requireAuthority(String requiredAuthority) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean allowed = authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> requiredAuthority.equals(authority)
+                        || "ROLE_ADMIN".equals(authority)
+                        || "ROLE_SUPER_ADMIN".equals(authority));
+        if (!allowed) {
+            throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该文件操作");
+        }
     }
 
     private Long resolveInvoiceProjectId(PayInvoice invoice) {

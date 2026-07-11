@@ -199,6 +199,24 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("GET /auth/dev-login 保留 cash-journal 站内跳转")
+    void testDevLoginRedirectToCashJournal() throws Exception {
+        var userInfo = new UserInfo();
+        userInfo.setUsername("demo_dev_super_admin");
+        var loginResponse = new LoginResponse("mock-token", "mock-refresh-token", userInfo);
+        when(authService.loginByUsernameEnsuringDevAccount(
+                eq("demo_dev_super_admin"),
+                eq("demo_dev_super_admin"))).thenReturn(loginResponse);
+
+        mockMvc.perform(get("/api/auth/dev-login")
+                        .servletPath("/auth/dev-login")
+                        .contextPath("/api")
+                        .param("redirect", "/cash-journal"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/cash-journal"));
+    }
+
+    @Test
     @DisplayName("POST /auth/login 已锁定 IP 仍返回 RATE_LIMIT_EXCEEDED")
     void testFormalLoginStillBlockedByLockout() throws Exception {
         when(lockoutStore.getRemainingLockoutMillis("10.0.0.88")).thenReturn(120_000L);

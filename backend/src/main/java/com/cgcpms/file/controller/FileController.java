@@ -24,7 +24,9 @@ public class FileController {
 
     @PostMapping("/upload")
     @AuditedOperation(type = "UPLOAD", businessType = "FILE", businessIdExpression = "#businessId")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:upload')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:upload')"
+            + " or (#businessType != null and #businessType.equalsIgnoreCase('CASH_JOURNAL')"
+            + " and hasAuthority('cashbook:journal:maintain'))")
     @RateLimit(maxRequests = 20, windowSeconds = 60, key = RateLimitKey.USER)
     public ApiResponse<SysFileVO> upload(
             @RequestParam MultipartFile file,
@@ -35,21 +37,25 @@ public class FileController {
 
     @GetMapping("/{id}/url")
     @AuditedOperation(type = "DOWNLOAD", businessType = "FILE", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')"
+            + " or hasAuthority('cashbook:journal:query')")
     public ApiResponse<String> getUrl(@PathVariable Long id) {
         return ApiResponse.success(fileService.getPresignedUrl(id));
     }
 
     @DeleteMapping("/{id}")
     @AuditedOperation(type = "DELETE", businessType = "FILE", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:delete')"
+            + " or hasAuthority('cashbook:journal:maintain')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         fileService.delete(id);
         return ApiResponse.success();
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')"
+            + " or (#businessType != null and #businessType.equalsIgnoreCase('CASH_JOURNAL')"
+            + " and hasAuthority('cashbook:journal:query'))")
     public ApiResponse<List<SysFileVO>> listByBusiness(
             @RequestParam String businessType,
             @RequestParam Long businessId) {

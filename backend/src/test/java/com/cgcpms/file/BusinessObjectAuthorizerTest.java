@@ -2,13 +2,18 @@ package com.cgcpms.file;
 
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cashbook.constant.CashbookConstants;
+import com.cgcpms.cashbook.entity.CashJournalEntry;
+import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
+import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
@@ -27,6 +32,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -51,20 +62,23 @@ class BusinessObjectAuthorizerTest {
     @Mock CostTargetMapper bidCostMapper;
     @Mock MdPartnerMapper partnerMapper;
     @Mock MdMaterialMapper materialMapper;
+    @Mock CashJournalEntryMapper cashJournalEntryMapper;
 
     private BusinessObjectAuthorizer authorizer;
 
     @BeforeEach
     void setUp() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setAuthentication("ROLE_ADMIN");
         authorizer = new BusinessObjectAuthorizer(projectAccessChecker, contractMapper, invoiceMapper,
                 receiptMapper, paymentMapper, payRecordMapper, subcontractMapper, settlementMapper,
-                variationMapper, bidCostMapper, partnerMapper, materialMapper);
+                variationMapper, bidCostMapper, partnerMapper, materialMapper, cashJournalEntryMapper);
     }
 
     @AfterEach
     void tearDown() {
         TestUserContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -86,7 +100,7 @@ class BusinessObjectAuthorizerTest {
         payment.setProjectId(10002L);
         when(paymentMapper.selectById(40001L)).thenReturn(payment);
 
-        authorizer.checkWriteAccess("PAYMENT", 40001L);
+        authorizer.checkUploadAccess("PAYMENT", 40001L);
 
         verify(projectAccessChecker).checkAccess(10002L, "写入付款申请文件");
     }
@@ -146,7 +160,7 @@ class BusinessObjectAuthorizerTest {
         settlement.setProjectId(10006L);
         when(settlementMapper.selectById(70001L)).thenReturn(settlement);
 
-        authorizer.checkWriteAccess("SETTLEMENT", 70001L);
+        authorizer.checkUploadAccess("SETTLEMENT", 70001L);
 
         verify(projectAccessChecker).checkAccess(10006L, "写入结算单文件");
     }
@@ -163,5 +177,109 @@ class BusinessObjectAuthorizerTest {
 
         assertEquals("FILE_ACCESS_DENIED", ex.getCode());
         verify(projectAccessChecker, never()).checkAccess(anyLong(), anyString());
+    }
+
+    @Test
+    void cashJournalDraftAllowsWriteAndChecksProjectWhenPresent() {
+        CashJournalEntry entry = new CashJournalEntry();
+        entry.setTenantId(TestUserContext.TENANT_0);
+        entry.setProjectId(10008L);
+        entry.setStatus(CashbookConstants.Status.DRAFT);
+        when(cashJournalEntryMapper.selectByIdForUpdate(80001L, TestUserContext.TENANT_0)).thenReturn(entry);
+
+        authorizer.checkUploadAccess("CASH_JOURNAL", 80001L);
+
+        verify(projectAccessChecker).checkAccess(10008L, "写入资金流水文件");
+    }
+
+    @Test
+    void archivedCashJournalRejectsAttachmentMutation() {
+        CashJournalEntry entry = new CashJournalEntry();
+        entry.setTenantId(TestUserContext.TENANT_0);
+        entry.setStatus(CashbookConstants.Status.ARCHIVED);
+        when(cashJournalEntryMapper.selectByIdForUpdate(80002L, TestUserContext.TENANT_0)).thenReturn(entry);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("CASH_JOURNAL", 80002L));
+
+        assertEquals("CASH_JOURNAL_ARCHIVED_IMMUTABLE", error.getCode());
+    }
+
+    @Test
+    void cashbookOnlyFinanceCannotAccessPartnerOrMaterialFiles() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 6L, "finance", List.of("FINANCE"));
+        setAuthentication("cashbook:journal:query", "cashbook:journal:maintain");
+
+        BusinessException read = assertThrows(BusinessException.class,
+                () -> authorizer.checkReadAccess("PARTNER", 81001L));
+        BusinessException upload = assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess("MATERIAL", 81002L));
+        BusinessException delete = assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("MATERIAL", 81002L));
+
+        assertEquals("FILE_ACCESS_DENIED", read.getCode());
+        assertEquals("FILE_ACCESS_DENIED", upload.getCode());
+        assertEquals("FILE_ACCESS_DENIED", delete.getCode());
+        verify(partnerMapper, never()).selectById(anyLong());
+        verify(materialMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void cashbookOnlyFinanceCanReadAndMutateDraftCashJournalFiles() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 6L, "finance", List.of("FINANCE"));
+        setAuthentication("cashbook:journal:query", "cashbook:journal:maintain");
+        CashJournalEntry entry = new CashJournalEntry();
+        entry.setTenantId(TestUserContext.TENANT_0);
+        entry.setStatus(CashbookConstants.Status.DRAFT);
+        when(cashJournalEntryMapper.selectById(82001L)).thenReturn(entry);
+        when(cashJournalEntryMapper.selectByIdForUpdate(82001L, TestUserContext.TENANT_0)).thenReturn(entry);
+
+        authorizer.checkReadAccess("CASH_JOURNAL", 82001L);
+        authorizer.checkUploadAccess("CASH_JOURNAL", 82001L);
+        authorizer.checkDeleteAccess("CASH_JOURNAL", 82001L);
+    }
+
+    @Test
+    void genericFileAuthoritiesKeepExistingPartnerAndMaterialPaths() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 7L, "file-user", List.of("USER"));
+        setAuthentication("file:query", "file:upload");
+        MdPartner partner = new MdPartner();
+        partner.setTenantId(TestUserContext.TENANT_0);
+        MdMaterial material = new MdMaterial();
+        material.setTenantId(TestUserContext.TENANT_0);
+        when(partnerMapper.selectById(83001L)).thenReturn(partner);
+        when(materialMapper.selectById(83002L)).thenReturn(material);
+
+        authorizer.checkReadAccess("PARTNER", 83001L);
+        authorizer.checkUploadAccess("MATERIAL", 83002L);
+    }
+
+    @Test
+    void genericUploadAuthorityDoesNotAuthorizeDelete() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 7L, "file-uploader", List.of("USER"));
+        setAuthentication("file:upload");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("PARTNER", 84001L));
+
+        assertEquals("FILE_ACCESS_DENIED", error.getCode());
+        verify(partnerMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void genericDeleteAuthorityKeepsExistingDeletePath() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 8L, "file-deleter", List.of("USER"));
+        setAuthentication("file:delete");
+        MdPartner partner = new MdPartner();
+        partner.setTenantId(TestUserContext.TENANT_0);
+        when(partnerMapper.selectById(84002L)).thenReturn(partner);
+
+        authorizer.checkDeleteAccess("PARTNER", 84002L);
+    }
+
+    private void setAuthentication(String... authorities) {
+        var granted = Arrays.stream(authorities).map(SimpleGrantedAuthority::new).toList();
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("test-user", null, granted));
     }
 }
