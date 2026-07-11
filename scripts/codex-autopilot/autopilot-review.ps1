@@ -44,6 +44,17 @@ function Test-AutopilotRetryAllowed {
   return $true
 }
 
+function Get-AutopilotReviewDisposition {
+  param([Parameter(Mandatory)][object]$ReviewResult)
+  if ($ReviewResult.decision -eq 'pass') { return [pscustomobject]@{ action='PASS'; failureFingerprint=''; summary='' } }
+  if ($ReviewResult.decision -eq 'blocked') { return [pscustomobject]@{ action='BLOCK'; failureFingerprint=''; summary='independent Reviewer blocked the issue' } }
+  if ($ReviewResult.decision -ne 'needs_repair') { throw "unknown Reviewer decision: $($ReviewResult.decision)" }
+  $summary = @($ReviewResult.findings | ForEach-Object { "$($_.severity)|$($_.file)|$($_.line)|$($_.risk)|$($_.requiredEvidence)" }) -join "`n"
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try { $fingerprint = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($summary)))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
+  return [pscustomobject]@{ action='REPAIR'; failureFingerprint=$fingerprint; summary=$summary }
+}
+
 function Resolve-AutopilotCodexCommand {
   $command = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($command) { return $command.Source }

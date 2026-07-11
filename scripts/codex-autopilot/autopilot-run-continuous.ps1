@@ -739,6 +739,12 @@ function Initialize-IterationProgress {
   $script:IterationLastCountedIssue = ""
 
   if ($null -eq $Limit) {
+    $statePath = Join-Path $AutoDir 'state.json'
+    if (Test-Path -LiteralPath $statePath) {
+      $state = Read-AutopilotState -Path $statePath
+      $script:IterationCompleted = [Math]::Max([int]$state.completedImplementationIssues, @($state.completedIssueIds).Count)
+      if ($state.iterationLastCountedIssue) { $script:IterationLastCountedIssue = [string]$state.iterationLastCountedIssue }
+    }
     return
   }
 
@@ -883,11 +889,6 @@ function Invoke-ChildWithHeartbeat {
     [int]$StallTerminateSeconds = 600,
     [int]$HeartbeatMilliseconds = 30000
   )
-  function Get-ProgressFingerprint([string]$Path) {
-    $status = (& git -C $Path status --porcelain=v1 --untracked-files=all 2>$null | Out-String)
-    $sha = [Security.Cryptography.SHA256]::Create()
-    try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($status)))).Replace('-', '') } finally { $sha.Dispose() }
-  }
   function Stop-ChildProcessTree([Diagnostics.Process]$Child) {
     & taskkill.exe /PID $Child.Id /T /F 2>$null | Out-Null
     if (!$Child.HasExited) { $Child.Kill() }
@@ -910,10 +911,10 @@ function Invoke-ChildWithHeartbeat {
   $stallTimedOut = $false
   $stallInspected = $false
   $lastProgressAt = [datetimeoffset]::Now
-  $progressFingerprint = Get-ProgressFingerprint $WorkingDirectory
+  $progressFingerprint = Get-AutopilotProgressFingerprint -Worktree $WorkingDirectory -RootPid $process.Id
   while (!$process.WaitForExit($HeartbeatMilliseconds)) {
     if ($script:RunLock) { Write-RunLock (Join-Path $autoDir 'run.lock') $script:RunLock }
-    $currentFingerprint = Get-ProgressFingerprint $WorkingDirectory
+    $currentFingerprint = Get-AutopilotProgressFingerprint -Worktree $WorkingDirectory -RootPid $process.Id
     if ($currentFingerprint -ne $progressFingerprint) {
       $progressFingerprint = $currentFingerprint
       $lastProgressAt = [datetimeoffset]::Now
@@ -959,7 +960,7 @@ function Invoke-IssueExecutor {
     return
   }
   $baseCommit = (& git -C $RepoRoot rev-parse HEAD).Trim()
-  $worktree = New-AutopilotIssueWorktree -RepoRoot $RepoRoot -IssueId $Issue.lint.issueId -BaseCommit $baseCommit
+  $worktree = New-AutopilotIssueWorktree -RepoRoot $RepoRoot -IssueId $Issue.lint.issueId -BaseCommit $baseCommit -AllowDirtyReuse:($Phase -eq 'repair')
   $script:Attempt = $Attempt
   $script:CurrentWorktree = $worktree.path
   $script:CurrentBranch = $worktree.branch
@@ -1054,7 +1055,14 @@ function Invoke-IssueExecutor {
           $reviewPath = Join-Path $reviewDir 'result.json'
           $review = Invoke-AutopilotReviewer -Worktree $worktree.path -RequestPath $requestPath -ResultPath $reviewPath -SchemaPath (Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Model $config.issueReviewer.model -Thinking $config.issueReviewer.thinking
           $result | Add-Member -NotePropertyName review -NotePropertyValue $review -Force
-          if ($review.decision -ne 'pass') { $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_FAILED' }
+          $reviewDisposition = Get-AutopilotReviewDisposition -ReviewResult $review
+          if ($reviewDisposition.action -eq 'REPAIR') {
+            $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_NEEDS_REPAIR'
+            $failureSummary = $reviewDisposition.summary; $currentFingerprint = $reviewDisposition.failureFingerprint
+            $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $currentFingerprint -Force
+          } elseif ($reviewDisposition.action -eq 'BLOCK') {
+            $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_FAILED'
+          }
         }
       }
       if ($result.status -eq 'done' -and $config.closeout -and $config.closeout.enabled -eq $true) {
@@ -1071,7 +1079,7 @@ function Invoke-IssueExecutor {
       }
       $result | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $resultPath -Encoding UTF8
       if ($Attempt -gt 0) { Copy-Item -LiteralPath $resultPath -Destination (Join-Path $script:RunContext.dir 'result.json') -Force }
-      if ($result.status -eq 'blocked' -and $result.stopReason -eq 'STOP_VERIFICATION_FAILED' -and $config.repair -and $config.repair.enabled -eq $true -and (Test-AutopilotRetryAllowed -PreviousFingerprint $script:FailureFingerprint -CurrentFingerprint $currentFingerprint -Attempt $Attempt)) {
+      if ($result.status -eq 'blocked' -and $result.stopReason -in @('STOP_VERIFICATION_FAILED','STOP_REVIEW_NEEDS_REPAIR') -and $config.repair -and $config.repair.enabled -eq $true -and (Test-AutopilotRetryAllowed -PreviousFingerprint $script:FailureFingerprint -CurrentFingerprint $currentFingerprint -Attempt $Attempt)) {
         $script:FailureFingerprint = $currentFingerprint
         Write-State $autoDir 'REPAIRING' $false 'REPAIR_START' $Issue.title $failureSummary ''
         Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt ($Attempt + 1) -Phase 'repair' -PreviousSummary $failureSummary
@@ -1089,6 +1097,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-ready.ps1')
 . (Join-Path $scriptDir 'autopilot-route.ps1')
 . (Join-Path $scriptDir 'autopilot-worktree.ps1')
+. (Join-Path $scriptDir 'autopilot-progress.ps1')
 . (Join-Path $scriptDir 'autopilot-context.ps1')
 . (Join-Path $scriptDir 'autopilot-verify.ps1')
 . (Join-Path $scriptDir 'autopilot-review.ps1')

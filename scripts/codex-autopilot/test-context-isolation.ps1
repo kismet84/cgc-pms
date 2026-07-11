@@ -34,6 +34,12 @@ try {
   }
   $worktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId $issue.issueId -BaseCommit $baseCommit
   if ((Get-Content -LiteralPath (Join-Path $worktree.path 'docs\quality\base.md') -Raw).Trim() -ne 'base') { throw 'main dirty content leaked into worktree' }
+  'repair-diff' | Set-Content -LiteralPath (Join-Path $worktree.path 'docs\quality\repair.md') -Encoding UTF8
+  $dirtyReuseRejected = $false
+  try { New-AutopilotIssueWorktree -RepoRoot $root -IssueId $issue.issueId -BaseCommit $baseCommit | Out-Null } catch { $dirtyReuseRejected = $true }
+  if (!$dirtyReuseRejected) { throw 'dirty worktree was reused by a fresh implementation attempt' }
+  $repairWorktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId $issue.issueId -BaseCommit $baseCommit -AllowDirtyReuse
+  if (!$repairWorktree.reused) { throw 'repair did not reuse the matching dirty worktree' }
 
   $contextPath = Join-Path $root 'context-a.json'
   $context = New-AutopilotContextPack -Issue $issue -Phase 'implement' -RepoRoot $root -Worktree $worktree.path -OutputPath $contextPath -RelevantSymbols @('docs/quality/base.md')
@@ -54,6 +60,12 @@ try {
   $mismatchRejected = $false
   try { Assert-AutopilotContextCurrent -Context $context -Issue $issue -Worktree $worktree.path -ExpectedBaseCommit '0000000000000000000000000000000000000000' } catch { $mismatchRejected = $true }
   if (!$mismatchRejected) { throw 'commit mismatch was accepted' }
+
+  Invoke-Git @('-C',$worktree.path,'add','docs/quality/repair.md')
+  & git -C $worktree.path commit -qm 'stale worktree head'
+  $staleHeadRejected = $false
+  try { New-AutopilotIssueWorktree -RepoRoot $root -IssueId $issue.issueId -BaseCommit $baseCommit -AllowDirtyReuse | Out-Null } catch { $staleHeadRejected = $true }
+  if (!$staleHeadRejected) { throw 'worktree with stale committed HEAD was reused' }
 
   Write-Host 'context isolation self-test passed'
 } finally {

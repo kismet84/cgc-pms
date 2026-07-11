@@ -22,6 +22,12 @@ try {
   $pass = [pscustomobject]@{ schemaVersion = 1; issueId = 'ISSUE-900-030'; decision = 'pass'; findings = @(); reviewedDiffHash = 'abc'; reviewedAt = [datetimeoffset]::Now.ToString('o') }
   Assert-AutopilotReviewGate -Route $route -ReviewResult $pass | Out-Null
 
+  $needsRepair = [pscustomobject]@{ schemaVersion = 1; issueId = 'ISSUE-900-030'; decision = 'needs_repair'; findings = @([pscustomobject]@{ severity='blocking'; file='a.ps1'; line=10; risk='bug'; requiredEvidence='test' }); reviewedDiffHash = 'def'; reviewedAt = [datetimeoffset]::Now.ToString('o') }
+  $disposition = Get-AutopilotReviewDisposition -ReviewResult $needsRepair
+  if ($disposition.action -ne 'REPAIR' -or !$disposition.failureFingerprint) { throw 'needs_repair was not routed to a bounded repair' }
+  $blockedDisposition = Get-AutopilotReviewDisposition -ReviewResult ([pscustomobject]@{ decision='blocked'; findings=@() })
+  if ($blockedDisposition.action -ne 'BLOCK') { throw 'blocked review was incorrectly made repairable' }
+
   if (Test-AutopilotRetryAllowed -PreviousFingerprint 'same' -CurrentFingerprint 'same' -Attempt 1) { throw 'same failure fingerprint was retried' }
   if (!(Test-AutopilotRetryAllowed -PreviousFingerprint 'old' -CurrentFingerprint 'new' -Attempt 1)) { throw 'new failure fingerprint was not allowed within budget' }
   if (Test-AutopilotRetryAllowed -PreviousFingerprint 'old' -CurrentFingerprint 'new' -Attempt 2) { throw 'third repair loop was allowed' }
