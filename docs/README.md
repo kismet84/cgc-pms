@@ -37,7 +37,7 @@
 | 验收或回归 | [09 测试规范](09-测试规范.md) |
 | 部署、备份、恢复 | [10 部署运维手册](10-部署运维手册.md) |
 | 安全加固 | [11 安全规范](11-安全规范.md) |
-| 子智能体分派 | [AGENTS.override.md](../AGENTS.override.md) |
+| 自适应执行路由/条件派工 | [AGENTS.override.md](../AGENTS.override.md) |
 
 ## 主线文档
 

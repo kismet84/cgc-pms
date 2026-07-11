@@ -31,7 +31,7 @@
 2. `启动迭代`
    - 进入连续迭代模式
    - 优先走插件 runner / checkpoint / classifier
-   - 仍遵守主线程/子智能体边界、Ready 队列、stop/pause/enabled、A-F 分工、no push
+   - A-F 作为职责检查表动态覆盖，由主线程按净收益选择直接执行、单派或多派；仍遵守 Ready 队列、stop/pause/enabled、no push
 3. `启动迭代-N`
    - `N` 为 1 到 50
    - 最多完成 N 个实施型 Ready Issue 后退出
@@ -49,3 +49,15 @@
 - `停止自动迭代系统`
 
 以上旧短语继续保留，但新会话默认优先使用 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代`。
+
+## 连续迭代硬边界
+
+- 普通交互任务获用户明确授权后不强制进入 Ready；AutoPilot 只实施合格 Ready Issue。
+- A-F 不对应固定六线程；D 的裁决必需验证证据与 E 的适用风险审查证据不可省略，但不强制独立线程。
+- 状态变更前核对 branch/status；AutoPilot 按开始、选题、改代码、验证、自动合并、报告收口等 checkpoint 检查 stop/pause/enabled。
+- 运行态或浏览器验收先过 health gate；失败先分类，环境未就绪先刷新并等待 180 秒复验。
+- 每轮最多并行 3 个完全无关联且无代码关联的 Ready Issue，不能证明无关联时串行。
+- 测试数据重置必须同时满足 dev/test/demo、host 为 localhost/127.0.0.1、存在 `ALLOW_TEST_DATA_RESET` marker。
+- `autoPush=false` / `no push` 禁止自动 push；显式 push 必须获得用户授权并通过其他门禁。
+- 收口需通过对应验证与 `git diff --check`、更新 iteration/backlog 并复查 flag；Ready 为空但当前 focus/阶段仍有可处理前置阻塞时先解阻，停止条件按项目规则执行。
+- 不自动发布生产，不连接生产数据库，不删除仓库外文件。

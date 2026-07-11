@@ -14,9 +14,9 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 
 ## Do first
 
-1. 先确认仓库级规则文件和当前派工边界。
+1. 先确认仓库级规则、授权边界和当前执行路由；普通交互任务获明确授权后不强制进入 Ready，只有 AutoPilot 连续迭代严格要求合格 Ready Issue。
 2. 只把本插件当成规则、模板、脚本工具箱与插件自有归档目录，不当成项目真实 backlog 或业务 quality 仓库；项目业务任务正式文档仍留在项目 `docs/**`。
-3. 进入实施前先跑 `scripts/autopilot-checkpoint.ps1`，至少看 `branch`、`gitStatus`、`stopFlag`、`pauseFlag`、`enabledFlag`。
+3. 任何状态变更前先核对 `git branch --show-current` 与 `git status --short`；进入 AutoPilot 实施前再跑 `scripts/autopilot-checkpoint.ps1`，至少看 `branch`、`gitStatus`、`stopFlag`、`pauseFlag`、`enabledFlag`。
 4. 需要 loop 协议时，优先参考 `../../schemas/loop-state.schema.json`、`../../schemas/loop-event.schema.json`、`../../schemas/classification-result.schema.json`、`../../scripts/autopilot-loop-runner.ps1` 和 `../../scripts/validate-loop-artifacts.ps1`。
 
 ## Trigger protocol
@@ -28,7 +28,7 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 2. `启动迭代`
    - 进入连续迭代模式
    - 优先走插件 runner / checkpoint / classifier
-   - 仍受主线程/子智能体边界、Ready 队列、stop/pause/enabled、A-F 分工、no push 约束
+   - 仍受 Ready 队列、stop/pause/enabled、A-F 职责检查、no push 等约束
 3. `启动迭代-N`
    - `N=1..50`
    - 最多完成 N 个实施型 Ready Issue 后退出
@@ -47,10 +47,10 @@ Legacy 兼容短语继续有效：
 
 ## Core flow
 
-1. 读项目 `ready` / `blocked` / `focus` 事实源。
+1. 读项目 `ready` / `blocked` / `focus` 事实源，只选择合格 Ready Issue 实施。
 2. 判定当前阶段属于实现、验收、运维还是审计。
-3. 按 A-F 拆角色并给出 `model`、`thinking`、`reason`。
-4. 实施前执行 checkpoint。
+3. 按 A-F 检查实际职责，再由主线程根据风险、耦合、并行收益、上下文成本和独立证据需要选择直接执行、单派或多派；只有实际派工才给出 `model`、`thinking`、`reason`。
+4. 实施前执行 checkpoint；需要运行态或浏览器验收时先过 health gate。
 5. 需要正式文本时，用模板和脚本生成草稿；插件自有计划书、质量报告、迭代摘要、run summary 默认落到 `../../artifacts/**`；独立项目业务任务的计划书、质量报告、iteration、backlog 更新仍写回项目 `docs/**`。
 6. 验收时先做失败分类，再给通过/不通过、阻塞/非阻塞结论；分类结果至少看 `category/subcategory/confidence/evidence/suggestedNextAction/retryPolicy`。
 7. F 收口后先做 `local-commit-closeout.ps1 -DryRun`，确认 `git diff --check` 和文件范围，再决定是否本地 commit。
@@ -58,10 +58,10 @@ Legacy 兼容短语继续有效：
 
 ## Role boundaries
 
-- 主线程负责：规划、拆题、分档、派工、验收、裁决。
-- 子智能体负责：在明确授权范围内执行修改、验证、归档或运维动作。
-- 主线程不直接改代码；子智能体第一句必须声明身份边界。
-- 派工单最少包含：`任务名称`、`角色边界`、`目标`、`范围`、`禁止事项`、`model`、`thinking`、`reason`、`验收输出`。
+- 授权门通过后主线程是默认执行者，并对实施、验证和收口负责。
+- 只有派工净收益明确时才使用子智能体；不存在按任务类别强制派工或固定六线程的规则。
+- 子智能体只在明确授权范围内执行修改、验证、归档或运维动作，第一句必须声明身份边界。
+- 实际派工单最少包含：`任务名称`、`角色边界`、`目标`、`范围`、`禁止事项`、`model`、`thinking`、`reason`、`验收输出`。
 
 细则见：
 
@@ -76,6 +76,8 @@ Legacy 兼容短语继续有效：
 - `../../references/forward-test-scenarios.md`
 
 ## A-F routing
+
+A-F 是职责检查表，不自动映射为六个独立线程；职责可合并、裁剪或分阶段覆盖，但责任不可遗漏。D 的裁决必需验证证据和 E 的适用风险审查证据不可省略，可由主线程、同一执行者、自动化工具或独立复核者提供，不强制拆成独立线程。
 
 - A 需求/架构分析：读 backlog、拆 Ready、识别依赖和重新分档时机。
 - B 前端/UI 实现：只处理前端页面、交互和前端验证。
@@ -130,7 +132,16 @@ Legacy 兼容短语继续有效：
 
 ## Safety rules
 
-- 不 push。
+- AutoPilot 业务或治理变更只实施合格 Ready Issue；普通交互任务不受此限制。
+- checkpoint 至少覆盖开始前、选任务后、改代码前、跑验证前、自动合并前、更新报告后；任务边界发现 `stop.flag` 或 `pause.flag` 时不启动下一任务，并持续核对 `enabled.flag`。
+- 运行态或浏览器验收前检查后端 health、前端入口和 dev-login；任一不通先归为环境前置类，刷新运行态并稳定等待 180 秒后复验。
+- 先做失败分类，再决定复跑、修复或阻塞；不得把一次命令失败直接定性为业务代码失败。
+- 每轮最多并行 3 个完全无关联且无代码关联的 Ready Issue；不能证明无关联时串行，数据库、权限、安全、租户、金额、审批状态机等任务不得并行。
+- `autoPush=false` / `no push` 禁止自动 push；只有用户明确授权且其他门禁通过后才可显式 push。
+- 仅允许在 dev/test/demo、数据库 host 为 `localhost` 或 `127.0.0.1`、且存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET` 时重置测试数据。
+- 收口前必须完成对应验证、`git diff --check`、iteration/backlog 更新并复查 stop/pause；Ready 为空但当前 focus/阶段仍有可处理前置阻塞时，先解阻再判断停止。
+- 停止条件只采用项目规则定义的停止指令、flag、迭代上限、已安全记录的不可解除阻塞、确无可拆 Ready/可处理前置或系统限制。
+- 不自动发布生产，不连接生产数据库。
 - 不删除仓库外文件。
 - 不读取默认禁止私有目录。
 - 不把 run id、临时日志名、截图名写进正式模板。
