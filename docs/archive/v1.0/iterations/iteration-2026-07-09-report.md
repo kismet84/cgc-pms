@@ -1182,7 +1182,7 @@ Mainline：第33条主线 Codex AutoPilot 插件 MVP 收口
 
 验证命令摘要：
 - `python C:\Users\L1597\.codex\skills\.system\plugin-creator\scripts\validate_plugin.py D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot`：通过。
-- `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/autopilot-checkpoint.ps1 -RepoRoot D:\projects-test\cgc-pms -AutopilotDir D:\projects-test\cgc-pms\.codex-autopilot -CheckGit`：通过，输出固定字段；当前 `stopFlag=false`、`pauseFlag=false`、`enabledFlag=false`。
+- `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/autopilot-checkpoint.ps1 -RepoRoot D:\projects-test\cgc-pms -AutopilotDir ../../../../.codex-autopilot -CheckGit`：通过，输出固定字段；当前 `stopFlag=false`、`pauseFlag=false`、`enabledFlag=false`。
 - `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/render-template.ps1 ...`：无 `OutputPath` 渲染通过。
 - `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/test-failure-classifier.ps1 -ExitCode 1 -ErrorText '...ECONNREFUSED ... dev-login...'`：返回 `environment_prereq`。
 - `powershell -NoProfile -File plugins/cgc-pms-autopilot/scripts/local-commit-closeout.ps1 -IssueId mainline-33 -ExpectedPaths plugins -DryRun`：通过；未误判 `plugins/`，`unexpectedPaths` 仅为 `.serena/*` 与计划书路径。

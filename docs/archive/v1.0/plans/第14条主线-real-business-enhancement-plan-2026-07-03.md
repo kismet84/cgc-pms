@@ -63,7 +63,7 @@
     - 不是口径缺解释
     - 不是后端 / 数据异常
   - 结果文档：
-    - [`docs/quality/mainline-14-m1-pm-dashboard-confirmation-2026-07-03.md`](D:/projects-test/cgc-pms/docs/quality/mainline-14-m1-pm-dashboard-confirmation-2026-07-03.md:1)
+    - [`docs/quality/mainline-14-m1-pm-dashboard-confirmation-2026-07-03.md`](../quality/mainline-14-m1-pm-dashboard-confirmation-2026-07-03.md)
 
 ### M2：付款链路真实业务增强
 
@@ -87,7 +87,7 @@
     - 页面级复验通过
     - `applyCode` 缺失问题已关闭
   - 结果文档：
-    - [`docs/quality/mainline-14-m2-payment-enhancement-2026-07-03.md`](D:/projects-test/cgc-pms/docs/quality/mainline-14-m2-payment-enhancement-2026-07-03.md:1)
+    - [`docs/quality/mainline-14-m2-payment-enhancement-2026-07-03.md`](../quality/mainline-14-m2-payment-enhancement-2026-07-03.md)
 
 ### M3：业务样本真实性增强
 

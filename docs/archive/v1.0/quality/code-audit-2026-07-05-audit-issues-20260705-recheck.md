@@ -21,10 +21,10 @@
 
 - 严重级别：高
 - 位置：
-  - [`backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java):894
-  - [`backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java):906
-  - [`backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java):916
-  - [`backend/src/main/java/com/cgcpms/alert/auth/AlertAccessScopeResolver.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/alert/auth/AlertAccessScopeResolver.java):92
+  - [`backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`](../../../../backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java):894
+  - [`backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`](../../../../backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java):906
+  - [`backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`](../../../../backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java):916
+  - [`backend/src/main/java/com/cgcpms/alert/auth/AlertAccessScopeResolver.java`](../../../../backend/src/main/java/com/cgcpms/alert/auth/AlertAccessScopeResolver.java):92
 - 证据：
   - 单条 `markRead()` 仍然调用 `assertAlertAccess()`。
   - 但 `batchMarkRead()` 现在只做了 `selectBatchIds()` + `tenantId` 过滤，然后直接批量更新。
@@ -39,9 +39,9 @@
 
 - 严重级别：中
 - 位置：
-  - [`frontend-admin/src/pages/cost/ledger.vue`](D:/projects-test/cgc-pms/frontend-admin/src/pages/cost/ledger.vue):48
-  - [`frontend-admin/src/pages/cost/ledger.vue`](D:/projects-test/cgc-pms/frontend-admin/src/pages/cost/ledger.vue):132
-  - [`frontend-admin/src/pages/cost/ledger.vue`](D:/projects-test/cgc-pms/frontend-admin/src/pages/cost/ledger.vue):161
+  - [`frontend-admin/src/pages/cost/ledger.vue`](../../../../frontend-admin/src/pages/cost/ledger.vue):48
+  - [`frontend-admin/src/pages/cost/ledger.vue`](../../../../frontend-admin/src/pages/cost/ledger.vue):132
+  - [`frontend-admin/src/pages/cost/ledger.vue`](../../../../frontend-admin/src/pages/cost/ledger.vue):161
 - 证据：
   - 页面状态和查询参数里已经恢复了 `costSubjectId`。
   - 但当前页面模板里没有对应的可见筛选控件，用户无法在页面上主动选择这个条件。
@@ -56,8 +56,8 @@
 
 - 严重级别：低
 - 位置：
-  - [`backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java):76
-  - [`backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java):97
+  - [`backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java`](../../../../backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java):76
+  - [`backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java`](../../../../backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java):97
 - 证据：
   - 白名单覆盖了很多前端前缀，但没有覆盖全部现有入口。
   - 当前路由里仍有 `/purchase`、`/org`、`/cost-target` 等入口，重定向可能被降到 `/`。

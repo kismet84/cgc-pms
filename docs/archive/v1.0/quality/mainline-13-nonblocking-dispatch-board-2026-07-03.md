@@ -29,7 +29,7 @@
 - 所有权：
   - 工作区改动边界判定与相关文档表述
 - 输入依据：
-  - [`docs/superpowers/plans/2026-07-03-commit-boundary-judgement-package.md`](D:/projects-test/cgc-pms/docs/superpowers/plans/2026-07-03-commit-boundary-judgement-package.md:1)
+  - [`docs/superpowers/plans/2026-07-03-commit-boundary-judgement-package.md`](../plans/superpowers/2026-07-03-commit-boundary-judgement-package.md)
 - 已完成事实：
   - 当前 `git status --short --untracked-files=all` 仅剩 `.serena` 删除项与本批前端收口改动。
   - `.auth` 运行产物已清理，`frontend-admin/.gitignore` 已补认证态忽略规则。
@@ -46,7 +46,7 @@
 - 所有权：
   - `frontend-admin/e2e/project.spec.ts`
 - 输入依据：
-  - [`docs/superpowers/plans/2026-07-03-project-spec-package.md`](D:/projects-test/cgc-pms/docs/superpowers/plans/2026-07-03-project-spec-package.md:1)
+  - [`docs/superpowers/plans/2026-07-03-project-spec-package.md`](../plans/superpowers/2026-07-03-project-spec-package.md)
 - 已完成事实：
   - `frontend-admin/e2e/project.spec.ts` 已新增。
   - 已执行 `pnpm exec playwright test e2e/project.spec.ts --project=chromium`。
@@ -64,7 +64,7 @@
   - `frontend-admin/e2e/inventory.spec.ts`
   - `frontend-admin/e2e/contract.spec.ts`
 - 输入依据：
-  - [`docs/superpowers/plans/2026-07-03-real-write-depth-package.md`](D:/projects-test/cgc-pms/docs/superpowers/plans/2026-07-03-real-write-depth-package.md:1)
+  - [`docs/superpowers/plans/2026-07-03-real-write-depth-package.md`](../plans/superpowers/2026-07-03-real-write-depth-package.md)
 - 已完成事实：
   - `inventory.spec.ts` 已补库存台账回读并定向验证通过。
   - `contract.spec.ts` 已补保存后回读增强并定向验证通过。
@@ -82,7 +82,7 @@
 - 所有权：
   - 当前登录账号、项目选择器、`/dashboard/project-manager` 返回证据、判定记录
 - 输入依据：
-  - [`docs/superpowers/plans/2026-07-03-pm-dashboard-data-confirmation-package.md`](D:/projects-test/cgc-pms/docs/superpowers/plans/2026-07-03-pm-dashboard-data-confirmation-package.md:1)
+  - [`docs/superpowers/plans/2026-07-03-pm-dashboard-data-confirmation-package.md`](../plans/superpowers/2026-07-03-pm-dashboard-data-confirmation-package.md)
 - 任务目标：
   - 先拿权限、项目、接口、口径四层证据
   - 仅在升级条件满足时再转前端或后端工程子智能体

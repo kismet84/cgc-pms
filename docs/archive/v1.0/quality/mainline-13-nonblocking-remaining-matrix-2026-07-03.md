@@ -22,7 +22,7 @@
 - 当前状态：未关闭。
 - 当前结论：非阻塞，但仍需要确认。
 - 已有产物：
-  - [`docs/superpowers/plans/2026-07-03-pm-dashboard-data-confirmation-package.md`](D:/projects-test/cgc-pms/docs/superpowers/plans/2026-07-03-pm-dashboard-data-confirmation-package.md:1)
+  - [`docs/superpowers/plans/2026-07-03-pm-dashboard-data-confirmation-package.md`](../plans/superpowers/2026-07-03-pm-dashboard-data-confirmation-package.md)
 - 已知事实：
   - 现有证据只证明标签可切换。
   - 管理员权限前提已基本收敛，不再是当前主风险。
@@ -39,7 +39,7 @@
 - 当前状态：已关闭。
 - 当前结论：非阻塞项已完成，无需继续派工。
 - 已有产物：
-  - [`docs/superpowers/plans/2026-07-03-project-spec-package.md`](D:/projects-test/cgc-pms/docs/superpowers/plans/2026-07-03-project-spec-package.md:1)
+  - [`docs/superpowers/plans/2026-07-03-project-spec-package.md`](../plans/superpowers/2026-07-03-project-spec-package.md)
 - 已知事实：
   - `frontend-admin/e2e/project.spec.ts` 已新增。
   - 子任务已在 `frontend-admin` 下执行 `pnpm exec playwright test e2e/project.spec.ts --project=chromium`。
@@ -53,7 +53,7 @@
 - 当前状态：已关闭。
 - 当前结论：非阻塞项已完成，无需继续派工。
 - 已有产物：
-  - [`docs/superpowers/plans/2026-07-03-real-write-depth-package.md`](D:/projects-test/cgc-pms/docs/superpowers/plans/2026-07-03-real-write-depth-package.md:1)
+  - [`docs/superpowers/plans/2026-07-03-real-write-depth-package.md`](../plans/superpowers/2026-07-03-real-write-depth-package.md)
 - 已知事实：
   - 审批链路已具备真实创建、提交、UI 操作、后端回读闭环。
   - `c3-failure-path.spec.ts` 已提供至少一个显式失败路径证据。
@@ -76,7 +76,7 @@
 - 当前状态：已关闭。
 - 当前结论：原始验收语义已满足，无需继续作为剩余项跟踪。
 - 已有产物：
-  - [`docs/superpowers/plans/2026-07-03-commit-boundary-judgement-package.md`](D:/projects-test/cgc-pms/docs/superpowers/plans/2026-07-03-commit-boundary-judgement-package.md:1)
+  - [`docs/superpowers/plans/2026-07-03-commit-boundary-judgement-package.md`](../plans/superpowers/2026-07-03-commit-boundary-judgement-package.md)
 - 已知事实：
   - 当前 `git status --short --untracked-files=all` 仅剩：
     - `D .serena/.gitignore`
@@ -89,7 +89,7 @@
   - `frontend-admin/.gitignore` 已增加 `e2e/.auth/admin-user.json`，用于避免认证态未跟踪文件反复污染。
   - `1378ca9fc` 曾明确执行 `chore: untrack .serena from repo`
   - `1fbf937ae` 又将 `.serena/.gitignore` 与 `.serena/project.yml` 重新加入版本控制
-  - [`docs/mcp-cleanup-record-2026-07-03.md`](D:/projects-test/cgc-pms/docs/mcp-cleanup-record-2026-07-03.md:131) 已明确记录：
+  - `docs/mcp-cleanup-record-2026-07-03.md`（原引用文件未纳入 `v1.0.0` 标签）曾明确记录：
     - 项目 `D:\projects-test\cgc-pms/.serena/` 目录应整体删除
     - 项目 `.serena` 已完全删除
 - 关闭依据：

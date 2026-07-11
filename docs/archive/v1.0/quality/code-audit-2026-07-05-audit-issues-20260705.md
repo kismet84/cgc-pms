@@ -12,10 +12,10 @@
 
 - 严重级别：高
 - 位置：
-  - [`frontend-admin/src/stores/user.ts`](D:/projects-test/cgc-pms/frontend-admin/src/stores/user.ts):11-15
-  - [`frontend-admin/src/stores/user.ts`](D:/projects-test/cgc-pms/frontend-admin/src/stores/user.ts):66-77
-  - [`frontend-admin/src/router/index.ts`](D:/projects-test/cgc-pms/frontend-admin/src/router/index.ts):487-517
-  - [`frontend-admin/src/directives/permission.ts`](D:/projects-test/cgc-pms/frontend-admin/src/directives/permission.ts):10-11
+  - [`frontend-admin/src/stores/user.ts`](../../../../frontend-admin/src/stores/user.ts):11-15
+  - [`frontend-admin/src/stores/user.ts`](../../../../frontend-admin/src/stores/user.ts):66-77
+  - [`frontend-admin/src/router/index.ts`](../../../../frontend-admin/src/router/index.ts):487-517
+  - [`frontend-admin/src/directives/permission.ts`](../../../../frontend-admin/src/directives/permission.ts):10-11
 - 证据：
   - `userInfo` 仍然被 `isLogin = !!userInfo.value` 视为“已登录”。
   - `persistUserInfo()` 现在只落盘 `userId / username / roleName`，不再持久化 `roles / permissions`。
@@ -33,9 +33,9 @@
 
 - 严重级别：高
 - 位置：
-  - [`frontend-admin/src/pages/cost/ledger.vue`](D:/projects-test/cgc-pms/frontend-admin/src/pages/cost/ledger.vue):44-48, 126-129, 152-155, 174-197
-  - [`backend/src/main/java/com/cgcpms/cost/service/CostLedgerService.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/cost/service/CostLedgerService.java):46-47, 70-71, 151-161
-  - [`frontend-admin/src/pages/cost/__tests__/CostLedgerProduction.test.ts`](D:/projects-test/cgc-pms/frontend-admin/src/pages/cost/__tests__/CostLedgerProduction.test.ts):19-28
+  - [`frontend-admin/src/pages/cost/ledger.vue`](../../../../frontend-admin/src/pages/cost/ledger.vue):44-48, 126-129, 152-155, 174-197
+  - [`backend/src/main/java/com/cgcpms/cost/service/CostLedgerService.java`](../../../../backend/src/main/java/com/cgcpms/cost/service/CostLedgerService.java):46-47, 70-71, 151-161
+  - [`frontend-admin/src/pages/cost/__tests__/CostLedgerProduction.test.ts`](../../../../frontend-admin/src/pages/cost/__tests__/CostLedgerProduction.test.ts):19-28
 - 证据：
   - 当前前端筛选状态只保留了 `projectId / contractId / partnerId / costStatus`，`costSubjectId / costType / sourceType` 已被移除。
   - 后端 `CostLedgerService` 仍然接收并使用 `costSubjectId / costType / sourceType` 做查询过滤。
@@ -52,12 +52,12 @@
 
 - 严重级别：中
 - 位置：
-  - [`backend/src/main/java/com/cgcpms/contract/entity/CtContract.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/contract/entity/CtContract.java):92-97
-  - [`backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/contract/service/CtContractService.java):205-215
-  - [`backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/contract/service/CtContractService.java):250-251
-  - [`backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`](D:/projects-test/cgc-pms/backend/src/main/java/com/cgcpms/contract/service/CtContractService.java):326
-  - [`frontend-admin/src/types/contract.ts`](D:/projects-test/cgc-pms/frontend-admin/src/types/contract.ts):42-71
-  - [`frontend-admin/src/api/modules/contract.ts`](D:/projects-test/cgc-pms/frontend-admin/src/api/modules/contract.ts):39-40, 128-137
+  - [`backend/src/main/java/com/cgcpms/contract/entity/CtContract.java`](../../../../backend/src/main/java/com/cgcpms/contract/entity/CtContract.java):92-97
+  - [`backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`](../../../../backend/src/main/java/com/cgcpms/contract/service/CtContractService.java):205-215
+  - [`backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`](../../../../backend/src/main/java/com/cgcpms/contract/service/CtContractService.java):250-251
+  - [`backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`](../../../../backend/src/main/java/com/cgcpms/contract/service/CtContractService.java):326
+  - [`frontend-admin/src/types/contract.ts`](../../../../frontend-admin/src/types/contract.ts):42-71
+  - [`frontend-admin/src/api/modules/contract.ts`](../../../../frontend-admin/src/api/modules/contract.ts):39-40, 128-137
 - 证据：
   - 实体新增了 `@Version private Integer version`，并且迁移脚本也新增了 `version` 列。
   - 但常规 `update()` 仍然使用 `ctContractMapper.update(null, new LambdaUpdateWrapper<>())`，没有带版本条件。

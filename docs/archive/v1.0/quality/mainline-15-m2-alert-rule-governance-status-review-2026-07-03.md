@@ -14,7 +14,7 @@
 
 已存在正式计划书：
 
-- [第15条主线-M2-预警中心规则治理增强任务计划书-2026-07-03.md](/D:/projects-test/cgc-pms/docs/plans/第15条主线-M2-预警中心规则治理增强任务计划书-2026-07-03.md)
+- [第15条主线-M2-预警中心规则治理增强任务计划书-2026-07-03.md](/../plans/第15条主线-M2-预警中心规则治理增强任务计划书-2026-07-03.md)
 
 计划书已满足以下要求：
 
@@ -96,7 +96,7 @@
 
 当前已存在的正式验收文档是：
 
-- [mainline-15-alert-center-enhancement-acceptance-2026-07-03.md](/D:/projects-test/cgc-pms/docs/quality/mainline-15-alert-center-enhancement-acceptance-2026-07-03.md)
+- [mainline-15-alert-center-enhancement-acceptance-2026-07-03.md](/mainline-15-alert-center-enhancement-acceptance-2026-07-03.md)
 
 该文档明确对应的是：
 

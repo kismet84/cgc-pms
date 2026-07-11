@@ -576,7 +576,7 @@ Write-Host "Stop time:  $StopTime"
 使用：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\install-schedule.ps1 -StartTime "09:00" -StopTime "23:30"
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/install-schedule.ps1 -StartTime "09:00" -StopTime "23:30"
 ```
 
 ---
@@ -599,7 +599,7 @@ Write-Host "AutoPilot schedule uninstalled."
 使用：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\uninstall-schedule.ps1
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/uninstall-schedule.ps1
 ```
 
 ---
@@ -1110,49 +1110,49 @@ autoPush = false
 ### 15.1 启动 AutoPilot
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-start.ps1
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/autopilot-start.ps1
 ```
 
 ### 15.2 停止 AutoPilot
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-stop.ps1
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/autopilot-stop.ps1
 ```
 
 ### 15.3 暂停 AutoPilot
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-pause.ps1
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/autopilot-pause.ps1
 ```
 
 ### 15.4 恢复 AutoPilot
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-resume.ps1
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/autopilot-resume.ps1
 ```
 
 ### 15.5 查看状态
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-status.ps1
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/autopilot-status.ps1
 ```
 
 ### 15.6 强制终止
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\autopilot-kill.ps1
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/autopilot-kill.ps1
 ```
 
 ### 15.7 安装定时任务
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\install-schedule.ps1 -StartTime "09:00" -StopTime "23:30"
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/install-schedule.ps1 -StartTime "09:00" -StopTime "23:30"
 ```
 
 ### 15.8 卸载定时任务
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\scripts\codex-autopilot\uninstall-schedule.ps1
+powershell -ExecutionPolicy Bypass -File ../../../../scripts/codex-autopilot/uninstall-schedule.ps1
 ```
 
 ---

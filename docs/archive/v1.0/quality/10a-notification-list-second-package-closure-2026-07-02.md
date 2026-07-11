@@ -52,7 +52,7 @@
 ## 归档关系说明
 
 1. 本归档对应 10A 第二版首批最小修复包的正式关闭结论。
-2. 本归档基于前置阻塞归档 [10a-notification-list-second-package-blocked-2026-07-02.md](D:\projects-test\cgc-pms\docs\quality\10a-notification-list-second-package-blocked-2026-07-02.md) 的后续收口，不改写当时“环境阻塞”判断本身。
+2. 本归档基于前置阻塞归档 [10a-notification-list-second-package-blocked-2026-07-02.md](10a-notification-list-second-package-blocked-2026-07-02.md) 的后续收口，不改写当时“环境阻塞”判断本身。
 3. 当前 `docs/` 目录仍被仓库 `.gitignore` 忽略，归档文件默认不进入版本管理；该点不影响本地质量归档成立。
 
 ## 非阻塞剩余风险
