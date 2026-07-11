@@ -76,6 +76,14 @@ try {
   (New-ReadyText).Replace('`git diff --check`', '`cd missing-backend; .\mvnw.cmd test`') | Set-Content -LiteralPath $readyPath -Encoding UTF8
   Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } '验证命令入口不存在'
 
+  (New-ReadyText).Replace('`git diff --check`', '`Remove-Item -Recurse deploy`') | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } '验证命令不在白名单'
+
+  New-ReadyText | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  $low = @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root)[0]
+  $upgraded = Get-AutopilotRoute -Issue $low -ChangedPaths @('backend/src/main/java/com/cgcpms/security/AuthGuard.java')
+  if (!$upgraded.highRisk -or !$upgraded.reviewRequired) { throw 'actual high-risk diff did not upgrade review route' }
+
   New-ReadyText -Nature '运维治理' -Risk '高' -Allowed '`backend/src/main/java/com/cgcpms/auth/**`, `frontend-admin/src/**`' | Set-Content -LiteralPath $readyPath -Encoding UTF8
   $high = @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root)[0]
   $route = Get-AutopilotRoute -Issue $high -ChangedPaths @('backend/src/main/java/com/cgcpms/auth/X.java','frontend-admin/src/X.vue')

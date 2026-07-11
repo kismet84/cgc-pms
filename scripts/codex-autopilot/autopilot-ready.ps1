@@ -52,15 +52,18 @@ function Test-AutopilotValidationEntry {
     if (!(Test-Path -LiteralPath $workDir -PathType Container)) { return "验证命令入口不存在：$Command" }
     $commandText = $cdMatch.Groups[2].Value.Trim()
   }
+  if ($commandText -match '[;&|<>]') { return "验证命令不在白名单：$Command" }
   if ($commandText -match '^(?:\.\\|\./)?mvnw(?:\.cmd)?\b') {
     if (!(Test-Path (Join-Path $workDir 'mvnw.cmd')) -and !(Test-Path (Join-Path $workDir 'mvnw'))) { return "验证命令入口不存在：$Command" }
   } elseif ($commandText -match '^pnpm\b') {
     if (!(Test-Path (Join-Path $workDir 'package.json'))) { return "验证命令入口不存在：$Command" }
   } elseif ($commandText -match '^git\s+diff\s+--check\b') {
     return ''
-  } elseif ($commandText -match '(?:-File\s+|^)([^\s]+\.ps1)\b') {
+  } elseif ($commandText -match '^powershell(?:\.exe)?\s+[^;&|<>]*-File\s+([^\s]+\.ps1)\b') {
     $scriptPath = $matches[1].Trim('"', "'")
     if (!(Test-Path (Join-Path $workDir $scriptPath))) { return "验证命令入口不存在：$Command" }
+  } else {
+    return "验证命令不在白名单：$Command"
   }
   return ''
 }
@@ -109,6 +112,7 @@ function ConvertTo-AutopilotReadyIssue {
     taskNature = $nature
     goal = @(Get-AutopilotSectionLines $Block.body '目标')
     nonGoals = @(Get-AutopilotSectionLines $Block.body '非目标')
+    acceptanceCriteria = @(Get-AutopilotSectionLines $Block.body '验收标准')
     allowedPaths = $allowedPaths
     forbiddenPaths = $forbiddenPaths
     validationCommands = $commands

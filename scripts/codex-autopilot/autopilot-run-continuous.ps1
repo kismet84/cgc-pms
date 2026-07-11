@@ -959,6 +959,18 @@ function Invoke-IssueExecutor {
     Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $Issue.title)"
     return
   }
+  if ($Route.verificationProfile -eq 'runtime-health') {
+    Write-State $autoDir 'VERIFYING' $false 'RUNTIME_HEALTH_GATE' $Issue.title 'runtime preflight' ''
+    $preflight = Invoke-AutopilotRuntimePreflight -RepoRoot $RepoRoot -RuntimeRefresh $config.runtimeRefresh
+    $healthDir = Join-Path $script:RunContext.dir $Issue.lint.issueId
+    New-Item -ItemType Directory -Path $healthDir -Force | Out-Null
+    $healthPath = Join-Path $healthDir 'runtime-health.json'
+    [IO.File]::WriteAllText($healthPath, ($preflight | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+    if ($preflight.status -ne 'pass') {
+      Write-State $autoDir 'BLOCKED' $false 'RUNTIME_HEALTH_FAILED' $Issue.title 'environment' 'STOP_RUNTIME_HEALTH_FAILED'
+      return
+    }
+  }
   $baseCommit = (& git -C $RepoRoot rev-parse HEAD).Trim()
   $worktree = New-AutopilotIssueWorktree -RepoRoot $RepoRoot -IssueId $Issue.lint.issueId -BaseCommit $baseCommit -AllowDirtyReuse:($Phase -eq 'repair')
   $script:Attempt = $Attempt
@@ -1034,15 +1046,37 @@ function Invoke-IssueExecutor {
           }
         }
       }
+      if ($result.status -eq 'done') {
+        foreach ($evidencePath in $evidencePaths) {
+          try {
+            $boundEvidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 | ConvertFrom-Json
+            Assert-AutopilotEvidenceCurrent -Evidence $boundEvidence -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit | Out-Null
+          } catch {
+            $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_EVIDENCE_STALE'
+            $result.validation += [pscustomobject]@{ name='evidence-current'; status='fail'; message=$_.Exception.Message }
+            break
+          }
+        }
+      }
+      $effectiveRoute = Get-AutopilotRoute -Issue $Issue.contract -ChangedPaths @(Get-AutopilotWorktreeChanges -Worktree $worktree.path)
+      if ($result.status -eq 'done') {
+        try {
+          Assert-AutopilotAllowedChanges -ChangedPaths @(Get-AutopilotWorktreeChanges -Worktree $worktree.path) -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
+        } catch {
+          $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
+          $result | Add-Member -NotePropertyName scopeViolationCount -NotePropertyValue 1 -Force
+          $result.validation += [pscustomobject]@{ name = 'post-validation-scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
+        }
+      }
       $result | Add-Member -NotePropertyName evidencePaths -NotePropertyValue @($evidencePaths) -Force
-      $result | Add-Member -NotePropertyName reviewRequired -NotePropertyValue ([bool]$Route.reviewRequired) -Force
+      $result | Add-Member -NotePropertyName reviewRequired -NotePropertyValue ([bool]$effectiveRoute.reviewRequired) -Force
       $result | Add-Member -NotePropertyName attempt -NotePropertyValue $Attempt -Force
       $result | Add-Member -NotePropertyName firstPassSuccess -NotePropertyValue ($Attempt -eq 0 -and $result.status -eq 'done') -Force
       $result | Add-Member -NotePropertyName manualInterventionCount -NotePropertyValue 0 -Force
       $result | Add-Member -NotePropertyName scopeViolationCount -NotePropertyValue $(if ($result.stopReason -eq 'STOP_SCOPE_VIOLATION') { 1 } else { 0 }) -Force
       $closed = $false
       if ($result.status -eq 'done') { $script:FailureFingerprint = $null }
-      if ($result.status -eq 'done' -and $Route.reviewRequired) {
+      if ($result.status -eq 'done' -and $effectiveRoute.reviewRequired) {
         Write-State $autoDir 'REVIEWING' $false 'VERIFICATION_COMPLETED' $Issue.title 'REVIEWING' ''
         $reviewDir = Join-Path $issueDir 'review'; New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
         $diffPath = Join-Path $reviewDir 'final.diff'

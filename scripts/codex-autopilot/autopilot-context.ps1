@@ -41,6 +41,7 @@ function New-AutopilotContextPack {
     diffHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $baseCommit
     goal = @($Issue.goal)
     nonGoals = @($Issue.nonGoals)
+    acceptanceCriteria = @($Issue.acceptanceCriteria)
     allowedPaths = @($Issue.allowedPaths)
     forbiddenPaths = @($Issue.forbiddenPaths)
     requiredCommands = @($Issue.validationCommands)

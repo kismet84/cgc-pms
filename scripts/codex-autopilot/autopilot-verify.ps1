@@ -94,3 +94,19 @@ function Test-AutopilotHealthGate {
   }
   return [pscustomobject]@{ status = if (@($results | Where-Object status -eq 'fail').Count -eq 0) { 'pass' } else { 'fail' }; results = @($results) }
 }
+
+function Invoke-AutopilotRuntimePreflight {
+  param([Parameter(Mandatory)][string]$RepoRoot, [object]$RuntimeRefresh)
+  $before = Test-AutopilotHealthGate
+  if ($before.status -eq 'pass') { return [pscustomobject]@{ status='pass'; refreshed=$false; before=$before; after=$before } }
+  if (!$RuntimeRefresh -or $RuntimeRefresh.enabled -ne $true -or !$RuntimeRefresh.command) { return [pscustomobject]@{ status='fail'; refreshed=$false; before=$before; after=$before; reason='runtime refresh is unavailable' } }
+  $timeoutSeconds = if ($RuntimeRefresh.timeoutSeconds) { [int]$RuntimeRefresh.timeoutSeconds } else { 900 }
+  $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("& { $($RuntimeRefresh.command) }; if (`$null -ne `$LASTEXITCODE) { exit `$LASTEXITCODE }"))
+  $process = Start-Process -FilePath powershell -ArgumentList '-NoProfile','-EncodedCommand',$encoded -WorkingDirectory $RepoRoot -PassThru -WindowStyle Hidden
+  if (!$process.WaitForExit($timeoutSeconds * 1000)) { & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null; return [pscustomobject]@{ status='fail'; refreshed=$true; before=$before; after=$null; reason='runtime refresh timed out' } }
+  if ($process.ExitCode -ne 0) { return [pscustomobject]@{ status='fail'; refreshed=$true; before=$before; after=$null; reason="runtime refresh exitCode=$($process.ExitCode)" } }
+  $waitSeconds = if ($RuntimeRefresh.waitSeconds) { [int]$RuntimeRefresh.waitSeconds } else { 180 }
+  Start-Sleep -Seconds $waitSeconds
+  $after = Test-AutopilotHealthGate
+  return [pscustomobject]@{ status=$after.status; refreshed=$true; before=$before; after=$after; reason=if($after.status -eq 'pass'){'runtime recovered'}else{'runtime remains unhealthy after refresh'} }
+}

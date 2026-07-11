@@ -66,6 +66,12 @@
     "maxRepairAttempts": 2,
     "repairTimeoutSeconds": 1200
   },
+  "runtimeRefresh": {
+    "enabled": true,
+    "command": "python scripts/rebuild.py",
+    "timeoutSeconds": 900,
+    "waitSeconds": 180
+  },
   "allowedEpics": [
     "EPIC-000",
     "EPIC-001",

@@ -29,7 +29,7 @@ try {
   $issue = [pscustomobject]@{
     issueId = 'ISSUE-900-010'; title = 'ISSUE-900-010：Context isolation'; body = 'task'
     readyContentHash = 'ready-hash-a'; taskNature = '缺口修复'; goal = @('isolate')
-    nonGoals = @('no leak'); allowedPaths = @('docs/quality/**'); forbiddenPaths = @('deploy/**')
+    nonGoals = @('no leak'); acceptanceCriteria = @('preserve business behavior'); allowedPaths = @('docs/quality/**'); forbiddenPaths = @('deploy/**')
     validationCommands = @('git diff --check'); riskLevel = '低'; migration = '不需要'
   }
   $worktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId $issue.issueId -BaseCommit $baseCommit
@@ -44,6 +44,7 @@ try {
   $contextPath = Join-Path $root 'context-a.json'
   $context = New-AutopilotContextPack -Issue $issue -Phase 'implement' -RepoRoot $root -Worktree $worktree.path -OutputPath $contextPath -RelevantSymbols @('docs/quality/base.md')
   if ($context.issueId -ne $issue.issueId -or $context.baseCommit -ne $baseCommit) { throw 'context identity is wrong' }
+  if ($context.acceptanceCriteria -notcontains 'preserve business behavior') { throw 'acceptance criteria were omitted from isolated context' }
 
   $issueB = $issue.PSObject.Copy()
   $issueB.issueId = 'ISSUE-900-011'

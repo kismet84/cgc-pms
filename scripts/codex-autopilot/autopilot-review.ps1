@@ -85,7 +85,7 @@ function Invoke-AutopilotReviewer {
   )
   $codex = Resolve-AutopilotCodexCommand
   $prompt = "Act as an independent reviewer. Read only the structured request at $RequestPath and files it references. Return JSON matching $SchemaPath."
-  $arguments = @('exec','--ephemeral','--sandbox','danger-full-access','--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$Worktree,'--output-schema',$SchemaPath,'--output-last-message',$ResultPath,'-')
+  $arguments = @('exec','--ephemeral','--sandbox','read-only','--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$Worktree,'--output-schema',$SchemaPath,'--output-last-message',$ResultPath,'-')
   $startInfo = [Diagnostics.ProcessStartInfo]::new()
   $startInfo.FileName = $codex
   $startInfo.Arguments = ($arguments | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
