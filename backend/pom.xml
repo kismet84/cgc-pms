@@ -13,7 +13,7 @@
 
     <groupId>com.cgcpms</groupId>
     <artifactId>cgc-pms-backend</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>cgc-pms-backend</name>
     <description>Construction General Contracting Project Management System - Backend</description>
 
