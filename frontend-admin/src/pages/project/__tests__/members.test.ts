@@ -122,4 +122,18 @@ describe('project/members.vue permissions', () => {
     expect(wrapper.find('.role-edit').exists()).toBe(false)
     expect(wrapper.find('.delete-action').exists()).toBe(false)
   })
+
+  it.each([
+    ['project:member:add', 'add'],
+    ['project:member:edit', 'edit'],
+    ['project:member:delete', 'delete'],
+  ] as const)('%s 只显示对应操作入口', async (permission, action) => {
+    mocks.permissions = new Set(['project:member:list', permission])
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.text().includes('添加成员')).toBe(action === 'add')
+    expect(wrapper.find('.role-edit').exists()).toBe(action === 'edit')
+    expect(wrapper.find('.delete-action').exists()).toBe(action === 'delete')
+  })
 })

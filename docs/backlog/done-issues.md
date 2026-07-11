@@ -2,6 +2,14 @@
 
 记录已经完成并收口的任务。
 
+### ISSUE-008-036：项目成员操作按钮权限正向显示回归
+
+完成日期：2026-07-11
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：非失败分类；既有权限可见性补齐正向自动化证据
+验证结果：通过；组件测试 4/4、type-check 通过
+相关报告：docs/quality/issue-008-036-project-member-positive-permission-visibility.md；docs/iterations/iteration-2026-07-11-report.md
+
 ### ISSUE-008-035：项目成员项目级访问范围治理
 
 完成日期：2026-07-11
