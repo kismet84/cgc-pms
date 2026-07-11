@@ -38,6 +38,7 @@
 | 部署、备份、恢复 | [10 部署运维手册](10-部署运维手册.md) |
 | 安全加固 | [11 安全规范](11-安全规范.md) |
 | 自适应执行路由/条件派工 | [AGENTS.override.md](../AGENTS.override.md) |
+| AutoPilot 无人值守运行与验收 | [第 36 条主线验收报告](quality/autopilot-unattended-acceptance.md)、[无人值守资格报告](quality/autopilot-unattended-qualification.md) |
 
 ## 主线文档
 
@@ -68,6 +69,8 @@ Prompt 类文档索引见 [prompt/README.md](prompt/README.md)。
 ## 质量与审计
 
 ### 当前有效结论入口（第 21 条主线最终收口）
+
+AutoPilot 专项当前入口：[第 36 条主线 AutoPilot 无人值守验收报告](quality/autopilot-unattended-acceptance.md)；适用范围为本地低/中风险串行、`autoPush=false`，不替代业务上线裁决。
 
 1. [第 21 条主线最终质量归档与收口报告](quality/mainline-21-legacy-governance-closure-2026-07-05.md)：**当前有效最终收口入口**，口径为“通过 / 非阻塞 / 可关闭第 21 条主线”。
 2. [第 21 条主线 P0-2：上线前总控状态校准与决策包重建报告](quality/mainline-21-p0-2-release-control-calibration-2026-07-05.md)：第 21 条阶段总控校准入口，口径为“通过 / 非阻塞 / 可进入 P1”。

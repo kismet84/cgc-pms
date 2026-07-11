@@ -9,6 +9,8 @@
 - 路由至少考虑风险、耦合、并行收益、上下文传递成本和独立证据需要，不按任务类别强制派工。
 - 任何代码、配置、文档、Git 或运行环境状态变更前，实际执行者都要核对 `git branch --show-current` 与 `git status --short`；怀疑冲突时再查 `git worktree list`。
 - A-F 是职责检查表，不是固定六线程；D 的裁决必需验证证据与 E 的适用风险审查证据不可省略，但不强制由独立线程提供。
+- 主线程不承载执行器长日志或推理历史；长期任务按 Issue/阶段生成最小 context pack，Reviewer 只接收 Ready、最终 diff 和绑定证据。
+- 一个 Issue 一个 worktree；不确定残留提交不得直接合并，先隔离并从当前 baseBranch 新鲜重跑。
 
 ## 子智能体
 

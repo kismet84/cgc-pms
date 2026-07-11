@@ -42,11 +42,14 @@ function Get-AutopilotQualification {
       try {
         $result = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
         [datetimeoffset]$created = [datetimeoffset]::MinValue
-        if ($result.createdAt -and [datetimeoffset]::TryParse([string]$result.createdAt, [ref]$created)) { [pscustomobject]@{ result=$result; createdAt=$created; path=$_.FullName } }
+        $validCreatedAt = $result.createdAt -and [datetimeoffset]::TryParse([string]$result.createdAt, [ref]$created)
+        $result | Add-Member -NotePropertyName qualificationCreatedAtValid -NotePropertyValue ([bool]$validCreatedAt) -Force
+        [pscustomobject]@{ result=$result; createdAt=$(if($validCreatedAt){$created}else{[datetimeoffset]::MaxValue}); path=$_.FullName }
       } catch {}
     } | Where-Object { $_ -and $_.result.status -ne 'noop' } | Sort-Object @{Expression='createdAt';Descending=$true},@{Expression='path';Descending=$true} | Select-Object -First $WindowSize | ForEach-Object result)
   }
   $reasons = @()
+  if (@($results | Where-Object { !$_.qualificationCreatedAtValid }).Count -gt 0) { $reasons += 'qualification window contains invalid result timestamp' }
   if ($results.Count -lt $WindowSize) { $reasons += "sample size $($results.Count)/$WindowSize" }
   if (@($results | Where-Object status -ne 'done').Count -gt 0) { $reasons += 'window contains non-done results' }
   if (@($results | Where-Object { !$_.gitSummary -or !$_.gitSummary.commit }).Count -gt 0) { $reasons += 'commit binding is missing' }
@@ -60,7 +63,7 @@ function Get-AutopilotQualification {
     return $false
   }).Count
   if ($invalidEvidence -gt 0) { $reasons += 'bound verification evidence is missing or invalid' }
-  if (@($results | Where-Object { $_.PSObject.Properties.Name -contains 'reviewRequired' -and $_.reviewRequired -and (!$_.review -or $_.review.decision -ne 'pass') }).Count -gt 0) { $reasons += 'required independent review is missing' }
+  if (@($results | Where-Object { $_.PSObject.Properties.Name -contains 'reviewRequired' -and $_.reviewRequired -and (!$_.review -or $_.review.decision -ne 'pass' -or $_.review.issueId -ne $_.issueId -or !$_.reviewedDiffHashExpected -or ([string]$_.review.reviewedDiffHash).ToLowerInvariant() -ne ([string]$_.reviewedDiffHashExpected).ToLowerInvariant()) }).Count -gt 0) { $reasons += 'required independent review is missing or mismatched' }
   $missingQualificationFields = @($results | Where-Object {
     $_.PSObject.Properties.Name -notcontains 'firstPassSuccess' -or
     $_.PSObject.Properties.Name -notcontains 'manualInterventionCount' -or

@@ -58,6 +58,11 @@ try {
   $failedResult | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $failedResultPath -Encoding UTF8
   $rejected = Get-AutopilotQualification -RunsDir $runs -WindowSize 20
   if ($rejected.qualified -or $rejected.reasons -notcontains 'manual intervention count is not zero') { throw 'manual intervention did not fail qualification' }
+  $failedResult.manualInterventionCount = 0
+  $failedResult.createdAt = 'not-a-time'
+  $failedResult | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $failedResultPath -Encoding UTF8
+  $invalidTimestamp = Get-AutopilotQualification -RunsDir $runs -WindowSize 20
+  if ($invalidTimestamp.qualified -or $invalidTimestamp.reasons -notcontains 'qualification window contains invalid result timestamp') { throw 'invalid result timestamp was silently excluded' }
 
   Write-Host 'metrics self-test passed'
 } finally {

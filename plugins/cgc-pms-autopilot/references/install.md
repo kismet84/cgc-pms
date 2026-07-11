@@ -18,10 +18,14 @@
 
 ## 使用顺序
 
-1. `autopilot-checkpoint.ps1`
-2. `ready-issue-writer.ps1` 或 `issue-closeout.ps1`
-3. `test-failure-classifier.ps1`
-4. `local-commit-closeout.ps1 -DryRun`
+1. 项目统一控制面：`scripts/codex-autopilot/autopilot-run-continuous.ps1`
+2. 插件兼容预演：`autopilot-loop-runner.ps1 -DryRun`
+3. `autopilot-checkpoint.ps1`
+4. `ready-issue-writer.ps1` 或 `issue-closeout.ps1`
+5. `test-failure-classifier.ps1`
+6. `local-commit-closeout.ps1 -DryRun`
+
+运行态 `state.json`、`run.lock`、events、executor/reviewer 日志只保存在 `.codex-autopilot/`，不得提交为项目事实。正式事实仍写入 `docs/backlog/**`、`docs/iterations/**`、`docs/quality/**` 和本地 Git commit。
 
 ## 项目级触发协议
 
