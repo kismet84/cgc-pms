@@ -31,6 +31,8 @@ try {
 
   "# Blocked Issues`n### ISSUE-1：Candidate A prerequisite`n状态：Blocked" | Set-Content -LiteralPath (Join-Path $backlog 'blocked-issues.md') -Encoding UTF8
   if ((Get-AutopilotRefillDecision -RepoRoot $root).action -ne 'UNBLOCK_FIRST') { throw 'current focus blocker was not prioritized' }
+  if (Test-AutopilotReadyPlanningAllowed -Action 'UNBLOCK_FIRST') { throw 'blocked prerequisite was allowed into Ready Planner' }
+  if (!(Test-AutopilotReadyPlanningAllowed -Action 'PLAN_READY')) { throw 'normal candidate refill was rejected' }
 
   $titles = @('报表中心 A','报表中心 B','报表中心 C')
   if (Test-AutopilotDomainContinuationAllowed -RecentTitles $titles -Domain '报表中心' -FocusText '继续做报表') { throw 'three-item domain streak skipped candidate comparison' }

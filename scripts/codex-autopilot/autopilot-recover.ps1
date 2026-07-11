@@ -18,12 +18,40 @@ function Get-AutopilotRecoveryDecision {
   if ($process) { return [pscustomobject]@{ action = 'REFUSE_SECOND_INSTANCE'; reason = 'owner PID is alive'; runId = $lock.runId } }
   $state = $null
   if (Test-Path -LiteralPath $statePath) { try { $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch {} }
+  if ($state -and $state.worktree -and (Test-Path -LiteralPath $state.worktree)) {
+    $changes = @(& git -C $state.worktree status --porcelain=v1 2>$null)
+    if ($changes.Count -eq 0) {
+      $repoRoot = Split-Path -Parent $AutoDir
+      $mainHead = (& git -C $repoRoot rev-parse HEAD 2>$null | Select-Object -First 1).Trim()
+      $worktreeHead = (& git -C $state.worktree rev-parse HEAD 2>$null | Select-Object -First 1).Trim()
+      if ($mainHead -and $worktreeHead -and $mainHead -ne $worktreeHead) {
+        & git -C $repoRoot merge-base --is-ancestor $mainHead $worktreeHead 2>$null
+        if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ action = 'RESUME_CLOSEOUT'; reason = 'clean issue worktree contains an unmerged descendant commit'; runId = $lock.runId; worktree = $state.worktree; commit = $worktreeHead } }
+      }
+    }
+  }
   if ($state -and $state.lastCommit -and $state.status -in @('CLOSING','COMMITTING','MERGING')) { return [pscustomobject]@{ action = 'RESUME_CLOSEOUT'; reason = 'commit exists but closeout is incomplete'; runId = $lock.runId } }
   if ($state -and $state.worktree -and (Test-Path -LiteralPath $state.worktree)) {
     $changes = @(& git -C $state.worktree status --porcelain=v1 2>$null)
     if ($changes.Count -gt 0) { return [pscustomobject]@{ action = 'VERIFY_UNCOMMITTED'; reason = 'dead executor left a diff'; runId = $lock.runId; worktree = $state.worktree } }
   }
   return [pscustomobject]@{ action = 'RESUME_FROM_CHECKPOINT'; reason = 'owner PID is gone and no unsafe diff was found'; runId = $lock.runId }
+}
+
+function Resume-AutopilotCommittedWorktree {
+  param([Parameter(Mandatory)][string]$RepoRoot, [Parameter(Mandatory)][string]$Worktree, [Parameter(Mandatory)][string]$Commit)
+  $changes = @(& git -C $RepoRoot status --porcelain=v1 2>$null)
+  if ($changes.Count -gt 0) { throw 'cannot resume closeout while the main worktree is dirty' }
+  $current = (& git -C $RepoRoot rev-parse HEAD).Trim()
+  if ($current -ne $Commit) {
+    & git -C $RepoRoot merge --ff-only $Commit | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'failed to fast-forward committed issue worktree during recovery' }
+  }
+  $branch = (& git -C $Worktree branch --show-current 2>$null | Select-Object -First 1).Trim()
+  & git -C $RepoRoot worktree remove --force $Worktree | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'failed to remove recovered issue worktree' }
+  if ($branch) { & git -C $RepoRoot branch -d $branch 2>$null | Out-Null }
+  return [pscustomobject]@{ merged=$true; commit=$Commit; branch=$branch }
 }
 
 function Get-AutopilotCloseoutKey {

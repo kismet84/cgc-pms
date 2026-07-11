@@ -11,6 +11,11 @@ function Test-AutopilotDomainContinuationAllowed {
   return $true
 }
 
+function Test-AutopilotReadyPlanningAllowed {
+  param([string]$Action)
+  return $Action -eq 'PLAN_READY'
+}
+
 function Get-AutopilotRefillDecision {
   param([Parameter(Mandatory)][string]$RepoRoot)
   $autoDir = Join-Path $RepoRoot '.codex-autopilot'

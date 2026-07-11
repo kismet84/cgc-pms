@@ -1065,6 +1065,16 @@ function Invoke-IssueExecutor {
           }
         }
       }
+      if ($result.status -eq 'done') {
+        $finalChanges = @(Get-AutopilotWorktreeChanges -Worktree $worktree.path)
+        try {
+          Assert-AutopilotAllowedChanges -ChangedPaths $finalChanges -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
+        } catch {
+          $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
+          $result.scopeViolationCount = 1
+          $result.validation += [pscustomobject]@{ name = 'final-scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
+        }
+      }
       if ($result.status -eq 'done' -and $config.closeout -and $config.closeout.enabled -eq $true) {
         Write-State $autoDir 'COMMITTING' $false 'CLOSEOUT_START' $Issue.title 'COMMITTING' ''
         $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge)
@@ -1079,7 +1089,7 @@ function Invoke-IssueExecutor {
       }
       $result | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $resultPath -Encoding UTF8
       if ($Attempt -gt 0) { Copy-Item -LiteralPath $resultPath -Destination (Join-Path $script:RunContext.dir 'result.json') -Force }
-      if ($result.status -eq 'blocked' -and $result.stopReason -in @('STOP_VERIFICATION_FAILED','STOP_REVIEW_NEEDS_REPAIR') -and $config.repair -and $config.repair.enabled -eq $true -and (Test-AutopilotRetryAllowed -PreviousFingerprint $script:FailureFingerprint -CurrentFingerprint $currentFingerprint -Attempt $Attempt)) {
+      if ($result.status -eq 'blocked' -and (Test-AutopilotCodeRepairAllowed -FailureCategory $result.failureCategory -StopReason $result.stopReason) -and $config.repair -and $config.repair.enabled -eq $true -and (Test-AutopilotRetryAllowed -PreviousFingerprint $script:FailureFingerprint -CurrentFingerprint $currentFingerprint -Attempt $Attempt)) {
         $script:FailureFingerprint = $currentFingerprint
         Write-State $autoDir 'REPAIRING' $false 'REPAIR_START' $Issue.title $failureSummary ''
         Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt ($Attempt + 1) -Phase 'repair' -PreviousSummary $failureSummary
@@ -1188,6 +1198,10 @@ try {
     if ($recovery.action -eq 'REFUSE_SECOND_INSTANCE') { Write-Host 'RUN_LOCK_ACTIVE'; throw 'Another AutoPilot run is active.' }
     if ($recovery.action -in @('RESUME_FROM_CHECKPOINT','RESUME_CLOSEOUT')) {
       Remove-Item -LiteralPath (Join-Path $autoDir 'run.lock') -Force -ErrorAction SilentlyContinue
+      if ($recovery.action -eq 'RESUME_CLOSEOUT' -and $recovery.worktree -and $recovery.commit) {
+        $resumedCloseout = Resume-AutopilotCommittedWorktree -RepoRoot $RepoRoot -Worktree $recovery.worktree -Commit $recovery.commit
+        $script:LastCommit = $resumedCloseout.commit
+      }
       Write-Host 'STALE_RUN_LOCK_REMOVED'
       Write-RunEvent 'recovery' ([pscustomobject]@{ decision = $recovery.action; status = 'RECOVERED'; reason = $recovery.reason })
     } elseif ($recovery.action -in @('VERIFY_UNCOMMITTED','QUARANTINE')) {
@@ -1295,7 +1309,7 @@ try {
     }
 
     $refillDecision = Get-AutopilotRefillDecision -RepoRoot $RepoRoot
-    if ($applyMode -and $config.readyPlanner -and $config.readyPlanner.enabled -eq $true -and $refillDecision.action -in @('PLAN_READY','UNBLOCK_FIRST')) {
+    if ($applyMode -and $config.readyPlanner -and $config.readyPlanner.enabled -eq $true -and (Test-AutopilotReadyPlanningAllowed -Action $refillDecision.action)) {
       Write-State $autoDir 'REFILLING' $false 'READY_PLANNER_START' '' $refillDecision.reason ''
       $planResultPath = Join-Path $script:RunContext.dir 'ready-plan.json'
       $planSchemaPath = Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\ready-plan.schema.json'

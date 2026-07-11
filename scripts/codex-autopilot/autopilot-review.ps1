@@ -55,6 +55,11 @@ function Get-AutopilotReviewDisposition {
   return [pscustomobject]@{ action='REPAIR'; failureFingerprint=$fingerprint; summary=$summary }
 }
 
+function Test-AutopilotCodeRepairAllowed {
+  param([string]$FailureCategory, [string]$StopReason)
+  return $FailureCategory -eq 'quality_security' -and $StopReason -in @('STOP_VERIFICATION_FAILED','STOP_REVIEW_NEEDS_REPAIR')
+}
+
 function Resolve-AutopilotCodexCommand {
   $command = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($command) { return $command.Source }
