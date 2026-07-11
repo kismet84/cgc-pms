@@ -58,6 +58,11 @@
     "localCommit": true,
     "localFastForwardMerge": true
   },
+  "repair": {
+    "enabled": true,
+    "maxRepairAttempts": 2,
+    "repairTimeoutSeconds": 1200
+  },
   "allowedEpics": [
     "EPIC-000",
     "EPIC-001",

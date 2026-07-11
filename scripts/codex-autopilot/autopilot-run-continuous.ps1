@@ -528,7 +528,7 @@ function Write-State {
     status = $stateStatus
     phase = $phase
     currentIssue = $LastIssue
-    attempt = 0
+    attempt = $script:Attempt
     startedAt = if ($null -ne $existing -and $existing.PSObject.Properties.Name -contains 'startedAt' -and $existing.startedAt) { [string]$existing.startedAt } else { $now }
     phaseStartedAt = $now
     lastHeartbeatAt = $now
@@ -908,7 +908,10 @@ function Invoke-IssueExecutor {
     [string]$RepoRoot,
     [string]$ConfigPath,
     [object]$Issue,
-    [object]$Route
+    [object]$Route,
+    [int]$Attempt = 0,
+    [ValidateSet('implement','repair')][string]$Phase = 'implement',
+    [string]$PreviousSummary = ''
   )
 
   $executorPath = Join-Path $scriptDir "autopilot-exec-issue.ps1"
@@ -919,12 +922,13 @@ function Invoke-IssueExecutor {
   }
   $baseCommit = (& git -C $RepoRoot rev-parse HEAD).Trim()
   $worktree = New-AutopilotIssueWorktree -RepoRoot $RepoRoot -IssueId $Issue.lint.issueId -BaseCommit $baseCommit
+  $script:Attempt = $Attempt
   $script:CurrentWorktree = $worktree.path
   $script:CurrentBranch = $worktree.branch
   $issueDir = Join-Path $script:RunContext.dir $Issue.lint.issueId
   New-Item -ItemType Directory -Path $issueDir -Force | Out-Null
-  $contextPath = Join-Path $issueDir 'implement\context.json'
-  New-AutopilotContextPack -Issue $Issue.contract -Phase 'implement' -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextPath | Out-Null
+  $contextPath = Join-Path $issueDir ("$Phase-$Attempt\context.json")
+  New-AutopilotContextPack -Issue $Issue.contract -Phase $Phase -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextPath -PreviousPhaseSummary $PreviousSummary | Out-Null
   Write-State $autoDir 'EXECUTING' $false 'EXECUTOR_START' $Issue.title 'EXECUTING' ''
   $executorArgs = @(
     '-NoProfile','-ExecutionPolicy','Bypass','-File',$executorPath,
@@ -932,7 +936,7 @@ function Invoke-IssueExecutor {
     '-ConfigPath',$ConfigPath,
     '-ReadyPath',(Join-Path $worktree.path 'docs\backlog\ready-issues.md'),
     '-Title',$Issue.title,
-    '-RunId',$script:RunContext.id,
+    '-RunId',$(if ($Attempt -eq 0) { $script:RunContext.id } else { "$($script:RunContext.id)-repair-$Attempt" }),
     '-ContextPath',$contextPath,
     '-Model',$Route.modelBaseline,
     '-Thinking',$Route.thinkingBaseline,
@@ -945,7 +949,8 @@ function Invoke-IssueExecutor {
     Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_PROCESS_FAILED' $Issue.title 'tool_config' 'STOP_EXECUTOR_PROCESS_FAILED'
     return
   }
-  $resultPath = Join-Path $script:RunContext.dir 'result.json'
+  $executionRunId = if ($Attempt -eq 0) { $script:RunContext.id } else { "$($script:RunContext.id)-repair-$Attempt" }
+  $resultPath = Join-Path (Join-Path $autoDir "runs\$executionRunId") 'result.json'
   if (Test-Path -LiteralPath $resultPath) {
     $result = Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($result.status -eq 'done') {
@@ -957,6 +962,8 @@ function Invoke-IssueExecutor {
         $result.validation += [pscustomobject]@{ name = 'scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
       }
       $evidencePaths = @()
+      $failureSummary = ''
+      $currentFingerprint = ''
       if ($result.status -eq 'done') {
         Write-State $autoDir 'VERIFYING' $false 'EXECUTOR_COMPLETED' $Issue.title 'VERIFYING' ''
         $verifyDir = Join-Path $issueDir 'verify'
@@ -968,12 +975,14 @@ function Invoke-IssueExecutor {
           $evidencePaths += $evidencePath
           $result.validation += [pscustomobject]@{ name = "ready-command-$($index + 1)"; status = $evidence.classification; message = "exitCode=$($evidence.exitCode); evidence=$evidencePath" }
           if ($evidence.exitCode -ne 0) {
-            $classifierPath = Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\scripts\test-failure-classifier.ps1'
+            $classifierPath = Join-Path (Resolve-Path (Join-Path $scriptDir '..\..')).Path 'plugins\cgc-pms-autopilot\scripts\test-failure-classifier.ps1'
             $classification = & powershell -NoProfile -ExecutionPolicy Bypass -File $classifierPath -ErrorText $evidence.summary -ExitCode $evidence.exitCode | ConvertFrom-Json
             $result.status = 'blocked'
             $result.failureCategory = if ($classification.category -eq 'environment_prereq') { 'environment' } elseif ($classification.category -eq 'ready_issue_config') { 'ready_issue_config' } elseif ($classification.category -eq 'tool_config') { 'tool_config' } else { 'quality_security' }
             $result.nextAction = 'STOP'; $result.stopReason = 'STOP_VERIFICATION_FAILED'
             $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $classification.failureFingerprint -Force
+            $failureSummary = $classification.reason
+            $currentFingerprint = $classification.failureFingerprint
             break
           }
         }
@@ -981,6 +990,7 @@ function Invoke-IssueExecutor {
       $result | Add-Member -NotePropertyName evidencePaths -NotePropertyValue @($evidencePaths) -Force
       $result | Add-Member -NotePropertyName reviewRequired -NotePropertyValue ([bool]$Route.reviewRequired) -Force
       $closed = $false
+      if ($result.status -eq 'done') { $script:FailureFingerprint = $null }
       if ($result.status -eq 'done' -and $Route.reviewRequired) {
         Write-State $autoDir 'REVIEWING' $false 'VERIFICATION_COMPLETED' $Issue.title 'REVIEWING' ''
         $reviewDir = Join-Path $issueDir 'review'; New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
@@ -1010,6 +1020,13 @@ function Invoke-IssueExecutor {
         $closed = $true
       }
       $result | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $resultPath -Encoding UTF8
+      if ($Attempt -gt 0) { Copy-Item -LiteralPath $resultPath -Destination (Join-Path $script:RunContext.dir 'result.json') -Force }
+      if ($result.status -eq 'blocked' -and $result.stopReason -eq 'STOP_VERIFICATION_FAILED' -and $config.repair -and $config.repair.enabled -eq $true -and (Test-AutopilotRetryAllowed -PreviousFingerprint $script:FailureFingerprint -CurrentFingerprint $currentFingerprint -Attempt $Attempt)) {
+        $script:FailureFingerprint = $currentFingerprint
+        Write-State $autoDir 'REPAIRING' $false 'REPAIR_START' $Issue.title $failureSummary ''
+        Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt ($Attempt + 1) -Phase 'repair' -PreviousSummary $failureSummary
+        return
+      }
       if ($result.status -eq 'done' -and $closed) { Write-State $autoDir 'CHECKPOINT' $false 'ISSUE_CLOSED' $Issue.title 'CHECKPOINT' '' } elseif ($result.status -eq 'done') { Write-State $autoDir 'CLOSING' $false 'VERIFICATION_COMPLETED' $Issue.title 'CLOSING' '' } else { Write-State $autoDir 'BLOCKED' $false 'VERIFICATION_BLOCKED' $Issue.title $result.failureCategory $result.stopReason }
     } else {
       Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_BLOCKED' $Issue.title $result.failureCategory $result.stopReason
@@ -1062,6 +1079,7 @@ $script:CurrentBranch = ''
 $script:ExecutorPid = $null
 $script:LastCommit = $null
 $script:FailureFingerprint = $null
+$script:Attempt = 0
 Initialize-IterationProgress $autoDir $readyPath $MaxIterations ([bool]$DryRun -or [bool]$ExplainNextAction)
 $script:RunContext = New-RunContext $autoDir
 Write-RunEvent "runner.start" ([pscustomobject]@{
