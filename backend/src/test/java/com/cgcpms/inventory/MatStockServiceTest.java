@@ -70,6 +70,8 @@ class MatStockServiceTest {
 
         assertNotNull(stock.getId(), "入库应返回雪花ID");
         assertEquals(0, qty.compareTo(stock.getAvailableQty()), "可用量应为100");
+        assertEquals(0, new BigDecimal("10.0000").compareTo(stock.getSafetyStockQty()),
+                "首次入库返回值应包含默认安全库存阈值");
         assertNotNull(stock.getCreatedTime(), "createdTime 应由 MetaObjectHandler 填充");
         assertNotNull(stock.getUpdatedTime(), "updatedTime 应由 MetaObjectHandler 填充");
 
@@ -622,6 +624,85 @@ class MatStockServiceTest {
         assertEquals(0, kpi.getLowStockCount(), "无库存时 lowStockCount 应为 0");
         assertEquals(0, kpi.getTxnInCount(), "无流水时 txnInCount 应为 0");
         assertEquals(0, kpi.getTxnOutCount(), "无流水时 txnOutCount 应为 0");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("安全库存阈值默认兼容 10 并驱动 KPI")
+    void testSafetyStockThresholdDrivesKpi() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+
+        MatStockLedgerVO initial = stockService.getLedger(1L, MATERIAL_ID, 10001L,
+                null, null, null, 1, 20);
+        assertEquals(0, new BigDecimal("10.0000").compareTo(initial.getStock().getSafetyStockQty()));
+        assertEquals(0, stockService.getKpi(1L, 10001L).getLowStockCount());
+
+        stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("100.0000"));
+        assertEquals(1, stockService.getKpi(1L, 10001L).getLowStockCount());
+
+        stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("50.0000"));
+        assertEquals(0, stockService.getKpi(1L, 10001L).getLowStockCount());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("安全库存阈值拒绝负数和超过四位小数")
+    void testSafetyStockThresholdValidation() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));
+
+        assertThrows(BusinessException.class,
+                () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("-0.0001")));
+        assertThrows(BusinessException.class,
+                () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("1.00001")));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("安全库存阈值更新按租户 fail-close")
+    void testSafetyStockThresholdRejectsCrossTenantStock() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));
+        jdbcTemplate.update("UPDATE mat_stock SET tenant_id = 1 WHERE id = ?", stock.getId());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("20.0000")));
+        assertEquals("STOCK_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("安全库存阈值更新拒绝无项目访问权")
+    void testSafetyStockThresholdRejectsInaccessibleProject() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));
+        UserContext.set(Jwts.claims()
+                .add("userId", 99999L)
+                .add("username", "no_project_access")
+                .add("tenantId", TENANT_ID)
+                .build());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("20.0000")));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("安全库存阈值更新拒绝禁用仓库")
+    void testSafetyStockThresholdRejectsDisabledWarehouse() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));
+        jdbcTemplate.update("UPDATE mat_warehouse SET status = 'DISABLE' WHERE id = 1");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("20.0000")));
+        assertEquals("STOCK_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("安全库存阈值更新拒绝伪造库存 ID")
+    void testSafetyStockThresholdRejectsUnknownStock() {
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> stockService.updateSafetyStockThreshold(Long.MAX_VALUE, new BigDecimal("20.0000")));
+        assertEquals("STOCK_NOT_FOUND", ex.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════════

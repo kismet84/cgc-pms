@@ -1,10 +1,15 @@
 import { ref, reactive, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { getStockLedger, getStockKpi, getWarehouseList } from '@/api/modules/inventory'
+import {
+  getStockLedger,
+  getStockKpi,
+  getWarehouseList,
+  updateStockSafetyThreshold,
+} from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
-import type { WarehouseVO, MatStockTxnVO, StockKpiVO } from '@/types/inventory'
+import type { WarehouseVO, MatStockTxnVO, StockKpiVO, MatStockVO } from '@/types/inventory'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // ---- 交易类型 ----
@@ -78,15 +83,9 @@ export function useStockLedger({
   const loading = ref(false)
   const hasLoaded = ref(false)
   const listError = ref<string | null>(null)
-  const stock = ref<{
-    warehouseId: string
-    materialId: string
-    availableQty: string
-    warehouseName?: string
-    materialName?: string
-    materialCode?: string
-    unit?: string
-  } | null>(null)
+  const stock = ref<MatStockVO | null>(null)
+  const safetyThresholdDraft = ref<number | null>(null)
+  const thresholdSaving = ref(false)
   const txnList = ref<MatStockTxnVO[]>([])
   const txnTotal = ref(0)
   const txnPageNo = ref(1)
@@ -138,6 +137,7 @@ export function useStockLedger({
 
   function resetTxnState() {
     stock.value = null
+    safetyThresholdDraft.value = null
     txnList.value = []
     txnTotal.value = 0
   }
@@ -168,6 +168,7 @@ export function useStockLedger({
       })
       if (mySeq !== fetchSeq) return
       stock.value = res.stock
+      safetyThresholdDraft.value = res.stock ? Number(res.stock.safetyStockQty) : null
       if (res.txns) {
         txnList.value = res.txns.records ?? []
         txnTotal.value = Number(res.txns.total ?? 0)
@@ -308,15 +309,17 @@ export function useStockLedger({
 
   // ---- 右侧分析面板 ----
   const lowStockWarn = computed(() => {
-    const items: { name: string; qty: number }[] = []
+    const items: { name: string; qty: number; threshold: number }[] = []
+    const safetyStockQty = Number(stock.value?.safetyStockQty)
     if (
       stock.value &&
-      Number(stock.value.availableQty) < 10 &&
+      Number(stock.value.availableQty) < safetyStockQty &&
       Number(stock.value.availableQty) > 0
     ) {
       items.push({
         name: stock.value.materialName || getMaterialName(stock.value.materialId),
         qty: Number(stock.value.availableQty),
+        threshold: safetyStockQty,
       })
     }
     return items
@@ -324,7 +327,9 @@ export function useStockLedger({
 
   function handleReplenish() {
     const quantity = Number(stock.value?.availableQty)
-    if (!stock.value || quantity <= 0 || quantity >= 10) return
+    const safetyStockQty = Number(stock.value?.safetyStockQty)
+    if (!stock.value || quantity <= 0 || quantity >= safetyStockQty) return
+    const suggestedQuantity = Math.max(0, safetyStockQty - quantity).toFixed(4)
     const projectId = warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId
     if (!projectId) {
       message.warning('当前仓库缺少项目归属，无法发起补货申请')
@@ -336,9 +341,25 @@ export function useStockLedger({
         prefill: 'replenishment',
         projectId,
         materialId: stock.value.materialId,
-        quantity: String(10 - Number(stock.value.availableQty)),
+        quantity: suggestedQuantity,
       },
     })
+  }
+
+  async function handleSafetyThresholdSave() {
+    if (!stock.value || safetyThresholdDraft.value == null) return
+    thresholdSaving.value = true
+    try {
+      const updated = await updateStockSafetyThreshold(stock.value.id, String(safetyThresholdDraft.value))
+      stock.value = updated
+      safetyThresholdDraft.value = Number(updated.safetyStockQty)
+      await fetchKpi()
+      message.success('安全库存阈值已更新')
+    } catch (e: unknown) {
+      console.error(e)
+    } finally {
+      thresholdSaving.value = false
+    }
   }
 
   const inOutStats = computed(() => {
@@ -416,6 +437,8 @@ export function useStockLedger({
     hasRequiredFilters,
     showEmptyState,
     stock,
+    safetyThresholdDraft,
+    thresholdSaving,
     txnList,
     txnTotal,
     txnPageNo,
@@ -454,6 +477,7 @@ export function useStockLedger({
     kpiPct,
     lowStockWarn,
     handleReplenish,
+    handleSafetyThresholdSave,
     inOutStats,
     gridColumns,
     visibleGridColumns,

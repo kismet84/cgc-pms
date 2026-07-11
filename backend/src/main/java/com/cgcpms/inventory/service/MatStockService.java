@@ -17,6 +17,7 @@ import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -43,11 +44,13 @@ import java.util.stream.Collectors;
 public class MatStockService {
 
     private static final int MAX_RETRIES = 3;
+    private static final BigDecimal DEFAULT_SAFETY_STOCK_QTY = new BigDecimal("10.0000");
 
     private final MatStockMapper matStockMapper;
     private final MatStockTxnMapper matStockTxnMapper;
     private final MatWarehouseMapper matWarehouseMapper;
     private final MdMaterialMapper mdMaterialMapper;
+    private final ProjectAccessChecker projectAccessChecker;
 
     /**
      * 入库：增加指定仓库+物料的可用库存。
@@ -81,6 +84,7 @@ public class MatStockService {
                 stock.setWarehouseId(warehouseId);
                 stock.setMaterialId(materialId);
                 stock.setAvailableQty(quantity);
+                stock.setSafetyStockQty(DEFAULT_SAFETY_STOCK_QTY);
                 stock.setVersion(0);
                 matStockMapper.insert(stock);
             } catch (DuplicateKeyException e) {
@@ -303,12 +307,12 @@ public class MatStockService {
         stockWrapper.gt(MatStock::getAvailableQty, BigDecimal.ZERO);
         kpi.setMaterialTypeCount(matStockMapper.selectCount(stockWrapper));
 
-        // 低库存物料数（可用量 > 0 且 < 10）
+        // 低库存物料数（保持既有零库存排除口径，阈值按库存项配置）
         LambdaQueryWrapper<MatStock> lowStockWrapper = new LambdaQueryWrapper<>();
         lowStockWrapper.eq(MatStock::getTenantId, tenantId);
         lowStockWrapper.in(MatStock::getWarehouseId, warehouseIds);
         lowStockWrapper.gt(MatStock::getAvailableQty, BigDecimal.ZERO);
-        lowStockWrapper.lt(MatStock::getAvailableQty, new BigDecimal("10"));
+        lowStockWrapper.apply("available_qty < safety_stock_qty"); // SQL-SAFETY: fixed-sql-fragment
         kpi.setLowStockCount(matStockMapper.selectCount(lowStockWrapper));
 
         // 出入库次数
@@ -323,6 +327,31 @@ public class MatStockService {
         kpi.setTxnOutCount(outCount);
 
         return kpi;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock updateSafetyStockThreshold(Long stockId, BigDecimal safetyStockQty) {
+        if (safetyStockQty == null || safetyStockQty.signum() < 0 || safetyStockQty.scale() > 4) {
+            throw new BusinessException("INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值必须为非负数且最多 4 位小数");
+        }
+
+        Long tenantId = UserContext.getCurrentTenantId();
+        MatStock stock = matStockMapper.selectById(stockId);
+        if (stock == null || !tenantId.equals(stock.getTenantId())) {
+            throw new BusinessException("STOCK_NOT_FOUND", "库存记录不存在");
+        }
+
+        MatWarehouse warehouse = matWarehouseMapper.selectById(stock.getWarehouseId());
+        if (warehouse == null || !tenantId.equals(warehouse.getTenantId()) || !"ENABLE".equals(warehouse.getStatus())) {
+            throw new BusinessException("STOCK_NOT_FOUND", "库存记录不存在");
+        }
+        projectAccessChecker.checkAccess(warehouse.getProjectId(), "维护安全库存阈值");
+
+        stock.setSafetyStockQty(safetyStockQty.setScale(4));
+        if (matStockMapper.updateById(stock) != 1) {
+            throw new BusinessException("STOCK_CONCURRENT_CONFLICT", "库存记录已变更，请刷新后重试");
+        }
+        return stock;
     }
 
     public MatStockVO toStockVO(MatStock entity) {
@@ -440,6 +469,7 @@ public class MatStockService {
         vo.setWarehouseId(entity.getWarehouseId());
         vo.setMaterialId(entity.getMaterialId());
         vo.setAvailableQty(entity.getAvailableQty());
+        vo.setSafetyStockQty(entity.getSafetyStockQty());
         vo.setCreatedTime(entity.getCreatedTime() != null ? entity.getCreatedTime().toString() : null);
         vo.setUpdatedTime(entity.getUpdatedTime() != null ? entity.getUpdatedTime().toString() : null);
 

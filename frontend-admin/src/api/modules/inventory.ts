@@ -10,6 +10,7 @@ import type {
   StockLedgerQuery,
   PurchaseRequestQuery,
   StockKpiVO,
+  MatStockVO,
 } from '@/types/inventory'
 
 // ── 仓库 CRUD ──
@@ -103,6 +104,15 @@ export function getStockKpi(params?: { warehouseId?: string; projectId?: string 
     url: '/inventory/stock/kpi',
     method: 'get',
     params,
+  })
+}
+
+/** 维护当前库存项安全库存阈值 */
+export function updateStockSafetyThreshold(id: string, safetyStockQty: string) {
+  return request<MatStockVO>({
+    url: `/inventory/stock/${id}/safety-threshold`,
+    method: 'put',
+    data: { safetyStockQty },
   })
 }
 

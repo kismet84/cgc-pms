@@ -30,7 +30,18 @@ describe('stock ledger production hardening', () => {
     expect(composableSource).toContain('function handleReplenish()')
     expect(composableSource).toContain('warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId')
     expect(composableSource).toContain("path: '/inventory/purchase-request'")
-    expect(composableSource).toContain('quantity: String(10 - Number(stock.value.availableQty))')
+    expect(composableSource).toContain('const safetyStockQty = Number(stock.value?.safetyStockQty)')
+    expect(composableSource).toContain(
+      'const suggestedQuantity = Math.max(0, safetyStockQty - quantity).toFixed(4)',
+    )
+    expect(composableSource).toContain('quantity: suggestedQuantity')
     expect(pageSource).toContain('@replenish="handleReplenish"')
+  })
+
+  it('uses and maintains the selected stock safety threshold', () => {
+    expect(composableSource).toContain('updateStockSafetyThreshold')
+    expect(composableSource).toContain('Number(stock.value?.safetyStockQty)')
+    expect(pageSource).toContain('安全库存阈值')
+    expect(pageSource).toContain('handleSafetyThresholdSave')
   })
 })

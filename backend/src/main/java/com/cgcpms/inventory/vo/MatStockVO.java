@@ -15,6 +15,7 @@ public class MatStockVO implements Serializable {
     private Long warehouseId;
     private Long materialId;
     private BigDecimal availableQty;
+    private BigDecimal safetyStockQty;
     private String createdTime;
     private String updatedTime;
 

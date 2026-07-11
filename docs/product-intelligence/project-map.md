@@ -79,8 +79,8 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 合同与付款条件 | `pages/contract/`、`api/modules/contract.ts` | `contract/` | `CtContractServiceTest`、`ContractApprovalIntegrationTest`、`ContractLedgerPage.test.ts` | Partial | 合同履约、金额口径和审批联动需当前复验 |
 | 变更与签证 | `pages/variation/`、`api/modules/variation.ts` | `variation/` | `VarOrderServiceTest`、`VarOrderControllerMockMvcTest`、`VariationOrderProduction.test.ts` | Partial | 变更收入/成本联动和审批边界待复验 |
 | 成本与目标成本 | `pages/cost/`、`pages/cost-target/` | `cost/`、`revenue/`、`overhead/`、`accounting/` | `CostSummaryServiceTest`、`CostLedgerServiceTest`、`CostSummaryProduction.test.ts` | Partial | 多来源成本、月份快照和下钻口径待复验 |
-| 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 已具备低库存到采购申请预填的最小桥接；安全库存、供货周期和预测规则仍缺失 |
-| 收货、仓库与库存 | `pages/receipt/`、`pages/inventory/` | `receipt/`、`inventory/` | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts` | Partial | 已可对当前选中低库存项发起补货；尚无全量建议列表、预测和跨仓调拨 |
+| 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 已具备低库存到采购申请预填，并按库存项阈值给出四位小数建议数量；供货周期和预测规则缺失 |
+| 收货、仓库与库存 | `pages/receipt/`、`pages/inventory/` | `receipt/`、`inventory/` | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts` | Partial | 已可维护仓库+物料安全库存阈值并联动 KPI/预警；仍无全量建议列表、预测和跨仓调拨 |
 | 领料 | `pages/requisition/` | `requisition/` | `MatRequisitionServiceTest`、`useRequisitionForm.test.ts` | Partial | 与计划需用量、施工部位和损耗分析尚未闭环 |
 | 分包与计量 | `pages/subcontract/` | `subcontract/` | `SubMeasureServiceTest`、`SubTaskControllerTest`、`subcontract/measure.test.ts` | Partial | 已有只读 WBS/甘特概览，但无独立计划任务、依赖和完整履约档案 |
 | 结算 | `pages/settlement/` | `settlement/` | `StlSettlementServiceTest`、`StlSettlementControllerMockMvcTest`、`settlement/index.test.ts` | Partial | 合同、变更、计量、付款汇总需当前一致性复验 |
@@ -128,7 +128,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 
 ### 产品候选
 
-- 采购补货建议：已完成当前选中低库存项到采购申请预填的最小闭环；仍缺安全库存、供货周期、预测与全量建议治理。
+- 采购补货建议：已完成当前选中低库存项到采购申请预填，并由 `ISSUE-037-006` 完成库存项安全阈值、动态 KPI/预警与四位小数建议数量；供货周期、预测与全量建议治理仍后置。
 - 现场日报 / 施工日志：`ISSUE-037-005` 已建立项目/日期唯一的日报对象、草稿提交、项目范围与 `SITE_DAILY_LOG` 附件链；人员设备材料、天气、移动离线和质量安全结构化子域仍未实现。
 - WBS 任务依赖与延期预警：`ISSUE-037-004` 已在分包任务上完成单前置 FS、项目数据范围和前置延期风险；仍不支持多前置、多类型、依赖连线、拖拽、自动改期或独立计划模型。
 - 供应商交付档案：`ISSUE-037-002` 已用订单明细与已审批验收累计数量还原交付完成日，并区分按期完成、迟交完成和逾期未完成；质量、价格和退货仍不具备稳定口径，页面明确不是综合评级。

@@ -1,7 +1,9 @@
 package com.cgcpms.inventory.controller;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.inventory.dto.StockTransactionDTO;
+import com.cgcpms.inventory.dto.SafetyStockThresholdDTO;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.inventory.vo.MatStockLedgerVO;
 import com.cgcpms.inventory.vo.MatStockVO;
@@ -54,5 +56,14 @@ public class MatStockController {
     public ApiResponse<StockKpiVO> getKpi(@RequestParam(required = false) Long warehouseId,
                                            @RequestParam(required = false) Long projectId) {
         return ApiResponse.success(matStockService.getKpi(warehouseId, projectId));
+    }
+
+    @PutMapping("/{id}/safety-threshold")
+    @AuditedOperation(type = "UPDATE", businessType = "STOCK_SAFETY_THRESHOLD", businessIdExpression = "#id")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:stock:edit')")
+    public ApiResponse<MatStockVO> updateSafetyThreshold(@PathVariable Long id,
+                                                         @Valid @RequestBody SafetyStockThresholdDTO dto) {
+        return ApiResponse.success(matStockService.toStockVO(
+                matStockService.updateSafetyStockThreshold(id, dto.getSafetyStockQty())));
     }
 }
