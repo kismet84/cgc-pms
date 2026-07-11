@@ -335,3 +335,10 @@ describe('router lazy loading', () => {
     expect(result).toBe(true)
   })
 })
+
+describe('inventory permission contracts', () => {
+  it('uses the same list permissions as inventory menus and backend controllers', () => {
+    expect(router.resolve('/inventory/stock').meta.permission).toBe('inventory:stock:list')
+    expect(router.resolve('/inventory/purchase-request').meta.permission).toBe('purchase:request:list')
+  })
+})

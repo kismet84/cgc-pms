@@ -2,7 +2,9 @@
 
 ## Ready 队列状态
 
-当前队列为空。v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
+v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
+
+当前队列为空。`ISSUE-037-001` 已完成并归档到 [验收报告](../quality/ISSUE-037-001-采购低库存补货建议最小闭环验收报告.md)。
 
 ## v1.5 准入要求
 

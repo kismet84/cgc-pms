@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -131,6 +132,48 @@ class PurchaseRequestServiceTest {
         assertEquals("DRAFT", vo.getStatus());
         assertEquals(String.valueOf(PROJECT_ID), vo.getProjectId());
         assertEquals(String.valueOf(TENANT_ID), vo.getTenantId());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("创建采购申请时拒绝无项目数据范围的用户")
+    void createRejectsProjectOutsideCurrentUserScope() {
+        UserContext.set(Jwts.claims()
+                .add("userId", 2L)
+                .add("username", "limited-user")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of())
+                .build());
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> requestService.create(request));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("采购经理具备补货到采购申请闭环所需权限")
+    void purchaseManagerHasReplenishmentPermissions() {
+        Set<String> permissions = Set.copyOf(jdbcTemplate.queryForList("""
+                SELECT m.perms
+                FROM sys_role r
+                JOIN sys_role_menu rm ON rm.role_id = r.id
+                JOIN sys_menu m ON m.id = rm.menu_id
+                WHERE r.role_code = 'PURCHASE_MANAGER' AND m.perms IS NOT NULL
+                """, String.class));
+
+        assertTrue(permissions.containsAll(Set.of(
+                "inventory:warehouse:list",
+                "inventory:stock:list",
+                "material:dict:list",
+                "contract:query",
+                "system:dict:list",
+                "purchase:request:list",
+                "purchase:request:add",
+                "purchase:request:edit",
+                "purchase:request:delete",
+                "purchase:request:submit")));
     }
 
     @Test
@@ -320,6 +363,48 @@ class PurchaseRequestServiceTest {
 
         List<MatPurchaseRequestItemVO> items = requestService.getItems(requestId);
         assertEquals(2, items.size(), "应有2条明细");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("保存采购申请明细时拒绝跨租户物料")
+    void saveItemsBatchRejectsMaterialFromAnotherTenant() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+        Long requestId = requestService.create(request);
+
+        MdMaterial foreign = new MdMaterial();
+        foreign.setTenantId(999L);
+        foreign.setMaterialCode("FOREIGN-MATERIAL");
+        foreign.setMaterialName("跨租户物料");
+        foreign.setUnit("个");
+        foreign.setStatus("ENABLE");
+        mdMaterialMapper.insert(foreign);
+
+        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
+        item.setMaterialId(foreign.getId());
+        item.setQuantity(BigDecimal.ONE);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> requestService.saveItemsBatch(requestId, List.of(item)));
+        assertEquals("MATERIAL_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("保存采购申请明细时拒绝非正数量")
+    void saveItemsBatchRejectsNonPositiveQuantity() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+        Long requestId = requestService.create(request);
+
+        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
+        item.setMaterialName("零数量物料");
+        item.setQuantity(BigDecimal.ZERO);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> requestService.saveItemsBatch(requestId, List.of(item)));
+        assertEquals("QUANTITY_INVALID", ex.getCode());
     }
 
     @Test

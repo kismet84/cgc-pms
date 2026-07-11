@@ -55,6 +55,7 @@ const {
   kpiMax,
   kpiPct,
   lowStockWarn,
+  handleReplenish,
   inOutStats,
   visibleGridColumns,
   showEmptyState,
@@ -278,7 +279,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
 
       <!-- 右侧分析面板 -->
-      <StockAnalysisPanel :low-stock-warn="lowStockWarn" :kpi="kpi" :in-out-stats="inOutStats" />
+      <StockAnalysisPanel
+        :low-stock-warn="lowStockWarn"
+        :kpi="kpi"
+        :in-out-stats="inOutStats"
+        @replenish="handleReplenish"
+      />
     </div>
   </div>
 </template>

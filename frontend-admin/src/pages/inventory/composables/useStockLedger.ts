@@ -322,6 +322,25 @@ export function useStockLedger({
     return items
   })
 
+  function handleReplenish() {
+    const quantity = Number(stock.value?.availableQty)
+    if (!stock.value || quantity <= 0 || quantity >= 10) return
+    const projectId = warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId
+    if (!projectId) {
+      message.warning('当前仓库缺少项目归属，无法发起补货申请')
+      return
+    }
+    router.push({
+      path: '/inventory/purchase-request',
+      query: {
+        prefill: 'replenishment',
+        projectId,
+        materialId: stock.value.materialId,
+        quantity: String(10 - Number(stock.value.availableQty)),
+      },
+    })
+  }
+
   const inOutStats = computed(() => {
     const inCount = Number(kpi.value.txnInCount) || 0
     const outCount = Number(kpi.value.txnOutCount) || 0
@@ -434,6 +453,7 @@ export function useStockLedger({
     kpiMax,
     kpiPct,
     lowStockWarn,
+    handleReplenish,
     inOutStats,
     gridColumns,
     visibleGridColumns,

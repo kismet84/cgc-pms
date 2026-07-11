@@ -79,8 +79,8 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 合同与付款条件 | `pages/contract/`、`api/modules/contract.ts` | `contract/` | `CtContractServiceTest`、`ContractApprovalIntegrationTest`、`ContractLedgerPage.test.ts` | Partial | 合同履约、金额口径和审批联动需当前复验 |
 | 变更与签证 | `pages/variation/`、`api/modules/variation.ts` | `variation/` | `VarOrderServiceTest`、`VarOrderControllerMockMvcTest`、`VariationOrderProduction.test.ts` | Partial | 变更收入/成本联动和审批边界待复验 |
 | 成本与目标成本 | `pages/cost/`、`pages/cost-target/` | `cost/`、`revenue/`、`overhead/`、`accounting/` | `CostSummaryServiceTest`、`CostLedgerServiceTest`、`CostSummaryProduction.test.ts` | Partial | 多来源成本、月份快照和下钻口径待复验 |
-| 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 没有安全库存/补货规则形成的闭环 |
-| 收货、仓库与库存 | `pages/receipt/`、`pages/inventory/` | `receipt/`、`inventory/` | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts` | Partial | 库存预测、供货周期和跨单据补货建议缺失 |
+| 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 已具备低库存到采购申请预填的最小桥接；安全库存、供货周期和预测规则仍缺失 |
+| 收货、仓库与库存 | `pages/receipt/`、`pages/inventory/` | `receipt/`、`inventory/` | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts` | Partial | 已可对当前选中低库存项发起补货；尚无全量建议列表、预测和跨仓调拨 |
 | 领料 | `pages/requisition/` | `requisition/` | `MatRequisitionServiceTest`、`useRequisitionForm.test.ts` | Partial | 与计划需用量、施工部位和损耗分析尚未闭环 |
 | 分包与计量 | `pages/subcontract/` | `subcontract/` | `SubMeasureServiceTest`、`SubTaskControllerTest`、`subcontract/measure.test.ts` | Partial | 已有只读 WBS/甘特概览，但无独立计划任务、依赖和完整履约档案 |
 | 结算 | `pages/settlement/` | `settlement/` | `StlSettlementServiceTest`、`StlSettlementControllerMockMvcTest`、`settlement/index.test.ts` | Partial | 合同、变更、计量、付款汇总需当前一致性复验 |
@@ -118,17 +118,17 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 能力 | 当前入口 | 状态 | 说明 |
 | --- | --- | --- | --- |
 | CI 门禁 | `.github/workflows/` | Partial | v1.0 结论已归档，当前远端 checks 需重新核验 |
-| 本地运行 | `scripts/rebuild.py`、Docker Compose | Partial | 运行态未在本轮启动，不作可用裁决 |
+| 本地运行 | `scripts/rebuild.py`、Docker Compose | Partial | ISSUE-037-001 已完成 8080、5173、dev-login health gate 与真实角色浏览器验收 |
 | Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1` | Implemented | 当前规则和解析入口存在；队列为空 |
 | 候选补货 | `autopilot-refill.ps1` | Implemented | 读取 Ad-hoc 和长期计划，当前不读取外部情报 |
 | 连续执行 | `autopilot-run-continuous.ps1` | Partial | 入口存在，未在本轮做无人值守运行验收 |
-| 质量归档 | `docs/quality/` | Implemented | v1.5 活动目录已建立，目前只有 README |
+| 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 正式验收报告 |
 
 ## 当前明确缺口
 
 ### 产品候选
 
-- 采购补货建议：现有采购/库存对象可复用，但缺安全库存、供货周期、预测与建议闭环。
+- 采购补货建议：已完成当前选中低库存项到采购申请预填的最小闭环；仍缺安全库存、供货周期、预测与全量建议治理。
 - 现场日报 / 施工日志：当前没有独立现场日报对象和证据链。
 - WBS 任务依赖与延期预警：分包任务页已有只读 WBS/甘特和延期展示，但当前明确不支持依赖线、拖拽或独立计划模型。
 - 供应商履约档案：采购经理驾驶舱已按采购订单形成供应商交付评分，但缺统一档案、质量/价格维度和跨期趋势。

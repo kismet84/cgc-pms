@@ -265,6 +265,40 @@ async function openBusinessIdFromQuery() {
   }
 }
 
+async function openPrefillFromQuery() {
+  if (route.query.prefill !== 'replenishment') return
+  const readQuery = (value: unknown) => (Array.isArray(value) ? value[0] : value)
+  const projectId = readQuery(route.query.projectId)
+  const materialId = readQuery(route.query.materialId)
+  const quantity = readQuery(route.query.quantity)
+  try {
+    if (!projectId || !materialId || !quantity || !Number.isFinite(Number(quantity)) || Number(quantity) <= 0) {
+      message.warning('补货预填参数无效，请从库存页重新发起')
+      return
+    }
+    handleAdd()
+    Object.assign(formData, { projectId: String(projectId) })
+    await loadContractsByProject(String(projectId))
+    const material = materialList.value.find((item) => item.id === String(materialId))
+    itemList.value = [{
+      key: keySeq.value++,
+      materialId: String(materialId),
+      materialName: material?.materialName ?? '',
+      quantity: String(quantity),
+      unit: material?.unit ?? '',
+      plannedDate: undefined,
+      remark: '',
+    }]
+  } finally {
+    const nextQuery = { ...route.query }
+    delete nextQuery.prefill
+    delete nextQuery.projectId
+    delete nextQuery.materialId
+    delete nextQuery.quantity
+    await router.replace({ path: route.path, query: nextQuery })
+  }
+}
+
 async function loadContractsByProject(projectId?: string) {
   if (!projectId) {
     contractList.value = []
@@ -528,13 +562,13 @@ const approvalBreakdown = computed(() => {
   }))
 })
 
-onMounted(() => {
+onMounted(async () => {
   fetchDictData(STATUS_DICT)
   fetchDictData(APPROVAL_STATUS_DICT)
-  referenceStore.fetchProjects()
-  referenceStore.fetchMaterials()
+  await Promise.all([referenceStore.fetchProjects(), referenceStore.fetchMaterials()])
   fetchData()
-  openBusinessIdFromQuery()
+  await openBusinessIdFromQuery()
+  await openPrefillFromQuery()
 })
 </script>
 

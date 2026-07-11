@@ -12,6 +12,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
@@ -48,6 +49,7 @@ public class MatPurchaseRequestService {
     private final CtContractMapper ctContractMapper;
     private final WorkflowEngine workflowEngine;
     private final PurchaseRequestConversionService conversionService;
+    private final ProjectAccessChecker projectAccessChecker;
 
     // ================================================================
     // 分页查询
@@ -123,6 +125,7 @@ public class MatPurchaseRequestService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatPurchaseRequest request) {
         validateProjectRequired(request.getProjectId());
+        projectAccessChecker.checkAccess(request.getProjectId(), "创建采购申请");
         validateContractProject(request.getContractId(), request.getProjectId());
 
         Long tenantId = UserContext.getCurrentTenantId();
@@ -162,6 +165,7 @@ public class MatPurchaseRequestService {
         request.setStatus(existing.getStatus());
         Long projectId = request.getProjectId() != null ? request.getProjectId() : existing.getProjectId();
         validateProjectRequired(projectId);
+        projectAccessChecker.checkAccess(projectId, "编辑采购申请");
         validateContractProject(request.getContractId(), projectId);
 
         requestMapper.updateById(request);
@@ -248,6 +252,8 @@ public class MatPurchaseRequestService {
         if (!"DRAFT".equals(request.getApprovalStatus()))
             throw new BusinessException("REQUEST_IN_APPROVAL", "采购申请审批中或已审批，不可编辑明细");
 
+        projectAccessChecker.checkAccess(request.getProjectId(), "编辑采购申请明细");
+
         // Delete old items (tenant isolation)
         LambdaQueryWrapper<MatPurchaseRequestItem> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(MatPurchaseRequestItem::getRequestId, requestId)
@@ -256,6 +262,9 @@ public class MatPurchaseRequestService {
 
         Long tenantId = UserContext.getCurrentTenantId();
         for (MatPurchaseRequestItem item : items) {
+            if (item.getQuantity() == null || item.getQuantity().signum() <= 0) {
+                throw new BusinessException("QUANTITY_INVALID", "物料数量必须大于 0");
+            }
             item.setId(IdWorker.getId());
             item.setRequestId(requestId);
             item.setTenantId(tenantId);
@@ -273,7 +282,13 @@ public class MatPurchaseRequestService {
      * 自定义物料：name + unit -> 自动查找或创建 MdMaterial
      */
     private void resolveMaterial(MatPurchaseRequestItem item, Long tenantId) {
-        if (item.getMaterialId() != null) return;
+        if (item.getMaterialId() != null) {
+            MdMaterial material = mdMaterialMapper.selectById(item.getMaterialId());
+            if (material == null || !Objects.equals(material.getTenantId(), tenantId)) {
+                throw new BusinessException("MATERIAL_NOT_FOUND", "物料不存在");
+            }
+            return;
+        }
         if (item.getMaterialName() == null || item.getMaterialName().isBlank()) return;
 
         MdMaterial existing = mdMaterialMapper.selectOne(

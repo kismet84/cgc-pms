@@ -68,6 +68,17 @@ describe('purchase request modal filters', () => {
     expect(source).toMatch(/onMounted\([\s\S]*?openBusinessIdFromQuery\(\)/)
   })
 
+  it('consumes a low-stock create prefill once and keeps the existing create flow', () => {
+    expect(source).toContain('async function openPrefillFromQuery()')
+    expect(source).toContain("route.query.prefill !== 'replenishment'")
+    expect(source).toContain('handleAdd()')
+    expect(source).toContain('projectId: String(projectId)')
+    expect(source).toContain('materialId: String(materialId)')
+    expect(source).toContain('quantity: String(quantity)')
+    expect(source).toContain('delete nextQuery.prefill')
+    expect(source).toMatch(/onMounted\([\s\S]*?openPrefillFromQuery\(\)/)
+  })
+
   it('uses explicit view mode so 查看态 is read-only and hides save entry', () => {
     expect(source).toMatch(/type ModalMode = 'create' \| 'edit' \| 'view'/)
     expect(source).toMatch(/const modalMode = ref<ModalMode>\('create'\)/)

@@ -6,6 +6,8 @@ defineProps<{
   kpi: StockKpiVO
   inOutStats: { inPct: number; outPct: number }
 }>()
+
+defineEmits<{ replenish: [] }>()
 </script>
 
 <template>
@@ -36,7 +38,9 @@ defineProps<{
               ></span>
             </span>
             <span class="lg-type-num" style="color: #ef4444">{{ w.qty }}</span>
-            <span class="lg-type-pct"></span>
+            <a-button class="lg-type-pct" type="link" size="small" @click="$emit('replenish')">
+              补货
+            </a-button>
           </div>
           <div v-if="lowStockWarn.length === 0" class="lg-type-row">
             <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>

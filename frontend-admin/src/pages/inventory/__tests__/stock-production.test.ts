@@ -25,4 +25,12 @@ describe('stock ledger production hardening', () => {
     expect(pageSource).toContain('title="库存台账加载失败"')
     expect(pageSource).toContain('<LgEmptyState description="暂无符合条件的库存流水">')
   })
+
+  it('starts replenishment only from the selected tenant-scoped warehouse project', () => {
+    expect(composableSource).toContain('function handleReplenish()')
+    expect(composableSource).toContain('warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId')
+    expect(composableSource).toContain("path: '/inventory/purchase-request'")
+    expect(composableSource).toContain('quantity: String(10 - Number(stock.value.availableQty))')
+    expect(pageSource).toContain('@replenish="handleReplenish"')
+  })
 })
