@@ -75,8 +75,20 @@ describe('purchase request modal filters', () => {
     expect(source).toContain('projectId: String(projectId)')
     expect(source).toContain('materialId: String(materialId)')
     expect(source).toContain('quantity: String(quantity)')
+    expect(source).toContain('const plannedDate = parseStrictLocalDate(readQuery(route.query.plannedDate))')
+    expect(source).toContain('plannedDate,')
+    expect(source).toContain('delete nextQuery.plannedDate')
     expect(source).toContain('delete nextQuery.prefill')
     expect(source).toMatch(/onMounted\([\s\S]*?openPrefillFromQuery\(\)/)
+  })
+
+  it('strictly validates YYYY-MM-DD prefill dates by calendar round trip', () => {
+    expect(source).toContain("const LOCAL_DATE_PATTERN = /^(\\d{4})-(\\d{2})-(\\d{2})$/")
+    expect(source).toContain('date.getFullYear() !== year')
+    expect(source).toContain('date.getMonth() !== month - 1')
+    expect(source).toContain('date.getDate() !== day')
+    expect(source).toContain("message.warning('补货计划日期无效，已忽略日期预填')")
+    expect(source).toContain('rawPlannedDate != null && !plannedDate')
   })
 
   it('uses explicit view mode so 查看态 is read-only and hides save entry', () => {

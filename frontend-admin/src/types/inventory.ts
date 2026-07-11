@@ -24,6 +24,7 @@ export interface MatStockVO {
   availableQty: string
   safetyStockQty: string
   replenishmentTargetQty?: string | null
+  replenishmentLeadDays?: number | null
   version: number
   createdTime?: string
   updatedTime?: string

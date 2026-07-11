@@ -265,18 +265,41 @@ async function openBusinessIdFromQuery() {
   }
 }
 
+const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function parseStrictLocalDate(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const match = LOCAL_DATE_PATTERN.exec(value)
+  if (!match) return undefined
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) return undefined
+  return value
+}
+
 async function openPrefillFromQuery() {
   if (route.query.prefill !== 'replenishment') return
   const readQuery = (value: unknown) => (Array.isArray(value) ? value[0] : value)
   const projectId = readQuery(route.query.projectId)
   const materialId = readQuery(route.query.materialId)
   const quantity = readQuery(route.query.quantity)
+  const rawPlannedDate = readQuery(route.query.plannedDate)
+  const plannedDate = parseStrictLocalDate(readQuery(route.query.plannedDate))
   try {
     if (!projectId || !materialId || !quantity || !Number.isFinite(Number(quantity)) || Number(quantity) <= 0) {
       message.warning('补货预填参数无效，请从库存页重新发起')
       return
     }
     handleAdd()
+    if (rawPlannedDate != null && !plannedDate) {
+      message.warning('补货计划日期无效，已忽略日期预填')
+    }
     Object.assign(formData, { projectId: String(projectId) })
     await loadContractsByProject(String(projectId))
     const material = materialList.value.find((item) => item.id === String(materialId))
@@ -286,7 +309,7 @@ async function openPrefillFromQuery() {
       materialName: material?.materialName ?? '',
       quantity: String(quantity),
       unit: material?.unit ?? '',
-      plannedDate: undefined,
+      plannedDate,
       remark: '',
     }]
   } finally {
@@ -295,6 +318,7 @@ async function openPrefillFromQuery() {
     delete nextQuery.projectId
     delete nextQuery.materialId
     delete nextQuery.quantity
+    delete nextQuery.plannedDate
     await router.replace({ path: route.path, query: nextQuery })
   }
 }

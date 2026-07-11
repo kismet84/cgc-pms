@@ -214,11 +214,26 @@ class MatStockControllerTest {
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\"}"))
+                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\",\"replenishmentLeadDays\":7}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.safetyStockQty").value(100.0000))
-                .andExpect(jsonPath("$.data.replenishmentTargetQty").value(150.0000));
+                .andExpect(jsonPath("$.data.replenishmentTargetQty").value(150.0000))
+                .andExpect(jsonPath("$.data.replenishmentLeadDays").value(7));
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.replenishmentLeadDays").value(7));
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\",\"replenishmentLeadDays\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.replenishmentLeadDays").doesNotExist());
     }
 
     @Test
@@ -234,6 +249,23 @@ class MatStockControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"99.9999\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("补货提前期拒绝小数和越界值")
+    void testRejectsInvalidReplenishmentLeadDays() throws Exception {
+        Long stockId = jdbcTemplate.queryForObject(
+                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
+                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+
+        for (String value : List.of("-1", "3651", "1.5")) {
+            mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                            .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":null,\"replenishmentLeadDays\":" + value + "}"))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     // ---- helpers ----

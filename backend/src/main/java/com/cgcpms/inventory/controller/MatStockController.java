@@ -76,6 +76,9 @@ public class MatStockController {
             @Valid @RequestBody ReplenishmentSettingsDTO dto) {
         return ApiResponse.success(matStockService.toStockVO(
                 matStockService.updateReplenishmentSettings(
-                        id, dto.getSafetyStockQty(), dto.getReplenishmentTargetQty())));
+                        id, dto.getSafetyStockQty(), dto.getReplenishmentTargetQty(),
+                        dto.getReplenishmentLeadDays() == null
+                                ? null : dto.getReplenishmentLeadDays().intValueExact(),
+                        dto.isReplenishmentLeadDaysSpecified())));
     }
 }

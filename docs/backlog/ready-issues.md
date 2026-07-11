@@ -4,7 +4,7 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂无待实施 Ready；`ISSUE-037-009` 已完成，进入下一轮产品情报补货。
+当前队列暂无待实施 Ready；`ISSUE-037-010` 已完成，`启动迭代-10` 达到 10/10 上限。
 
 ## v1.5 准入要求
 
@@ -122,6 +122,61 @@ Reviewer要求：实现后必须独立复核 NULL 回退、目标量与安全阈
 验证命令：
 - `cd backend; .\mvnw.cmd "-Dtest=MatStockServiceTest,MatStockControllerTest" test`
 - `cd frontend-admin; pnpm test:unit src/pages/inventory/__tests__/stock-production.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-010：库存项人工补货提前期与计划日期预填
+
+优先级：P1
+任务性质：能力新增
+类型：库存 / 采购补货 / 时间计划 / 项目数据范围 / 前后端 / Migration / 测试
+状态：Done（2026-07-12；计入本轮第 10/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Odoo 19 Lead Times 与 Replenishment Report 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-05`；`docs/backlog/ad-hoc-plan.md` 的“库存项人工补货提前期”候选
+Migration：需要
+依赖：复用 `ISSUE-037-009` 的库存组合设置、`inventory:stock:edit`、stock→warehouse→project 范围校验、补货路由预填链及采购申请明细现有 `plannedDate`；不修改采购后端。
+风险等级：中
+运行态要求：后端专项、库存/采购申请前端专项和类型检查通过；真实 API 前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现后必须独立复核 NULL/0 语义、整数边界、本地自然日和 `YYYY-MM-DD` 公式、旧设置兼容、项目/租户/权限、乐观锁及采购页面 query 清理；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-010-库存项人工补货提前期与计划日期预填验收报告.md`
+目标：
+- 为仓库+物料库存项增加可空人工补货提前期（自然日）；NULL 保持旧行为不预填日期，0 表示当前本地日期。
+- 将提前期纳入现有补货组合设置与 VO，继续使用同一库存项乐观锁和权限范围。
+- 从低库存发起补货时，按“当前本地日期 + 提前期自然日”生成 `YYYY-MM-DD`，预填采购申请明细计划日期。
+非目标：
+- 不建设供应商级提前期/价目表，不声称为预计到货承诺或供应商交期预测。
+- 不处理工作日历、节假日、时区服务、采购确认时长、历史交付学习、自动下单或全量补货报告。
+- 不修改采购申请后端实体、API、审批状态机、权限模型或生产部署。
+允许修改：
+- `backend/src/main/resources/db/migration/V145__add_stock_replenishment_lead_days.sql`
+- `backend/src/main/resources/db/migration-h2/V145__add_stock_replenishment_lead_days.sql`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/stock.vue`
+- `frontend-admin/src/pages/inventory/composables/useStockLedger.ts`
+- `frontend-admin/src/pages/inventory/purchase-request.vue`
+- `frontend-admin/src/pages/inventory/__tests__/stock-production.test.ts`
+- `frontend-admin/src/pages/inventory/__tests__/purchase-request.test.ts`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- 已应用的 `backend/src/main/resources/db/migration/V1__*.sql` 至 `V144__*.sql`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- 采购申请后端 DTO、Service、Controller、Entity 与数据库表
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- V145 MySQL/H2 仅增加 `replenishment_lead_days INT NULL`，不回填；首次入库保持 NULL。
+- 组合设置接口接收可空整数 `replenishmentLeadDays`，只允许 0 至 3650；负数、超上限和小数请求 fail-close，并与安全阈值/目标量同次 `@Version` 更新。
+- NULL 表示补货跳转不携带 `plannedDate`；0 表示当前本地日期；正数按当前本地日期加自然日，格式固定 `YYYY-MM-DD`，不做工作日调整。
+- 采购申请预填只接受严格 `YYYY-MM-DD` 且可还原为同一日期的 query；无效日期提示并不写入，成功或失败后都清理 `plannedDate` 与既有补货 query。
+- 设置接口继续使用 `inventory:stock:edit` 和现有租户/启用仓库/项目范围；旧安全阈值接口保持兼容，KPI 与补货数量公式不变。
+- 至少覆盖迁移、NULL/0/正数、整数边界、日期跨月/年、无效 query、旧设置兼容、权限范围和前端 query 清理；回滚为移除 V145 列和前端日期预填，不改写历史 migration。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockServiceTest,MatStockControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/inventory/__tests__/stock-production.test.ts src/pages/inventory/__tests__/purchase-request.test.ts`
 - `cd frontend-admin; pnpm type-check`
 - `git diff --check`
 

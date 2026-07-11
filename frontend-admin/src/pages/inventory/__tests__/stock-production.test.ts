@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { formatLocalDateAfterDays } from '../composables/useStockLedger'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const pageSource = readFileSync(resolve(currentDir, '../stock.vue'), 'utf-8')
@@ -46,5 +47,13 @@ describe('stock ledger production hardening', () => {
     expect(pageSource).toContain('安全库存阈值')
     expect(pageSource).toContain('人工补货目标量')
     expect(pageSource).toContain('handleReplenishmentSettingsSave')
+  })
+
+  it('prefills a local calendar date only when lead days are configured', () => {
+    expect(formatLocalDateAfterDays(1, new Date(2026, 0, 31))).toBe('2026-02-01')
+    expect(formatLocalDateAfterDays(1, new Date(2026, 11, 31))).toBe('2027-01-01')
+    expect(composableSource).toContain('stock.value.replenishmentLeadDays != null')
+    expect(composableSource).toContain('plannedDate: formatLocalDateAfterDays(stock.value.replenishmentLeadDays)')
+    expect(pageSource).toContain('人工补货提前期（自然日）')
   })
 })

@@ -663,10 +663,11 @@ class MatStockServiceTest {
         MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
 
         MatStock updated = stockService.updateReplenishmentSettings(
-                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("150.0000"));
+                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("150.0000"), 7);
 
         assertEquals(0, new BigDecimal("100.0000").compareTo(updated.getSafetyStockQty()));
         assertEquals(0, new BigDecimal("150.0000").compareTo(updated.getReplenishmentTargetQty()));
+        assertEquals(7, updated.getReplenishmentLeadDays());
         assertEquals(1, stockService.getKpi(1L, 10001L).getLowStockCount());
         assertEquals(0, new BigDecimal("150.0000").compareTo(
                 stockService.getLedger(1L, MATERIAL_ID, 10001L, null, null, null, 1, 20)
@@ -680,12 +681,14 @@ class MatStockServiceTest {
         MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
 
         assertThrows(BusinessException.class, () -> stockService.updateReplenishmentSettings(
-                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("99.9999")));
+                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("99.9999"), null));
 
         MatStock cleared = stockService.updateReplenishmentSettings(
-                stock.getId(), new BigDecimal("100.0000"), null);
+                stock.getId(), new BigDecimal("100.0000"), null, null);
         assertNull(cleared.getReplenishmentTargetQty());
+        assertNull(cleared.getReplenishmentLeadDays());
         assertNull(stockService.toStockVO(cleared).getReplenishmentTargetQty());
+        assertNull(stockService.toStockVO(cleared).getReplenishmentLeadDays());
     }
 
     @Test
@@ -694,10 +697,43 @@ class MatStockServiceTest {
     void testLegacySafetyThresholdCannotExceedReplenishmentTarget() {
         MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
         stockService.updateReplenishmentSettings(
-                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("150.0000"));
+                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("150.0000"), 0);
 
         assertThrows(BusinessException.class,
                 () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("151.0000")));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("人工补货提前期只接受 0 到 3650 的整数并与设置原子保存")
+    void testReplenishmentLeadDaysValidation() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+
+        assertEquals(0, stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("10.0000"), null, 0).getReplenishmentLeadDays());
+        assertEquals(3650, stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("10.0000"), null, 3650).getReplenishmentLeadDays());
+        assertThrows(BusinessException.class, () -> stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("10.0000"), null, -1));
+        assertThrows(BusinessException.class, () -> stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("10.0000"), null, 3651));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("旧组合设置省略提前期时保留原值，显式 NULL 才清空")
+    void testOmittedLeadDaysPreservesExistingValue() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+        stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("10.0000"), null, 7);
+
+        MatStock preserved = stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("11.0000"), null, null, false);
+        assertEquals(7, preserved.getReplenishmentLeadDays());
+
+        MatStock cleared = stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("11.0000"), null, null);
+        assertNull(cleared.getReplenishmentLeadDays());
     }
 
     @Test

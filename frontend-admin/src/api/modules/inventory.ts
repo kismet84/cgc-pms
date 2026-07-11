@@ -121,11 +121,12 @@ export function updateStockReplenishmentSettings(
   id: string,
   safetyStockQty: string,
   replenishmentTargetQty: string | null,
+  replenishmentLeadDays: number | null,
 ) {
   return request<MatStockVO>({
     url: `/inventory/stock/${id}/replenishment-settings`,
     method: 'put',
-    data: { safetyStockQty, replenishmentTargetQty },
+    data: { safetyStockQty, replenishmentTargetQty, replenishmentLeadDays },
   })
 }
 

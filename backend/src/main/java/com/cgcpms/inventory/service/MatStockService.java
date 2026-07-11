@@ -345,7 +345,17 @@ public class MatStockService {
 
     @Transactional(rollbackFor = Exception.class)
     public MatStock updateReplenishmentSettings(Long stockId, BigDecimal safetyStockQty,
-                                                BigDecimal replenishmentTargetQty) {
+                                                BigDecimal replenishmentTargetQty,
+                                                Integer replenishmentLeadDays) {
+        return updateReplenishmentSettings(stockId, safetyStockQty, replenishmentTargetQty,
+                replenishmentLeadDays, true);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock updateReplenishmentSettings(Long stockId, BigDecimal safetyStockQty,
+                                                BigDecimal replenishmentTargetQty,
+                                                Integer replenishmentLeadDays,
+                                                boolean replenishmentLeadDaysSpecified) {
         validateQuantity(safetyStockQty, "INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值");
         if (replenishmentTargetQty != null) {
             validateQuantity(replenishmentTargetQty, "INVALID_REPLENISHMENT_TARGET", "人工补货目标量");
@@ -355,10 +365,17 @@ public class MatStockService {
         if (normalizedTarget != null && normalizedTarget.compareTo(normalizedSafety) < 0) {
             throw new BusinessException("INVALID_REPLENISHMENT_SETTINGS", "人工补货目标量不能低于安全库存阈值");
         }
+        if (replenishmentLeadDays != null
+                && (replenishmentLeadDays < 0 || replenishmentLeadDays > 3650)) {
+            throw new BusinessException("INVALID_REPLENISHMENT_LEAD_DAYS", "人工补货提前期必须为 0 到 3650 的整数");
+        }
 
         MatStock stock = loadAuthorizedStock(stockId, "维护补货设置");
         stock.setSafetyStockQty(normalizedSafety);
         stock.setReplenishmentTargetQty(normalizedTarget);
+        if (replenishmentLeadDaysSpecified) {
+            stock.setReplenishmentLeadDays(replenishmentLeadDays);
+        }
         updateStockOrThrow(stock);
         return stock;
     }
@@ -480,6 +497,7 @@ public class MatStockService {
         vo.setAvailableQty(entity.getAvailableQty());
         vo.setSafetyStockQty(entity.getSafetyStockQty());
         vo.setReplenishmentTargetQty(entity.getReplenishmentTargetQty());
+        vo.setReplenishmentLeadDays(entity.getReplenishmentLeadDays());
         vo.setCreatedTime(entity.getCreatedTime() != null ? entity.getCreatedTime().toString() : null);
         vo.setUpdatedTime(entity.getUpdatedTime() != null ? entity.getUpdatedTime().toString() : null);
 

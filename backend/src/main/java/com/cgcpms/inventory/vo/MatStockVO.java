@@ -17,6 +17,7 @@ public class MatStockVO implements Serializable {
     private BigDecimal availableQty;
     private BigDecimal safetyStockQty;
     private BigDecimal replenishmentTargetQty;
+    private Integer replenishmentLeadDays;
     private String createdTime;
     private String updatedTime;
 

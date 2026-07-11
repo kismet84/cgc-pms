@@ -30,6 +30,7 @@ const {
   stock,
   safetyThresholdDraft,
   replenishmentTargetDraft,
+  replenishmentLeadDaysDraft,
   thresholdSaving,
   txnList,
   txnTotal,
@@ -155,6 +156,18 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 :precision="4"
                 :disabled="!canEditStock"
                 placeholder="未填则补到安全阈值"
+                style="width: 180px"
+              />
+            </div>
+            <div>
+              <span style="font-size: 13px; color: var(--text-secondary)">人工补货提前期（自然日）：</span>
+              <a-input-number
+                v-model:value="replenishmentLeadDaysDraft"
+                :min="0"
+                :max="3650"
+                :precision="0"
+                :disabled="!canEditStock"
+                placeholder="未填则不预填日期"
                 style="width: 180px"
               />
               <a-button

@@ -60,6 +60,15 @@ export function getSourceTypeColor(type: string | null | undefined): string {
   return SOURCE_TYPE_COLOR[type] ?? 'default'
 }
 
+export function formatLocalDateAfterDays(days: number, baseDate = new Date()): string {
+  const date = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())
+  date.setDate(date.getDate() + days)
+  const year = String(date.getFullYear()).padStart(4, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export function useStockLedger({
   route,
   router,
@@ -86,6 +95,7 @@ export function useStockLedger({
   const stock = ref<MatStockVO | null>(null)
   const safetyThresholdDraft = ref<number | null>(null)
   const replenishmentTargetDraft = ref<number | null>(null)
+  const replenishmentLeadDaysDraft = ref<number | null>(null)
   const thresholdSaving = ref(false)
   const txnList = ref<MatStockTxnVO[]>([])
   const txnTotal = ref(0)
@@ -140,6 +150,7 @@ export function useStockLedger({
     stock.value = null
     safetyThresholdDraft.value = null
     replenishmentTargetDraft.value = null
+    replenishmentLeadDaysDraft.value = null
     txnList.value = []
     txnTotal.value = 0
   }
@@ -174,6 +185,7 @@ export function useStockLedger({
       replenishmentTargetDraft.value = res.stock?.replenishmentTargetQty == null
         ? null
         : Number(res.stock.replenishmentTargetQty)
+      replenishmentLeadDaysDraft.value = res.stock?.replenishmentLeadDays ?? null
       if (res.txns) {
         txnList.value = res.txns.records ?? []
         txnTotal.value = Number(res.txns.total ?? 0)
@@ -348,6 +360,9 @@ export function useStockLedger({
         projectId,
         materialId: stock.value.materialId,
         quantity: suggestedQuantity,
+        ...(stock.value.replenishmentLeadDays != null
+          ? { plannedDate: formatLocalDateAfterDays(stock.value.replenishmentLeadDays) }
+          : {}),
       },
     })
   }
@@ -360,12 +375,14 @@ export function useStockLedger({
         stock.value.id,
         String(safetyThresholdDraft.value),
         replenishmentTargetDraft.value == null ? null : String(replenishmentTargetDraft.value),
+        replenishmentLeadDaysDraft.value,
       )
       stock.value = updated
       safetyThresholdDraft.value = Number(updated.safetyStockQty)
       replenishmentTargetDraft.value = updated.replenishmentTargetQty == null
         ? null
         : Number(updated.replenishmentTargetQty)
+      replenishmentLeadDaysDraft.value = updated.replenishmentLeadDays ?? null
       await fetchKpi()
       message.success('补货设置已更新')
     } catch (e: unknown) {
@@ -452,6 +469,7 @@ export function useStockLedger({
     stock,
     safetyThresholdDraft,
     replenishmentTargetDraft,
+    replenishmentLeadDaysDraft,
     thresholdSaving,
     txnList,
     txnTotal,
