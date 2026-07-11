@@ -3,6 +3,7 @@ package com.cgcpms.dashboard.service;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.TestUserContext;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -43,6 +44,8 @@ import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.tech.entity.TechItem;
 import com.cgcpms.tech.mapper.TechItemMapper;
@@ -73,6 +76,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @DisplayName("Dashboard finance and management views")
 class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport {
+
+    @Autowired private SysRoleMapper sysRoleMapper;
 
     @Test
     @Transactional
@@ -158,6 +163,65 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNotNull(vo);
         assertNotNull(vo.getProjectRankings());
         assertNotNull(vo.getTotalContractAmount());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("5.3 Management view: rankings, tasks and risks respect SELF project scope")
+    void testManagementView_RespectsProjectDataScope() {
+        SeedResult visible = seed("MGMT_SELF_VISIBLE");
+        SeedResult hidden = seed("MGMT_SELF_HIDDEN");
+        long scopedUserId = 88_201L;
+        String roleCode = applySelfScope(visible.projectId, hidden.projectId, scopedUserId);
+
+        ManagementDashboardVO vo = dashboardService.getManagementView();
+        assertEquals(1L, vo.getActiveProjectCount());
+        assertEquals(List.of(visible.projectId.toString()), vo.getProjectRankings().stream()
+                .map(DashboardProjectSummaryVO::getProjectId).toList());
+        DashboardProjectSummaryVO visibleRanking = vo.getProjectRankings().get(0);
+        assertEquals(visibleRanking.getContractIncome(), vo.getTotalContractAmount());
+        assertEquals(visibleRanking.getDynamicCost(), vo.getTotalDynamicCost());
+        assertEquals(visibleRanking.getExpectedProfit(), vo.getTotalExpectedProfit());
+        assertEquals(visibleRanking.getPaidAmount(), vo.getTotalPaidAmount());
+        assertEquals(1L, vo.getTotalPendingTaskCount());
+        assertEquals(1L, vo.getTotalRiskCount());
+
+        TestUserContext.setUser(TENANT_ID, scopedUserId + 99, "management-self-empty", List.of(roleCode));
+        ManagementDashboardVO empty = dashboardService.getManagementView();
+        assertEquals(0L, empty.getActiveProjectCount());
+        assertEquals("0", empty.getTotalContractAmount());
+        assertEquals("0", empty.getTotalDynamicCost());
+        assertEquals("0", empty.getTotalExpectedProfit());
+        assertEquals("0", empty.getTotalPaidAmount());
+        assertEquals(0L, empty.getTotalPendingTaskCount());
+        assertEquals(0L, empty.getTotalRiskCount());
+        assertTrue(empty.getProjectRankings().isEmpty());
+        assertTrue(empty.getMetricSources().isEmpty());
+        assertTrue(empty.getOverdueItems().isEmpty());
+        assertTrue(empty.getMajorRisks().isEmpty());
+    }
+
+    private String applySelfScope(Long visibleProjectId, Long hiddenProjectId, long scopedUserId) {
+        PmProject visible = projectMapper.selectById(visibleProjectId);
+        visible.setCreatedBy(scopedUserId);
+        visible.setProjectManagerId(null);
+        projectMapper.updateById(visible);
+        PmProject hidden = projectMapper.selectById(hiddenProjectId);
+        hidden.setCreatedBy(scopedUserId + 1);
+        hidden.setProjectManagerId(null);
+        projectMapper.updateById(hidden);
+
+        String roleCode = "MGMT_DASH_SELF_" + System.nanoTime();
+        SysRole role = new SysRole();
+        role.setTenantId(TENANT_ID);
+        role.setRoleCode(roleCode);
+        role.setRoleName("Management dashboard SELF scope");
+        role.setRoleType("CUSTOM");
+        role.setStatus("ENABLE");
+        role.setDataScope("SELF");
+        sysRoleMapper.insert(role);
+        TestUserContext.setUser(TENANT_ID, scopedUserId, "management-dashboard-self", List.of(roleCode));
+        return roleCode;
     }
 
     // ========================================================================

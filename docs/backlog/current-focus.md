@@ -23,5 +23,7 @@
 - 决策依据：[项目地图](../product-intelligence/project-map.md)、[竞品情报](../product-intelligence/competitor-analysis.md)、[迭代决策](../product-intelligence/evolution-decision.md)。
 - 补货结论：`PI-2026-07-11-02` 已确认现有订单与已审批验收数据足以支撑“仅交付维度”的供应商档案，原阻塞已解除。
 - 已完成：`ISSUE-037-002` 供应商交付档案最小闭环，真实采购经理角色已看到迟交完成与逾期未完成两类交付状态。
-- 当前补货：先把 `DashboardProjectBusinessService` 的滞后项目、任务、审批、到期合同，以及 `DashboardFinanceManagementService` 的管理任务/风险租户全量聚合拆为“驾驶舱项目数据范围统一收口”Ready，再评估分包 WBS 与现场日报。
+- 已完成：`ISSUE-037-003` 驾驶舱项目数据范围统一收口，项目经理与管理驾驶舱的项目型聚合已按可见 ACTIVE projectIds fail-close。
+- 当前补货：重新比较分包 WBS 单前置 FS 依赖与现场日报，优先拆最小可验证产品切片。
+- 非阻塞观察：`DashboardPerformanceTest` 实际断言门槛为 `<=20`，显示名/输出仍写 `<=10`，后续测试治理时统一文案。
 - 后续候选：分包 WBS 单前置 FS 依赖与延期风险、现场日报最小闭环；必须在当前 Issue 收口后重新检查 Ready、flags 和同域连续次数。

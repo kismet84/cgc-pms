@@ -29,6 +29,7 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
@@ -83,6 +84,8 @@ import java.util.stream.Stream;
 @Service
 public class DashboardFinanceManagementService extends DashboardSharedSupport {
 
+    private final ProjectAccessChecker projectAccessChecker;
+
     public DashboardFinanceManagementService(
             CostSummaryService costSummaryService,
             CostSummaryMapper costSummaryMapper,
@@ -109,8 +112,10 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             TechItemMapper techItemMapper,
             MdPartnerMapper partnerMapper,
             MdMaterialMapper materialMapper,
-            SysUserMapper userMapper) {
+            SysUserMapper userMapper,
+            ProjectAccessChecker projectAccessChecker) {
         super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
+        this.projectAccessChecker = projectAccessChecker;
     }
 
     public FinanceDashboardVO getFinanceView(Long projectId) {
@@ -217,11 +222,25 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         ManagementDashboardVO vo = new ManagementDashboardVO();
 
         // Active projects
-        List<PmProject> activeProjects = projectMapper.selectList(
+        List<PmProject> activeProjects = projectAccessChecker.filterAccessible(projectMapper.selectList(
                 new LambdaQueryWrapper<PmProject>()
                         .eq(PmProject::getTenantId, tenantId)
-                        .eq(PmProject::getStatus, "ACTIVE"));
+                        .eq(PmProject::getStatus, "ACTIVE")));
         vo.setActiveProjectCount((long) activeProjects.size());
+
+        if (activeProjects.isEmpty()) {
+            vo.setTotalContractAmount("0");
+            vo.setTotalDynamicCost("0");
+            vo.setTotalExpectedProfit("0");
+            vo.setTotalPaidAmount("0");
+            vo.setTotalPendingTaskCount(0L);
+            vo.setTotalRiskCount(0L);
+            vo.setProjectRankings(Collections.emptyList());
+            vo.setMetricSources(Collections.emptyList());
+            vo.setOverdueItems(Collections.emptyList());
+            vo.setMajorRisks(Collections.emptyList());
+            return vo;
+        }
 
         // Aggregate totals across all active projects
         BigDecimal totalContractAmount = BigDecimal.ZERO;
@@ -233,6 +252,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
 
         // Batch load all project summaries to avoid N+1 per-project queries
         List<Long> projectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toList());
+        Set<Long> visibleProjectIds = new HashSet<>(projectIds);
         Map<Long, CostProjectSummaryVO> summaryMap = costSummaryService.getBatchProjectSummaries(tenantId, projectIds);
 
         for (PmProject project : activeProjects) {
@@ -282,17 +302,26 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 .collect(Collectors.toList()));
 
         // Pending tasks count (tenant-wide)
-        Long currentUserId = UserContext.getCurrentUserId();
         List<WfTask> allPending = wfTaskMapper.selectList(
                 new LambdaQueryWrapper<WfTask>()
                         .eq(WfTask::getTenantId, tenantId)
                         .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
                         .orderByDesc(WfTask::getReceivedAt));
-        vo.setTotalPendingTaskCount((long) allPending.size());
+        Map<Long, WfInstance> pendingInstanceMap = batchLoadInstances(allPending);
+        List<WfTask> visiblePending = allPending.stream()
+                .filter(task -> {
+                    WfInstance instance = pendingInstanceMap.get(task.getInstanceId());
+                    return instance != null
+                            && Objects.equals(tenantId, instance.getTenantId())
+                            && instance.getProjectId() != null
+                            && visibleProjectIds.contains(instance.getProjectId());
+                })
+                .collect(Collectors.toList());
+        vo.setTotalPendingTaskCount((long) visiblePending.size());
 
         // Overdue items: pending tasks older than 7 days
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
-        List<DashboardTaskItemVO> overdueItems = allPending.stream()
+        List<DashboardTaskItemVO> overdueItems = visiblePending.stream()
                 .filter(t -> t.getReceivedAt() != null && t.getReceivedAt().isBefore(sevenDaysAgo))
                 .limit(20)
                 .map(t -> {
@@ -310,6 +339,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         List<AlertLog> highAlerts = alertLogMapper.selectList(
                 new LambdaQueryWrapper<AlertLog>()
                         .eq(AlertLog::getTenantId, tenantId)
+                        .in(AlertLog::getProjectId, visibleProjectIds)
                         .eq(AlertLog::getIsRead, 0)
                         .eq(AlertLog::getSeverity, "HIGH")
                         .orderByDesc(AlertLog::getTriggeredAt));
