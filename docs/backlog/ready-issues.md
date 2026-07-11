@@ -4,7 +4,7 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂空；`ISSUE-037-008` 已完成，AutoPilot 继续按产品情报机制补货。
+当前队列暂无待实施 Ready；`ISSUE-037-009` 已完成，进入下一轮产品情报补货。
 
 ## v1.5 准入要求
 
@@ -69,6 +69,59 @@ Reviewer要求：实现完成后必须独立复核同项目同日唯一、草稿
 验证命令：
 - `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogControllerTest,SiteDailyLogServiceTest,TenantBoundaryTask2Test,BusinessObjectAuthorizerTest" test`
 - `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts src/router/__tests__/router.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-009：库存项人工补货目标量联动
+
+优先级：P1
+任务性质：能力新增
+类型：库存 / 采购补货 / 配置关系 / 项目数据范围 / 前后端 / Migration / 测试
+状态：Done（2026-07-12；计入本轮第 9/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Odoo Inventory Reordering Rules 19 最小/最大库存事实；`docs/product-intelligence/evolution-decision.md`；`docs/backlog/ad-hoc-plan.md` 的“人工补货目标量”候选
+Migration：需要
+依赖：复用 `ISSUE-037-006` 的安全库存阈值、`inventory:stock:edit`、stock→warehouse→project 范围校验和采购申请预填链；不新增规则表。
+风险等级：中
+运行态要求：后端专项、前端单测和类型检查通过；真实 API 前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现后必须独立复核 NULL 回退、目标量与安全阈值原子关系、旧接口兼容、项目/租户/权限、乐观锁、KPI 不变和四位小数建议数量；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-009-库存项人工补货目标量联动验收报告.md`
+目标：
+- 为仓库+物料库存项增加可选人工补货目标量；NULL 表示未单独配置，建议数量继续回退到安全库存阈值。
+- 提供一次原子保存安全阈值和目标量的设置接口，始终保持非空目标量大于等于安全阈值。
+- 低库存触发后按“目标量（或安全阈值）-当前可用量”生成四位小数采购申请预填数量。
+非目标：
+- 目标量不是库存硬上限，不阻止超量入库，不建设最大库存控制或库存容量约束。
+- 不实现供货周期、需求预测、历史消耗模型、自动下单、供应商选择、跨仓调拨或全量补货工作台。
+- 不修改采购申请审批、KPI 低库存触发口径、权限模型或生产部署。
+允许修改：
+- `backend/src/main/resources/db/migration/V144__add_stock_replenishment_target.sql`
+- `backend/src/main/resources/db/migration-h2/V144__add_stock_replenishment_target.sql`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- 已应用的 `backend/src/main/resources/db/migration/V1__*.sql` 至 `V143__*.sql`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `frontend-admin/src/pages/inventory/purchase-request.vue`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- V144 MySQL/H2 仅增加 `replenishment_target_qty DECIMAL(18,4) NULL`，不回填旧数据；首次入库保持 NULL。
+- 新设置接口一次接收安全阈值与可空目标量；两者非负、最多 4 位小数，目标量非空时必须大于等于安全阈值，使用现有 `@Version` 原子更新。
+- 原有 `PUT /inventory/stock/{id}/safety-threshold` 保持兼容；若已有目标量，新安全阈值不得高于目标量。
+- 设置接口继续使用 `inventory:stock:edit`，复用租户、启用仓库和 `ProjectAccessChecker`；跨租户、无项目范围、禁用仓库或伪造 stockId fail-close。
+- KPI 低库存仍为 `availableQty > 0 AND availableQty < safetyStockQty`，目标量不参与触发；VO 返回 `replenishmentTargetQty`。
+- 前端一次维护安全阈值和可空人工补货目标量，明确“未填则补到安全阈值”；保存后刷新库存/KPI。
+- 补货建议只在低库存时产生，数量按 `(replenishmentTargetQty ?? safetyStockQty) - availableQty` 固定四位小数；NULL 回退与 0/非空值语义有测试。
+- 至少覆盖迁移兼容、关系校验、NULL 回退、旧接口兼容、权限/项目范围、KPI 不变和前端建议数量；回滚为移除 V144 列和新设置接口，不改写 V142。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockServiceTest,MatStockControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/inventory/__tests__/stock-production.test.ts`
 - `cd frontend-admin; pnpm type-check`
 - `git diff --check`
 

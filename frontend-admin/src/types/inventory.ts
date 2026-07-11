@@ -23,6 +23,7 @@ export interface MatStockVO {
   materialId: string
   availableQty: string
   safetyStockQty: string
+  replenishmentTargetQty?: string | null
   version: number
   createdTime?: string
   updatedTime?: string

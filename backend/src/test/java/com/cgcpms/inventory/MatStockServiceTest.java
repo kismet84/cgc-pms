@@ -658,6 +658,50 @@ class MatStockServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("补货设置原子保存目标量并保持 KPI 仍由安全阈值驱动")
+    void testReplenishmentSettingsAreAtomicAndKpiUsesSafetyThreshold() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+
+        MatStock updated = stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("150.0000"));
+
+        assertEquals(0, new BigDecimal("100.0000").compareTo(updated.getSafetyStockQty()));
+        assertEquals(0, new BigDecimal("150.0000").compareTo(updated.getReplenishmentTargetQty()));
+        assertEquals(1, stockService.getKpi(1L, 10001L).getLowStockCount());
+        assertEquals(0, new BigDecimal("150.0000").compareTo(
+                stockService.getLedger(1L, MATERIAL_ID, 10001L, null, null, null, 1, 20)
+                        .getStock().getReplenishmentTargetQty()));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("补货目标量可清空且不得低于安全库存")
+    void testReplenishmentTargetValidationAndNullFallback() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+
+        assertThrows(BusinessException.class, () -> stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("99.9999")));
+
+        MatStock cleared = stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("100.0000"), null);
+        assertNull(cleared.getReplenishmentTargetQty());
+        assertNull(stockService.toStockVO(cleared).getReplenishmentTargetQty());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("旧安全阈值接口不得破坏已有补货目标量关系")
+    void testLegacySafetyThresholdCannotExceedReplenishmentTarget() {
+        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+        stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("100.0000"), new BigDecimal("150.0000"));
+
+        assertThrows(BusinessException.class,
+                () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("151.0000")));
+    }
+
+    @Test
+    @Transactional
     @DisplayName("安全库存阈值更新按租户 fail-close")
     void testSafetyStockThresholdRejectsCrossTenantStock() {
         MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));

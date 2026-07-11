@@ -29,6 +29,7 @@ const {
   listError,
   stock,
   safetyThresholdDraft,
+  replenishmentTargetDraft,
   thresholdSaving,
   txnList,
   txnTotal,
@@ -60,7 +61,7 @@ const {
   kpiPct,
   lowStockWarn,
   handleReplenish,
-  handleSafetyThresholdSave,
+  handleReplenishmentSettingsSave,
   inOutStats,
   visibleGridColumns,
   showEmptyState,
@@ -145,11 +146,22 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                 :disabled="!canEditStock"
                 style="width: 140px"
               />
+            </div>
+            <div>
+              <span style="font-size: 13px; color: var(--text-secondary)">人工补货目标量：</span>
+              <a-input-number
+                v-model:value="replenishmentTargetDraft"
+                :min="0"
+                :precision="4"
+                :disabled="!canEditStock"
+                placeholder="未填则补到安全阈值"
+                style="width: 180px"
+              />
               <a-button
                 v-if="canEditStock"
                 type="link"
                 :loading="thresholdSaving"
-                @click="handleSafetyThresholdSave"
+                @click="handleReplenishmentSettingsSave"
               >
                 保存
               </a-button>

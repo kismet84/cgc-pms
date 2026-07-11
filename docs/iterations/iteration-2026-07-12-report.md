@@ -44,3 +44,12 @@
 - 自动合并：本地 commit only；`autoPush=false`。
 - 下一轮：恢复产品差距补货；未命中 stop/pause。
 - 正式报告：`docs/quality/ISSUE-037-008-现场日报dev-login直达路由验收报告.md`。
+
+## ISSUE-037-009：库存项人工补货目标量联动
+
+- 状态：Done；计入 `启动迭代-10` 第 9 条实施型 Ready Issue。
+- 修改范围：V144 可空目标量、库存设置原子接口/兼容校验、库存台账设置与补货预填、产品情报与 backlog。
+- 验证：后端 53/53、前端 4/4、类型检查、Ready lint、`git diff --check`、独立审查、MySQL V144、180 秒稳定等待和真实采购经理设置/回读/非法关系拒绝/NULL 恢复通过。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：重新刷新产品情报并裁决第 10 条；未命中 stop/pause。
+- 正式报告：`docs/quality/ISSUE-037-009-库存项人工补货目标量联动验收报告.md`。

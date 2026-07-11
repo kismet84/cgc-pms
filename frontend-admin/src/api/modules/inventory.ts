@@ -116,6 +116,19 @@ export function updateStockSafetyThreshold(id: string, safetyStockQty: string) {
   })
 }
 
+/** 原子维护当前库存项安全阈值与可选人工补货目标量 */
+export function updateStockReplenishmentSettings(
+  id: string,
+  safetyStockQty: string,
+  replenishmentTargetQty: string | null,
+) {
+  return request<MatStockVO>({
+    url: `/inventory/stock/${id}/replenishment-settings`,
+    method: 'put',
+    data: { safetyStockQty, replenishmentTargetQty },
+  })
+}
+
 // ── 采购申请 ──
 
 /** 采购申请分页列表 */

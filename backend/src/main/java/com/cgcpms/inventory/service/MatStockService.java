@@ -331,26 +331,35 @@ public class MatStockService {
 
     @Transactional(rollbackFor = Exception.class)
     public MatStock updateSafetyStockThreshold(Long stockId, BigDecimal safetyStockQty) {
-        if (safetyStockQty == null || safetyStockQty.signum() < 0 || safetyStockQty.scale() > 4) {
-            throw new BusinessException("INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值必须为非负数且最多 4 位小数");
+        validateQuantity(safetyStockQty, "INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值");
+        MatStock stock = loadAuthorizedStock(stockId, "维护安全库存阈值");
+        BigDecimal normalizedSafety = safetyStockQty.setScale(4);
+        if (stock.getReplenishmentTargetQty() != null
+                && normalizedSafety.compareTo(stock.getReplenishmentTargetQty()) > 0) {
+            throw new BusinessException("INVALID_REPLENISHMENT_SETTINGS", "安全库存阈值不能高于人工补货目标量");
+        }
+        stock.setSafetyStockQty(normalizedSafety);
+        updateStockOrThrow(stock);
+        return stock;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock updateReplenishmentSettings(Long stockId, BigDecimal safetyStockQty,
+                                                BigDecimal replenishmentTargetQty) {
+        validateQuantity(safetyStockQty, "INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值");
+        if (replenishmentTargetQty != null) {
+            validateQuantity(replenishmentTargetQty, "INVALID_REPLENISHMENT_TARGET", "人工补货目标量");
+        }
+        BigDecimal normalizedSafety = safetyStockQty.setScale(4);
+        BigDecimal normalizedTarget = replenishmentTargetQty == null ? null : replenishmentTargetQty.setScale(4);
+        if (normalizedTarget != null && normalizedTarget.compareTo(normalizedSafety) < 0) {
+            throw new BusinessException("INVALID_REPLENISHMENT_SETTINGS", "人工补货目标量不能低于安全库存阈值");
         }
 
-        Long tenantId = UserContext.getCurrentTenantId();
-        MatStock stock = matStockMapper.selectById(stockId);
-        if (stock == null || !tenantId.equals(stock.getTenantId())) {
-            throw new BusinessException("STOCK_NOT_FOUND", "库存记录不存在");
-        }
-
-        MatWarehouse warehouse = matWarehouseMapper.selectById(stock.getWarehouseId());
-        if (warehouse == null || !tenantId.equals(warehouse.getTenantId()) || !"ENABLE".equals(warehouse.getStatus())) {
-            throw new BusinessException("STOCK_NOT_FOUND", "库存记录不存在");
-        }
-        projectAccessChecker.checkAccess(warehouse.getProjectId(), "维护安全库存阈值");
-
-        stock.setSafetyStockQty(safetyStockQty.setScale(4));
-        if (matStockMapper.updateById(stock) != 1) {
-            throw new BusinessException("STOCK_CONCURRENT_CONFLICT", "库存记录已变更，请刷新后重试");
-        }
+        MatStock stock = loadAuthorizedStock(stockId, "维护补货设置");
+        stock.setSafetyStockQty(normalizedSafety);
+        stock.setReplenishmentTargetQty(normalizedTarget);
+        updateStockOrThrow(stock);
         return stock;
     }
 
@@ -470,6 +479,7 @@ public class MatStockService {
         vo.setMaterialId(entity.getMaterialId());
         vo.setAvailableQty(entity.getAvailableQty());
         vo.setSafetyStockQty(entity.getSafetyStockQty());
+        vo.setReplenishmentTargetQty(entity.getReplenishmentTargetQty());
         vo.setCreatedTime(entity.getCreatedTime() != null ? entity.getCreatedTime().toString() : null);
         vo.setUpdatedTime(entity.getUpdatedTime() != null ? entity.getUpdatedTime().toString() : null);
 
@@ -481,6 +491,32 @@ public class MatStockService {
             vo.setUnit(mat.getUnit());
         }
         return vo;
+    }
+
+    private void validateQuantity(BigDecimal value, String code, String label) {
+        if (value == null || value.signum() < 0 || value.scale() > 4) {
+            throw new BusinessException(code, label + "必须为非负数且最多 4 位小数");
+        }
+    }
+
+    private MatStock loadAuthorizedStock(Long stockId, String action) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        MatStock stock = matStockMapper.selectById(stockId);
+        if (stock == null || !tenantId.equals(stock.getTenantId())) {
+            throw new BusinessException("STOCK_NOT_FOUND", "库存记录不存在");
+        }
+        MatWarehouse warehouse = matWarehouseMapper.selectById(stock.getWarehouseId());
+        if (warehouse == null || !tenantId.equals(warehouse.getTenantId()) || !"ENABLE".equals(warehouse.getStatus())) {
+            throw new BusinessException("STOCK_NOT_FOUND", "库存记录不存在");
+        }
+        projectAccessChecker.checkAccess(warehouse.getProjectId(), action);
+        return stock;
+    }
+
+    private void updateStockOrThrow(MatStock stock) {
+        if (matStockMapper.updateById(stock) != 1) {
+            throw new BusinessException("STOCK_CONCURRENT_CONFLICT", "库存记录已变更，请刷新后重试");
+        }
     }
 
     /**

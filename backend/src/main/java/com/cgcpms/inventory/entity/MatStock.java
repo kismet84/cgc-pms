@@ -38,6 +38,10 @@ public class MatStock extends BaseEntity {
     /** 安全库存阈值，按租户内仓库+物料库存项维护 */
     private BigDecimal safetyStockQty;
 
+    /** 人工补货目标量；NULL 表示回退到安全库存阈值 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private BigDecimal replenishmentTargetQty;
+
     /** 乐观锁版本号，MyBatis-Plus @Version 自动在 update 时递增并作为 WHERE 条件 */
     @Version
     private Integer version;

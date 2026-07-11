@@ -5,7 +5,7 @@ import {
   getStockLedger,
   getStockKpi,
   getWarehouseList,
-  updateStockSafetyThreshold,
+  updateStockReplenishmentSettings,
 } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
 import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
@@ -85,6 +85,7 @@ export function useStockLedger({
   const listError = ref<string | null>(null)
   const stock = ref<MatStockVO | null>(null)
   const safetyThresholdDraft = ref<number | null>(null)
+  const replenishmentTargetDraft = ref<number | null>(null)
   const thresholdSaving = ref(false)
   const txnList = ref<MatStockTxnVO[]>([])
   const txnTotal = ref(0)
@@ -138,6 +139,7 @@ export function useStockLedger({
   function resetTxnState() {
     stock.value = null
     safetyThresholdDraft.value = null
+    replenishmentTargetDraft.value = null
     txnList.value = []
     txnTotal.value = 0
   }
@@ -169,6 +171,9 @@ export function useStockLedger({
       if (mySeq !== fetchSeq) return
       stock.value = res.stock
       safetyThresholdDraft.value = res.stock ? Number(res.stock.safetyStockQty) : null
+      replenishmentTargetDraft.value = res.stock?.replenishmentTargetQty == null
+        ? null
+        : Number(res.stock.replenishmentTargetQty)
       if (res.txns) {
         txnList.value = res.txns.records ?? []
         txnTotal.value = Number(res.txns.total ?? 0)
@@ -328,8 +333,9 @@ export function useStockLedger({
   function handleReplenish() {
     const quantity = Number(stock.value?.availableQty)
     const safetyStockQty = Number(stock.value?.safetyStockQty)
+    const replenishmentTargetQty = Number(stock.value?.replenishmentTargetQty ?? stock.value?.safetyStockQty)
     if (!stock.value || quantity <= 0 || quantity >= safetyStockQty) return
-    const suggestedQuantity = Math.max(0, safetyStockQty - quantity).toFixed(4)
+    const suggestedQuantity = Math.max(0, replenishmentTargetQty - quantity).toFixed(4)
     const projectId = warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId
     if (!projectId) {
       message.warning('当前仓库缺少项目归属，无法发起补货申请')
@@ -346,15 +352,22 @@ export function useStockLedger({
     })
   }
 
-  async function handleSafetyThresholdSave() {
+  async function handleReplenishmentSettingsSave() {
     if (!stock.value || safetyThresholdDraft.value == null) return
     thresholdSaving.value = true
     try {
-      const updated = await updateStockSafetyThreshold(stock.value.id, String(safetyThresholdDraft.value))
+      const updated = await updateStockReplenishmentSettings(
+        stock.value.id,
+        String(safetyThresholdDraft.value),
+        replenishmentTargetDraft.value == null ? null : String(replenishmentTargetDraft.value),
+      )
       stock.value = updated
       safetyThresholdDraft.value = Number(updated.safetyStockQty)
+      replenishmentTargetDraft.value = updated.replenishmentTargetQty == null
+        ? null
+        : Number(updated.replenishmentTargetQty)
       await fetchKpi()
-      message.success('安全库存阈值已更新')
+      message.success('补货设置已更新')
     } catch (e: unknown) {
       console.error(e)
     } finally {
@@ -438,6 +451,7 @@ export function useStockLedger({
     showEmptyState,
     stock,
     safetyThresholdDraft,
+    replenishmentTargetDraft,
     thresholdSaving,
     txnList,
     txnTotal,
@@ -477,7 +491,7 @@ export function useStockLedger({
     kpiPct,
     lowStockWarn,
     handleReplenish,
-    handleSafetyThresholdSave,
+    handleReplenishmentSettingsSave,
     inOutStats,
     gridColumns,
     visibleGridColumns,

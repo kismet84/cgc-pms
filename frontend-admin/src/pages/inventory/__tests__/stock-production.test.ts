@@ -30,18 +30,21 @@ describe('stock ledger production hardening', () => {
     expect(composableSource).toContain('function handleReplenish()')
     expect(composableSource).toContain('warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId')
     expect(composableSource).toContain("path: '/inventory/purchase-request'")
-    expect(composableSource).toContain('const safetyStockQty = Number(stock.value?.safetyStockQty)')
     expect(composableSource).toContain(
-      'const suggestedQuantity = Math.max(0, safetyStockQty - quantity).toFixed(4)',
+      'const replenishmentTargetQty = Number(stock.value?.replenishmentTargetQty ?? stock.value?.safetyStockQty)',
+    )
+    expect(composableSource).toContain(
+      'const suggestedQuantity = Math.max(0, replenishmentTargetQty - quantity).toFixed(4)',
     )
     expect(composableSource).toContain('quantity: suggestedQuantity')
     expect(pageSource).toContain('@replenish="handleReplenish"')
   })
 
-  it('uses and maintains the selected stock safety threshold', () => {
-    expect(composableSource).toContain('updateStockSafetyThreshold')
+  it('atomically maintains safety threshold and optional replenishment target', () => {
+    expect(composableSource).toContain('updateStockReplenishmentSettings')
     expect(composableSource).toContain('Number(stock.value?.safetyStockQty)')
     expect(pageSource).toContain('安全库存阈值')
-    expect(pageSource).toContain('handleSafetyThresholdSave')
+    expect(pageSource).toContain('人工补货目标量')
+    expect(pageSource).toContain('handleReplenishmentSettingsSave')
   })
 })
