@@ -15,10 +15,12 @@ function New-AutopilotReviewRequest {
     issueId = $IssueId
     readyPath = $ReadyPath
     diffPath = $DiffPath
+    diffSha256 = (Get-FileHash -LiteralPath $DiffPath -Algorithm SHA256).Hash.ToLowerInvariant()
     evidencePaths = @($EvidencePaths)
     instructions = @(
       'Review only the Ready contract, final diff, required source, project rules, and bound verification evidence.',
       'Return pass, needs_repair, or blocked with file/line evidence.',
+      'Set reviewedDiffHash to the exact diffSha256 from this request and preserve the exact issueId.',
       'Do not infer success from the Implementer report.'
     )
   }
@@ -45,7 +47,9 @@ function Test-AutopilotRetryAllowed {
 }
 
 function Get-AutopilotReviewDisposition {
-  param([Parameter(Mandatory)][object]$ReviewResult)
+  param([Parameter(Mandatory)][object]$ReviewResult, [string]$ExpectedIssueId = '', [string]$ExpectedDiffHash = '')
+  if ($ExpectedIssueId -and $ReviewResult.issueId -ne $ExpectedIssueId) { throw 'Reviewer result Issue ID mismatch' }
+  if ($ExpectedDiffHash -and ([string]$ReviewResult.reviewedDiffHash).ToLowerInvariant() -ne $ExpectedDiffHash.ToLowerInvariant()) { throw 'Reviewer result diff hash mismatch' }
   if ($ReviewResult.decision -eq 'pass') { return [pscustomobject]@{ action='PASS'; failureFingerprint=''; summary='' } }
   if ($ReviewResult.decision -eq 'blocked') { return [pscustomobject]@{ action='BLOCK'; failureFingerprint=''; summary='independent Reviewer blocked the issue' } }
   if ($ReviewResult.decision -ne 'needs_repair') { throw "unknown Reviewer decision: $($ReviewResult.decision)" }

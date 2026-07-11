@@ -16,14 +16,19 @@ try {
   try { New-AutopilotReviewRequest -IssueId 'ISSUE-900-030' -ReadyPath 'ready.md' -DiffPath 'diff.patch' -EvidencePaths @('executor.log') -OutputPath (Join-Path $root 'review-request.json') | Out-Null } catch { $leakRejected = $true }
   if (!$leakRejected) { throw 'Reviewer accepted Implementer conversation/log history' }
 
-  $request = New-AutopilotReviewRequest -IssueId 'ISSUE-900-030' -ReadyPath 'ready.md' -DiffPath 'diff.patch' -EvidencePaths @('evidence.json') -OutputPath (Join-Path $root 'review-request.json')
+  $diffPath = Join-Path $root 'diff.patch'; 'diff' | Set-Content -LiteralPath $diffPath -Encoding UTF8
+  $request = New-AutopilotReviewRequest -IssueId 'ISSUE-900-030' -ReadyPath 'ready.md' -DiffPath $diffPath -EvidencePaths @('evidence.json') -OutputPath (Join-Path $root 'review-request.json')
   if ($request.PSObject.Properties.Name -contains 'implementerReasoning') { throw 'review request leaked Implementer reasoning' }
 
-  $pass = [pscustomobject]@{ schemaVersion = 1; issueId = 'ISSUE-900-030'; decision = 'pass'; findings = @(); reviewedDiffHash = 'abc'; reviewedAt = [datetimeoffset]::Now.ToString('o') }
+  $pass = [pscustomobject]@{ schemaVersion = 1; issueId = 'ISSUE-900-030'; decision = 'pass'; findings = @(); reviewedDiffHash = $request.diffSha256; reviewedAt = [datetimeoffset]::Now.ToString('o') }
   Assert-AutopilotReviewGate -Route $route -ReviewResult $pass | Out-Null
+  $mismatchRejected = $false
+  try { Get-AutopilotReviewDisposition -ReviewResult $pass -ExpectedIssueId 'ISSUE-OTHER' -ExpectedDiffHash $request.diffSha256 | Out-Null } catch { $mismatchRejected = $true }
+  if (!$mismatchRejected) { throw 'Reviewer identity mismatch was accepted' }
 
   $needsRepair = [pscustomobject]@{ schemaVersion = 1; issueId = 'ISSUE-900-030'; decision = 'needs_repair'; findings = @([pscustomobject]@{ severity='blocking'; file='a.ps1'; line=10; risk='bug'; requiredEvidence='test' }); reviewedDiffHash = 'def'; reviewedAt = [datetimeoffset]::Now.ToString('o') }
-  $disposition = Get-AutopilotReviewDisposition -ReviewResult $needsRepair
+  $needsRepair.reviewedDiffHash = $request.diffSha256
+  $disposition = Get-AutopilotReviewDisposition -ReviewResult $needsRepair -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256
   if ($disposition.action -ne 'REPAIR' -or !$disposition.failureFingerprint) { throw 'needs_repair was not routed to a bounded repair' }
   $blockedDisposition = Get-AutopilotReviewDisposition -ReviewResult ([pscustomobject]@{ decision='blocked'; findings=@() })
   if ($blockedDisposition.action -ne 'BLOCK') { throw 'blocked review was incorrectly made repairable' }

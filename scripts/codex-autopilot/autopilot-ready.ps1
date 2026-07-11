@@ -49,10 +49,13 @@ function Test-AutopilotValidationEntry {
   if ($cdMatch.Success) {
     $target = $cdMatch.Groups[1].Value.Trim().Trim('"', "'")
     $workDir = Join-Path $RepoRoot $target
+    $repoFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
+    $workFull = [IO.Path]::GetFullPath($workDir).TrimEnd('\')
+    if ($workFull -ne $repoFull -and !$workFull.StartsWith($repoFull + '\', [StringComparison]::OrdinalIgnoreCase)) { return "验证命令目录逃逸仓库：$Command" }
     if (!(Test-Path -LiteralPath $workDir -PathType Container)) { return "验证命令入口不存在：$Command" }
     $commandText = $cdMatch.Groups[2].Value.Trim()
   }
-  if ($commandText -match '[;&|<>]') { return "验证命令不在白名单：$Command" }
+  if ($commandText -match '[;&|<>`]' -or $commandText -match '\$\(|@\(') { return "验证命令不在白名单：$Command" }
   if ($commandText -match '^(?:\.\\|\./)?mvnw(?:\.cmd)?\b') {
     if (!(Test-Path (Join-Path $workDir 'mvnw.cmd')) -and !(Test-Path (Join-Path $workDir 'mvnw'))) { return "验证命令入口不存在：$Command" }
   } elseif ($commandText -match '^pnpm\b') {

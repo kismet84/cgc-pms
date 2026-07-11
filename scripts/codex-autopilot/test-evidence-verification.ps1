@@ -11,6 +11,7 @@ try {
   & git -C $root init -q
   & git -C $root config user.email 'autopilot@test.local'
   & git -C $root config user.name 'AutoPilot Test'
+  "*.json`r`n*.log" | Set-Content -LiteralPath (Join-Path $root '.gitignore') -Encoding UTF8
   'base' | Set-Content -LiteralPath (Join-Path $root 'file.txt') -Encoding UTF8
   & git -C $root add .
   & git -C $root commit -qm 'base'
@@ -26,6 +27,12 @@ try {
   $staleRejected = $false
   try { Assert-AutopilotEvidenceCurrent -Evidence $evidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null } catch { $staleRejected = $true }
   if (!$staleRejected) { throw 'stale evidence was accepted after diff change' }
+
+  $fresh = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'git diff --check' -EvidencePath (Join-Path $root 'fresh-evidence.json') -LogPath (Join-Path $root 'fresh.log') -TimeoutSeconds 20
+  'untracked' | Set-Content -LiteralPath (Join-Path $root 'new-file.txt') -Encoding UTF8
+  $untrackedRejected = $false
+  try { Assert-AutopilotEvidenceCurrent -Evidence $fresh -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null } catch { $untrackedRejected = $true }
+  if (!$untrackedRejected) { throw 'untracked content did not invalidate evidence' }
 
   $failed = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'powershell -NoProfile -Command "exit 7"' -EvidencePath (Join-Path $root 'failed-evidence.json') -LogPath (Join-Path $root 'fail.log') -TimeoutSeconds 20
   if ($failed.exitCode -ne 7 -or $failed.classification -eq 'pass') { throw 'nonzero exit code was recorded as pass' }

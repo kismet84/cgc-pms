@@ -1080,7 +1080,7 @@ function Invoke-IssueExecutor {
         Write-State $autoDir 'REVIEWING' $false 'VERIFICATION_COMPLETED' $Issue.title 'REVIEWING' ''
         $reviewDir = Join-Path $issueDir 'review'; New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
         $diffPath = Join-Path $reviewDir 'final.diff'
-        (& git -C $worktree.path diff --binary $baseCommit -- | Out-String) | Set-Content -LiteralPath $diffPath -Encoding UTF8
+        Get-AutopilotDiffText -Worktree $worktree.path -BaseCommit $baseCommit | Set-Content -LiteralPath $diffPath -Encoding UTF8
         $requestPath = Join-Path $reviewDir 'request.json'
         New-AutopilotReviewRequest -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $worktree.path 'docs\backlog\ready-issues.md') -DiffPath $diffPath -EvidencePaths $evidencePaths -OutputPath $requestPath | Out-Null
         if (!$config.issueReviewer -or $config.issueReviewer.enabled -ne $true) {
@@ -1089,7 +1089,7 @@ function Invoke-IssueExecutor {
           $reviewPath = Join-Path $reviewDir 'result.json'
           $review = Invoke-AutopilotReviewer -Worktree $worktree.path -RequestPath $requestPath -ResultPath $reviewPath -SchemaPath (Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Model $config.issueReviewer.model -Thinking $config.issueReviewer.thinking
           $result | Add-Member -NotePropertyName review -NotePropertyValue $review -Force
-          $reviewDisposition = Get-AutopilotReviewDisposition -ReviewResult $review
+          $reviewDisposition = Get-AutopilotReviewDisposition -ReviewResult $review -ExpectedIssueId $Issue.lint.issueId -ExpectedDiffHash $request.diffSha256
           if ($reviewDisposition.action -eq 'REPAIR') {
             $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_NEEDS_REPAIR'
             $failureSummary = $reviewDisposition.summary; $currentFingerprint = $reviewDisposition.failureFingerprint

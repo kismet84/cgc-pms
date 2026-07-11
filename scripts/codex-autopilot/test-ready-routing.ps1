@@ -78,6 +78,10 @@ try {
 
   (New-ReadyText).Replace('`git diff --check`', '`Remove-Item -Recurse deploy`') | Set-Content -LiteralPath $readyPath -Encoding UTF8
   Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } '验证命令不在白名单'
+  (New-ReadyText).Replace('`git diff --check`', '`git diff --check $(Remove-Item deploy)`') | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } '验证命令不在白名单'
+  (New-ReadyText).Replace('`git diff --check`', '`cd ..; git diff --check`') | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } '验证命令目录逃逸仓库'
 
   New-ReadyText | Set-Content -LiteralPath $readyPath -Encoding UTF8
   $low = @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root)[0]

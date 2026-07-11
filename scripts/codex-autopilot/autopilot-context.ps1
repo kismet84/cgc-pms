@@ -8,9 +8,20 @@ function Get-AutopilotTextHash {
 
 function Get-AutopilotDiffHash {
   param([string]$Worktree, [string]$BaseCommit)
+  $diff = Get-AutopilotDiffText -Worktree $Worktree -BaseCommit $BaseCommit
+  return Get-AutopilotTextHash $diff
+}
+
+function Get-AutopilotDiffText {
+  param([string]$Worktree, [string]$BaseCommit)
   $diff = (& git -C $Worktree diff --binary $BaseCommit -- 2>&1 | Out-String)
   if ($LASTEXITCODE -ne 0) { throw 'cannot calculate worktree diff hash' }
-  return Get-AutopilotTextHash $diff
+  foreach ($path in @(& git -C $Worktree ls-files --others --exclude-standard)) {
+    $untrackedDiff = (& git -C $Worktree diff --no-index --binary -- NUL $path 2>&1 | Out-String)
+    if ($LASTEXITCODE -notin @(0,1)) { throw "cannot include untracked file in diff: $path" }
+    $diff += $untrackedDiff
+  }
+  return $diff
 }
 
 function New-AutopilotContextPack {
