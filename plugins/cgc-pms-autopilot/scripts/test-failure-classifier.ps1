@@ -50,6 +50,9 @@ function New-Classification {
         [string]$RetryPolicy
     )
 
+    $fingerprintSource = "$Category|$Subcategory|$normalizedText|$ExitCode"
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $fingerprint = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($fingerprintSource)))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
     [ordered]@{
         category = $Category
         subcategory = $Subcategory
@@ -61,6 +64,7 @@ function New-Classification {
         suggestedNextAction = $SuggestedNextAction
         retryPolicy = $RetryPolicy
         reason = $Reason
+        failureFingerprint = $fingerprint
     }
 }
 

@@ -8,5 +8,6 @@
   ],
   "suggestedNextAction": "fix_ready_selector",
   "retryPolicy": "retry_after_ready_fix",
-  "reason": "Verification selector does not point to a valid existing test target."
+  "reason": "Verification selector does not point to a valid existing test target.",
+  "failureFingerprint": "3333333333333333333333333333333333333333333333333333333333333333"
 }

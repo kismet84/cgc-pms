@@ -22,6 +22,11 @@ try {
   & powershell -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $Repo -MaxIterations 10 | Out-Null
   $State = Get-Content -Raw (Join-Path $AutoDir "state.json") | ConvertFrom-Json
 
+  if ($State.schemaVersion -ne 2) { throw "Expected schemaVersion=2" }
+  if ($State.status -ne "IDLE") { throw "Expected status=IDLE" }
+  if ($State.phase -ne "idle") { throw "Expected phase=idle" }
+  if ($State.completedImplementationIssues -ne 0) { throw "Expected completedImplementationIssues=0" }
+  if (@($State.completedIssueIds).Count -ne 0) { throw "Expected completedIssueIds empty" }
   if ($State.iterationLimit -ne 10) { throw "Expected iterationLimit=10" }
   if ($State.iterationCompleted -ne 0) { throw "Expected iterationCompleted=0" }
   if ($State.remainingIterations -ne 10) { throw "Expected remainingIterations=10" }

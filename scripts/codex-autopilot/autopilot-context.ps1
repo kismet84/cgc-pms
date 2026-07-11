@@ -1,0 +1,69 @@
+$ErrorActionPreference = 'Stop'
+
+function Get-AutopilotTextHash {
+  param([string]$Text)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text)))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
+}
+
+function Get-AutopilotDiffHash {
+  param([string]$Worktree, [string]$BaseCommit)
+  $diff = (& git -C $Worktree diff --binary $BaseCommit -- 2>&1 | Out-String)
+  if ($LASTEXITCODE -ne 0) { throw 'cannot calculate worktree diff hash' }
+  return Get-AutopilotTextHash $diff
+}
+
+function New-AutopilotContextPack {
+  param(
+    [Parameter(Mandatory)][object]$Issue,
+    [Parameter(Mandatory)][ValidateSet('implement','repair','review')][string]$Phase,
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [Parameter(Mandatory)][string]$Worktree,
+    [string]$OutputPath = '',
+    [string[]]$RelevantSymbols = @(),
+    [string]$PreviousPhaseSummary = '',
+    [string[]]$ChangedPaths = @(),
+    [string[]]$AcceptedDecisions = @(),
+    [string[]]$OpenRisks = @()
+  )
+  if (@($RelevantSymbols).Count -gt 12) { throw 'context source budget exceeded: max 12 relevant symbols/files' }
+  if ([Text.Encoding]::UTF8.GetByteCount($PreviousPhaseSummary) -gt 5120) { throw 'previous phase summary budget exceeded: max 5 KB' }
+  if (@($ChangedPaths).Count -gt 20) { throw 'changed file budget exceeded: max 20 files' }
+  $baseCommit = (& git -C $Worktree rev-parse HEAD).Trim()
+  if ($LASTEXITCODE -ne 0) { throw 'cannot resolve worktree base commit' }
+  $context = [ordered]@{
+    schemaVersion = 1
+    issueId = $Issue.issueId
+    phase = $Phase
+    baseCommit = $baseCommit
+    contextGeneratedAt = [datetimeoffset]::Now.ToString('o')
+    readyContentHash = $Issue.readyContentHash
+    diffHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $baseCommit
+    goal = @($Issue.goal)
+    nonGoals = @($Issue.nonGoals)
+    allowedPaths = @($Issue.allowedPaths)
+    forbiddenPaths = @($Issue.forbiddenPaths)
+    requiredCommands = @($Issue.validationCommands)
+    archiveReport = $Issue.archiveReport
+    relevantSymbols = @($RelevantSymbols)
+    acceptedDecisions = @($AcceptedDecisions)
+    openRisks = @($OpenRisks)
+    previousPhaseSummary = if ($PreviousPhaseSummary) { $PreviousPhaseSummary } else { $null }
+  }
+  if ($OutputPath) {
+    $parent = Split-Path -Parent $OutputPath
+    if ($parent -and !(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+    [IO.File]::WriteAllText($OutputPath, ($context | ConvertTo-Json -Depth 10), [Text.UTF8Encoding]::new($false))
+  }
+  return [pscustomobject]$context
+}
+
+function Assert-AutopilotContextCurrent {
+  param([object]$Context, [object]$Issue, [string]$Worktree, [string]$ExpectedBaseCommit)
+  if ($Context.issueId -ne $Issue.issueId) { throw 'context Issue ID mismatch' }
+  if ($Context.readyContentHash -ne $Issue.readyContentHash) { throw 'context Ready hash mismatch' }
+  if ($Context.baseCommit -ne $ExpectedBaseCommit) { throw 'context base commit mismatch' }
+  $actualHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $Context.baseCommit
+  if ($Context.diffHash -ne $actualHash) { throw 'context diff hash is stale' }
+  return $true
+}

@@ -85,7 +85,12 @@ function Test-CommandAvailable {
   if ((Split-Path -Leaf $Command) -ne $Command -and (Test-Path -LiteralPath $Command)) {
     return $true
   }
-  return $null -ne (Get-Command $Command -ErrorAction SilentlyContinue)
+  if ($null -ne (Get-Command $Command -ErrorAction SilentlyContinue)) { return $true }
+  if ($Command -match '^codex(?:\.exe)?$' -and (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue)) {
+    $package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue
+    if ($package -and (Test-Path -LiteralPath (Join-Path $package.InstallLocation 'app\resources\codex.exe'))) { return $true }
+  }
+  return $false
 }
 
 if (!$ConfigPath) {

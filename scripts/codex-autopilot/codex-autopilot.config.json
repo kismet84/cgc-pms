@@ -4,6 +4,7 @@
   "worktreeRoot": "D:\\projects-test\\cgc-pms\\.worktrees",
   "autopilotDir": "D:\\projects-test\\cgc-pms\\.codex-autopilot",
   "mode": "codex-desktop-automation",
+  "controlPlane": "scripts\\codex-autopilot\\autopilot-run-continuous.ps1",
   "continuousRunnerEntry": "scripts\\codex-autopilot\\autopilot-run-continuous.ps1",
   "autoMerge": true,
   "autoPush": false,
@@ -11,7 +12,8 @@
   "allowTestDataDeletion": true,
   "requireTestDataResetMarker": true,
   "maxIssuesPerRun": 3,
-  "maxParallelIssues": 3,
+  "maxParallel": 1,
+  "maxParallelIssues": 1,
   "parallelSafetyMode": "strict-independent-only",
   "maxFilesChangedPerIssue": 20,
   "maxRunMinutes": 90,
@@ -23,8 +25,8 @@
       "--skip-git-repo-check",
       "--sandbox",
       "danger-full-access",
-      "--model",
-      "gpt-5.5",
+      "--ephemeral",
+      "--json",
       "--cd",
       "{repoRoot}",
       "-"
@@ -32,6 +34,29 @@
     "stdinFile": "{promptFile}",
     "timeoutSeconds": 7200,
     "requireChangedFiles": true
+  },
+  "modelPolicy": {
+    "mechanical": { "model": "gpt-5.6-luna", "thinking": "low" },
+    "normal": { "model": "gpt-5.6-terra", "thinking": "medium" },
+    "highRisk": { "model": "gpt-5.6-sol", "thinking": "high" },
+    "formalReview": { "model": "gpt-5.6-sol", "thinking": "high" }
+  },
+  "issueReviewer": {
+    "enabled": true,
+    "model": "gpt-5.6-sol",
+    "thinking": "high",
+    "timeoutSeconds": 1200
+  },
+  "readyPlanner": {
+    "enabled": true,
+    "model": "gpt-5.6-sol",
+    "thinking": "high",
+    "timeoutSeconds": 1200
+  },
+  "closeout": {
+    "enabled": true,
+    "localCommit": true,
+    "localFastForwardMerge": true
   },
   "allowedEpics": [
     "EPIC-000",

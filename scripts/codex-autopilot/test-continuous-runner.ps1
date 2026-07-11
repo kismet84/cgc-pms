@@ -26,8 +26,15 @@ function New-Fixture {
     [int]$MaxParallelIssues = 3,
     [string]$ParallelSafetyMode = "strict-independent-only",
     [string]$ExecutorMode = "success",
-    [switch]$Enabled
+    [switch]$Enabled,
+    [switch]$SkipStrictDefaults
   )
+
+  if (!$SkipStrictDefaults) {
+    $Ready = $Ready -replace '(?m)^目标：', "任务性质：缺口修复`r`n目标："
+    $Ready = $Ready -replace '(?m)^允许修改：', "非目标：`r`n- No production or unrelated change.`r`n允许修改："
+    $Ready = $Ready -replace '(?m)^状态：', "Migration：不需要`r`n依赖：无`r`n风险等级：低`r`n运行态要求：无`r`nReviewer要求：不需要`r`n状态："
+  }
 
   $Root = Join-Path $TempRoot $Name
   $AutoDir = Join-Path $Root ".codex-autopilot"
@@ -84,6 +91,7 @@ if ("$ExecutorMode" -eq "fail") {
   exit 7
 }
 if ("$ExecutorMode" -ne "no-change") {
+  New-Item -ItemType Directory -Path (Join-Path `$RepoRoot "docs\quality") -Force | Out-Null
   "executed `$IssueId with `$PromptPath" | Out-File -Encoding utf8 (Join-Path `$RepoRoot "docs\quality\mock-execution.txt")
 }
 Write-Host "mock executor completed for `$IssueId"
@@ -91,7 +99,12 @@ Write-Host "mock executor completed for `$IssueId"
   $Ready | Out-File -Encoding utf8 (Join-Path $BacklogDir "ready-issues.md")
   $Focus | Out-File -Encoding utf8 (Join-Path $BacklogDir "current-focus.md")
   $Plan | Out-File -Encoding utf8 (Join-Path $BacklogDir "cgc-pms-production-enhancement-plan.md")
+  ".worktrees/`r`n.codex-autopilot/" | Out-File -Encoding utf8 (Join-Path $Root '.gitignore')
   & git -C $Root init -q 2>$null
+  & git -C $Root config user.email 'autopilot@test.local'
+  & git -C $Root config user.name 'AutoPilot Test'
+  & git -C $Root add .
+  & git -C $Root commit -qm 'fixture'
   return $Root
 }
 
@@ -271,7 +284,7 @@ function Get-RunEvents {
 function Assert-EventSchema {
   param([object]$Event)
 
-  foreach ($field in @("timestamp", "event", "mode", "issueId", "title", "checkpoint", "decision", "status", "stopReason", "dryRun", "apply", "maxIterations")) {
+  foreach ($field in @("runId", "timestamp", "event", "mode", "issueId", "title", "checkpoint", "decision", "status", "stopReason", "dryRun", "apply", "maxIterations", "from", "to", "reason", "evidencePath")) {
     if ($Event.PSObject.Properties.Name -notcontains $field) {
       throw "Missing events.jsonl field: $field"
     }
@@ -349,7 +362,10 @@ try {
   Assert-Contains $ReadyLimitCompatOutput "iterationLimit=2"
   $ReadyDoneResult = Get-LatestResult $ReadyRoot
   Assert-ResultSchema $ReadyDoneResult
-  if ($ReadyDoneResult.status -ne "done") { throw "Expected real executor status done. Actual: $($ReadyDoneResult | ConvertTo-Json -Compress -Depth 8)" }
+  if ($ReadyDoneResult.status -ne "done") {
+    $executorLog = @($ReadyDoneResult.artifacts | Where-Object { $_ -like '*executor.log' } | ForEach-Object { if (Test-Path $_) { Get-Content -LiteralPath $_ -Raw } }) -join "`n"
+    throw "Expected real executor status done. Actual: $($ReadyDoneResult | ConvertTo-Json -Compress -Depth 8) Log: $executorLog"
+  }
   if ($ReadyDoneResult.failureCategory -ne "none") { throw "Expected real executor failureCategory none. Actual: $($ReadyDoneResult | ConvertTo-Json -Compress -Depth 8)" }
   $ReadyNoopEvents = Get-RunEvents $ReadyRoot
   if (!($ReadyNoopEvents | Where-Object { $_.event -eq "executor.result" -and $_.status -eq "done" })) { throw "Expected executor result event" }
@@ -602,7 +618,7 @@ try {
     Assert-NotContains $NonReadyOutput "nextReady=ISSUE-100-001"
   }
 
-  $MissingFieldRoot = New-Fixture -Name "ready-missing-field" -Enabled -Ready @"
+  $MissingFieldRoot = New-Fixture -Name "ready-missing-field" -Enabled -SkipStrictDefaults -Ready @"
 # Ready Issues
 
 ### ISSUE-100-001：Runner missing field
@@ -696,30 +712,24 @@ try {
   $ApplyOutput = Invoke-Runner $ApplyRoot -Apply
   Assert-Contains $ApplyOutput "BACKLOG_SPLIT_APPLIED"
   Assert-Contains $ApplyOutput "postSplitCheckpoint=CONTINUE"
-  Assert-Contains $ApplyOutput "READY_ISSUE_FOUND"
-  Assert-Contains $ApplyOutput "EXECUTOR_RESULT_WRITTEN"
+  Assert-Contains $ApplyOutput "REFILL_ROUND_COMPLETE"
+  Assert-NotContains $ApplyOutput "READY_ISSUE_FOUND"
+  Assert-NotContains $ApplyOutput "EXECUTOR_RESULT_WRITTEN"
   $ApplyReady = Get-Content -Raw (Join-Path $ApplyRoot "docs\backlog\ready-issues.md")
   Assert-Contains $ApplyReady "状态：Ready"
   Assert-Contains $ApplyReady "验证命令："
   Assert-Contains $ApplyReady "来源锚点："
   $ApplyState = Get-Content -Raw (Join-Path $ApplyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($ApplyState.mode -ne "continuous-runner") { throw "Expected state.mode=continuous-runner" }
-  if ($ApplyState.lastAction -ne "READY_ISSUE_FOUND") { throw "Expected state.lastAction=READY_ISSUE_FOUND" }
-  if ($ApplyState.lastIssue -notlike "ISSUE-008-001*") { throw "Expected state.lastIssue to record selected issue" }
-  if ($ApplyState.lastReason -ne "READY_ISSUE_FOUND") { throw "Expected state.lastReason=READY_ISSUE_FOUND" }
+  if ($ApplyState.lastAction -ne "BACKLOG_SPLIT_APPLIED") { throw "Expected state.lastAction=BACKLOG_SPLIT_APPLIED" }
+  if ($ApplyState.status -ne "REFILLING") { throw "Expected state.status=REFILLING" }
+  if ($ApplyState.lastIssue) { throw "Expected refill round not to select an implementation issue" }
+  if ($ApplyState.lastReason -ne "BACKLOG_SPLIT_APPLIED") { throw "Expected state.lastReason=BACKLOG_SPLIT_APPLIED" }
   if ($ApplyState.stopReason) { throw "Expected state.stopReason to be empty for ready issue handoff" }
   if ($ApplyState.iterationCompleted -ne 0) { throw "Expected split/ready handoff not to increment iterationCompleted" }
   if (Test-Path (Join-Path $ApplyRoot ".codex-autopilot\run.lock")) { throw "ApplyBacklogSplit should release run.lock" }
-  $ApplyResult = Get-LatestResult $ApplyRoot
-  Assert-ResultSchema $ApplyResult
-  if ($ApplyResult.status -ne "done") { throw "Expected split handoff to run real executor" }
-  $ApplyStatus = & powershell -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $ApplyRoot 2>&1 | Out-String
-  $ApplyStatusJson = $ApplyStatus | ConvertFrom-Json
-  if ($ApplyStatusJson.latestResultStatus -ne "done") { throw "Expected status to expose latest done result" }
-  if (!$ApplyStatusJson.latestResultPath) { throw "Expected status to expose latestResultPath" }
-  if (!$ApplyStatusJson.latestRunId) { throw "Expected status to expose latestRunId" }
-  if ($ApplyStatusJson.latestEvent -ne "executor.result") { throw "Expected status latestEvent=executor.result" }
-  if ($ApplyStatusJson.latestStopReason) { throw "Expected empty latestStopReason for successful execution" }
+  $refillCommit = (& git -C $ApplyRoot log -1 --pretty=%s).Trim()
+  if ($refillCommit -ne 'chore(autopilot): refill ready queue') { throw 'Expected refill round local commit' }
 
   $FailRoot = New-Fixture -Name "executor-fail" -Enabled -ExecutorMode "fail" -Ready @"
 # Ready Issues
@@ -796,8 +806,8 @@ try {
   Assert-ResultSchema $DirtyBeforeResult
   if ($DirtyBeforeResult.status -ne "done") { throw "Expected pre-dirty executor status done. Actual: $($DirtyBeforeResult | ConvertTo-Json -Compress -Depth 8)" }
   if ($DirtyBeforeResult.failureCategory -ne "none") { throw "Expected pre-dirty executor failureCategory none. Actual: $($DirtyBeforeResult | ConvertTo-Json -Compress -Depth 8)" }
-  if (!(($DirtyBeforeResult.validation | Where-Object { $_.name -eq "execution-artifacts" }).message -like "*content:docs/quality/mock-execution.txt*")) {
-    throw "Expected execution-artifacts to record content fingerprint change for pre-dirty file"
+  if (!(($DirtyBeforeResult.validation | Where-Object { $_.name -eq "execution-artifacts" }).message -like "*docs/quality/mock-execution.txt*")) {
+    throw "Expected isolated executor artifact to be recorded"
   }
 
   $NoExecutorConfig = Join-Path $TempRoot "no-executor.config.json"
@@ -875,7 +885,7 @@ try {
   $LimitOneDoneOutput = Invoke-Runner $LimitOneRoot -Apply -MaxIterations 1
   Assert-Contains $LimitOneDoneOutput "STOP_ITERATION_LIMIT_REACHED"
   $LimitOneState = Get-Content -Raw (Join-Path $LimitOneRoot ".codex-autopilot\state.json") | ConvertFrom-Json
-  if ($LimitOneState.iterationCompleted -ne 1) { throw "Expected MaxIterations=1 to count one completed issue" }
+  if ($LimitOneState.iterationCompleted -ne 1) { throw "Expected MaxIterations=1 to count one completed issue. Actual: $($LimitOneState | ConvertTo-Json -Compress -Depth 8)" }
   if ($LimitOneState.remainingIterations -ne 0) { throw "Expected MaxIterations=1 remainingIterations=0" }
   if ($LimitOneState.stopReason -ne "STOP_ITERATION_LIMIT_REACHED") { throw "Expected STOP_ITERATION_LIMIT_REACHED stopReason" }
 

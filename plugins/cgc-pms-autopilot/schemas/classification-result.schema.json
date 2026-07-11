@@ -12,7 +12,8 @@
     "evidence",
     "suggestedNextAction",
     "retryPolicy",
-    "reason"
+    "reason",
+    "failureFingerprint"
   ],
   "properties": {
     "category": {
@@ -95,6 +96,11 @@
       "type": "string",
       "minLength": 1,
       "description": "Compatibility field retained from the earlier classifier output."
+    },
+    "failureFingerprint": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64
     }
   }
 }

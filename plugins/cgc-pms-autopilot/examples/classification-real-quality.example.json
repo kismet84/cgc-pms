@@ -8,5 +8,6 @@
   ],
   "suggestedNextAction": "open_repair_request",
   "retryPolicy": "manual_review_required",
-  "reason": "Assertions failed with reproducible evidence."
+  "reason": "Assertions failed with reproducible evidence.",
+  "failureFingerprint": "4444444444444444444444444444444444444444444444444444444444444444"
 }

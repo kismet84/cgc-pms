@@ -8,6 +8,8 @@ $LockPath = Join-Path $AutoDir "run.lock"
 $RunsDir = Join-Path $AutoDir "runs"
 $ConfigPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "codex-autopilot.config.json"
 $MaxRunMinutes = 120
+. (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-recover.ps1')
+. (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-metrics.ps1')
 if (Test-Path $ConfigPath) {
   $Config = Get-Content -Raw $ConfigPath | ConvertFrom-Json
   if ($Config.maxRunMinutes) {
@@ -84,6 +86,18 @@ if (Test-Path $StatePath) {
   $State = Get-Content -Raw $StatePath | ConvertFrom-Json
   $Summary.stateExists = $true
   $Summary.status = $State.status
+  $Summary.schemaVersion = $State.schemaVersion
+  $Summary.runId = $State.runId
+  $Summary.phase = $State.phase
+  $Summary.currentIssue = $State.currentIssue
+  $Summary.attempt = $State.attempt
+  $Summary.phaseStartedAt = $State.phaseStartedAt
+  $Summary.completedImplementationIssues = $State.completedImplementationIssues
+  $Summary.worktree = $State.worktree
+  $Summary.branch = $State.branch
+  $Summary.executorPid = $State.executorPid
+  $Summary.lastCommit = $State.lastCommit
+  $Summary.failureFingerprint = $State.failureFingerprint
   $Summary.mode = $State.mode
   $Summary.lastAction = $State.lastAction
   $Summary.lastIssue = $State.lastIssue
@@ -129,6 +143,7 @@ if (Test-Path $RunsDir) {
           $Summary.latestEventUnreadable = $true
         }
       }
+      try { $Summary.latestRunMetrics = Get-AutopilotRunMetrics -EventPath $LatestEventPath -RunId $LatestRun.Name } catch { $Summary.latestRunMetricsError = $_.Exception.Message }
     }
   }
   $LatestResult = Get-ChildItem -Path $RunsDir -Filter result.json -Recurse -ErrorAction SilentlyContinue |
@@ -151,5 +166,9 @@ if (Test-Path $RunsDir) {
     }
   }
 }
+
+$Recovery = Get-AutopilotRecoveryDecision -AutoDir $AutoDir
+$Summary.recoveryAction = $Recovery.action
+$Summary.recoveryReason = $Recovery.reason
 
 $Summary | ConvertTo-Json

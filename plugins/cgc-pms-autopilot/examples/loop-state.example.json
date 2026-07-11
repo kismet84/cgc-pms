@@ -1,22 +1,19 @@
 {
-  "loopId": "LOOP-33-1-M1",
-  "issueId": "READY-33-1-M5",
+  "schemaVersion": 2,
+  "runId": "run-example",
+  "status": "VERIFYING",
   "phase": "verify",
-  "actorRole": "D",
-  "inputArtifacts": [
-    "plugins/cgc-pms-autopilot/artifacts/plans/第33-1条主线-Codex AutoPilot Loop Engineering增强改进任务计划书.md",
-    "plugins/cgc-pms-autopilot/scripts/validate-loop-artifacts.ps1"
-  ],
-  "outputArtifacts": [
-    "plugins/cgc-pms-autopilot/examples/loop-state.example.json",
-    "plugins/cgc-pms-autopilot/examples/loop-event.example.json"
-  ],
-  "verification": [
-    "powershell -NoProfile -ExecutionPolicy Bypass -File plugins\\cgc-pms-autopilot\\scripts\\validate-loop-artifacts.ps1",
-    "git diff --check"
-  ],
-  "failureCategory": "none",
-  "decision": "continue",
-  "nextAction": "Run plugin validation and template renders.",
-  "stopReason": "none"
+  "currentIssue": "ISSUE-900-001",
+  "attempt": 0,
+  "startedAt": "2026-07-11T12:00:00+08:00",
+  "phaseStartedAt": "2026-07-11T12:05:00+08:00",
+  "lastHeartbeatAt": "2026-07-11T12:05:30+08:00",
+  "iterationLimit": 3,
+  "completedImplementationIssues": 0,
+  "completedIssueIds": [],
+  "worktree": "D:/projects-test/cgc-pms/.worktrees/autopilot/issue-900-001",
+  "branch": "codex/autopilot/issue-900-001",
+  "executorPid": null,
+  "lastCommit": null,
+  "failureFingerprint": null
 }

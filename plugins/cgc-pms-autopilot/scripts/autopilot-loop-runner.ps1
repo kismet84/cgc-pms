@@ -14,10 +14,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+if ($EnableLocalCommit) {
+    throw 'autopilot-loop-runner.ps1 is preview-only. Use scripts/codex-autopilot/autopilot-run-continuous.ps1 for real execution.'
+}
+
 $pluginRoot = Split-Path -Parent $PSScriptRoot
 $repoRoot = (Resolve-Path (Join-Path $pluginRoot '..\..')).Path
 $loopId = "LOOP-$([DateTimeOffset]::Now.ToString('yyyyMMddHHmmss'))"
-$effectiveDryRun = [bool]($DryRun -or (-not $EnableLocalCommit))
+$effectiveDryRun = $true
 $phases = @(
     'select',
     'checkpoint',
@@ -39,6 +43,8 @@ function New-PreviewClassification {
         [string]$Evidence = 'Preview only.'
     )
 
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $fingerprint = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes("none|preview|$Reason")))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
     return [ordered]@{
         category = 'none'
         subcategory = 'preview'
@@ -47,6 +53,7 @@ function New-PreviewClassification {
         suggestedNextAction = $NextAction
         retryPolicy = 'no_retry'
         reason = $Reason
+        failureFingerprint = $fingerprint
     }
 }
 

@@ -8,5 +8,6 @@
   ],
   "suggestedNextAction": "refresh_frontend_runtime",
   "retryPolicy": "rerun_after_refresh",
-  "reason": "Frontend dev server is likely still proxying to an old backend container address."
+  "reason": "Frontend dev server is likely still proxying to an old backend container address.",
+  "failureFingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
 }

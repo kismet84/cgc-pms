@@ -5,6 +5,11 @@ param(
   [string]$Title = "",
   [string]$ReadyPath = "",
   [string]$RunId = "",
+  [string]$ContextPath = "",
+  [string]$Model = "",
+  [string]$Thinking = "",
+  [string]$ExecutorRole = "",
+  [switch]$ReviewRequired,
   [switch]$DryRun,
   [switch]$Noop
 )
@@ -169,7 +174,12 @@ function Test-CommandAvailable {
   if ((Split-Path -Leaf $Command) -ne $Command -and (Test-Path -LiteralPath $Command)) {
     return $true
   }
-  return $null -ne (Get-Command $Command -ErrorAction SilentlyContinue)
+  if ($null -ne (Get-Command $Command -ErrorAction SilentlyContinue)) { return $true }
+  if ($Command -match '^codex(?:\.exe)?$' -and (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue)) {
+    $package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue
+    if ($package -and (Test-Path -LiteralPath (Join-Path $package.InstallLocation 'app\resources\codex.exe'))) { return $true }
+  }
+  return $false
 }
 
 function Resolve-ExecutorCommand {
@@ -182,6 +192,13 @@ function Resolve-ExecutorCommand {
   $resolved = Get-Command $Command -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($resolved -and $resolved.Source) {
     return $resolved.Source
+  }
+  if ($Command -match '^codex(?:\.exe)?$' -and (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue)) {
+    $package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue
+    if ($package) {
+      $candidate = Join-Path $package.InstallLocation 'app\resources\codex.exe'
+      if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
   }
   return $Command
 }
@@ -209,14 +226,16 @@ function New-IssuePromptFile {
   )
 
   $promptPath = Join-Path $RunDir "issue-prompt.md"
+  $contextInstruction = if ($ContextPath) { "只读取并遵守上下文包：$ContextPath" } else { "任务正文：`n$($Issue.body)" }
   @"
 你是被 AutoPilot 明确派工的执行智能体，不是主线程；在本 Ready Issue 范围内可以执行授权动作。
 
 仓库：$RepoRoot
 Issue：$($Issue.title)
+角色：$ExecutorRole
+需要独立复核：$([bool]$ReviewRequired)
 
-任务正文：
-$($Issue.body)
+$contextInstruction
 
 执行边界：
 - 只处理该 Ready Issue 声明的允许修改范围。
@@ -351,6 +370,10 @@ function Invoke-ConfiguredIssueExecutor {
   $args = @()
   foreach ($arg in @($executor.args)) {
     $args += (Expand-ExecutorToken ([string]$arg) $Issue $promptPath $RunDir)
+  }
+  if ((Split-Path -Leaf $command) -match '^codex(?:\.exe)?$') {
+    if ($Model) { $args += @('--model', $Model) }
+    if ($Thinking) { $args += @('-c', "model_reasoning_effort=$Thinking") }
   }
   $stdinPath = if ($executor.stdinFile) { Expand-ExecutorToken ([string]$executor.stdinFile) $Issue $promptPath $RunDir } else { "" }
 
@@ -493,7 +516,7 @@ if (!$ConfigPath) {
   $ConfigPath = Join-Path $scriptDir "codex-autopilot.config.json"
 }
 $config = Read-JsonFile $ConfigPath
-if ($config.repoRoot) {
+if ($config.repoRoot -and !$PSBoundParameters.ContainsKey('RepoRoot')) {
   $RepoRoot = $config.repoRoot
 }
 if (!$ReadyPath) {

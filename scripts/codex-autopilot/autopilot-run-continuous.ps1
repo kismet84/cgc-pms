@@ -125,6 +125,9 @@ function New-RunLock {
     $lock = [pscustomobject]@{
       owner = "$env:USERNAME@$env:COMPUTERNAME"
       pid = $PID
+      runId = if ($script:RunContext) { $script:RunContext.id } else { '' }
+      host = $env:COMPUTERNAME
+      workspaceRoot = $RepoRoot
       startedAt = Get-Date -Format o
       heartbeatAt = Get-Date -Format o
       mode = $Mode
@@ -165,29 +168,24 @@ function Remove-RunLock {
 function Get-ReadyIssues {
   param([string]$ReadyPath, [string]$RepoRoot, [string]$ScriptDir)
 
-  if (!(Test-Path $ReadyPath)) {
-    return @()
-  }
-
-  $text = Get-Content -Raw $ReadyPath
-  $matches = [regex]::Matches($text, "(?ms)^###\s+(ISSUE-[0-9-]+[^\r\n]*)\r?\n(.*?)(?=^###\s+ISSUE-|\z)")
-  $issues = @()
-  foreach ($match in $matches) {
-    $body = $match.Groups[2].Value
-    $statusMatch = [regex]::Match($body, "(?m)^状态[：:]\s*(.+?)\s*$")
-    $status = if ($statusMatch.Success) { $statusMatch.Groups[1].Value.Trim() } else { "" }
-    if ($status -ceq "Ready") {
-      $title = $match.Groups[1].Value.Trim()
-      $lint = Invoke-ReadyLint $RepoRoot $ReadyPath $ScriptDir $title
-      $issues += [pscustomobject]@{
-        title = $title
-        status = $status
-        body = $body
-        lint = $lint
+  if (!(Test-Path $ReadyPath)) { return @() }
+  try {
+    return @(Get-AutopilotReadyIssues -Path $ReadyPath -RepoRoot $RepoRoot | ForEach-Object {
+      [pscustomobject]@{
+        title = $_.title; status = 'Ready'; body = $_.body; contract = $_
+        lint = [pscustomobject]@{ status = 'pass'; issueId = $_.issueId; title = $_.title; readyContentHash = $_.readyContentHash; errors = @(); warnings = @() }
       }
-    }
+    })
+  } catch {
+    $text = Get-Content -LiteralPath $ReadyPath -Raw -Encoding UTF8
+    $match = [regex]::Match($text, '(?ms)^###\s+(ISSUE-[0-9-]+[^\r\n]*)\r?\n(.*?)(?=^###\s+ISSUE-|\z)')
+    if (!$match.Success) { return @() }
+    $title = $match.Groups[1].Value.Trim()
+    return @([pscustomobject]@{
+      title = $title; status = 'Ready'; body = $match.Groups[2].Value; contract = $null
+      lint = [pscustomobject]@{ status = 'fail'; issueId = ([regex]::Match($title, '^(ISSUE-[0-9-]+)')).Groups[1].Value; title = $title; readyContentHash = ''; errors = @($_.Exception.Message); warnings = @() }
+    })
   }
-  return $issues
 }
 
 function Get-SectionLines {
@@ -251,7 +249,7 @@ function Get-ParallelIssueInfo {
   param([pscustomobject]$Issue)
 
   $body = [string]$Issue.body
-  $riskPattern = "数据库|migration|Flyway|权限|安全|租户|金额|审批|状态机"
+  $route = if ($Issue.contract) { Get-AutopilotRoute -Issue $Issue.contract } else { $null }
   $paths = @()
   $paths += Get-BacktickValues ((Get-SectionLines $body "允许修改") -join "`n")
   $paths += Get-BacktickValues ((Get-SectionLines $body "归档报告") -join "`n")
@@ -262,7 +260,7 @@ function Get-ParallelIssueInfo {
 
   $reason = ""
   $canParallel = $true
-  if ($body -match $riskPattern) {
+  if ($route -and $route.highRisk) {
     $canParallel = $false
     $reason = "SERIAL_HIGH_RISK_DOMAIN"
   } elseif ($hasBroadScope -or $keys.Count -eq 0) {
@@ -298,6 +296,12 @@ function Get-ReadyIssueBatchPlan {
   foreach ($issue in $ReadyIssues) {
     if ($issue.lint.status -ne "pass") {
       break
+    }
+    if ($issue.contract) {
+      $route = Get-AutopilotRoute -Issue $issue.contract
+      if ($route.serialRequired) {
+        return [pscustomobject]@{ issues = [object[]]@($ReadyIssues[0]); decision = "READY_ISSUE"; reason = "SERIAL_RISK_POLICY"; parallel = $false }
+      }
     }
 
     $info = Get-ParallelIssueInfo $issue
@@ -429,13 +433,21 @@ function New-ReadyIssueDraft {
 
 优先级：P2
 类型：生产增强 / 回归 / 最小实现
+任务性质：回归证明
 状态：Ready
 自动合并：auto-merge/local-commit-only
 来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``$($Candidate.anchor)`` 节
 是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
+Migration：不需要
+依赖：无
+风险等级：中
+运行态要求：按验收命令判断
+Reviewer要求：跨前后端时需要
 目标：
 - 基于现有架构补齐“$($Candidate.name)”的一轮最小可验收能力或回归断言。
 - 不扩大为完整平台化改造，不连接生产环境。
+非目标：
+- 不新增平台、依赖或生产能力。
 允许修改：
 - ``backend/**``
 - ``frontend-admin/**``
@@ -499,25 +511,67 @@ function Write-State {
     Write-RunLock (Join-Path $AutoDir "run.lock") $script:RunLock
   }
 
-  $statePath = Join-Path $AutoDir "state.json"
-  $now = Get-Date -Format s
-  if (Test-Path $statePath) {
-    $state = Get-Content -Raw $statePath | ConvertFrom-Json
-  } else {
-    $state = [pscustomobject]@{}
+  $statePath = Join-Path $AutoDir 'state.json'
+  $now = [datetimeoffset]::Now.ToString('o')
+  $existing = $null
+  if (Test-Path -LiteralPath $statePath) {
+    try { $existing = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $existing = $null }
   }
-  $state | Add-Member -NotePropertyName status -NotePropertyValue $Status -Force
-  $state | Add-Member -NotePropertyName mode -NotePropertyValue "continuous-runner" -Force
-  $state | Add-Member -NotePropertyName lastAction -NotePropertyValue $LastAction -Force
-  $state | Add-Member -NotePropertyName lastIssue -NotePropertyValue $LastIssue -Force
-  $state | Add-Member -NotePropertyName lastReason -NotePropertyValue $LastReason -Force
-  $state | Add-Member -NotePropertyName stopReason -NotePropertyValue $StopReason -Force
-  $state | Add-Member -NotePropertyName iterationLimit -NotePropertyValue $script:IterationLimit -Force
-  $state | Add-Member -NotePropertyName iterationCompleted -NotePropertyValue $script:IterationCompleted -Force
-  $state | Add-Member -NotePropertyName remainingIterations -NotePropertyValue $script:RemainingIterations -Force
-  $state | Add-Member -NotePropertyName iterationLastCountedIssue -NotePropertyValue $script:IterationLastCountedIssue -Force
-  $state | Add-Member -NotePropertyName lastHeartbeatAt -NotePropertyValue $now -Force
-  $state | ConvertTo-Json | Out-File -Encoding utf8 $statePath
+  $completedIds = @()
+  if ($null -ne $existing -and $existing.PSObject.Properties.Name -contains 'completedIssueIds') { $completedIds = @($existing.completedIssueIds) }
+  while ($completedIds.Count -lt $script:IterationCompleted) { $completedIds += "legacy-completed-$($completedIds.Count + 1)" }
+  $stateStatus = if ($script:AutopilotStatuses -contains $Status) { $Status } elseif ($Status -eq 'STOP_ITERATION_LIMIT_REACHED') { 'LIMIT_REACHED' } elseif ($Status -eq 'STOP_PAUSE_FLAG') { 'PAUSED' } elseif ($Status -eq 'STOP_DISABLED') { 'DISABLED' } elseif ($Status -like 'STOP*') { 'STOPPED' } elseif ($Status -like 'READY_ISSUE*') { 'PLANNING' } elseif ($Status -like '*SPLIT*') { 'REFILLING' } else { 'CHECKPOINT' }
+  $phase = $stateStatus.ToLowerInvariant()
+  $state = [ordered]@{
+    schemaVersion = 2
+    runId = if ($script:RunContext) { $script:RunContext.id } else { 'run-' + [datetimeoffset]::Now.ToString('yyyyMMdd-HHmmss-fff') }
+    status = $stateStatus
+    phase = $phase
+    currentIssue = $LastIssue
+    attempt = 0
+    startedAt = if ($null -ne $existing -and $existing.PSObject.Properties.Name -contains 'startedAt' -and $existing.startedAt) { [string]$existing.startedAt } else { $now }
+    phaseStartedAt = $now
+    lastHeartbeatAt = $now
+    iterationLimit = $script:IterationLimit
+    completedImplementationIssues = $script:IterationCompleted
+    completedIssueIds = @($completedIds)
+    worktree = if ($script:CurrentWorktree) { $script:CurrentWorktree } else { '' }
+    branch = if ($script:CurrentBranch) { $script:CurrentBranch } else { (& git -C $RepoRoot branch --show-current 2>$null | Select-Object -First 1) }
+    executorPid = $script:ExecutorPid
+    lastCommit = $script:LastCommit
+    failureFingerprint = $script:FailureFingerprint
+    enabled = Test-Path (Join-Path $AutoDir 'enabled.flag')
+    mode = 'continuous-runner'
+    iterationCompleted = $script:IterationCompleted
+    remainingIterations = $script:RemainingIterations
+    iterationLastCountedIssue = $script:IterationLastCountedIssue
+    lastAction = $LastAction
+    lastIssue = $LastIssue
+    lastReason = $LastReason
+    stopReason = $StopReason
+    stopRequested = Test-Path (Join-Path $AutoDir 'stop.flag')
+    autoMerge = if ($config.PSObject.Properties.Name -contains 'autoMerge') { [bool]$config.autoMerge } else { $true }
+    autoPush = $false
+    allowTestDataReset = Test-Path (Join-Path $AutoDir 'ALLOW_TEST_DATA_RESET')
+  }
+  Write-AutopilotStateAtomic -Path $statePath -State $state | Out-Null
+}
+
+function Commit-ReadyRefill {
+  param([string]$RepoRoot, [string]$ReadyPath)
+  $repoPrefix = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\') + '\'
+  $readyFull = [IO.Path]::GetFullPath($ReadyPath)
+  if (!$readyFull.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Ready path is outside repository.' }
+  $relativeReady = $readyFull.Substring($repoPrefix.Length).Replace('\','/')
+  $otherChanges = @(& git -C $RepoRoot status --porcelain=v1 | Where-Object { $_.Substring(3).Trim('"').Replace('\','/') -ne $relativeReady })
+  if ($otherChanges.Count -gt 0) { throw 'Cannot commit Ready refill while unrelated worktree changes exist.' }
+  & git -C $RepoRoot add -- $relativeReady
+  if ($LASTEXITCODE -ne 0) { throw 'Failed to stage Ready refill.' }
+  & git -C $RepoRoot diff --cached --check
+  if ($LASTEXITCODE -ne 0) { throw 'Ready refill failed git diff --check.' }
+  & git -C $RepoRoot commit -m 'chore(autopilot): refill ready queue' | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'Failed to commit Ready refill.' }
+  return (& git -C $RepoRoot rev-parse HEAD).Trim()
 }
 
 function New-RunContext {
@@ -545,6 +599,7 @@ function Write-RunEvent {
     return
   }
   $payload = [ordered]@{
+    runId = $script:RunContext.id
     timestamp = Get-Date -Format o
     event = $Event
     mode = "continuous-runner"
@@ -557,6 +612,10 @@ function Write-RunEvent {
     dryRun = [bool]$DryRun
     apply = [bool]$ApplyBacklogSplit
     maxIterations = $script:IterationLimit
+    from = if ($Data.from) { $Data.from } else { '' }
+    to = if ($Data.to) { $Data.to } elseif ($Data.status) { [string]$Data.status } else { $Event }
+    reason = if ($Data.reason) { [string]$Data.reason } elseif ($Data.decision) { [string]$Data.decision } else { $Event }
+    evidencePath = if ($Data.evidencePath) { [string]$Data.evidencePath } else { '' }
   }
   foreach ($name in @($Data.PSObject.Properties.Name)) {
     if ($payload.Contains($name)) {
@@ -564,7 +623,9 @@ function Write-RunEvent {
     }
     $payload[$name] = $Data.$name
   }
-  ($payload | ConvertTo-Json -Compress -Depth 8) | Add-Content -Encoding utf8 $script:RunContext.events
+  $line = $payload | ConvertTo-Json -Compress -Depth 8
+  $line | Add-Content -Encoding utf8 $script:RunContext.events
+  [IO.File]::AppendAllText((Join-Path $autoDir 'events.ndjson'), $line + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
 }
 
 function Get-IssueBodyByTitle {
@@ -616,6 +677,8 @@ function Get-IterationProgressFromRuns {
     return [pscustomobject]@{
       completedCount = 0
       latestIssueRef = ""
+      completedIssueIds = @()
+      completedIssueRefs = @()
     }
   }
 
@@ -657,6 +720,8 @@ function Get-IterationProgressFromRuns {
   return [pscustomobject]@{
     completedCount = $completed.Count
     latestIssueRef = $latestIssueRef
+    completedIssueIds = @($completed.Keys)
+    completedIssueRefs = @($completed.Values)
   }
 }
 
@@ -685,6 +750,7 @@ function Initialize-IterationProgress {
   $statePath = Join-Path $AutoDir "state.json"
   if (Test-Path $statePath) {
     $state = Get-Content -Raw $statePath | ConvertFrom-Json
+    $runProgress = [pscustomobject]@{ completedCount = 0; latestIssueRef = ''; completedIssueIds = @(); completedIssueRefs = @() }
     if ($null -ne $state.iterationCompleted) {
       $script:IterationCompleted = [int]$state.iterationCompleted
     }
@@ -703,7 +769,9 @@ function Initialize-IterationProgress {
       }
     }
 
-    if (!$ReadOnlyMode -and $state.lastAction -eq "READY_ISSUE_FOUND" -and $state.lastIssue -and $state.iterationLastCountedIssue -ne $state.lastIssue) {
+    $lastIssueId = if ($state.lastIssue) { ([regex]::Match([string]$state.lastIssue, '^(ISSUE-[0-9-]+)')).Groups[1].Value } else { '' }
+    $alreadyInRuns = $state.lastIssue -in @($runProgress.completedIssueRefs) -or ($lastIssueId -and $lastIssueId -in @($runProgress.completedIssueIds))
+    if (!$ReadOnlyMode -and !$alreadyInRuns -and $state.lastAction -eq "READY_ISSUE_FOUND" -and $state.lastIssue -and $state.iterationLastCountedIssue -ne $state.lastIssue) {
       if (Test-IssueCompleted $ReadyPath $state.lastIssue) {
         $script:IterationCompleted += 1
         $script:IterationLastCountedIssue = $state.lastIssue
@@ -806,23 +874,160 @@ function Get-ExecutorCommand {
   return "powershell -NoProfile -ExecutionPolicy Bypass -File `"$executorPath`" -RepoRoot `"$RepoRoot`" -ConfigPath `"$ConfigPath`" -Title `"$IssueTitle`""
 }
 
+function Invoke-ChildWithHeartbeat {
+  param([string[]]$Arguments, [string]$WorkingDirectory, [int]$TimeoutSeconds)
+  function Quote-ChildArgument([string]$Value) { if ($Value -match '[\s"]') { return '"' + $Value.Replace('"','\"') + '"' }; return $Value }
+  $startInfo = [Diagnostics.ProcessStartInfo]::new()
+  $startInfo.FileName = 'powershell'
+  $startInfo.Arguments = ($Arguments | ForEach-Object { Quote-ChildArgument $_ }) -join ' '
+  $startInfo.WorkingDirectory = $WorkingDirectory
+  $startInfo.UseShellExecute = $false
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo
+  [void]$process.Start()
+  $script:ExecutorPid = $process.Id
+  Write-State $autoDir 'EXECUTING' $false 'EXECUTOR_RUNNING' $script:RunLock.issueId 'EXECUTING' ''
+  $stdoutTask = $process.StandardOutput.ReadToEndAsync(); $stderrTask = $process.StandardError.ReadToEndAsync()
+  $deadline = [datetimeoffset]::Now.AddSeconds($TimeoutSeconds)
+  $timedOut = $false
+  while (!$process.WaitForExit(30000)) {
+    if ($script:RunLock) { Write-RunLock (Join-Path $autoDir 'run.lock') $script:RunLock }
+    if ([datetimeoffset]::Now -ge $deadline) { $timedOut = $true; $process.Kill($true); break }
+  }
+  $process.WaitForExit()
+  $script:ExecutorPid = $null
+  $stdout = $stdoutTask.GetAwaiter().GetResult(); $stderr = $stderrTask.GetAwaiter().GetResult()
+  if ($stdout) { Write-Host $stdout.TrimEnd() }
+  if ($stderr) { Write-Warning $stderr.TrimEnd() }
+  return [pscustomobject]@{ exitCode = if ($timedOut) { 124 } else { $process.ExitCode }; timedOut = $timedOut }
+}
+
 function Invoke-IssueExecutor {
   param(
     [string]$RepoRoot,
     [string]$ConfigPath,
-    [string]$IssueTitle
+    [object]$Issue,
+    [object]$Route
   )
 
   $executorPath = Join-Path $scriptDir "autopilot-exec-issue.ps1"
   if (!(Test-Path $executorPath)) {
     Write-Host "EXECUTOR_NOT_FOUND"
-    Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $IssueTitle)"
+    Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $Issue.title)"
     return
   }
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $executorPath -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Title $IssueTitle -RunId $script:RunContext.id
+  $baseCommit = (& git -C $RepoRoot rev-parse HEAD).Trim()
+  $worktree = New-AutopilotIssueWorktree -RepoRoot $RepoRoot -IssueId $Issue.lint.issueId -BaseCommit $baseCommit
+  $script:CurrentWorktree = $worktree.path
+  $script:CurrentBranch = $worktree.branch
+  $issueDir = Join-Path $script:RunContext.dir $Issue.lint.issueId
+  New-Item -ItemType Directory -Path $issueDir -Force | Out-Null
+  $contextPath = Join-Path $issueDir 'implement\context.json'
+  New-AutopilotContextPack -Issue $Issue.contract -Phase 'implement' -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextPath | Out-Null
+  Write-State $autoDir 'EXECUTING' $false 'EXECUTOR_START' $Issue.title 'EXECUTING' ''
+  $executorArgs = @(
+    '-NoProfile','-ExecutionPolicy','Bypass','-File',$executorPath,
+    '-RepoRoot',$worktree.path,
+    '-ConfigPath',$ConfigPath,
+    '-ReadyPath',(Join-Path $worktree.path 'docs\backlog\ready-issues.md'),
+    '-Title',$Issue.title,
+    '-RunId',$script:RunContext.id,
+    '-ContextPath',$contextPath,
+    '-Model',$Route.modelBaseline,
+    '-Thinking',$Route.thinkingBaseline,
+    '-ExecutorRole',$Route.executorRole
+  )
+  if ($Route.reviewRequired) { $executorArgs += '-ReviewRequired' }
+  $executorTimeout = if ($config.issueExecutor.timeoutSeconds) { [int]$config.issueExecutor.timeoutSeconds + 120 } else { 7320 }
+  $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout
+  if ($childResult.exitCode -ne 0) {
+    Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_PROCESS_FAILED' $Issue.title 'tool_config' 'STOP_EXECUTOR_PROCESS_FAILED'
+    return
+  }
+  $resultPath = Join-Path $script:RunContext.dir 'result.json'
+  if (Test-Path -LiteralPath $resultPath) {
+    $result = Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($result.status -eq 'done') {
+      $changes = @(Get-AutopilotWorktreeChanges -Worktree $worktree.path)
+      try {
+        Assert-AutopilotAllowedChanges -ChangedPaths $changes -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
+      } catch {
+        $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
+        $result.validation += [pscustomobject]@{ name = 'scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
+      }
+      $evidencePaths = @()
+      if ($result.status -eq 'done') {
+        Write-State $autoDir 'VERIFYING' $false 'EXECUTOR_COMPLETED' $Issue.title 'VERIFYING' ''
+        $verifyDir = Join-Path $issueDir 'verify'
+        New-Item -ItemType Directory -Path $verifyDir -Force | Out-Null
+        for ($index = 0; $index -lt $Issue.contract.validationCommands.Count; $index++) {
+          $evidencePath = Join-Path $verifyDir ("evidence-{0:00}.json" -f ($index + 1))
+          $logPath = Join-Path $verifyDir ("command-{0:00}.log" -f ($index + 1))
+          $evidence = Invoke-AutopilotVerificationCommand -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -Command $Issue.contract.validationCommands[$index] -EvidencePath $evidencePath -LogPath $logPath
+          $evidencePaths += $evidencePath
+          $result.validation += [pscustomobject]@{ name = "ready-command-$($index + 1)"; status = $evidence.classification; message = "exitCode=$($evidence.exitCode); evidence=$evidencePath" }
+          if ($evidence.exitCode -ne 0) {
+            $classifierPath = Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\scripts\test-failure-classifier.ps1'
+            $classification = & powershell -NoProfile -ExecutionPolicy Bypass -File $classifierPath -ErrorText $evidence.summary -ExitCode $evidence.exitCode | ConvertFrom-Json
+            $result.status = 'blocked'
+            $result.failureCategory = if ($classification.category -eq 'environment_prereq') { 'environment' } elseif ($classification.category -eq 'ready_issue_config') { 'ready_issue_config' } elseif ($classification.category -eq 'tool_config') { 'tool_config' } else { 'quality_security' }
+            $result.nextAction = 'STOP'; $result.stopReason = 'STOP_VERIFICATION_FAILED'
+            $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $classification.failureFingerprint -Force
+            break
+          }
+        }
+      }
+      $result | Add-Member -NotePropertyName evidencePaths -NotePropertyValue @($evidencePaths) -Force
+      $result | Add-Member -NotePropertyName reviewRequired -NotePropertyValue ([bool]$Route.reviewRequired) -Force
+      $closed = $false
+      if ($result.status -eq 'done' -and $Route.reviewRequired) {
+        Write-State $autoDir 'REVIEWING' $false 'VERIFICATION_COMPLETED' $Issue.title 'REVIEWING' ''
+        $reviewDir = Join-Path $issueDir 'review'; New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
+        $diffPath = Join-Path $reviewDir 'final.diff'
+        (& git -C $worktree.path diff --binary $baseCommit -- | Out-String) | Set-Content -LiteralPath $diffPath -Encoding UTF8
+        $requestPath = Join-Path $reviewDir 'request.json'
+        New-AutopilotReviewRequest -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $worktree.path 'docs\backlog\ready-issues.md') -DiffPath $diffPath -EvidencePaths $evidencePaths -OutputPath $requestPath | Out-Null
+        if (!$config.issueReviewer -or $config.issueReviewer.enabled -ne $true) {
+          $result.status = 'blocked'; $result.failureCategory = 'tool_config'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEWER_REQUIRED'
+        } else {
+          $reviewPath = Join-Path $reviewDir 'result.json'
+          $review = Invoke-AutopilotReviewer -Worktree $worktree.path -RequestPath $requestPath -ResultPath $reviewPath -SchemaPath (Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Model $config.issueReviewer.model -Thinking $config.issueReviewer.thinking
+          $result | Add-Member -NotePropertyName review -NotePropertyValue $review -Force
+          if ($review.decision -ne 'pass') { $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_FAILED' }
+        }
+      }
+      if ($result.status -eq 'done' -and $config.closeout -and $config.closeout.enabled -eq $true) {
+        Write-State $autoDir 'COMMITTING' $false 'CLOSEOUT_START' $Issue.title 'COMMITTING' ''
+        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge)
+        $script:LastCommit = $closeout.commit
+        $result.gitSummary | Add-Member -NotePropertyName commit -NotePropertyValue $closeout.commit -Force
+        $result | Add-Member -NotePropertyName merged -NotePropertyValue $closeout.merged -Force
+        $result.nextAction = 'CHECKPOINT'
+        $closeoutKey = Get-AutopilotCloseoutKey -IssueId $Issue.lint.issueId -Commit $closeout.commit -ReportPath $Issue.contract.archiveReport
+        Register-AutopilotCloseout -LedgerPath (Join-Path $autoDir 'closeouts.ndjson') -Key $closeoutKey | Out-Null
+        Write-RunEvent 'closeout' ([pscustomobject]@{ issueId = $Issue.lint.issueId; title = $Issue.title; decision = 'DONE'; status = 'CLOSING'; reason = 'local commit closeout'; evidencePath = $Issue.contract.archiveReport; commit = $closeout.commit })
+        $closed = $true
+      }
+      $result | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $resultPath -Encoding UTF8
+      if ($result.status -eq 'done' -and $closed) { Write-State $autoDir 'CHECKPOINT' $false 'ISSUE_CLOSED' $Issue.title 'CHECKPOINT' '' } elseif ($result.status -eq 'done') { Write-State $autoDir 'CLOSING' $false 'VERIFICATION_COMPLETED' $Issue.title 'CLOSING' '' } else { Write-State $autoDir 'BLOCKED' $false 'VERIFICATION_BLOCKED' $Issue.title $result.failureCategory $result.stopReason }
+    } else {
+      Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_BLOCKED' $Issue.title $result.failureCategory $result.stopReason
+    }
+  }
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptDir 'autopilot-state.ps1')
+. (Join-Path $scriptDir 'autopilot-ready.ps1')
+. (Join-Path $scriptDir 'autopilot-route.ps1')
+. (Join-Path $scriptDir 'autopilot-worktree.ps1')
+. (Join-Path $scriptDir 'autopilot-context.ps1')
+. (Join-Path $scriptDir 'autopilot-verify.ps1')
+. (Join-Path $scriptDir 'autopilot-review.ps1')
+. (Join-Path $scriptDir 'autopilot-recover.ps1')
+. (Join-Path $scriptDir 'autopilot-refill.ps1')
+. (Join-Path $scriptDir 'autopilot-closeout.ps1')
 if (!$ConfigPath) {
   $ConfigPath = Join-Path $scriptDir "codex-autopilot.config.json"
 }
@@ -852,6 +1057,11 @@ $splitLimit = 5
 $applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun -and -not [bool]$ExplainNextAction
 $dryRunMode = -not $applyMode
 $script:RunLock = $null
+$script:CurrentWorktree = ''
+$script:CurrentBranch = ''
+$script:ExecutorPid = $null
+$script:LastCommit = $null
+$script:FailureFingerprint = $null
 Initialize-IterationProgress $autoDir $readyPath $MaxIterations ([bool]$DryRun -or [bool]$ExplainNextAction)
 $script:RunContext = New-RunContext $autoDir
 Write-RunEvent "runner.start" ([pscustomobject]@{
@@ -897,6 +1107,17 @@ if ($ExplainNextAction) {
 
 try {
   if ($applyMode) {
+    $recovery = Get-AutopilotRecoveryDecision -AutoDir $autoDir
+    if ($recovery.action -eq 'REFUSE_SECOND_INSTANCE') { Write-Host 'RUN_LOCK_ACTIVE'; throw 'Another AutoPilot run is active.' }
+    if ($recovery.action -in @('RESUME_FROM_CHECKPOINT','RESUME_CLOSEOUT')) {
+      Remove-Item -LiteralPath (Join-Path $autoDir 'run.lock') -Force -ErrorAction SilentlyContinue
+      Write-Host 'STALE_RUN_LOCK_REMOVED'
+      Write-RunEvent 'recovery' ([pscustomobject]@{ decision = $recovery.action; status = 'RECOVERED'; reason = $recovery.reason })
+    } elseif ($recovery.action -in @('VERIFY_UNCOMMITTED','QUARANTINE')) {
+      Write-State $autoDir 'BLOCKED' $false 'RECOVERY_REVIEW_REQUIRED' '' $recovery.reason 'STOP_RECOVERY_REVIEW_REQUIRED'
+      Write-Host 'STOP_RECOVERY_REVIEW_REQUIRED'
+      exit 0
+    }
     $script:RunLock = New-RunLock $autoDir $maxRunMinutes "apply-backlog-split"
   }
 
@@ -950,6 +1171,7 @@ try {
       $batchPlan = Get-ReadyIssueBatchPlan $readyIssues $maxParallelIssues $parallelSafetyMode
       $batchIssues = @($batchPlan.issues)
       $selectedIssue = $batchIssues[0]
+      $selectedRoute = if ($selectedIssue.contract) { Get-AutopilotRoute -Issue $selectedIssue.contract } else { $null }
       $readyStatus = if ($batchPlan.parallel) { "READY_ISSUE_BATCH_FOUND" } else { "READY_ISSUE_FOUND" }
       Write-State $autoDir $readyStatus ([bool]$DryRun) $readyStatus $selectedIssue.title $readyStatus ""
       Write-RunEvent "decision" ([pscustomobject]@{
@@ -961,6 +1183,11 @@ try {
         parallelBatchSize = $batchIssues.Count
         parallelDecision = $batchPlan.reason
         parallelSafetyMode = $parallelSafetyMode
+        executorRole = if ($selectedRoute) { $selectedRoute.executorRole } else { '' }
+        modelBaseline = if ($selectedRoute) { $selectedRoute.modelBaseline } else { '' }
+        thinkingBaseline = if ($selectedRoute) { $selectedRoute.thinkingBaseline } else { '' }
+        reviewRequired = if ($selectedRoute) { $selectedRoute.reviewRequired } else { $false }
+        verificationProfile = if ($selectedRoute) { $selectedRoute.verificationProfile } else { '' }
       })
       Write-Host $readyStatus
       Write-Host "selected=$($selectedIssue.title)"
@@ -985,8 +1212,29 @@ try {
           Write-Host "PARALLEL_BATCH_PLAN_ONLY"
         }
       } else {
-        Invoke-IssueExecutor $RepoRoot $ConfigPath $selectedIssue.title
+        Invoke-IssueExecutor $RepoRoot $ConfigPath $selectedIssue $selectedRoute
       }
+      exit 0
+    }
+
+    $refillDecision = Get-AutopilotRefillDecision -RepoRoot $RepoRoot
+    if ($applyMode -and $config.readyPlanner -and $config.readyPlanner.enabled -eq $true -and $refillDecision.action -in @('PLAN_READY','UNBLOCK_FIRST')) {
+      Write-State $autoDir 'REFILLING' $false 'READY_PLANNER_START' '' $refillDecision.reason ''
+      $planResultPath = Join-Path $script:RunContext.dir 'ready-plan.json'
+      $planSchemaPath = Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\ready-plan.schema.json'
+      Invoke-AutopilotReadyPlanner -RepoRoot $RepoRoot -Candidates $refillDecision.candidates -OutputPath $planResultPath -SchemaPath $planSchemaPath -Model $config.readyPlanner.model -Thinking $config.readyPlanner.thinking -TimeoutSeconds $config.readyPlanner.timeoutSeconds | Out-Null
+      $imported = Import-AutopilotReadyPlan -PlanPath $planResultPath -ReadyPath $readyPath -RepoRoot $RepoRoot
+      $refillCommit = Commit-ReadyRefill $RepoRoot $readyPath
+      Write-RunEvent 'refill.planned' ([pscustomobject]@{ decision = 'BACKLOG_SPLIT_APPLIED'; status = 'BACKLOG_SPLIT_APPLIED'; reason = $refillDecision.reason; createdReadyIssueDrafts = $imported.createdCount; commit = $refillCommit })
+      Write-State $autoDir 'REFILLING' $false 'BACKLOG_SPLIT_APPLIED' '' 'BACKLOG_SPLIT_APPLIED' ''
+      Write-Host 'BACKLOG_SPLIT_APPLIED'
+      Write-Host "createdReadyIssueDrafts=$($imported.createdCount)"
+      Write-Host 'REFILL_ROUND_COMPLETE'
+      exit 0
+    }
+    if ($refillDecision.action -eq 'UNBLOCK_FIRST') {
+      Write-State $autoDir 'BLOCKED' $false 'UNBLOCK_REQUIRED' '' $refillDecision.reason 'STOP_UNBLOCK_PLANNER_UNAVAILABLE'
+      Write-Host 'STOP_UNBLOCK_PLANNER_UNAVAILABLE'
       exit 0
     }
 
@@ -1020,8 +1268,9 @@ try {
     }
 
     $createdCount = Add-ReadyIssueDrafts $readyPath $candidates
+    $refillCommit = Commit-ReadyRefill $RepoRoot $readyPath
     Write-State $autoDir "BACKLOG_SPLIT_APPLIED" $false "BACKLOG_SPLIT_APPLIED" "" "BACKLOG_SPLIT_APPLIED" ""
-    Write-RunEvent "split.applied" ([pscustomobject]@{ decision = "BACKLOG_SPLIT_APPLIED"; status = "BACKLOG_SPLIT_APPLIED"; shouldSplitBacklog = $true; createdReadyIssueDrafts = $createdCount })
+    Write-RunEvent "split.applied" ([pscustomobject]@{ decision = "BACKLOG_SPLIT_APPLIED"; status = "BACKLOG_SPLIT_APPLIED"; shouldSplitBacklog = $true; createdReadyIssueDrafts = $createdCount; commit = $refillCommit })
     Write-Host "BACKLOG_SPLIT_APPLIED"
     Write-Host "createdReadyIssueDrafts=$createdCount"
 
@@ -1034,16 +1283,7 @@ try {
       Write-Host $checkpoint
       exit 0
     }
-
-    $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
-    if ($readyIssues.Count -gt 0) {
-      continue
-    }
-
-    $stopReason = Get-StopReasonForEmptyPool $readyPath
-    Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = $stopReason; stopReason = $stopReason })
-    Write-State $autoDir $stopReason $false "STOP" "" $stopReason $stopReason
-    Write-Host $stopReason
+    Write-Host 'REFILL_ROUND_COMPLETE'
     exit 0
   }
 

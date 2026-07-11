@@ -1,99 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cgc-pms.local/plugins/cgc-pms-autopilot/schemas/loop-event.schema.json",
-  "title": "CGC PMS AutoPilot Loop Event",
-  "description": "Minimal event contract for short, machine-readable loop observations.",
+  "title": "CGC PMS AutoPilot Durable Event",
   "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "time",
-    "loopId",
-    "issueId",
-    "phase",
-    "role",
-    "eventType",
-    "summary",
-    "evidence",
-    "nextAction"
-  ],
+  "additionalProperties": true,
+  "required": ["runId", "issueId", "from", "to", "timestamp", "reason", "evidencePath"],
   "properties": {
-    "time": {
-      "type": "string",
-      "description": "ISO-8601 timestamp for this event.",
-      "format": "date-time"
-    },
-    "loopId": {
-      "type": "string",
-      "description": "Loop identifier that ties related events together.",
-      "minLength": 1
-    },
-    "issueId": {
-      "type": "string",
-      "description": "Ready issue or task identifier referenced by this event.",
-      "minLength": 1
-    },
-    "phase": {
-      "type": "string",
-      "description": "Loop phase active when the event was emitted.",
-      "enum": [
-        "select",
-        "plan",
-        "act",
-        "observe",
-        "classify",
-        "repair",
-        "verify",
-        "closeout",
-        "learn",
-        "next"
-      ]
-    },
-    "role": {
-      "type": "string",
-      "description": "Role that produced the event summary.",
-      "enum": [
-        "owner",
-        "A",
-        "B",
-        "C",
-        "D",
-        "E",
-        "F",
-        "ops"
-      ]
-    },
-    "eventType": {
-      "type": "string",
-      "description": "Event category for tracing dispatch and evidence flow.",
-      "enum": [
-        "checkpoint",
-        "dispatch",
-        "command",
-        "observation",
-        "classification",
-        "repair",
-        "verification",
-        "closeout",
-        "reflection"
-      ]
-    },
-    "summary": {
-      "type": "string",
-      "description": "Short human-readable summary without raw logs or secrets.",
-      "minLength": 1
-    },
-    "evidence": {
-      "type": "array",
-      "description": "Minimal evidence references, not full stdout or stderr dumps.",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "nextAction": {
-      "type": "string",
-      "description": "Immediate next step inferred from this event.",
-      "minLength": 1
-    }
+    "runId": { "type": "string", "minLength": 1 },
+    "issueId": { "type": "string" },
+    "from": { "type": "string" },
+    "to": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "reason": { "type": "string" },
+    "evidencePath": { "type": "string" }
   }
 }

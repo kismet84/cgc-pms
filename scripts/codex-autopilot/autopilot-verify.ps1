@@ -1,0 +1,96 @@
+$ErrorActionPreference = 'Stop'
+$contextScript = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-context.ps1'
+if (Test-Path -LiteralPath $contextScript) { . $contextScript }
+
+function Invoke-AutopilotVerificationCommand {
+  param(
+    [Parameter(Mandatory)][string]$IssueId,
+    [Parameter(Mandatory)][string]$Worktree,
+    [Parameter(Mandatory)][string]$BaseCommit,
+    [Parameter(Mandatory)][string]$Command,
+    [Parameter(Mandatory)][string]$EvidencePath,
+    [Parameter(Mandatory)][string]$LogPath,
+    [int]$TimeoutSeconds = 1800
+  )
+  $started = [datetimeoffset]::Now
+  $wrappedCommand = "& { $Command }; if (`$null -ne `$LASTEXITCODE) { exit `$LASTEXITCODE }"
+  $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($wrappedCommand))
+  $startInfo = [Diagnostics.ProcessStartInfo]::new()
+  $startInfo.FileName = 'powershell'
+  $startInfo.Arguments = "-NoProfile -EncodedCommand $encoded"
+  $startInfo.WorkingDirectory = $Worktree
+  $startInfo.UseShellExecute = $false
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $process = [Diagnostics.Process]::new()
+  $process.StartInfo = $startInfo
+  [void]$process.Start()
+  $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+  $stderrTask = $process.StandardError.ReadToEndAsync()
+  $timedOut = !$process.WaitForExit($TimeoutSeconds * 1000)
+  if ($timedOut) { $process.Kill($true) }
+  $process.WaitForExit()
+  $stdout = $stdoutTask.GetAwaiter().GetResult()
+  $stderr = $stderrTask.GetAwaiter().GetResult()
+  $exitCode = if ($timedOut) { 124 } else { [int]$process.ExitCode }
+  $parent = Split-Path -Parent $LogPath
+  if ($parent -and !(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+  [IO.File]::WriteAllText($LogPath, "[stdout]`r`n$stdout`r`n[stderr]`r`n$stderr", [Text.UTF8Encoding]::new($false))
+  $summarySource = if ($exitCode -eq 0) { $stdout } else { "$stderr`n$stdout" }
+  $summaryLines = @($summarySource -split '\r?\n' | Where-Object { $_ } | Select-Object -Last 20)
+  $commit = (& git -C $Worktree rev-parse HEAD).Trim()
+  $evidence = [ordered]@{
+    schemaVersion = 1
+    issueId = $IssueId
+    baseCommit = $BaseCommit
+    commit = $commit
+    diffHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $BaseCommit
+    command = $Command
+    startedAt = $started.ToString('o')
+    durationSeconds = [Math]::Round(([datetimeoffset]::Now - $started).TotalSeconds, 3)
+    exitCode = $exitCode
+    classification = if ($exitCode -eq 0) { 'pass' } elseif ($timedOut) { 'timeout' } else { 'fail' }
+    summary = (($summaryLines -join "`n").Trim())
+    rawLogPath = $LogPath
+  }
+  $evidenceParent = Split-Path -Parent $EvidencePath
+  if ($evidenceParent -and !(Test-Path -LiteralPath $evidenceParent)) { New-Item -ItemType Directory -Path $evidenceParent -Force | Out-Null }
+  [IO.File]::WriteAllText($EvidencePath, ($evidence | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+  return [pscustomobject]$evidence
+}
+
+function Assert-AutopilotEvidenceCurrent {
+  param([object]$Evidence, [string]$IssueId, [string]$Worktree, [string]$BaseCommit)
+  if ($Evidence.issueId -ne $IssueId) { throw 'evidence Issue ID mismatch' }
+  if ($Evidence.baseCommit -ne $BaseCommit) { throw 'evidence base commit mismatch' }
+  if ($Evidence.exitCode -ne 0 -or $Evidence.classification -ne 'pass') { throw 'evidence does not prove a pass' }
+  $currentHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $BaseCommit
+  if ($Evidence.diffHash -ne $currentHash) { throw 'evidence diff hash is stale' }
+  return $true
+}
+
+function Get-AutopilotRetryBudget {
+  param([string]$Category, [string]$Subcategory = '')
+  if ($Category -in @('tool_config','environment_prereq','ready_issue_config','unknown')) { return 1 }
+  if ($Category -eq 'real_quality_or_security' -and $Subcategory -eq 'real_permission_or_security_failure') { return 1 }
+  if ($Category -eq 'real_quality_or_security') { return 2 }
+  return 0
+}
+
+function Test-AutopilotHealthGate {
+  param([int]$TimeoutSeconds = 10)
+  $targets = @(
+    @{ name = 'backend'; url = 'http://localhost:8080/api/actuator/health' },
+    @{ name = 'frontend'; url = 'http://localhost:5173/' },
+    @{ name = 'dev-login'; url = 'http://localhost:5173/api/auth/dev-login?redirect=/dashboard' }
+  )
+  $results = foreach ($target in $targets) {
+    try {
+      $response = Invoke-WebRequest -UseBasicParsing -Uri $target.url -TimeoutSec $TimeoutSeconds -MaximumRedirection 0 -ErrorAction Stop
+      [pscustomobject]@{ name = $target.name; url = $target.url; status = 'pass'; statusCode = [int]$response.StatusCode }
+    } catch {
+      [pscustomobject]@{ name = $target.name; url = $target.url; status = 'fail'; statusCode = $null; error = $_.Exception.Message }
+    }
+  }
+  return [pscustomobject]@{ status = if (@($results | Where-Object status -eq 'fail').Count -eq 0) { 'pass' } else { 'fail' }; results = @($results) }
+}

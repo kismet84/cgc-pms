@@ -1,0 +1,37 @@
+param()
+
+$ErrorActionPreference = 'Stop'
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $scriptDir 'autopilot-worktree.ps1')
+. (Join-Path $scriptDir 'autopilot-closeout.ps1')
+
+$root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-closeout-test-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path (Join-Path $root 'docs\backlog'),(Join-Path $root 'docs\quality') -Force | Out-Null
+try {
+  & git -C $root init -q
+  & git -C $root config user.email 'autopilot@test.local'
+  & git -C $root config user.name 'AutoPilot Test'
+  ".worktrees/`r`n.codex-autopilot/" | Set-Content -LiteralPath (Join-Path $root '.gitignore') -Encoding UTF8
+  @'
+# Ready Issues
+### ISSUE-900-040：Closeout
+状态：Ready
+'@ | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Encoding UTF8
+  '# Done Issues' | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Encoding UTF8
+  & git -C $root add .; & git -C $root commit -qm 'base'
+  $base = (& git -C $root rev-parse HEAD).Trim()
+  $worktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId 'ISSUE-900-040' -BaseCommit $base
+  New-Item -ItemType Directory -Path (Join-Path $worktree.path 'docs\quality') -Force | Out-Null
+  'accepted' | Set-Content -LiteralPath (Join-Path $worktree.path 'docs\quality\issue-900-040.md') -Encoding UTF8
+  $issue = [pscustomobject]@{ issueId = 'ISSUE-900-040'; title = 'ISSUE-900-040：Closeout'; archiveReport = 'docs/quality/issue-900-040.md' }
+  $result = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true
+  if (!$result.commit -or !$result.merged) { throw 'closeout did not commit and merge' }
+  if ((Get-Content -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Raw) -notmatch '状态：Done') { throw 'Ready was not closed as Done' }
+  if ((Get-Content -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Raw) -notmatch 'ISSUE-900-040') { throw 'done ledger was not updated' }
+  $again = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true
+  if ($again.commit -ne $result.commit -or !$again.idempotent) { throw 'closeout retry was not idempotent' }
+  Write-Host 'closeout self-test passed'
+} finally {
+  if (Test-Path -LiteralPath (Join-Path $root '.git')) { & git -C $root worktree remove --force (Join-Path $root '.worktrees\autopilot\issue-900-040') 2>$null | Out-Null }
+  Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+}
