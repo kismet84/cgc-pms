@@ -9,8 +9,9 @@
 | 后端接口无前端入口治理 | 高 | Candidate |
 | 现场日报 / 施工日志 | 高 | Candidate |
 | WBS 任务依赖与延期预警 | 高 | Candidate |
-| 供应商履约档案 | 高 | Candidate |
 | 子智能体超时、悬挂线程退役与有限重派治理 | 高 | Candidate |
+
+供应商履约档案已因评分数据口径不足转入 [blocked-issues.md](blocked-issues.md)，解除前不再作为可拆 Candidate。
 
 ## 子智能体超时、悬挂线程退役与有限重派治理
 
