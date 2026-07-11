@@ -82,6 +82,7 @@ admin-state.json
 .opencode/
 .sisyphus/
 .superpowers/
+.worktrees/
 .trae/
 backend/nul
 graphify-out/
