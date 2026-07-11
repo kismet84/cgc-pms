@@ -144,6 +144,8 @@ export interface DashboardSupplierScoreVO {
   partnerName: string
   orderCount: number
   overdueOrderCount: number
+  lateCompletedCount?: number
+  overdueIncompleteCount?: number
   onTimeDeliveryRate: string
   performanceScore: string
 }

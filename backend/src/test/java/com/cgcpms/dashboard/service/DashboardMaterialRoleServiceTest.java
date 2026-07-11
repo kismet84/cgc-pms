@@ -3,6 +3,8 @@ package com.cgcpms.dashboard.service;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.TestUserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -43,6 +45,8 @@ import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.tech.entity.TechItem;
 import com.cgcpms.tech.mapper.TechItemMapper;
@@ -65,6 +69,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -73,6 +78,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @DisplayName("Dashboard purchase and production views")
 class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
+
+    @Autowired private SysRoleMapper sysRoleMapper;
 
     @Test
     @Transactional
@@ -580,16 +587,75 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         noOrders.setStatus("ENABLE");
         partnerMapper.insert(noOrders);
 
+        LocalDate cohortDeliveryDate = LocalDate.now().withDayOfMonth(1).minusDays(1);
+
         MatPurchaseOrder completedLate = new MatPurchaseOrder();
         completedLate.setTenantId(TENANT_ID);
         completedLate.setProjectId(sr.projectId);
         completedLate.setPartnerId(first.getId());
         completedLate.setOrderCode("PO-PUR-SCORE-COMPLETED");
-        completedLate.setOrderDate(LocalDate.now());
-        completedLate.setDeliveryDate(LocalDate.now().minusDays(1));
+        completedLate.setOrderDate(cohortDeliveryDate.minusMonths(1));
+        completedLate.setDeliveryDate(cohortDeliveryDate);
         completedLate.setApprovalStatus("APPROVED");
         completedLate.setOrderStatus("COMPLETED");
         purchaseOrderMapper.insert(completedLate);
+
+        MatPurchaseOrderItem completedLateItem = new MatPurchaseOrderItem();
+        completedLateItem.setTenantId(TENANT_ID);
+        completedLateItem.setProjectId(sr.projectId);
+        completedLateItem.setOrderId(completedLate.getId());
+        completedLateItem.setMaterialId(sr.materialId);
+        completedLateItem.setQuantity(new BigDecimal("10.0000"));
+        purchaseOrderItemMapper.insert(completedLateItem);
+
+        MatReceipt completedLateReceipt = new MatReceipt();
+        completedLateReceipt.setTenantId(TENANT_ID);
+        completedLateReceipt.setProjectId(sr.projectId);
+        completedLateReceipt.setOrderId(completedLate.getId());
+        completedLateReceipt.setReceiptCode("RC-PUR-SCORE-COMPLETED");
+        completedLateReceipt.setReceiptDate(cohortDeliveryDate.plusDays(1));
+        completedLateReceipt.setApprovalStatus("APPROVED");
+        receiptMapper.insert(completedLateReceipt);
+
+        MatReceiptItem completedLateReceiptItem = new MatReceiptItem();
+        completedLateReceiptItem.setTenantId(TENANT_ID);
+        completedLateReceiptItem.setReceiptId(completedLateReceipt.getId());
+        completedLateReceiptItem.setOrderItemId(completedLateItem.getId());
+        completedLateReceiptItem.setActualQuantity(new BigDecimal("6.0000"));
+        completedLateReceiptItem.setQualifiedQuantity(new BigDecimal("6.0000"));
+        receiptItemMapper.insert(completedLateReceiptItem);
+
+        MatReceipt earlyApprovedReceipt = new MatReceipt();
+        earlyApprovedReceipt.setTenantId(TENANT_ID);
+        earlyApprovedReceipt.setProjectId(sr.projectId);
+        earlyApprovedReceipt.setOrderId(completedLate.getId());
+        earlyApprovedReceipt.setReceiptCode("RC-PUR-SCORE-EARLY-PARTIAL");
+        earlyApprovedReceipt.setReceiptDate(cohortDeliveryDate.minusDays(1));
+        earlyApprovedReceipt.setApprovalStatus("APPROVED");
+        receiptMapper.insert(earlyApprovedReceipt);
+        MatReceiptItem earlyApprovedItem = new MatReceiptItem();
+        earlyApprovedItem.setTenantId(TENANT_ID);
+        earlyApprovedItem.setReceiptId(earlyApprovedReceipt.getId());
+        earlyApprovedItem.setOrderItemId(completedLateItem.getId());
+        earlyApprovedItem.setActualQuantity(new BigDecimal("4.0000"));
+        earlyApprovedItem.setQualifiedQuantity(new BigDecimal("4.0000"));
+        receiptItemMapper.insert(earlyApprovedItem);
+
+        MatReceipt ignoredDraftReceipt = new MatReceipt();
+        ignoredDraftReceipt.setTenantId(TENANT_ID);
+        ignoredDraftReceipt.setProjectId(sr.projectId);
+        ignoredDraftReceipt.setOrderId(completedLate.getId());
+        ignoredDraftReceipt.setReceiptCode("RC-PUR-SCORE-DRAFT");
+        ignoredDraftReceipt.setReceiptDate(cohortDeliveryDate.minusDays(2));
+        ignoredDraftReceipt.setApprovalStatus("DRAFT");
+        receiptMapper.insert(ignoredDraftReceipt);
+        MatReceiptItem ignoredDraftItem = new MatReceiptItem();
+        ignoredDraftItem.setTenantId(TENANT_ID);
+        ignoredDraftItem.setReceiptId(ignoredDraftReceipt.getId());
+        ignoredDraftItem.setOrderItemId(completedLateItem.getId());
+        ignoredDraftItem.setActualQuantity(new BigDecimal("10.0000"));
+        ignoredDraftItem.setQualifiedQuantity(new BigDecimal("10.0000"));
+        receiptItemMapper.insert(ignoredDraftItem);
 
         MatPurchaseOrder firstOnTime = new MatPurchaseOrder();
         firstOnTime.setTenantId(TENANT_ID);
@@ -613,6 +679,78 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         secondOnTime.setOrderStatus("APPROVED");
         purchaseOrderMapper.insert(secondOnTime);
 
+        MatPurchaseOrder partial = new MatPurchaseOrder();
+        partial.setTenantId(TENANT_ID);
+        partial.setProjectId(sr.projectId);
+        partial.setPartnerId(first.getId());
+        partial.setOrderCode("PO-PUR-SCORE-PARTIAL");
+        partial.setOrderDate(LocalDate.now());
+        partial.setDeliveryDate(cohortDeliveryDate);
+        partial.setApprovalStatus("APPROVED");
+        partial.setOrderStatus("APPROVED");
+        purchaseOrderMapper.insert(partial);
+
+        MatPurchaseOrderItem partialItem = new MatPurchaseOrderItem();
+        partialItem.setTenantId(TENANT_ID);
+        partialItem.setProjectId(sr.projectId);
+        partialItem.setOrderId(partial.getId());
+        partialItem.setMaterialId(sr.materialId);
+        partialItem.setQuantity(new BigDecimal("10.0000"));
+        purchaseOrderItemMapper.insert(partialItem);
+
+        MatReceipt partialReceipt = new MatReceipt();
+        partialReceipt.setTenantId(TENANT_ID);
+        partialReceipt.setProjectId(sr.projectId);
+        partialReceipt.setOrderId(partial.getId());
+        partialReceipt.setReceiptCode("RC-PUR-SCORE-PARTIAL");
+        partialReceipt.setReceiptDate(cohortDeliveryDate.plusDays(1));
+        partialReceipt.setApprovalStatus("APPROVED");
+        receiptMapper.insert(partialReceipt);
+
+        MatReceiptItem partialReceiptItem = new MatReceiptItem();
+        partialReceiptItem.setTenantId(TENANT_ID);
+        partialReceiptItem.setReceiptId(partialReceipt.getId());
+        partialReceiptItem.setOrderItemId(partialItem.getId());
+        partialReceiptItem.setActualQuantity(new BigDecimal("5.0000"));
+        partialReceiptItem.setQualifiedQuantity(new BigDecimal("5.0000"));
+        receiptItemMapper.insert(partialReceiptItem);
+
+        MatPurchaseOrder onTime = new MatPurchaseOrder();
+        onTime.setTenantId(TENANT_ID);
+        onTime.setProjectId(sr.projectId);
+        onTime.setPartnerId(first.getId());
+        onTime.setOrderCode("PO-PUR-SCORE-ON-TIME");
+        onTime.setOrderDate(cohortDeliveryDate.minusMonths(1));
+        onTime.setDeliveryDate(cohortDeliveryDate);
+        onTime.setApprovalStatus("APPROVED");
+        onTime.setOrderStatus("COMPLETED");
+        purchaseOrderMapper.insert(onTime);
+
+        MatPurchaseOrderItem onTimeItem = new MatPurchaseOrderItem();
+        onTimeItem.setTenantId(TENANT_ID);
+        onTimeItem.setProjectId(sr.projectId);
+        onTimeItem.setOrderId(onTime.getId());
+        onTimeItem.setMaterialId(sr.materialId);
+        onTimeItem.setQuantity(new BigDecimal("10.0000"));
+        purchaseOrderItemMapper.insert(onTimeItem);
+
+        MatReceipt onTimeReceipt = new MatReceipt();
+        onTimeReceipt.setTenantId(TENANT_ID);
+        onTimeReceipt.setProjectId(sr.projectId);
+        onTimeReceipt.setOrderId(onTime.getId());
+        onTimeReceipt.setReceiptCode("RC-PUR-SCORE-ON-TIME");
+        onTimeReceipt.setReceiptDate(cohortDeliveryDate.minusDays(1));
+        onTimeReceipt.setApprovalStatus("APPROVED");
+        receiptMapper.insert(onTimeReceipt);
+
+        MatReceiptItem onTimeReceiptItem = new MatReceiptItem();
+        onTimeReceiptItem.setTenantId(TENANT_ID);
+        onTimeReceiptItem.setReceiptId(onTimeReceipt.getId());
+        onTimeReceiptItem.setOrderItemId(onTimeItem.getId());
+        onTimeReceiptItem.setActualQuantity(new BigDecimal("10.0000"));
+        onTimeReceiptItem.setQualifiedQuantity(new BigDecimal("10.0000"));
+        receiptItemMapper.insert(onTimeReceiptItem);
+
         MatPurchaseOrder emptySupplier = new MatPurchaseOrder();
         emptySupplier.setTenantId(TENANT_ID);
         emptySupplier.setProjectId(sr.projectId);
@@ -623,7 +761,8 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         emptySupplier.setOrderStatus("APPROVED");
         purchaseOrderMapper.insert(emptySupplier);
 
-        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(sr.projectId);
+        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(
+                sr.projectId, YearMonth.from(cohortDeliveryDate).toString());
         List<DashboardSupplierScoreVO> scores = vo.getSupplierScores();
 
         assertTrue(scores.stream().noneMatch(i -> otherProject.partnerId.toString().equals(i.getPartnerId())),
@@ -633,15 +772,62 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         assertTrue(scores.stream().noneMatch(i -> i.getPartnerId() == null),
                 "Order without supplier must not create a synthetic score");
 
-        List<DashboardSupplierScoreVO> tied = scores.stream()
-                .filter(i -> "同名供应商".equals(i.getPartnerName()))
-                .toList();
-        assertEquals(List.of(first.getId().toString(), second.getId().toString()),
-                tied.stream().map(DashboardSupplierScoreVO::getPartnerId).toList(),
-                "Equal score and name must fall back to partner ID order");
-        assertEquals(0L, tied.get(0).getOverdueOrderCount(),
-                "Completed past-delivery order keeps the existing non-overdue definition");
-        assertEquals("100.00", tied.get(0).getOnTimeDeliveryRate());
+        DashboardSupplierScoreVO completedLateScore = scores.stream()
+                .filter(i -> first.getId().toString().equals(i.getPartnerId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(3L, completedLateScore.getOrderCount(),
+                "Delivery cohort must use deliveryDate instead of orderDate");
+        assertEquals(1L, completedLateScore.getLateCompletedCount(),
+                "Completed after the planned delivery date must be classified as late completed");
+        assertEquals(1L, completedLateScore.getOverdueIncompleteCount(),
+                "Partially received order must be classified as overdue incomplete");
+        assertEquals(2L, completedLateScore.getOverdueOrderCount(),
+                "Legacy non-on-time count must remain the sum of both late categories");
+        assertEquals("33.33", completedLateScore.getOnTimeDeliveryRate());
+        assertTrue(scores.stream().noneMatch(i -> second.getId().toString().equals(i.getPartnerId())),
+                "Future incomplete orders must not enter the score denominator");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("8.5b Purchase view: project data scope blocks hidden project aggregates")
+    void testPurchaseView_RespectsProjectDataScope() {
+        SeedResult visible = seed("PUR_SCOPE_VISIBLE");
+        SeedResult hidden = seed("PUR_SCOPE_HIDDEN");
+        long scopedUserId = 88_001L;
+
+        PmProject visibleProject = projectMapper.selectById(visible.projectId);
+        visibleProject.setCreatedBy(scopedUserId);
+        visibleProject.setProjectManagerId(null);
+        projectMapper.updateById(visibleProject);
+        PmProject hiddenProject = projectMapper.selectById(hidden.projectId);
+        hiddenProject.setCreatedBy(scopedUserId + 1);
+        hiddenProject.setProjectManagerId(null);
+        projectMapper.updateById(hiddenProject);
+
+        String roleCode = "DASH_SELF_" + System.nanoTime();
+        SysRole role = new SysRole();
+        role.setTenantId(TENANT_ID);
+        role.setRoleCode(roleCode);
+        role.setRoleName("Dashboard SELF scope");
+        role.setRoleType("CUSTOM");
+        role.setStatus("ENABLE");
+        role.setDataScope("SELF");
+        sysRoleMapper.insert(role);
+        TestUserContext.setUser(TENANT_ID, scopedUserId, "dashboard-self", List.of(roleCode));
+
+        BusinessException denied = assertThrows(BusinessException.class,
+                () -> dashboardService.getPurchaseManagerView(hidden.projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", denied.getCode());
+
+        PurchaseManagerDashboardVO allVisible = dashboardService.getPurchaseManagerView(null);
+        assertTrue(allVisible.getSupplierScores().stream()
+                .anyMatch(i -> visible.partnerId.toString().equals(i.getPartnerId())),
+                "SELF scope must keep visible project aggregates");
+        assertTrue(allVisible.getSupplierScores().stream()
+                .noneMatch(i -> hidden.partnerId.toString().equals(i.getPartnerId())),
+                "Tenant-wide dashboard must filter projects outside SELF scope");
     }
 
     @Test

@@ -190,6 +190,57 @@ class MatReceiptServiceTest {
                 .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
     }
 
+    @Test
+    @DisplayName("R-2d: 保存收货明细拒绝跨订单引用与非法数量")
+    void testSaveItemsBatchRejectsInvalidOrderItemAndQuantities() {
+        MatPurchaseOrder firstOrder = new MatPurchaseOrder();
+        firstOrder.setProjectId(PROJECT_ID);
+        firstOrder.setOrderType("PURCHASE");
+        Long firstOrderId = orderService.create(firstOrder);
+
+        MatPurchaseOrderItem firstOrderItem = new MatPurchaseOrderItem();
+        firstOrderItem.setOrderId(firstOrderId);
+        firstOrderItem.setProjectId(PROJECT_ID);
+        firstOrderItem.setMaterialId(1001L);
+        firstOrderItem.setQuantity(new BigDecimal("10.0000"));
+        firstOrderItem.setUnitPrice(BigDecimal.ONE);
+        firstOrderItem.setAmount(BigDecimal.TEN);
+        orderService.saveItemsBatch(firstOrderId, List.of(firstOrderItem));
+        Long firstOrderItemId = orderItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                        .eq(MatPurchaseOrderItem::getOrderId, firstOrderId))
+                .get(0).getId();
+
+        MatPurchaseOrder secondOrder = new MatPurchaseOrder();
+        secondOrder.setProjectId(PROJECT_ID);
+        secondOrder.setOrderType("PURCHASE");
+        Long secondOrderId = orderService.create(secondOrder);
+        MatReceipt receipt = buildReceipt("QUALIFIED");
+        receipt.setOrderId(secondOrderId);
+        Long receiptId = receiptService.create(receipt);
+
+        MatReceiptItem crossOrder = new MatReceiptItem();
+        crossOrder.setOrderItemId(firstOrderItemId);
+        crossOrder.setActualQuantity(BigDecimal.ONE);
+        crossOrder.setQualifiedQuantity(BigDecimal.ONE);
+        BusinessException mismatch = assertThrows(BusinessException.class,
+                () -> receiptService.saveItemsBatch(receiptId, List.of(crossOrder)));
+        assertEquals("ORDER_ITEM_MISMATCH", mismatch.getCode());
+
+        MatReceiptItem zeroActual = new MatReceiptItem();
+        zeroActual.setActualQuantity(BigDecimal.ZERO);
+        zeroActual.setQualifiedQuantity(BigDecimal.ZERO);
+        BusinessException zero = assertThrows(BusinessException.class,
+                () -> receiptService.saveItemsBatch(receiptId, List.of(zeroActual)));
+        assertEquals("RECEIPT_QUANTITY_INVALID", zero.getCode());
+
+        MatReceiptItem excessiveQualified = new MatReceiptItem();
+        excessiveQualified.setActualQuantity(BigDecimal.ONE);
+        excessiveQualified.setQualifiedQuantity(new BigDecimal("2"));
+        BusinessException excessive = assertThrows(BusinessException.class,
+                () -> receiptService.saveItemsBatch(receiptId, List.of(excessiveQualified)));
+        assertEquals("RECEIPT_QUANTITY_INVALID", excessive.getCode());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // R-3: 分页查询
     // ═══════════════════════════════════════════════════════════════
