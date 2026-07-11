@@ -61,7 +61,7 @@ try {
   ((New-ReadyText) + "`n" + (New-ReadyText)) | Set-Content -LiteralPath $readyPath -Encoding UTF8
   Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } 'duplicate Ready Issue ID'
 
-  (New-ReadyText).Replace("非目标：`n- No business or production change.`n", '') | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  ((New-ReadyText) -replace '非目标：\r?\n- No business or production change\.\r?\n', '') | Set-Content -LiteralPath $readyPath -Encoding UTF8
   Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } '非目标'
 
   New-ReadyText -Nature '随便做做' | Set-Content -LiteralPath $readyPath -Encoding UTF8
