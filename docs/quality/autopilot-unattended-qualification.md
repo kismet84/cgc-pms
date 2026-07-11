@@ -26,7 +26,7 @@
 
 最终演练命令：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-unattended-canary.ps1`。
 
-最终耗时：312.6 秒。演练使用临时 Git 仓库，逐条完成 Ready → 隔离 worktree → 执行 → 验证 → 证据绑定 → Done → 本地提交 → fast-forward merge，不修改项目业务数据。
+最终耗时：315.7 秒。演练使用临时 Git 仓库，逐条完成 Ready → 隔离 worktree → 执行 → 验证 → 证据绑定 → Done → 本地提交 → fast-forward merge，不修改项目业务数据。
 
 ## 故障与恢复资格
 
@@ -38,13 +38,12 @@
 
 ## 对比基线
 
-历史基线最近 10 条结果为 Done 7、Blocked 2、Noop 1；可识别真实运行事件的 P50 为 453.7 秒、P95 为 728.9 秒，且 0/9 Done/Blocked 结果具备完整 commit 绑定。本次资格窗口达到 20/20 Done、20/20 commit/evidence 绑定，并将单窗口演练耗时压到 312.6 秒。
+历史基线最近 10 条结果为 Done 7、Blocked 2、Noop 1；可识别真实运行事件的 P50 为 453.7 秒、P95 为 728.9 秒，且 0/9 Done/Blocked 结果具备完整 commit 绑定。本次资格窗口达到 20/20 Done、20/20 commit/evidence 绑定，并将单窗口演练耗时压到 315.7 秒。
 
-该对比用于证明控制面完整性和自动收口效率提升；临时 canary 与真实业务 Issue 难度不同，不把 312.6 秒解释为真实业务工期承诺。
+该对比用于证明控制面完整性和自动收口效率提升；临时 canary 与真实业务 Issue 难度不同，不把 315.7 秒解释为真实业务工期承诺。
 
 ## 剩余风险
 
 - 尚无 20 个真实业务 Issue 的滚动窗口，因此保持串行，不启用并发 2。
 - runtime refresh 会调用本地 `python scripts/rebuild.py` 并等待 180 秒；仅适用于本地 dev/test/demo。
 - PowerShell/Windows 行尾警告不影响退出码，但后续可单独治理 `.gitattributes`，本主线不扩 scope。
-
