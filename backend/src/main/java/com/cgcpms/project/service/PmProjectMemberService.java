@@ -7,6 +7,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.project.vo.PmProjectMemberVO;
@@ -25,6 +26,7 @@ public class PmProjectMemberService {
 
     private final PmProjectMemberMapper memberMapper;
     private final PmProjectMapper projectMapper;
+    private final ProjectAccessChecker projectAccessChecker;
 
     /**
      * Verify the project exists and belongs to the current tenant.
@@ -37,6 +39,7 @@ public class PmProjectMemberService {
         if (!project.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
+        projectAccessChecker.checkAccess(projectId, "访问项目成员");
         return project;
     }
 

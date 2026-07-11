@@ -2,6 +2,14 @@
 
 记录已经完成并收口的任务。
 
+### ISSUE-008-035：项目成员项目级访问范围治理
+
+完成日期：2026-07-11
+合并方式：auto-merge/local-commit-only
+失败分类或非失败分类：真实安全边界缺口已修复；项目成员服务统一接入既有项目访问检查器
+验证结果：通过；定向后端测试 11/11
+相关报告：docs/quality/issue-008-035-project-member-access-scope.md；docs/iterations/iteration-2026-07-11-report.md
+
 ## 记录格式
 
 ### ISSUE-xxx：任务标题

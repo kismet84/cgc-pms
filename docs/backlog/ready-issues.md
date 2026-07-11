@@ -1,8 +1,8 @@
 ## Ready 队列状态
 
-- 当前无合格 Ready；第34条主线已于 2026-07-11 按统一验收口径收口，等待项目总负责人按既有补货规则选择下一真实焦点。
-- 当前无合格 Ready；`ISSUE-008-034` 已完成并计入新的 `启动迭代-3` 第 `3/3` 条。
-- 本轮已达到 `3/3` 实施型上限，停止下一任务派发；不得在本轮补货或进入下一任务。
+- 当前有 3 条合格 Ready：`ISSUE-008-035`、`ISSUE-008-036`、`ISSUE-008-037`，按依赖串行执行。
+- 本次 `启动迭代-3` 为独立新轮次，实施型完成数初始化为 `0/3`；拆单轮不计数。
+- 上一轮 `ISSUE-008-032` 至 `ISSUE-008-034` 已完成并保留历史证据，不计入本轮。
 - `ISSUE-008-022` 至 `ISSUE-008-031` 已完成并转 Done；既有两轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
 - `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
 - `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
@@ -50,10 +50,94 @@
 
 ## 执行顺序建议
 
-1. `ISSUE-008-032` 已完成接口/前端入口映射治理并转 Done。
-2. `ISSUE-008-033` 已完成现有 WBS 日期字段派生的延期风险可见性，未建设前置任务依赖网络。
-3. `ISSUE-008-034` 已完成供应商交期表现摘要与采购订单下钻，不新增履约档案表。
-4. 三条均已串行完成；达到 `3/3` 后已完成最小总验收并停止下一任务派发。
+1. `ISSUE-008-035`：先收紧项目成员后端项目级访问边界。
+2. `ISSUE-008-036`：再补项目成员按钮权限正向显示回归，依赖 035 的最终权限口径。
+3. `ISSUE-008-037`：最后补操作审计日志承载页；与前两条同属接口入口治理，未证明完全无关联，保持串行。
+
+### ISSUE-008-035：项目成员项目级访问范围治理
+
+优先级：P1
+任务性质：缺口修复
+类型：后端 / 权限 / 项目隔离 / 测试
+状态：Done（2026-07-11；计入本轮第 1/3 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`ISSUE-008-032` 非阻塞后续；`docs/quality/10b-project-isolation-first-package-closure-2026-07-01.md`
+依赖：无；本轮第 1 条。
+是否需要新增 migration：否。
+目标：
+- 将项目成员查询、新增、修改、删除统一接入既有 `ProjectAccessChecker`，不再只校验同租户项目归属。
+- 复用现有项目访问规则，不新增第二套权限抽象。
+允许修改：
+- `backend/src/main/java/com/cgcpms/project/service/PmProjectMemberService.java`
+- `backend/src/test/java/com/cgcpms/project/**`
+- `docs/quality/**`、`docs/iterations/**`、`docs/backlog/**`
+禁止修改：
+- Controller 权限码、已应用 migration、生产配置、项目数据范围枚举
+验收标准：
+- 同租户但无项目访问权的用户读取或维护项目成员时 fail-close；管理员和有权用户不回退。
+- 所有入口复用同一服务级项目访问检查，并有稳定正负测试。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=PmProjectMemberServiceTest" test`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-035-project-member-access-scope.md`
+
+### ISSUE-008-036：项目成员操作按钮权限正向显示回归
+
+优先级：P2
+任务性质：回归证明
+类型：前端 / 权限可见性 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`ISSUE-008-032` 非阻塞后续
+依赖：`ISSUE-008-035` 已完成；本轮第 2 条，当前可执行。
+是否需要新增 migration：否。
+目标：
+- 为 `project:member:add/edit/delete` 三项权限补齐正向显示测试，同时保留无权限隐藏断言。
+- 只证明既有权限控制生效，不改权限模型或页面结构。
+允许修改：
+- `frontend-admin/src/pages/project/__tests__/members.test.ts`
+- 必要时同页既有测试辅助代码
+- `docs/quality/**`、`docs/iterations/**`、`docs/backlog/**`
+禁止修改：
+- 后端、路由、权限码、页面重构、migration、生产配置
+验收标准：
+- 每项权限分别控制对应按钮；全权限时三个操作入口均可见，无权限时均不可见。
+验证命令：
+- `cd frontend-admin; pnpm test:unit src/pages/project/__tests__/members.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-036-project-member-positive-permission-visibility.md`
+
+### ISSUE-008-037：操作审计日志最小承载页
+
+优先级：P2
+任务性质：缺口修复
+类型：前端 / 审计日志 / 路由 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`ISSUE-008-032` 遗留的 `/audit-logs` 无承载页缺口
+依赖：`ISSUE-008-036` 完成；本轮第 3 条。
+是否需要新增 migration：否；复用现有 `/audit-logs` 查询接口与 `audit:query` 权限。
+目标：
+- 新增只读审计日志列表与系统设置入口，支持既有分页和最小筛选。
+- 复用项目现有表格、请求和异常态模式，不新增审计后端能力或通用页面框架。
+允许修改：
+- `frontend-admin/src/api/modules/audit.ts`
+- `frontend-admin/src/pages/system/audit/index.vue`
+- 对应最小测试
+- `frontend-admin/src/router/index.ts`、`frontend-admin/src/router/navigation.ts`
+- `docs/quality/**`、`docs/iterations/**`、`docs/backlog/**`
+禁止修改：
+- 后端、migration、审计采集口径、敏感请求/响应体展示、导出、生产配置
+验收标准：
+- 仅有 `audit:query` 或管理员可见/可达；列表覆盖 loading、empty、error/retry 和分页。
+- 页面不展示请求体、响应体、Token、Cookie 等敏感内容。
+验证命令：
+- `cd frontend-admin; pnpm test:unit src/pages/system/audit/__tests__/index.test.ts src/router/__tests__/router.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/issue-008-037-operation-audit-log-page.md`
 
 ## P1
 
