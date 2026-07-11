@@ -25,6 +25,9 @@ try {
   $mismatchRejected = $false
   try { Get-AutopilotReviewDisposition -ReviewResult $pass -ExpectedIssueId 'ISSUE-OTHER' -ExpectedDiffHash $request.diffSha256 | Out-Null } catch { $mismatchRejected = $true }
   if (!$mismatchRejected) { throw 'Reviewer identity mismatch was accepted' }
+  $unboundPassRejected = $false
+  try { Get-AutopilotReviewDisposition -ReviewResult $pass | Out-Null } catch { $unboundPassRejected = $true }
+  if (!$unboundPassRejected) { throw 'unbound Reviewer pass was accepted' }
 
   $needsRepair = [pscustomobject]@{ schemaVersion = 1; issueId = 'ISSUE-900-030'; decision = 'needs_repair'; findings = @([pscustomobject]@{ severity='blocking'; file='a.ps1'; line=10; risk='bug'; requiredEvidence='test' }); reviewedDiffHash = 'def'; reviewedAt = [datetimeoffset]::Now.ToString('o') }
   $needsRepair.reviewedDiffHash = $request.diffSha256

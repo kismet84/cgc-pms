@@ -5,7 +5,7 @@ function Get-AutopilotRoute {
 
   $paths = @(@($Issue.allowedPaths) + @($ChangedPaths) | Where-Object { $_ } | Select-Object -Unique)
   $text = (($paths -join ' ') + ' ' + $Issue.body).ToLowerInvariant()
-  $highRisk = $Issue.riskLevel -eq '高' -or $Issue.migration -eq '需要' -or $text -match 'auth|permission|security|tenant|金额|付款|审批|db/migration|状态机|file.*security'
+  $highRisk = $Issue.riskLevel -eq '高' -or $Issue.migration -eq '需要' -or $text -match 'auth|authorization|permission|security|tenant|rbac|acl|sysrole|sysuser|(?:^|[/\\._-])role(?:[/\\._-]|$)|鉴权|权限|租户|金额|付款|审批|db/migration|状态机|file.*security'
   $roots = @($paths | ForEach-Object { (($_ -replace '\\','/') -split '/')[0] } | Where-Object { $_ -in @('backend','frontend-admin','mobile','deploy','docs') } | Select-Object -Unique)
   $crossModule = $roots.Count -gt 1
   $docsOrTestsOnly = $paths.Count -gt 0 -and @($paths | Where-Object { $_ -notmatch '^(docs/|.*test.*|scripts/codex-autopilot/test-)'}).Count -eq 0

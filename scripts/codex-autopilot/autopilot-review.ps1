@@ -48,6 +48,7 @@ function Test-AutopilotRetryAllowed {
 
 function Get-AutopilotReviewDisposition {
   param([Parameter(Mandatory)][object]$ReviewResult, [string]$ExpectedIssueId = '', [string]$ExpectedDiffHash = '')
+  if ($ReviewResult.decision -eq 'pass' -and (!$ExpectedIssueId -or !$ExpectedDiffHash)) { throw 'Reviewer pass requires explicit Issue and diff hash expectations' }
   if ($ExpectedIssueId -and $ReviewResult.issueId -ne $ExpectedIssueId) { throw 'Reviewer result Issue ID mismatch' }
   if ($ExpectedDiffHash -and ([string]$ReviewResult.reviewedDiffHash).ToLowerInvariant() -ne $ExpectedDiffHash.ToLowerInvariant()) { throw 'Reviewer result diff hash mismatch' }
   if ($ReviewResult.decision -eq 'pass') { return [pscustomobject]@{ action='PASS'; failureFingerprint=''; summary='' } }

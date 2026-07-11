@@ -1082,7 +1082,7 @@ function Invoke-IssueExecutor {
         $diffPath = Join-Path $reviewDir 'final.diff'
         Get-AutopilotDiffText -Worktree $worktree.path -BaseCommit $baseCommit | Set-Content -LiteralPath $diffPath -Encoding UTF8
         $requestPath = Join-Path $reviewDir 'request.json'
-        New-AutopilotReviewRequest -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $worktree.path 'docs\backlog\ready-issues.md') -DiffPath $diffPath -EvidencePaths $evidencePaths -OutputPath $requestPath | Out-Null
+        $request = New-AutopilotReviewRequest -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $worktree.path 'docs\backlog\ready-issues.md') -DiffPath $diffPath -EvidencePaths $evidencePaths -OutputPath $requestPath
         if (!$config.issueReviewer -or $config.issueReviewer.enabled -ne $true) {
           $result.status = 'blocked'; $result.failureCategory = 'tool_config'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEWER_REQUIRED'
         } else {

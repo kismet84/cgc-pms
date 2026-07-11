@@ -87,6 +87,8 @@ try {
   $low = @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root)[0]
   $upgraded = Get-AutopilotRoute -Issue $low -ChangedPaths @('backend/src/main/java/com/cgcpms/security/AuthGuard.java')
   if (!$upgraded.highRisk -or !$upgraded.reviewRequired) { throw 'actual high-risk diff did not upgrade review route' }
+  $roleUpgrade = Get-AutopilotRoute -Issue $low -ChangedPaths @('backend/src/main/java/com/cgcpms/system/service/SysRoleService.java')
+  if (!$roleUpgrade.highRisk -or !$roleUpgrade.reviewRequired) { throw 'actual permission-role diff did not upgrade review route' }
 
   New-ReadyText -Nature '运维治理' -Risk '高' -Allowed '`backend/src/main/java/com/cgcpms/auth/**`, `frontend-admin/src/**`' | Set-Content -LiteralPath $readyPath -Encoding UTF8
   $high = @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root)[0]
