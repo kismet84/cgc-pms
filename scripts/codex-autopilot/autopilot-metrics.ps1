@@ -38,15 +38,28 @@ function Get-AutopilotQualification {
   param([Parameter(Mandatory)][string]$RunsDir, [int]$WindowSize = 20)
   $results = @()
   if (Test-Path -LiteralPath $RunsDir) {
-    $results = @(Get-ChildItem -LiteralPath $RunsDir -Filter result.json -Recurse | Sort-Object LastWriteTime -Descending | ForEach-Object {
-      try { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json } catch {}
-    } | Where-Object { $_ -and $_.status -ne 'noop' } | Select-Object -First $WindowSize)
+    $results = @(Get-ChildItem -LiteralPath $RunsDir -Filter result.json -Recurse | ForEach-Object {
+      try {
+        $result = Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+        [datetimeoffset]$created = [datetimeoffset]::MinValue
+        if ($result.createdAt -and [datetimeoffset]::TryParse([string]$result.createdAt, [ref]$created)) { [pscustomobject]@{ result=$result; createdAt=$created } }
+      } catch {}
+    } | Where-Object { $_ -and $_.result.status -ne 'noop' } | Sort-Object createdAt -Descending | Select-Object -First $WindowSize | ForEach-Object result)
   }
   $reasons = @()
   if ($results.Count -lt $WindowSize) { $reasons += "sample size $($results.Count)/$WindowSize" }
   if (@($results | Where-Object status -ne 'done').Count -gt 0) { $reasons += 'window contains non-done results' }
   if (@($results | Where-Object { !$_.gitSummary -or !$_.gitSummary.commit }).Count -gt 0) { $reasons += 'commit binding is missing' }
-  if (@($results | Where-Object { $_.PSObject.Properties.Name -notcontains 'evidencePaths' -or @($_.evidencePaths).Count -eq 0 }).Count -gt 0) { $reasons += 'bound verification evidence is missing' }
+  $invalidEvidence = @($results | Where-Object {
+    if ($_.PSObject.Properties.Name -notcontains 'evidencePaths' -or @($_.evidencePaths).Count -eq 0) { return $true }
+    foreach ($path in @($_.evidencePaths)) {
+      if (!(Test-Path -LiteralPath $path -PathType Leaf)) { return $true }
+      try { $evidence = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return $true }
+      if ($evidence.issueId -ne $_.issueId -or $evidence.exitCode -ne 0 -or $evidence.classification -ne 'pass') { return $true }
+    }
+    return $false
+  }).Count
+  if ($invalidEvidence -gt 0) { $reasons += 'bound verification evidence is missing or invalid' }
   if (@($results | Where-Object { $_.PSObject.Properties.Name -contains 'reviewRequired' -and $_.reviewRequired -and (!$_.review -or $_.review.decision -ne 'pass') }).Count -gt 0) { $reasons += 'required independent review is missing' }
   $missingQualificationFields = @($results | Where-Object {
     $_.PSObject.Properties.Name -notcontains 'firstPassSuccess' -or

@@ -24,7 +24,7 @@ function Get-AutopilotRefillDecision {
   if (Test-Path -LiteralPath (Join-Path $autoDir 'pause.flag')) { return [pscustomobject]@{ action = 'PAUSE'; targetReadyCount = 0; candidates = @(); reason = 'pause.flag present' } }
   $readyPath = Join-Path $backlog 'ready-issues.md'
   $readyText = if (Test-Path -LiteralPath $readyPath) { Get-Content -LiteralPath $readyPath -Raw -Encoding UTF8 } else { '' }
-  $readyCount = [regex]::Matches($readyText, '(?m)^状态[：:]\s*Ready\s*$').Count
+  $readyCount = if (Test-Path -LiteralPath $readyPath) { @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $RepoRoot).Count } else { 0 }
   if ($readyCount -ge 3) { return [pscustomobject]@{ action = 'READY_SUFFICIENT'; targetReadyCount = $readyCount; candidates = @(); reason = 'Ready queue already has at least three items' } }
 
   $focusPath = Join-Path $backlog 'current-focus.md'; $blockedPath = Join-Path $backlog 'blocked-issues.md'
@@ -65,11 +65,14 @@ function Import-AutopilotReadyPlan {
   $plan = Get-Content -LiteralPath $PlanPath -Raw -Encoding UTF8 | ConvertFrom-Json
   $blocks = @($plan.readyBlocks)
   if ($blocks.Count -lt 1 -or $blocks.Count -gt 5) { throw 'ready planner must return 1..5 blocks' }
+  $plannedIds = @($blocks | ForEach-Object { $match = [regex]::Match([string]$_, '(?m)^###\s+(ISSUE-[0-9-]+)'); if (!$match.Success) { throw 'planned block is missing an Issue header' }; $match.Groups[1].Value })
+  if (@($plannedIds | Select-Object -Unique).Count -ne $blocks.Count) { throw 'planned Ready Issue IDs must be unique' }
   $existing = if (Test-Path -LiteralPath $ReadyPath) { Get-Content -LiteralPath $ReadyPath -Raw -Encoding UTF8 } else { '# Ready Issues' }
   $tempPath = "$ReadyPath.$([guid]::NewGuid().ToString('N')).tmp"
   try {
     [IO.File]::WriteAllText($tempPath, ($existing.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine + ($blocks -join ([Environment]::NewLine + [Environment]::NewLine))), [Text.UTF8Encoding]::new($false))
     $issues = @(Get-AutopilotReadyIssues -Path $tempPath -RepoRoot $RepoRoot)
+    foreach ($plannedId in $plannedIds) { if ($issues.issueId -notcontains $plannedId) { throw "planned block did not produce a strict Ready Issue: $plannedId" } }
     if ($issues.Count -gt 5) { throw 'refill would exceed five Ready Issues' }
     [IO.File]::Copy($tempPath, $ReadyPath, $true)
     return [pscustomobject]@{ createdCount = $blocks.Count; totalReadyCount = $issues.Count; issueIds = @($issues.issueId) }

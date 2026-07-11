@@ -70,6 +70,11 @@ Reviewer要求：不需要
   [ordered]@{ readyBlocks = @((New-PlannedBlock 'ISSUE-901-001'),(New-PlannedBlock 'ISSUE-901-002'),(New-PlannedBlock 'ISSUE-901-003')) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $planPath -Encoding UTF8
   $imported = Import-AutopilotReadyPlan -PlanPath $planPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root
   if ($imported.createdCount -ne 3) { throw 'validated planner output was not imported' }
+  $invalidPlanPath = Join-Path $root 'invalid-ready-plan.json'
+  [ordered]@{ readyBlocks = @((New-PlannedBlock 'ISSUE-901-004').Replace('状态：Ready','状态：Blocked')) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
+  $blockedRejected = $false
+  try { Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root | Out-Null } catch { $blockedRejected = $true }
+  if (!$blockedRejected) { throw 'Planner Blocked block was imported into Ready backlog' }
 
   Write-Host 'refill self-test passed'
 } finally {
