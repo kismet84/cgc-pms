@@ -1,5 +1,12 @@
 $ErrorActionPreference = 'Stop'
 
+function Write-AutopilotReviewDiff {
+  param([Parameter(Mandatory)][string]$Text, [Parameter(Mandatory)][string]$OutputPath)
+  $parent = Split-Path -Parent $OutputPath
+  if ($parent -and !(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+  [IO.File]::WriteAllText($OutputPath, $Text, [Text.UTF8Encoding]::new($false))
+}
+
 function New-AutopilotReviewRequest {
   param(
     [string]$IssueId,

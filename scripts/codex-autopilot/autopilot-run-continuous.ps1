@@ -1142,7 +1142,7 @@ function Invoke-IssueExecutor {
         Write-State $autoDir 'REVIEWING' $false 'VERIFICATION_COMPLETED' $Issue.title 'REVIEWING' ''
         $reviewDir = Join-Path $issueDir 'review'; New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
         $diffPath = Join-Path $reviewDir 'final.diff'
-        Get-AutopilotDiffText -Worktree $worktree.path -BaseCommit $baseCommit | Set-Content -LiteralPath $diffPath -Encoding UTF8
+        Write-AutopilotReviewDiff -Text (Get-AutopilotDiffText -Worktree $worktree.path -BaseCommit $baseCommit) -OutputPath $diffPath
         $requestPath = Join-Path $reviewDir 'request.json'
         $request = New-AutopilotReviewRequest -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $worktree.path 'docs\backlog\ready-issues.md') -DiffPath $diffPath -EvidencePaths $evidencePaths -OutputPath $requestPath
         if (!$config.issueReviewer -or $config.issueReviewer.enabled -ne $true) {

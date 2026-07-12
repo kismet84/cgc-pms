@@ -3,6 +3,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-review.ps1')
+. (Join-Path $scriptDir 'autopilot-context.ps1')
 
 $reviewSchema = Get-Content -LiteralPath (Join-Path $scriptDir '..\..\plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Raw | ConvertFrom-Json
 if ($reviewSchema.properties.schemaVersion.type -ne 'integer' -or
@@ -14,6 +15,10 @@ if ($reviewSchema.properties.schemaVersion.type -ne 'integer' -or
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-review-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root -Force | Out-Null
 try {
+  $canonicalDiff = "diff --git a/a b/a`n+中文`n"
+  $canonicalPath = Join-Path $root 'canonical.diff'
+  Write-AutopilotReviewDiff -Text $canonicalDiff -OutputPath $canonicalPath
+  if ((Get-FileHash -LiteralPath $canonicalPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne (Get-AutopilotTextHash $canonicalDiff)) { throw 'review diff file hash does not match canonical verification hash' }
   $route = [pscustomobject]@{ reviewRequired = $true }
   $missingReviewRejected = $false
   try { Assert-AutopilotReviewGate -Route $route -ReviewResult $null | Out-Null } catch { $missingReviewRejected = $true }
