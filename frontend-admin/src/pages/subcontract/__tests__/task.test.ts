@@ -317,6 +317,11 @@ describe('subcontract task page quality guardrails', () => {
     expect(source).toContain('v-model:value="formData.predecessorTaskId"')
     expect(source).toContain('loadPredecessorOptions(v)')
     expect(source).toContain('pageSize: 1000, projectId')
+    expect(source).toContain("predecessor.status !== 'COMPLETED'")
+    expect(source).toContain('value="IN_PROGRESS" :disabled="predecessorStartBlocked"')
+    expect(source).toContain('value="COMPLETED" :disabled="predecessorStartBlocked"')
+    expect(source).toContain('前置任务未完成，当前任务不能开工或完成')
+    expect(source).toContain("e instanceof Error && e.message ? e.message : '操作失败，请稍后重试'")
     expect(source).not.toMatch(/draggable|dragstart|dhtmlx|frappe-gantt|criticalPath/i)
   })
 

@@ -230,6 +230,8 @@ public class SubTaskService {
                 : existing == null ? null : existing.getPlannedStartDate();
         LocalDate plannedEnd = task.getPlannedEndDate() != null ? task.getPlannedEndDate()
                 : existing == null ? null : existing.getPlannedEndDate();
+        String status = task.getStatus() != null ? task.getStatus()
+                : existing == null ? null : existing.getStatus();
 
         if (predecessorId != null) {
             if (Objects.equals(currentId, predecessorId))
@@ -251,6 +253,9 @@ public class SubTaskService {
             if (predecessor.getPlannedEndDate() != null && plannedStart != null
                     && plannedStart.isBefore(predecessor.getPlannedEndDate()))
                 throw new BusinessException("SUB_TASK_FS_DATE_INVALID", "后续任务计划开始不能早于前置任务计划结束");
+            if (("IN_PROGRESS".equals(status) || "COMPLETED".equals(status))
+                    && !"COMPLETED".equals(predecessor.getStatus()))
+                throw new BusinessException("SUB_TASK_PREDECESSOR_NOT_COMPLETED", "前置任务未完成，后续任务不能开工或完成");
         }
 
         if (currentId == null) return;

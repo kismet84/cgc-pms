@@ -82,6 +82,10 @@ const predecessorOptions = computed(() =>
     (task) => task.projectId === formData.projectId && task.id !== editingId.value,
   ),
 )
+const predecessorStartBlocked = computed(() => {
+  const predecessor = predecessorOptions.value.find((task) => task.id === formData.predecessorTaskId)
+  return predecessor != null && predecessor.status !== 'COMPLETED'
+})
 
 async function loadPredecessorOptions(projectId?: string) {
   if (!projectId) {
@@ -296,7 +300,7 @@ async function handleModalOk() {
     fetchData()
   } catch (e: unknown) {
     console.error(e)
-    message.error('操作失败，请稍后重试')
+    message.error(e instanceof Error && e.message ? e.message : '操作失败，请稍后重试')
   }
 }
 
@@ -838,10 +842,11 @@ onMounted(() => {
           <a-form-item label="状态">
             <a-select v-model:value="formData.status" placeholder="请选择状态">
               <a-select-option value="NOT_STARTED">未开始</a-select-option>
-              <a-select-option value="IN_PROGRESS">进行中</a-select-option>
-              <a-select-option value="COMPLETED">已完成</a-select-option>
+              <a-select-option value="IN_PROGRESS" :disabled="predecessorStartBlocked">进行中</a-select-option>
+              <a-select-option value="COMPLETED" :disabled="predecessorStartBlocked">已完成</a-select-option>
               <a-select-option value="SUSPENDED">已暂停</a-select-option>
             </a-select>
+            <div v-if="predecessorStartBlocked" class="form-tip">前置任务未完成，当前任务不能开工或完成</div>
           </a-form-item>
           <a-form-item label="备注">
             <a-textarea v-model:value="formData.remark" :rows="1" placeholder="请输入备注" />
