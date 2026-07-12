@@ -4,6 +4,13 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-review.ps1')
 
+$reviewSchema = Get-Content -LiteralPath (Join-Path $scriptDir '..\..\plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Raw | ConvertFrom-Json
+if ($reviewSchema.properties.schemaVersion.type -ne 'integer' -or
+    $reviewSchema.properties.decision.type -ne 'string' -or
+    $reviewSchema.properties.findings.items.properties.severity.type -ne 'string') {
+  throw 'review response schema enum/const properties must declare explicit JSON types'
+}
+
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-review-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root -Force | Out-Null
 try {
