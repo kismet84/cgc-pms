@@ -4,7 +4,56 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂无待实施 Ready；`ISSUE-037-013` 已完成，`启动迭代-3` 达到 3/3 上限。
+当前队列有 1 条待实施 Ready：`ISSUE-037-014`。
+
+### ISSUE-037-014：现场日报当日已审批领料只读联动
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 领料出库 / 跨域只读聚合 / 项目数据范围 / 前后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Productivity 与 Odoo 19 validated stock moves 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-09`
+Migration：不需要
+依赖：复用现有 `site_daily_log`、`mat_requisition`、`mat_requisition_item`、物料主数据、`ProjectAccessChecker` 与日报详情 API；不新建日报材料表。
+风险等级：中
+运行态要求：后端专项、前端日报单测和类型检查通过；真实 API 或浏览器验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：必须复核租户/项目/日期范围、仅 `APPROVED` 且 `stock_out_flag = 1`、批量查询、数量精度、敏感金额字段不出参、日报权限不放宽领料写能力及前端只读边界。
+归档报告：`docs/quality/ISSUE-037-014-现场日报当日已审批领料只读联动验收报告.md`
+目标：
+- 在现场日报详情只读展示同租户、同项目、日报日期当天已审批且已真实出库的领料明细。
+- 展示领料单号、物料、数量、单位和使用部位，复用既有审批出库事实，避免重复录入。
+- 草稿与已提交日报均可查看；领料联动不参与日报提交、修改或附件状态机。
+非目标：
+- 不新增日报材料表，不从日报创建或修改领料单，不自动生成库存、成本或安装量动作。
+- 不把领料数量解释为已安装或已消耗，不展示 DRAFT、APPROVING、REJECTED 或未出库领料单。
+- 不返回单价、金额、合同、供应商，不修改领料审批、库存出库、成本生成、权限模型、migration 或生产部署。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/requisition/**`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 日报详情只聚合同租户、同项目、`requisition_date = report_date`、`approval_status = APPROVED` 且 `stock_out_flag = 1` 的领料单；跨租户、跨项目、其他日期、其他状态或未出库记录不得出现。
+- 每条明细只返回领料单 ID/编号、明细 ID、物料 ID/名称/单位、领料数量和使用部位；数量保持数据库精度，不转为浮点数，不返回单价、金额、合同或供应商。
+- 日报不存在或无项目访问权继续沿用既有 fail-close；联动查询发生在项目访问校验之后，不新增 `requisition:query` 或领料写权限。
+- 查询使用批量领料单、明细和物料读取，禁止按明细逐条查询；无命中返回空列表。
+- 前端详情以只读区域展示领料明细和空态，不提供新增、编辑、删除、提交审批、库存或成本写入口，文案不得声称已安装。
+- 至少覆盖 APPROVED/非 APPROVED、出库标记、租户/项目/日期隔离、空列表、数量字符串、敏感字段不出现和前端只读渲染；回滚为移除聚合字段和展示区，不涉及数据迁移。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
 
 ### ISSUE-037-013：现场日报变更历史只读展示
 

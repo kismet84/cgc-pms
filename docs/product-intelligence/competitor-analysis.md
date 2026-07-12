@@ -4,8 +4,8 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| checkedAt | 2026-07-11 |
-| 项目基线 | `develop/1.5@9b0965712` |
+| checkedAt | 2026-07-12 |
+| 项目基线 | `develop/1.5@667299a93` |
 | 研究原则 | 组合对标，不复制单一产品 |
 | 证据范围 | 官方文档、官方产品页、官方案例 |
 | 失效提醒 | 超过 90 天未复核的来源，在关键决策前重新核验 |
@@ -57,6 +57,8 @@
 2026-07-12 增量核验：官方 Daily Log Overview 将 Deliveries 用于记录到货来源、追踪号与内容，将 Productivity 用于记录到场和已安装材料。对 CGC-PMS 的最小动作是复用既有已审批材料验收事实做日报只读联动，不复制完整日志类型体系。来源：<https://support.procore.com/products/online/user-guide/project-level/daily-log/tutorials/daily-log-overview>。
 
 同页的 Change History 用于列出日报当天发生的修改及修改人。对 CGC-PMS 的最小动作是复用统一操作审计并修正 CREATE 的业务 ID 归属，不新建日报历史表或字段级版本系统。
+
+2026-07-12 补货核验：Procore Daily Log Overview 将 Productivity 用于记录到场和已安装材料；Odoo 19 项目盈利官方文档则只把已验证库存移动计入项目材料成本。结合当前代码，CGC-PMS 不把领料冒充“已安装”，仅复用审批通过且已真实出库的领料单，在日报中只读展示“当日已审批领料”，作为现场材料流转证据。来源：<https://support.procore.com/products/online/user-guide/project-level/daily-log/tutorials/daily-log-overview>、<https://www.odoo.com/documentation/19.0/applications/services/project/project_management/project_profitability.html>。
 
 ### 4. Autodesk Construction Cloud
 
