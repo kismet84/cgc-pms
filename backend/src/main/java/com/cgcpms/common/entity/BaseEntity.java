@@ -35,6 +35,5 @@ public class BaseEntity implements Serializable {
     @TableLogic(value = "0", delval = "1")
     private Integer deletedFlag;
 
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String remark;
 }

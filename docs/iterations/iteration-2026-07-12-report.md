@@ -171,3 +171,14 @@
 - 非阻塞观察：三条均完成代码级/自动化验收，未构造真实角色与真实业务数据做浏览器验收；相关限制已写入各质量报告。
 - 当前 focus：产品地图已回写，Ready 为空；未来新启动可继续刷新产品情报，但本轮因 3/3 上限停止。
 - 发布边界：未发布生产、未连接生产数据库、未 push。
+
+## ISSUE-037-017：BaseEntity 备注写入契约修复
+
+- 状态：Done；计入 `启动迭代-10` 第 1/10 条实施型 Ready Issue。
+- 修改范围：只移除 `BaseEntity.remark` 的 `READ_ONLY`，新增一个共享 JSON 契约测试；无 Controller、Service、前端或 migration 变更。
+- 验证：`BaseEntityJsonContractTest` 1/1、`git diff --check`、严格范围核对和独立安全审查通过。
+- 图谱检索证据：CodeGraph 定位 `BaseEntity` 及实体直绑 Controller/Service 调用面；`codebase-memory-mcp` 交叉核验备注在后端与前端的跨层使用，当前 diff 与专项测试完成最终确认。
+- 失败分类：首次 runner 阻塞属于 `tool_config`；scope gate 将未跟踪目录折叠为路径而误报越界，业务实现与专项测试无失败。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：Ready 清空后进入产品情报补货；未命中 stop/pause。
+- 正式报告：`docs/quality/ISSUE-037-017-BaseEntity备注写入契约修复验收报告.md`。

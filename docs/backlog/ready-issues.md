@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前 Ready 队列有 1 条：`ISSUE-037-017`。`启动迭代-5` 在 3/5 的停止保留为历史状态，不自动恢复旧运行。
+当前 Ready 队列为空；`ISSUE-037-017` 已完成，等待 `启动迭代-10` 补货链继续裁决。
 
 ### ISSUE-037-017：BaseEntity 备注写入契约修复
 
 优先级：P0
 任务性质：缺口修复
 类型：共享实体 / JSON 契约 / 数据正确性 / 后端测试
-状态：Ready
+状态：Done（2026-07-12；计入 `启动迭代-10` 第 1/10 条）
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-13`
 Migration：不需要
