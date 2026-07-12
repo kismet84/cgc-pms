@@ -5,6 +5,7 @@
 - `PI-2026-07-12-12` 的停止动作保持为历史事实，但“无合格 Candidate”因候选范围过窄和地图回写滞后被后续复核撤销。
 - `ISSUE-037-017` 已完成：共享 `BaseEntity.remark` 恢复正常 JSON 写入，ID、租户、审计和逻辑删除字段继续只读；未修改 Controller、Service、前端或数据库。
 - 插件 Ready 预演修复了标题正则缺少多行匹配的问题；合法的二、三级标题现可通过 Select Gate，并有最小回归脚本保护。
+- `ISSUE-037-018` 已完成：执行器 300/600 秒 inspect/retire、一次 repair、第二次 stall blocked、退役证据和有界长命令声明已闭环；PID 复用与延迟启动计时边界有回归保护。
 - 本轮只修复共享根因并保护 ID、租户和审计字段，不扩成 DTO 重构或全接口治理。
 
 ## 2026-07-12 增量：WBS 软删除编号冲突
@@ -162,7 +163,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 现场日报验收直达 | `DevAuthController`、`/site/daily-log` | Implemented | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据 |
 | Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner | Implemented | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护 |
 | 候选补货 | `autopilot-refill.ps1` | Implemented | 读取 Ad-hoc 和长期计划，当前不读取外部情报 |
-| 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 20 轮隔离 canary 已验证连续执行、提交、证据、零人工干预和上限停止；LIMIT_REACHED 已统一关闭 enabled 并被 checkpoint/status 识别 |
+| 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 已具备隔离执行、本地提交、上限停止、300/600 秒停滞处置、一次有限重派、第二次 blocked 和有界长命令声明 |
 | 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-016 正式验收报告 |
 
 ## 当前明确缺口
