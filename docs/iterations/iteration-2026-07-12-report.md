@@ -1,5 +1,29 @@
 # AutoPilot 迭代报告（2026-07-12）
 
+## ISSUE-037-001：采购低库存补货建议最小闭环
+
+- 状态：Done；计入 `启动迭代-10` 第 1 条实施型 Ready Issue。
+- 修改范围：低库存补货入口、采购申请一次性预填、采购申请服务信任边界与采购经理最小权限。
+- 验证：后端 59/59、前端 44/44、类型检查、Ready lint、health gate 与真实采购经理预填/创建/清理闭环通过。
+- 自动合并：本地 commit `2fc8d22bf`；`autoPush=false`。
+- 正式报告：`docs/quality/ISSUE-037-001-采购低库存补货建议最小闭环验收报告.md`。
+
+## ISSUE-037-002：供应商交付档案最小闭环
+
+- 状态：Done；计入 `启动迭代-10` 第 2 条实施型 Ready Issue。
+- 修改范围：供应商交付三分类、已审批验收累计、采购驾驶舱页面与验收明细输入校验。
+- 验证：后端 24/24、前端 18/18、类型检查、`git diff --check`、独立补修、180 秒稳定等待与真实采购经理页面通过。
+- 自动合并：本地 commit `d7b9a872e`；`autoPush=false`。
+- 正式报告：`docs/quality/ISSUE-037-002-供应商交付档案最小闭环验收报告.md`。
+
+## ISSUE-037-003：驾驶舱项目数据范围统一收口
+
+- 状态：Done；计入 `启动迭代-10` 第 3 条实施型 Ready Issue。
+- 修改范围：项目经理与管理驾驶舱统一可见 ACTIVE projectIds、工作流/合同/风险 fail-close 与批量聚合。
+- 验证：后端 21/21、17 条 SQL 性能证据、`git diff --check`、独立安全复核、180 秒稳定等待与 health gate 通过。
+- 自动合并：本地 commit `f1b7e0670`；`autoPush=false`。
+- 正式报告：`docs/quality/ISSUE-037-003-驾驶舱项目数据范围统一收口验收报告.md`。
+
 ## ISSUE-037-004：分包 WBS 单前置 FS 依赖与延期风险
 
 - 状态：Done；计入 `启动迭代-10` 第 4 条实施型 Ready Issue。
@@ -70,3 +94,11 @@
 - 非阻塞观察：Dashboard 性能测试门槛文案、库存设置独立跨项目/并发专项，以及供应商级提前期/工作日历/预测仍作为后续治理或产品候选，均已沉淀到 Current Focus。
 - 当前 focus：允许在新的启动指令下重新刷新产品情报；本次运行因 10/10 上限停止。
 - 发布边界：未发布生产、未连接生产数据库、未 push。
+
+## AutoPilot 控制面整改复验
+
+- 根因：迭代上限只由 continuous runner 主循环判断，`enabled.flag`、checkpoint 和 status 未同步终态，导致 state 已为 `LIMIT_REACHED` 时 checkpoint 仍返回 `go`。
+- 修复：runner 达到上限时移除 `enabled.flag`；checkpoint 读取 state 并返回 `limit_reached`；status 回退展示 `iterationLastCountedIssue`，终态不再显示 `NEW_RUN` recovery。
+- TDD：新增 limit fixture 先稳定失败于“上限未关闭 future dispatch”，最小修复后 `test-continuous-runner.ps1` 全套通过。
+- 无人值守：复用现有 `test-unattended-canary.ps1` 完成 20 轮隔离验证，覆盖自动执行、本地提交、证据路径、零人工干预、零范围违规和 20/20 上限停止。
+- 当前状态：`enabled.flag=false`、checkpoint=`limit_reached`、status=`LIMIT_REACHED`、lastIssue=`ISSUE-037-010`、recoveryAction=`NONE`。

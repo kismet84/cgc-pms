@@ -1251,6 +1251,7 @@ try {
 
   if ($null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
     Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = "STOP_ITERATION_LIMIT_REACHED"; stopReason = "STOP_ITERATION_LIMIT_REACHED" })
+    Remove-Item -LiteralPath (Join-Path $autoDir 'enabled.flag') -Force -ErrorAction SilentlyContinue
     Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" ([bool]$DryRun) "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
     Write-Host "STOP_ITERATION_LIMIT_REACHED"
     exit 0

@@ -7,6 +7,8 @@ $Runner = Join-Path $ScriptDir "autopilot-run-continuous.ps1"
 $StartScript = Join-Path $ScriptDir "autopilot-start.ps1"
 $Executor = Join-Path $ScriptDir "autopilot-exec-issue.ps1"
 $StatusScript = Join-Path $ScriptDir "autopilot-status.ps1"
+$RepoRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+$CheckpointScript = Join-Path $RepoRoot "plugins\cgc-pms-autopilot\scripts\autopilot-checkpoint.ps1"
 $KillScript = Join-Path $ScriptDir "autopilot-kill.ps1"
 $ReadinessScript = Join-Path $ScriptDir "autopilot-readiness-check.ps1"
 $TempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("cgc-pms-autopilot-runner-test-" + [guid]::NewGuid().ToString("N"))
@@ -892,6 +894,12 @@ try {
   if ($LimitOneState.iterationCompleted -ne 1) { throw "Expected MaxIterations=1 to count one completed issue. Actual: $($LimitOneState | ConvertTo-Json -Compress -Depth 8)" }
   if ($LimitOneState.remainingIterations -ne 0) { throw "Expected MaxIterations=1 remainingIterations=0" }
   if ($LimitOneState.stopReason -ne "STOP_ITERATION_LIMIT_REACHED") { throw "Expected STOP_ITERATION_LIMIT_REACHED stopReason" }
+  if (Test-Path (Join-Path $LimitOneRoot ".codex-autopilot\enabled.flag")) { throw "Iteration limit must disable future dispatch" }
+  $LimitCheckpoint = & powershell -NoProfile -ExecutionPolicy Bypass -File $CheckpointScript -RepoRoot $LimitOneRoot -AsJson | ConvertFrom-Json
+  if ($LimitCheckpoint.decision -ne 'limit_reached') { throw "Checkpoint must report limit_reached, got $($LimitCheckpoint.decision)" }
+  $LimitStatus = & powershell -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $LimitOneRoot | ConvertFrom-Json
+  if ($LimitStatus.lastIssue -ne $LimitOneState.iterationLastCountedIssue) { throw "Status must expose iterationLastCountedIssue as lastIssue" }
+  if ($LimitStatus.recoveryAction -ne 'NONE') { throw "Terminal limit state must not advertise NEW_RUN recovery" }
 
   $LimitTwoRoot = New-Fixture -Name "limit-two" -Enabled -Ready @"
 # Ready Issues

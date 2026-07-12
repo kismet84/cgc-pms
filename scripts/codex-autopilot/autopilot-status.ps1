@@ -100,7 +100,7 @@ if (Test-Path $StatePath) {
   $Summary.failureFingerprint = $State.failureFingerprint
   $Summary.mode = $State.mode
   $Summary.lastAction = $State.lastAction
-  $Summary.lastIssue = $State.lastIssue
+  $Summary.lastIssue = if ($State.lastIssue) { $State.lastIssue } else { $State.iterationLastCountedIssue }
   $Summary.lastReason = $State.lastReason
   $Summary.stopReason = $State.stopReason
   $Summary.iterationLimit = $State.iterationLimit
@@ -167,8 +167,13 @@ if (Test-Path $RunsDir) {
   }
 }
 
-$Recovery = Get-AutopilotRecoveryDecision -AutoDir $AutoDir
-$Summary.recoveryAction = $Recovery.action
-$Summary.recoveryReason = $Recovery.reason
+if ($Summary.status -eq 'LIMIT_REACHED') {
+  $Summary.recoveryAction = 'NONE'
+  $Summary.recoveryReason = 'iteration limit reached'
+} else {
+  $Recovery = Get-AutopilotRecoveryDecision -AutoDir $AutoDir
+  $Summary.recoveryAction = $Recovery.action
+  $Summary.recoveryReason = $Recovery.reason
+}
 
 $Summary | ConvertTo-Json

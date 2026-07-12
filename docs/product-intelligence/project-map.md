@@ -122,7 +122,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 现场日报验收直达 | `DevAuthController`、`/site/daily-log` | Implemented | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据 |
 | Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1` | Implemented | 当前规则和解析入口存在；ISSUE-037-004 收口后进入下一轮补货 |
 | 候选补货 | `autopilot-refill.ps1` | Implemented | 读取 Ad-hoc 和长期计划，当前不读取外部情报 |
-| 连续执行 | `autopilot-run-continuous.ps1` | Partial | 入口存在，未在本轮做无人值守运行验收 |
+| 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 20 轮隔离 canary 已验证连续执行、提交、证据、零人工干预和上限停止；LIMIT_REACHED 已统一关闭 enabled 并被 checkpoint/status 识别 |
 | 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-004 正式验收报告 |
 
 ## 当前明确缺口

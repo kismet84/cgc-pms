@@ -18,6 +18,10 @@ try {
     $stopPath = Join-Path $flagsRoot 'stop.flag'
     $pausePath = Join-Path $flagsRoot 'pause.flag'
     $enabledPath = Join-Path $flagsRoot 'enabled.flag'
+    $statePath = Join-Path $flagsRoot 'state.json'
+    $state = if (Test-Path -LiteralPath $statePath) {
+        try { Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $null }
+    } else { $null }
 
     $health = $null
     if ($CheckHealth) {
@@ -50,6 +54,13 @@ try {
     if (-not (Test-Path -LiteralPath $enabledPath)) {
         if ($decision -eq 'go') { $decision = 'disabled' }
         $reasons += 'enabled.flag missing'
+    }
+    if ($decision -in @('go', 'disabled') -and $state -and (
+        $state.status -eq 'LIMIT_REACHED' -or
+        ($null -ne $state.iterationLimit -and [int]$state.remainingIterations -le 0)
+    )) {
+        $decision = 'limit_reached'
+        $reasons += 'iteration limit reached'
     }
 
     $result = [ordered]@{
