@@ -11,6 +11,10 @@ import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.requisition.entity.MatRequisition;
+import com.cgcpms.requisition.entity.MatRequisitionItem;
+import com.cgcpms.requisition.mapper.MatRequisitionItemMapper;
+import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.audit.annotation.AuditedOperation;
@@ -20,6 +24,7 @@ import com.cgcpms.site.controller.SiteDailyLogController;
 import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.site.service.SiteDailyLogService;
+import com.cgcpms.site.vo.SiteDailyRequisitionVO;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +32,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.mockito.ArgumentCaptor;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
@@ -34,6 +41,7 @@ import org.apache.ibatis.builder.MapperBuilderAssistant;
 
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.cgcpms.common.exception.BusinessException;
@@ -63,6 +71,7 @@ class SiteDailyLogServiceTest {
         assertEquals("晴，午后有风", detail.getWeatherSummary());
         assertEquals(0, detail.getOnSiteHeadcount());
         assertTrue(detail.getDeliveries().isEmpty());
+        assertTrue(detail.getRequisitions().isEmpty());
     }
 
     @Test
@@ -112,6 +121,7 @@ class SiteDailyLogServiceTest {
         MdPartnerMapper partnerMapper = mock(MdPartnerMapper.class);
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, projectMapper, checker, receiptMapper, itemMapper, materialMapper, partnerMapper,
+                mock(MatRequisitionMapper.class), mock(MatRequisitionItemMapper.class),
                 mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
@@ -161,6 +171,69 @@ class SiteDailyLogServiceTest {
     }
 
     @Test
+    void detailIncludesOnlyApprovedStockOutRequisitionsForSameTenantProjectAndDate() {
+        SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
+        ProjectAccessChecker checker = mock(ProjectAccessChecker.class);
+        MatRequisitionMapper requisitionMapper = mock(MatRequisitionMapper.class);
+        MatRequisitionItemMapper itemMapper = mock(MatRequisitionItemMapper.class);
+        MdMaterialMapper materialMapper = mock(MdMaterialMapper.class);
+        SiteDailyLogService service = new SiteDailyLogService(
+                mapper, mock(PmProjectMapper.class), checker, mock(MatReceiptMapper.class),
+                mock(MatReceiptItemMapper.class), materialMapper, mock(MdPartnerMapper.class),
+                requisitionMapper, itemMapper, mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class));
+        UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
+
+        SiteDailyLog log = new SiteDailyLog();
+        log.setId(34L); log.setTenantId(11L); log.setProjectId(21L);
+        log.setReportDate(LocalDate.of(2099, 4, 1)); log.setConstructionContent("施工内容");
+        log.setStatus("SUBMITTED");
+        when(mapper.selectById(34L)).thenReturn(log);
+        MatRequisition requisition = new MatRequisition();
+        requisition.setId(41L); requisition.setRequisitionCode("LL-20990401-001");
+        when(requisitionMapper.selectList(any())).thenReturn(List.of(requisition));
+        MatRequisitionItem item = new MatRequisitionItem();
+        item.setId(51L); item.setRequisitionId(41L); item.setMaterialId(61L);
+        item.setQuantity(new BigDecimal("12.3400")); item.setUseLocation("1号楼三层");
+        when(itemMapper.selectList(any())).thenReturn(List.of(item));
+        MdMaterial material = new MdMaterial();
+        material.setId(61L); material.setMaterialName("钢筋"); material.setUnit("吨");
+        when(materialMapper.selectList(any())).thenReturn(List.of(material));
+
+        var detail = service.getById(34L);
+
+        assertEquals(1, detail.getRequisitions().size());
+        var result = detail.getRequisitions().get(0);
+        assertEquals("LL-20990401-001", result.getRequisitionCode());
+        assertEquals("钢筋", result.getMaterialName());
+        assertEquals("吨", result.getMaterialUnit());
+        assertEquals("12.3400", result.getQuantity());
+        assertEquals("1号楼三层", result.getUseLocation());
+        Set<String> fields = java.util.Arrays.stream(SiteDailyRequisitionVO.class.getDeclaredFields())
+                .map(java.lang.reflect.Field::getName).collect(Collectors.toSet());
+        assertFalse(fields.stream().anyMatch(Set.of("unitPrice", "amount", "contractId", "partnerId")::contains));
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatRequisition>> query = ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+        verify(requisitionMapper).selectList(query.capture());
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), MatRequisition.class);
+        String sql = query.getValue().getSqlSegment();
+        assertTrue(sql.contains("tenant_id"));
+        assertTrue(sql.contains("project_id"));
+        assertTrue(sql.contains("requisition_date"));
+        assertTrue(sql.contains("approval_status"));
+        assertTrue(sql.contains("stock_out_flag"));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(11L));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(21L));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(LocalDate.of(2099, 4, 1)));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue("APPROVED"));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(1));
+        var ordered = inOrder(checker, requisitionMapper);
+        ordered.verify(checker).checkAccess(21L, "访问现场日报");
+        ordered.verify(requisitionMapper).selectList(any());
+        verify(itemMapper, times(1)).selectList(any());
+        verify(materialMapper, times(1)).selectList(any());
+    }
+
+    @Test
     void detailIncludesPlannedTasksCoveringTheReportDate() {
         SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
         PmProjectMapper projectMapper = mock(PmProjectMapper.class);
@@ -168,7 +241,8 @@ class SiteDailyLogServiceTest {
         SubTaskMapper taskMapper = mock(SubTaskMapper.class);
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
-                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), taskMapper,
+                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
+                mock(MatRequisitionItemMapper.class), taskMapper,
                 mock(OperationAuditLogMapper.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
@@ -218,7 +292,8 @@ class SiteDailyLogServiceTest {
         OperationAuditLogMapper auditMapper = mock(OperationAuditLogMapper.class);
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
-                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(SubTaskMapper.class), auditMapper);
+                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
+                mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class), auditMapper);
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -267,7 +342,8 @@ class SiteDailyLogServiceTest {
                                         ProjectAccessChecker checker) {
         return new SiteDailyLogService(mapper, projectMapper, checker,
                 mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
-                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(SubTaskMapper.class),
+                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
+                mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class),
                 mock(OperationAuditLogMapper.class));
     }
 }

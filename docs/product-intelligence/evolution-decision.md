@@ -8,6 +8,7 @@
 - 裁决：选择 `ISSUE-037-014`，按租户、项目、领料日期、APPROVED 和真实出库标记批量读取领料及明细，在日报详情只读展示最小字段。
 - 非目标：不新增领料写入口，不修改审批/出库/成本，不展示单价金额，不做安装量、损耗分析、计划需用量或材料追踪平台。
 - 代码检索交叉核验：CodeGraph 命中 `MatRequisitionService`、`MaterialRequisitionWorkflowHandler.onApproved`、`SiteDailyLogService`；`codebase-memory-mcp` 命中审批后 `stockOutFlag=1` 与项目/日期/租户字段。两者共同确认可复用真实出库事实，首次项目名查询失败归类为 `tool_config`，改用索引名 `D-projects-test-cgc-pms` 后成功。
+- 实施回写（2026-07-12）：`ISSUE-037-014` 已完成日报当日已审批领料只读联动；后端 10 tests、前端 6 tests、类型检查、独立审查与敏感字段边界通过，未新增写入口或数据表。
 
 ## PI-2026-07-12-08：现场日报变更历史只读展示
 

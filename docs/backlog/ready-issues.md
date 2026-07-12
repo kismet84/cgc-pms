@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列有 1 条待实施 Ready：`ISSUE-037-014`。
+当前队列暂无待实施 Ready；`ISSUE-037-014` 已完成，本轮进度 1/5。
 
 ### ISSUE-037-014：现场日报当日已审批领料只读联动
 
 优先级：P1
 任务性质：能力新增
 类型：现场生产 / 项目日报 / 领料出库 / 跨域只读聚合 / 项目数据范围 / 前后端 / 测试
-状态：Ready
+状态：Done（2026-07-12；计入 `启动迭代-5` 第 1/5 条）
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Productivity 与 Odoo 19 validated stock moves 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-09`
 Migration：不需要

@@ -54,6 +54,19 @@ describe('site daily log page', () => {
     expect(source).not.toContain('updatePlannedTask')
   })
 
+  it('renders approved stock-out requisitions as read-only daily facts', () => {
+    expect(source).toContain('当日已审批领料')
+    expect(source).toContain('activeRecord.requisitions')
+    expect(source).toContain('requisition.requisitionCode')
+    expect(source).toContain('requisition.materialName')
+    expect(source).toContain('requisition.quantity')
+    expect(source).toContain('requisition.materialUnit')
+    expect(source).toContain('requisition.useLocation')
+    expect(source).toContain('当日暂无已审批且已出库领料')
+    expect(source).not.toContain('createRequisition')
+    expect(source).not.toContain('已安装')
+  })
+
   it('renders a minimal audit trail without sensitive audit fields', () => {
     expect(source).toContain('变更历史')
     expect(source).toContain('activeRecord.auditTrail')

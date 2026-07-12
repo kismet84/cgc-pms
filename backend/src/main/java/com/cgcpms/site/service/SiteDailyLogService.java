@@ -18,11 +18,16 @@ import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.requisition.entity.MatRequisition;
+import com.cgcpms.requisition.entity.MatRequisitionItem;
+import com.cgcpms.requisition.mapper.MatRequisitionItemMapper;
+import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.site.vo.SiteDailyLogVO;
 import com.cgcpms.site.vo.SiteDailyDeliveryVO;
 import com.cgcpms.site.vo.SiteDailyPlannedTaskVO;
+import com.cgcpms.site.vo.SiteDailyRequisitionVO;
 import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.audit.entity.OperationAuditLog;
@@ -55,6 +60,8 @@ public class SiteDailyLogService {
     private final MatReceiptItemMapper receiptItemMapper;
     private final MdMaterialMapper materialMapper;
     private final MdPartnerMapper partnerMapper;
+    private final MatRequisitionMapper requisitionMapper;
+    private final MatRequisitionItemMapper requisitionItemMapper;
     private final SubTaskMapper subTaskMapper;
     private final OperationAuditLogMapper auditLogMapper;
 
@@ -92,6 +99,7 @@ public class SiteDailyLogService {
         PmProject project = projectMapper.selectById(log.getProjectId());
         SiteDailyLogVO detail = toVO(log, project == null ? null : project.getProjectName());
         detail.setDeliveries(loadDeliveries(log));
+        detail.setRequisitions(loadRequisitions(log));
         detail.setPlannedTasks(loadPlannedTasks(log));
         detail.setAuditTrail(loadAuditTrail(log.getId()));
         return detail;
@@ -276,6 +284,49 @@ public class SiteDailyLogService {
                     planned.setProgressPercent(task.getProgressPercent() == null ? null : task.getProgressPercent().toPlainString());
                     return planned;
                 }).toList();
+    }
+
+    private List<SiteDailyRequisitionVO> loadRequisitions(SiteDailyLog log) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<MatRequisition> requisitions = requisitionMapper.selectList(new LambdaQueryWrapper<MatRequisition>()
+                .eq(MatRequisition::getTenantId, tenantId)
+                .eq(MatRequisition::getProjectId, log.getProjectId())
+                .eq(MatRequisition::getRequisitionDate, log.getReportDate())
+                .eq(MatRequisition::getApprovalStatus, "APPROVED")
+                .eq(MatRequisition::getStockOutFlag, 1)
+                .orderByAsc(MatRequisition::getRequisitionCode));
+        if (requisitions.isEmpty()) return List.of();
+
+        Set<Long> requisitionIds = requisitions.stream().map(MatRequisition::getId).collect(Collectors.toSet());
+        List<MatRequisitionItem> items = requisitionItemMapper.selectList(new LambdaQueryWrapper<MatRequisitionItem>()
+                .eq(MatRequisitionItem::getTenantId, tenantId)
+                .in(MatRequisitionItem::getRequisitionId, requisitionIds)
+                .orderByAsc(MatRequisitionItem::getCreatedTime));
+        if (items.isEmpty()) return List.of();
+
+        Set<Long> materialIds = items.stream().map(MatRequisitionItem::getMaterialId)
+                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, MdMaterial> materials = materialIds.isEmpty() ? Map.of() : materialMapper.selectList(
+                        new LambdaQueryWrapper<MdMaterial>().eq(MdMaterial::getTenantId, tenantId)
+                                .in(MdMaterial::getId, materialIds))
+                .stream().collect(Collectors.toMap(MdMaterial::getId, material -> material, (a, b) -> a));
+        Map<Long, MatRequisition> requisitionById = requisitions.stream()
+                .collect(Collectors.toMap(MatRequisition::getId, requisition -> requisition));
+
+        return items.stream().map(item -> {
+            MatRequisition requisition = requisitionById.get(item.getRequisitionId());
+            MdMaterial material = materials.get(item.getMaterialId());
+            SiteDailyRequisitionVO result = new SiteDailyRequisitionVO();
+            result.setRequisitionId(requisition.getId().toString());
+            result.setRequisitionCode(requisition.getRequisitionCode());
+            result.setRequisitionItemId(item.getId().toString());
+            result.setMaterialId(item.getMaterialId().toString());
+            result.setMaterialName(material == null ? null : material.getMaterialName());
+            result.setMaterialUnit(material == null ? null : material.getUnit());
+            result.setQuantity(item.getQuantity() == null ? null : item.getQuantity().toPlainString());
+            result.setUseLocation(item.getUseLocation());
+            return result;
+        }).toList();
     }
 
     private List<SiteDailyAuditEntryVO> loadAuditTrail(Long logId) {

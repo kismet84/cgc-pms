@@ -214,6 +214,18 @@ onMounted(() => { referenceStore.fetchProjects(); fetchData() })
         <a-empty v-else description="当日暂无已审批材料到货" />
       </section>
       <section v-if="activeRecord && modalMode === 'view'" class="site-daily-planned-tasks">
+        <strong>当日已审批领料</strong>
+        <a-table v-if="activeRecord.requisitions?.length" :data-source="activeRecord.requisitions" :pagination="false" row-key="requisitionItemId" size="small">
+          <a-table-column key="requisitionCode" title="领料单号" data-index="requisitionCode" />
+          <a-table-column key="materialName" title="物料" data-index="materialName" />
+          <a-table-column key="quantity" title="领料数量" data-index="quantity" />
+          <a-table-column key="materialUnit" title="单位" data-index="materialUnit" />
+          <a-table-column key="useLocation" title="使用部位" data-index="useLocation" />
+          <template #bodyCell="{ column, record: requisition }"><span v-if="column.key === 'requisitionCode'">{{ requisition.requisitionCode }}</span><span v-else-if="column.key === 'materialName'">{{ requisition.materialName || '-' }}</span><span v-else-if="column.key === 'quantity'">{{ requisition.quantity ?? '-' }}</span><span v-else-if="column.key === 'materialUnit'">{{ requisition.materialUnit || '-' }}</span><span v-else-if="column.key === 'useLocation'">{{ requisition.useLocation || '-' }}</span></template>
+        </a-table>
+        <a-empty v-else description="当日暂无已审批且已出库领料" />
+      </section>
+      <section v-if="activeRecord && modalMode === 'view'" class="site-daily-planned-tasks">
         <strong>当日计划任务</strong>
         <a-table v-if="activeRecord.plannedTasks?.length" :data-source="activeRecord.plannedTasks" :pagination="false" row-key="id" size="small">
           <a-table-column key="taskCode" title="任务编号" data-index="taskCode" />

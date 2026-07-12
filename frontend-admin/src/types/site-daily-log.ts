@@ -22,6 +22,17 @@ export interface SiteDailyPlannedTaskVO {
   progressPercent?: string
 }
 
+export interface SiteDailyRequisitionVO {
+  requisitionId: string
+  requisitionCode: string
+  requisitionItemId: string
+  materialId: string
+  materialName?: string
+  materialUnit?: string
+  quantity?: string
+  useLocation?: string
+}
+
 export interface SiteDailyAuditEntryVO {
   operationType: string
   userId?: string
@@ -40,6 +51,7 @@ export interface SiteDailyLogVO {
   weatherSummary?: string
   onSiteHeadcount?: number | null
   deliveries?: SiteDailyDeliveryVO[]
+  requisitions?: SiteDailyRequisitionVO[]
   plannedTasks?: SiteDailyPlannedTaskVO[]
   auditTrail?: SiteDailyAuditEntryVO[]
   status: SiteDailyLogStatus
