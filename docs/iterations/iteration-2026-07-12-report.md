@@ -216,3 +216,21 @@
 - 自动合并：本地 commit only；`autoPush=false`。
 - 下一轮：Ready 清空后继续产品情报补货。
 - 正式报告：`docs/quality/ISSUE-037-020-长期计划描述性标题误入候选修复验收报告.md`。
+
+## ISSUE-037-021：CI/CD 与上线门禁 v1.5 现状复验
+
+- 状态：回归证明已完成；裁决为不通过 / 阻塞 / 不可上线，不计入 `启动迭代-10` 的实施型 Ready Issue 完成数。
+- 远端事实：目标 master commit 的 11 个 required checks 中 `frontend-lint`、`frontend-test`、`e2e` 为 failure；分支保护 `enforce_admins=false` 且未启用 push restrictions。
+- 本地复验：Ready lint、前端类型检查、构建、依赖审计和 `git diff --check` 通过；后端 verify 受 144-bit 测试 JWT 弱密钥前置影响并另有 1 条权限断言失败，前端 lint/coverage 与 SQL safety scan 仍有未解除项。
+- 失败分类：远端三个 required 红灯为真实质量类；管理员绕过为工具配置/仓库治理类；217 个后端上下文错误共享 JWT 弱密钥环境前置，不按 217 个业务缺陷计数。
+- 独立审查：报告证据与失败分类通过复核；该通过只表示审计证据合格，不表示上线门禁通过。
+- 自动合并：仅归档本次负向裁决，本地 commit only；`autoPush=false`。
+- 正式报告：`docs/quality/ISSUE-037-021-CI-CD与上线门禁v1.5复验报告.md`。
+
+## `启动迭代-10` 停止总验收
+
+- 完成：`ISSUE-037-017` 至 `ISSUE-037-020`，共 4 条实施型 Ready Issue。
+- 负向裁决：`ISSUE-037-021` 回归证明完成，但上线门禁不通过、阻塞、不可上线，不计入实施完成数。
+- 停止原因：用户执行 `停止迭代`；控制面已关闭 `enabled.flag` 并设置 `stop.flag`，当前任务自然收口后未派发下一任务。
+- 当前 focus：Ready 为空；CI 红灯、分支保护绕过、本地 JWT 测试前置、权限断言和 SQL marker 缺口均已进入 Blocked 或 Current Focus。
+- 发布边界：未发布生产、未连接生产数据库、未 push；剩余 6 个实施名额不再继续执行。

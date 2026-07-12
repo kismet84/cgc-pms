@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-12 增量：CI/CD 与上线门禁 v1.5 复验
+
+- `ISSUE-037-021` 已完成只读复验：当前 master commit `781b41661cd96b2a2f7eed825f98ff3d9bdf137b` 的 11 个 required checks 中 `frontend-lint`、`frontend-test`、`e2e` 为 failure，结论为不通过、阻塞、不可上线。
+- required checks 与现行 workflow job 一一对应且 `strict=true`；`enforce_admins=false` 与未启用 push restrictions 仍保留绕过风险。
+- 红灯与治理缺口已按责任域进入 Blocked；本次未修改业务代码、workflow 或远端设置。
+
 ## 2026-07-12 增量：系统审查与 Ready 恢复
 
 - `PI-2026-07-12-12` 的停止动作保持为历史事实，但“无合格 Candidate”因候选范围过窄和地图回写滞后被后续复核撤销。
@@ -158,13 +164,13 @@ Docker Compose + Nginx + Actuator + Prometheus
 
 | 能力 | 当前入口 | 状态 | 说明 |
 | --- | --- | --- | --- |
-| CI 门禁 | `.github/workflows/` | Partial | v1.0 结论已归档，当前远端 checks 需重新核验 |
+| CI 门禁 | `.github/workflows/` | Blocked | `ISSUE-037-021` 已确认 master 的 frontend-lint、frontend-test、e2e required checks 红灯，且分支保护仍有管理员绕过风险 |
 | 本地运行 | `scripts/rebuild.py`、Docker Compose | Partial | ISSUE-037-001 已完成 8080、5173、dev-login health gate 与真实角色浏览器验收 |
 | 现场日报验收直达 | `DevAuthController`、`/site/daily-log` | Implemented | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据 |
 | Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner | Implemented | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护 |
 | 候选补货 | `autopilot-refill.ps1` | Implemented | 先读 Ad-hoc；长期计划仅接纳第 7–9 章开发计划，排除现状/对标/差距/目标等描述性标题 |
 | 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 已具备隔离执行、本地提交、上限停止、300/600 秒停滞处置、一次有限重派、第二次 blocked 和有界长命令声明 |
-| 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-016 正式验收报告 |
+| 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-021 正式验收报告 |
 
 ## 当前明确缺口
 
@@ -186,7 +192,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 
 ## Unknown 与待复验
 
-- 当前远端 CI checks 与分支保护实际状态。
+- 当前 CI 红灯与分支保护绕过风险的解除时间；目标 commit 变化后需重新核验。
 - 当前本地 Docker、后端和前端运行态。
 - 五类驾驶舱角色的真实账号与数据可见范围。
 - 当前全量后端、前端单元测试结果。

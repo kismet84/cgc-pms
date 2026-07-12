@@ -59,3 +59,7 @@
 - 后续边界：入口补建、接口废弃或兼容性清理按责任域另拆 Ready；外部客户端调用和动态菜单证据不足项先保持需要确认。
 - 本次 `启动迭代-10` 当前完成 3/10；Ready 清空后继续补货。静态盘点不代表真实角色、动态菜单或运行态可见性通过。
 - `ISSUE-037-020` 已完成：长期计划补货只接纳第 7–9 章开发计划，2–6 章现状/对标/差距/目标标题不再误入 Candidate；本次当前完成 4/10，继续补货。
+- `ISSUE-037-021` 已通过独立 Reviewer 证据复核：master 最新 CI run 29146534529 的 frontend-lint、frontend-test、e2e 为 required 红灯，且分支保护 `enforce_admins=false`、未启用 push restrictions；当前裁决维持不通过、阻塞、不可上线。
+- 当前 Issue 工作树 `1aeb90c8f` 的差异不改变 master 裁决但需后续治理：后端 verify 受 144-bit 测试 JWT 前置影响并有 1 条权限断言失败，SQL safety scan 有两处固定字面量 marker 缺口；不得用远端 master 绿项覆盖这些本地差异。
+- CI 工具链观察：GitHub annotation 提示 Node 20 action 被强制运行于 Node 24；当前不是三个红灯的退出根因，升级 Actions 需另行授权。
+- `停止迭代` 已生效：本次 `启动迭代-10` 最终完成 4/10 条实施型 Ready；`ISSUE-037-021` 仅作为不通过的回归证明归档，不计入实施数，当前不再派发下一任务。

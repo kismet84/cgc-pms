@@ -1,5 +1,13 @@
 # CGC-PMS v1.5 首轮迭代方向决策
 
+## PI-2026-07-12-15：CI/CD 与上线门禁 v1.5 复验裁决
+
+- 项目事实：master 当前 11 个 required checks 与现行 workflow job 一一对应且 `strict=true`，但 `frontend-lint`、`frontend-test`、`e2e` 为 failure；最近 20 次 master push run 均失败。
+- 治理事实：`enforce_admins=false`，push restrictions 未启用；管理员绕过风险尚未解除。
+- 裁决：`ISSUE-037-021` 的回归证明任务完成，但上线门禁结论为不通过、阻塞、不可上线；红灯与治理缺口按责任域进入 Blocked，不修改业务代码、workflow 或远端设置。
+- 解除条件：形成新目标 commit，并让 11 个 required checks 全部 success；分支保护收紧需另获授权并由独立 Reviewer 复读 API。
+- 回滚：仅回退本 Issue 的报告、项目地图、迭代决策和 backlog 文档差异。
+
 ## PI-2026-07-12-14：长期计划描述性标题候选过滤
 
 - 项目事实：旧 refill 会枚举长期计划全部 `### N.N` 标题，导致 `2.1 当前技术栈` 进入 Planner；当前第 2–6 章为现状/对标/差距/目标，第 7–9 章为真实开发计划。
