@@ -24,7 +24,11 @@ import {
   submitOrderForApproval,
 } from '@/api/modules/purchase'
 import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchase'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
@@ -81,16 +85,15 @@ const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 const materialList = computed(() => referenceStore.materials ?? [])
 const supplierList = ref<{ id: string; partnerName?: string }[]>([])
-const hasActiveFilters = computed(
-  () =>
-    Boolean(
-      filter.projectId ||
-        filter.contractId ||
-        filter.partnerId ||
-        filter.orderStatus ||
-        filter.orderType ||
-        filter.keyword,
-    ),
+const hasActiveFilters = computed(() =>
+  Boolean(
+    filter.projectId ||
+    filter.contractId ||
+    filter.partnerId ||
+    filter.orderStatus ||
+    filter.orderType ||
+    filter.keyword,
+  ),
 )
 
 const modalVisible = ref(false)
@@ -257,7 +260,16 @@ async function syncRouteQuery() {
       pageNo: pageNo.value,
       pageSize: pageSize.value,
     },
-    ['projectId', 'contractId', 'partnerId', 'orderStatus', 'orderType', 'keyword', 'pageNo', 'pageSize'],
+    [
+      'projectId',
+      'contractId',
+      'partnerId',
+      'orderStatus',
+      'orderType',
+      'keyword',
+      'pageNo',
+      'pageSize',
+    ],
   )
   await router.replace({ path: route.path, query: nextQuery })
 }
@@ -766,11 +778,7 @@ onMounted(() => {
           <!-- 表格 -->
           <div class="lg-table-wrap">
             <div v-if="listError" class="purchase-order-list-feedback">
-              <a-result
-                status="error"
-                title="采购订单列表加载失败"
-                :sub-title="listError"
-              >
+              <a-result status="error" title="采购订单列表加载失败" :sub-title="listError">
                 <template #extra>
                   <a-button type="primary" @click="fetchData">重试</a-button>
                 </template>

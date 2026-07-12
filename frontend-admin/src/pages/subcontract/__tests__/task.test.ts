@@ -10,14 +10,19 @@ const source = readFileSync(resolve(currentDir, '../task.vue'), 'utf-8')
 const configSource = readFileSync(resolve(currentDir, '../pageConfig.ts'), 'utf-8')
 const originalTimezone = process.env.TZ
 
-const { mockGetSubTaskList, mockRouterReplace, mockFetchProjects, mockFetchContracts, mockFetchPartners } =
-  vi.hoisted(() => ({
-    mockGetSubTaskList: vi.fn(),
-    mockRouterReplace: vi.fn(),
-    mockFetchProjects: vi.fn(),
-    mockFetchContracts: vi.fn(),
-    mockFetchPartners: vi.fn(),
-  }))
+const {
+  mockGetSubTaskList,
+  mockRouterReplace,
+  mockFetchProjects,
+  mockFetchContracts,
+  mockFetchPartners,
+} = vi.hoisted(() => ({
+  mockGetSubTaskList: vi.fn(),
+  mockRouterReplace: vi.fn(),
+  mockFetchProjects: vi.fn(),
+  mockFetchContracts: vi.fn(),
+  mockFetchPartners: vi.fn(),
+}))
 
 vi.mock('@/api/modules/subcontract', () => ({
   getSubTaskList: mockGetSubTaskList,
@@ -203,7 +208,10 @@ describe('subcontract task page quality guardrails', () => {
     expect(wrapper.text()).toContain('计划：2026-08-10 ~ 2026-08-01')
     expect(wrapper.text()).toContain('已暂停')
 
-    await wrapper.findAll('button').find((button) => button.text().includes('刷新'))!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('刷新'))!
+      .trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('暂无任务可生成 WBS/甘特概览')
@@ -273,7 +281,9 @@ describe('subcontract task page quality guardrails', () => {
     expect(rows).toHaveLength(6)
     expect(rows.find((row) => row.text().includes('逾期未完成'))!.text()).toContain('已延期')
     expect(rows.find((row) => row.text().includes('今天到期'))!.text()).not.toContain('已延期')
-    expect(rows.find((row) => row.text().includes('已有实际完成日期'))!.text()).not.toContain('已延期')
+    expect(rows.find((row) => row.text().includes('已有实际完成日期'))!.text()).not.toContain(
+      '已延期',
+    )
     expect(rows.find((row) => row.text().includes('状态已完成'))!.text()).not.toContain('已延期')
     expect(rows.find((row) => row.text().includes('进度已完成'))!.text()).not.toContain('已延期')
     const noPlanRow = rows.find((row) => row.text().includes('无计划日期'))!
@@ -287,19 +297,38 @@ describe('subcontract task page quality guardrails', () => {
     mockGetSubTaskList.mockResolvedValue({
       records: [
         {
-          id: 'waiting', taskCode: '3.1', taskName: '等待前置', plannedStartDate: '2026-07-15',
-          predecessorTaskId: 'p1', predecessorTaskName: '基础施工', predecessorStatus: 'IN_PROGRESS',
-          predecessorPlannedEndDate: '2026-07-14', progressPercent: '0', status: 'NOT_STARTED',
+          id: 'waiting',
+          taskCode: '3.1',
+          taskName: '等待前置',
+          plannedStartDate: '2026-07-15',
+          predecessorTaskId: 'p1',
+          predecessorTaskName: '基础施工',
+          predecessorStatus: 'IN_PROGRESS',
+          predecessorPlannedEndDate: '2026-07-14',
+          progressPercent: '0',
+          status: 'NOT_STARTED',
         },
         {
-          id: 'late', taskCode: '3.2', taskName: '前置迟交', plannedStartDate: '2026-07-10',
-          predecessorTaskId: 'p2', predecessorTaskName: '结构施工', predecessorStatus: 'COMPLETED',
-          predecessorActualEndDate: '2026-07-12', progressPercent: '0', status: 'NOT_STARTED',
+          id: 'late',
+          taskCode: '3.2',
+          taskName: '前置迟交',
+          plannedStartDate: '2026-07-10',
+          predecessorTaskId: 'p2',
+          predecessorTaskName: '结构施工',
+          predecessorStatus: 'COMPLETED',
+          predecessorActualEndDate: '2026-07-12',
+          progressPercent: '0',
+          status: 'NOT_STARTED',
         },
         {
-          id: 'missing-date', taskCode: '3.3', taskName: '缺少日期',
-          predecessorTaskId: 'p3', predecessorTaskName: '材料进场', predecessorStatus: 'IN_PROGRESS',
-          progressPercent: '0', status: 'NOT_STARTED',
+          id: 'missing-date',
+          taskCode: '3.3',
+          taskName: '缺少日期',
+          predecessorTaskId: 'p3',
+          predecessorTaskName: '材料进场',
+          predecessorStatus: 'IN_PROGRESS',
+          progressPercent: '0',
+          status: 'NOT_STARTED',
         },
       ],
       total: 3,
@@ -344,7 +373,9 @@ describe('subcontract task page quality guardrails', () => {
   it('renders explicit error and empty states with retry entry', () => {
     expect(source).toContain('const listError = ref<string | null>(null)')
     expect(source).toContain('const hasLoaded = ref(false)')
-    expect(source).toContain('<a-result status="error" title="分包任务列表加载失败" :sub-title="listError">')
+    expect(source).toContain(
+      '<a-result status="error" title="分包任务列表加载失败" :sub-title="listError">',
+    )
     expect(source).toContain('<LgEmptyState description="暂无符合条件的分包任务">')
     expect(source).toContain('@click="fetchData"')
   })
@@ -362,7 +393,7 @@ describe('subcontract task page quality guardrails', () => {
     expect(source).toContain("{{ item.row.taskName || '-' }}")
     expect(source).toContain("{{ item.row.plannedStartDate || '未设置计划日期' }}")
     expect(source).toContain("{{ item.row.actualStartDate || '-' }}")
-    expect(source).toContain(":percent=\"parseFloat(item.row.progressPercent || '0') || 0\"")
+    expect(source).toContain(':percent="parseFloat(item.row.progressPercent || \'0\') || 0"')
     expect(source).toContain('STATUS_LABEL[item.row.status]')
   })
 

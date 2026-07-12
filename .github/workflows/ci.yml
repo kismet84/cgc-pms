@@ -228,11 +228,35 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - name: Set daily Trivy cache key
+        run: echo "TRIVY_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+      - name: Restore Trivy vulnerability databases
+        uses: actions/cache@v4
+        with:
+          path: .trivy-cache
+          key: trivy-java-db-${{ runner.os }}-${{ env.TRIVY_CACHE_DATE }}
+          restore-keys: |
+            trivy-java-db-${{ runner.os }}-
       - name: Download backend jar
         uses: actions/download-artifact@v4
         with:
           name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: artifacts/backend
+      - name: Scan built backend jar
+        run: |
+          mkdir -p .trivy-cache
+          docker run --rm \
+            -v "$PWD/.trivy-cache:/root/.cache/trivy" \
+            -v "$PWD/artifacts/backend:/workspace:ro" \
+            aquasec/trivy:0.65.0 \
+            rootfs \
+            --scanners vuln \
+            --pkg-types library \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --format table \
+            --timeout 10m \
+            /workspace
       - name: Download frontend build
         uses: actions/download-artifact@v4
         with:

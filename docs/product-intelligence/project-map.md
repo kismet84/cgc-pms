@@ -1,5 +1,14 @@
 # CGC-PMS 项目地图
 
+## 2026-07-13 增量：develop/1.5 全量审计根因闭环
+
+- 原全量审计的 7 项阻塞已完成本地闭环：测试态全局写限流隔离、陈旧菜单数字 ID 契约、前端 lint 与 3 项静态契约、SQL 安全标记、Playwright/合法空态 E2E、`master` 分支保护。
+- 后端最终 `verify` 为 184 suites、1723 tests、0 failures、0 errors、1 skipped；另补结算金额快照直接测试，并修复 Dashboard 合同到期测试夹具从每月 13 日起漂移的问题。
+- 前端主机依赖已恢复；413 条纯 Prettier 告警已治理至 lint 0 error / 0 warning；ECharts 已升级到 6.1.0、vue-echarts 升级到 8.0.1，依赖审计为 0 漏洞；类型检查/构建/bundle 通过、91 files / 505 tests 全过；用户提供的 Chrome 149 完成 UI smoke 7/7，内置浏览器也已真实到达驾驶舱。
+- 供应链门禁确认 `trivy fs` 不覆盖 post-build JAR，现由 `supply-chain-security` 对构建目录执行 `trivy rootfs`；本地识别 fat JAR 并得到 HIGH/CRITICAL 0。
+- `master` 已启用 `enforce_admins=true` 与 `required_conversation_resolution=true`，原 11 个 required checks、`strict=true`、禁止 force push/delete 保持不变。
+- 当前状态为“本地整改通过、上线仍阻塞”：本轮未获 commit/push 授权，尚无同一待合并 SHA 的远端 11 checks 全绿证据；不得以本地通过替代远端上线门禁。
+
 ## 2026-07-12 增量：AutoPilot Windows PowerShell 5.1 编码阻塞
 
 - 当前 AutoPilot 统一控制面在 Windows PowerShell 5.1 `-File` 入口稳定产生 ParserError；显式 UTF-8 AST 解析无错误，根因是含中文的 UTF-8 无 BOM 脚本被系统 ANSI/GBK 解码。
@@ -170,7 +179,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 
 | 能力 | 当前入口 | 状态 | 说明 |
 | --- | --- | --- | --- |
-| CI 门禁 | `.github/workflows/` | Blocked | `ISSUE-037-021` 已确认 master 的 frontend-lint、frontend-test、e2e required checks 红灯，且分支保护仍有管理员绕过风险 |
+| CI 门禁 | `.github/workflows/` | Partial | 本地整改与 11 项门禁映射已通过，`enforce_admins=true`、`required_conversation_resolution=true`；等待本轮整改 commit/push 后同一待合并 SHA 的远端 required checks 全绿证据 |
 | 本地运行 | `scripts/rebuild.py`、Docker Compose | Partial | ISSUE-037-001 已完成 8080、5173、dev-login health gate 与真实角色浏览器验收 |
 | 现场日报验收直达 | `DevAuthController`、`/site/daily-log` | Implemented | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据 |
 | Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner | Implemented | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护 |

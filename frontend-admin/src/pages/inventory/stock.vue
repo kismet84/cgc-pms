@@ -48,8 +48,6 @@ const {
   detailItem,
   showDetail,
   closeDetail,
-  fetchKpi,
-  fetchWarehouses,
   handleSearch,
   handleReset,
   onProjectChange,
@@ -160,7 +158,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               />
             </div>
             <div>
-              <span style="font-size: 13px; color: var(--text-secondary)">人工补货提前期（自然日）：</span>
+              <span style="font-size: 13px; color: var(--text-secondary)"
+                >人工补货提前期（自然日）：</span
+              >
               <a-input-number
                 v-model:value="replenishmentLeadDaysDraft"
                 :min="0"

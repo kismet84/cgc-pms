@@ -1,4 +1,8 @@
-import { buildActionColumn, buildAmountColumn, buildStatusColumn } from '@/composables/listTablePresets'
+import {
+  buildActionColumn,
+  buildAmountColumn,
+  buildStatusColumn,
+} from '@/composables/listTablePresets'
 
 export const APPROVAL_STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',

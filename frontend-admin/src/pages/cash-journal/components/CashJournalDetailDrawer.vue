@@ -83,7 +83,9 @@ function beforeUpload(file: File) {
 }
 
 function money(value?: string) {
-  return value == null || value === '' ? '-' : `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
+  return value == null || value === ''
+    ? '-'
+    : `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
 }
 </script>
 
@@ -98,19 +100,28 @@ function money(value?: string) {
     <template v-if="entry">
       <a-descriptions bordered :column="2" size="small">
         <a-descriptions-item label="流水号">{{ entry.entryNo }}</a-descriptions-item>
-        <a-descriptions-item label="状态"><a-tag>{{ entry.status }}</a-tag></a-descriptions-item>
+        <a-descriptions-item label="状态"
+          ><a-tag>{{ entry.status }}</a-tag></a-descriptions-item
+        >
         <a-descriptions-item label="业务日期">{{ entry.businessDate }}</a-descriptions-item>
         <a-descriptions-item label="金额">{{ money(entry.amount) }}</a-descriptions-item>
-        <a-descriptions-item label="资金账户">{{ entry.accountName || '待选择' }}</a-descriptions-item>
-        <a-descriptions-item label="方向">{{ entry.direction === 'IN' ? '收入' : '支出' }}</a-descriptions-item>
-        <a-descriptions-item label="往来单位">{{ entry.counterpartyName || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="资金账户">{{
+          entry.accountName || '待选择'
+        }}</a-descriptions-item>
+        <a-descriptions-item label="方向">{{
+          entry.direction === 'IN' ? '收入' : '支出'
+        }}</a-descriptions-item>
+        <a-descriptions-item label="往来单位">{{
+          entry.counterpartyName || '-'
+        }}</a-descriptions-item>
         <a-descriptions-item label="来源">
           <a-button
             v-if="entry.sourceType === 'PAY_RECORD'"
             type="link"
             size="small"
             @click="emit('openSource', entry)"
-          >付款记录 #{{ entry.sourceId }}</a-button>
+            >付款记录 #{{ entry.sourceId }}</a-button
+          >
           <span v-else>{{ entry.sourceType }}</span>
         </a-descriptions-item>
         <a-descriptions-item label="摘要" :span="2">{{ entry.summary }}</a-descriptions-item>
@@ -145,7 +156,8 @@ function money(value?: string) {
                 type="link"
                 size="small"
                 @click="emit('deleteFile', item.id)"
-              >删除</a-button>
+                >删除</a-button
+              >
             </a-list-item>
           </template>
         </a-list>
@@ -171,20 +183,28 @@ function money(value?: string) {
           data-testid="archive-button"
           type="primary"
           @click="requestArchive"
-        >确认归档</a-button>
+          >确认归档</a-button
+        >
         <a-button
           v-if="canMaintain && entry.status === 'ARCHIVED'"
           danger
           @click="reverseVisible = true"
-        >红冲</a-button>
+          >红冲</a-button
+        >
         <a-button
           v-if="isSuperAdmin && entry.status === 'ARCHIVED'"
           data-testid="reopen-button"
           @click="reopenVisible = true"
-        >撤销归档</a-button>
+          >撤销归档</a-button
+        >
       </div>
 
-      <a-modal :open="reopenVisible" title="撤销归档" :footer="null" @cancel="reopenVisible = false">
+      <a-modal
+        :open="reopenVisible"
+        title="撤销归档"
+        :footer="null"
+        @cancel="reopenVisible = false"
+      >
         <template v-if="reopenVisible">
           <textarea
             v-model="reopenReason"
@@ -195,14 +215,26 @@ function money(value?: string) {
           />
           <div class="modal-actions">
             <a-button @click="reopenVisible = false">取消</a-button>
-            <a-button data-testid="reopen-confirm" type="primary" @click="requestReopen">确认</a-button>
+            <a-button data-testid="reopen-confirm" type="primary" @click="requestReopen"
+              >确认</a-button
+            >
           </div>
         </template>
       </a-modal>
 
-      <a-modal :open="reverseVisible" title="红冲流水" :footer="null" @cancel="reverseVisible = false">
+      <a-modal
+        :open="reverseVisible"
+        title="红冲流水"
+        :footer="null"
+        @cancel="reverseVisible = false"
+      >
         <template v-if="reverseVisible">
-          <textarea v-model="reverseReason" class="reason-input" maxlength="500" placeholder="必填：说明红冲原因" />
+          <textarea
+            v-model="reverseReason"
+            class="reason-input"
+            maxlength="500"
+            placeholder="必填：说明红冲原因"
+          />
           <div class="modal-actions">
             <a-button @click="reverseVisible = false">取消</a-button>
             <a-button danger type="primary" @click="requestReverse">确认红冲</a-button>
@@ -215,13 +247,42 @@ function money(value?: string) {
 
 <style scoped>
 .cash-journal-files,
-.cash-journal-changes { margin-top: 20px; }
+.cash-journal-changes {
+  margin-top: 20px;
+}
 .section-title,
 .cash-journal-detail-actions,
-.modal-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.cash-journal-detail-actions { justify-content: flex-end; margin-top: 24px; flex-wrap: wrap; }
-.change-log-item { margin-top: 10px; padding: 10px; border: 1px solid var(--border-color, #eee); border-radius: 6px; }
-.change-log-item pre { white-space: pre-wrap; word-break: break-all; font-size: 12px; }
-.reason-input { width: 100%; min-height: 96px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 6px; }
-.modal-actions { justify-content: flex-end; margin-top: 12px; }
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cash-journal-detail-actions {
+  justify-content: flex-end;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.change-log-item {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--border-color, #eee);
+  border-radius: 6px;
+}
+.change-log-item pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 12px;
+}
+.reason-input {
+  width: 100%;
+  min-height: 96px;
+  padding: 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+}
+.modal-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
 </style>

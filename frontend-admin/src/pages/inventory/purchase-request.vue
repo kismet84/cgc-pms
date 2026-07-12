@@ -275,11 +275,8 @@ function parseStrictLocalDate(value: unknown): string | undefined {
   const month = Number(match[2])
   const day = Number(match[3])
   const date = new Date(year, month - 1, day)
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) return undefined
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day)
+    return undefined
   return value
 }
 
@@ -292,7 +289,13 @@ async function openPrefillFromQuery() {
   const rawPlannedDate = readQuery(route.query.plannedDate)
   const plannedDate = parseStrictLocalDate(readQuery(route.query.plannedDate))
   try {
-    if (!projectId || !materialId || !quantity || !Number.isFinite(Number(quantity)) || Number(quantity) <= 0) {
+    if (
+      !projectId ||
+      !materialId ||
+      !quantity ||
+      !Number.isFinite(Number(quantity)) ||
+      Number(quantity) <= 0
+    ) {
       message.warning('补货预填参数无效，请从库存页重新发起')
       return
     }
@@ -303,15 +306,17 @@ async function openPrefillFromQuery() {
     Object.assign(formData, { projectId: String(projectId) })
     await loadContractsByProject(String(projectId))
     const material = materialList.value.find((item) => item.id === String(materialId))
-    itemList.value = [{
-      key: keySeq.value++,
-      materialId: String(materialId),
-      materialName: material?.materialName ?? '',
-      quantity: String(quantity),
-      unit: material?.unit ?? '',
-      plannedDate,
-      remark: '',
-    }]
+    itemList.value = [
+      {
+        key: keySeq.value++,
+        materialId: String(materialId),
+        materialName: material?.materialName ?? '',
+        quantity: String(quantity),
+        unit: material?.unit ?? '',
+        plannedDate,
+        remark: '',
+      },
+    ]
   } finally {
     const nextQuery = { ...route.query }
     delete nextQuery.prefill

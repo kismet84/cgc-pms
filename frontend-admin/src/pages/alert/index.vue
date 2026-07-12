@@ -34,7 +34,11 @@ import {
   type AlertSubscriptionResponse,
 } from '@/types/alert'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import { downloadBlobFile } from '@/utils/download'
 import AlertDetailPanel from './components/AlertDetailPanel.vue'
 import AlertFilterPanel from './components/AlertFilterPanel.vue'
@@ -158,7 +162,9 @@ function normalizeSeverity(
   value: string | undefined,
   fallback: AlertSubscriptionConfig['minSeverity'] = 'LOW',
 ): AlertSubscriptionConfig['minSeverity'] {
-  const normalized = String(value ?? '').trim().toUpperCase() as AlertSubscriptionConfig['minSeverity']
+  const normalized = String(value ?? '')
+    .trim()
+    .toUpperCase() as AlertSubscriptionConfig['minSeverity']
   return SEVERITY_ORDER.includes(normalized) ? normalized : fallback
 }
 
@@ -202,14 +208,14 @@ function normalizeSubscriptionConfig(
   }
 }
 
-const availableSubscriptionDomains = computed(() =>
-  resolveSubscriptionBoundaries(subscriptionState.value).domains,
+const availableSubscriptionDomains = computed(
+  () => resolveSubscriptionBoundaries(subscriptionState.value).domains,
 )
-const availableSubscriptionChannels = computed(() =>
-  resolveSubscriptionBoundaries(subscriptionState.value).channels,
+const availableSubscriptionChannels = computed(
+  () => resolveSubscriptionBoundaries(subscriptionState.value).channels,
 )
-const availableSeverityOptions = computed(() =>
-  resolveSubscriptionBoundaries(subscriptionState.value).severityOptions,
+const availableSeverityOptions = computed(
+  () => resolveSubscriptionBoundaries(subscriptionState.value).severityOptions,
 )
 const defaultSubscriptionEnabled = computed(() =>
   Boolean(subscriptionState.value?.defaultSubscription.enabled),

@@ -81,7 +81,10 @@ function handleReset() {
   outInlineError.value = ''
 }
 
-function getTransactionError(form: { warehouseId?: string; materialId?: string; quantity: string }, action: '入库' | '出库') {
+function getTransactionError(
+  form: { warehouseId?: string; materialId?: string; quantity: string },
+  action: '入库' | '出库',
+) {
   if (!form.warehouseId) return '请选择仓库'
   if (!form.materialId) return '请选择物料'
   if (!form.quantity || parseFloat(form.quantity) <= 0) return `请输入有效的${action}数量`
@@ -298,7 +301,13 @@ onMounted(() => {
             <!-- Stock In Form -->
             <div v-if="activeTab === 'in'">
               <a-form layout="vertical" class="transaction-form">
-                <a-alert v-if="inInlineError" class="transaction-form-alert" type="warning" show-icon :message="inInlineError" />
+                <a-alert
+                  v-if="inInlineError"
+                  class="transaction-form-alert"
+                  type="warning"
+                  show-icon
+                  :message="inInlineError"
+                />
                 <a-form-item label="入库数量" required>
                   <a-input-number
                     v-model:value="inForm.quantity"

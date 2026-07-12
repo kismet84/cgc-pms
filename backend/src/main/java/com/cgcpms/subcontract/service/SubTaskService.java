@@ -57,7 +57,7 @@ public class SubTaskService {
                             pmProjectMapper.selectList(new LambdaQueryWrapper<PmProject>()
                                     .eq(PmProject::getTenantId, UserContext.getCurrentTenantId())))
                     .stream().map(PmProject::getId).toList();
-            if (visibleProjectIds.isEmpty()) wrapper.apply("1 = 0");
+            if (visibleProjectIds.isEmpty()) wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
             else wrapper.in(SubTask::getProjectId, visibleProjectIds);
         }
         if (contractId != null) wrapper.eq(SubTask::getContractId, contractId);

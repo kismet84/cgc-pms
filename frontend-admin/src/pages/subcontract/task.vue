@@ -23,7 +23,11 @@ import {
 import { useReferenceStore } from '@/stores/reference'
 import type { SubTaskVO } from '@/types/subcontract'
 import type { SelectOption } from '@/types/ui'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import {
@@ -83,7 +87,9 @@ const predecessorOptions = computed(() =>
   ),
 )
 const predecessorStartBlocked = computed(() => {
-  const predecessor = predecessorOptions.value.find((task) => task.id === formData.predecessorTaskId)
+  const predecessor = predecessorOptions.value.find(
+    (task) => task.id === formData.predecessorTaskId,
+  )
   return predecessor != null && predecessor.status !== 'COMPLETED'
 })
 
@@ -557,7 +563,10 @@ onMounted(() => {
             </div>
             <div v-else-if="showEmptyState" class="subcontract-task-list-feedback">
               <LgEmptyState description="暂无符合条件的分包任务">
-                <a-button v-if="filter.keyword || filter.projectId || filter.status" @click="handleReset">
+                <a-button
+                  v-if="filter.keyword || filter.projectId || filter.status"
+                  @click="handleReset"
+                >
                   清空筛选
                 </a-button>
                 <a-button v-else type="primary" @click="handleAdd">新建任务</a-button>
@@ -621,15 +630,27 @@ onMounted(() => {
               <a-tag color="blue">只读</a-tag>
             </div>
             <div v-if="wbsTimelineRows.length" class="subcontract-task-wbs-list">
-              <div v-for="item in wbsTimelineRows" :key="item.row.id" class="subcontract-task-wbs-row">
+              <div
+                v-for="item in wbsTimelineRows"
+                :key="item.row.id"
+                class="subcontract-task-wbs-row"
+              >
                 <div class="subcontract-task-wbs-meta">
                   <strong>{{ item.row.taskCode || '-' }}</strong>
                   <span>{{ item.row.taskName || '-' }}</span>
                 </div>
                 <div class="subcontract-task-wbs-dates">
-                  <span>计划：{{ item.row.plannedStartDate || '未设置计划日期' }} ~ {{ item.row.plannedEndDate || '未设置计划日期' }}</span>
-                  <span>实际：{{ item.row.actualStartDate || '-' }} ~ {{ item.row.actualEndDate || '-' }}</span>
-                  <span v-if="item.row.predecessorTaskId">前置：{{ item.row.predecessorTaskName || item.row.predecessorTaskId }}</span>
+                  <span
+                    >计划：{{ item.row.plannedStartDate || '未设置计划日期' }} ~
+                    {{ item.row.plannedEndDate || '未设置计划日期' }}</span
+                  >
+                  <span
+                    >实际：{{ item.row.actualStartDate || '-' }} ~
+                    {{ item.row.actualEndDate || '-' }}</span
+                  >
+                  <span v-if="item.row.predecessorTaskId"
+                    >前置：{{ item.row.predecessorTaskName || item.row.predecessorTaskId }}</span
+                  >
                 </div>
                 <div class="subcontract-task-wbs-progress">
                   <a-progress
@@ -641,7 +662,9 @@ onMounted(() => {
                     {{ STATUS_LABEL[item.row.status] ?? item.row.status }}
                   </a-tag>
                   <a-tag v-if="item.isDelayed" color="error">已延期</a-tag>
-                  <a-tag v-if="item.predecessorRisk === 'INCOMPLETE'" color="warning">前置未完成</a-tag>
+                  <a-tag v-if="item.predecessorRisk === 'INCOMPLETE'" color="warning"
+                    >前置未完成</a-tag
+                  >
                   <a-tag v-if="item.predecessorRisk === 'LATE'" color="error">前置迟交</a-tag>
                 </div>
                 <div class="subcontract-task-gantt-track">
@@ -842,11 +865,17 @@ onMounted(() => {
           <a-form-item label="状态">
             <a-select v-model:value="formData.status" placeholder="请选择状态">
               <a-select-option value="NOT_STARTED">未开始</a-select-option>
-              <a-select-option value="IN_PROGRESS" :disabled="predecessorStartBlocked">进行中</a-select-option>
-              <a-select-option value="COMPLETED" :disabled="predecessorStartBlocked">已完成</a-select-option>
+              <a-select-option value="IN_PROGRESS" :disabled="predecessorStartBlocked"
+                >进行中</a-select-option
+              >
+              <a-select-option value="COMPLETED" :disabled="predecessorStartBlocked"
+                >已完成</a-select-option
+              >
               <a-select-option value="SUSPENDED">已暂停</a-select-option>
             </a-select>
-            <div v-if="predecessorStartBlocked" class="form-tip">前置任务未完成，当前任务不能开工或完成</div>
+            <div v-if="predecessorStartBlocked" class="form-tip">
+              前置任务未完成，当前任务不能开工或完成
+            </div>
           </a-form-item>
           <a-form-item label="备注">
             <a-textarea v-model:value="formData.remark" :rows="1" placeholder="请输入备注" />

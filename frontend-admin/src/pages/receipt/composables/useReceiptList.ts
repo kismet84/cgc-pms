@@ -4,7 +4,11 @@ import { message, Modal } from 'ant-design-vue'
 import { getReceiptList, deleteReceipt, submitReceiptForApproval } from '@/api/modules/receipt'
 import { getOrderList } from '@/api/modules/purchase'
 import { getWarehouseList } from '@/api/modules/inventory'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import {
   buildActionColumn,
   buildAmountColumn,
@@ -60,8 +64,8 @@ export function useReceiptList({
 
   const orderList = ref<MatPurchaseOrderVO[]>([])
   const warehouseList = ref<WarehouseVO[]>([])
-  const hasActiveFilters = computed(
-    () => Boolean(filter.projectId || filter.orderId || filter.receiptCode || filter.qualityStatus),
+  const hasActiveFilters = computed(() =>
+    Boolean(filter.projectId || filter.orderId || filter.receiptCode || filter.qualityStatus),
   )
 
   // ---- KPI computeds ----

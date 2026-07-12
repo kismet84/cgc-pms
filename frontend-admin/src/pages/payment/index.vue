@@ -19,7 +19,11 @@ import { getCashJournalList } from '@/api/modules/cashbook'
 import { getReceiptItems, getReceiptList } from '@/api/modules/receipt'
 import { getMeasureItems, getMeasureList } from '@/api/modules/subcontract'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import { formatWanAmount } from '@/composables/listTablePresets'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useReferenceStore } from '@/stores/reference'
@@ -71,16 +75,15 @@ const canViewCashJournal = computed(
     userStore.roles.includes('SUPER_ADMIN') ||
     userStore.hasPermission('cashbook:journal:query'),
 )
-const hasActiveFilters = computed(
-  () =>
-    Boolean(
-      filter.projectId ||
-        filter.contractId ||
-        filter.partnerId ||
-        filter.payType ||
-        filter.payStatus ||
-        filter.approvalStatus,
-    ),
+const hasActiveFilters = computed(() =>
+  Boolean(
+    filter.projectId ||
+    filter.contractId ||
+    filter.partnerId ||
+    filter.payType ||
+    filter.payStatus ||
+    filter.approvalStatus,
+  ),
 )
 
 type BasisType = 'MAT_RECEIPT' | 'SUB_MEASURE'
@@ -222,7 +225,16 @@ async function syncRouteQuery() {
       pageNo: pageNo.value,
       pageSize: pageSize.value,
     },
-    ['projectId', 'contractId', 'partnerId', 'payType', 'payStatus', 'approvalStatus', 'pageNo', 'pageSize'],
+    [
+      'projectId',
+      'contractId',
+      'partnerId',
+      'payType',
+      'payStatus',
+      'approvalStatus',
+      'pageNo',
+      'pageSize',
+    ],
   )
   await router.replace({ path: route.path, query: nextQuery })
 }
@@ -669,7 +681,13 @@ onMounted(() => {
     <div v-if="linkedCashJournal" class="linked-cash-journal-banner">
       <div>
         <strong>关联资金流水 {{ linkedCashJournal.entryNo }}</strong>
-        <span>状态：{{ linkedCashJournal.status === 'PENDING_ARCHIVE' ? '待选择账户、上传附件并归档' : linkedCashJournal.status }}</span>
+        <span
+          >状态：{{
+            linkedCashJournal.status === 'PENDING_ARCHIVE'
+              ? '待选择账户、上传附件并归档'
+              : linkedCashJournal.status
+          }}</span
+        >
       </div>
       <a-button type="primary" @click="openLinkedCashJournal">进入资金日记账</a-button>
     </div>
@@ -724,11 +742,7 @@ onMounted(() => {
 
         <div class="lg-table-wrap">
           <div v-if="listError" class="payment-list-feedback">
-            <a-result
-              status="error"
-              title="付款列表加载失败"
-              :sub-title="listError"
-            >
+            <a-result status="error" title="付款列表加载失败" :sub-title="listError">
               <template #extra>
                 <a-button type="primary" @click="fetchData">重试</a-button>
               </template>
@@ -875,7 +889,10 @@ onMounted(() => {
           <a-input v-model:value="writebackForm.voucherNo" placeholder="请输入凭证号" />
         </a-form-item>
         <a-form-item label="外部交易流水号" required>
-          <a-input v-model:value="writebackForm.externalTxnNo" placeholder="银行或支付渠道唯一流水号" />
+          <a-input
+            v-model:value="writebackForm.externalTxnNo"
+            placeholder="银行或支付渠道唯一流水号"
+          />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -898,8 +915,14 @@ onMounted(() => {
   background: #f0f7ff;
 }
 
-.linked-cash-journal-banner > div { display: grid; gap: 4px; }
-.linked-cash-journal-banner span { color: var(--text-secondary); font-size: 13px; }
+.linked-cash-journal-banner > div {
+  display: grid;
+  gap: 4px;
+}
+.linked-cash-journal-banner span {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
 
 .payment-table-panel {
   min-height: 754px;

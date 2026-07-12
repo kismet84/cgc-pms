@@ -7,7 +7,11 @@ import {
   submitRequisitionForApproval,
 } from '@/api/modules/requisition'
 import { getWarehouseList } from '@/api/modules/inventory'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import {
   buildActionColumn,
   buildAmountColumn,
@@ -45,15 +49,14 @@ export function useRequisitionList({
   const queryReady = ref(false)
 
   const warehouseList = ref<WarehouseVO[]>([])
-  const hasActiveFilters = computed(
-    () =>
-      Boolean(
-        filter.projectId ||
-          filter.contractId ||
-          filter.warehouseId ||
-          filter.approvalStatus ||
-          filter.requisitionCode,
-      ),
+  const hasActiveFilters = computed(() =>
+    Boolean(
+      filter.projectId ||
+      filter.contractId ||
+      filter.warehouseId ||
+      filter.approvalStatus ||
+      filter.requisitionCode,
+    ),
   )
 
   // ---- KPI computeds ----

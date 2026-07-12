@@ -15,6 +15,15 @@
 - 候选来源依次为 [Ad-hoc 计划](ad-hoc-plan.md)、[长期增强计划](cgc-pms-production-enhancement-plan.md)。
 - v1.0 的完成记录、测试数量和质量结论不得直接作为 v1.5 验收证据。
 
+## 2026-07-13 全量审计闭环状态
+
+- `docs/quality/code-audit-2026-07-12-full-develop-1.5.md` 的 7 项原阻塞已完成本地根因闭环；后端 1723 tests、前端 505 tests、MySQL 8 Flyway、SQL safety、构建后 JAR Trivy、UI smoke 与内置浏览器验收均通过。
+- `master` 分支保护已启用管理员强制与 required conversation resolution，11 个 required checks 和 strict 语义保持不变。
+- 当前唯一上线阻塞：整改已获 commit/push 授权并进入远端取证阶段；在同一待合并 SHA 的 11 个 required checks 全绿前仍不可上线。
+- 已完成依赖与格式治理：413 条纯 Prettier 告警已降为 0，ECharts 6.1.0 / vue-echarts 8.0.1 升级后 `pnpm audit --audit-level moderate` 为 0 漏洞；格式化后全量前端与 E2E 通过。
+- Trivy Java DB 已在 `supply-chain-security` 增加按 UTC 日期缓存与历史缓存回退；国内网络风险收敛为首次冷缓存下载时延，不采用未经项目验证的第三方镜像。
+- 本机临时项：损坏 ACL 的旧 `node_modules` 已隔离并尝试清理，残留文件仍受原 ACL 保护；用户 Chrome 与 Trivy DB 缓存位于 `.codex-autopilot/runs/`，均不进入版本管理或运行构建。
+
 ## 当前方向决策
 
 - 决策周期：`PI-2026-07-11-01`。
@@ -60,7 +69,7 @@
 - 本次 `启动迭代-10` 当前完成 3/10；Ready 清空后继续补货。静态盘点不代表真实角色、动态菜单或运行态可见性通过。
 - `ISSUE-037-020` 已完成：长期计划补货只接纳第 7–9 章开发计划，2–6 章现状/对标/差距/目标标题不再误入 Candidate；本次当前完成 4/10，继续补货。
 - `ISSUE-037-021` 已通过独立 Reviewer 证据复核：master 最新 CI run 29146534529 的 frontend-lint、frontend-test、e2e 为 required 红灯，且分支保护 `enforce_admins=false`、未启用 push restrictions；当前裁决维持不通过、阻塞、不可上线。
-- 当前 Issue 工作树 `1aeb90c8f` 的差异不改变 master 裁决但需后续治理：后端 verify 受 144-bit 测试 JWT 前置影响并有 1 条权限断言失败，SQL safety scan 有两处固定字面量 marker 缺口；不得用远端 master 绿项覆盖这些本地差异。
+- 当前工作树的原本地差异已完成根因治理：后端 `verify` 为 1723 tests、0 failure、0 error（1 skipped），SQL safety scan 通过；剩余阻塞仅为尚未获得 commit/push 授权及同一待合并 SHA 的远端 required checks 证据。
 - CI 工具链观察：GitHub annotation 提示 Node 20 action 被强制运行于 Node 24；当前不是三个红灯的退出根因，升级 Actions 需另行授权。
 - `停止迭代` 已生效：本次 `启动迭代-10` 最终完成 4/10 条实施型 Ready；`ISSUE-037-021` 仅作为不通过的回归证明归档，不计入实施数，当前不再派发下一任务。
 - 新一轮 `启动迭代-1` 在控制面选单前稳定复现 Windows PowerShell 5.1 ParserError；已按 `tool_config` 分类并建立 `ISSUE-037-022`，仅恢复 AutoPilot 脚本 UTF-8 解析兼容与回归保护，不改变业务或生产边界。

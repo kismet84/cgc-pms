@@ -62,7 +62,12 @@ const supplierScoreCols = [
   { title: '供应商', dataIndex: 'partnerName', width: 160, ellipsis: true },
   { title: '订单数', dataIndex: 'orderCount', width: 96, align: 'right' as const },
   { title: '迟交完成数', dataIndex: 'lateCompletedCount', width: 116, align: 'right' as const },
-  { title: '逾期未完成数', dataIndex: 'overdueIncompleteCount', width: 128, align: 'right' as const },
+  {
+    title: '逾期未完成数',
+    dataIndex: 'overdueIncompleteCount',
+    width: 128,
+    align: 'right' as const,
+  },
   { title: '交期达成率', dataIndex: 'onTimeDeliveryRate', width: 116, align: 'right' as const },
   { title: '交期表现评分', dataIndex: 'performanceScore', width: 128, align: 'right' as const },
 ]

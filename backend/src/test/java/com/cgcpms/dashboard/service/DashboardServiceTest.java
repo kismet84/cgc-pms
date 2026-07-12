@@ -124,7 +124,10 @@ abstract class DashboardServiceTestSupport {
      */
     protected SeedResult seed(String suffix) {
         setAdminContext();
-        LocalDate currentMonthDate = LocalDate.now().withDayOfMonth(1).plusDays(1);
+        LocalDate today = LocalDate.now();
+        LocalDate currentMonthDate = today.withDayOfMonth(1).plusDays(1);
+        LocalDate expiringContractDate = today.plusDays(
+                Math.min(10, today.lengthOfMonth() - today.getDayOfMonth()));
 
         // Project
         PmProject project = new PmProject();
@@ -149,7 +152,7 @@ abstract class DashboardServiceTestSupport {
         contract.setCurrentAmount(new BigDecimal("5500000.00"));
         contract.setPaidAmount(new BigDecimal("2000000.00"));
         contract.setContractStatus("PERFORMING");
-        contract.setEndDate(currentMonthDate.plusDays(10));
+        contract.setEndDate(expiringContractDate);
         ctContractMapper.insert(contract);
         Long contractId = contract.getId();
 

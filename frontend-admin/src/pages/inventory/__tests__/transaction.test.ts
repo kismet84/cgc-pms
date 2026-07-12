@@ -25,7 +25,10 @@ describe('inventory transaction permission gate', () => {
   it('keeps visible inline validation feedback for empty inbound and outbound submit attempts', () => {
     expect(source).toContain('inInlineError')
     expect(source).toContain('outInlineError')
-    expect(source).toMatch(/<a-alert v-if="inInlineError"[\s\S]*type="warning"/)
-    expect(source).toMatch(/<a-alert[\s\S]*v-if="outInlineError"[\s\S]*type="warning"/)
+    expect(source).toContain('v-if="inInlineError"')
+    expect(source).toContain(':message="inInlineError"')
+    expect(source).toContain('v-if="outInlineError"')
+    expect(source).toContain(':message="outInlineError"')
+    expect(source.match(/type="warning"/g)).toHaveLength(2)
   })
 })

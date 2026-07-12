@@ -1,6 +1,11 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { PayApplicationVO, PayApplicationBasisVO, PayRecordVO, PayWritebackDTO } from '@/types/payment'
+import type {
+  PayApplicationVO,
+  PayApplicationBasisVO,
+  PayRecordVO,
+  PayWritebackDTO,
+} from '@/types/payment'
 
 /** 付款申请列表分页查询 */
 export function getApplicationList(params: Record<string, unknown>) {

@@ -75,29 +75,17 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     })
   })
 
-  test('4. 付款申请页 -- KPI 卡片可见', async ({ page }) => {
+  test('4. 付款申请页 -- 经营摘要与列表状态可见', async ({ page }) => {
     await page.goto('/payment/application')
-    await page.waitForSelector('.ant-table, .vxe-table, .lg-kpi-strip', { timeout: 10000 })
+    await page.waitForSelector('.vxe-table, .payment-list-feedback', { timeout: 10000 })
 
     // 验证页面容器
     await expect(page.locator('.lg-page').first()).toBeVisible()
 
-    // 验证表格可见（付款申请页核心是表格）
-    const table = page.locator('.ant-table, .vxe-table').first()
-    await expect(table).toBeVisible({ timeout: 5000 })
-
-    // KPI 卡片可选验证
-    const kpiCards = page.locator('.lg-kpi-strip, .ant-card:has(.ant-statistic)')
-    const kpiVisible = await kpiCards
-      .first()
-      .isVisible({ timeout: 3000 })
-      .catch(() => false)
-    if (kpiVisible) {
-      const kpiCount = await kpiCards.count()
-      console.log(`付款页 KPI 卡片数量: ${kpiCount}`)
-    } else {
-      console.log('付款页无 KPI 卡片（可能为空状态）')
-    }
+    // 经营摘要必须存在；列表允许展示数据表格或明确空状态。
+    await expect(page.locator('.payment-head-digest')).toBeVisible()
+    const tableOrFeedback = page.locator('.vxe-table, .payment-list-feedback')
+    await expect(tableOrFeedback.first()).toBeVisible({ timeout: 5000 })
 
     await page.screenshot({ path: 'e2e/screenshots/ui-smoke-payment.png', fullPage: true })
   })
@@ -119,17 +107,17 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     })
   })
 
-  test('6. 审批中心 -- 待办列表可见', async ({ page }) => {
+  test('6. 审批中心 -- 待办列表状态可见', async ({ page }) => {
     await page.goto('/approval/todo')
-    await page.waitForSelector('.ant-table, .vxe-table, .ant-tabs', { timeout: 10000 })
+    await page.waitForSelector('.vxe-table, .approval-list-feedback', { timeout: 10000 })
 
     // 验证标签页可见（待办/已办/抄送）
     const tabs = page.locator('.ant-tabs')
     await expect(tabs.first()).toBeVisible({ timeout: 5000 })
 
-    // 验证表格或列表可见
-    const table = page.locator('.ant-table, .vxe-table, .ant-list').first()
-    await expect(table).toBeVisible({ timeout: 5000 })
+    // 验证数据表格或合法的空态/错误反馈可见
+    const listState = page.locator('.vxe-table, .approval-list-feedback').first()
+    await expect(listState).toBeVisible({ timeout: 5000 })
 
     await page.screenshot({
       path: 'e2e/screenshots/ui-smoke-approval-todo.png',

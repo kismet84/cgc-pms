@@ -76,7 +76,7 @@ public class SiteDailyLogService {
             List<Long> visibleIds = projectAccessChecker.filterAccessible(projectMapper.selectList(
                             new LambdaQueryWrapper<PmProject>().eq(PmProject::getTenantId, UserContext.getCurrentTenantId())))
                     .stream().map(PmProject::getId).toList();
-            if (visibleIds.isEmpty()) query.apply("1 = 0");
+            if (visibleIds.isEmpty()) query.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
             else query.in(SiteDailyLog::getProjectId, visibleIds);
         }
         if (startDate != null) query.ge(SiteDailyLog::getReportDate, startDate);

@@ -8,7 +8,11 @@ import {
   updateStockReplenishmentSettings,
 } from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import type { WarehouseVO, MatStockTxnVO, StockKpiVO, MatStockVO } from '@/types/inventory'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
@@ -102,8 +106,8 @@ export function useStockLedger({
   const txnPageNo = ref(1)
   const txnPageSize = ref(20)
   const queryReady = ref(false)
-  const hasActiveFilters = computed(
-    () => Boolean(filter.projectId || filter.warehouseId || filter.materialId || filter.keyword),
+  const hasActiveFilters = computed(() =>
+    Boolean(filter.projectId || filter.warehouseId || filter.materialId || filter.keyword),
   )
   const hasRequiredFilters = computed(() => Boolean(filter.warehouseId && filter.materialId))
 
@@ -182,9 +186,8 @@ export function useStockLedger({
       if (mySeq !== fetchSeq) return
       stock.value = res.stock
       safetyThresholdDraft.value = res.stock ? Number(res.stock.safetyStockQty) : null
-      replenishmentTargetDraft.value = res.stock?.replenishmentTargetQty == null
-        ? null
-        : Number(res.stock.replenishmentTargetQty)
+      replenishmentTargetDraft.value =
+        res.stock?.replenishmentTargetQty == null ? null : Number(res.stock.replenishmentTargetQty)
       replenishmentLeadDaysDraft.value = res.stock?.replenishmentLeadDays ?? null
       if (res.txns) {
         txnList.value = res.txns.records ?? []
@@ -345,7 +348,9 @@ export function useStockLedger({
   function handleReplenish() {
     const quantity = Number(stock.value?.availableQty)
     const safetyStockQty = Number(stock.value?.safetyStockQty)
-    const replenishmentTargetQty = Number(stock.value?.replenishmentTargetQty ?? stock.value?.safetyStockQty)
+    const replenishmentTargetQty = Number(
+      stock.value?.replenishmentTargetQty ?? stock.value?.safetyStockQty,
+    )
     if (!stock.value || quantity <= 0 || quantity >= safetyStockQty) return
     const suggestedQuantity = Math.max(0, replenishmentTargetQty - quantity).toFixed(4)
     const projectId = warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId
@@ -379,9 +384,8 @@ export function useStockLedger({
       )
       stock.value = updated
       safetyThresholdDraft.value = Number(updated.safetyStockQty)
-      replenishmentTargetDraft.value = updated.replenishmentTargetQty == null
-        ? null
-        : Number(updated.replenishmentTargetQty)
+      replenishmentTargetDraft.value =
+        updated.replenishmentTargetQty == null ? null : Number(updated.replenishmentTargetQty)
       replenishmentLeadDaysDraft.value = updated.replenishmentLeadDays ?? null
       await fetchKpi()
       message.success('补货设置已更新')
@@ -445,7 +449,12 @@ export function useStockLedger({
   } = useColumnSettings('stock_ledger_cols', gridColumns)
 
   const showEmptyState = computed(
-    () => hasLoaded.value && !loading.value && !listError.value && hasRequiredFilters.value && !txnList.value.length,
+    () =>
+      hasLoaded.value &&
+      !loading.value &&
+      !listError.value &&
+      hasRequiredFilters.value &&
+      !txnList.value.length,
   )
 
   function init() {

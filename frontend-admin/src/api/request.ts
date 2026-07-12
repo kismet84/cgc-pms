@@ -112,7 +112,9 @@ service.interceptors.response.use(
     if (res.code === SUCCESS_CODE) {
       return res.data as never
     }
-    message.error(getConfiguredErrorMessage(response.config) || res.message || '操作失败，请稍后重试')
+    message.error(
+      getConfiguredErrorMessage(response.config) || res.message || '操作失败，请稍后重试',
+    )
     return Promise.reject(new Error(res.message || '操作失败'))
   },
   async (error) => {

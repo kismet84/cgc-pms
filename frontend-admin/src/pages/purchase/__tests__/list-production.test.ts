@@ -9,9 +9,10 @@ const source = readFileSync(resolve(currentDir, '../order.vue'), 'utf-8')
 describe('purchase order list production hardening', () => {
   it('hydrates and persists filters through route query', () => {
     expect(source).toContain("import { useRoute, useRouter } from 'vue-router'")
-    expect(source).toContain(
-      "import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'",
-    )
+    expect(source).toContain("from '@/composables/listPageQuery'")
+    expect(source).toContain('readPositiveIntQuery')
+    expect(source).toContain('readStringQuery')
+    expect(source).toContain('replaceListQuery')
     expect(source).toContain('readStringQuery(route.query.projectId)')
     expect(source).toContain('readStringQuery(route.query.keyword)')
     expect(source).toContain('readPositiveIntQuery(route.query.pageNo, 1)')

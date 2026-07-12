@@ -22,7 +22,10 @@ const ATableStub = defineComponent({
       const rows = (props.dataSource as Array<Record<string, unknown>>) ?? []
 
       return h('table', { class: 'table-stub' }, [
-        h('thead', columns.map((column) => h('th', String(column.title ?? '')))),
+        h(
+          'thead',
+          columns.map((column) => h('th', String(column.title ?? ''))),
+        ),
         h(
           'tbody',
           rows.length

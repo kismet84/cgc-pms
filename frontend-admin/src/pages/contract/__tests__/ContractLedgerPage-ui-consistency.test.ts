@@ -42,7 +42,7 @@ describe('ContractLedgerPage UI consistency', () => {
     expect(source).toContain('@toggle="toggleCol"')
     expect(source).toContain(':columns="visibleColumns"')
     expect(composableSource).toContain("title: '甲方'")
-    expect(composableSource).toContain("title: '签订日期'")
+    expect(composableSource).toContain("buildDateColumn('signedDate', '签订日期'")
     expect(composableSource).toContain('partyAName: false')
     expect(composableSource).toContain('signedDate: false')
     expect(source).toContain('color: var(--text-secondary)')

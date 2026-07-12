@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "spring.main.allow-circular-references=true",
+        "rate-limit.global-write.enabled=true",
         "rate-limit.global-write.max-requests=2",
         "rate-limit.global-write.window-seconds=60"
 })

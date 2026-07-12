@@ -105,7 +105,9 @@ const drawerStubs = {
   ADescriptionsItem: { template: '<div><slot /></div>' },
   ATag: { template: '<span><slot /></span>' },
   AButton: { template: '<button v-bind="$attrs"><slot /></button>' },
-  AModal: { template: '<div><slot /></div><template v-if="$slots.footer"><slot name="footer" /></template>' },
+  AModal: {
+    template: '<div><slot /></div><template v-if="$slots.footer"><slot name="footer" /></template>',
+  },
   AList: { template: '<div><slot /></div>' },
   AListItem: { template: '<div><slot /></div>' },
   AUpload: { template: '<div><slot /></div>' },
@@ -133,7 +135,11 @@ describe('cash journal detail controls', () => {
     const wrapper = mount(CashJournalDetailDrawer, {
       props: {
         open: true,
-        entry: entry({ status: 'ARCHIVED', attachmentCount: 1, attachments: [{ id: 'f1' } as never] }),
+        entry: entry({
+          status: 'ARCHIVED',
+          attachmentCount: 1,
+          attachments: [{ id: 'f1' } as never],
+        }),
         canMaintain: true,
         isSuperAdmin: true,
       },
@@ -165,7 +171,11 @@ describe('cash journal page', () => {
     mocks.contracts = []
     mocks.getList.mockReset().mockResolvedValue({ records: [], total: 0, pageNo: 1, pageSize: 20 })
     mocks.getSummary.mockReset().mockResolvedValue({
-      cashBalance: '1.00', bankBalance: '2.00', income: '3.00', expense: '4.00', pendingCount: 0,
+      cashBalance: '1.00',
+      bankBalance: '2.00',
+      income: '3.00',
+      expense: '4.00',
+      pendingCount: 0,
     })
     mocks.getAccounts.mockReset().mockResolvedValue([])
     mocks.getDetail.mockReset().mockResolvedValue(entry())
@@ -229,34 +239,47 @@ describe('cash journal page', () => {
   it.each([
     ['project:query', true, false],
     ['contract:query', false, true],
-  ])('loads only the authorized %s reference', async (permission, loadsProjects, loadsContracts) => {
-    mocks.roles = ['FINANCE']
-    mocks.permissions = ['cashbook:journal:query', permission]
+  ])(
+    'loads only the authorized %s reference',
+    async (permission, loadsProjects, loadsContracts) => {
+      mocks.roles = ['FINANCE']
+      mocks.permissions = ['cashbook:journal:query', permission]
 
-    const wrapper = mount(CashJournalPage, {
-      global: {
-        stubs: {
-          CashJournalDetailDrawer: true,
-          CashJournalFormModal: true,
-          FundAccountModal: true,
+      const wrapper = mount(CashJournalPage, {
+        global: {
+          stubs: {
+            CashJournalDetailDrawer: true,
+            CashJournalFormModal: true,
+            FundAccountModal: true,
+          },
         },
-      },
-    })
-    await flushPromises()
+      })
+      await flushPromises()
 
-    expect(mocks.fetchProjects).toHaveBeenCalledTimes(loadsProjects ? 1 : 0)
-    expect(mocks.fetchContracts).toHaveBeenCalledTimes(loadsContracts ? 1 : 0)
-    expect(wrapper.find('[data-testid="project-filter"]').exists()).toBe(loadsProjects)
-    expect(wrapper.find('[data-testid="contract-filter"]').exists()).toBe(loadsContracts)
-  })
+      expect(mocks.fetchProjects).toHaveBeenCalledTimes(loadsProjects ? 1 : 0)
+      expect(mocks.fetchContracts).toHaveBeenCalledTimes(loadsContracts ? 1 : 0)
+      expect(wrapper.find('[data-testid="project-filter"]').exists()).toBe(loadsProjects)
+      expect(wrapper.find('[data-testid="contract-filter"]').exists()).toBe(loadsContracts)
+    },
+  )
 
   it('contains the wide table scroll inside the page and wraps primary actions at 440px', () => {
     const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-    expect(source).toMatch(/\.cash-journal-page\s*\{[^}]*min-width:\s*0;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s)
+    expect(source).toMatch(
+      /\.cash-journal-page\s*\{[^}]*min-width:\s*0;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    )
     expect(source).toMatch(/\.cash-journal-table-card\s*\{[^}]*min-width:\s*0;/s)
-    expect(source).toMatch(/\.cash-journal-table-wrap\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*auto;/s)
-    expect(source).toMatch(/@media \(max-width: 440px\)[\s\S]*?\.cash-journal-primary-actions\s*\{[^}]*position:\s*static;[^}]*width:\s*100%;/s)
-    expect(source).toMatch(/@media \(max-width: 440px\)[\s\S]*?\.cash-journal-primary-actions :deep\(\.ant-btn\)\s*\{[^}]*flex:\s*1 1 132px;/s)
-    expect(source).toMatch(/@media \(max-width: 440px\)[\s\S]*?\.filter-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s)
+    expect(source).toMatch(
+      /\.cash-journal-table-wrap\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*auto;/s,
+    )
+    expect(source).toMatch(
+      /@media \(max-width: 440px\)[\s\S]*?\.cash-journal-primary-actions\s*\{[^}]*position:\s*static;[^}]*width:\s*100%;/s,
+    )
+    expect(source).toMatch(
+      /@media \(max-width: 440px\)[\s\S]*?\.cash-journal-primary-actions :deep\(\.ant-btn\)\s*\{[^}]*flex:\s*1 1 132px;/s,
+    )
+    expect(source).toMatch(
+      /@media \(max-width: 440px\)[\s\S]*?\.filter-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    )
   })
 })

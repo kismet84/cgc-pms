@@ -28,7 +28,11 @@ import type {
 } from '@/types/settlement'
 import { SETTLEMENT_STATUS_LABEL, SETTLEMENT_STATUS_COLOR } from '@/types/settlement'
 import type { PageResult } from '@/types/api'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import { formatWanAmount } from '@/composables/listTablePresets'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'

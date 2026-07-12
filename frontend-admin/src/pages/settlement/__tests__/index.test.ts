@@ -30,7 +30,9 @@ describe('settlement page quality guardrails', () => {
   it('renders explicit error and empty states with retry entry', () => {
     expect(source).toContain('const listError = ref<string | null>(null)')
     expect(source).toContain('const hasLoaded = ref(false)')
-    expect(source).toContain('<a-result status="error" title="结算列表加载失败" :sub-title="listError">')
+    expect(source).toContain(
+      '<a-result status="error" title="结算列表加载失败" :sub-title="listError">',
+    )
     expect(source).toContain('<LgEmptyState description="暂无符合条件的结算记录">')
     expect(source).toContain('@click="fetchData"')
   })

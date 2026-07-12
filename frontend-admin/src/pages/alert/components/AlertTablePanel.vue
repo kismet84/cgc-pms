@@ -63,7 +63,10 @@ defineProps<{
           @click="handleBatchStatus('PROCESSED')"
           >批量处理</a-button
         >
-        <a-button v-if="canManageAlerts" :disabled="selectedCount === 0" @click="handleBatchMarkRead"
+        <a-button
+          v-if="canManageAlerts"
+          :disabled="selectedCount === 0"
+          @click="handleBatchMarkRead"
           >标记已读</a-button
         >
         <a-button

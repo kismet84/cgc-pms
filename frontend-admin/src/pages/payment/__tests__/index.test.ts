@@ -33,8 +33,7 @@ vi.mock('vue-router', () => ({
 vi.mock('@/stores/user', () => ({
   useUserStore: () => ({
     roles: mocks.roles,
-    hasPermission: (code: string) =>
-      mocks.permissions.has('*') || mocks.permissions.has(code),
+    hasPermission: (code: string) => mocks.permissions.has('*') || mocks.permissions.has(code),
   }),
 }))
 
@@ -192,7 +191,6 @@ describe('payment page quality guardrails', () => {
     expect(source).toContain('<PaymentOverviewPanel')
     expect(source).toContain('<PaymentFormModal')
   })
-
 })
 
 describe('payment writeback result boundaries', () => {
@@ -217,7 +215,9 @@ describe('payment writeback result boundaries', () => {
 
     expect(mocks.error).toHaveBeenCalledWith('银行拒绝付款')
     expect(wrapper.find('[data-testid="writeback-modal"]').exists()).toBe(true)
-    expect((wrapper.get('[data-testid="pay-amount"]').element as HTMLInputElement).value).toBe('100')
+    expect((wrapper.get('[data-testid="pay-amount"]').element as HTMLInputElement).value).toBe(
+      '100',
+    )
     expect(
       (wrapper.get('input[placeholder="银行或支付渠道唯一流水号"]').element as HTMLInputElement)
         .value,
@@ -267,21 +267,24 @@ describe('payment writeback result boundaries', () => {
     expect(mocks.getCashJournalList).not.toHaveBeenCalled()
   })
 
-  it.each(['ADMIN', 'SUPER_ADMIN'])('allows %s to view the linked journal without an explicit query permission', async (role) => {
-    mocks.roles = [role]
-    mocks.permissions = new Set(['payment:record:writeback'])
-    mocks.writeback.mockResolvedValue({ id: 'new-pay-record' })
-    mocks.getCashJournalList.mockResolvedValue({ records: [] })
-    const wrapper = await mountPaymentPage()
+  it.each(['ADMIN', 'SUPER_ADMIN'])(
+    'allows %s to view the linked journal without an explicit query permission',
+    async (role) => {
+      mocks.roles = [role]
+      mocks.permissions = new Set(['payment:record:writeback'])
+      mocks.writeback.mockResolvedValue({ id: 'new-pay-record' })
+      mocks.getCashJournalList.mockResolvedValue({ records: [] })
+      const wrapper = await mountPaymentPage()
 
-    await openAndFillWriteback(wrapper)
-    await wrapper.get('[data-testid="writeback-confirm"]').trigger('click')
-    await flushPromises()
+      await openAndFillWriteback(wrapper)
+      await wrapper.get('[data-testid="writeback-confirm"]').trigger('click')
+      await flushPromises()
 
-    expect(mocks.getCashJournalList).toHaveBeenCalledWith(
-      expect.objectContaining({ sourceId: 'new-pay-record' }),
-    )
-  })
+      expect(mocks.getCashJournalList).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceId: 'new-pay-record' }),
+      )
+    },
+  )
 
   it('handles a linked journal query failure from the route without an unhandled rejection', async () => {
     mocks.routeQuery = { payRecordId: 'missing-pay-record' }
