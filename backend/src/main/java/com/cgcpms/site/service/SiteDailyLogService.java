@@ -22,6 +22,9 @@ import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.site.vo.SiteDailyLogVO;
 import com.cgcpms.site.vo.SiteDailyDeliveryVO;
+import com.cgcpms.site.vo.SiteDailyPlannedTaskVO;
+import com.cgcpms.subcontract.entity.SubTask;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -49,6 +52,7 @@ public class SiteDailyLogService {
     private final MatReceiptItemMapper receiptItemMapper;
     private final MdMaterialMapper materialMapper;
     private final MdPartnerMapper partnerMapper;
+    private final SubTaskMapper subTaskMapper;
 
     public IPage<SiteDailyLogVO> getPage(long pageNo, long pageSize, Long projectId,
                                          LocalDate startDate, LocalDate endDate, String status) {
@@ -84,6 +88,7 @@ public class SiteDailyLogService {
         PmProject project = projectMapper.selectById(log.getProjectId());
         SiteDailyLogVO detail = toVO(log, project == null ? null : project.getProjectName());
         detail.setDeliveries(loadDeliveries(log));
+        detail.setPlannedTasks(loadPlannedTasks(log));
         return detail;
     }
 
@@ -241,5 +246,30 @@ public class SiteDailyLogService {
             delivery.setQualifiedQuantity(item.getQualifiedQuantity() == null ? null : item.getQualifiedQuantity().toPlainString());
             return delivery;
         }).toList();
+    }
+
+    private List<SiteDailyPlannedTaskVO> loadPlannedTasks(SiteDailyLog log) {
+        LocalDate reportDate = log.getReportDate();
+        return subTaskMapper.selectList(new LambdaQueryWrapper<SubTask>()
+                        .eq(SubTask::getTenantId, UserContext.getCurrentTenantId())
+                        .eq(SubTask::getProjectId, log.getProjectId())
+                        .isNotNull(SubTask::getPlannedStartDate)
+                        .isNotNull(SubTask::getPlannedEndDate)
+                        .le(SubTask::getPlannedStartDate, reportDate)
+                        .ge(SubTask::getPlannedEndDate, reportDate)
+                        .orderByAsc(SubTask::getPlannedStartDate)
+                        .orderByAsc(SubTask::getTaskCode))
+                .stream().map(task -> {
+                    SiteDailyPlannedTaskVO planned = new SiteDailyPlannedTaskVO();
+                    planned.setId(task.getId().toString());
+                    planned.setTaskCode(task.getTaskCode());
+                    planned.setTaskName(task.getTaskName());
+                    planned.setWorkArea(task.getWorkArea());
+                    planned.setPlannedStartDate(task.getPlannedStartDate().format(DateTimeUtils.DATE_FMT));
+                    planned.setPlannedEndDate(task.getPlannedEndDate().format(DateTimeUtils.DATE_FMT));
+                    planned.setStatus(task.getStatus());
+                    planned.setProgressPercent(task.getProgressPercent() == null ? null : task.getProgressPercent().toPlainString());
+                    return planned;
+                }).toList();
     }
 }

@@ -1,5 +1,15 @@
 # CGC-PMS v1.5 首轮迭代方向决策
 
+## PI-2026-07-12-07：现场日报当日计划任务只读联动
+
+- 项目事实：现有 `sub_task` 已包含 tenant/project、计划开始/结束、作业区域、状态和进度；日报详情已具备项目访问校验和跨域只读聚合模式。
+- 外部事实：Procore Daily Log 官方概览将 Scheduled Work 用于跟踪计划到场并完成任务的项目资源；核验时间 2026-07-12。
+- 候选比较：只读对照既有计划任务，比新建日报排程、设备台账、多前置 WBS 或继续扩材料写模型更小，且连接了已完成的 WBS 与日报能力。
+- 最小闭环：按同租户、同项目和计划日期闭区间返回当天任务的最小字段；无命中为空列表。
+- 非目标：不改任务、不自动排程、不扩多前置/关键路径，不披露合同金额或供应商信息。
+- 裁决：形成 `ISSUE-037-012`，任务性质为能力新增，风险中等。
+- 官方来源：<https://support.procore.com/products/online/user-guide/project-level/daily-log/tutorials/daily-log-overview>。
+
 ## PI-2026-07-12-06：现场日报已审批材料到货只读联动
 
 - 项目事实：`SiteDailyLogService.getById()` 已在返回详情前执行项目访问校验；`MatReceipt` 已具备项目、验收日期和审批状态，`MatReceiptItem` 已具备物料、实收与合格数量，`MaterialReceiptWorkflowHandler` 仅在审批通过后将状态设为 `APPROVED` 并执行入库/成本生成。

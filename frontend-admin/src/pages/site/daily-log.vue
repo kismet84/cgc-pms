@@ -209,6 +209,19 @@ onMounted(() => { referenceStore.fetchProjects(); fetchData() })
         </a-table>
         <a-empty v-else description="当日暂无已审批材料到货" />
       </section>
+      <section v-if="activeRecord && modalMode === 'view'" class="site-daily-planned-tasks">
+        <strong>当日计划任务</strong>
+        <a-table v-if="activeRecord.plannedTasks?.length" :data-source="activeRecord.plannedTasks" :pagination="false" row-key="id" size="small">
+          <a-table-column key="taskCode" title="任务编号" data-index="taskCode" />
+          <a-table-column key="taskName" title="任务" data-index="taskName" />
+          <a-table-column key="workArea" title="作业区域" data-index="workArea" />
+          <a-table-column key="plannedDate" title="计划日期" />
+          <a-table-column key="status" title="状态" data-index="status" />
+          <a-table-column key="progressPercent" title="进度(%)" data-index="progressPercent" />
+          <template #bodyCell="{ column, record: planned }"><span v-if="column.key === 'taskCode'">{{ planned.taskCode }}</span><span v-else-if="column.key === 'taskName'">{{ planned.taskName }}</span><span v-else-if="column.key === 'workArea'">{{ planned.workArea || '-' }}</span><span v-else-if="column.key === 'plannedDate'">{{ planned.plannedStartDate }} 至 {{ planned.plannedEndDate }}</span><span v-else-if="column.key === 'status'">{{ planned.status }}</span><span v-else-if="column.key === 'progressPercent'">{{ planned.progressPercent ?? '-' }}</span></template>
+        </a-table>
+        <a-empty v-else description="当日暂无计划任务" />
+      </section>
       <section v-if="activeRecord" class="site-daily-files"><strong>附件</strong><input v-if="canEdit && activeRecord.status === 'DRAFT'" type="file" @change="onFileChange" /><a-spin :spinning="filesLoading"><div v-for="file in files" :key="file.id"><a-button type="link" @click="download(file)">{{ file.originalName }}</a-button><a-button v-if="canEdit && activeRecord.status === 'DRAFT'" danger type="link" @click="removeFile(file)">删除</a-button></div><a-empty v-if="!files.length" description="暂无附件" /></a-spin></section>
       <template #footer><a-button @click="modalOpen = false">关闭</a-button><a-button v-if="modalMode !== 'view'" type="primary" :loading="saving" @click="save">保存草稿</a-button><a-button v-if="canEdit && activeRecord?.status === 'DRAFT'" type="primary" @click="submitRecord(activeRecord)">提交定稿</a-button></template>
     </a-modal>
@@ -221,4 +234,5 @@ onMounted(() => { referenceStore.fetchProjects(); fetchData() })
 .lg-page-head h1 { margin:0; }.lg-page-head p { margin:6px 0 0; color:var(--text-secondary); }
 .site-daily-files { display:grid; gap:8px; margin-top:16px; }
 .site-daily-deliveries { display:grid; gap:8px; margin-top:16px; }
+.site-daily-planned-tasks { display:grid; gap:8px; margin-top:16px; }
 </style>

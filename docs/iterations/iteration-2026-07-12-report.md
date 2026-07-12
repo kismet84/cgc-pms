@@ -121,3 +121,13 @@
 - 自动合并：本地 commit only；`autoPush=false`。
 - 下一轮：继续产品情报刷新与候选补货；未命中 stop/pause。
 - 正式报告：`docs/quality/ISSUE-037-011-现场日报已审批材料到货只读联动验收报告.md`。
+
+## ISSUE-037-012：现场日报当日计划任务只读联动
+
+- 状态：Done；计入 `启动迭代-3` 第 2/3 条实施型 Ready Issue。
+- 修改范围：日报详情增加分包 WBS 当日计划任务只读聚合、最小 VO/前端表格、产品情报与 backlog；无 migration，无任务写路径修改。
+- 验证：后端 8/8、前端 4/4、类型检查、Ready lint、`git diff --check` 与主线程权限审查通过。
+- 图谱检索证据：CodeGraph 定位 `SubTask`/`SubTaskService` 和日报关联点，但编辑期自动同步因文件锁停用；`codebase-memory-mcp` 只读确认 `SubTask` 的租户/项目/计划日期/状态/进度字段与服务边界，当前 diff/编译/测试完成交叉核验。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：继续产品情报刷新，完成第 3/3 条后停止下一任务派发。
+- 正式报告：`docs/quality/ISSUE-037-012-现场日报当日计划任务只读联动验收报告.md`。

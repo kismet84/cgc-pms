@@ -4,7 +4,54 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂无待实施 Ready；`ISSUE-037-011` 已完成，等待下一轮产品情报补货。
+当前队列暂无待实施 Ready；`ISSUE-037-012` 已完成，等待下一轮产品情报补货。
+
+### ISSUE-037-012：现场日报当日计划任务只读联动
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 分包 WBS / 跨域只读聚合 / 项目数据范围 / 前后端 / 测试
+状态：Done（2026-07-12；计入 `启动迭代-3` 第 2/3 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Scheduled Work 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-07`
+Migration：不需要
+依赖：复用现有 `site_daily_log`、`sub_task` 计划日期/状态/进度、`ProjectAccessChecker` 与日报详情 API；不新建日报计划表。
+风险等级：中
+运行态要求：后端专项、前端日报单测和类型检查通过；真实 API 或浏览器验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：必须复核租户/项目/日期范围、计划日期闭区间、空日期排除、批量查询、最小字段披露、日报权限不放宽写能力及前端只读边界。
+归档报告：`docs/quality/ISSUE-037-012-现场日报当日计划任务只读联动验收报告.md`
+目标：
+- 在日报详情只读展示计划日期区间覆盖日报日期的同项目分包 WBS 任务。
+- 展示任务编号、名称、作业区域、计划开始/结束、状态和进度，帮助现场日报对照当天计划。
+- 复用既有任务事实，不从日报创建、修改或完成任务。
+非目标：
+- 不新增日报计划/排程表，不实现拖拽排程、自动改期、关键路径、多前置或资源负载。
+- 不展示合同金额、供应商敏感信息或任务审批，不替代分包任务页面。
+- 不修改分包任务写接口、权限、migration、生产部署。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/subcontract/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 只返回同租户、同项目，且 `planned_start_date <= report_date <= planned_end_date` 的任务；任一计划日期为空、跨租户、跨项目或区间不覆盖时不得出现。
+- 返回任务 ID/编号/名称、作业区域、计划开始/结束、状态和字符串进度；不返回合同金额、供应商信息或写操作能力。
+- 日报不存在或无项目访问权继续 fail-close；联动查询复用 `site:daily:query` 的项目语境，不新增任务写权限。
+- 后端单次批量查询并按计划开始/任务编号排序；无命中返回空列表。
+- 前端详情只读展示计划任务和空态，不提供新建、编辑、删除、进度更新或跳转写入口。
+- 至少覆盖日期闭区间、空日期排除、租户/项目隔离、空列表、进度字符串和前端只读渲染；回滚为移除聚合字段与展示区。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
 
 ### ISSUE-037-011：现场日报已审批材料到货只读联动
 

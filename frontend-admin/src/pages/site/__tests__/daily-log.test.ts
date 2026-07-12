@@ -42,4 +42,15 @@ describe('site daily log page', () => {
     expect(source).toContain('当日暂无已审批材料到货')
     expect(source).not.toContain('createDelivery')
   })
+
+  it('renders planned tasks covering the daily report date without write actions', () => {
+    expect(source).toContain('当日计划任务')
+    expect(source).toContain('activeRecord.plannedTasks')
+    expect(source).toContain('planned.taskCode')
+    expect(source).toContain('planned.taskName')
+    expect(source).toContain('planned.workArea')
+    expect(source).toContain('planned.progressPercent')
+    expect(source).toContain('当日暂无计划任务')
+    expect(source).not.toContain('updatePlannedTask')
+  })
 })

@@ -11,6 +11,17 @@ export interface SiteDailyDeliveryVO {
   qualifiedQuantity?: string
 }
 
+export interface SiteDailyPlannedTaskVO {
+  id: string
+  taskCode: string
+  taskName: string
+  workArea?: string
+  plannedStartDate: string
+  plannedEndDate: string
+  status: string
+  progressPercent?: string
+}
+
 export interface SiteDailyLogVO {
   id: string
   projectId: string
@@ -22,6 +33,7 @@ export interface SiteDailyLogVO {
   weatherSummary?: string
   onSiteHeadcount?: number | null
   deliveries?: SiteDailyDeliveryVO[]
+  plannedTasks?: SiteDailyPlannedTaskVO[]
   status: SiteDailyLogStatus
   submittedBy?: string
   submittedAt?: string

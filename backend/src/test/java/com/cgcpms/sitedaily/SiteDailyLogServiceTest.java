@@ -11,6 +11,8 @@ import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.subcontract.entity.SubTask;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.site.service.SiteDailyLogService;
@@ -104,7 +106,8 @@ class SiteDailyLogServiceTest {
         MdMaterialMapper materialMapper = mock(MdMaterialMapper.class);
         MdPartnerMapper partnerMapper = mock(MdPartnerMapper.class);
         SiteDailyLogService service = new SiteDailyLogService(
-                mapper, projectMapper, checker, receiptMapper, itemMapper, materialMapper, partnerMapper);
+                mapper, projectMapper, checker, receiptMapper, itemMapper, materialMapper, partnerMapper,
+                mock(SubTaskMapper.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -152,10 +155,59 @@ class SiteDailyLogServiceTest {
         assertTrue(query.getValue().getParamNameValuePairs().containsValue("APPROVED"));
     }
 
+    @Test
+    void detailIncludesPlannedTasksCoveringTheReportDate() {
+        SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
+        PmProjectMapper projectMapper = mock(PmProjectMapper.class);
+        ProjectAccessChecker checker = mock(ProjectAccessChecker.class);
+        SubTaskMapper taskMapper = mock(SubTaskMapper.class);
+        SiteDailyLogService service = new SiteDailyLogService(
+                mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
+                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), taskMapper);
+        UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
+
+        SiteDailyLog log = new SiteDailyLog();
+        log.setId(32L); log.setTenantId(11L); log.setProjectId(21L);
+        log.setReportDate(LocalDate.of(2099, 2, 10)); log.setConstructionContent("施工内容");
+        log.setStatus("DRAFT");
+        when(mapper.selectById(32L)).thenReturn(log);
+
+        SubTask task = new SubTask();
+        task.setId(81L); task.setTenantId(11L); task.setProjectId(21L);
+        task.setTaskCode("SUB-001"); task.setTaskName("主体钢筋施工"); task.setWorkArea("1号楼");
+        task.setPlannedStartDate(LocalDate.of(2099, 2, 9));
+        task.setPlannedEndDate(LocalDate.of(2099, 2, 10));
+        task.setStatus("IN_PROGRESS"); task.setProgressPercent(new BigDecimal("35.00"));
+        when(taskMapper.selectList(any())).thenReturn(List.of(task));
+
+        var detail = service.getById(32L);
+
+        assertEquals(1, detail.getPlannedTasks().size());
+        var planned = detail.getPlannedTasks().get(0);
+        assertEquals("SUB-001", planned.getTaskCode());
+        assertEquals("主体钢筋施工", planned.getTaskName());
+        assertEquals("1号楼", planned.getWorkArea());
+        assertEquals("2099-02-09", planned.getPlannedStartDate());
+        assertEquals("2099-02-10", planned.getPlannedEndDate());
+        assertEquals("IN_PROGRESS", planned.getStatus());
+        assertEquals("35.00", planned.getProgressPercent());
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SubTask>> query = ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+        verify(taskMapper).selectList(query.capture());
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), SubTask.class);
+        String sql = query.getValue().getSqlSegment();
+        assertTrue(sql.contains("tenant_id"));
+        assertTrue(sql.contains("project_id"));
+        assertTrue(sql.contains("planned_start_date"));
+        assertTrue(sql.contains("planned_end_date"));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(11L));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(21L));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(LocalDate.of(2099, 2, 10)));
+    }
+
     private SiteDailyLogService service(SiteDailyLogMapper mapper, PmProjectMapper projectMapper,
                                         ProjectAccessChecker checker) {
         return new SiteDailyLogService(mapper, projectMapper, checker,
                 mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
-                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class));
+                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(SubTaskMapper.class));
     }
 }
