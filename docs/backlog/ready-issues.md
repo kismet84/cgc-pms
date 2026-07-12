@@ -4,7 +4,48 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前 Ready 队列为空；本轮进度 2/5，下一步须刷新产品情报后再决定是否补货。
+当前队列有 1 条待实施 Ready：`ISSUE-037-016`；本轮进度 2/5。
+
+### ISSUE-037-016：WBS 软删除编号冲突修复
+
+优先级：P1
+任务性质：缺口修复
+类型：分包 WBS / 逻辑删除 / 唯一键 / 测试稳定性
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-11`
+Migration：不需要
+依赖：复用现有 `SubTaskService.delete()`、MyBatis Plus 逻辑删除和任务 ID。
+风险等级：中
+运行态要求：后端专项通过；不要求 Docker、前端或真实浏览器。
+Reviewer要求：复核租户/项目访问、被引用任务禁止删除、墓碑编号唯一性、事务原子性和无跨表扩散。
+归档报告：`docs/quality/ISSUE-037-016-WBS软删除编号冲突修复验收报告.md`
+目标：
+- 修复当天编号被历史软删除记录复用后，再次逻辑删除触发唯一键冲突的问题。
+- 保持现有任务编号生成、引用保护、租户/项目权限和 API 语义。
+非目标：
+- 不新增 migration，不修改 `SUB-yyyyMMdd-XXX` 生成格式，不重构全局软删除。
+- 不清理或批量改写历史数据，不修改其他业务表。
+允许修改：
+- `backend/src/main/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/TenantBoundaryTask2Test.java`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 删除前在同一事务内把 `task_code` 改为基于任务 ID 的唯一墓碑值，再执行既有逻辑删除；墓碑值长度不超过 64。
+- 同日创建→删除→再次创建复用业务编号→再次删除全部成功，不出现 `DATA_CONFLICT`。
+- 被后续任务引用时仍先返回 `SUB_TASK_DEPENDENCY_IN_USE`，不得提前改写编号。
+- 不放宽租户/项目访问，不新增 migration 或其他表修改；失败必须整体回滚。
+- 恢复 `ISSUE-037-015` 为规避 H2 冲突而移除的两处测试清理，并与新增回归共同通过。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest,TenantBoundaryTask2Test" test`
+- `git diff --check`
 
 ### ISSUE-037-015：WBS 单前置 FS 开工门禁
 
