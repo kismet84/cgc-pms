@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [string]$IssueId = "",
@@ -21,7 +21,7 @@ function Read-JsonFile {
   if (!(Test-Path $Path)) {
     throw "Config not found: $Path"
   }
-  return Get-Content -Raw $Path | ConvertFrom-Json
+  return Get-Content -Encoding UTF8 -Raw $Path | ConvertFrom-Json
 }
 
 function Get-IssueBlocks {
@@ -31,7 +31,7 @@ function Get-IssueBlocks {
     return @()
   }
 
-  $text = Get-Content -Raw $Path
+  $text = Get-Content -Encoding UTF8 -Raw $Path
   $matches = [regex]::Matches($text, "(?ms)^###\s+(ISSUE-[0-9-]+[^\r\n]*)\r?\n(.*?)(?=^###\s+ISSUE-|\z)")
   $issues = @()
   foreach ($match in $matches) {
@@ -282,7 +282,7 @@ function Invoke-ExecutorProcess {
   $stderrTask = $process.StandardError.ReadToEndAsync()
 
   if ($StdinPath) {
-    $process.StandardInput.Write((Get-Content -Raw -LiteralPath $StdinPath))
+    $process.StandardInput.Write((Get-Content -Encoding UTF8 -Raw -LiteralPath $StdinPath))
     $process.StandardInput.Close()
   }
 
@@ -402,8 +402,8 @@ function Invoke-ConfiguredIssueExecutor {
     -BeforeFingerprints $beforeFingerprints `
     -AfterFingerprints $afterFingerprints
   $requireChangedFiles = if ($null -ne $executor.requireChangedFiles) { [bool]$executor.requireChangedFiles } else { $true }
-  $logText = if (Test-Path $logPath) { Get-Content -Raw -LiteralPath $logPath } else { "" }
-  $logTail = if (Test-Path $logPath) { @((Get-Content -Tail 40 -LiteralPath $logPath) -join "`n") } else { @() }
+  $logText = if (Test-Path $logPath) { Get-Content -Encoding UTF8 -Raw -LiteralPath $logPath } else { "" }
+  $logTail = if (Test-Path $logPath) { @((Get-Content -Encoding UTF8 -Tail 40 -LiteralPath $logPath) -join "`n") } else { @() }
 
   if ($exitCode -ne 0) {
     $failureCategory = Get-ExecutorFailureCategory $command $logText

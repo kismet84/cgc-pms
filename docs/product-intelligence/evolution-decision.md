@@ -1,5 +1,12 @@
 # CGC-PMS v1.5 首轮迭代方向决策
 
+## PI-2026-07-12-16：AutoPilot Windows PowerShell 5.1 编码阻塞解锁
+
+- 项目事实：当前统一控制面及若干被加载脚本为 UTF-8 无 BOM；Windows PowerShell 5.1 默认按系统 ANSI/GBK 解码，导致 `-File` 入口在 ParserError 阶段中止，而显式 UTF-8 AST 解析错误为 0。
+- 决策：该工具配置缺口直接阻塞 v1.5 的 Ready 准入、实施与正式验收，允许按 `ISSUE-037-022` 作为 `缺口修复` 进入 Ready；只修编码兼容和回归断言，不扩展 runner、不处理业务能力或 GitHub CI 红灯。
+- 回滚：回退脚本编码标记、控制面自测和本次状态文档；无业务代码、数据、schema、运行态或生产动作。
+- 实施回写：源码解析与运行期文本读取的两层 UTF-8 边界已闭合，控制面及连续 runner 自测通过；该结论只恢复本地 AutoPilot，不改变 `ISSUE-037-021` 的 CI/CD 阻塞裁决。
+
 ## PI-2026-07-12-15：CI/CD 与上线门禁 v1.5 复验裁决
 
 - 项目事实：master 当前 11 个 required checks 与现行 workflow job 一一对应且 `strict=true`，但 `frontend-lint`、`frontend-test`、`e2e` 为 failure；最近 20 次 master push run 均失败。

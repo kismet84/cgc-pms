@@ -66,7 +66,7 @@ foreach ($relativePath in $jsonPaths) {
     }
 
     try {
-        Get-Content -LiteralPath $fullPath -Raw | ConvertFrom-Json | Out-Null
+        Get-Content -Encoding UTF8 -LiteralPath $fullPath -Raw | ConvertFrom-Json | Out-Null
     } catch {
         $invalidJson.Add($relativePath)
     }
@@ -88,8 +88,8 @@ foreach ($check in $schemaExampleChecks) {
     }
 
     try {
-        $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
-        $example = Get-Content -LiteralPath $examplePath -Raw | ConvertFrom-Json
+        $schema = Get-Content -Encoding UTF8 -LiteralPath $schemaPath -Raw | ConvertFrom-Json
+        $example = Get-Content -Encoding UTF8 -LiteralPath $examplePath -Raw | ConvertFrom-Json
         foreach ($requiredProperty in @($schema.required)) {
             if ($requiredProperty -notin $example.PSObject.Properties.Name) {
                 $schemaMismatches.Add("$($check.Example) missing required property '$requiredProperty'")

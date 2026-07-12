@@ -20,7 +20,7 @@ try {
 '@ | Out-File -Encoding utf8 (Join-Path $AutoDir "state.json")
 
   & powershell -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $Repo -MaxIterations 10 | Out-Null
-  $State = Get-Content -Raw (Join-Path $AutoDir "state.json") | ConvertFrom-Json
+  $State = Get-Content -Encoding UTF8 -Raw (Join-Path $AutoDir "state.json") | ConvertFrom-Json
 
   if ($State.schemaVersion -ne 2) { throw "Expected schemaVersion=2" }
   if ($State.status -ne "IDLE") { throw "Expected status=IDLE" }

@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $readyPath = Join-Path ([System.IO.Path]::GetTempPath()) "cgc-pms-ready-$([guid]::NewGuid().ToString('N')).md"

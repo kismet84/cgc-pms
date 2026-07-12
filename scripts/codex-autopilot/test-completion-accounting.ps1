@@ -1,4 +1,4 @@
-param()
+﻿param()
 $ErrorActionPreference='Stop'
 $scriptDir=Split-Path -Parent $MyInvocation.MyCommand.Path
 $runner=Join-Path $scriptDir 'autopilot-run-continuous.ps1'

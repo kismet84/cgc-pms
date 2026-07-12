@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 function Set-AutopilotReadyDone {
   param([string]$ReadyPath, [string]$IssueTitle)

@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $readyLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-ready.ps1'
 if (Test-Path -LiteralPath $readyLibrary) { . $readyLibrary }
 

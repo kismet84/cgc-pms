@@ -13,7 +13,7 @@ if (!(Test-Path $AutoDir)) {
 Remove-Item (Join-Path $AutoDir "enabled.flag") -ErrorAction SilentlyContinue
 
 if (Test-Path $StatePath) {
-  $State = Get-Content -Raw $StatePath | ConvertFrom-Json
+  $State = Get-Content -Encoding UTF8 -Raw $StatePath | ConvertFrom-Json
 } else {
   $State = [pscustomobject]@{
     enabled = $false

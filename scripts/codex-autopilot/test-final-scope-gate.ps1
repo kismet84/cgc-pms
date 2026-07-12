@@ -1,4 +1,4 @@
-param()
+﻿param()
 $ErrorActionPreference='Stop'
 $scriptDir=Split-Path -Parent $MyInvocation.MyCommand.Path
 $runner=Join-Path $scriptDir 'autopilot-run-continuous.ps1'
@@ -40,7 +40,7 @@ Reviewer要求：不需要
   & git -C $root init -q;& git -C $root config user.email a@b.c;& git -C $root config user.name test;& git -C $root add .;& git -C $root commit -qm base
   $old=$ErrorActionPreference;$ErrorActionPreference='Continue';$output=& powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $config -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1|Out-String;$code=$LASTEXITCODE;$ErrorActionPreference=$old
   if($code -ne 0){throw "runner failed: $output"}
-  $result=Get-ChildItem (Join-Path $autoDir 'runs') -Filter result.json -Recurse|Select-Object -First 1|ForEach-Object{Get-Content $_.FullName -Raw|ConvertFrom-Json}
+  $result=Get-ChildItem (Join-Path $autoDir 'runs') -Filter result.json -Recurse|Select-Object -First 1|ForEach-Object{Get-Content -Encoding UTF8 $_.FullName -Raw|ConvertFrom-Json}
   if($result.status -ne 'blocked' -or $result.stopReason -ne 'STOP_SCOPE_VIOLATION'){throw 'final scope violation was not blocked'}
   Write-Host 'final scope gate self-test passed'
 }finally{if(Test-Path (Join-Path $root '.git')){& git -C $root worktree prune 2>$null|Out-Null};Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue}

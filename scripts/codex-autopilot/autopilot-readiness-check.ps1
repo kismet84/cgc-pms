@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [switch]$AllowStopped

@@ -6,6 +6,59 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 当前 Ready 队列为空；`ISSUE-037-021` 已完成只读复验，但上线门禁仍阻塞，未解除项已进入 `blocked-issues.md`。
 
+### ISSUE-037-022：Windows PowerShell 5.1 AutoPilot 脚本编码兼容修复
+
+优先级：P0
+任务性质：缺口修复
+类型：AutoPilot / 控制面 / Windows PowerShell 5.1 / 编码兼容
+状态：Done（2026-07-12；计入 `启动迭代-1` 第 1/1 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md` 的 Ready 准入控制面、`docs/product-intelligence/evolution-decision.md` 的 v1.5 AutoPilot 准入与正式验收边界
+关联产品目标：恢复 v1.5 本地 AutoPilot 的合格 Ready 选单、实施、验证和收口控制面，使产品迭代仍受 stop/pause、Ready、A-F 与 no-push 门禁约束。
+阻塞证据：在当前 `develop/1.5` HEAD 上，`powershell -File scripts/codex-autopilot/autopilot-run-continuous.ps1` 稳定产生 ParserError；脚本为 UTF-8 无 BOM，Windows PowerShell 5.1 按系统 ANSI/GBK 解码，显式 UTF-8 读入后的 AST 解析错误为 0，且工作区 hash 与 HEAD blob 一致。
+解除条件：控制面及其 PowerShell 脚本在 Windows PowerShell 5.1 默认 `-File` 入口下均可解析；控制面自测、连续 runner 自测和 `git diff --check` 通过；本轮 runner 能继续选单或按规则补货。
+Migration：不需要
+依赖：仅使用仓库现有 PowerShell 自测与 AST 解析器；不新增工具、依赖、调度器或运行态服务。
+风险等级：中
+运行态要求：仅需 Windows PowerShell 5.1；不要求 Docker、backend、frontend、数据库、5173/8080、dev-login 或浏览器，不得修改业务运行态。
+Reviewer要求：主线程必须复核修复仅改变脚本编码兼容与回归断言，不改变 stop/pause、Ready 解析、执行路由、业务代码或生产边界；输出直接用于通过/不通过裁决。
+归档报告：`docs/quality/ISSUE-037-022-Windows-PowerShell-5.1-AutoPilot-脚本编码兼容修复验收报告.md`
+最小回滚：回退本 Issue 对 PowerShell 脚本编码、控制面自测和状态文档的差异；无业务代码、数据、schema 或运行态恢复动作。
+目标：
+- 为 Windows PowerShell 5.1 `-File` 入口提供最小、可验证的 UTF-8 解析兼容。
+- 用现有控制面自测固化所有 AutoPilot PowerShell 脚本的默认解析断言，避免中文内容再次使控制面失效。
+非目标：
+- 不修改业务接口、页面、权限、租户、审批、金额、数据库 migration 或产品功能。
+- 不升级 PowerShell，不引入第二套 runner、编码转换器、调度器或外部依赖。
+- 不处理 `ISSUE-037-021` 的 GitHub CI 红灯或分支保护问题。
+允许修改：
+- `scripts/codex-autopilot/*.ps1`
+- `plugins/cgc-pms-autopilot/scripts/*.ps1`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/iterations/**`
+- `docs/quality/ISSUE-037-022-Windows-PowerShell-5.1-AutoPilot-脚本编码兼容修复验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `deploy/**`
+- `.github/workflows/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- 生产凭据、生产数据库连接、生产发布配置、仓库外文件
+验收标准：
+- `scripts/codex-autopilot/*.ps1` 在 Windows PowerShell 5.1 默认文件解码下 AST 解析错误为 0。
+- `test-control-plane.ps1` 在修复前因脚本 ParserError 断言失败，修复后通过；相关连续 runner 自测通过。
+- 实际控制面入口不再出现本轮 ParserError，并继续遵守 stop/pause/enabled、Ready 与 no-push 边界。
+- 修改只收敛编码兼容、回归断言和正式状态文档；`git diff --check` 通过。
+验证命令：
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-control-plane.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-continuous-runner.ps1`
+- `git diff --check`
+
 ### ISSUE-037-017：BaseEntity 备注写入契约修复
 
 优先级：P0

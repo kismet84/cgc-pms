@@ -12,7 +12,7 @@ if (!(Test-Path $AutoDir)) {
 "paused at $Now" | Out-File -Encoding utf8 (Join-Path $AutoDir "pause.flag")
 
 if (Test-Path $StatePath) {
-  $State = Get-Content -Raw $StatePath | ConvertFrom-Json
+  $State = Get-Content -Encoding UTF8 -Raw $StatePath | ConvertFrom-Json
   $State.status = "PAUSED"
   $State.lastHeartbeatAt = $Now
   $State | ConvertTo-Json | Out-File -Encoding utf8 $StatePath

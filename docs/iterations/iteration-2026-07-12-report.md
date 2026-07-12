@@ -234,3 +234,23 @@
 - 停止原因：用户执行 `停止迭代`；控制面已关闭 `enabled.flag` 并设置 `stop.flag`，当前任务自然收口后未派发下一任务。
 - 当前 focus：Ready 为空；CI 红灯、分支保护绕过、本地 JWT 测试前置、权限断言和 SQL marker 缺口均已进入 Blocked 或 Current Focus。
 - 发布边界：未发布生产、未连接生产数据库、未 push；剩余 6 个实施名额不再继续执行。
+
+## ISSUE-037-022：Windows PowerShell 5.1 AutoPilot 脚本编码兼容修复
+
+- 状态：Done；计入本次 `启动迭代-1` 第 1/1 条实施型 Ready Issue。
+- 修改范围：AutoPilot PowerShell 源文件 UTF-8 BOM、运行期 `Get-Content -Encoding UTF8`、控制面解析回归、产品情报与 backlog；无业务代码、数据库、运行态或远端设置变更。
+- TDD：`test-control-plane.ps1` 先稳定列出 12 个项目脚本与 1 个插件 runner 的默认解析失败；第一轮 GREEN 暴露 UTF-8 无 BOM `state.json` 运行期读取缺口，补齐显式 UTF-8 后同一连续 runner 自测通过。
+- 验证：控制面自测通过；连续 runner 自测通过；实际 `-ExplainNextAction` 正确选取 `ISSUE-037-022`；全部 AutoPilot `.ps1` 默认解析通过；`mechanicalMismatchCount=0`；`git diff --check` 通过。
+- 图谱检索证据：CodeGraph 用于定位 AutoPilot 编码入口但未召回 PowerShell 脚本，归类“工具召回不足”；`codebase-memory-mcp` 纠正项目名后仍查询失败，归类 `tool_config`；以 `rg`、PowerShell AST、Git blob hash 和当前 diff 完成交叉核验。
+- 审查：PASS；除控制面新增解析断言外，PowerShell 差异只包含 BOM 与显式 UTF-8 读取，无控制流、权限、安全、数据一致性或生产边界变化。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 停止原因：达到 `启动迭代-1` 的 1/1 实施上限，停止下一任务派发。
+- 正式报告：`docs/quality/ISSUE-037-022-Windows-PowerShell-5.1-AutoPilot-脚本编码兼容修复验收报告.md`。
+
+## `启动迭代-1` 最小总验收
+
+- 完成：`ISSUE-037-022`，共 1 条实施型 Ready Issue。
+- 阻塞：本轮 AutoPilot 编码阻塞已解除；`ISSUE-037-021` 的远端 CI/CD 阻塞保持原裁决，不属于本 Issue 范围。
+- 非阻塞观察：未安装 PowerShell 7，未做 `pwsh` 跨版本回归；Windows PowerShell 5.1 默认 `-File` 路径已通过。
+- 当前 focus：Ready 为空；达到 1/1 上限后不再补货或派发下一任务。
+- 发布边界：未发布生产、未连接生产数据库、未 push。

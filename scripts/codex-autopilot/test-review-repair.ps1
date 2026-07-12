@@ -1,11 +1,11 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-review.ps1')
 . (Join-Path $scriptDir 'autopilot-context.ps1')
 
-$reviewSchema = Get-Content -LiteralPath (Join-Path $scriptDir '..\..\plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Raw | ConvertFrom-Json
+$reviewSchema = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir '..\..\plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Raw | ConvertFrom-Json
 if ($reviewSchema.properties.schemaVersion.type -ne 'integer' -or
     $reviewSchema.properties.decision.type -ne 'string' -or
     $reviewSchema.properties.findings.items.properties.severity.type -ne 'string') {

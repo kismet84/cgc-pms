@@ -53,7 +53,7 @@ try {
   $qualification = Get-AutopilotQualification -RunsDir $runs -WindowSize 20
   if (!$qualification.qualified -or $qualification.firstPassRate -ne 0.9) { throw 'valid qualification window was rejected' }
   $failedResultPath = Join-Path $runs 'run-20\result.json'
-  $failedResult = Get-Content -LiteralPath $failedResultPath -Raw | ConvertFrom-Json
+  $failedResult = Get-Content -Encoding UTF8 -LiteralPath $failedResultPath -Raw | ConvertFrom-Json
   $failedResult.manualInterventionCount = 1
   $failedResult | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $failedResultPath -Encoding UTF8
   $rejected = Get-AutopilotQualification -RunsDir $runs -WindowSize 20

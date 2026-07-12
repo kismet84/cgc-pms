@@ -9,7 +9,7 @@ $LockPath = Join-Path $AutoDir "run.lock"
 $ConfigPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "codex-autopilot.config.json"
 $MaxRunMinutes = 120
 if (Test-Path $ConfigPath) {
-  $Config = Get-Content -Raw $ConfigPath | ConvertFrom-Json
+  $Config = Get-Content -Encoding UTF8 -Raw $ConfigPath | ConvertFrom-Json
   if ($Config.maxRunMinutes) {
     $MaxRunMinutes = [int]$Config.maxRunMinutes
   }
@@ -23,7 +23,7 @@ function Read-RunLock {
     return $null
   }
   try {
-    return Get-Content -Raw $Path | ConvertFrom-Json
+    return Get-Content -Encoding UTF8 -Raw $Path | ConvertFrom-Json
   } catch {
     return [pscustomobject]@{
       owner = "unknown"
@@ -66,7 +66,7 @@ if (!(Test-Path $AutoDir)) {
 Remove-Item (Join-Path $AutoDir "enabled.flag") -ErrorAction SilentlyContinue
 
 if (Test-Path $StatePath) {
-  $State = Get-Content -Raw $StatePath | ConvertFrom-Json
+  $State = Get-Content -Encoding UTF8 -Raw $StatePath | ConvertFrom-Json
 } else {
   $State = [pscustomobject]@{
     enabled = $false

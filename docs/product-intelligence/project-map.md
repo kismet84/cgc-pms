@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-12 增量：AutoPilot Windows PowerShell 5.1 编码阻塞
+
+- 当前 AutoPilot 统一控制面在 Windows PowerShell 5.1 `-File` 入口稳定产生 ParserError；显式 UTF-8 AST 解析无错误，根因是含中文的 UTF-8 无 BOM 脚本被系统 ANSI/GBK 解码。
+- 该缺口直接阻塞 Ready 选单、实施和正式收口，按 `ISSUE-037-022` 进入最小治理 Ready；范围仅限编码兼容、控制面回归与状态回写，不替代产品方向。
+- 实施回写：`ISSUE-037-022` 已统一脚本源码 BOM 与运行期显式 UTF-8 读取；Windows PowerShell 5.1 控制面自测、连续 runner 自测及真实 `ISSUE-037-022` 路由均通过，Ready 准入恢复为可用。
+
 ## 2026-07-12 增量：CI/CD 与上线门禁 v1.5 复验
 
 - `ISSUE-037-021` 已完成只读复验：当前 master commit `781b41661cd96b2a2f7eed825f98ff3d9bdf137b` 的 11 个 required checks 中 `frontend-lint`、`frontend-test`、`e2e` 为 failure，结论为不通过、阻塞、不可上线。

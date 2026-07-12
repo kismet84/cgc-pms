@@ -11,7 +11,7 @@ $MaxRunMinutes = 120
 . (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-recover.ps1')
 . (Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-metrics.ps1')
 if (Test-Path $ConfigPath) {
-  $Config = Get-Content -Raw $ConfigPath | ConvertFrom-Json
+  $Config = Get-Content -Encoding UTF8 -Raw $ConfigPath | ConvertFrom-Json
   if ($Config.maxRunMinutes) {
     $MaxRunMinutes = [int]$Config.maxRunMinutes
   }
@@ -24,7 +24,7 @@ function Read-RunLock {
     return $null
   }
   try {
-    return Get-Content -Raw $Path | ConvertFrom-Json
+    return Get-Content -Encoding UTF8 -Raw $Path | ConvertFrom-Json
   } catch {
     return [pscustomobject]@{
       owner = "unknown"
@@ -83,7 +83,7 @@ if ($Lock) {
 }
 
 if (Test-Path $StatePath) {
-  $State = Get-Content -Raw $StatePath | ConvertFrom-Json
+  $State = Get-Content -Encoding UTF8 -Raw $StatePath | ConvertFrom-Json
   $Summary.stateExists = $true
   $Summary.status = $State.status
   $Summary.schemaVersion = $State.schemaVersion
@@ -128,7 +128,7 @@ if (Test-Path $RunsDir) {
     $LatestEventPath = Join-Path $LatestRun.FullName "events.jsonl"
     if (Test-Path $LatestEventPath) {
       $Summary.latestEventPath = $LatestEventPath
-      $LatestEventLine = Get-Content -LiteralPath $LatestEventPath -Tail 1
+      $LatestEventLine = Get-Content -Encoding UTF8 -LiteralPath $LatestEventPath -Tail 1
       if ($LatestEventLine) {
         try {
           $LatestEvent = $LatestEventLine | ConvertFrom-Json
@@ -151,7 +151,7 @@ if (Test-Path $RunsDir) {
     Select-Object -First 1
   if ($LatestResult) {
     try {
-      $Result = Get-Content -Raw $LatestResult.FullName | ConvertFrom-Json
+      $Result = Get-Content -Encoding UTF8 -Raw $LatestResult.FullName | ConvertFrom-Json
       $Summary.latestResultPath = $LatestResult.FullName
       $Summary.latestResultIssueId = $Result.issueId
       $Summary.latestResultTitle = $Result.title

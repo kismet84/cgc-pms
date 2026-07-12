@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [switch]$DryRun,
@@ -15,7 +15,7 @@ function Read-JsonFile {
   if (!(Test-Path $Path)) {
     throw "Config not found: $Path"
   }
-  return Get-Content -Raw $Path | ConvertFrom-Json
+  return Get-Content -Encoding UTF8 -Raw $Path | ConvertFrom-Json
 }
 
 function Test-Checkpoint {
@@ -40,7 +40,7 @@ function Read-RunLock {
     return $null
   }
   try {
-    return Get-Content -Raw $LockPath | ConvertFrom-Json
+    return Get-Content -Encoding UTF8 -Raw $LockPath | ConvertFrom-Json
   } catch {
     return [pscustomobject]@{
       owner = "unknown"
@@ -378,12 +378,12 @@ function Get-SplitCandidates {
     return @()
   }
 
-  $focus = Get-Content -Raw $FocusPath
-  $ready = if (Test-Path $ReadyPath) { Get-Content -Raw $ReadyPath } else { "" }
+  $focus = Get-Content -Encoding UTF8 -Raw $FocusPath
+  $ready = if (Test-Path $ReadyPath) { Get-Content -Encoding UTF8 -Raw $ReadyPath } else { "" }
   $forbidden = "财务|生产数据库|生产发布|总工程师|BIM|AI"
   $allowed = "报表|规则治理|通知|WBS|进度|甘特图|供应商|采购增强"
   $candidates = @()
-  foreach ($line in Get-Content $PlanPath) {
+  foreach ($line in Get-Content -Encoding UTF8 $PlanPath) {
     if ($line -match "^#{2,3}\s+([0-9]+\.[0-9]+)\s+(.+)$") {
       $section = $matches[1].Trim()
       $name = $matches[2].Trim()
@@ -480,7 +480,7 @@ function Add-ReadyIssueDrafts {
     return 0
   }
 
-  $readyText = if (Test-Path $ReadyPath) { Get-Content -Raw $ReadyPath } else { "# Ready Issues`r`n" }
+  $readyText = if (Test-Path $ReadyPath) { Get-Content -Encoding UTF8 -Raw $ReadyPath } else { "# Ready Issues`r`n" }
   $drafts = @()
   for ($index = 0; $index -lt $Candidates.Count; $index++) {
     $issueId = Get-NextIssueId $readyText $Candidates[$index].section ($index + 1)
@@ -645,7 +645,7 @@ function Get-IssueBodyByTitle {
     return ""
   }
 
-  $text = Get-Content -Raw $ReadyPath
+  $text = Get-Content -Encoding UTF8 -Raw $ReadyPath
   $pattern = "(?ms)^###\s+" + [regex]::Escape($Title) + "\r?\n(.*?)(?=^###\s+ISSUE-|\z)"
   $match = [regex]::Match($text, $pattern)
   if (!$match.Success) {
@@ -700,7 +700,7 @@ function Get-IterationProgressFromRuns {
     }
 
     try {
-      $result = Get-Content -Raw $resultPath | ConvertFrom-Json
+      $result = Get-Content -Encoding UTF8 -Raw $resultPath | ConvertFrom-Json
     } catch {
       return
     }
@@ -762,7 +762,7 @@ function Initialize-IterationProgress {
   $script:IterationLimit = [int]$Limit
   $statePath = Join-Path $AutoDir "state.json"
   if (Test-Path $statePath) {
-    $state = Get-Content -Raw $statePath | ConvertFrom-Json
+    $state = Get-Content -Encoding UTF8 -Raw $statePath | ConvertFrom-Json
     $runProgress = [pscustomobject]@{ completedCount = 0; latestIssueRef = ''; completedIssueIds = @(); completedIssueRefs = @() }
     if ($null -ne $state.iterationCompleted) {
       $script:IterationCompleted = [int]$state.iterationCompleted
@@ -802,7 +802,7 @@ function Get-StopReasonForEmptyPool {
     return "STOP_READY_AND_POOL_EMPTY"
   }
 
-  $text = Get-Content -Raw $ReadyPath
+  $text = Get-Content -Encoding UTF8 -Raw $ReadyPath
   if ($text -match "(?m)^状态[：:]\s*(Blocked|阻塞)\b") {
     return "STOP_CURRENT_ISSUE_BLOCKED"
   }

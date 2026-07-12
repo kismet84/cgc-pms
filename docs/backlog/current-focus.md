@@ -63,3 +63,6 @@
 - 当前 Issue 工作树 `1aeb90c8f` 的差异不改变 master 裁决但需后续治理：后端 verify 受 144-bit 测试 JWT 前置影响并有 1 条权限断言失败，SQL safety scan 有两处固定字面量 marker 缺口；不得用远端 master 绿项覆盖这些本地差异。
 - CI 工具链观察：GitHub annotation 提示 Node 20 action 被强制运行于 Node 24；当前不是三个红灯的退出根因，升级 Actions 需另行授权。
 - `停止迭代` 已生效：本次 `启动迭代-10` 最终完成 4/10 条实施型 Ready；`ISSUE-037-021` 仅作为不通过的回归证明归档，不计入实施数，当前不再派发下一任务。
+- 新一轮 `启动迭代-1` 在控制面选单前稳定复现 Windows PowerShell 5.1 ParserError；已按 `tool_config` 分类并建立 `ISSUE-037-022`，仅恢复 AutoPilot 脚本 UTF-8 解析兼容与回归保护，不改变业务或生产边界。
+- `ISSUE-037-022` 已完成：含非 ASCII 的 AutoPilot PowerShell 脚本统一具备 UTF-8 BOM，运行期文本读取显式使用 UTF-8；控制面、连续 runner 与真实 Ready 路由复验通过。`启动迭代-1` 已达到 1/1，上限停止下一任务派发。
+- 非阻塞观察：本机未安装 PowerShell 7，本轮只证明 Windows PowerShell 5.1 默认 `-File` 路径；未来引入 `pwsh` 时需另做跨版本回归，不阻塞当前 Windows 控制面。

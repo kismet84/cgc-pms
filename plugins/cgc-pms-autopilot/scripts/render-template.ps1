@@ -22,7 +22,7 @@ if (-not $variables) {
     $variables = [pscustomobject]@{}
 }
 
-$template = Get-Content -LiteralPath $TemplatePath -Raw
+$template = Get-Content -Encoding UTF8 -LiteralPath $TemplatePath -Raw
 $tokens = [regex]::Matches($template, '\{\{([a-zA-Z0-9_]+)\}\}') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
 $missing = @($tokens | Where-Object {
     $property = $variables.PSObject.Properties[$_]

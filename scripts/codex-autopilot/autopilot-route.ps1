@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 function Get-AutopilotRoute {
   param([Parameter(Mandatory)][object]$Issue, [string[]]$ChangedPaths = @())

@@ -7,7 +7,7 @@ function Get-AutopilotRunMetrics {
   $events = @()
   $valid = $true
   [datetimeoffset]$previous = [datetimeoffset]::MinValue
-  foreach ($line in Get-Content -LiteralPath $EventPath) {
+  foreach ($line in Get-Content -Encoding UTF8 -LiteralPath $EventPath) {
     try { $event = $line | ConvertFrom-Json } catch { $valid = $false; continue }
     if ($event.runId -ne $RunId) { continue }
     $key = "$($event.runId)|$($event.issueId)|$($event.to)|$($event.timestamp)|$($event.reason)"

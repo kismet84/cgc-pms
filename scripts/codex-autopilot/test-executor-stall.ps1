@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -10,9 +10,9 @@ $autoDir = Join-Path $root '.codex-autopilot'
 $counterPath = Join-Path $root 'executor-attempts.txt'
 New-Item -ItemType Directory -Path $backlog,$fixtureScripts,$autoDir -Force | Out-Null
 try {
-  $defaults = Get-Content -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
+  $defaults = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
   if ([int]$defaults.issueExecutor.stallInspectSeconds -ne 300 -or [int]$defaults.issueExecutor.stallTerminateSeconds -ne 600) { throw 'production stall thresholds must remain 300/600 seconds' }
-  $runnerText = Get-Content -LiteralPath $runner -Raw
+  $runnerText = Get-Content -Encoding UTF8 -LiteralPath $runner -Raw
   if ($runnerText -notmatch '(?s)\$idleSeconds\s*=.*?Now\s+-ge\s+\$deadline.*?\$idleSeconds\s+-ge\s+\$StallTerminateSeconds') { throw 'issueExecutor total timeout must be checked before long-command stall exemption' }
   if ($runnerText -match 'Where-Object\s+executorPid\s+-eq\s+\$process\.Id') { throw 'retired executor identity must not use a cross-run PID-only tombstone' }
   $tick = [char]96
@@ -78,10 +78,10 @@ Start-Sleep -Seconds 20
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $ErrorActionPreference = $old
-  $state = Get-Content -LiteralPath (Join-Path $autoDir 'state.json') -Raw | ConvertFrom-Json
+  $state = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $autoDir 'state.json') -Raw | ConvertFrom-Json
   if ($state.status -ne 'BLOCKED' -or $state.stopReason -ne 'STOP_EXECUTOR_STALL_RETRY_EXHAUSTED') { throw "stalled executor did not stop safely: $output" }
-  if ([int](Get-Content -LiteralPath $counterPath -Raw) -ne 2) { throw 'stalled executor did not use exactly one fresh retry' }
-  $events = @(Get-Content -LiteralPath (Join-Path $autoDir 'events.ndjson') | ForEach-Object { $_ | ConvertFrom-Json })
+  if ([int](Get-Content -Encoding UTF8 -LiteralPath $counterPath -Raw) -ne 2) { throw 'stalled executor did not use exactly one fresh retry' }
+  $events = @(Get-Content -Encoding UTF8 -LiteralPath (Join-Path $autoDir 'events.ndjson') | ForEach-Object { $_ | ConvertFrom-Json })
   $inspectEvents = @($events | Where-Object event -eq 'executor.stall.inspect')
   $retireEvents = @($events | Where-Object event -eq 'executor.stall.retire')
   if ($inspectEvents.Count -lt 2 -or $retireEvents.Count -ne 2) { throw "inspect/retire evidence is incomplete: inspect=$($inspectEvents.Count), retire=$($retireEvents.Count), events=$($events.event -join ',')" }
@@ -94,9 +94,9 @@ Start-Sleep -Seconds 20
   }
   if (@($state.retiredExecutors).Count -ne 2 -or [int]$state.retryCount -ne 1) { throw 'retired executor state was not persisted' }
   $repairContext = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Recurse -Filter context.json | Where-Object FullName -match 'repair-1' | Select-Object -First 1
-  $context = Get-Content -LiteralPath $repairContext.FullName -Raw | ConvertFrom-Json
+  $context = Get-Content -Encoding UTF8 -LiteralPath $repairContext.FullName -Raw | ConvertFrom-Json
   if ($context.phase -ne 'repair' -or !$context.previousPhaseSummary -or @($context.longRunningCommands).Count -ne 1) { throw 'repair context did not carry narrowed scope, timeout reason, and long-command declaration' }
-  $blocked = Get-Content -LiteralPath (Join-Path $backlog 'blocked-issues.md') -Raw
+  $blocked = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $backlog 'blocked-issues.md') -Raw
   if ($blocked -notmatch '两个 executorPid 永久退役' -or $blocked -notmatch '未完成验收项') { throw 'blocked backlog closeout is incomplete' }
   Write-Host 'executor stall self-test passed'
 } finally {
