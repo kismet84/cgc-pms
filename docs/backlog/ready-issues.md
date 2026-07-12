@@ -825,3 +825,65 @@ Reviewer要求：必须由独立 Reviewer 复核长期计划章节边界、Ad-ho
 验证命令：
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-refill.ps1`
 - `git diff --check`
+
+### ISSUE-037-021：CI/CD 与上线门禁 v1.5 现状复验与红灯分类裁决
+
+优先级：P0
+任务性质：回归证明
+类型：CI/CD / GitHub Actions / 分支保护 / 上线门禁 / 只读审计 / 正式裁决
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 的 `7.1 P0-1：CI/CD 与上线门禁`；`docs/未来开发计划.md` 的“CI/CD 与上线门禁复验”；`docs/backlog/current-focus.md` 的 v1.0 证据不得直接作为 v1.5 验收证据约束
+关联产品目标：为 v1.5 下一主线准入和正式上线裁决建立当前、可追溯的 CI/CD 门禁事实，不以 v1.0 绿灯或旧分支保护快照替代当前证据。
+阻塞证据：2026-07-12 只读核验显示 master 最近 5 次 CI push run 均为 failure；最新 run 29146534529 的 frontend-lint、frontend-test、e2e 失败，而 master required checks 仍要求这 11 个核心 job 且 strict=true，因此当前不能给出上线门禁通过结论。
+解除条件：完成最新失败日志分类；核对现行 workflow job 与 master required checks 一一对应；本地可复现入口结果与远端证据无矛盾；正式报告明确通过/不通过并把未解除项同步到 Ready、Blocked 或 Current Focus。
+Migration：不需要
+依赖：GitHub CLI 已认证且对 `kismet84/cgc-pms` 具有 actions 与 branch protection 只读权限；复用现有 `.github/workflows/ci.yml`、前后端构建测试入口和 `scripts/check-sql-safety.ps1`，不新增扫描器或依赖。
+风险等级：高
+运行态要求：需要 GitHub 网络只读访问、Java 21、Node.js 22、pnpm 11；默认不启动 Docker、backend、frontend 或浏览器，不触发 workflow rerun；若为复现 e2e 才先执行 8080/5173/dev-login health gate，环境刷新后稳定等待 180 秒，且不得连接生产或重置数据。
+Reviewer要求：必须由独立 Reviewer 复核远端 run/job/step 证据、失败三分类、workflow 与 required checks 对应关系、strict/enforce_admins/PR review 配置、产物与回滚信息；输出直接用于通过/不通过和是否可上线裁决，任何红灯或证据缺失均不得判通过。
+归档报告：`docs/quality/ISSUE-037-021-CI-CD与上线门禁v1.5复验报告.md`
+最小回滚：仅回退本 Issue 新增的正式报告及 product-intelligence/backlog/iteration 状态文档；无代码、workflow、远端设置、数据库或运行态恢复动作。
+目标：
+- 以当前 master 分支保护、required checks、最新 CI runs 和现行 `.github/workflows/ci.yml` 为准，复验 CI/CD 与上线门禁，不沿用 v1.0 完成结论。
+- 对最新失败的 workflow/job/step 按工具配置类、环境前置类、真实质量/安全类逐项分类，记录 commit、run URL、失败关键词、复现结果和解除条件。
+- 形成唯一正式裁决；未解除红灯按责任域拆入 Ready 或 Blocked，本 Issue 不直接修业务代码或远端设置。
+非目标：
+- 不修复 frontend-lint、frontend-test、e2e 或其他业务/测试代码失败，不修改 workflow，不触发 rerun、commit、push、merge、release 或生产发布。
+- 不升级 Actions、Node、Java、pnpm、Maven、Spring Boot 或依赖，不新增 CI 平台、扫描器、发布系统或通用门禁框架。
+- 不连接生产数据库，不重置测试数据，不把本地单项通过替代远端 required checks 全绿。
+允许修改：
+- `docs/quality/ISSUE-037-021-CI-CD与上线门禁v1.5复验报告.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/iterations/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `.github/workflows/**`
+- `scripts/**`
+- `plugins/**`
+- `deploy/**`
+- `AGENTS.md`、`AGENTS.override.md`
+- 生产凭据、生产数据库连接、GitHub 分支保护、required checks、Actions runs、release、仓库外文件
+验收标准：
+- 报告记录核验时间、分支、commit、最新 master push/PR run、逐 job/step 结论和 URL；至少覆盖 required 的 backend-test、backend-test-mysql、backend-dependency-scan、frontend-lint、type-check、frontend-build、frontend-test、frontend-dependency-audit、sql-safety-scan、e2e、supply-chain-security。
+- master 分支保护的 strict、required checks、enforce_admins、PR review 与限制项均有当前 API 证据；required checks 与 `.github/workflows/ci.yml` job 名称逐项比对，缺失、多余、不可触发或可绕过项不得忽略。
+- 最新红灯逐项先分类；frontend-lint、frontend-test、e2e 的失败日志至少记录失败 step、关键词和最小复现，不能仅凭 job 名猜测根因，一次性波动需复核后再升级为阻塞。
+- 本地只读复验入口均执行并记录；本地与远端不一致时以当前远端 required checks 为上线裁决依据并解释差异，不修改业务代码或 workflow 掩盖红灯。
+- 只有目标 commit 的 11 个 required checks 全部 success、分支保护与 workflow 对应且无绕过风险时才允许结论为“通过 / 非阻塞 / 可上线”；否则必须为“不通过 / 阻塞 / 不可上线或需要确认”。
+- 每个未解除项写明责任域、失败分类、解除条件、最小安全恢复方式并同步到 Ready、Blocked 或 Current Focus；回滚仅删除本 Issue 文档差异。
+验证命令：
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/ready-lint.ps1 -IssueTitle ISSUE-037-021`
+- `cd backend; .\mvnw.cmd verify`
+- `cd frontend-admin; pnpm lint:check`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm build`
+- `cd frontend-admin; pnpm test:coverage`
+- `cd frontend-admin; pnpm audit --audit-level high --registry=https://registry.npmjs.org`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-sql-safety.ps1`
+- `git diff --check`
