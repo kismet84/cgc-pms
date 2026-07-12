@@ -41,7 +41,7 @@ public class SiteDailyLogController {
     }
 
     @PostMapping
-    @AuditedOperation(type = "CREATE", businessType = "SITE_DAILY_LOG")
+    @AuditedOperation(type = "CREATE", businessType = "SITE_DAILY_LOG", businessIdExpression = "#log.id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:edit')")
     public ApiResponse<Long> create(@Valid @RequestBody SiteDailyLog log) {
         return ApiResponse.success(service.create(log));

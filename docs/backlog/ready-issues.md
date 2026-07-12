@@ -4,7 +4,54 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂无待实施 Ready；`ISSUE-037-012` 已完成，等待下一轮产品情报补货。
+当前队列暂无待实施 Ready；`ISSUE-037-013` 已完成，`启动迭代-3` 达到 3/3 上限。
+
+### ISSUE-037-013：现场日报变更历史只读展示
+
+优先级：P1
+任务性质：缺口修复
+类型：现场生产 / 项目日报 / 操作审计 / 变更历史 / 租户边界 / 前后端 / 测试
+状态：Done（2026-07-12；计入 `启动迭代-3` 第 3/3 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Change History 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-08`
+Migration：不需要
+依赖：复用现有 `@AuditedOperation`、`sys_operation_audit_log`、日报详情 API 与项目访问校验；不新建历史表。
+风险等级：中
+运行态要求：后端专项、前端日报单测和类型检查通过；真实 API 或浏览器验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：必须复核 CREATE businessId 绑定、租户/businessType/businessId 精确过滤、失败事件可见性、敏感字段不出参、用户 ID 最小展示和无审计写路径新增。
+归档报告：`docs/quality/ISSUE-037-013-现场日报变更历史只读展示验收报告.md`
+目标：
+- 修正日报 CREATE 审计记录缺少 businessId，使新建、修改、提交都能归属具体日报。
+- 在日报详情只读展示操作类型、用户 ID、成功/失败和操作时间，形成最小变更历史。
+- 复用统一操作审计表，不创建日报专用历史副本。
+非目标：
+- 不做字段级前后值 diff、版本恢复、审计导出、审批轨迹或用户快照。
+- 不向前端返回 sourceIp、requestPath、errorCode、durationMs 等安全/运维字段。
+- 不修改统一审计表结构、异步写入机制、权限模型或生产部署。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/audit/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 日报 CREATE 的 `@AuditedOperation` 使用 `businessIdExpression = "#log.id"`，插入成功后记录具体日报 ID；UPDATE/SUBMIT 既有表达式保持不变。
+- 详情只查询当前 tenant、`business_type = SITE_DAILY_LOG`、`business_id = 日报ID` 的审计记录，并按创建时间倒序。
+- 返回 operationType、userId、successFlag、createdAt；不返回 IP、路径、错误码、耗时或其他审计内部字段。
+- 日报不存在或无项目访问权继续 fail-close；审计查询必须发生在项目访问校验之后。
+- 前端详情只读展示动作、用户 ID、结果和时间；无记录显示空态，不提供删除、重放、恢复或导出。
+- 至少覆盖 CREATE 表达式、租户/业务类型/业务 ID 过滤、成功/失败映射、空列表和前端敏感字段不出现；回滚为移除详情历史与 CREATE 表达式。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
 
 ### ISSUE-037-012：现场日报当日计划任务只读联动
 

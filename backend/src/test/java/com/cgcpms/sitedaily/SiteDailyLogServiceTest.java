@@ -13,6 +13,10 @@ import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
+import com.cgcpms.audit.annotation.AuditedOperation;
+import com.cgcpms.audit.entity.OperationAuditLog;
+import com.cgcpms.audit.mapper.OperationAuditLogMapper;
+import com.cgcpms.site.controller.SiteDailyLogController;
 import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.site.service.SiteDailyLogService;
@@ -20,6 +24,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 import org.mockito.ArgumentCaptor;
@@ -107,7 +112,7 @@ class SiteDailyLogServiceTest {
         MdPartnerMapper partnerMapper = mock(MdPartnerMapper.class);
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, projectMapper, checker, receiptMapper, itemMapper, materialMapper, partnerMapper,
-                mock(SubTaskMapper.class));
+                mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -163,7 +168,8 @@ class SiteDailyLogServiceTest {
         SubTaskMapper taskMapper = mock(SubTaskMapper.class);
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
-                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), taskMapper);
+                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), taskMapper,
+                mock(OperationAuditLogMapper.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -204,10 +210,64 @@ class SiteDailyLogServiceTest {
         assertTrue(query.getValue().getParamNameValuePairs().containsValue(LocalDate.of(2099, 2, 10)));
     }
 
+    @Test
+    void detailIncludesMinimalAuditTrailAndCreateBindsGeneratedId() throws Exception {
+        SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
+        PmProjectMapper projectMapper = mock(PmProjectMapper.class);
+        ProjectAccessChecker checker = mock(ProjectAccessChecker.class);
+        OperationAuditLogMapper auditMapper = mock(OperationAuditLogMapper.class);
+        SiteDailyLogService service = new SiteDailyLogService(
+                mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
+                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(SubTaskMapper.class), auditMapper);
+        UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
+
+        SiteDailyLog log = new SiteDailyLog();
+        log.setId(33L); log.setTenantId(11L); log.setProjectId(21L);
+        log.setReportDate(LocalDate.of(2099, 3, 1)); log.setConstructionContent("施工内容");
+        log.setStatus("SUBMITTED");
+        when(mapper.selectById(33L)).thenReturn(log);
+
+        OperationAuditLog success = new OperationAuditLog();
+        success.setId(91L); success.setTenantId(11L); success.setUserId(7L);
+        success.setOperationType("SUBMIT"); success.setBusinessType("SITE_DAILY_LOG");
+        success.setBusinessId("33"); success.setSuccessFlag(1);
+        success.setCreatedAt(LocalDateTime.of(2099, 3, 1, 18, 0));
+        OperationAuditLog failed = new OperationAuditLog();
+        failed.setId(92L); failed.setTenantId(11L); failed.setUserId(8L);
+        failed.setOperationType("UPDATE"); failed.setBusinessType("SITE_DAILY_LOG");
+        failed.setBusinessId("33"); failed.setSuccessFlag(0);
+        failed.setCreatedAt(LocalDateTime.of(2099, 3, 1, 19, 0));
+        when(auditMapper.selectList(any())).thenReturn(List.of(failed, success));
+
+        var detail = service.getById(33L);
+
+        assertEquals(2, detail.getAuditTrail().size());
+        assertEquals("UPDATE", detail.getAuditTrail().get(0).getOperationType());
+        assertEquals("8", detail.getAuditTrail().get(0).getUserId());
+        assertEquals(false, detail.getAuditTrail().get(0).getSuccess());
+        assertEquals("2099-03-01 19:00:00", detail.getAuditTrail().get(0).getCreatedAt());
+        assertEquals(true, detail.getAuditTrail().get(1).getSuccess());
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OperationAuditLog>> query = ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+        verify(auditMapper).selectList(query.capture());
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), OperationAuditLog.class);
+        String sql = query.getValue().getSqlSegment();
+        assertTrue(sql.contains("tenant_id"));
+        assertTrue(sql.contains("business_type"));
+        assertTrue(sql.contains("business_id"));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue(11L));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue("SITE_DAILY_LOG"));
+        assertTrue(query.getValue().getParamNameValuePairs().containsValue("33"));
+
+        AuditedOperation createAudit = SiteDailyLogController.class
+                .getMethod("create", SiteDailyLog.class).getAnnotation(AuditedOperation.class);
+        assertEquals("#log.id", createAudit.businessIdExpression());
+    }
+
     private SiteDailyLogService service(SiteDailyLogMapper mapper, PmProjectMapper projectMapper,
                                         ProjectAccessChecker checker) {
         return new SiteDailyLogService(mapper, projectMapper, checker,
                 mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
-                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(SubTaskMapper.class));
+                mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(SubTaskMapper.class),
+                mock(OperationAuditLogMapper.class));
     }
 }

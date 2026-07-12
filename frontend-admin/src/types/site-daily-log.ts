@@ -22,6 +22,13 @@ export interface SiteDailyPlannedTaskVO {
   progressPercent?: string
 }
 
+export interface SiteDailyAuditEntryVO {
+  operationType: string
+  userId?: string
+  success: boolean
+  createdAt?: string
+}
+
 export interface SiteDailyLogVO {
   id: string
   projectId: string
@@ -34,6 +41,7 @@ export interface SiteDailyLogVO {
   onSiteHeadcount?: number | null
   deliveries?: SiteDailyDeliveryVO[]
   plannedTasks?: SiteDailyPlannedTaskVO[]
+  auditTrail?: SiteDailyAuditEntryVO[]
   status: SiteDailyLogStatus
   submittedBy?: string
   submittedAt?: string

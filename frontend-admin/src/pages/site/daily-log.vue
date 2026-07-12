@@ -161,6 +161,10 @@ function resetFilters() {
   fetchData()
 }
 
+function auditRowKey(audit: NonNullable<SiteDailyLogVO['auditTrail']>[number]) {
+  return `${audit.createdAt}-${audit.operationType}-${audit.userId}-${audit.success}`
+}
+
 onMounted(() => { referenceStore.fetchProjects(); fetchData() })
 </script>
 
@@ -222,6 +226,17 @@ onMounted(() => { referenceStore.fetchProjects(); fetchData() })
         </a-table>
         <a-empty v-else description="当日暂无计划任务" />
       </section>
+      <section v-if="activeRecord && modalMode === 'view'" class="site-daily-audit-trail">
+        <strong>变更历史</strong>
+        <a-table v-if="activeRecord.auditTrail?.length" :data-source="activeRecord.auditTrail" :pagination="false" :row-key="auditRowKey" size="small">
+          <a-table-column key="operationType" title="动作" data-index="operationType" />
+          <a-table-column key="userId" title="用户ID" data-index="userId" />
+          <a-table-column key="success" title="结果" />
+          <a-table-column key="createdAt" title="时间" data-index="createdAt" />
+          <template #bodyCell="{ column, record: audit }"><span v-if="column.key === 'operationType'">{{ audit.operationType }}</span><span v-else-if="column.key === 'userId'">{{ audit.userId || '-' }}</span><a-tag v-else-if="column.key === 'success'" :color="audit.success ? 'success' : 'error'">{{ audit.success ? '成功' : '失败' }}</a-tag><span v-else-if="column.key === 'createdAt'">{{ audit.createdAt || '-' }}</span></template>
+        </a-table>
+        <a-empty v-else description="暂无变更记录" />
+      </section>
       <section v-if="activeRecord" class="site-daily-files"><strong>附件</strong><input v-if="canEdit && activeRecord.status === 'DRAFT'" type="file" @change="onFileChange" /><a-spin :spinning="filesLoading"><div v-for="file in files" :key="file.id"><a-button type="link" @click="download(file)">{{ file.originalName }}</a-button><a-button v-if="canEdit && activeRecord.status === 'DRAFT'" danger type="link" @click="removeFile(file)">删除</a-button></div><a-empty v-if="!files.length" description="暂无附件" /></a-spin></section>
       <template #footer><a-button @click="modalOpen = false">关闭</a-button><a-button v-if="modalMode !== 'view'" type="primary" :loading="saving" @click="save">保存草稿</a-button><a-button v-if="canEdit && activeRecord?.status === 'DRAFT'" type="primary" @click="submitRecord(activeRecord)">提交定稿</a-button></template>
     </a-modal>
@@ -235,4 +250,5 @@ onMounted(() => { referenceStore.fetchProjects(); fetchData() })
 .site-daily-files { display:grid; gap:8px; margin-top:16px; }
 .site-daily-deliveries { display:grid; gap:8px; margin-top:16px; }
 .site-daily-planned-tasks { display:grid; gap:8px; margin-top:16px; }
+.site-daily-audit-trail { display:grid; gap:8px; margin-top:16px; }
 </style>

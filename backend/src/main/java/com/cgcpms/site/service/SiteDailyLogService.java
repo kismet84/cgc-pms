@@ -25,6 +25,9 @@ import com.cgcpms.site.vo.SiteDailyDeliveryVO;
 import com.cgcpms.site.vo.SiteDailyPlannedTaskVO;
 import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
+import com.cgcpms.audit.entity.OperationAuditLog;
+import com.cgcpms.audit.mapper.OperationAuditLogMapper;
+import com.cgcpms.site.vo.SiteDailyAuditEntryVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -53,6 +56,7 @@ public class SiteDailyLogService {
     private final MdMaterialMapper materialMapper;
     private final MdPartnerMapper partnerMapper;
     private final SubTaskMapper subTaskMapper;
+    private final OperationAuditLogMapper auditLogMapper;
 
     public IPage<SiteDailyLogVO> getPage(long pageNo, long pageSize, Long projectId,
                                          LocalDate startDate, LocalDate endDate, String status) {
@@ -89,6 +93,7 @@ public class SiteDailyLogService {
         SiteDailyLogVO detail = toVO(log, project == null ? null : project.getProjectName());
         detail.setDeliveries(loadDeliveries(log));
         detail.setPlannedTasks(loadPlannedTasks(log));
+        detail.setAuditTrail(loadAuditTrail(log.getId()));
         return detail;
     }
 
@@ -270,6 +275,23 @@ public class SiteDailyLogService {
                     planned.setStatus(task.getStatus());
                     planned.setProgressPercent(task.getProgressPercent() == null ? null : task.getProgressPercent().toPlainString());
                     return planned;
+                }).toList();
+    }
+
+    private List<SiteDailyAuditEntryVO> loadAuditTrail(Long logId) {
+        return auditLogMapper.selectList(new LambdaQueryWrapper<OperationAuditLog>()
+                        .eq(OperationAuditLog::getTenantId, UserContext.getCurrentTenantId())
+                        .eq(OperationAuditLog::getBusinessType, "SITE_DAILY_LOG")
+                        .eq(OperationAuditLog::getBusinessId, logId.toString())
+                        .orderByDesc(OperationAuditLog::getCreatedAt)
+                        .orderByDesc(OperationAuditLog::getId))
+                .stream().map(entry -> {
+                    SiteDailyAuditEntryVO audit = new SiteDailyAuditEntryVO();
+                    audit.setOperationType(entry.getOperationType());
+                    audit.setUserId(entry.getUserId() == null ? null : entry.getUserId().toString());
+                    audit.setSuccess(Integer.valueOf(1).equals(entry.getSuccessFlag()));
+                    audit.setCreatedAt(entry.getCreatedAt() == null ? null : entry.getCreatedAt().format(DateTimeUtils.DTF));
+                    return audit;
                 }).toList();
     }
 }

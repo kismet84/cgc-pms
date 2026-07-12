@@ -56,6 +56,8 @@
 
 2026-07-12 增量核验：官方 Daily Log Overview 将 Deliveries 用于记录到货来源、追踪号与内容，将 Productivity 用于记录到场和已安装材料。对 CGC-PMS 的最小动作是复用既有已审批材料验收事实做日报只读联动，不复制完整日志类型体系。来源：<https://support.procore.com/products/online/user-guide/project-level/daily-log/tutorials/daily-log-overview>。
 
+同页的 Change History 用于列出日报当天发生的修改及修改人。对 CGC-PMS 的最小动作是复用统一操作审计并修正 CREATE 的业务 ID 归属，不新建日报历史表或字段级版本系统。
+
 ### 4. Autodesk Construction Cloud
 
 | 字段 | 内容 |

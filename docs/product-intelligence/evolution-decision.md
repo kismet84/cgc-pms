@@ -1,5 +1,15 @@
 # CGC-PMS v1.5 首轮迭代方向决策
 
+## PI-2026-07-12-08：现场日报变更历史只读展示
+
+- 项目事实：日报 CREATE/UPDATE/SUBMIT 均使用统一 `@AuditedOperation`；UPDATE/SUBMIT 已绑定 `#id`，CREATE 的实体在插入后已有 ID 但当前表达式为空；统一审计表具备 tenant、businessType、businessId、operationType、userId、successFlag 和 createdAt。
+- 外部事实：Procore Daily Log 官方概览将 Change History 定义为列出当天日报的修改及修改人；核验时间 2026-07-12。
+- 候选比较：复用统一审计比新建日报历史表、字段级 diff 或质量巡检新域更小，且补齐现有审计归属缺口。
+- 最小闭环：CREATE 绑定 `#log.id`，详情按 tenant/SITE_DAILY_LOG/id 返回动作、用户 ID、结果和时间。
+- 非目标：字段级 diff、版本恢复、IP/错误码等敏感字段、审计写机制重构。
+- 裁决：形成 `ISSUE-037-013`，任务性质为缺口修复，风险中等。
+- 官方来源：<https://support.procore.com/products/online/user-guide/project-level/daily-log/tutorials/daily-log-overview>。
+
 ## PI-2026-07-12-07：现场日报当日计划任务只读联动
 
 - 项目事实：现有 `sub_task` 已包含 tenant/project、计划开始/结束、作业区域、状态和进度；日报详情已具备项目访问校验和跨域只读聚合模式。

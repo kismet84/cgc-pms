@@ -17,6 +17,7 @@ public class SiteDailyLogVO {
     private Integer onSiteHeadcount;
     private List<SiteDailyDeliveryVO> deliveries;
     private List<SiteDailyPlannedTaskVO> plannedTasks;
+    private List<SiteDailyAuditEntryVO> auditTrail;
     private String status;
     private String submittedBy;
     private String submittedAt;

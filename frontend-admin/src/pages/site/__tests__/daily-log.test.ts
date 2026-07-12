@@ -53,4 +53,17 @@ describe('site daily log page', () => {
     expect(source).toContain('当日暂无计划任务')
     expect(source).not.toContain('updatePlannedTask')
   })
+
+  it('renders a minimal audit trail without sensitive audit fields', () => {
+    expect(source).toContain('变更历史')
+    expect(source).toContain('activeRecord.auditTrail')
+    expect(source).toContain('audit.operationType')
+    expect(source).toContain('audit.userId')
+    expect(source).toContain('audit.success')
+    expect(source).toContain('audit.createdAt')
+    expect(source).toContain('暂无变更记录')
+    expect(source).not.toContain('sourceIp')
+    expect(source).not.toContain('requestPath')
+    expect(source).not.toContain('errorCode')
+  })
 })
