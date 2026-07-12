@@ -4,7 +4,7 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前 Ready 队列为空；本轮进度 3/5，下一步须刷新产品情报后再决定是否补货。
+当前 Ready 队列为空；`启动迭代-5` 已在 3/5 因无合格 Candidate 安全停止。
 
 ### ISSUE-037-016：WBS 软删除编号冲突修复
 
