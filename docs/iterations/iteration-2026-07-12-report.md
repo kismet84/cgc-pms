@@ -102,3 +102,12 @@
 - TDD：新增 limit fixture 先稳定失败于“上限未关闭 future dispatch”，最小修复后 `test-continuous-runner.ps1` 全套通过。
 - 无人值守：复用现有 `test-unattended-canary.ps1` 完成 20 轮隔离验证，覆盖自动执行、本地提交、证据路径、零人工干预、零范围违规和 20/20 上限停止。
 - 当前状态：`enabled.flag=false`、checkpoint=`limit_reached`、status=`LIMIT_REACHED`、lastIssue=`ISSUE-037-010`、recoveryAction=`NONE`。
+
+## 双图谱路由整改复验
+
+- 历史事实：`ISSUE-037-001` 至 `ISSUE-037-010` 执行期间使用了 CodeGraph 与 `rg`，但未调用 `codebase-memory-mcp`；以下整改后查询不追算为原迭代证据。
+- 根因：原规则只规定 CodeGraph 优先级和 `codebase-memory-mcp` 只读边界，没有后者的必用条件，A/F 角色契约与 iteration 模板也没有图谱证据字段。
+- 修复：跨层影响、跨前后端/跨语言关系、复杂多跳调用链、架构边界/聚类或 CodeGraph 召回不足时，必须补充调用 `codebase-memory-mcp`；A 记录查询目的、命中摘要和交叉核验，F 写入图谱检索证据或不适用原因。
+- TDD：`test-tool-routing.ps1` 先稳定失败于 `AGENTS.override.md missing required tool-routing text: 跨层影响`，最小规则与模板整改后通过。
+- 图谱检索证据：CodeGraph 查询目的=定位 AutoPilot runner、checkpoint、iteration report 与测试入口；`codebase-memory-mcp` 查询目的=核对 `replenishmentLeadDays` 到 `plannedDate` 的跨层影响，返回 43 个关联结果并命中 DTO、实体、VO、Controller/Service、后端测试、前端 API 与 `useStockLedger`；交叉核验=`rg` 在当前分支确认对应符号与文件真实存在。
+- 安全边界：仅执行本地只读查询，未重建/升级索引，未运行 install/uninstall，未修改业务代码。
