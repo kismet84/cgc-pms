@@ -301,6 +301,8 @@ public class SubTaskService {
         if (successorCount > 0)
             throw new BusinessException("SUB_TASK_DEPENDENCY_IN_USE", "前置任务仍被后续任务引用");
 
+        existing.setTaskCode("DELETED-" + id);
+        subTaskMapper.updateById(existing);
         subTaskMapper.deleteById(id);
     }
 

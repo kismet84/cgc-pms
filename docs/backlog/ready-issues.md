@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列有 1 条待实施 Ready：`ISSUE-037-016`；本轮进度 2/5。
+当前 Ready 队列为空；本轮进度 3/5，下一步须刷新产品情报后再决定是否补货。
 
 ### ISSUE-037-016：WBS 软删除编号冲突修复
 
 优先级：P1
 任务性质：缺口修复
 类型：分包 WBS / 逻辑删除 / 唯一键 / 测试稳定性
-状态：Ready
+状态：Done（2026-07-12；计入 `启动迭代-5` 第 3/5 条）
 自动合并：auto-merge/local-commit-only
 来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-11`
 Migration：不需要

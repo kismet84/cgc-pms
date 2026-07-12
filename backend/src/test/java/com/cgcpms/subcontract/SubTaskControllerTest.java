@@ -95,7 +95,11 @@ class SubTaskControllerTest {
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(d("/sub-tasks/" + predecessorTaskId).cookie(adminCookie()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUB_TASK_DEPENDENCY_IN_USE"));
+        mockMvc.perform(g("/sub-tasks/" + predecessorTaskId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.taskCode", startsWith("SUB-")));
         mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"predecessorTaskId\":null,\"plannedStartDate\":\"2026-07-10\",\"plannedEndDate\":\"2026-07-20\",\"progressPercent\":0,\"status\":\"NOT_STARTED\"}"))
@@ -204,6 +208,7 @@ class SubTaskControllerTest {
         mockMvc.perform(g("/sub-tasks/" + id).cookie(adminCookie()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
+        mockMvc.perform(d("/sub-tasks/" + id).cookie(adminCookie())).andExpect(status().isOk());
     }
 
     @Test @Order(10) @DisplayName("GET /sub-tasks/{id} -> 200")
@@ -247,7 +252,28 @@ class SubTaskControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(13) @DisplayName("DELETE /sub-tasks/{id} -> 200")
+    @Test @Order(13) @DisplayName("DELETE permits reusing and deleting the same daily task code")
+    void testDeleteReusedDailyTaskCode() throws Exception {
+        String firstResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"软删除编号复用-1\",\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Long firstId = Long.parseLong(firstResponse.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+        String firstCode = mockMvc.perform(g("/sub-tasks/" + firstId).cookie(adminCookie()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()
+                .replaceAll(".*\"taskCode\":\"([^\"]+)\".*", "$1");
+        mockMvc.perform(d("/sub-tasks/" + firstId).cookie(adminCookie())).andExpect(status().isOk());
+
+        String secondResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"软删除编号复用-2\",\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Long secondId = Long.parseLong(secondResponse.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+        mockMvc.perform(g("/sub-tasks/" + secondId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.taskCode").value(firstCode));
+        mockMvc.perform(d("/sub-tasks/" + secondId).cookie(adminCookie())).andExpect(status().isOk());
+    }
+
+    @Test @Order(14) @DisplayName("DELETE /sub-tasks/{id} -> 200")
     void testDelete() throws Exception {
         Assertions.assertNotNull(taskId);
         mockMvc.perform(d("/sub-tasks/" + dependentTaskId).cookie(adminCookie())).andExpect(status().isOk());

@@ -279,6 +279,9 @@ class TenantBoundaryTask2Test {
         TestUserContext.setAdmin(TENANT_A, USER_A);
         var vo = subTaskService.getById(id);
         assertNotNull(vo);
+        // Clean up
+        TestUserContext.setAdmin(TENANT_A, USER_A);
+        subTaskService.delete(id);
     }
 
     @Test
