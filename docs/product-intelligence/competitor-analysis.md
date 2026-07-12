@@ -120,6 +120,8 @@
 | 对 CGC-PMS 的启示 | 模块间连接比继续增加独立列表价值更高；但 CGC-PMS 应保持建筑业务语义，不复制通用任务模型 |
 | 候选动作 | WBS/现场任务必须与项目、施工对象和现有审批/预警结合 |
 
+2026-07-12 补货核验：Odoo 19 官方任务依赖文档明确后续任务在前置完成前保持 Waiting，不能进入 In Progress。CGC-PMS 已有单前置 FS、同项目/环/日期校验和风险展示，但后端尚未阻止前置未完成时推进后续任务；下一最小动作只补状态门禁，不扩多前置、自动排程或依赖连线。来源：<https://www.odoo.com/documentation/19.0/applications/services/project/tasks/task_dependencies.html>。
+
 ### 9. Odoo Inventory Reordering Rules 19
 
 | 字段 | 内容 |

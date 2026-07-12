@@ -4,7 +4,57 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂无待实施 Ready；`ISSUE-037-014` 已完成，本轮进度 1/5。
+当前队列有 1 条待实施 Ready：`ISSUE-037-015`；本轮进度 1/5。
+
+### ISSUE-037-015：WBS 单前置 FS 开工门禁
+
+优先级：P1
+任务性质：缺口修复
+类型：分包 WBS / 单前置 FS / 状态门禁 / 项目数据范围 / 前后端 / 测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Odoo 19 Task Dependencies 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-10`
+Migration：不需要
+依赖：复用现有 `SubTask.predecessorTaskId`、`SubTaskService.validateDependencyConsistency()`、同项目/租户/环/日期校验、前端前置任务选项和状态下拉。
+风险等级：中
+运行态要求：后端专项、前端分包任务单测和类型检查通过；不要求 Docker 或真实浏览器。
+Reviewer要求：必须复核创建/更新/更换前置/清空前置、旧客户端省略字段兼容、租户/项目 fail-close、前置状态读取、状态绕过和前端仅做体验不替代后端门禁。
+归档报告：`docs/quality/ISSUE-037-015-WBS单前置FS开工门禁验收报告.md`
+目标：
+- 将现有单前置 FS 从只读风险提示补成后端状态门禁。
+- 有效前置任务未 `COMPLETED` 时，后续任务不得创建或更新为 `IN_PROGRESS` / `COMPLETED`。
+- 前端选择未完成前置时禁用对应状态选项并显示最小提示，减少无效提交。
+非目标：
+- 不新增 WAITING 状态、多前置、依赖类型、lag、工作日历、自动排程、拖拽、关键路径或跨项目依赖。
+- 不改变无前置任务、前置已完成任务、`NOT_STARTED` / `SUSPENDED` 的既有保存语义。
+- 不修改权限、审批、日报、生产部署或数据库 migration。
+允许修改：
+- `backend/src/main/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/TenantBoundaryTask2Test.java`
+- `frontend-admin/src/types/subcontract.ts`
+- `frontend-admin/src/pages/subcontract/task.vue`
+- `frontend-admin/src/pages/subcontract/__tests__/task.test.ts`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 创建或更新任务时，若最终有效 `predecessorTaskId` 非空且前置状态不是 `COMPLETED`，最终状态为 `IN_PROGRESS` 或 `COMPLETED` 必须以稳定业务错误拒绝。
+- 前置已完成、无前置、显式清空前置、最终状态为 `NOT_STARTED` 或 `SUSPENDED` 保持既有行为；旧客户端省略 `predecessorTaskId` 时沿用现有前置并正确门禁。
+- 更换前置后按新前置状态判断；跨租户、跨项目、自依赖、间接环和 FS 日期校验继续 fail-close，不得被状态门禁绕过。
+- 后端门禁位于统一 Service 校验路径，不能只靠 Controller 或前端；不得新增逐任务列表查询以外的无界扫描。
+- 前端根据当前所选前置任务状态禁用 `IN_PROGRESS` / `COMPLETED` 并显示原因；服务端拒绝仍需显示错误，不新增状态或写入口。
+- 至少覆盖创建、更新、省略字段、更换/清空前置、已完成/未完成前置、跨项目/环/日期既有回归和前端禁用提示；回滚为移除状态门禁与前端禁用，不涉及数据迁移。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest,TenantBoundaryTask2Test" test`
+- `cd frontend-admin; pnpm test:unit src/pages/subcontract/__tests__/task.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
 
 ### ISSUE-037-014：现场日报当日已审批领料只读联动
 
