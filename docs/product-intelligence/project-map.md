@@ -1,5 +1,12 @@
 # CGC-PMS 项目地图
 
+## 2026-07-12 增量：系统审查与 Ready 恢复
+
+- `PI-2026-07-12-12` 的停止动作保持为历史事实，但“无合格 Candidate”因候选范围过窄和地图回写滞后被后续复核撤销。
+- 共享 `BaseEntity.remark` 被错误标记为只读，而现有前端和业务服务仍把备注作为可编辑字段；已准入 `ISSUE-037-017` 做单点契约修复。
+- 插件 Ready 预演修复了标题正则缺少多行匹配的问题；合法的二、三级标题现可通过 Select Gate，并有最小回归脚本保护。
+- 本轮只修复共享根因并保护 ID、租户和审计字段，不扩成 DTO 重构或全接口治理。
+
 ## 2026-07-12 增量：WBS 软删除编号冲突
 
 - `ISSUE-037-015` 验收稳定复现：当天自动编号只查询未删除任务，历史软删除编号会被复用；再次删除复用编号的任务时，`(tenant_id, task_code, deleted_flag)` 唯一键冲突并返回 409。
@@ -39,11 +46,11 @@
 | --- | --- |
 | 产品版本 | `1.5.0-dev.0` |
 | 分支 | `develop/1.5` |
-| Commit | `a2d58b591` |
-| 生成时间 | 2026-07-11 |
+| Commit | 当前 `develop/1.5` 工作区 |
+| 生成时间 | 2026-07-12 |
 | 证据类型 | 当前代码、配置、现行规范、测试入口静态核对 |
 | 验证新鲜度 | 业务测试和真实角色运行态待本轮后续复验 |
-| 下次刷新 | 第37条主线首个业务 Candidate 完成后，或当前事实变化时 |
+| 下次刷新 | `ISSUE-037-017` 完成后，或当前事实变化时 |
 
 > 本地图中的 `Partial` 不等于功能不存在，表示真实代码链路已经存在，但尚未取得 v1.5 当前周期的完整运行或业务验收证据。v1.0 历史测试结论不用于升级状态。
 
@@ -112,10 +119,10 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 合同与付款条件 | `pages/contract/`、`api/modules/contract.ts` | `contract/` | `CtContractServiceTest`、`ContractApprovalIntegrationTest`、`ContractLedgerPage.test.ts` | Partial | 合同履约、金额口径和审批联动需当前复验 |
 | 变更与签证 | `pages/variation/`、`api/modules/variation.ts` | `variation/` | `VarOrderServiceTest`、`VarOrderControllerMockMvcTest`、`VariationOrderProduction.test.ts` | Partial | 变更收入/成本联动和审批边界待复验 |
 | 成本与目标成本 | `pages/cost/`、`pages/cost-target/` | `cost/`、`revenue/`、`overhead/`、`accounting/` | `CostSummaryServiceTest`、`CostLedgerServiceTest`、`CostSummaryProduction.test.ts` | Partial | 多来源成本、月份快照和下钻口径待复验 |
-| 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 已按安全阈值给出四位小数建议；尚无独立人工补货目标量，`ISSUE-037-009` 拟补，供货周期和预测仍缺失 |
+| 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 已完成安全阈值、人工补货目标量和自然日提前期预填；供应商级提前期、工作日历和预测仍缺失 |
 | 收货、仓库与库存 | `pages/receipt/`、`pages/inventory/` | `receipt/`、`inventory/` | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts` | Partial | 已维护安全阈值并联动 KPI/预警；目标量、全量建议、预测和跨仓调拨仍缺 |
 | 领料 | `pages/requisition/` | `requisition/` | `MatRequisitionServiceTest`、`useRequisitionForm.test.ts` | Partial | 与计划需用量、施工部位和损耗分析尚未闭环 |
-| 分包与计量 | `pages/subcontract/` | `subcontract/` | `SubMeasureServiceTest`、`SubTaskControllerTest`、`subcontract/measure.test.ts` | Partial | 已有只读 WBS/甘特概览，但无独立计划任务、依赖和完整履约档案 |
+| 分包与计量 | `pages/subcontract/` | `subcontract/` | `SubMeasureServiceTest`、`SubTaskControllerTest`、`subcontract/measure.test.ts` | Partial | 已完成单前置 FS、状态门禁、延期风险和软删除编号冲突修复；仍无多前置、多类型、自动排程和完整履约档案 |
 | 结算 | `pages/settlement/` | `settlement/` | `StlSettlementServiceTest`、`StlSettlementControllerMockMvcTest`、`settlement/index.test.ts` | Partial | 合同、变更、计量、付款汇总需当前一致性复验 |
 | 付款与资金日记账 | `pages/payment/`、`pages/cash-journal/` | `payment/`、`accounting/` | `PaymentFinancialConsistencyTest`、`PayRecordCashJournalIntegrationTest`、`payment/save-chain.test.ts` | Partial | 金额、财务回写、附件和权限需当前复验 |
 | 发票与识别 | `pages/invoice/` | `invoice/` | `InvoiceServiceTest`、`InvoiceRecognitionTest`、`invoice-pdf.test.ts` | Partial | 识别可靠性、付款关联和文件安全需当前复验 |
@@ -153,10 +160,10 @@ Docker Compose + Nginx + Actuator + Prometheus
 | CI 门禁 | `.github/workflows/` | Partial | v1.0 结论已归档，当前远端 checks 需重新核验 |
 | 本地运行 | `scripts/rebuild.py`、Docker Compose | Partial | ISSUE-037-001 已完成 8080、5173、dev-login health gate 与真实角色浏览器验收 |
 | 现场日报验收直达 | `DevAuthController`、`/site/daily-log` | Implemented | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据 |
-| Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1` | Implemented | 当前规则和解析入口存在；ISSUE-037-004 收口后进入下一轮补货 |
+| Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner | Implemented | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护 |
 | 候选补货 | `autopilot-refill.ps1` | Implemented | 读取 Ad-hoc 和长期计划，当前不读取外部情报 |
 | 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 20 轮隔离 canary 已验证连续执行、提交、证据、零人工干预和上限停止；LIMIT_REACHED 已统一关闭 enabled 并被 checkpoint/status 识别 |
-| 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-004 正式验收报告 |
+| 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-016 正式验收报告 |
 
 ## 当前明确缺口
 
@@ -172,6 +179,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 ### 工程治理候选
 
 - 子智能体超时、悬挂线程退役与有限重派治理。
+- 实体直绑更新字段白名单、前端重复错误提示和接口—入口映射仍需按独立证据拆分，不与 `ISSUE-037-017` 扩域合并。
 
 工程治理候选必须与产品候选分组排序，默认不能用泛化工具或流程改进替代产品方向判断。若当前证据证明治理缺口直接阻塞已选产品目标、安全边界或正式验收，可按 `缺口修复` 或 `运维治理` 进入 Ready；必须绑定产品目标、阻塞证据、解除条件、非目标和回滚方式。
 

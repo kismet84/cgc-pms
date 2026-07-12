@@ -4,7 +4,47 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前 Ready 队列为空；`启动迭代-5` 已在 3/5 因无合格 Candidate 安全停止。
+当前 Ready 队列有 1 条：`ISSUE-037-017`。`启动迭代-5` 在 3/5 的停止保留为历史状态，不自动恢复旧运行。
+
+### ISSUE-037-017：BaseEntity 备注写入契约修复
+
+优先级：P0
+任务性质：缺口修复
+类型：共享实体 / JSON 契约 / 数据正确性 / 后端测试
+状态：Ready
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-13`
+Migration：不需要
+依赖：复用现有 `BaseEntity` 与 Spring/Jackson 配置；不新增 DTO、依赖或兼容层。
+风险等级：中
+运行态要求：共享 JSON 契约专项通过；不要求 Docker、前端或真实浏览器。
+Reviewer要求：复核 `remark` 可反序列化且可序列化，ID、租户、创建/更新人和时间仍保持只读；确认无 Controller、Service、前端或数据库扩散。
+归档报告：`docs/quality/ISSUE-037-017-BaseEntity备注写入契约修复验收报告.md`
+目标：
+- 修复客户端提交 `remark` 时被 Jackson 静默忽略的问题。
+- 保持共享实体其余受保护字段的反序列化边界不变。
+非目标：
+- 不修改业务 Controller、Service、Mapper、前端页面或数据库。
+- 不开展 DTO 重构、实体直绑更新白名单审计或历史数据回填。
+允许修改：
+- `backend/src/main/java/com/cgcpms/common/entity/BaseEntity.java`
+- `backend/src/test/java/com/cgcpms/common/entity/BaseEntityJsonContractTest.java`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/**/controller/**`
+- `backend/src/main/java/com/cgcpms/**/service/**`
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`、生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- JSON 中的 `remark` 能反序列化到 `BaseEntity`，序列化仍返回备注。
+- JSON 中的 `id`、`tenantId`、`createdBy`、`createdAt`、`updatedBy`、`updatedAt` 继续被反序列化忽略。
+- 实现仅移除 `remark` 的只读标记，不改变其他共享字段、业务接口或数据库结构。
+- 专项测试和 `git diff --check` 通过；回滚只恢复该标记并移除契约测试。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=BaseEntityJsonContractTest" test`
+- `git diff --check`
 
 ### ISSUE-037-016：WBS 软删除编号冲突修复
 
