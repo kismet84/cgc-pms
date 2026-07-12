@@ -193,3 +193,15 @@
 - 自动合并：本地 commit only；`autoPush=false`。
 - 下一轮：Ready 清空后继续产品情报补货；未命中 stop/pause。
 - 正式报告：`docs/quality/ISSUE-037-018-子智能体超时悬挂线程退役与有限重派治理验收报告.md`。
+
+## ISSUE-037-019：后端接口无前端入口只读盘点与治理裁决
+
+- 状态：Done；计入本次 `启动迭代-10` 第 3/10 条实施型 Ready Issue。
+- 交付：53 个 Controller、321 个唯一 HTTP 方法的前端 API/路由/页面/菜单静态映射；无业务代码、配置、数据库或运行态变更。
+- 分类：有用户入口 219、前端调用但无独立页面 57、内部/集成/运维 4、需补入口 30、待废弃 0、需要确认 11；总计 321、重复 0。
+- 验证：Ready lint、后端 compile、前端 35 tests、类型检查与 `git diff --check` 通过。
+- 独立审查：PASS；全查 30 条需补入口、11 条需要确认，并抽查 24 个存在入口的业务域，后端引用与权限注解无不符。
+- 失败分类：CLI Reviewer 因 response schema 缺少显式类型返回 400，归类 `tool_config`；修复 schema 后由新鲜独立 reviewer 完成裁决。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：按责任域另拆入口补建/兼容性核实；Ready 清空后继续产品情报补货。
+- 正式报告：`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`。
