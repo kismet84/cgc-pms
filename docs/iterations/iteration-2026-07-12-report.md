@@ -182,3 +182,14 @@
 - 自动合并：本地 commit only；`autoPush=false`。
 - 下一轮：Ready 清空后进入产品情报补货；未命中 stop/pause。
 - 正式报告：`docs/quality/ISSUE-037-017-BaseEntity备注写入契约修复验收报告.md`。
+
+## ISSUE-037-018：子智能体超时、悬挂执行线程退役与有限重派治理
+
+- 状态：Done；计入本次 `启动迭代-10` 第 2/10 条实施型 Ready Issue。
+- 修改范围：复用连续 runner/state/progress/context，补齐 300/600 秒生命周期证据、一次 repair、第二次 blocked、有界长命令声明和 schema；无业务代码或数据库变更。
+- 验证：executor stall、state machine、progress fingerprint、制品 schema、`git diff --check` 全部通过。
+- 独立审查：首次 FAIL 并发现 PID 复用误杀与长命令错误计时；两项按 TDD 补修后由主线程复验，阻塞解除。
+- 失败分类：执行器内部 reviewer 无回传及 Git CRLF stderr 中断均为 `tool_config`；未定性为业务质量失败。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：Ready 清空后继续产品情报补货；未命中 stop/pause。
+- 正式报告：`docs/quality/ISSUE-037-018-子智能体超时悬挂线程退役与有限重派治理验收报告.md`。

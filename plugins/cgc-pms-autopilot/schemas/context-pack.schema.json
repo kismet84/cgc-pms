@@ -26,6 +26,18 @@
     "relevantSymbols": { "type": "array", "maxItems": 12, "items": { "type": "string" } },
     "acceptedDecisions": { "type": "array", "items": { "type": "string" } },
     "openRisks": { "type": "array", "items": { "type": "string" } },
+    "longRunningCommands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "expectedSeconds"],
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "expectedSeconds": { "type": "integer", "minimum": 601 }
+        }
+      }
+    },
     "previousPhaseSummary": { "type": ["string", "null"], "maxLength": 5120 }
   }
 }

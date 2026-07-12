@@ -56,6 +56,30 @@
     "worktree": { "type": "string" },
     "branch": { "type": "string" },
     "executorPid": { "type": ["integer", "null"], "minimum": 1 },
+    "executorStartedAt": { "type": ["string", "null"], "format": "date-time" },
+    "lastProgressAt": { "type": ["string", "null"], "format": "date-time" },
+    "retryCount": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "timeoutReason": { "type": ["string", "null"] },
+    "retiredAt": { "type": ["string", "null"], "format": "date-time" },
+    "retiredStatus": { "type": ["string", "null"], "enum": [null, "RETIRED"] },
+    "retiredExecutors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["issueId", "task", "executorPid", "startedAt", "lastProgressAt", "retryCount", "timeoutReason", "retiredAt", "retiredStatus"],
+        "properties": {
+          "issueId": { "type": "string" }, "task": { "type": "string" },
+          "executorPid": { "type": "integer", "minimum": 1 },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "lastProgressAt": { "type": "string", "format": "date-time" },
+          "retryCount": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "timeoutReason": { "type": "string" },
+          "retiredAt": { "type": "string", "format": "date-time" },
+          "retiredStatus": { "const": "RETIRED" }
+        }
+      }
+    },
     "lastCommit": { "type": ["string", "null"] },
     "failureFingerprint": { "type": ["string", "null"] },
     "enabled": { "type": "boolean" },

@@ -56,6 +56,13 @@ function Assert-AutopilotState {
     [datetimeoffset]$parsed = [datetimeoffset]::MinValue
     if (![datetimeoffset]::TryParse([string]$State.$name, [ref]$parsed)) { throw "Invalid AutoPilot timestamp: $name" }
   }
+  foreach ($name in 'executorStartedAt','lastProgressAt','retiredAt') {
+    if ($State.PSObject.Properties.Name -contains $name -and $State.$name) {
+      [datetimeoffset]$parsed = [datetimeoffset]::MinValue
+      if (![datetimeoffset]::TryParse([string]$State.$name, [ref]$parsed)) { throw "Invalid AutoPilot timestamp: $name" }
+    }
+  }
+  if ($State.PSObject.Properties.Name -contains 'retryCount' -and [int]$State.retryCount -lt 0) { throw 'retryCount cannot be negative' }
   $ids = @($State.completedIssueIds)
   if (@($ids | Select-Object -Unique).Count -ne $ids.Count) { throw 'completedIssueIds must be unique' }
   if ([int]$State.completedImplementationIssues -ne $ids.Count) { throw 'completedImplementationIssues must equal completedIssueIds count' }

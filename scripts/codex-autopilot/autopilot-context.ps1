@@ -14,10 +14,10 @@ function Get-AutopilotDiffHash {
 
 function Get-AutopilotDiffText {
   param([string]$Worktree, [string]$BaseCommit)
-  $diff = (& git -C $Worktree diff --binary $BaseCommit -- 2>&1 | Out-String)
+  $diff = (& git -c core.autocrlf=false -C $Worktree diff --binary $BaseCommit -- 2>$null | Out-String)
   if ($LASTEXITCODE -ne 0) { throw 'cannot calculate worktree diff hash' }
   foreach ($path in @(& git -C $Worktree ls-files --others --exclude-standard)) {
-    $untrackedDiff = (& git -C $Worktree diff --no-index --binary -- NUL $path 2>&1 | Out-String)
+    $untrackedDiff = (& git -c core.autocrlf=false -C $Worktree diff --no-index --binary -- NUL $path 2>$null | Out-String)
     if ($LASTEXITCODE -notin @(0,1)) { throw "cannot include untracked file in diff: $path" }
     $diff += $untrackedDiff
   }
@@ -35,7 +35,8 @@ function New-AutopilotContextPack {
     [string]$PreviousPhaseSummary = '',
     [string[]]$ChangedPaths = @(),
     [string[]]$AcceptedDecisions = @(),
-    [string[]]$OpenRisks = @()
+    [string[]]$OpenRisks = @(),
+    [object[]]$LongRunningCommands = @()
   )
   if (@($RelevantSymbols).Count -gt 12) { throw 'context source budget exceeded: max 12 relevant symbols/files' }
   if ([Text.Encoding]::UTF8.GetByteCount($PreviousPhaseSummary) -gt 5120) { throw 'previous phase summary budget exceeded: max 5 KB' }
@@ -60,6 +61,9 @@ function New-AutopilotContextPack {
     relevantSymbols = @($RelevantSymbols)
     acceptedDecisions = @($AcceptedDecisions)
     openRisks = @($OpenRisks)
+    longRunningCommands = @($LongRunningCommands | Where-Object { [int]$_.expectedSeconds -gt 600 } | ForEach-Object {
+      [ordered]@{ command = [string]$_.command; expectedSeconds = [int]$_.expectedSeconds }
+    })
     previousPhaseSummary = if ($PreviousPhaseSummary) { $PreviousPhaseSummary } else { $null }
   }
   if ($OutputPath) {
