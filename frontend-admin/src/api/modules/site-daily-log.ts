@@ -15,6 +15,10 @@ export function getSiteDailyLogs(params: SiteDailyLogQuery) {
   return request<PageResult<SiteDailyLogVO>>({ url: '/site-daily-logs', method: 'get', params })
 }
 
+export function getSiteDailyLog(id: string) {
+  return request<SiteDailyLogVO>({ url: `/site-daily-logs/${id}`, method: 'get' })
+}
+
 export function createSiteDailyLog(data: SiteDailyLogCommand) {
   return request<string>({ url: '/site-daily-logs', method: 'post', data })
 }

@@ -4,7 +4,57 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前队列暂无待实施 Ready；`ISSUE-037-010` 已完成，`启动迭代-10` 达到 10/10 上限。
+当前队列暂无待实施 Ready；`ISSUE-037-011` 已完成，等待下一轮产品情报补货。
+
+### ISSUE-037-011：现场日报已审批材料到货只读联动
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 材料验收 / 跨域只读聚合 / 项目数据范围 / 前后端 / 测试
+状态：Done（2026-07-12；计入 `启动迭代-3` 第 1/3 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Deliveries/Productivity 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-06`；`docs/backlog/ad-hoc-plan.md` 的“现场日报已审批材料到货只读联动”候选
+Migration：不需要
+依赖：复用现有 `site_daily_log`、`mat_receipt`、`mat_receipt_item`、物料/供应商主数据、`ProjectAccessChecker` 与日报详情页；不新建日报材料表。
+风险等级：中
+运行态要求：后端专项、前端日报单测和类型检查通过；真实 API 或浏览器验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现后必须复核租户/项目/日期范围、仅 `APPROVED` 验收单、批量查询、数量精度、空列表、日报权限和前端只读边界；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-011-现场日报已审批材料到货只读联动验收报告.md`
+目标：
+- 在现场日报详情中只读展示同租户、同项目、日报日期当天已审批的材料验收到货明细。
+- 展示验收单号、供应商、物料、实收数量和合格数量，复用既有验收事实，避免重复录入。
+- 草稿与已提交日报均可查看；到货联动不参与日报提交、修改或附件状态机。
+非目标：
+- 不新增日报材料/配送表，不从日报创建或修改验收单，不自动生成采购、库存或成本动作。
+- 不展示 DRAFT、APPROVING、REJECTED 验收单，不扩展到设备、材料消耗、安装量或生产率。
+- 不修改验收审批、库存入库、成本生成、权限模型、生产部署或历史 migration。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/api/modules/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/receipt/**`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 日报详情只聚合同租户、同项目、`receipt_date = report_date` 且 `approval_status = APPROVED` 的验收单；跨租户、跨项目和其他日期记录不得出现。
+- 每条到货明细返回验收单 ID/编号、供应商名称、物料 ID/名称、实收数量和合格数量；数量保持数据库精度，不转为浮点数。
+- 日报不存在或无项目访问权继续沿用既有 fail-close；联动查询不得新增 `receipt:query` 要求或绕过 `site:daily:query`。
+- 查询使用批量 receipt/item/物料/供应商读取，禁止按明细逐条查询；无命中返回空列表。
+- 前端详情以只读区域展示到货明细和空态，不提供新增、编辑、删除、跳过审批或库存写入口。
+- 至少覆盖 APPROVED/非 APPROVED、租户/项目/日期隔离、空列表、数量字符串和前端只读渲染；回滚为移除聚合字段和展示区，不涉及数据迁移。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
 
 ## v1.5 准入要求
 

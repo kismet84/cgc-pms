@@ -111,3 +111,13 @@
 - TDD：`test-tool-routing.ps1` 先稳定失败于 `AGENTS.override.md missing required tool-routing text: 跨层影响`，最小规则与模板整改后通过。
 - 图谱检索证据：CodeGraph 查询目的=定位 AutoPilot runner、checkpoint、iteration report 与测试入口；`codebase-memory-mcp` 查询目的=核对 `replenishmentLeadDays` 到 `plannedDate` 的跨层影响，返回 43 个关联结果并命中 DTO、实体、VO、Controller/Service、后端测试、前端 API 与 `useStockLedger`；交叉核验=`rg` 在当前分支确认对应符号与文件真实存在。
 - 安全边界：仅执行本地只读查询，未重建/升级索引，未运行 install/uninstall，未修改业务代码。
+
+## ISSUE-037-011：现场日报已审批材料到货只读联动
+
+- 状态：Done；计入 `启动迭代-3` 第 1/3 条实施型 Ready Issue。
+- 修改范围：日报详情跨域只读聚合、到货 VO、前端详情 API/只读表格、产品情报与 backlog；无 migration，无验收/库存/成本写路径修改。
+- 验证：后端 7/7、前端 3/3、类型检查、Ready lint、`git diff --check` 与主线程安全审查通过。
+- 图谱检索证据：CodeGraph 先定位日报/验收/库存跨层调用和 blast radius；`codebase-memory-mcp` 复核后端架构边界。CodeGraph 编辑后自动同步因文件锁停用，归类 `tool_config`，以当前 diff、编译与测试交叉核验。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：继续产品情报刷新与候选补货；未命中 stop/pause。
+- 正式报告：`docs/quality/ISSUE-037-011-现场日报已审批材料到货只读联动验收报告.md`。

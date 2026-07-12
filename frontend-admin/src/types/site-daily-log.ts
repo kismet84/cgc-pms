@@ -1,5 +1,16 @@
 export type SiteDailyLogStatus = 'DRAFT' | 'SUBMITTED'
 
+export interface SiteDailyDeliveryVO {
+  receiptItemId: string
+  receiptId: string
+  receiptCode: string
+  partnerName?: string
+  materialId?: string
+  materialName?: string
+  actualQuantity?: string
+  qualifiedQuantity?: string
+}
+
 export interface SiteDailyLogVO {
   id: string
   projectId: string
@@ -10,6 +21,7 @@ export interface SiteDailyLogVO {
   nextDayPlan?: string
   weatherSummary?: string
   onSiteHeadcount?: number | null
+  deliveries?: SiteDailyDeliveryVO[]
   status: SiteDailyLogStatus
   submittedBy?: string
   submittedAt?: string

@@ -29,4 +29,17 @@ describe('site daily log page', () => {
     expect(source).toContain('listError')
     expect(source).toContain('暂无现场日报')
   })
+
+  it('renders approved material deliveries as read-only daily facts', () => {
+    expect(source).toContain('当日材料到货')
+    expect(source).toContain('getSiteDailyLog')
+    expect(source).toContain('activeRecord.deliveries')
+    expect(source).toContain('delivery.receiptCode')
+    expect(source).toContain('delivery.partnerName')
+    expect(source).toContain('delivery.materialName')
+    expect(source).toContain('delivery.actualQuantity')
+    expect(source).toContain('delivery.qualifiedQuantity')
+    expect(source).toContain('当日暂无已审批材料到货')
+    expect(source).not.toContain('createDelivery')
+  })
 })

@@ -6,6 +6,7 @@ import { useReferenceStore } from '@/stores/reference'
 import { useUserStore } from '@/stores/user'
 import {
   createSiteDailyLog,
+  getSiteDailyLog,
   getSiteDailyLogs,
   submitSiteDailyLog,
   updateSiteDailyLog,
@@ -87,10 +88,15 @@ function openCreate() {
 
 async function openRecord(record: SiteDailyLogVO, edit = false) {
   modalMode.value = edit ? 'edit' : 'view'
-  activeRecord.value = record
-  resetForm(record)
-  modalOpen.value = true
-  await fetchFiles(record.id)
+  try {
+    const detail = await getSiteDailyLog(record.id)
+    activeRecord.value = detail
+    resetForm(detail)
+    modalOpen.value = true
+    await fetchFiles(record.id)
+  } catch {
+    message.error('现场日报详情加载失败')
+  }
 }
 
 async function save() {
@@ -191,6 +197,18 @@ onMounted(() => { referenceStore.fetchProjects(); fetchData() })
           <a-input-number v-else v-model:value="form.onSiteHeadcount" :min="0" :max="100000" :precision="0" placeholder="未填写" style="width:100%" />
         </a-form-item>
       </a-form>
+      <section v-if="activeRecord && modalMode === 'view'" class="site-daily-deliveries">
+        <strong>当日材料到货</strong>
+        <a-table v-if="activeRecord.deliveries?.length" :data-source="activeRecord.deliveries" :pagination="false" row-key="receiptItemId" size="small">
+          <a-table-column key="receiptCode" title="验收单" data-index="receiptCode" />
+          <a-table-column key="partnerName" title="供应商" data-index="partnerName" />
+          <a-table-column key="materialName" title="物料" data-index="materialName" />
+          <a-table-column key="actualQuantity" title="实收" data-index="actualQuantity" />
+          <a-table-column key="qualifiedQuantity" title="合格" data-index="qualifiedQuantity" />
+          <template #bodyCell="{ column, record: delivery }"><span v-if="column.key === 'receiptCode'">{{ delivery.receiptCode }}</span><span v-else-if="column.key === 'partnerName'">{{ delivery.partnerName || '-' }}</span><span v-else-if="column.key === 'materialName'">{{ delivery.materialName || '-' }}</span><span v-else-if="column.key === 'actualQuantity'">{{ delivery.actualQuantity || '-' }}</span><span v-else-if="column.key === 'qualifiedQuantity'">{{ delivery.qualifiedQuantity || '-' }}</span></template>
+        </a-table>
+        <a-empty v-else description="当日暂无已审批材料到货" />
+      </section>
       <section v-if="activeRecord" class="site-daily-files"><strong>附件</strong><input v-if="canEdit && activeRecord.status === 'DRAFT'" type="file" @change="onFileChange" /><a-spin :spinning="filesLoading"><div v-for="file in files" :key="file.id"><a-button type="link" @click="download(file)">{{ file.originalName }}</a-button><a-button v-if="canEdit && activeRecord.status === 'DRAFT'" danger type="link" @click="removeFile(file)">删除</a-button></div><a-empty v-if="!files.length" description="暂无附件" /></a-spin></section>
       <template #footer><a-button @click="modalOpen = false">关闭</a-button><a-button v-if="modalMode !== 'view'" type="primary" :loading="saving" @click="save">保存草稿</a-button><a-button v-if="canEdit && activeRecord?.status === 'DRAFT'" type="primary" @click="submitRecord(activeRecord)">提交定稿</a-button></template>
     </a-modal>
@@ -202,4 +220,5 @@ onMounted(() => { referenceStore.fetchProjects(); fetchData() })
 .lg-page-head { display:flex; justify-content:space-between; align-items:center; }
 .lg-page-head h1 { margin:0; }.lg-page-head p { margin:6px 0 0; color:var(--text-secondary); }
 .site-daily-files { display:grid; gap:8px; margin-top:16px; }
+.site-daily-deliveries { display:grid; gap:8px; margin-top:16px; }
 </style>
