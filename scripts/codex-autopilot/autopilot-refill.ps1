@@ -50,6 +50,7 @@ function Get-AutopilotRefillDecision {
     if (Test-Path -LiteralPath $planPath) {
       $planText = Get-Content -LiteralPath $planPath -Raw -Encoding UTF8
       foreach ($match in [regex]::Matches($planText, '(?m)^###\s+([0-9]+(?:\.[0-9]+)+)\s+(.+?)\s*$')) {
+        if ([int]$match.Groups[1].Value.Split('.')[0] -lt 7) { continue }
         $name = $match.Groups[2].Value.Trim()
         if ($candidates.name -notcontains $name) { $candidates += [pscustomobject]@{ name = $name; status = 'Candidate'; source = "long-term:$($match.Groups[1].Value)" } }
       }

@@ -26,6 +26,15 @@ try {
   if ($decision.action -ne 'PLAN_READY' -or $decision.targetReadyCount -ne 1 -or $decision.candidates.Count -ne 1) { throw 'refill must select only the highest-priority candidate' }
   if ($decision.candidates[0].name -ne 'Candidate A') { throw 'refill did not keep candidate priority' }
 
+  '# Ad-hoc' | Set-Content -LiteralPath (Join-Path $backlog 'ad-hoc-plan.md') -Encoding UTF8
+  "# Plan`n### 2.1 当前技术栈`n### 8.1 报表中心" | Set-Content -LiteralPath (Join-Path $backlog 'cgc-pms-production-enhancement-plan.md') -Encoding UTF8
+  $longTermDecision = Get-AutopilotRefillDecision -RepoRoot $root
+  if ($longTermDecision.candidates.Count -ne 1 -or $longTermDecision.candidates[0].source -ne 'long-term:8.1') { throw 'long-term refill admitted a descriptive heading or rejected a development plan heading' }
+
+  'stop' | Set-Content -LiteralPath (Join-Path $autoDir 'stop.flag') -Encoding UTF8
+  if ((Get-AutopilotRefillDecision -RepoRoot $root).action -ne 'STOP') { throw 'stop flag did not stop refill' }
+  Remove-Item -LiteralPath (Join-Path $autoDir 'stop.flag')
+
   'pause' | Set-Content -LiteralPath (Join-Path $autoDir 'pause.flag') -Encoding UTF8
   if ((Get-AutopilotRefillDecision -RepoRoot $root).action -ne 'PAUSE') { throw 'pause flag did not stop refill' }
   Remove-Item -LiteralPath (Join-Path $autoDir 'pause.flag')

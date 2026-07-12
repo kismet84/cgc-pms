@@ -205,3 +205,14 @@
 - 自动合并：本地 commit only；`autoPush=false`。
 - 下一轮：按责任域另拆入口补建/兼容性核实；Ready 清空后继续产品情报补货。
 - 正式报告：`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`。
+
+## ISSUE-037-020：长期计划描述性标题误入候选修复
+
+- 状态：Done；计入本次 `启动迭代-10` 第 4/10 条实施型 Ready Issue。
+- 修改范围：长期计划候选提取增加 major >= 7 的最小边界，并扩充现有 refill 自测；无业务代码、依赖或运行态变更。
+- 验证：`test-refill.ps1` 与 `git diff --check` 通过。
+- 独立审查：PASS；第 2–6 章描述性标题被排除，第 7–9 章开发计划保留，Ad-hoc/Ready/stop/pause/blocked-first 未回退。
+- 失败分类：首次 Reviewer 因验证哈希与 review 文件 BOM/换行哈希不一致而阻塞，归类 `tool_config`；统一无 BOM UTF-8 review diff 后全套 runner 自测通过。
+- 自动合并：本地 commit only；`autoPush=false`。
+- 下一轮：Ready 清空后继续产品情报补货。
+- 正式报告：`docs/quality/ISSUE-037-020-长期计划描述性标题误入候选修复验收报告.md`。
