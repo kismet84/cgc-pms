@@ -5,14 +5,13 @@ import com.cgcpms.audit.event.OperationAuditEvent;
 import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.context.event.EventListener;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 异步持久化操作审计事件。
+ * 持久化操作审计事件。
  * Mapper 异常被捕获并记录日志，绝不抛回业务线程。
  */
 @Service
@@ -26,7 +25,6 @@ public class OperationAuditService {
         this.mapper = mapper;
     }
 
-    @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     @EventListener
     public void handleAuditEvent(OperationAuditEvent event) {

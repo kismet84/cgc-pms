@@ -95,6 +95,12 @@
 - 当前 focus：允许在新的启动指令下重新刷新产品情报；本次运行因 10/10 上限停止。
 - 发布边界：未发布生产、未连接生产数据库、未 push。
 
+## `ISSUE-037-013` 后续风险收口
+
+- 审计即时可见性：统一审计监听器移除 `@Async`，保留 `REQUIRES_NEW` 与异常隔离；新增事件发布返回前完成写入的回归断言。
+- 验证：`OperationAuditServiceTest,OperationAuditAspectTest,SiteDailyLogServiceTest,SiteDailyLogControllerTest` 共 22/22 通过，`git diff --check` 通过。
+- CodeGraph：确认旧告警为并发写锁超出重试预算；占锁写入结束后 `codegraph sync .` 成功，`codegraph status .` 为 up-to-date，无需重建索引或修改规则。
+
 ## AutoPilot 控制面整改复验
 
 - 根因：迭代上限只由 continuous runner 主循环判断，`enabled.flag`、checkpoint 和 status 未同步终态，导致 state 已为 `LIMIT_REACHED` 时 checkpoint 仍返回 `go`。
