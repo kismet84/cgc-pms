@@ -26,6 +26,7 @@ import { deleteFile, getFileUrl, listFiles, uploadFile } from '../file'
 import {
   createMenu,
   deleteMenu,
+  getMenuDetail,
   getMenuTree,
   getRoles,
   getUserList,
@@ -83,6 +84,18 @@ describe('system-related API modules', () => {
       method: 'delete',
     })
     expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+  })
+
+  it('builds a bodyless menu detail request', () => {
+    getMenuDetail('13')
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/menus/13',
+      method: 'get',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')
   })
 
   it('builds alert requests', () => {

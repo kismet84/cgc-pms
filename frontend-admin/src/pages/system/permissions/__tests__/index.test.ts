@@ -3,11 +3,12 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MenuTreeVO } from '@/types/system'
+import type { MenuTreeVO, SysMenuVO } from '@/types/system'
 
 const mocks = vi.hoisted(() => ({
   getMenuTree: vi.fn(),
   getRoles: vi.fn(),
+  getMenuDetail: vi.fn(),
   createMenu: vi.fn(),
   deleteMenu: vi.fn(),
   success: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('ant-design-vue', async () => {
 vi.mock('@/api/modules/system', () => ({
   getMenuTree: mocks.getMenuTree,
   getRoles: mocks.getRoles,
+  getMenuDetail: mocks.getMenuDetail,
   createMenu: mocks.createMenu,
   deleteMenu: mocks.deleteMenu,
 }))
@@ -83,6 +85,20 @@ const menuTreeAfterDelete: MenuTreeVO[] = [
   },
 ]
 
+const menuDetail: SysMenuVO = {
+  id: '11',
+  parentId: '10',
+  menuName: '菜单概览',
+  menuType: 'MENU',
+  path: '/system/overview',
+  component: 'system/overview/index',
+  perms: '',
+  icon: 'menu',
+  orderNum: 3,
+  status: 'ENABLE',
+  visible: 1,
+}
+
 const buttonStub = {
   template:
     '<button v-bind="$attrs" :disabled="$attrs.disabled"><slot name="icon" /><slot /></button>',
@@ -104,7 +120,7 @@ const selectStub = {
 
 const treeSelectStub = {
   props: ['value', 'treeData'],
-  emits: ['update:value'],
+  emits: ['update:value', 'change'],
   setup() {
     const flattenTreeOptions = (
       nodes: Array<{ title: string; value: number | string; children?: unknown[] }>,
@@ -122,7 +138,7 @@ const treeSelectStub = {
     return { flattenTreeOptions }
   },
   template:
-    '<select v-bind="$attrs" :value="value" @change="$emit(\'update:value\', $event.target.value)"><option v-for="node in flattenTreeOptions(treeData || [])" :key="node.value" :value="node.value">{{ node.title }}</option></select>',
+    '<select v-bind="$attrs" :value="value" @change="$emit(\'update:value\', $event.target.value); $emit(\'change\', $event.target.value)"><option v-for="node in flattenTreeOptions(treeData || [])" :key="node.value" :value="node.value">{{ node.title }}</option></select>',
 }
 
 function mountPage() {
@@ -138,10 +154,12 @@ function mountPage() {
         AModal: {
           props: ['open', 'title'],
           template:
-            '<div v-if="open" :data-testid="title === \'删除菜单\' ? \'delete-menu-modal\' : \'create-menu-modal\'"><slot /></div>',
+            "<div v-if=\"open\" :data-testid=\"title === '删除菜单' ? 'delete-menu-modal' : title === '菜单详情' ? 'detail-menu-modal' : 'create-menu-modal'\"><slot /></div>",
         },
         AAlert: {
-          template: '<div><slot name="message" /><slot name="description" /></div>',
+          props: ['message'],
+          template:
+            '<div v-bind="$attrs">{{ message }}<slot name="message" /><slot name="description" /></div>',
         },
         AForm: { template: '<form><slot /></form>' },
         AFormItem: { template: '<label><slot /></label>' },
@@ -152,6 +170,7 @@ function mountPage() {
         PlusOutlined: true,
         DeleteOutlined: true,
         ReloadOutlined: true,
+        EyeOutlined: true,
       },
     },
   })
@@ -163,6 +182,7 @@ describe('permission governance menu management', () => {
     mocks.permissions = ['system:menu:query']
     mocks.getMenuTree.mockReset().mockResolvedValue(menuTree)
     mocks.getRoles.mockReset().mockResolvedValue([])
+    mocks.getMenuDetail.mockReset().mockResolvedValue(menuDetail)
     mocks.createMenu.mockReset().mockResolvedValue('100')
     mocks.deleteMenu.mockReset().mockResolvedValue(undefined)
     mocks.success.mockReset()
@@ -175,6 +195,7 @@ describe('permission governance menu management', () => {
 
     expect(wrapper.find('[data-testid="create-menu-open"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="delete-menu-open"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="detail-menu-open"]').exists()).toBe(false)
   })
 
   it('keeps the admin-only route boundary even with system:menu:add', async () => {
@@ -193,6 +214,13 @@ describe('permission governance menu management', () => {
     expect(wrapper.find('[data-testid="delete-menu-open"]').exists()).toBe(false)
   })
 
+  it('keeps the admin-only detail boundary even with system:menu:query', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="detail-menu-open"]').exists()).toBe(false)
+  })
+
   it.each([
     { roles: ['ADMIN'], permissions: [] },
     { roles: ['SUPER_ADMIN'], permissions: [] },
@@ -204,6 +232,84 @@ describe('permission governance menu management', () => {
 
     expect(wrapper.find('[data-testid="create-menu-open"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="delete-menu-open"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="detail-menu-open"]').exists()).toBe(true)
+  })
+
+  it('offers every menu-tree node as a detail target and loads the selected detail once', async () => {
+    mocks.roles = ['ADMIN']
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-testid="detail-menu-open"]').trigger('click')
+
+    const options = wrapper.findAll('[data-testid="detail-menu-target"] option')
+    expect(options.map((option) => option.attributes('value'))).toEqual(['10', '11', '12'])
+    expect(options.map((option) => option.text())).toEqual(['系统管理', '菜单概览', '查询按钮'])
+
+    await wrapper.get('[data-testid="detail-menu-target"]').setValue('11')
+    await flushPromises()
+
+    expect(mocks.getMenuDetail).toHaveBeenCalledOnce()
+    expect(mocks.getMenuDetail).toHaveBeenCalledWith('11')
+    expect(wrapper.get('[data-testid="detail-menu-name"]').text()).toBe('菜单概览')
+    const detailText = wrapper.get('[data-testid="detail-menu-content"]').text()
+    expect(detailText).toContain('菜单')
+    expect(detailText).toContain('/system/overview')
+    expect(detailText).toContain('system/overview/index')
+    expect(detailText).toContain('menu')
+    expect(detailText).toContain('启用')
+    expect(detailText).toContain('可见')
+    expect(detailText).not.toContain('tenantId')
+    expect(detailText).not.toContain('createdAt')
+    expect(detailText).not.toContain('children')
+  })
+
+  it('clears the previous detail while loading a new target', async () => {
+    mocks.roles = ['ADMIN']
+    let resolveSecondDetail: ((value: SysMenuVO) => void) | undefined
+    mocks.getMenuDetail
+      .mockReset()
+      .mockResolvedValueOnce(menuDetail)
+      .mockImplementationOnce(
+        () =>
+          new Promise<SysMenuVO>((resolve) => {
+            resolveSecondDetail = resolve
+          }),
+      )
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-testid="detail-menu-open"]').trigger('click')
+    await wrapper.get('[data-testid="detail-menu-target"]').setValue('11')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="detail-menu-name"]').text()).toBe('菜单概览')
+
+    await wrapper.get('[data-testid="detail-menu-target"]').setValue('12')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="detail-menu-content"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="detail-menu-loading"]').exists()).toBe(true)
+    resolveSecondDetail?.({ ...menuDetail, id: '12', menuName: '查询按钮', menuType: 'BUTTON' })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="detail-menu-name"]').text()).toBe('查询按钮')
+  })
+
+  it('keeps the selected target and shows an understandable error when detail loading fails', async () => {
+    mocks.roles = ['ADMIN']
+    mocks.getMenuDetail.mockRejectedValueOnce(new Error('菜单不存在或不可访问'))
+    const wrapper = mountPage()
+    await flushPromises()
+    await wrapper.get('[data-testid="detail-menu-open"]').trigger('click')
+    await wrapper.get('[data-testid="detail-menu-target"]').setValue('12')
+    await flushPromises()
+
+    expect(mocks.getMenuDetail).toHaveBeenCalledOnce()
+    expect(mocks.error).toHaveBeenCalledWith('菜单不存在或不可访问')
+    expect(wrapper.get('[data-testid="detail-menu-error"]').text()).toContain(
+      '菜单不存在或不可访问',
+    )
+    expect(wrapper.find('[data-testid="detail-menu-content"]').exists()).toBe(false)
+    expect(
+      (wrapper.get('[data-testid="detail-menu-target"]').element as HTMLSelectElement).value,
+    ).toBe('12')
   })
 
   it('validates required fields before submitting', async () => {
@@ -336,13 +442,11 @@ describe('permission governance menu management', () => {
 
     expect(mocks.deleteMenu).toHaveBeenCalledWith('11')
     expect(mocks.success).not.toHaveBeenCalled()
-    expect(mocks.error).toHaveBeenCalledWith(
-      '菜单已删除，但刷新权限清单失败：刷新菜单树失败',
-    )
+    expect(mocks.error).toHaveBeenCalledWith('菜单已删除，但刷新权限清单失败：刷新菜单树失败')
     expect(wrapper.find('[data-testid="delete-menu-modal"]').exists()).toBe(true)
-    expect((wrapper.get('[data-testid="delete-menu-target"]').element as HTMLSelectElement).value).toBe(
-      '11',
-    )
+    expect(
+      (wrapper.get('[data-testid="delete-menu-target"]').element as HTMLSelectElement).value,
+    ).toBe('11')
   })
 
   it('does not claim complete success when the refreshed tree still contains the target', async () => {
@@ -376,9 +480,9 @@ describe('permission governance menu management', () => {
     expect(mocks.success).not.toHaveBeenCalled()
     expect(mocks.error).toHaveBeenCalledWith('菜单被角色引用，无法删除')
     expect(wrapper.find('[data-testid="delete-menu-modal"]').exists()).toBe(true)
-    expect((wrapper.get('[data-testid="delete-menu-target"]').element as HTMLSelectElement).value).toBe(
-      '12',
-    )
+    expect(
+      (wrapper.get('[data-testid="delete-menu-target"]').element as HTMLSelectElement).value,
+    ).toBe('12')
   })
 
   it('keeps the existing route and does not add edit or sort actions', () => {
@@ -396,6 +500,7 @@ describe('permission governance menu management', () => {
     )
     expect(source).not.toContain('updateMenu')
     expect(source).toContain('deleteMenu')
+    expect(source).toContain('getMenuDetail')
     expect(source).not.toContain('级联删除选项')
     expect(source).not.toContain('强制解绑选项')
     expect(source).not.toContain('拖拽排序')

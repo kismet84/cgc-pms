@@ -108,13 +108,42 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.data.children").doesNotExist());
     }
 
-    @Test @Order(5) @DisplayName("POST /system/menus missing required -> 400")
+    @Test @Order(5) @DisplayName("GET /system/menus/{id} SUPER_ADMIN -> 200")
+    void testGetById_SuperAdmin() throws Exception {
+        mockMvc.perform(g("/system/menus/1")
+                        .cookie(cookie(List.of("SUPER_ADMIN"), List.of())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(6) @DisplayName("GET /system/menus/{id} system:menu:query -> 200")
+    void testGetById_WithPermission() throws Exception {
+        mockMvc.perform(g("/system/menus/1")
+                        .cookie(cookie(List.of("USER"), List.of("system:menu:query"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(7) @DisplayName("GET /system/menus/{id} without role or permission -> 403")
+    void testGetById_Forbidden() throws Exception {
+        mockMvc.perform(g("/system/menus/1")
+                        .cookie(cookie(List.of("USER"), List.of())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test @Order(8) @DisplayName("GET /system/menus/{id} without JWT -> 401")
+    void testGetById_Unauthorized() throws Exception {
+        mockMvc.perform(g("/system/menus/1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test @Order(9) @DisplayName("POST /system/menus missing required -> 400")
     void testCreate_Missing() throws Exception {
         mockMvc.perform(p("/system/menus").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
     }
 
-    @Test @Order(6) @DisplayName("POST /system/menus ADMIN -> 200")
+    @Test @Order(10) @DisplayName("POST /system/menus ADMIN -> 200")
     void testCreate_Admin() throws Exception {
         mockMvc.perform(p("/system/menus").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"parentId\":0,\"menuName\":\"管理员新建菜单\",\"menuType\":\"MENU\",\"path\":\"/admin-created\"}"))
@@ -123,7 +152,7 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.data").exists());
     }
 
-    @Test @Order(7) @DisplayName("POST /system/menus system:menu:add -> 200")
+    @Test @Order(11) @DisplayName("POST /system/menus system:menu:add -> 200")
     void testCreate_WithPermission() throws Exception {
         mockMvc.perform(p("/system/menus")
                         .cookie(cookie(List.of("USER"), List.of("system:menu:add")))
@@ -133,7 +162,7 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(8) @DisplayName("POST /system/menus without role or permission -> 403")
+    @Test @Order(12) @DisplayName("POST /system/menus without role or permission -> 403")
     void testCreate_Forbidden() throws Exception {
         mockMvc.perform(p("/system/menus")
                         .cookie(cookie(List.of("USER"), List.of("system:menu:query")))
@@ -142,7 +171,7 @@ class SysMenuControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    @Test @Order(9) @DisplayName("DELETE /system/menus/{id} ADMIN -> 200")
+    @Test @Order(13) @DisplayName("DELETE /system/menus/{id} ADMIN -> 200")
     void testDelete_Admin() throws Exception {
         long menuId = createDeletableMenu("管理员删除菜单");
         mockMvc.perform(d("/system/menus/" + menuId).cookie(adminCookie()))
@@ -150,7 +179,7 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(10) @DisplayName("DELETE /system/menus/{id} SUPER_ADMIN -> 200")
+    @Test @Order(14) @DisplayName("DELETE /system/menus/{id} SUPER_ADMIN -> 200")
     void testDelete_SuperAdmin() throws Exception {
         long menuId = createDeletableMenu("超级管理员删除菜单");
         mockMvc.perform(d("/system/menus/" + menuId)
@@ -159,7 +188,7 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(11) @DisplayName("DELETE /system/menus/{id} system:menu:delete -> 200")
+    @Test @Order(15) @DisplayName("DELETE /system/menus/{id} system:menu:delete -> 200")
     void testDelete_WithPermission() throws Exception {
         long menuId = createDeletableMenu("权限码删除菜单");
         mockMvc.perform(d("/system/menus/" + menuId)
@@ -168,7 +197,7 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(12) @DisplayName("DELETE /system/menus/{id} without role or permission -> 403 and target remains")
+    @Test @Order(16) @DisplayName("DELETE /system/menus/{id} without role or permission -> 403 and target remains")
     void testDelete_Forbidden() throws Exception {
         long menuId = createDeletableMenu("越权删除保留菜单");
         mockMvc.perform(d("/system/menus/" + menuId)

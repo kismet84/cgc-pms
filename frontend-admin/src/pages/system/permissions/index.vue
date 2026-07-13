@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
-import { createMenu, deleteMenu, getMenuTree, getRoles } from '@/api/modules/system'
+import { createMenu, deleteMenu, getMenuDetail, getMenuTree, getRoles } from '@/api/modules/system'
 import { useUserStore } from '@/stores/user'
-import type { CreateMenuPayload, MenuTreeVO, SysRoleVO } from '@/types/system'
+import type { CreateMenuPayload, MenuTreeVO, SysMenuVO, SysRoleVO } from '@/types/system'
 
 interface PermissionRow {
   id: string
@@ -26,12 +26,19 @@ const createForm = reactive<CreateMenuPayload>(defaultCreateForm())
 const deleteOpen = ref(false)
 const deleting = ref(false)
 const deleteTargetId = ref<number | string>()
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detailTargetId = ref<number | string>()
+const menuDetail = ref<SysMenuVO>()
+const detailError = ref('')
+let detailRequestSequence = 0
 
 const isAdmin = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
 const canCreateMenu = computed(() => isAdmin.value)
 const canDeleteMenu = computed(() => isAdmin.value)
+const canViewMenuDetail = computed(() => isAdmin.value)
 const parentTreeData = computed(() => [
   {
     title: '根节点',
@@ -40,6 +47,7 @@ const parentTreeData = computed(() => [
   },
 ])
 const deleteTreeData = computed(() => toDeleteTreeData(menuTree.value))
+const detailTreeData = computed(() => toDeleteTreeData(menuTree.value))
 const selectedDeleteMenu = computed(() => findMenu(menuTree.value, deleteTargetId.value))
 
 const rows = computed(() => flattenPermissions(menuTree.value, boundMenuIds.value))
@@ -149,6 +157,61 @@ function closeDelete() {
   if (deleting.value) return
   deleteOpen.value = false
   deleteTargetId.value = undefined
+}
+
+function openDetail() {
+  detailRequestSequence += 1
+  detailTargetId.value = undefined
+  menuDetail.value = undefined
+  detailError.value = ''
+  detailOpen.value = true
+}
+
+function closeDetail() {
+  if (detailLoading.value) return
+  detailRequestSequence += 1
+  detailOpen.value = false
+  detailTargetId.value = undefined
+  menuDetail.value = undefined
+  detailError.value = ''
+}
+
+async function selectDetailTarget(menuId: number | string) {
+  detailTargetId.value = menuId
+  menuDetail.value = undefined
+  detailError.value = ''
+  detailLoading.value = true
+  const requestSequence = ++detailRequestSequence
+
+  try {
+    const detail = await getMenuDetail(menuId)
+    if (requestSequence === detailRequestSequence) menuDetail.value = detail
+  } catch (error: unknown) {
+    if (requestSequence !== detailRequestSequence) return
+    console.error(error)
+    detailError.value = errorMessage(error, '菜单详情加载失败')
+    message.error(detailError.value)
+  } finally {
+    if (requestSequence === detailRequestSequence) detailLoading.value = false
+  }
+}
+
+function displayValue(value: unknown) {
+  return value === undefined || value === null || value === '' ? '-' : String(value)
+}
+
+function menuTypeLabel(menuType: SysMenuVO['menuType']) {
+  return { DIR: '目录', MENU: '菜单', BUTTON: '按钮' }[menuType] ?? menuType
+}
+
+function statusLabel(status: string) {
+  return { ENABLE: '启用', DISABLE: '停用' }[status] ?? displayValue(status)
+}
+
+function visibleLabel(visible?: number) {
+  if (visible === 1) return '可见'
+  if (visible === 0) return '隐藏'
+  return '-'
 }
 
 function errorMessage(error: unknown, fallback: string) {
@@ -270,6 +333,10 @@ onMounted(fetchData)
             >
               <template #icon><PlusOutlined /></template>
               新建菜单
+            </a-button>
+            <a-button v-if="canViewMenuDetail" data-testid="detail-menu-open" @click="openDetail">
+              <template #icon><EyeOutlined /></template>
+              查看详情
             </a-button>
             <a-button
               v-if="canDeleteMenu"
@@ -399,7 +466,9 @@ onMounted(fetchData)
           <template #message>删除操作不可逆</template>
           <template #description>
             <span data-testid="delete-menu-warning">
-              将删除“{{ selectedDeleteMenu?.menuName ?? '未选择' }}”。有子节点或角色引用时后端会拒绝删除；此处不提供级联删除或强制解绑。
+              将删除“{{
+                selectedDeleteMenu?.menuName ?? '未选择'
+              }}”。有子节点或角色引用时后端会拒绝删除；此处不提供级联删除或强制解绑。
             </span>
           </template>
         </a-alert>
@@ -417,5 +486,97 @@ onMounted(fetchData)
         </div>
       </a-form>
     </a-modal>
+
+    <a-modal :open="detailOpen" title="菜单详情" :footer="null" @cancel="closeDetail">
+      <a-form layout="vertical">
+        <a-form-item label="目标菜单" required>
+          <a-tree-select
+            :value="detailTargetId"
+            data-testid="detail-menu-target"
+            :tree-data="detailTreeData"
+            tree-default-expand-all
+            placeholder="请选择目录、菜单或按钮"
+            @change="selectDetailTarget"
+          />
+        </a-form-item>
+      </a-form>
+
+      <div v-if="detailLoading" data-testid="detail-menu-loading" class="lg-empty-text">
+        正在加载菜单详情…
+      </div>
+      <a-alert
+        v-else-if="detailError"
+        type="error"
+        show-icon
+        data-testid="detail-menu-error"
+        :message="detailError"
+      />
+      <dl v-else-if="menuDetail" data-testid="detail-menu-content" class="lg-detail-list">
+        <div>
+          <dt>名称</dt>
+          <dd data-testid="detail-menu-name">{{ displayValue(menuDetail.menuName) }}</dd>
+        </div>
+        <div>
+          <dt>类型</dt>
+          <dd>{{ menuTypeLabel(menuDetail.menuType) }}</dd>
+        </div>
+        <div>
+          <dt>父节点</dt>
+          <dd>{{ displayValue(menuDetail.parentId) }}</dd>
+        </div>
+        <div>
+          <dt>路径</dt>
+          <dd>{{ displayValue(menuDetail.path) }}</dd>
+        </div>
+        <div>
+          <dt>组件</dt>
+          <dd>{{ displayValue(menuDetail.component) }}</dd>
+        </div>
+        <div>
+          <dt>权限码</dt>
+          <dd>{{ displayValue(menuDetail.perms) }}</dd>
+        </div>
+        <div>
+          <dt>图标</dt>
+          <dd>{{ displayValue(menuDetail.icon) }}</dd>
+        </div>
+        <div>
+          <dt>排序</dt>
+          <dd>{{ displayValue(menuDetail.orderNum) }}</dd>
+        </div>
+        <div>
+          <dt>状态</dt>
+          <dd>{{ statusLabel(menuDetail.status) }}</dd>
+        </div>
+        <div>
+          <dt>可见性</dt>
+          <dd>{{ visibleLabel(menuDetail.visible) }}</dd>
+        </div>
+      </dl>
+      <div v-else class="lg-empty-text">请选择一个菜单节点查看详情</div>
+    </a-modal>
   </div>
 </template>
+
+<style scoped>
+.lg-detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.lg-detail-list > div {
+  min-width: 0;
+}
+
+.lg-detail-list dt {
+  color: var(--lg-text-secondary, #6b7280);
+  font-size: 12px;
+}
+
+.lg-detail-list dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+</style>
