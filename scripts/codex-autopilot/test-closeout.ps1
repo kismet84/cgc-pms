@@ -84,13 +84,21 @@ try {
     stockIssueClosed=$false;sameRootIssueAdded=$false;followupNetChange=0;sourceRefs=@('docs/quality/issue-900-041.md')
   }
   $scoreConfig = [pscustomobject]@{ enabled=$true; activeVersion='autopilot-task-score/v1'; approvalStatus='APPROVED' }
-  $scored = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $scoredWorktree.path -Issue $scoredIssue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $scoredBase -ScoreEvidence $scoreEvidence -TaskScoringConfig $scoreConfig
-  if (!$scored.merged -or !$scored.score -or $scored.implementationCommit -eq $scored.closeoutCommit) { throw 'scored closeout did not produce two distinct commits' }
+  $shadowEvidence = [ordered]@{} + $scoreEvidence
+  $shadowEvidence.executionEvidenceComplete=$true; $shadowEvidence.implementationDispatchCount=1; $shadowEvidence.validationDispatchCount=1; $shadowEvidence.reviewDispatchCount=0; $shadowEvidence.repairDispatchCount=0; $shadowEvidence.closeoutDispatchCount=1; $shadowEvidence.reviewRequired=$false; $shadowEvidence.runResumeCount=0; $shadowEvidence.phaseRestartCount=0; $shadowEvidence.manualRecoveryCount=0; $shadowEvidence.toolConfigBlockCount=0; $shadowEvidence.environmentRetryCount=0; $shadowEvidence.duplicateDispatchBlockedCount=0
+  $scored = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $scoredWorktree.path -Issue $scoredIssue -AutoMerge $false -BaseBranch $baseBranch -ExpectedBaseCommit $scoredBase -ScoreEvidence $scoreEvidence -ScoreShadowEvidence $shadowEvidence -TaskScoringConfig $scoreConfig
+  if ($scored.merged -or !$scored.score -or !$scored.scoreShadow -or $scored.implementationCommit -eq $scored.closeoutCommit) { throw 'scored closeout did not produce two distinct unmerged commits' }
   $closeoutParent = (& git -C $root rev-parse "$($scored.closeoutCommit)^" | Select-Object -First 1).Trim()
   if ($closeoutParent -ne $scored.implementationCommit) { throw 'score closeout commit is not based on implementationCommit' }
-  if ((Get-Content -LiteralPath (Join-Path $root 'docs\quality\issue-900-041.md') -Raw -Encoding UTF8) -notmatch [regex]::Escape($scored.score.key)) { throw 'formal report does not contain the bound score' }
+  if ((Get-Content -LiteralPath (Join-Path $scoredWorktree.path 'docs\quality\issue-900-041.md') -Raw -Encoding UTF8) -notmatch [regex]::Escape($scored.score.key)) { throw 'formal report does not contain the bound score' }
+  $durableMerge = Merge-AutopilotIssueCloseoutCommit -RepoRoot $root -Commit $scored.closeoutCommit -ExpectedBaseCommit $scoredBase
+  if (!$durableMerge.merged -or $durableMerge.idempotent) { throw 'durable closeout merge did not fast-forward after checkpoint-ready commit creation' }
+  $durableMergeAgain = Merge-AutopilotIssueCloseoutCommit -RepoRoot $root -Commit $scored.closeoutCommit -ExpectedBaseCommit $scoredBase
+  if (!$durableMergeAgain.merged -or !$durableMergeAgain.idempotent) { throw 'durable closeout merge retry was not idempotent' }
+  $recoveredMerge = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $scoredWorktree.path -Issue $scoredIssue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $scoredBase -ScoreEvidence $scoreEvidence -ScoreShadowEvidence $shadowEvidence -TaskScoringConfig $scoreConfig
+  if (!$recoveredMerge.merged -or !$recoveredMerge.idempotent -or !$recoveredMerge.score -or !$recoveredMerge.scoreShadow) { throw 'closeout commit was not resumed and merged with its bound scores' }
   $scoredAgain = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $scoredWorktree.path -Issue $scoredIssue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $scoredBase -ScoreEvidence $scoreEvidence -TaskScoringConfig $scoreConfig
-  if (!$scoredAgain.idempotent -or $scoredAgain.closeoutCommit -ne $scored.closeoutCommit) { throw 'scored closeout retry is not idempotent' }
+  if (!$scoredAgain.idempotent -or !$scoredAgain.score -or $scoredAgain.closeoutCommit -ne $scored.closeoutCommit) { throw 'scored closeout retry is not idempotent' }
   Write-Host 'closeout self-test passed'
 } finally {
   if (Test-Path -LiteralPath (Join-Path $root '.git')) { & git -C $root worktree remove --force (Join-Path $root '.worktrees\autopilot\issue-900-040') 2>$null | Out-Null }

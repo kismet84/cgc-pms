@@ -15,6 +15,13 @@
 - 补货顺序固定为：已有合格 Ready → [当前问题唯一快照](current-issues.json) 中可执行存量 → 当前 focus 可解除阻塞 → [Ad-hoc 计划](ad-hoc-plan.md) 中已过决策门候选 → 产品情报刷新；[长期增强计划](cgc-pms-production-enhancement-plan.md) 只提供研究输入，不得直接拆 Ready。
 - v1.0 的完成记录、测试数量和质量结论不得直接作为 v1.5 验收证据。
 
+## 2026-07-13 第42条主线：AutoPilot 跨 Run 恢复与效率评分
+
+- `AUTOPILOT-CROSS-RUN-PHASE-RECOVERY` 已完成实现与自动化验收：活动 Issue 使用 durable phase checkpoint 绑定 Ready/base/worktree/branch/scope/diff/evidence；有效现场只从 validation、Reviewer 或 closeout 恢复，closeout 已合并后的崩溃窗口也可幂等完成 ledger/state/图谱登记，禁止删除 worktree 后重派 B/C。
+- Reviewer `tool_config` 与业务 repair 已隔离；同 diff 只允许一次跨 run Reviewer 重试，累计两次仍失败进入 `PAUSED/REVIEW_TOOL_BLOCKED`；绑定同一 Issue/diff 的人工结构化 PASS 可接管，只有完整 blocking finding 才能进入 repair。
+- `AUTOPILOT-END-TO-END-EFFICIENCY-EVIDENCE` 的指标采集和 disabled `autopilot-task-score/v2-candidate` 已完成：`runResumeCount` 与各阶段 dispatch、人工恢复、工具阻塞共同决定 `taskExecutionEfficiency=10`，最终 shadow 写入独立本地候选账本，不污染 v1 正式 ledger。正式版本名、完整35/25/20/10/10权重和生效时间仍为 `NEEDS_CONFIRMATION`，不得激活或计入20任务正式周期。
+- 控制面行为文件和行为配置形成稳定指纹；指纹变化后 N>1/无界执行必须先由用户明确启动并成功收口一次 `启动迭代-1`，并读回 closeout ledger、state 与知识图谱 Git cursor。当前 `pause.flag` 继续生效，真实金丝雀和下一任务均未派发。
+
 ## 2026-07-13 AutoPilot 启动迭代-10 恢复状态
 
 - `ISSUE-040-022` 已从重复 BC 启动中安全恢复到 D/E/F：业务实现专项、类型检查、差异检查、独立 Reviewer 与 Issue worktree 浏览器验收均通过；本批完成 1/10。

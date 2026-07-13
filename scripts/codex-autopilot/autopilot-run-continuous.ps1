@@ -196,6 +196,25 @@ function Get-ReadyIssues {
   }
 }
 
+function Get-RecoveryIssueFromCheckpoint {
+  param([Parameter(Mandatory)][object]$Recovery, [Parameter(Mandatory)][string]$RepoRoot)
+  $checkpoint = $Recovery.checkpoint
+  $readyPath = Join-Path ([string]$checkpoint.worktree) ([string]$checkpoint.readyPath)
+  $block = @(Get-AutopilotIssueBlocks $readyPath | Where-Object { $_.issueId -eq [string]$checkpoint.issueId } | Select-Object -First 1)
+  if ($block.Count -ne 1) { throw 'recoverable terminal Issue contract is missing from its preserved worktree' }
+  $normalizedBody = [regex]::Replace([string]$block[0].body, '(?m)^状态：Done[ \t]*(?=\r?$)', '状态：Ready')
+  $normalizedRaw = [regex]::Replace([string]$block[0].rawBlock, '(?m)^状态：Done[ \t]*(?=\r?$)', '状态：Ready')
+  $normalizedBlock = [pscustomobject]@{ issueId=$block[0].issueId; title=$block[0].title; body=$normalizedBody; rawBlock=$normalizedRaw }
+  $contract = ConvertTo-AutopilotReadyIssue -Block $normalizedBlock -RepoRoot $RepoRoot
+  $normalizedHash = Get-AutopilotReadyContractHash -ReadyPath $readyPath -IssueId $checkpoint.issueId -NormalizeDoneStatus
+  if ($normalizedHash -ne [string]$checkpoint.readyContentHash) { throw 'reconstructed terminal Issue contract no longer matches its dispatch hash' }
+  $contract | Add-Member -NotePropertyName readyContentHash -NotePropertyValue ([string]$checkpoint.readyContentHash) -Force
+  return [pscustomobject]@{
+    title=$contract.title; status='Ready'; body=$contract.body; contract=$contract
+    lint=[pscustomobject]@{ status='pass'; issueId=$contract.issueId; title=$contract.title; readyContentHash=$contract.readyContentHash; failureCategory='none'; errorCode=''; errors=@(); warnings=@() }
+  }
+}
+
 function Get-SectionLines {
   param([string]$Body, [string]$Name)
 
@@ -446,6 +465,10 @@ function Write-State {
     lastRetrospectiveAt = Get-AutopilotStateProperty $existing 'lastRetrospectiveAt'
     lastRetrospectiveReport = Get-AutopilotStateProperty $existing 'lastRetrospectiveReport'
     activeScoringVersion = if ($script:TaskScoringActive) { [string]$config.taskScoring.activeVersion } else { $null }
+    issueCheckpointPath = if ($script:IssueCheckpointPath) { [string]$script:IssueCheckpointPath } else { [string](Get-AutopilotStateProperty $existing 'issueCheckpointPath' '') }
+    currentIssuePhase = if ($script:IssuePhase) { [string]$script:IssuePhase } else { [string](Get-AutopilotStateProperty $existing 'currentIssuePhase' '') }
+    lastCanaryFingerprint = if ($script:LastCanaryFingerprint) { [string]$script:LastCanaryFingerprint } else { [string](Get-AutopilotStateProperty $existing 'lastCanaryFingerprint' '') }
+    lastCanaryReport = if ($script:LastCanaryReport) { [string]$script:LastCanaryReport } else { [string](Get-AutopilotStateProperty $existing 'lastCanaryReport' '') }
     enabled = Test-Path (Join-Path $AutoDir 'enabled.flag')
     mode = 'continuous-runner'
     iterationCompleted = $script:IterationCompleted
@@ -919,16 +942,18 @@ function Invoke-IssueExecutor {
     [object]$Route,
     [int]$Attempt = 0,
     [ValidateSet('implement','repair')][string]$Phase = 'implement',
-    [string]$PreviousSummary = ''
+    [string]$PreviousSummary = '',
+    [object]$ResumeCheckpoint = $null
   )
 
+  $resuming = $null -ne $ResumeCheckpoint
   $executorPath = Join-Path $scriptDir "autopilot-exec-issue.ps1"
-  if (!(Test-Path $executorPath)) {
+  if (!$resuming -and !(Test-Path $executorPath)) {
     Write-Host "EXECUTOR_NOT_FOUND"
     Write-Host "executorCommand=$(Get-ExecutorCommand $RepoRoot $ConfigPath $Issue.title)"
     return
   }
-  if ($Route.verificationProfile -eq 'runtime-health') {
+  if (!$resuming -and $Route.verificationProfile -eq 'runtime-health') {
     Write-State $autoDir 'VERIFYING' $false 'RUNTIME_HEALTH_GATE' $Issue.title 'runtime preflight' ''
     $preflight = Invoke-AutopilotRuntimePreflight -RepoRoot $RepoRoot -RuntimeRefresh $config.runtimeRefresh
     $healthDir = Join-Path $script:RunContext.dir $Issue.lint.issueId
@@ -940,18 +965,34 @@ function Invoke-IssueExecutor {
       return
     }
   }
-  $baseCommit = (& git -C $RepoRoot rev-parse HEAD).Trim()
-  $worktree = New-AutopilotIssueWorktree -RepoRoot $RepoRoot -IssueId $Issue.lint.issueId -BaseCommit $baseCommit -AllowDirtyReuse:($Phase -eq 'repair')
+  $baseCommit = if ($resuming) { [string]$ResumeCheckpoint.baseCommit } else { (& git -C $RepoRoot rev-parse HEAD).Trim() }
+  $worktree = if ($resuming) {
+    [pscustomobject]@{ path=[string]$ResumeCheckpoint.worktree; branch=[string]$ResumeCheckpoint.branch; baseCommit=$baseCommit; reused=$true }
+  } else {
+    New-AutopilotIssueWorktree -RepoRoot $RepoRoot -IssueId $Issue.lint.issueId -BaseCommit $baseCommit -AllowDirtyReuse:($Phase -eq 'repair')
+  }
   $script:Attempt = $Attempt
   $script:CurrentWorktree = $worktree.path
   $script:CurrentBranch = $worktree.branch
-  $issueDir = Join-Path $script:RunContext.dir $Issue.lint.issueId
+  $issueDir = if ($resuming -and $ResumeCheckpoint.artifacts.issueDirectory) { [string]$ResumeCheckpoint.artifacts.issueDirectory } else { Join-Path $script:RunContext.dir $Issue.lint.issueId }
   New-Item -ItemType Directory -Path $issueDir -Force | Out-Null
-  $contextPath = Join-Path $issueDir ("$Phase-$Attempt\context.json")
-  $longRunningCommands = if ($config.issueExecutor.longRunningCommands) { @($config.issueExecutor.longRunningCommands) } else { @() }
-  New-AutopilotContextPack -Issue $Issue.contract -Phase $Phase -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextPath -PreviousPhaseSummary $PreviousSummary -LongRunningCommands $longRunningCommands | Out-Null
-  Write-State $autoDir 'EXECUTING' $false 'EXECUTOR_START' $Issue.title 'EXECUTING' ''
-  $executorArgs = @(
+  $checkpointPath = if ($resuming) { [string]$script:RecoveryDecision.checkpointPath } else { Get-AutopilotIssueCheckpointPath -AutoDir $autoDir -IssueId $Issue.lint.issueId }
+  if ($resuming) {
+    $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+  } elseif ($Phase -eq 'repair' -and (Test-Path -LiteralPath $checkpointPath)) {
+    $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REPAIRING -IncrementDispatch repair
+  } else {
+    $checkpoint = New-AutopilotIssueCheckpoint -AutoDir $autoDir -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -BaseCommit $baseCommit -Worktree $worktree.path -Branch $worktree.branch -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths -ArtifactDirectory $issueDir
+    $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase IMPLEMENTING -IncrementDispatch implementation
+  }
+  $script:IssueCheckpointPath = $checkpointPath
+  $script:IssuePhase = [string]$checkpoint.phase
+  if (!$resuming) {
+    $contextPath = Join-Path $issueDir ("$Phase-$Attempt\context.json")
+    $longRunningCommands = if ($config.issueExecutor.longRunningCommands) { @($config.issueExecutor.longRunningCommands) } else { @() }
+    New-AutopilotContextPack -Issue $Issue.contract -Phase $Phase -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextPath -PreviousPhaseSummary $PreviousSummary -LongRunningCommands $longRunningCommands | Out-Null
+    Write-State $autoDir 'EXECUTING' $false 'EXECUTOR_START' $Issue.title 'EXECUTING' ''
+    $executorArgs = @(
     '-NoProfile','-ExecutionPolicy','Bypass','-File',$executorPath,
     '-RepoRoot',$worktree.path,
     '-ConfigPath',$ConfigPath,
@@ -963,13 +1004,13 @@ function Invoke-IssueExecutor {
     '-Thinking',$Route.thinkingBaseline,
     '-ExecutorRole',$Route.executorRole
   )
-  if ($Route.reviewRequired) { $executorArgs += '-ReviewRequired' }
-  $executorTimeout = if ($config.issueExecutor.timeoutSeconds) { [int]$config.issueExecutor.timeoutSeconds + 120 } else { 2820 }
-  $stallInspectSeconds = if ($config.issueExecutor.stallInspectSeconds) { [int]$config.issueExecutor.stallInspectSeconds } else { 300 }
-  $stallTerminateSeconds = if ($config.issueExecutor.stallTerminateSeconds) { [int]$config.issueExecutor.stallTerminateSeconds } else { 600 }
-  $heartbeatMilliseconds = if ($config.issueExecutor.heartbeatMilliseconds) { [int]$config.issueExecutor.heartbeatMilliseconds } else { 30000 }
-  $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds -LongRunningCommands $longRunningCommands -Task $Phase
-  if ($childResult.exitCode -ne 0) {
+    if ($Route.reviewRequired) { $executorArgs += '-ReviewRequired' }
+    $executorTimeout = if ($config.issueExecutor.timeoutSeconds) { [int]$config.issueExecutor.timeoutSeconds + 120 } else { 2820 }
+    $stallInspectSeconds = if ($config.issueExecutor.stallInspectSeconds) { [int]$config.issueExecutor.stallInspectSeconds } else { 300 }
+    $stallTerminateSeconds = if ($config.issueExecutor.stallTerminateSeconds) { [int]$config.issueExecutor.stallTerminateSeconds } else { 600 }
+    $heartbeatMilliseconds = if ($config.issueExecutor.heartbeatMilliseconds) { [int]$config.issueExecutor.heartbeatMilliseconds } else { 30000 }
+    $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds -LongRunningCommands $longRunningCommands -Task $Phase
+    if ($childResult.exitCode -ne 0) {
     if ($childResult.stallTimedOut -and $config.repair -and $config.repair.enabled -eq $true -and $Attempt -lt 1) {
       Write-State $autoDir 'REPAIRING' $false 'EXECUTOR_STALL_REPAIR' $Issue.title 'executor timed out without worktree progress' ''
       Write-RunEvent 'executor.stall.retry-request' ([pscustomobject]@{ issueId = $Issue.lint.issueId; task = 'repair'; status = 'RETRY_REQUESTED'; executorPid = $childResult.executorPid; startedAt = $script:ExecutorStartedAt; lastProgressAt = $script:LastProgressAt; retryCount = 1; timeoutReason = 'no new evidence; retry scope limited to unfinished acceptance items with missing context supplied'; retiredAt = $script:RetiredAt; retiredStatus = $script:RetiredStatus })
@@ -984,12 +1025,27 @@ function Invoke-IssueExecutor {
     }
     Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_PROCESS_FAILED' $Issue.title 'tool_config' 'STOP_EXECUTOR_PROCESS_FAILED'
     return
+    }
+    $executionRunId = if ($Attempt -eq 0) { $script:RunContext.id } else { "$($script:RunContext.id)-repair-$Attempt" }
+    $resultPath = Join-Path (Join-Path $autoDir "runs\$executionRunId") 'result.json'
+  } else {
+    $resultPath = [string]$ResumeCheckpoint.artifacts.resultPath
+    if (!$resultPath) { throw 'recoverable Issue checkpoint is missing resultPath' }
+    Write-RunEvent 'issue.phase.resume' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision=$script:RecoveryDecision.action; status='RECOVERED'; reason=$script:RecoveryDecision.reason; checkpointPath=$checkpointPath })
   }
-  $executionRunId = if ($Attempt -eq 0) { $script:RunContext.id } else { "$($script:RunContext.id)-repair-$Attempt" }
-  $resultPath = Join-Path (Join-Path $autoDir "runs\$executionRunId") 'result.json'
   if (Test-Path -LiteralPath $resultPath) {
     $result = Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($resuming -and $script:RecoveryDecision.action -eq 'RESUME_VALIDATION' -and [string]$result.status -eq 'blocked' -and [string]$result.failureCategory -eq 'environment' -and [string]$result.stopReason -eq 'STOP_VERIFICATION_FAILED') {
+      $result.status = 'done'; $result.failureCategory = 'none'; $result.nextAction = 'VERIFY'; $result.stopReason = ''
+      $result.validation = @()
+      Write-RunEvent 'validation.environment-retry' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='RETRY_VALIDATION'; status='RECOVERED'; reason='one classified environment prerequisite retry uses the preserved implementation diff' })
+    }
     if ($result.status -eq 'done') {
+      if (!$resuming) {
+        $implementedHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+        $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase IMPLEMENTED -Artifacts @{resultPath=$resultPath;issueDirectory=$issueDir;archiveReport=[string]$Issue.contract.archiveReport} -Evidence @{diffHash=$implementedHash}
+        $script:IssuePhase = 'IMPLEMENTED'
+      }
       $changes = @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit)
       try {
         Assert-AutopilotAllowedChanges -ChangedPaths $changes -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
@@ -997,10 +1053,14 @@ function Invoke-IssueExecutor {
         $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
         $result.validation += [pscustomobject]@{ name = 'scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
       }
-      $evidencePaths = @()
+      $resumePhase = if ($resuming) { [string]$checkpoint.phase } else { '' }
+      $skipValidation = $resuming -and $resumePhase -in @('VALIDATED','REVIEWING','REVIEW_TOOL_BLOCKED','REVIEWED','CLOSING','IMPLEMENTATION_COMMITTED','CLOSEOUT_COMMITTED','REGISTERED')
+      $evidencePaths = if ($skipValidation) { @($checkpoint.artifacts.evidencePaths) } else { @() }
       $failureSummary = ''
       $currentFingerprint = ''
-      if ($result.status -eq 'done') {
+      if ($result.status -eq 'done' -and !$skipValidation) {
+        $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase VALIDATING -IncrementDispatch validation
+        $script:IssuePhase = 'VALIDATING'
         Write-State $autoDir 'VERIFYING' $false 'EXECUTOR_COMPLETED' $Issue.title 'VERIFYING' ''
         $verifyDir = Join-Path $issueDir 'verify'
         New-Item -ItemType Directory -Path $verifyDir -Force | Out-Null
@@ -1021,6 +1081,11 @@ function Invoke-IssueExecutor {
             $result.status = 'blocked'
             $result.failureCategory = if ($classification.category -eq 'environment_prereq') { 'environment' } elseif ($classification.category -eq 'ready_issue_config') { 'ready_issue_config' } elseif ($classification.category -eq 'tool_config') { 'tool_config' } else { 'quality_security' }
             $result.nextAction = 'STOP'; $result.stopReason = 'STOP_VERIFICATION_FAILED'
+            if ($classification.category -eq 'environment_prereq') {
+              $environmentDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+              $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase IMPLEMENTED -Evidence @{diffHash=$environmentDiffHash} -IncrementEnvironmentRetry
+              $script:IssuePhase = 'IMPLEMENTED'
+            }
             $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $classification.failureFingerprint -Force
             $failureSummary = $classification.reason
             $currentFingerprint = $classification.failureFingerprint
@@ -1040,6 +1105,11 @@ function Invoke-IssueExecutor {
           }
         }
       }
+      if ($result.status -eq 'done' -and !$skipValidation) {
+        $verifiedHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+        $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase VALIDATED -Artifacts @{evidencePaths=@($evidencePaths)} -Evidence @{diffHash=$verifiedHash;verificationDiffHash=$verifiedHash}
+        $script:IssuePhase = 'VALIDATED'
+      }
       $effectiveRoute = Get-AutopilotRoute -Issue $Issue.contract -ChangedPaths @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit)
       if ($result.status -eq 'done') {
         try {
@@ -1058,9 +1128,46 @@ function Invoke-IssueExecutor {
       $result | Add-Member -NotePropertyName firstPassSuccess -NotePropertyValue ($Attempt -eq 0 -and $result.status -eq 'done') -Force
       $result | Add-Member -NotePropertyName manualInterventionCount -NotePropertyValue 0 -Force
       $result | Add-Member -NotePropertyName scopeViolationCount -NotePropertyValue $(if ($result.stopReason -eq 'STOP_SCOPE_VIOLATION') { 1 } else { 0 }) -Force
+      $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+      foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
+        $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $checkpoint.metrics $metricName 0) -Force
+      }
+      $result | Add-Member -NotePropertyName phaseDurationsSeconds -NotePropertyValue $checkpoint.metrics.phaseDurationsSeconds -Force
+      $result | Add-Member -NotePropertyName resumedFromPhase -NotePropertyValue $(if ($resuming) { $resumePhase } else { '' }) -Force
       $closed = $false
       if ($result.status -eq 'done') { $script:FailureFingerprint = $null }
-      if ($result.status -eq 'done' -and $effectiveRoute.reviewRequired) {
+      if ($result.status -eq 'done' -and $effectiveRoute.reviewRequired -and $resuming -and $resumePhase -eq 'REVIEW_TOOL_BLOCKED') {
+        $manualReviewPath = [string]$checkpoint.artifacts.reviewResultPath
+        if ($manualReviewPath -and (Test-Path -LiteralPath $manualReviewPath -PathType Leaf)) {
+          try {
+            $manualReview = Get-Content -LiteralPath $manualReviewPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $manualReviewHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+            $manualDisposition = Get-AutopilotReviewDisposition -ReviewResult $manualReview -ExpectedIssueId $Issue.lint.issueId -ExpectedDiffHash $manualReviewHash
+            if ($manualDisposition.action -eq 'PASS') {
+              $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REVIEWED -Evidence @{diffHash=$manualReviewHash;reviewDiffHash=$manualReviewHash} -IncrementManualRecovery
+              $resumePhase = 'REVIEWED'
+              $script:IssuePhase = 'REVIEWED'
+              Write-RunEvent 'review.manual-pass-consumed' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='PASS'; status='REVIEWED'; reviewedDiffHash=$manualReviewHash })
+            }
+          } catch {
+            Write-RunEvent 'review.manual-pass-rejected' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='RETRY_TOOL'; status='REVIEW_TOOL_BLOCKED'; reason=$_.Exception.Message })
+          }
+        }
+      }
+      $reviewAlreadyPassed = $resuming -and $resumePhase -in @('REVIEWED','CLOSING','IMPLEMENTATION_COMMITTED','CLOSEOUT_COMMITTED','REGISTERED')
+      if ($result.status -eq 'done' -and $effectiveRoute.reviewRequired -and $reviewAlreadyPassed) {
+        $reviewPath = [string]$checkpoint.artifacts.reviewResultPath
+        if (!(Test-Path -LiteralPath $reviewPath -PathType Leaf)) { throw 'reviewed checkpoint is missing bound Reviewer result' }
+        $review = Get-Content -LiteralPath $reviewPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $currentReviewHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+        $reviewDisposition = Get-AutopilotReviewDisposition -ReviewResult $review -ExpectedIssueId $Issue.lint.issueId -ExpectedDiffHash $currentReviewHash
+        if ($reviewDisposition.action -ne 'PASS') { throw 'checkpoint Reviewer evidence no longer permits closeout' }
+        $result | Add-Member -NotePropertyName review -NotePropertyValue $review -Force
+        $result | Add-Member -NotePropertyName reviewedDiffHashExpected -NotePropertyValue $currentReviewHash -Force
+      }
+      if ($result.status -eq 'done' -and $effectiveRoute.reviewRequired -and !$reviewAlreadyPassed) {
+        $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REVIEWING -IncrementDispatch review
+        $script:IssuePhase = 'REVIEWING'
         Write-State $autoDir 'REVIEWING' $false 'VERIFICATION_COMPLETED' $Issue.title 'REVIEWING' ''
         $reviewDir = Join-Path $issueDir 'review'; New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
         $diffPath = Join-Path $reviewDir 'final.diff'
@@ -1075,7 +1182,10 @@ function Invoke-IssueExecutor {
           $result | Add-Member -NotePropertyName review -NotePropertyValue $review -Force
           $result | Add-Member -NotePropertyName reviewedDiffHashExpected -NotePropertyValue $request.diffSha256 -Force
           $reviewDisposition = Get-AutopilotReviewDisposition -ReviewResult $review -ExpectedIssueId $Issue.lint.issueId -ExpectedDiffHash $request.diffSha256
-          if ($reviewDisposition.action -eq 'REPAIR') {
+          if ($reviewDisposition.action -eq 'PASS') {
+            $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REVIEWED -Artifacts @{reviewRequestPath=$requestPath;reviewResultPath=$reviewPath} -Evidence @{diffHash=$request.diffSha256;reviewDiffHash=$request.diffSha256}
+            $script:IssuePhase = 'REVIEWED'
+          } elseif ($reviewDisposition.action -eq 'REPAIR') {
             $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_NEEDS_REPAIR'
             $failureSummary = $reviewDisposition.summary; $currentFingerprint = $reviewDisposition.failureFingerprint
             $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $currentFingerprint -Force
@@ -1083,6 +1193,9 @@ function Invoke-IssueExecutor {
             $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_FAILED'
           } elseif ($reviewDisposition.action -eq 'BLOCK_TOOL') {
             $result.status = 'blocked'; $result.failureCategory = 'tool_config'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEWER_TOOL_FAILURE'
+            $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REVIEW_TOOL_BLOCKED -Artifacts @{reviewRequestPath=$requestPath;reviewResultPath=$reviewPath} -Evidence @{diffHash=$request.diffSha256} -IncrementToolConfigBlock
+            $script:IssuePhase = 'REVIEW_TOOL_BLOCKED'
+            if ([int]$checkpoint.metrics.reviewDispatchCount -ge 2) { $result.stopReason = 'STOP_REVIEWER_TOOL_RETRY_EXHAUSTED' }
           }
         }
       }
@@ -1097,29 +1210,88 @@ function Invoke-IssueExecutor {
         }
       }
       if ($result.status -eq 'done' -and $config.closeout -and $config.closeout.enabled -eq $true) {
+        $terminalResume = $resuming -and $resumePhase -in @('CLOSEOUT_COMMITTED','REGISTERED')
+        if (!$terminalResume) { $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase CLOSING -IncrementDispatch closeout }
+        $script:IssuePhase = 'CLOSING'
         Write-State $autoDir 'COMMITTING' $false 'CLOSEOUT_START' $Issue.title 'COMMITTING' ''
         $scoreEvidence = $null
+        $scoreShadowEvidence = $null
         if ($script:TaskScoringActive) {
           $reportPath = Join-Path $worktree.path $Issue.contract.archiveReport
           $isStockIssue = (Get-IssueBodyByTitle (Join-Path $worktree.path 'docs\backlog\ready-issues.md') $Issue.title) -match '\[stock:[^\]]+\]'
+          $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+          foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
+            $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $checkpoint.metrics $metricName 0) -Force
+          }
           $scoreEvidence = New-AutopilotTaskScoreEvidenceFromResult -Result $result -ReportPath $reportPath -ImplementationCommit ('0' * 40) -StockIssueTarget $isStockIssue
+          if ($config.taskScoring.candidateVersion -eq $script:AutopilotTaskScoreV2CandidateVersion -and $config.taskScoring.candidateEnabled -ne $true) {
+            $scoreShadowEvidence = New-AutopilotTaskScoreV2EvidenceFromResult -Result $result -ReportPath $reportPath -ImplementationCommit ('0' * 40) -StockIssueTarget $isStockIssue
+          }
         }
-        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge) -BaseBranch $configuredBaseBranch -ExpectedBaseCommit $baseCommit -ScoreEvidence $scoreEvidence -TaskScoringConfig $(if ($script:TaskScoringActive) { $config.taskScoring } else { $null })
+        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge $false -BaseBranch $configuredBaseBranch -ExpectedBaseCommit $baseCommit -ScoreEvidence $scoreEvidence -ScoreShadowEvidence $scoreShadowEvidence -TaskScoringConfig $(if ($script:TaskScoringActive) { $config.taskScoring } else { $null })
         $script:LastCommit = $closeout.commit
         $result.gitSummary | Add-Member -NotePropertyName commit -NotePropertyValue $closeout.commit -Force
         $result.gitSummary | Add-Member -NotePropertyName implementationCommit -NotePropertyValue $closeout.implementationCommit -Force
         $result.gitSummary | Add-Member -NotePropertyName closeoutCommit -NotePropertyValue $closeout.closeoutCommit -Force
         if ($closeout.score) { $result | Add-Member -NotePropertyName taskScore -NotePropertyValue $closeout.score -Force }
-        $result | Add-Member -NotePropertyName merged -NotePropertyValue $closeout.merged -Force
+        if ($closeout.scoreShadow) { $result | Add-Member -NotePropertyName taskScoreV2Shadow -NotePropertyValue $closeout.scoreShadow -Force }
         $result.nextAction = 'CHECKPOINT'
-        $closeoutKey = Get-AutopilotCloseoutKey -IssueId $Issue.lint.issueId -Commit $closeout.commit -ReportPath $Issue.contract.archiveReport
-        Register-AutopilotCloseout -LedgerPath (Join-Path $autoDir 'closeouts.ndjson') -Key $closeoutKey | Out-Null
-        if ($script:RetrospectiveActive) {
-          $remainingAfterCloseout = if ($null -eq $script:IterationLimit) { $null } else { [Math]::Max(0, [int]$script:RemainingIterations - 1) }
-          Add-AutopilotReviewCycleIssue -Path (Join-Path $autoDir 'state.json') -IssueId $Issue.lint.issueId -ScoreKey $closeout.score.key -ScoringVersion $closeout.score.scoringVersion -Threshold ([int]$config.retrospective.threshold) -BoundedBatchRemaining $remainingAfterCloseout | Out-Null
+        $closeoutDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+        $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase CLOSEOUT_COMMITTED -Evidence @{implementationCommit=[string]$closeout.implementationCommit;closeoutCommit=[string]$closeout.closeoutCommit;diffHash=$closeoutDiffHash}
+        $script:IssuePhase = 'CLOSEOUT_COMMITTED'
+        $merged = $false
+        if ([bool]$config.autoMerge) {
+          $mergeResult = Merge-AutopilotIssueCloseoutCommit -RepoRoot $RepoRoot -Commit $closeout.closeoutCommit -ExpectedBaseCommit $baseCommit
+          $merged = [bool]$mergeResult.merged
         }
-        Write-RunEvent 'closeout' ([pscustomobject]@{ issueId = $Issue.lint.issueId; title = $Issue.title; decision = 'DONE'; status = 'CLOSING'; reason = 'local commit closeout'; evidencePath = $Issue.contract.archiveReport; commit = $closeout.commit })
-        $closed = $true
+        $result | Add-Member -NotePropertyName merged -NotePropertyValue $merged -Force
+        if ($merged) {
+          $closeoutKey = Get-AutopilotCloseoutKey -IssueId $Issue.lint.issueId -Commit $closeout.commit -ReportPath $Issue.contract.archiveReport
+          $ledgerPath = Join-Path $autoDir 'closeouts.ndjson'
+          Register-AutopilotCloseout -LedgerPath $ledgerPath -Key $closeoutKey | Out-Null
+          if (!(Test-AutopilotCloseoutRegistered -LedgerPath $ledgerPath -Key $closeoutKey)) { throw 'closeout ledger read-back failed' }
+          if ($script:RetrospectiveActive) {
+            $remainingAfterCloseout = if ($null -eq $script:IterationLimit) { $null } else { [Math]::Max(0, [int]$script:RemainingIterations - 1) }
+            Add-AutopilotReviewCycleIssue -Path (Join-Path $autoDir 'state.json') -IssueId $Issue.lint.issueId -ScoreKey $closeout.score.key -ScoringVersion $closeout.score.scoringVersion -Threshold ([int]$config.retrospective.threshold) -BoundedBatchRemaining $remainingAfterCloseout | Out-Null
+          }
+          $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REGISTERED
+          $script:IssuePhase = 'REGISTERED'
+          $result | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $resultPath -Encoding UTF8
+          Write-State $autoDir 'REGISTERED' $false 'CLOSEOUT_REGISTERED' $Issue.title 'REGISTERED' ''
+          $registeredState = Read-AutopilotState -Path (Join-Path $autoDir 'state.json')
+          if ([string]$registeredState.issueCheckpointPath -ne $checkpointPath -or [string]$registeredState.currentIssuePhase -ne 'REGISTERED') { throw 'registered AutoPilot state read-back failed' }
+          if ($controlPlaneCanaryEnabled -and $null -ne $script:IterationLimit -and [int]$script:IterationLimit -eq 1) {
+            $graphSnapshot = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $RepoRoot
+            $mergedHead = (& git -C $RepoRoot rev-parse HEAD).Trim()
+            if (!$graphSnapshot.available -or [string]$graphSnapshot.cursor -ne $mergedHead) { throw "control-plane canary knowledge-graph cursor gate failed: $($graphSnapshot.stopReason) $($graphSnapshot.message)" }
+            $script:LastCanaryFingerprint = $script:ControlPlaneFingerprint
+            $script:LastCanaryReport = [string]$Issue.contract.archiveReport
+            Write-State $autoDir 'REGISTERED' $false 'CONTROL_PLANE_CANARY_PASSED' $Issue.title 'REGISTERED' ''
+            $canaryState = Read-AutopilotState -Path (Join-Path $autoDir 'state.json')
+            if ([string]$canaryState.lastCanaryFingerprint -ne $script:ControlPlaneFingerprint -or [string]$canaryState.lastCanaryReport -ne [string]$Issue.contract.archiveReport) { throw 'control-plane canary state read-back failed' }
+            Write-RunEvent 'control-plane.canary-passed' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='PASS'; status='CANARY_PASSED'; controlPlaneFingerprint=$script:ControlPlaneFingerprint; evidencePath=$Issue.contract.archiveReport; graphGitCursor=$graphSnapshot.cursor })
+          }
+          if ($script:TaskScoringActive -and $config.taskScoring.candidateVersion -eq $script:AutopilotTaskScoreV2CandidateVersion -and $config.taskScoring.candidateEnabled -ne $true) {
+            $finalCheckpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+            foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
+              $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $finalCheckpoint.metrics $metricName 0) -Force
+            }
+            $finalV2Evidence = New-AutopilotTaskScoreV2EvidenceFromResult -Result $result -ReportPath (Join-Path $worktree.path $Issue.contract.archiveReport) -ImplementationCommit $closeout.implementationCommit -StockIssueTarget ([bool]$isStockIssue)
+            $finalV2Score = New-AutopilotTaskScoreV2Shadow -Evidence $finalV2Evidence
+            Set-AutopilotCloseoutCandidateScore -LedgerPath (Join-Path $autoDir 'candidate-score-shadows.ndjson') -Key $closeoutKey -Score $finalV2Score -PhaseMetrics $finalCheckpoint.metrics | Out-Null
+            $result | Add-Member -NotePropertyName taskScoreV2Shadow -NotePropertyValue $finalV2Score -Force
+            $result | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath $resultPath -Encoding UTF8
+          }
+          $script:IssueCheckpointPath = ''
+          $script:IssuePhase = ''
+          Write-State $autoDir 'CHECKPOINT' $false 'ISSUE_CLOSED' $Issue.title 'CHECKPOINT' ''
+          $closedState = Read-AutopilotState -Path (Join-Path $autoDir 'state.json')
+          if ([string]$closedState.issueCheckpointPath -or [string]$closedState.currentIssuePhase) { throw 'closed AutoPilot state read-back failed' }
+          Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase CLOSED | Out-Null
+          Remove-AutopilotIssueCheckpoint -Path $checkpointPath -Closed
+          Write-RunEvent 'closeout' ([pscustomobject]@{ issueId = $Issue.lint.issueId; title = $Issue.title; decision = 'DONE'; status = 'CLOSED'; reason = 'ledger/state/graph read-back completed before checkpoint retirement'; evidencePath = $Issue.contract.archiveReport; commit = $closeout.commit })
+          $closed = $true
+        }
       }
       $result | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $resultPath -Encoding UTF8
       if ($Attempt -gt 0) { Copy-Item -LiteralPath $resultPath -Destination (Join-Path $script:RunContext.dir 'result.json') -Force }
@@ -1129,7 +1301,9 @@ function Invoke-IssueExecutor {
         Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt ($Attempt + 1) -Phase 'repair' -PreviousSummary $failureSummary
         return
       }
-      if ($result.status -eq 'done' -and $closed) { Write-State $autoDir 'CHECKPOINT' $false 'ISSUE_CLOSED' $Issue.title 'CHECKPOINT' '' } elseif ($result.status -eq 'done') { Write-State $autoDir 'CLOSING' $false 'VERIFICATION_COMPLETED' $Issue.title 'CLOSING' '' } else { Write-State $autoDir 'BLOCKED' $false 'VERIFICATION_BLOCKED' $Issue.title $result.failureCategory $result.stopReason }
+      if ($result.status -eq 'done' -and $closed) {
+        Write-Host 'ISSUE_DURABLY_CLOSED'
+      } elseif ($result.status -eq 'done') { Write-State $autoDir 'CLOSING' $false 'VERIFICATION_COMPLETED' $Issue.title 'CLOSING' '' } elseif ($result.stopReason -eq 'STOP_REVIEWER_TOOL_RETRY_EXHAUSTED') { Write-State $autoDir 'PAUSED' $false 'REVIEW_TOOL_BLOCKED' $Issue.title $result.failureCategory $result.stopReason } else { Write-State $autoDir 'BLOCKED' $false 'VERIFICATION_BLOCKED' $Issue.title $result.failureCategory $result.stopReason }
     } else {
       Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_BLOCKED' $Issue.title $result.failureCategory $result.stopReason
     }
@@ -1138,6 +1312,7 @@ function Invoke-IssueExecutor {
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-state.ps1')
+. (Join-Path $scriptDir 'autopilot-control-plane-fingerprint.ps1')
 . (Join-Path $scriptDir 'autopilot-task-score.ps1')
 . (Join-Path $scriptDir 'autopilot-ready.ps1')
 . (Join-Path $scriptDir 'autopilot-route.ps1')
@@ -1146,6 +1321,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-context.ps1')
 . (Join-Path $scriptDir 'autopilot-verify.ps1')
 . (Join-Path $scriptDir 'autopilot-review.ps1')
+. (Join-Path $scriptDir 'autopilot-issue-checkpoint.ps1')
 . (Join-Path $scriptDir 'autopilot-recover.ps1')
 . (Join-Path $scriptDir 'autopilot-refill.ps1')
 . (Join-Path $scriptDir 'autopilot-closeout.ps1')
@@ -1163,6 +1339,8 @@ $actualBaseBranch = (& git -C $RepoRoot branch --show-current 2>$null | Select-O
 if ($actualBaseBranch -ne $configuredBaseBranch) { throw "AutoPilot control plane requires base branch $configuredBaseBranch, actual=$actualBaseBranch" }
 
 $autoDir = if ($config.autopilotDir) { $config.autopilotDir } else { Join-Path $RepoRoot ".codex-autopilot" }
+$controlPlaneCanaryEnabled = $null -ne $config.controlPlaneCanary -and $config.controlPlaneCanary.enabled -eq $true
+$script:ControlPlaneFingerprint = if ($controlPlaneCanaryEnabled) { Get-AutopilotControlPlaneFingerprint -RepoRoot $RepoRoot -Paths @($config.controlPlaneCanary.fingerprintPaths) } else { '' }
 $maxIssuesPerRun = if ($config.maxIssuesPerRun) { [int]$config.maxIssuesPerRun } else { 1 }
 $maxParallelIssues = if ($config.maxParallelIssues) { [int]$config.maxParallelIssues } else { 3 }
 $parallelSafetyMode = if ($config.parallelSafetyMode) { [string]$config.parallelSafetyMode } else { "strict-independent-only" }
@@ -1192,12 +1370,19 @@ $script:RetiredExecutors = @()
 $script:LastCommit = $null
 $script:FailureFingerprint = $null
 $script:Attempt = 0
+$script:IssueCheckpointPath = ''
+$script:IssuePhase = ''
+$script:LastCanaryFingerprint = ''
+$script:LastCanaryReport = ''
+$script:RecoveryDecision = $null
 Initialize-IterationProgress $autoDir $readyPath $MaxIterations ([bool]$DryRun -or [bool]$ExplainNextAction)
 $existingStatePath = Join-Path $autoDir 'state.json'
 if (Test-Path -LiteralPath $existingStatePath) {
   try {
     $existingState = Get-Content -LiteralPath $existingStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($existingState.PSObject.Properties.Name -contains 'retiredExecutors') { $script:RetiredExecutors = @($existingState.retiredExecutors) }
+    if ($existingState.PSObject.Properties.Name -contains 'lastCanaryFingerprint') { $script:LastCanaryFingerprint = [string]$existingState.lastCanaryFingerprint }
+    if ($existingState.PSObject.Properties.Name -contains 'lastCanaryReport') { $script:LastCanaryReport = [string]$existingState.lastCanaryReport }
   } catch { $script:RetiredExecutors = @() }
 }
 $script:RunContext = New-RunContext $autoDir
@@ -1247,11 +1432,33 @@ try {
   if ($applyMode) {
     $recovery = Get-AutopilotRecoveryDecision -AutoDir $autoDir
     if ($recovery.action -eq 'REFUSE_SECOND_INSTANCE') { Write-Host 'RUN_LOCK_ACTIVE'; throw 'Another AutoPilot run is active.' }
-    if ($recovery.action -in @('RESUME_FROM_CHECKPOINT','RESTART_ISSUE')) {
+    $resumeActions = @('RESUME_VALIDATION','RESUME_REVIEW','RESUME_CLOSEOUT','RESUME_SCORE_AND_CLOSEOUT','RESUME_MERGE_AND_REGISTER','RESUME_FINALIZE')
+    if ($recovery.action -eq 'CLEAN_CLOSED_CHECKPOINT') {
       Remove-Item -LiteralPath (Join-Path $autoDir 'run.lock') -Force -ErrorAction SilentlyContinue
-      if ($recovery.action -eq 'RESTART_ISSUE' -and $recovery.worktree) { Remove-AutopilotResidualWorktree -RepoRoot $RepoRoot -Worktree $recovery.worktree | Out-Null }
+      Remove-AutopilotIssueCheckpoint -Path $recovery.checkpointPath -Closed
+      Write-RunEvent 'recovery' ([pscustomobject]@{ decision='CLEAN_CLOSED_CHECKPOINT'; status='RECOVERED'; reason='final state was already read back before checkpoint retirement' })
+      $recovery = [pscustomobject]@{ action='NEW_RUN'; reason='closed checkpoint retired' }
+    }
+    if ($recovery.action -in @('RESUME_FROM_CHECKPOINT') + $resumeActions) {
+      Remove-Item -LiteralPath (Join-Path $autoDir 'run.lock') -Force -ErrorAction SilentlyContinue
+      if ($recovery.action -in $resumeActions) {
+        $resumeMetricArgs = @{ Path=$recovery.checkpointPath; Phase=[string]$recovery.checkpoint.phase; IncrementRunResume=$true }
+        if ([string]$recovery.checkpoint.phase -in @('VALIDATING','REVIEWING','CLOSING','REPAIRING')) { $resumeMetricArgs.IncrementPhaseRestart = $true }
+        $recovery.checkpoint = Set-AutopilotIssueCheckpointPhase @resumeMetricArgs
+        $script:RecoveryDecision = $recovery
+        $script:IssueCheckpointPath = [string]$recovery.checkpointPath
+        $script:IssuePhase = [string]$recovery.checkpoint.phase
+      }
       Write-Host 'STALE_RUN_LOCK_REMOVED'
       Write-RunEvent 'recovery' ([pscustomobject]@{ decision = $recovery.action; status = 'RECOVERED'; reason = $recovery.reason })
+    } elseif ($recovery.action -eq 'PAUSE_REVIEW_TOOL_BLOCKED') {
+      Write-State $autoDir 'PAUSED' $false 'REVIEW_TOOL_BLOCKED' ([string]$recovery.issueId) $recovery.reason 'STOP_REVIEWER_TOOL_RETRY_EXHAUSTED'
+      Write-Host 'STOP_REVIEWER_TOOL_RETRY_EXHAUSTED'
+      exit 0
+    } elseif ($recovery.action -eq 'PAUSE_ENVIRONMENT_RETRY_EXHAUSTED') {
+      Write-State $autoDir 'PAUSED' $false 'ENVIRONMENT_RETRY_EXHAUSTED' ([string]$recovery.issueId) $recovery.reason 'STOP_ENVIRONMENT_RETRY_EXHAUSTED'
+      Write-Host 'STOP_ENVIRONMENT_RETRY_EXHAUSTED'
+      exit 0
     } elseif ($recovery.action -in @('VERIFY_UNCOMMITTED','QUARANTINE')) {
       Write-State $autoDir 'BLOCKED' $false 'RECOVERY_REVIEW_REQUIRED' '' $recovery.reason 'STOP_RECOVERY_REVIEW_REQUIRED'
       Write-Host 'STOP_RECOVERY_REVIEW_REQUIRED'
@@ -1261,10 +1468,17 @@ try {
   }
 
   $boundaryStatePath = Join-Path $autoDir 'state.json'
+  $boundaryCheckpoint = Test-Checkpoint $autoDir
+  if ($boundaryCheckpoint -eq 'CONTINUE' -and !$script:RecoveryDecision -and (Test-AutopilotControlPlaneCanaryRequired -Enabled $controlPlaneCanaryEnabled -IterationLimit $script:IterationLimit -CurrentFingerprint $(if ($script:ControlPlaneFingerprint) { $script:ControlPlaneFingerprint } else { 'disabled' }) -LastCanaryFingerprint $script:LastCanaryFingerprint)) {
+    Write-RunEvent 'control-plane.canary-required' ([pscustomobject]@{ decision='STOP'; status='CONTROL_PLANE_CANARY_REQUIRED'; stopReason='CONTROL_PLANE_CANARY_REQUIRED'; controlPlaneFingerprint=$script:ControlPlaneFingerprint })
+    Write-State $autoDir 'PAUSED' $false 'CONTROL_PLANE_CANARY_REQUIRED' '' 'control-plane fingerprint requires a successful user-started single-Issue canary' 'CONTROL_PLANE_CANARY_REQUIRED'
+    Write-Host 'CONTROL_PLANE_CANARY_REQUIRED'
+    exit 0
+  }
   if (Test-Path -LiteralPath $boundaryStatePath) {
     $boundaryState = Read-AutopilotState -Path $boundaryStatePath
     $boundedReviewDue = $null -ne $boundaryState.iterationLimit -and [int]$boundaryState.remainingIterations -le 0
-    if ([bool]$boundaryState.retrospectiveDue -and ($null -eq $boundaryState.iterationLimit -or $boundedReviewDue)) {
+    if (!$script:RecoveryDecision -and [bool]$boundaryState.retrospectiveDue -and ($null -eq $boundaryState.iterationLimit -or $boundedReviewDue)) {
       Write-RunEvent 'stop' ([pscustomobject]@{ decision='STOP'; status='STOP_RETROSPECTIVE_REQUIRED'; stopReason='STOP_RETROSPECTIVE_REQUIRED'; reviewCycleId=$boundaryState.reviewCycleId; reviewCycleCompletedCount=$boundaryState.reviewCycleCompletedCount })
       Write-State $autoDir 'STOP_RETROSPECTIVE_REQUIRED' ([bool]$DryRun) 'RETROSPECTIVE_REQUIRED' '' 'pending retrospective blocks new task dispatch' 'STOP_RETROSPECTIVE_REQUIRED'
       Write-Host 'STOP_RETROSPECTIVE_REQUIRED'
@@ -1272,7 +1486,7 @@ try {
     }
   }
 
-  if ($null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
+  if (!$script:RecoveryDecision -and $null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
     Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = "STOP_ITERATION_LIMIT_REACHED"; stopReason = "STOP_ITERATION_LIMIT_REACHED" })
     Remove-Item -LiteralPath (Join-Path $autoDir 'enabled.flag') -Force -ErrorAction SilentlyContinue
     Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" ([bool]$DryRun) "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
@@ -1285,14 +1499,30 @@ try {
     Write-RunEvent "checkpoint" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "CHECKPOINT"; loop = $loop })
     Write-Host "checkpoint[$loop]=$checkpoint"
     if ($checkpoint -ne "CONTINUE") {
+      if ($script:RecoveryDecision -and $script:RecoveryDecision.action -in @('RESUME_VALIDATION','RESUME_REVIEW','RESUME_CLOSEOUT','RESUME_SCORE_AND_CLOSEOUT','RESUME_MERGE_AND_REGISTER','RESUME_FINALIZE')) {
+        Write-RunEvent 'checkpoint.active-issue-closeout' ([pscustomobject]@{ checkpoint=$checkpoint; decision=$script:RecoveryDecision.action; status='RECOVERING'; reason='stop/pause prevents new selection but does not abandon the already-started durable Issue' })
+      } else {
       Write-RunEvent "stop" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "STOP"; status = $checkpoint; stopReason = $checkpoint; loop = $loop })
       Write-State $autoDir $checkpoint ([bool]$DryRun) "STOP" "" $checkpoint $checkpoint
       Write-Host $checkpoint
       exit 0
+      }
     }
 
     $readyIssues = @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir)
+    if ($script:RecoveryDecision -and @($readyIssues | Where-Object { $_.lint.issueId -eq $script:RecoveryDecision.issueId }).Count -eq 0 -and $script:RecoveryDecision.action -in @('RESUME_MERGE_AND_REGISTER','RESUME_FINALIZE')) {
+      $readyIssues = @((Get-RecoveryIssueFromCheckpoint -Recovery $script:RecoveryDecision -RepoRoot $RepoRoot)) + $readyIssues
+    }
     if ($readyIssues.Count -gt 0) {
+      if ($script:RecoveryDecision -and $script:RecoveryDecision.action -in @('RESUME_VALIDATION','RESUME_REVIEW','RESUME_CLOSEOUT','RESUME_SCORE_AND_CLOSEOUT','RESUME_MERGE_AND_REGISTER','RESUME_FINALIZE')) {
+        $recoverable = @($readyIssues | Where-Object { $_.lint.issueId -eq $script:RecoveryDecision.issueId })
+        if ($recoverable.Count -ne 1) {
+          Write-State $autoDir 'BLOCKED' $false 'RECOVERY_READY_MISSING' ([string]$script:RecoveryDecision.issueId) 'recoverable Issue no longer has one Ready contract' 'STOP_RECOVERY_REVIEW_REQUIRED'
+          Write-Host 'STOP_RECOVERY_REVIEW_REQUIRED'
+          exit 0
+        }
+        $readyIssues = @($recoverable[0]) + @($readyIssues | Where-Object { $_.lint.issueId -ne $script:RecoveryDecision.issueId })
+      }
       if ($readyIssues[0].lint.status -ne "pass") {
         Write-RunEvent "ready-lint" ([pscustomobject]@{
           issueId = $readyIssues[0].lint.issueId
@@ -1368,7 +1598,11 @@ try {
           Write-Host "PARALLEL_BATCH_PLAN_ONLY"
         }
       } else {
-        Invoke-IssueExecutor $RepoRoot $ConfigPath $selectedIssue $selectedRoute
+        if ($script:RecoveryDecision -and $selectedIssue.lint.issueId -eq $script:RecoveryDecision.issueId) {
+          Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $selectedIssue -Route $selectedRoute -ResumeCheckpoint $script:RecoveryDecision.checkpoint
+        } else {
+          Invoke-IssueExecutor $RepoRoot $ConfigPath $selectedIssue $selectedRoute
+        }
       }
       exit 0
     }

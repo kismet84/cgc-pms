@@ -10,7 +10,7 @@
 - 任何代码、配置、文档、Git 或运行环境状态变更前，实际执行者都要核对 `git branch --show-current` 与 `git status --short`；怀疑冲突时再查 `git worktree list`。
 - A-F 是职责检查表，不是固定六线程；D 的裁决必需验证证据与 E 的适用风险审查证据不可省略，但不强制由独立线程提供。
 - 主线程不承载执行器长日志或推理历史；长期任务按 Issue/阶段生成最小 context pack，Reviewer 只接收 Ready、最终 diff 和绑定证据。
-- 一个 Issue 一个 worktree；不确定残留提交不得直接合并，先隔离并从当前 baseBranch 新鲜重跑。
+- 一个 Issue 一个 worktree；恢复先核验 durable phase checkpoint。证据一致时保留 worktree 并从首个未完成阶段继续；证据缺失或冲突时 quarantine，不得猜测合并、删除现场或从 B/C 新鲜重跑。
 
 ## 子智能体
 

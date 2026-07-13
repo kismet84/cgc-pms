@@ -39,7 +39,11 @@
     "retrospectiveFailureCategory",
     "lastRetrospectiveAt",
     "lastRetrospectiveReport",
-    "activeScoringVersion"
+    "activeScoringVersion",
+    "issueCheckpointPath",
+    "currentIssuePhase",
+    "lastCanaryFingerprint",
+    "lastCanaryReport"
   ],
   "properties": {
     "schemaVersion": {
@@ -124,6 +128,10 @@
     "lastRetrospectiveAt": { "type": ["string", "null"], "format": "date-time" },
     "lastRetrospectiveReport": { "type": ["string", "null"] },
     "activeScoringVersion": { "type": ["string", "null"] },
+    "issueCheckpointPath": { "type": "string" },
+    "currentIssuePhase": { "type": "string" },
+    "lastCanaryFingerprint": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
+    "lastCanaryReport": { "type": "string" },
     "enabled": { "type": "boolean" },
     "mode": { "type": "string" },
     "iterationCompleted": { "type": "integer", "minimum": 0 },

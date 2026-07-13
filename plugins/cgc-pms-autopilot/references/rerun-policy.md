@@ -31,3 +31,12 @@ different failure -> collect stronger evidence
 1. Maven `testCompile`、代理抖动、启动竞态只按疑似瞬时问题处理一次，不允许无限复跑。
 2. 第二次仍为同类环境前置错误时，转 runtime refresh、repair 或 blocked，不再机械重试。
 3. `unknown` 优先于错误归因；证据不足时不要把失败硬判成业务代码问题。
+
+## 跨 run 阶段恢复
+
+1. 活动 Issue 存在 durable phase checkpoint 时，必须先校验 Ready 内容、baseCommit、worktree/branch、scope、diff 与 evidence；全部一致才允许恢复。
+2. `IMPLEMENTED/VALIDATING` 从 validation 恢复，`VALIDATED/REVIEWING` 从 Reviewer 恢复，`REVIEWED/CLOSING` 从 closeout 恢复；不得重新派发 implementation。
+3. Reviewer `tool_config` 仅重试同一 diff 的 Reviewer；累计两次仍失败进入 `PAUSED/REVIEW_TOOL_BLOCKED`，不转 repair。若人工独立 Reviewer 写入绑定同一 Issue/diff 的结构化 PASS，应消费该证据并从 closeout 继续。
+4. closeout commit 必须先写 checkpoint 再快进合并；合并后中断可用 worktree 中归一化后的 Done 合同、closeout commit 祖先关系和原始 Ready 哈希恢复 final registration。
+5. closeout ledger、state、候选效率 shadow 与适用的知识图谱游标必须读回成功后才退役 checkpoint。
+6. 任一绑定证据变化进入 `QUARANTINE` 并保留 worktree；没有 checkpoint 的残留提交也只允许人工证据恢复或显式放弃。

@@ -30,7 +30,7 @@ function New-AutopilotReviewRequest {
     evidencePaths = @($EvidencePaths)
     instructions = @(
       'Review only the Ready contract, final diff, required source, project rules, and bound verification evidence.',
-      'Return pass, needs_repair, or blocked with file/line evidence.',
+      'Return pass, needs_repair, blocked, or tool_blocked with file/line evidence.',
       'Set reviewedDiffHash to the exact diffSha256 from this request and preserve the exact issueId.',
       'Do not infer success from the Implementer report.'
     )
@@ -61,12 +61,23 @@ function Get-AutopilotReviewDisposition {
   param([Parameter(Mandatory)][object]$ReviewResult, [string]$ExpectedIssueId = '', [string]$ExpectedDiffHash = '')
   if ($ReviewResult.decision -eq 'pass' -and (!$ExpectedIssueId -or !$ExpectedDiffHash)) { throw 'Reviewer pass requires explicit Issue and diff hash expectations' }
   if ($ExpectedIssueId -and $ReviewResult.issueId -ne $ExpectedIssueId) { throw 'Reviewer result Issue ID mismatch' }
-  if ($ReviewResult.decision -eq 'blocked' -and (Test-AutopilotReviewerSandboxFailure -ReviewResult $ReviewResult)) { return [pscustomobject]@{ action='BLOCK_TOOL'; failureFingerprint=''; summary='independent Reviewer sandbox could not read the bound evidence' } }
+  if ($ReviewResult.decision -eq 'tool_blocked' -or ($ReviewResult.decision -eq 'blocked' -and (Test-AutopilotReviewerSandboxFailure -ReviewResult $ReviewResult))) { return [pscustomobject]@{ action='BLOCK_TOOL'; failureFingerprint=''; summary='independent Reviewer tool could not read the bound evidence' } }
   if ($ExpectedDiffHash -and ([string]$ReviewResult.reviewedDiffHash).ToLowerInvariant() -ne $ExpectedDiffHash.ToLowerInvariant()) { throw 'Reviewer result diff hash mismatch' }
   if ($ReviewResult.decision -eq 'pass') { return [pscustomobject]@{ action='PASS'; failureFingerprint=''; summary='' } }
   if ($ReviewResult.decision -eq 'blocked') { return [pscustomobject]@{ action='BLOCK'; failureFingerprint=''; summary='independent Reviewer blocked the issue' } }
   if ($ReviewResult.decision -ne 'needs_repair') { throw "unknown Reviewer decision: $($ReviewResult.decision)" }
-  $summary = @($ReviewResult.findings | ForEach-Object { "$($_.severity)|$($_.file)|$($_.line)|$($_.risk)|$($_.requiredEvidence)" }) -join "`n"
+  $findings = @($ReviewResult.findings)
+  if ($findings.Count -eq 0) { throw 'Reviewer needs_repair requires at least one blocking finding' }
+  foreach ($finding in $findings) {
+    if ([string]$finding.severity -ne 'blocking' -or
+        [string]::IsNullOrWhiteSpace([string]$finding.file) -or
+        $null -eq $finding.line -or [int]$finding.line -lt 1 -or
+        [string]::IsNullOrWhiteSpace([string]$finding.risk) -or
+        [string]::IsNullOrWhiteSpace([string]$finding.requiredEvidence)) {
+      throw 'Reviewer needs_repair finding must bind blocking severity, file, positive line, risk, and requiredEvidence'
+    }
+  }
+  $summary = @($findings | ForEach-Object { "$($_.severity)|$($_.file)|$($_.line)|$($_.risk)|$($_.requiredEvidence)" }) -join "`n"
   $sha = [Security.Cryptography.SHA256]::Create()
   try { $fingerprint = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($summary)))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
   return [pscustomobject]@{ action='REPAIR'; failureFingerprint=$fingerprint; summary=$summary }
@@ -74,9 +85,25 @@ function Get-AutopilotReviewDisposition {
 
 function Test-AutopilotReviewerSandboxFailure {
   param([Parameter(Mandatory)][object]$ReviewResult)
+  if ($ReviewResult.decision -eq 'tool_blocked') { return $true }
   if ($ReviewResult.decision -ne 'blocked') { return $false }
   $text = @($ReviewResult.findings | ForEach-Object { "$($_.risk)`n$($_.requiredEvidence)" }) -join "`n"
   return $text -match '(?i)orchestrator_helper_launch_failed|sandbox.{0,40}initialization failed|os error 3'
+}
+
+function New-AutopilotReviewerToolBlockedResult {
+  param([Parameter(Mandatory)][string]$RequestPath, [Parameter(Mandatory)][string]$ResultPath, [Parameter(Mandatory)][string]$Reason)
+  $request = Get-Content -LiteralPath $RequestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $result = [ordered]@{
+    schemaVersion = 1
+    issueId = [string]$request.issueId
+    decision = 'tool_blocked'
+    findings = @([ordered]@{ severity='blocking'; file=''; line=$null; risk='Reviewer tool_config failure'; requiredEvidence=$Reason })
+    reviewedDiffHash = [string]$request.diffSha256
+    reviewedAt = [datetimeoffset]::Now.ToString('o')
+  }
+  [IO.File]::WriteAllText($ResultPath, ($result | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+  return [pscustomobject]$result
 }
 
 function Invoke-AutopilotReviewerProcess {
@@ -121,10 +148,20 @@ function Invoke-AutopilotReviewer {
 )
   $headBefore = (& git -C $Worktree rev-parse HEAD).Trim()
   $fingerprintBefore = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $headBefore
-  $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'read-only'
+  try {
+    $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'read-only'
+  } catch {
+    if ($_.Exception.Message -notmatch '(?i)orchestrator_helper_launch_failed|sandbox.{0,80}initialization failed|os error 3') { throw }
+    $review = New-AutopilotReviewerToolBlockedResult -RequestPath $RequestPath -ResultPath $ResultPath -Reason $_.Exception.Message
+  }
   if (Test-AutopilotReviewerSandboxFailure -ReviewResult $review) {
     Remove-Item -LiteralPath $ResultPath -Force -ErrorAction SilentlyContinue
-    $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'danger-full-access'
+    try {
+      $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'danger-full-access'
+    } catch {
+      if ($_.Exception.Message -notmatch '(?i)orchestrator_helper_launch_failed|sandbox.{0,80}initialization failed|os error 3') { throw }
+      $review = New-AutopilotReviewerToolBlockedResult -RequestPath $RequestPath -ResultPath $ResultPath -Reason $_.Exception.Message
+    }
     $headAfter = (& git -C $Worktree rev-parse HEAD).Trim()
     $fingerprintAfter = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $headAfter
     if ($headAfter -ne $headBefore -or $fingerprintAfter -ne $fingerprintBefore) { throw 'independent Reviewer fallback modified the issue worktree' }

@@ -45,12 +45,21 @@ try {
   $needsRepair.reviewedDiffHash = $request.diffSha256
   $disposition = Get-AutopilotReviewDisposition -ReviewResult $needsRepair -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256
   if ($disposition.action -ne 'REPAIR' -or !$disposition.failureFingerprint) { throw 'needs_repair was not routed to a bounded repair' }
+  foreach ($invalidFindings in @(@(), @([pscustomobject]@{ severity='blocking'; file=''; line=$null; risk=''; requiredEvidence='' }))) {
+    $invalidRepairRejected = $false
+    try {
+      Get-AutopilotReviewDisposition -ReviewResult ([pscustomobject]@{ issueId='ISSUE-900-030'; decision='needs_repair'; findings=$invalidFindings; reviewedDiffHash=$request.diffSha256 }) -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256 | Out-Null
+    } catch { $invalidRepairRejected = $true }
+    if (!$invalidRepairRejected) { throw 'incomplete needs_repair finding was routed to the repair executor' }
+  }
   $blockedDisposition = Get-AutopilotReviewDisposition -ReviewResult ([pscustomobject]@{ decision='blocked'; findings=@() })
   if ($blockedDisposition.action -ne 'BLOCK') { throw 'blocked review was incorrectly made repairable' }
   $sandboxBlocked = [pscustomobject]@{ issueId='ISSUE-900-030'; decision='blocked'; findings=@([pscustomobject]@{ risk='orchestrator_helper_launch_failed: Windows sandbox 初始化失败 (os error 3)'; requiredEvidence='retry reviewer' }); reviewedDiffHash='unavailable' }
   if (!(Test-AutopilotReviewerSandboxFailure -ReviewResult $sandboxBlocked)) { throw 'Reviewer sandbox failure was not recognized' }
   $sandboxDisposition = Get-AutopilotReviewDisposition -ReviewResult $sandboxBlocked -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256
   if ($sandboxDisposition.action -ne 'BLOCK_TOOL') { throw 'Reviewer sandbox failure was not classified as tool_config' }
+  $structuredToolBlocked = New-AutopilotReviewerToolBlockedResult -RequestPath (Join-Path $root 'review-request.json') -ResultPath (Join-Path $root 'tool-blocked.json') -Reason 'sandbox initialization failed (os error 3)'
+  if ($structuredToolBlocked.decision -ne 'tool_blocked' -or (Get-AutopilotReviewDisposition -ReviewResult $structuredToolBlocked -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256).action -ne 'BLOCK_TOOL') { throw 'structured Reviewer tool block was not isolated from business repair' }
   if (Test-AutopilotCodeRepairAllowed -FailureCategory 'environment' -StopReason 'STOP_VERIFICATION_FAILED') { throw 'environment failure was routed to code repair' }
   if (!(Test-AutopilotCodeRepairAllowed -FailureCategory 'quality_security' -StopReason 'STOP_VERIFICATION_FAILED')) { throw 'quality failure lost bounded repair' }
 

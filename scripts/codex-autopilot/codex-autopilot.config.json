@@ -5,6 +5,22 @@
   "autopilotDir": "D:\\projects-test\\cgc-pms\\.codex-autopilot",
   "mode": "codex-desktop-automation",
   "controlPlane": "scripts\\codex-autopilot\\autopilot-run-continuous.ps1",
+  "controlPlaneCanary": {
+    "enabled": true,
+    "fingerprintPaths": [
+      "scripts/codex-autopilot/codex-autopilot.config.json",
+      "scripts/codex-autopilot/autopilot-run-continuous.ps1",
+      "scripts/codex-autopilot/autopilot-recover.ps1",
+      "scripts/codex-autopilot/autopilot-issue-checkpoint.ps1",
+      "scripts/codex-autopilot/autopilot-review.ps1",
+      "scripts/codex-autopilot/autopilot-closeout.ps1",
+      "scripts/codex-autopilot/autopilot-state.ps1",
+      "scripts/codex-autopilot/autopilot-task-score.ps1",
+      "plugins/cgc-pms-autopilot/schemas/issue-checkpoint.schema.json",
+      "plugins/cgc-pms-autopilot/schemas/review-result.schema.json",
+      "plugins/cgc-pms-autopilot/schemas/task-score.schema.json"
+    ]
+  },
   "continuousRunnerEntry": "scripts\\codex-autopilot\\autopilot-run-continuous.ps1",
   "autoMerge": true,
   "autoPush": false,
@@ -26,7 +42,10 @@
   },
   "taskScoring": {
     "enabled": true,
-    "candidateVersion": "autopilot-task-score/v1",
+    "candidateVersion": "autopilot-task-score/v2-candidate",
+    "candidateEnabled": false,
+    "candidateApprovalStatus": "NEEDS_CONFIRMATION",
+    "candidateEffectiveFrom": null,
     "activeVersion": "autopilot-task-score/v1",
     "approvalStatus": "APPROVED",
     "approvedAt": "2026-07-13T18:30:59.8101265+08:00",
@@ -37,6 +56,13 @@
       "zeroDanglingIssues": 25,
       "firstPassAcceptance": 20,
       "cycleEfficiency": 10,
+      "stockIssueReduction": 10
+    },
+    "candidateWeights": {
+      "deliveryCorrectness": 35,
+      "zeroDanglingIssues": 25,
+      "firstPassAcceptance": 20,
+      "taskExecutionEfficiency": 10,
       "stockIssueReduction": 10
     }
   },

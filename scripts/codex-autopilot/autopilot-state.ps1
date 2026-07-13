@@ -50,7 +50,16 @@ function ConvertTo-AutopilotStateV3 {
   $version = 0
   if ($State -is [System.Collections.IDictionary] -and $State.Contains('schemaVersion')) { $version = [int]$State['schemaVersion'] }
   elseif ($State.PSObject.Properties.Name -contains 'schemaVersion') { $version = [int]$State.schemaVersion }
-  if ($version -eq 3) { return $State }
+  if ($version -eq 3) {
+    foreach ($entry in @(
+      @('issueCheckpointPath',''), @('currentIssuePhase',''), @('lastCanaryFingerprint',''), @('lastCanaryReport','')
+    )) {
+      $name = [string]$entry[0]
+      $present = ($State -is [System.Collections.IDictionary] -and $State.Contains($name)) -or ($State.PSObject.Properties.Name -contains $name)
+      if (!$present) { Set-AutopilotProperty $State $name $entry[1] }
+    }
+    return $State
+  }
   if ($version -ne 2) { throw "Unsupported AutoPilot state schemaVersion: $version" }
 
   Set-AutopilotProperty $State 'schemaVersion' 3
@@ -71,6 +80,10 @@ function ConvertTo-AutopilotStateV3 {
   Set-AutopilotProperty $State 'lastRetrospectiveAt' $null
   Set-AutopilotProperty $State 'lastRetrospectiveReport' $null
   Set-AutopilotProperty $State 'activeScoringVersion' $null
+  Set-AutopilotProperty $State 'issueCheckpointPath' ''
+  Set-AutopilotProperty $State 'currentIssuePhase' ''
+  Set-AutopilotProperty $State 'lastCanaryFingerprint' ''
+  Set-AutopilotProperty $State 'lastCanaryReport' ''
   return $State
 }
 
@@ -84,7 +97,8 @@ function Assert-AutopilotState {
     'reviewCycleCompletedIssueIds','reviewCycleScoreKeys','reviewCycleCompletedCount','retrospectiveDue',
     'retrospectiveStatus','retrospectivePhase','retrospectiveRequiredAt','retrospectiveReportCommit',
     'retrospectiveFactsCommit','retrospectiveGraphGitCursor','retrospectiveEpisodeId',
-    'retrospectiveFailureCategory','lastRetrospectiveAt','lastRetrospectiveReport','activeScoringVersion'
+    'retrospectiveFailureCategory','lastRetrospectiveAt','lastRetrospectiveReport','activeScoringVersion',
+    'issueCheckpointPath','currentIssuePhase','lastCanaryFingerprint','lastCanaryReport'
   )
   foreach ($name in $required) {
     if ($State.PSObject.Properties.Name -notcontains $name -and !($State -is [System.Collections.IDictionary] -and $State.Contains($name))) {
@@ -128,7 +142,8 @@ function Read-AutopilotState {
   param([Parameter(Mandatory)][string]$Path)
   if (!(Test-Path -LiteralPath $Path -PathType Leaf)) { throw "AutoPilot state not found: $Path" }
   try { $state = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { throw "AutoPilot state is invalid JSON: $Path" }
-  if ([int]$state.schemaVersion -eq 2) {
+  $requiresShapeUpgrade = [int]$state.schemaVersion -eq 2 -or $state.PSObject.Properties.Name -notcontains 'issueCheckpointPath'
+  if ($requiresShapeUpgrade) {
     $state = ConvertTo-AutopilotStateV3 $state
     Write-AutopilotStateAtomic -Path $Path -State $state | Out-Null
   }

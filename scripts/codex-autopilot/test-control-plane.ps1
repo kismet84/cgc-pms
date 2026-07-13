@@ -49,6 +49,10 @@ if (!$config.taskScoring -or $config.taskScoring.enabled -ne $true -or $config.t
 $weights = $config.taskScoring.weights
 if ([int]$weights.deliveryCorrectness -ne 35 -or [int]$weights.zeroDanglingIssues -ne 25 -or [int]$weights.firstPassAcceptance -ne 20 -or [int]$weights.cycleEfficiency -ne 10 -or [int]$weights.stockIssueReduction -ne 10) { throw 'approved task scoring v1 weights changed unexpectedly' }
 if ($config.taskScoring.effectiveFrom -ne 'NEXT_NEW_IMPLEMENTATION_READY' -or !$config.taskScoring.approvalSource) { throw 'task scoring approval evidence or effective boundary is missing' }
+if ($config.taskScoring.candidateVersion -ne 'autopilot-task-score/v2-candidate' -or $config.taskScoring.candidateEnabled -ne $false -or $config.taskScoring.candidateApprovalStatus -ne 'NEEDS_CONFIRMATION') { throw 'v2 task execution efficiency candidate must remain disabled and unapproved' }
+$candidateWeights = $config.taskScoring.candidateWeights
+if ([int]$candidateWeights.deliveryCorrectness -ne 35 -or [int]$candidateWeights.zeroDanglingIssues -ne 25 -or [int]$candidateWeights.firstPassAcceptance -ne 20 -or [int]$candidateWeights.taskExecutionEfficiency -ne 10 -or [int]$candidateWeights.stockIssueReduction -ne 10) { throw 'v2 candidate weights must remain 35/25/20/10/10' }
+if (!$config.controlPlaneCanary -or $config.controlPlaneCanary.enabled -ne $true -or @($config.controlPlaneCanary.fingerprintPaths).Count -lt 5) { throw 'control-plane single-Issue canary gate is not enabled' }
 if (!$config.retrospective -or $config.retrospective.enabled -ne $true -or [int]$config.retrospective.threshold -ne 20) { throw 'approved retrospective config is invalid' }
 if (!(Test-AutopilotRetrospectiveActive -TaskScoringConfig $config.taskScoring -RetrospectiveConfig $config.retrospective)) { throw 'approved scoring and retrospective config did not activate together' }
 if ([int]$config.maxParallel -ne 1 -or [int]$config.maxParallelIssues -ne 1) { throw 'unattended rollout must start with maxParallel=1' }

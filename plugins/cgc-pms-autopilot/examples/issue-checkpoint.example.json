@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "issueId": "ISSUE-040-022",
+  "readyPath": "docs/backlog/ready-issues.md",
+  "readyContentHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "baseCommit": "0000000000000000000000000000000000000000",
+  "worktree": "D:\\projects-test\\cgc-pms\\.worktrees\\autopilot\\issue-040-022",
+  "branch": "codex/autopilot/issue-040-022",
+  "allowedPathsHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "forbiddenPathsHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "phase": "VALIDATED",
+  "createdAt": "2026-07-13T20:00:00+08:00",
+  "updatedAt": "2026-07-13T20:10:00+08:00",
+  "phaseStartedAt": "2026-07-13T20:10:00+08:00",
+  "lastHeartbeatAt": "2026-07-13T20:10:00+08:00",
+  "artifacts": { "issueDirectory": ".codex-autopilot/runs/example/ISSUE-040-022", "resultPath": ".codex-autopilot/runs/example/result.json", "evidencePaths": [], "reviewRequestPath": "", "reviewResultPath": "", "archiveReport": "docs/quality/example.md" },
+  "evidence": { "diffHash": "", "verificationDiffHash": "", "reviewDiffHash": "", "implementationCommit": "", "closeoutCommit": "" },
+  "metrics": { "implementationDispatchCount": 1, "validationDispatchCount": 1, "reviewDispatchCount": 0, "repairDispatchCount": 0, "closeoutDispatchCount": 0, "runResumeCount": 0, "phaseRestartCount": 0, "manualRecoveryCount": 0, "toolConfigBlockCount": 0, "environmentRetryCount": 0, "duplicateDispatchBlockedCount": 0, "wallClockSeconds": 600, "phaseDurationsSeconds": { "IMPLEMENTING": 500, "VALIDATING": 100 } },
+  "quarantineReason": null
+}

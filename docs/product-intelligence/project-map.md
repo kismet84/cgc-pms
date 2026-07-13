@@ -1,5 +1,12 @@
 # CGC-PMS 项目地图
 
+## 2026-07-13 增量：AutoPilot 跨 Run 阶段恢复与任务执行效率评分
+
+- 控制面新增原子 Issue phase checkpoint，绑定 Ready 内容、base、worktree/branch、scope、diff/evidence、阶段产物和派发指标；死进程接管不再删除有效 worktree 或重新派发 implementation，而是从 validation、Reviewer 或 closeout 的首个未完成阶段继续。
+- Reviewer 结果新增结构化 `tool_blocked` 路由。Windows sandbox/tool_config 失败只重试同一 diff 的 Reviewer，累计两次仍失败暂停当前 Issue；业务 `NEEDS_REPAIR` 继续要求完整 finding 并执行有界 repair。
+- v1 的35/25/20/10/10正式评分和历史记录保持不变；disabled `autopilot-task-score/v2-candidate` 将10分维度升级为 `taskExecutionEfficiency`，覆盖 `runResumeCount`、各阶段派发、人工恢复、工具重试与证据完整性。最终 shadow 仅写独立本地候选账本，v2 未经完整批准不进入正式 ledger 或20任务计数。
+- 控制面指纹覆盖行为配置并阻止未经单任务证明的 N>1/无界放量；真实金丝雀仍须用户明确执行 `启动迭代-1`，只有 closeout ledger、state 与知识图谱 Git cursor 全部读回才登记成功，不会由本主线自动启动。
+
 ## 2026-07-13 增量：系统菜单平铺列表管理员入口
 
 - `ISSUE-040-022` 在既有 admin-only `/system/permissions` 页面增加“菜单列表”只读入口，按需调用无 body、无 params 的 `GET /system/menus`，复用 `SysMenuVO[]`，关闭后重新打开会重新获取确定性快照。
