@@ -62,3 +62,14 @@ function Get-AutopilotWorktreeChanges {
     if ($raw -match '\s+->\s+') { ($raw -split '\s+->\s+')[-1].Trim('"') } elseif ($raw) { $raw.Trim('"') }
   } | Where-Object { $_ } | Select-Object -Unique)
 }
+
+function Get-AutopilotIssueChanges {
+  param(
+    [Parameter(Mandatory)][string]$Worktree,
+    [Parameter(Mandatory)][string]$BaseCommit
+  )
+
+  $committed = @(& git -C $Worktree diff --name-only $BaseCommit HEAD -- 2>$null)
+  if ($LASTEXITCODE -ne 0) { throw "failed to inspect committed issue changes from base: $BaseCommit" }
+  return @($committed + @(Get-AutopilotWorktreeChanges -Worktree $Worktree) | Where-Object { $_ } | ForEach-Object { ConvertTo-AutopilotPath $_ } | Select-Object -Unique)
+}

@@ -149,7 +149,8 @@ function Get-ChangedBusinessArtifacts {
     [string[]]$BeforeStatus,
     [string[]]$AfterStatus,
     [hashtable]$BeforeFingerprints,
-    [hashtable]$AfterFingerprints
+    [hashtable]$AfterFingerprints,
+    [string[]]$CommittedPaths = @()
   )
 
   $statusChanges = @($AfterStatus | Where-Object { $BeforeStatus -notcontains $_ })
@@ -159,11 +160,13 @@ function Get-ChangedBusinessArtifacts {
       $contentChanges += "content:$path"
     }
   }
+  $committedChanges = @($CommittedPaths | Where-Object { $_ -and -not (Test-ExcludedBusinessPath $_) } | ForEach-Object { "commit:$($_.Replace('\', '/'))" } | Select-Object -Unique)
 
   return [pscustomobject]@{
     statusChanges = $statusChanges
     contentChanges = $contentChanges
-    artifacts = @($statusChanges + $contentChanges)
+    committedChanges = $committedChanges
+    artifacts = @($statusChanges + $contentChanges + $committedChanges)
   }
 }
 
@@ -377,6 +380,7 @@ function Invoke-ConfiguredIssueExecutor {
 
   $promptPath = New-IssuePromptFile $Issue $RunDir
   $logPath = Join-Path $RunDir "executor.log"
+  $beforeHead = (& git -C $RepoRoot rev-parse HEAD 2>$null | Out-String).Trim()
   $before = @(Get-BusinessGitStatus @((Get-GitSummary $RepoRoot).statusShort))
   $beforeFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $before
   $args = @()
@@ -406,13 +410,19 @@ function Invoke-ConfiguredIssueExecutor {
   }
 
   $afterSummary = Get-GitSummary $RepoRoot
+  $afterHead = (& git -C $RepoRoot rev-parse HEAD 2>$null | Out-String).Trim()
+  $committedPaths = @()
+  if ($beforeHead -and $afterHead -and $beforeHead -ne $afterHead) {
+    $committedPaths = @(& git -C $RepoRoot diff --name-only $beforeHead $afterHead -- 2>$null)
+  }
   $after = @(Get-BusinessGitStatus @($afterSummary.statusShort))
   $afterFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $after
   $artifactChanges = Get-ChangedBusinessArtifacts `
     -BeforeStatus $before `
     -AfterStatus $after `
     -BeforeFingerprints $beforeFingerprints `
-    -AfterFingerprints $afterFingerprints
+    -AfterFingerprints $afterFingerprints `
+    -CommittedPaths $committedPaths
   $requireChangedFiles = if ($null -ne $executor.requireChangedFiles) { [bool]$executor.requireChangedFiles } else { $true }
   $logText = if (Test-Path $logPath) { Get-Content -Encoding UTF8 -Raw -LiteralPath $logPath } else { "" }
   $logTail = if (Test-Path $logPath) { @((Get-Content -Encoding UTF8 -Tail 40 -LiteralPath $logPath) -join "`n") } else { @() }

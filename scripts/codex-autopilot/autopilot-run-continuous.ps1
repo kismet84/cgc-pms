@@ -960,7 +960,7 @@ function Invoke-IssueExecutor {
   if (Test-Path -LiteralPath $resultPath) {
     $result = Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($result.status -eq 'done') {
-      $changes = @(Get-AutopilotWorktreeChanges -Worktree $worktree.path)
+      $changes = @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit)
       try {
         Assert-AutopilotAllowedChanges -ChangedPaths $changes -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
       } catch {
@@ -1005,10 +1005,10 @@ function Invoke-IssueExecutor {
           }
         }
       }
-      $effectiveRoute = Get-AutopilotRoute -Issue $Issue.contract -ChangedPaths @(Get-AutopilotWorktreeChanges -Worktree $worktree.path)
+      $effectiveRoute = Get-AutopilotRoute -Issue $Issue.contract -ChangedPaths @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit)
       if ($result.status -eq 'done') {
         try {
-          Assert-AutopilotAllowedChanges -ChangedPaths @(Get-AutopilotWorktreeChanges -Worktree $worktree.path) -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
+          Assert-AutopilotAllowedChanges -ChangedPaths @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit) -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
         } catch {
           $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
           $result | Add-Member -NotePropertyName scopeViolationCount -NotePropertyValue 1 -Force
@@ -1050,7 +1050,7 @@ function Invoke-IssueExecutor {
         }
       }
       if ($result.status -eq 'done') {
-        $finalChanges = @(Get-AutopilotWorktreeChanges -Worktree $worktree.path)
+        $finalChanges = @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit)
         try {
           Assert-AutopilotAllowedChanges -ChangedPaths $finalChanges -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
         } catch {

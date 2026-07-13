@@ -97,6 +97,10 @@ if ("$ExecutorMode" -ne "no-change") {
   New-Item -ItemType Directory -Path (Join-Path `$RepoRoot "docs\quality") -Force | Out-Null
   "executed `$IssueId with `$PromptPath" | Out-File -Encoding utf8 (Join-Path `$RepoRoot "docs\quality\mock-execution.txt")
 }
+if ("$ExecutorMode" -eq "commit") {
+  & git -C `$RepoRoot add docs/quality/mock-execution.txt
+  & git -C `$RepoRoot commit -qm "mock executor commit"
+}
 Write-Host "mock executor completed for `$IssueId"
 "@ | Out-File -Encoding utf8 (Join-Path $ScriptDir "mock-issue-executor.ps1")
   $Ready | Out-File -Encoding utf8 (Join-Path $BacklogDir "ready-issues.md")
@@ -810,6 +814,34 @@ try {
   if ($DirtyBeforeResult.failureCategory -ne "none") { throw "Expected pre-dirty executor failureCategory none. Actual: $($DirtyBeforeResult | ConvertTo-Json -Compress -Depth 8)" }
   if (!(($DirtyBeforeResult.validation | Where-Object { $_.name -eq "execution-artifacts" }).message -like "*docs/quality/mock-execution.txt*")) {
     throw "Expected isolated executor artifact to be recorded"
+  }
+
+  $CommittedRoot = New-Fixture -Name "executor-committed-change" -Enabled -ExecutorMode "commit" -Ready @"
+# Ready Issues
+
+### ISSUE-100-001：Runner executor committed change
+
+目标：
+- Executor success should recognize artifacts committed by the executor.
+允许修改：
+- ``docs/quality/**``
+禁止修改：
+- 生产发布
+验收标准：
+- Committed execution artifact is validated and remains in scope.
+状态：Ready
+来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 报表中心`` 节
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/issue-100-001.md``
+"@ -Plan "# Plan`n"
+  Assert-Contains (Invoke-Runner $CommittedRoot -Apply) "EXECUTOR_RESULT_WRITTEN"
+  $CommittedResult = Get-LatestResult $CommittedRoot
+  Assert-ResultSchema $CommittedResult
+  if ($CommittedResult.status -ne "done") { throw "Expected committed executor status done. Actual: $($CommittedResult | ConvertTo-Json -Compress -Depth 8)" }
+  if ($CommittedResult.failureCategory -ne "none") { throw "Expected committed executor failureCategory none" }
+  if (!(($CommittedResult.validation | Where-Object { $_.name -eq "execution-artifacts" }).message -like "*commit:docs/quality/mock-execution.txt*")) {
+    throw "Expected committed executor artifact to be recorded"
   }
 
   $NoExecutorConfig = Join-Path $TempRoot "no-executor.config.json"
