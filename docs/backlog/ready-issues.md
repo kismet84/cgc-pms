@@ -1041,3 +1041,58 @@ Reviewer要求：必须由独立 Reviewer 复核远端 run/job/step 证据、失
 - 未解除项已按前端质量、E2E、仓库治理三个责任域写入 `blocked-issues.md`；本 Issue 不越界修复或修改远端设置。
 - 正式证据：`docs/quality/ISSUE-037-021-CI-CD与上线门禁v1.5复验报告.md`。
 - Reviewer 结论：报告证据与失败分类通过复核；上线裁决仍为不通过 / 阻塞 / 不可上线。
+
+### ISSUE-040-019：系统菜单新建管理员入口与树约束
+
+优先级：P0
+任务性质：缺口修复
+类型：系统管理 / 前后端入口 / 权限 / 租户隔离 / 菜单树一致性
+状态：Ready
+来源锚点：`docs/backlog/current-issues.json` 的 `A-01-MENU-CREATE`；`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；`docs/product-intelligence/project-map.md`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-13-02` 与“后端接口无前端入口治理”决策卡
+存量标记：[stock:A-01-MENU-CREATE]
+关联产品目标：让管理员从既有权限清单页可达已经实现的菜单创建能力，关闭“后端存在但用户不可达”的 A-01 最小缺口，不扩展为菜单管理平台重构。
+阻塞证据：`SysMenuController.create` 已提供 `POST /system/menus` 并要求 ADMIN/SUPER_ADMIN 或 `system:menu:add`；`frontend-admin/src/api/modules/system.ts` 仅有菜单树 GET，`frontend-admin/src/pages/system/permissions/index.vue` 仅只读展示权限清单，当前没有同方法创建调用或新建交互；`SysMenuService.create` 虽强制当前租户，但尚未校验非根父菜单的同租户存在性、父节点类型和菜单类型枚举。
+解除条件：既有权限清单页提供受控的新建菜单入口，前端只向 `POST /system/menus` 发送最小合法载荷，后端保持精确授权并拒绝非法树关系；创建成功后刷新树，权限、租户和树结构正负样本全部通过。
+Migration：不需要
+依赖：复用既有 `/system/permissions` 管理员页面、`getMenuTree`、`SysMenuController.create`、`SysMenuService`、`UserContext` 与当前 `sys_menu` 表；不新增路由、菜单种子、表或权限码。
+风险等级：高
+运行态要求：自动化先在本地 dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，并从 dev-login 进入 `/system/permissions`；不得连接生产，创建或删除真实测试菜单前还必须满足 dev/test/demo、数据库 host 为 localhost/127.0.0.1 且存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`。
+Reviewer要求：独立复核 `system:menu:add` 与 ADMIN/SUPER_ADMIN 授权未放宽、无权限负样本为 403、租户 ID 不能由客户端覆盖、非根父节点必须属于当前租户且不能是 BUTTON、菜单类型仅允许 DIR/MENU/BUTTON、前端隐藏不替代后端门禁；结论直接用于通过/不通过裁决。
+归档报告：`docs/quality/ISSUE-040-019-系统菜单新建管理员入口验收报告.md`
+最小回滚：回退本 Issue 新增的前端创建交互/API/类型和后端树约束及对应测试；无 schema 回滚。若运行态产生测试菜单，仅在满足测试数据重置三项前置后删除该唯一测试记录。
+目标：
+- 在既有 `/system/permissions` 页面增加“新建菜单”最小入口与表单，复用当前菜单树选择父节点；只有 ADMIN/SUPER_ADMIN 或持有 `system:menu:add` 的用户可见并可提交。
+- 在 `frontend-admin/src/api/modules/system.ts` 增加类型化的 `POST /system/menus` 调用；创建成功后关闭表单并刷新菜单树，失败时不伪造成功状态。
+- 在后端创建路径补齐最小树约束：根节点统一使用 `parentId=0`；非根父节点必须存在于当前租户且不能是 BUTTON；`menuType` 只接受 DIR/MENU/BUTTON；继续强制以 `UserContext` 覆盖客户端 tenantId。
+非目标：
+- 不实现菜单编辑、删除、拖拽排序、批量授权、动态路由生成或完整菜单管理 CRUD。
+- 不新增页面路由、侧栏项、角色、权限码、数据库 migration 或种子数据，不修改已应用 migration。
+- 不重构 `SysMenu` 为全量 DTO，不修改角色授权、审计、登录或其他系统管理页面，不连接生产数据库或发布生产。
+允许修改：
+- `frontend-admin/src/api/modules/system.ts`
+- `frontend-admin/src/api/modules/__tests__/system-modules.test.ts`
+- `frontend-admin/src/types/system.ts`
+- `frontend-admin/src/pages/system/permissions/index.vue`
+- `frontend-admin/src/pages/system/permissions/__tests__/index.test.ts`
+- `backend/src/main/java/com/cgcpms/system/service/SysMenuService.java`
+- `backend/src/test/java/com/cgcpms/system/SysMenuControllerTest.java`
+- `backend/src/test/java/com/cgcpms/system/SysMenuServiceTest.java`
+- `docs/backlog/current-issues.json`、`docs/backlog/ready-issues.md`、`docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`、`docs/product-intelligence/evolution-decision.md`、`docs/quality/**`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/system/controller/SysMenuController.java`、`backend/src/main/java/com/cgcpms/system/entity/SysMenu.java`、`backend/src/main/java/com/cgcpms/system/mapper/**`
+- `backend/src/main/resources/db/migration/**`、`backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`、`frontend-admin/src/router/navigation.ts`、其他 `frontend-admin/src/pages/system/**`
+- `deploy/**`、`.github/**`、生产凭据、生产数据库、仓库外文件与受保护私有目录
+验收标准：
+- 前端 API 测试精确断言创建调用为 `POST /system/menus`，载荷不含 `id`、`tenantId`、审计字段或 children；权限清单页测试覆盖入口权限、必填校验、父节点选择、提交成功刷新与失败保留表单。
+- ADMIN/SUPER_ADMIN 或持有 `system:menu:add` 的请求可创建；既非管理员也无该权限的请求返回 403；前端可见性与后端授权分别有证据。
+- 根节点以 `parentId=0` 创建；非根父节点不存在、属于其他租户或类型为 BUTTON 时拒绝；非法 `menuType` 拒绝；合法同租户父节点创建成功且 `tenantId` 始终来自当前用户上下文。
+- 创建成功后重新获取菜单树，新节点只出现在选定父节点下；失败不刷新为成功态，不新增菜单编辑、删除或排序能力。
+- 收口时必须引用 `docs/backlog/current-issues.json` 和源报告；全部验证通过后移除 `A-01-MENU-CREATE`，或在未完全通过时以证据更新其唯一状态/分类，禁止 Done 后仍保留原 OPEN；同时更新 A-01 守恒计数、Ready/current-focus/project-map，并在归档报告统计新增后续项、关闭后续项、后续项净变化。
+- 后端专项、前端专项、类型检查和 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SysMenuControllerTest,SysMenuServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/system-modules.test.ts src/pages/system/permissions/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
