@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-14 增量：AutoPilot 控制面模块化与状态机瘦身
+
+- 第43条主线将原 1725 行连续 Runner 拆为薄入口、显式 RuntimeContext、run coordinator、Issue lifecycle、Executor supervisor、StageResult 和 transition writer；Ready、恢复、Reviewer、评分、stop/pause 与两阶段收口语义不变。
+- 活动 Issue 的 checkpoint 迁移现在由唯一 transition writer 校验合法边并读回 `transitionId + generation`；阶段执行结果采用结构化 `StageResult`，不再把自由文本作为阶段路由契约。
+- 原连续 Runner 场景矩阵保留为兼容测试，新增主题测试入口和确定性 Git fixture。真实 Ready 金丝雀仍是新控制面指纹允许 N>1/无界放量前的用户授权门。
+
 ## 2026-07-14 增量：AutoPilot PowerShell 7 与控制面一致性
 
 - AutoPilot 控制面固定使用 PowerShell 7 `pwsh`，不再支持 Windows PowerShell 5.1；普通临时 Git fixture 使用仓库本地换行规则，CRLF warning 专项 fixture 单独保留。

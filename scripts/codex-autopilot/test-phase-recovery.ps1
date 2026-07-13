@@ -12,6 +12,9 @@ try {
   & git -C $root init -q
   & git -C $root config user.email 'autopilot@test.local'
   & git -C $root config user.name 'AutoPilot Test'
+  & git -C $root config --local core.autocrlf false
+  & git -C $root config --local core.safecrlf false
+  [IO.File]::WriteAllText((Join-Path $root '.gitattributes'), "* text=auto eol=lf`n", [Text.UTF8Encoding]::new($false))
   ".worktrees/`r`n.codex-autopilot/" | Set-Content -LiteralPath (Join-Path $root '.gitignore') -Encoding UTF8
   "# Ready Issues`r`n`r`n### ISSUE-040-022：phase recovery`r`n`r`n状态：Ready`r`n" | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Encoding UTF8
   & git -C $root add .
@@ -20,7 +23,7 @@ try {
   $worktree = Join-Path $root '.worktrees\autopilot\issue-040-022'
   New-Item -ItemType Directory -Path (Split-Path -Parent $worktree) -Force | Out-Null
   & git -C $root worktree add -q -b codex/autopilot/issue-040-022 $worktree $base
-  & git -C $root config core.autocrlf true
+  & git -C $root config --local core.autocrlf false
   [IO.File]::WriteAllText((Join-Path $worktree 'implementation.txt'), "implementation`n", [Text.UTF8Encoding]::new($false))
   $issueDir = Join-Path $autoDir 'runs\old\ISSUE-040-022'
   New-Item -ItemType Directory -Path $issueDir -Force | Out-Null

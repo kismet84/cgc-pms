@@ -4,7 +4,15 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = (Resolve-Path (Join-Path $scriptDir '..\..')).Path
 $config = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
-$runnerSource = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'autopilot-run-continuous.ps1') -Raw
+$runnerSource = @(
+  'autopilot-run-continuous.ps1'
+  'autopilot-run-coordinator.ps1'
+  'autopilot-run-coordinator-support.ps1'
+  'autopilot-issue-lifecycle.ps1'
+  'autopilot-executor-supervisor.ps1'
+  'autopilot-runtime-context.ps1'
+  'autopilot-transition.ps1'
+) | ForEach-Object { Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir $_) -Raw } | Join-String -Separator "`n"
 . (Join-Path $scriptDir 'autopilot-command.ps1')
 . (Join-Path $scriptDir 'autopilot-task-score.ps1')
 
@@ -78,5 +86,7 @@ if ($output -notmatch 'preview-only') { throw "plugin runner did not explain the
 $readinessScript = Join-Path $scriptDir 'autopilot-readiness-check.ps1'
 $readiness = & pwsh -NoProfile -ExecutionPolicy Bypass -File $readinessScript -RepoRoot $repoRoot -ConfigPath (Join-Path $scriptDir 'codex-autopilot.config.json') -AllowStopped | ConvertFrom-Json
 if (!(($readiness.gates | Where-Object name -eq 'executor.realExecution').status -eq 'pass')) { throw 'bundled Codex CLI was not resolved for unattended execution' }
+if (!(($readiness.gates | Where-Object name -eq 'runner.capabilities').status -eq 'pass')) { throw 'modular runner capabilities were not detected by readiness' }
+if (!(($readiness.gates | Where-Object name -eq 'selfTest.coverage').status -eq 'pass')) { throw 'modular runner test coverage was not detected by readiness' }
 
 Write-Host 'control plane self-test passed'

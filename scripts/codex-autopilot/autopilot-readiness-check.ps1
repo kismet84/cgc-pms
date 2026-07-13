@@ -76,6 +76,16 @@ function Test-FileContains {
   return @($Patterns | Where-Object { $text -notmatch [regex]::Escape($_) })
 }
 
+function Test-FilesContain {
+  param([string[]]$Paths, [string[]]$Patterns)
+  $existingPaths = @($Paths | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+  if ($existingPaths.Count -ne $Paths.Count) {
+    return @($Patterns)
+  }
+  $text = ($existingPaths | ForEach-Object { Get-Content -Raw -Encoding UTF8 -LiteralPath $_ }) -join "`n"
+  return @($Patterns | Where-Object { $text -notmatch [regex]::Escape($_) })
+}
+
 function Test-CommandAvailable {
   param([string]$Command)
 
@@ -184,9 +194,17 @@ if (!(Test-Path $lockPath)) {
 }
 
 $runnerPath = Join-Path $scriptDir "autopilot-run-continuous.ps1"
-$runnerMissing = Test-FileContains $runnerPath @("New-RunLock", "Read-RunLock", "Test-RunLockStale", "Write-RunEvent", "Invoke-IssueExecutor", "ExplainNextAction")
+$runnerCapabilityPaths = @(
+  $runnerPath
+  (Join-Path $scriptDir 'autopilot-run-coordinator.ps1')
+  (Join-Path $scriptDir 'autopilot-run-coordinator-support.ps1')
+  (Join-Path $scriptDir 'autopilot-runtime-context.ps1')
+  (Join-Path $scriptDir 'autopilot-transition.ps1')
+  (Join-Path $scriptDir 'autopilot-issue-lifecycle.ps1')
+)
+$runnerMissing = Test-FilesContain $runnerCapabilityPaths @("New-RunLock", "Read-RunLock", "Test-RunLockStale", "Write-RunEvent", "Invoke-IssueExecutor", "ExplainNextAction")
 if ($runnerMissing.Count -eq 0) {
-  Add-Gate $gates "runner.capabilities" "pass" "Continuous runner contains lock, JSONL, executor handoff, and explain support." @{ path = $runnerPath }
+  Add-Gate $gates "runner.capabilities" "pass" "Continuous runner modules contain lock, JSONL, executor handoff, and explain support." @{ paths = $runnerCapabilityPaths }
 } else {
   Add-Gate $gates "runner.capabilities" "fail" "Continuous runner is missing required capabilities." @{ missing = $runnerMissing }
 }
@@ -252,9 +270,15 @@ if ($explain.ok) {
 }
 
 $testPath = Join-Path $scriptDir "test-continuous-runner.ps1"
-$testMissing = Test-FileContains $testPath @("Assert-ResultSchema", "Assert-EventSchema", "RUN_LOCK_ACTIVE", "STALE_RUN_LOCK_REMOVED", "EXPLAIN_NEXT_ACTION", "maxParallelIssues", "parallelBatchSize=3", "SERIAL_UNPROVEN_INDEPENDENCE")
+$testCapabilityPaths = @(
+  $testPath
+  (Join-Path $scriptDir 'tests\test-runner-compatibility.ps1')
+  (Join-Path $scriptDir 'tests\test-execution-modes.ps1')
+  (Join-Path $scriptDir 'tests\test-lock-and-fencing.ps1')
+)
+$testMissing = Test-FilesContain $testCapabilityPaths @("Assert-ResultSchema", "Assert-EventSchema", "RUN_LOCK_ACTIVE", "STALE_RUN_LOCK_REMOVED", "EXPLAIN_NEXT_ACTION", "maxParallelIssues", "parallelBatchSize=3", "SERIAL_UNPROVEN_INDEPENDENCE")
 if ($testMissing.Count -eq 0) {
-  Add-Gate $gates "selfTest.coverage" "pass" "Runner self-test covers result, event, lock, stale lock, explain, and parallel safety paths." @{ path = $testPath }
+  Add-Gate $gates "selfTest.coverage" "pass" "Runner self-test modules cover result, event, lock, stale lock, explain, and parallel safety paths." @{ paths = $testCapabilityPaths }
 } else {
   Add-Gate $gates "selfTest.coverage" "fail" "Runner self-test coverage is incomplete." @{ missing = $testMissing }
 }

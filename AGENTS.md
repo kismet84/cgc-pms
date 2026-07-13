@@ -17,6 +17,7 @@
 - AutoPilot 死进程恢复必须优先校验活动 Issue 的 durable phase checkpoint；Ready/base/worktree/branch/diff/evidence 一致时只从首个未完成的验证、Reviewer 或收口阶段继续，不得删除有效 worktree 后重新派发实现。Reviewer `tool_config` 重试耗尽只暂停 Reviewer；控制面指纹变化后 N>1/无界执行必须先通过用户启动的单任务金丝雀。
 - AutoPilot 控制面、子进程和测试入口统一使用 PowerShell 7 `pwsh`；缺失时归类为 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 并安全停止，不得回退到 Windows PowerShell 5.1。原生命令以退出码和命令契约裁决，stderr warning 仅作诊断证据。
 - AutoPilot 只有持有当前 `runInstanceId + leaseEpoch + controlPlaneFingerprint` fencing token 的 APPLY 实例可以派发、写状态或执行 Git 变更；CPU/心跳变化不算任务进度，进度只由工作区内容或 durable checkpoint/result/evidence 变化推进。
+- AutoPilot 各阶段统一返回可校验 `StageResult`，不得以自由文本路由；活动 Issue 的 checkpoint 阶段迁移只能经 `autopilot-transition.ps1`，并校验合法边、fencing、控制面指纹及 `transitionId + generation` 读回，state/checkpoint 底层模块不得自行决定业务阶段。
 - `autoPush=false` / `no push` 禁止自动推送；提交或 push 只可在用户明确授权且其他适用门禁通过后执行。
 - 修改代码后必须运行相关验证：后端至少跑相关测试/构建，前端至少跑类型检查/测试/构建中的相关项。
 - 不要修改已经应用过的 Flyway 迁移脚本；数据库结构变化必须新增版本化 migration。

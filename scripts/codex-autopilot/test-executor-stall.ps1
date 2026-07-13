@@ -12,7 +12,10 @@ New-Item -ItemType Directory -Path $backlog,$fixtureScripts,$autoDir -Force | Ou
 try {
   $defaults = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
   if ([int]$defaults.issueExecutor.stallInspectSeconds -ne 300 -or [int]$defaults.issueExecutor.stallTerminateSeconds -ne 600) { throw 'production stall thresholds must remain 300/600 seconds' }
-  $runnerText = Get-Content -Encoding UTF8 -LiteralPath $runner -Raw
+  $runnerText = @(
+    Get-Content -Encoding UTF8 -LiteralPath $runner -Raw
+    Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'autopilot-executor-supervisor.ps1') -Raw
+  ) -join "`n"
   if ($runnerText -notmatch '(?s)\$idleSeconds\s*=.*?Now\s+-ge\s+\$deadline.*?\$idleSeconds\s+-ge\s+\$StallTerminateSeconds') { throw 'issueExecutor total timeout must be checked before long-command stall exemption' }
   if ($runnerText -match 'Where-Object\s+executorPid\s+-eq\s+\$process\.Id') { throw 'retired executor identity must not use a cross-run PID-only tombstone' }
   $tick = [char]96

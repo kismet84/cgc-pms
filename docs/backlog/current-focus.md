@@ -1,5 +1,13 @@
 # Current Focus
 
+## 2026-07-14 第43条主线：AutoPilot 控制面模块化与状态机瘦身
+
+- 控制面入口已瘦身为参数、PowerShell 7 门禁和协调器调用；运行上下文、run 协调、Issue 生命周期、Executor 监管、阶段结果与 transition writer 已分离，外部命令行与第42-1安全语义保持兼容。
+- 阶段退出统一为可校验 `StageResult`；活动 Issue checkpoint 阶段变化只经 transition writer，合法边与 `transitionId + generation` 必须写后读回。底层 state/checkpoint 继续只承担模型和原子存储。
+- 连续 Runner 兼容矩阵保留，并新增执行模式、锁/fencing、恢复、semantic stall、Reviewer、closeout 等独立主题入口；普通临时 Git 仓库固定本地换行策略，CRLF warning 仅由原生命令专项场景制造。
+- readiness已按模块化布局组合扫描Runner能力和测试覆盖，启动前复验为15项通过、1项Ready为空警告、0项失败；Ready为空仍按知识图谱优先补货，不视为业务代码失败。
+- 本主线不自动运行真实 Ready。自动化验收通过后，控制面新指纹仍需用户另行明确启动一次 `启动迭代-1` 金丝雀；金丝雀未完成前，N>1/无界放量继续阻塞。
+
 ## 2026-07-14 第42-1条主线：AutoPilot 控制面一致性修复
 
 - 控制面实现与自动化回归已收敛到 PowerShell 7 `pwsh`；缺失时按 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 安全停止，不再回退 Windows PowerShell 5.1。原生命令按退出码裁决，stderr warning 只保留诊断。

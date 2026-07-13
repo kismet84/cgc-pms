@@ -7,6 +7,11 @@ if (!(Get-Command Read-AutopilotIssueCheckpoint -ErrorAction SilentlyContinue) -
   . $checkpointLibrary
 }
 
+$transitionLibrary = Join-Path $PSScriptRoot 'autopilot-transition.ps1'
+if (!(Get-Command Move-AutopilotIssuePhase -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $transitionLibrary)) {
+  . $transitionLibrary
+}
+
 function Get-AutopilotStallLevel {
   param([Parameter(Mandatory)][datetimeoffset]$LastProgressAt)
   $minutes = ([datetimeoffset]::Now - $LastProgressAt).TotalMinutes
@@ -139,7 +144,7 @@ function Get-AutopilotRecoveryDecision {
       if ($category -ne 'integrity_conflict') {
         return [pscustomobject]@{ action=$(if ($category -eq 'environment_prereq') { 'PAUSE_RECOVERY_ENVIRONMENT' } else { 'PAUSE_RECOVERY_TOOL_CONFIG' }); reason=$_.Exception.Message; failureCategory=$category; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; issueId=$checkpoint.issueId }
       }
-      try { Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase QUARANTINED -QuarantineReason $_.Exception.Message | Out-Null } catch {}
+      try { Move-AutopilotIssuePhase -Path $checkpointPath -Phase QUARANTINED -QuarantineReason $_.Exception.Message | Out-Null } catch {}
       return [pscustomobject]@{ action='QUARANTINE'; reason=$_.Exception.Message; failureCategory='integrity_conflict'; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; issueId=$checkpoint.issueId }
     }
     $action = if ($closeoutAlreadyMerged -and [string]$checkpoint.phase -ne 'CLOSED') { 'RESUME_FINALIZE' } else { switch ([string]$checkpoint.phase) {

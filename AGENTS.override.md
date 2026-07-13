@@ -218,6 +218,7 @@ CI 与验收失败分类规则：
 - 若连续 `2` 个 Issue 的后续项净变化均大于 `0`，连续模式必须暂停选择新的`能力新增`任务，先进入缺口修复、运维治理或阻塞核实，直到后续项总量不高于这两个 Issue 开始前的基线；不得通过改名、拆分、重复迁移载体规避止涨门槛
 - F 每次写 AutoPilot state / backlog 收口状态时，必须同步刷新 `lastHeartbeatAt`；若未刷新，不得把该次 state 写入视为最新心跳
 - AutoPilot 每个活动 Issue 必须维护原子阶段 checkpoint，并至少绑定 Ready 内容哈希、baseCommit、worktree/branch、范围哈希、diff/evidence 和阶段派发计数。死进程恢复时先核验 checkpoint；证据有效只从 validation、review 或 closeout 的首个未完成阶段继续，禁止删除 worktree 后重新派发 B/C。证据不一致进入 `QUARANTINE` 并保留现场；没有 durable checkpoint 的残留提交也不得猜测合并或自动重做。
+- AutoPilot 阶段处理器必须返回并通过校验的 `StageResult`，不得用自由文本决定下一阶段；活动 Issue 的 checkpoint 阶段迁移只能通过 `autopilot-transition.ps1` 的 transition writer，底层 state/checkpoint 模块只负责模型、序列化与原子存储。transition writer 必须校验合法边、fencing token、控制面指纹，并对 `transitionId + generation` 写后读回；恢复模块只能请求迁移，不得建立第二套状态机。
 - Reviewer `tool_config` 与业务 `NEEDS_REPAIR` 必须隔离：同一 diff 的 Reviewer 工具故障只允许一次跨 run 重试，第二次仍失败进入 `PAUSED/REVIEW_TOOL_BLOCKED`；不得触发 implementation executor。只有绑定同一 Issue/diff 且 finding 完整的 `NEEDS_REPAIR` 才允许有界 repair。
 - AutoPilot 任务评分只对已通过全部硬门禁、完成正式归档并产生不同的 `implementationCommit` 与 `closeoutCommit` 的实施型 Ready Issue 生效；评分绑定实施提交，评分收口提交与 closeout ledger 登记成功后才可计入回顾周期。低分只用于周期观测，不得改变 DONE 裁决、触发自动补修或抵消既有质量/安全门禁。
 - 评分配置必须区分 candidate 与 active；只有用户明确批准 `scoringVersion`、五维权重和生效时间后，才允许设置 `approvalStatus=APPROVED`、激活版本并增加正式回顾计数。未批准候选只能用于 disabled 回放和测试，不得写入正式累计。
