@@ -122,7 +122,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
-          version: 11
+          package_json_file: frontend-admin/package.json
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -150,7 +150,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
-          version: 11
+          package_json_file: frontend-admin/package.json
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -165,7 +165,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
-          version: 11
+          package_json_file: frontend-admin/package.json
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -188,7 +188,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
-          version: 11
+          package_json_file: frontend-admin/package.json
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -211,7 +211,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
         with:
-          version: 11
+          package_json_file: frontend-admin/package.json
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
@@ -341,7 +341,7 @@ jobs:
           cache: maven
       - uses: pnpm/action-setup@v6
         with:
-          version: 11
+          package_json_file: frontend-admin/package.json
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
