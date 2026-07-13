@@ -503,7 +503,7 @@ class AlertRuleEvaluator {
 
     private Map<Long, CtContract> batchLoadContracts(Set<Long> contractIds) {
         if (contractIds.isEmpty()) return Collections.emptyMap();
-        List<CtContract> contracts = ctContractMapper.selectBatchIds(contractIds);
+        List<CtContract> contracts = ctContractMapper.selectByIds(contractIds);
         return contracts.stream().collect(Collectors.toMap(CtContract::getId, c -> c));
     }
 }

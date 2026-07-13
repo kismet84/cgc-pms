@@ -147,7 +147,7 @@ public class CostSummaryService {
         Set<Long> subjectIds = itemsBySubject.keySet();
         Map<Long, String> subjectNameMap = Collections.emptyMap();
         if (!subjectIds.isEmpty()) {
-            List<CostSubject> subjects = costSubjectMapper.selectBatchIds(subjectIds);
+            List<CostSubject> subjects = costSubjectMapper.selectByIds(subjectIds);
             subjectNameMap = subjects.stream()
                     .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
         }
@@ -308,7 +308,7 @@ public class CostSummaryService {
         }
 
         // 1. Batch load projects
-        List<PmProject> projects = projectMapper.selectBatchIds(projectIds);
+        List<PmProject> projects = projectMapper.selectByIds(projectIds);
         Map<Long, PmProject> projectMap = projects.stream()
                 .filter(p -> Objects.equals(p.getTenantId(), tenantId))
                 .collect(Collectors.toMap(PmProject::getId, p -> p, (a, b) -> a));

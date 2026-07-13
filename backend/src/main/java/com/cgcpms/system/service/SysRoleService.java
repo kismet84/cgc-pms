@@ -156,7 +156,7 @@ public class SysRoleService {
 
     private Map<Long, SysMenu> loadMenus(List<Long> menuIds, Long tenantId) {
         if (menuIds.isEmpty()) return Map.of();
-        List<SysMenu> menus = sysMenuMapper.selectBatchIds(menuIds);
+        List<SysMenu> menus = sysMenuMapper.selectByIds(menuIds);
         Map<Long, SysMenu> menuMap = menus.stream()
                 .filter(menu -> tenantId.equals(menu.getTenantId()))
                 .collect(Collectors.toMap(SysMenu::getId, menu -> menu));

@@ -89,16 +89,16 @@ public class SubTaskService {
                 .collect(Collectors.toSet());
 
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
-                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                : pmProjectMapper.selectByIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         Map<Long, String> contractNames = contractIds.isEmpty() ? Map.of()
-                : ctContractMapper.selectBatchIds(contractIds).stream()
+                : ctContractMapper.selectByIds(contractIds).stream()
                         .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
         Map<Long, String> partnerNames = partnerIds.isEmpty() ? Map.of()
-                : mdPartnerMapper.selectBatchIds(partnerIds).stream()
+                : mdPartnerMapper.selectByIds(partnerIds).stream()
                         .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
         Map<Long, SubTask> predecessors = predecessorIds.isEmpty() ? Map.of()
-                : subTaskMapper.selectBatchIds(predecessorIds).stream()
+                : subTaskMapper.selectByIds(predecessorIds).stream()
                         .collect(Collectors.toMap(SubTask::getId, t -> t, (a, b) -> a));
 
         records.forEach(task -> validateStoredPredecessor(task, predecessors));

@@ -47,6 +47,9 @@ spring:
 minio:
   enabled: false
 
+virus-scan:
+  enabled: false
+
 # JWT
 jwt:
   # Must be provided explicitly for local/CI test runs.
@@ -66,6 +69,8 @@ logging:
     org.springframework.security: DEBUG
 
 auth:
+  token-blacklist:
+    enabled: false
   dev-login:
     enabled: true
     default-username: demo_dev_super_admin

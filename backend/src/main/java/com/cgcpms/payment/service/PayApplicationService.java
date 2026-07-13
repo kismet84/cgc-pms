@@ -134,13 +134,13 @@ public class PayApplicationService {
                 .collect(Collectors.toSet());
 
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
-                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                : pmProjectMapper.selectByIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         Map<Long, String> contractNames = contractIds.isEmpty() ? Map.of()
-                : ctContractMapper.selectBatchIds(contractIds).stream()
+                : ctContractMapper.selectByIds(contractIds).stream()
                         .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
         Map<Long, String> partnerNames = partnerIds.isEmpty() ? Map.of()
-                : mdPartnerMapper.selectBatchIds(partnerIds).stream()
+                : mdPartnerMapper.selectByIds(partnerIds).stream()
                         .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
 
         return page.convert(t -> toVO(t, projectNames, contractNames, partnerNames));
@@ -154,15 +154,15 @@ public class PayApplicationService {
 
         // Pre-fetch related name maps to avoid N+1 queries (same pattern as getPage)
         Map<Long, String> projectNames = app.getProjectId() != null
-                ? pmProjectMapper.selectBatchIds(Set.of(app.getProjectId())).stream()
+                ? pmProjectMapper.selectByIds(Set.of(app.getProjectId())).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a))
                 : Map.of();
         Map<Long, String> contractNames = app.getContractId() != null
-                ? ctContractMapper.selectBatchIds(Set.of(app.getContractId())).stream()
+                ? ctContractMapper.selectByIds(Set.of(app.getContractId())).stream()
                         .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a))
                 : Map.of();
         Map<Long, String> partnerNames = app.getPartnerId() != null
-                ? mdPartnerMapper.selectBatchIds(Set.of(app.getPartnerId())).stream()
+                ? mdPartnerMapper.selectByIds(Set.of(app.getPartnerId())).stream()
                         .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a))
                 : Map.of();
 
@@ -604,7 +604,7 @@ public class PayApplicationService {
                 .distinct()
                 .toList();
         if (ids.isEmpty()) return Map.of();
-        return matReceiptItemMapper.selectBatchIds(ids).stream()
+        return matReceiptItemMapper.selectByIds(ids).stream()
                 .collect(Collectors.toMap(MatReceiptItem::getId, Function.identity()));
     }
 
@@ -616,7 +616,7 @@ public class PayApplicationService {
                 .distinct()
                 .toList();
         if (ids.isEmpty()) return Map.of();
-        return subMeasureItemMapper.selectBatchIds(ids).stream()
+        return subMeasureItemMapper.selectByIds(ids).stream()
                 .collect(Collectors.toMap(SubMeasureItem::getId, Function.identity()));
     }
 
@@ -628,7 +628,7 @@ public class PayApplicationService {
                 .distinct()
                 .toList();
         if (receiptIds.isEmpty()) return Map.of();
-        return matReceiptMapper.selectBatchIds(receiptIds).stream()
+        return matReceiptMapper.selectByIds(receiptIds).stream()
                 .collect(Collectors.toMap(MatReceipt::getId, Function.identity()));
     }
 
@@ -640,7 +640,7 @@ public class PayApplicationService {
                 .distinct()
                 .toList();
         if (measureIds.isEmpty()) return Map.of();
-        return subMeasureMapper.selectBatchIds(measureIds).stream()
+        return subMeasureMapper.selectByIds(measureIds).stream()
                 .collect(Collectors.toMap(SubMeasure::getId, Function.identity()));
     }
 

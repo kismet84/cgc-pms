@@ -83,7 +83,7 @@ class TokenBlacklistServiceTest {
         /**
          * When StringRedisTemplate is not available as a Spring bean
          * (e.g., local/H2 profile without Redis), the TokenBlacklistService
-         * is not created at all (via @ConditionalOnBean).
+         * is represented by a service whose provider has no Redis template.
          *
          * Callers use ObjectProvider.getIfAvailable() and get null.
          * This test verifies the caller-side behavior pattern — that
@@ -108,16 +108,10 @@ class TokenBlacklistServiceTest {
         @Test
         @DisplayName("isBlacklisted 在 Redis 异常时返回 true 且不抛异常")
         void isBlacklistedReturnsTrueOnRedisException() throws Exception {
-            // Given a Redis connection that throws on operations
-            RedisConnectionFactory failingFactory = mock(RedisConnectionFactory.class);
-            RedisConnection failingConnection = mock(RedisConnection.class);
-            when(failingFactory.getConnection()).thenReturn(failingConnection);
-            when(failingConnection.isClosed()).thenReturn(false);
-            doThrow(new RuntimeException("Connection refused"))
-                    .when(failingConnection).exists(any(byte[].class));
-
-            StringRedisTemplate failingTemplate = new StringRedisTemplate(failingFactory);
-            failingTemplate.afterPropertiesSet();
+            // Given a template that exposes the same connection failure at the service boundary
+            StringRedisTemplate failingTemplate = mock(StringRedisTemplate.class);
+            when(failingTemplate.hasKey(anyString()))
+                    .thenThrow(new RuntimeException("Connection refused"));
 
             TokenBlacklistService service = new TokenBlacklistService(failingTemplate);
 
@@ -163,6 +157,30 @@ class TokenBlacklistServiceTest {
             assertFalse(output.getOut().contains("redis://"));
             assertFalse(output.getOut().contains("secret"));
             assertFalse(output.getOut().contains("redis.internal"));
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void enabledServiceFailsClosedWhenRedisBeanIsMissing() {
+            org.springframework.beans.factory.ObjectProvider<StringRedisTemplate> provider =
+                    mock(org.springframework.beans.factory.ObjectProvider.class);
+            TokenBlacklistService service = new TokenBlacklistService(provider, true);
+
+            assertTrue(service.isBlacklisted("token"));
+            assertFalse(service.blacklist("token", 1000L));
+            assertFalse(service.isAvailable());
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void explicitlyDisabledServiceBypassesRedisForLocalTests() {
+            org.springframework.beans.factory.ObjectProvider<StringRedisTemplate> provider =
+                    mock(org.springframework.beans.factory.ObjectProvider.class);
+            TokenBlacklistService service = new TokenBlacklistService(provider, false);
+
+            assertFalse(service.isBlacklisted("token"));
+            assertTrue(service.blacklist("token", 1000L));
+            assertFalse(service.isEnabled());
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.cgcpms.file.vo;
 
 public enum FileVirusScanStatus {
+    CLEAN("VIRUS_SCAN_CLEAN", "病毒扫描通过", true),
+    INFECTED("VIRUS_SCAN_INFECTED", "检测到恶意文件，已拒绝保存", false),
     NOT_SCANNED("VIRUS_SCAN_NOT_SCANNED", "文件尚未完成病毒扫描，未标记为安全检查通过", false),
     NOT_CONFIGURED("VIRUS_SCAN_NOT_CONFIGURED", "未接入病毒扫描能力，文件未标记为安全检查通过", false),
     FAILED("VIRUS_SCAN_FAILED", "病毒扫描失败，文件未标记为安全检查通过", false);

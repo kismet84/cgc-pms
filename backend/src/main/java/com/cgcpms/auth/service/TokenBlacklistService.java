@@ -1,15 +1,19 @@
 package com.cgcpms.auth.service;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 
 /**
- * Redis-backed token blacklist. Only active when StringRedisTemplate is available
- * (i.e. not in the local profile where Redis is excluded).
+ * Redis-backed token blacklist. The service is always registered so an enabled
+ * deployment cannot silently lose blacklist protection because Redis auto-configuration
+ * was evaluated later. Local/test profiles must disable it explicitly.
  *
  * <p>When Redis is unavailable, operations degrade safely:
  * <ul>
@@ -24,19 +28,43 @@ import java.time.Duration;
  */
 @Slf4j
 @Service
-@ConditionalOnBean(StringRedisTemplate.class)
 public class TokenBlacklistService {
 
     private static final String PREFIX = "token:blacklist:";
     private final StringRedisTemplate redisTemplate;
+    private final boolean enabled;
 
     public TokenBlacklistService(StringRedisTemplate redisTemplate) {
+        this(redisTemplate, true);
+    }
+
+    @Autowired
+    public TokenBlacklistService(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+                                 Environment environment) {
+        this(redisTemplateProvider.getIfAvailable(), environment.getProperty(
+                "auth.token-blacklist.enabled",
+                Boolean.class,
+                !environment.acceptsProfiles(Profiles.of("local", "test"))));
+    }
+
+    public TokenBlacklistService(ObjectProvider<StringRedisTemplate> redisTemplateProvider,
+                                 boolean enabled) {
+        this(redisTemplateProvider.getIfAvailable(), enabled);
+    }
+
+    private TokenBlacklistService(StringRedisTemplate redisTemplate, boolean enabled) {
         this.redisTemplate = redisTemplate;
+        this.enabled = enabled;
     }
 
     /** Blacklist a token using its last 32 chars as key, with given TTL. */
     public boolean blacklist(String token, long ttlMillis) {
+        if (!enabled) return true;
         if (ttlMillis <= 0) return true;
+        if (redisTemplate == null) {
+            log.warn("TOKEN_BLACKLIST_WRITE_FAILED: Redis模板不可用，令牌黑名单写入失败");
+            return false;
+        }
         String key = PREFIX + tokenKey(token);
         try {
             redisTemplate.opsForValue().set(key, "1", Duration.ofMillis(ttlMillis));
@@ -58,6 +86,11 @@ public class TokenBlacklistService {
      *         {@code false} only if Redis confirms the key does not exist.
      */
     public boolean isBlacklisted(String token) {
+        if (!enabled) return false;
+        if (redisTemplate == null) {
+            log.warn("TOKEN_BLACKLIST_CHECK_FAILED: Redis模板不可用，黑名单检查回退为拒绝（fail-close）");
+            return true;
+        }
         try {
             return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + tokenKey(token)));
         } catch (RuntimeException e) {
@@ -72,6 +105,7 @@ public class TokenBlacklistService {
      * Redis exception messages because they may contain connection details.
      */
     public boolean isAvailable() {
+        if (!enabled || redisTemplate == null) return false;
         try {
             redisTemplate.hasKey(PREFIX + "__health_probe__");
             return true;
@@ -80,6 +114,10 @@ public class TokenBlacklistService {
                     safeErrorType(e));
             return false;
         }
+    }
+
+    public boolean isEnabled() {
+        return enabled;
     }
 
     /**

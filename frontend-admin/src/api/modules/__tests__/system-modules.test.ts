@@ -8,7 +8,7 @@ vi.mock('@/api/request', () => ({
   request: mockRequest,
 }))
 
-import { getAlertList, markAlertRead, batchEvaluate } from '../alert'
+import { getAlertList, getAlertProcessingReport, markAlertRead, batchEvaluate } from '../alert'
 import {
   createDictData,
   createDictType,
@@ -64,6 +64,32 @@ describe('system-related API modules', () => {
     expect(mockRequest).toHaveBeenNthCalledWith(3, {
       url: '/alerts/batch-evaluate',
       method: 'post',
+    })
+  })
+
+  it('builds the alert processing report request from the active filter', () => {
+    getAlertProcessingReport({
+      pageNum: 1,
+      pageSize: 20,
+      projectId: 'p1',
+      alertDomain: 'PURCHASE',
+      severity: 'HIGH',
+      processStatus: 'OPEN',
+    })
+
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/alerts/processing-report',
+      method: 'get',
+      params: {
+        projectId: 'p1',
+        ruleType: undefined,
+        alertDomain: 'PURCHASE',
+        severity: 'HIGH',
+        isRead: undefined,
+        processStatus: 'OPEN',
+        triggeredStart: undefined,
+        triggeredEnd: undefined,
+      },
     })
   })
 

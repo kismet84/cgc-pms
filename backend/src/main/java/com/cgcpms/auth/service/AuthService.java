@@ -155,7 +155,7 @@ public class AuthService {
         List<Long> roleIds = userRoles.stream()
                 .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
                 .toList();
-        return sysRoleMapper.selectBatchIds(roleIds).stream()
+        return sysRoleMapper.selectByIds(roleIds).stream()
                 .map(SysRole::getRoleCode)
                 .collect(Collectors.toList());
     }
@@ -173,7 +173,7 @@ public class AuthService {
         List<Long> roleIds = userRoles.stream()
                 .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
                 .toList();
-        List<String> roleCodes = sysRoleMapper.selectBatchIds(roleIds).stream()
+        List<String> roleCodes = sysRoleMapper.selectByIds(roleIds).stream()
                 .map(SysRole::getRoleCode)
                 .toList();
         if (roleCodes.contains("SUPER_ADMIN") || roleCodes.contains("ADMIN")) {
@@ -196,7 +196,7 @@ public class AuthService {
                 .distinct()
                 .toList();
 
-        return sysMenuMapper.selectBatchIds(menuIds).stream()
+        return sysMenuMapper.selectByIds(menuIds).stream()
                 .map(SysMenu::getPerms)
                 .filter(p -> p != null && !p.isBlank())
                 .collect(Collectors.toList());

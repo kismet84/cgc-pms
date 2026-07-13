@@ -72,14 +72,14 @@ public class MatPurchaseRequestService {
         Set<Long> projectIds = records.stream().map(MatPurchaseRequest::getProjectId)
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
-                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                : pmProjectMapper.selectByIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
 
         // Batch-prefetch contract names to avoid N+1
         Set<Long> contractIds = records.stream().map(MatPurchaseRequest::getContractId)
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> contractNames = contractIds.isEmpty() ? Map.of()
-                : ctContractMapper.selectBatchIds(contractIds).stream()
+                : ctContractMapper.selectByIds(contractIds).stream()
                         .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
 
         IPage<MatPurchaseRequestVO> voPage = page.convert(r -> toVO(r, projectNames, contractNames));
@@ -113,7 +113,7 @@ public class MatPurchaseRequestService {
         Set<Long> materialIds = items.stream().map(MatPurchaseRequestItem::getMaterialId)
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> materialNames = materialIds.isEmpty() ? Map.of()
-                : mdMaterialMapper.selectBatchIds(materialIds).stream()
+                : mdMaterialMapper.selectByIds(materialIds).stream()
                         .collect(Collectors.toMap(MdMaterial::getId, MdMaterial::getMaterialName, (a, b) -> a));
         return items.stream().map(item -> toItemVO(item, materialNames)).collect(Collectors.toList());
     }

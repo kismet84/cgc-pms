@@ -140,9 +140,11 @@ services:
     #   - "6379:6379"
     volumes:
       - redis-data:/data
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD} ping || exit 1"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -184,6 +186,26 @@ services:
           memory: 512M
 
   # ===========================================================================
+  # ClamAV — real malware scanning, internal network only
+  # ===========================================================================
+  clamav:
+    image: clamav/clamav:1.4.3_base
+    container_name: cgc-pms-clamav
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 1 >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+    networks:
+      - cgc-pms-net
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+
+  # ===========================================================================
   # Backend — Spring Boot 3.3 Java 21 REST API (:8080)
   # ===========================================================================
   backend:
@@ -198,6 +220,8 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     environment:
       # ---- Spring profile ----
@@ -217,6 +241,10 @@ services:
       MINIO_ENDPOINT: "http://minio:9000"
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      # ---- Malware scan (fail closed) ----
+      VIRUS_SCAN_ENABLED: ${VIRUS_SCAN_ENABLED:-true}
+      VIRUS_SCAN_HOST: ${VIRUS_SCAN_HOST:-clamav}
+      VIRUS_SCAN_PORT: ${VIRUS_SCAN_PORT:-3310}
       # ---- JWT (MUST be set in .env for production) ----
       JWT_SECRET: ${JWT_SECRET}
       JASYPT_ENCRYPTOR_PASSWORD: ${JASYPT_ENCRYPTOR_PASSWORD}

@@ -20,6 +20,7 @@ const downloadUtilSource = readFileSync(resolve(currentDir, '../../../utils/down
 const {
   mockExportAlertAudit,
   mockGetAlertList,
+  mockGetAlertProcessingReport,
   mockGetAlertSubscription,
   mockUpdateAlertSubscription,
   mockDownloadBlobFile,
@@ -30,6 +31,7 @@ const {
 } = vi.hoisted(() => ({
   mockExportAlertAudit: vi.fn(),
   mockGetAlertList: vi.fn(),
+  mockGetAlertProcessingReport: vi.fn(),
   mockGetAlertSubscription: vi.fn(),
   mockUpdateAlertSubscription: vi.fn(),
   mockDownloadBlobFile: vi.fn(),
@@ -154,6 +156,7 @@ vi.mock('vue-router', () => ({
 vi.mock('@/api/modules/alert', () => ({
   exportAlertAudit: mockExportAlertAudit,
   getAlertList: mockGetAlertList,
+  getAlertProcessingReport: mockGetAlertProcessingReport,
   getAlertSubscription: mockGetAlertSubscription,
   updateAlertSubscription: mockUpdateAlertSubscription,
 }))
@@ -443,6 +446,13 @@ beforeEach(() => {
   mockRoute.query = {}
   mockRoute.meta = {}
   mockGetAlertList.mockResolvedValue(createPagedAlertResponse([]))
+  mockGetAlertProcessingReport.mockResolvedValue({
+    totalCount: 0,
+    unreadCount: 0,
+    readCount: 0,
+    severityCounts: {},
+    processStatusCounts: {},
+  })
   mockExportAlertAudit.mockResolvedValue(undefined)
   mockGetAlertSubscription.mockResolvedValue(buildSubscriptionResponse())
   mockUpdateAlertSubscription.mockResolvedValue(

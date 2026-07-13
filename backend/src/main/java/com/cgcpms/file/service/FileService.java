@@ -6,6 +6,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.config.MinioConfig;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.scan.VirusScanner;
 import com.cgcpms.file.vo.FileVirusScanStatus;
 import com.cgcpms.file.vo.SysFileVO;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -58,6 +59,7 @@ public class FileService {
     private final com.cgcpms.file.auth.BusinessObjectAuthorizer authorizer;
     private final RetryTemplate minioRetryTemplate;
     private final ObjectProvider<MeterRegistry> meterRegistryProvider;
+    private final VirusScanner virusScanner;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     /**
@@ -109,6 +111,7 @@ public class FileService {
         validateBusinessBindingParams(businessType, businessId);
         // 业务对象上传权限校验
         authorizer.checkUploadAccess(businessType, businessId);
+        scanOrReject(content);
 
         try {
             String originalName = vr.sanitizedName();
@@ -131,6 +134,9 @@ public class FileService {
             sysFile.setContentType(contentType);
             sysFile.setStoragePath(storagePath);
             sysFile.setBucketName(bucketName);
+            sysFile.setVirusScanStatus(FileVirusScanStatus.CLEAN.name());
+            sysFile.setVirusScanDetail(null);
+            sysFile.setVirusScannedAt(LocalDateTime.now());
             sysFileMapper.insert(sysFile);
 
             // Generate presigned URL for response
@@ -161,6 +167,7 @@ public class FileService {
         }
         // 业务对象读权限校验
         authorizer.checkReadAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
+        ensureDownloadAllowed(sysFile);
         try {
             return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath(), sysFile);
         } catch (Exception e) {
@@ -229,7 +236,9 @@ public class FileService {
         List<SysFile> files = sysFileMapper.selectList(wrapper);
 
         return files.stream()
-                .map(f -> toVO(f, genPresignedUrl(f.getBucketName(), f.getStoragePath(), f)))
+                .map(f -> toVO(f, isScanClean(f)
+                        ? genPresignedUrl(f.getBucketName(), f.getStoragePath(), f)
+                        : null))
                 .toList();
     }
 
@@ -262,6 +271,28 @@ public class FileService {
         if (!businessType.matches("[A-Za-z0-9_-]+")) {
             throw new BusinessException("FILE_PARAM_INVALID", "业务类型格式非法");
         }
+    }
+
+    private void scanOrReject(byte[] content) {
+        VirusScanner.ScanResult result = virusScanner.scan(content);
+        if (result.status() == VirusScanner.ScanResult.Status.CLEAN) {
+            return;
+        }
+        if (result.status() == VirusScanner.ScanResult.Status.INFECTED) {
+            log.warn("File upload rejected by virus scanner: threat={}", result.detail());
+            throw new BusinessException("FILE_VIRUS_DETECTED", "文件安全检查未通过，已拒绝上传");
+        }
+        throw new BusinessException("FILE_VIRUS_SCAN_UNAVAILABLE", "文件安全检查服务暂不可用，请稍后重试");
+    }
+
+    private void ensureDownloadAllowed(SysFile file) {
+        if (!isScanClean(file)) {
+            throw new BusinessException("FILE_VIRUS_SCAN_REQUIRED", "文件尚未通过安全检查，暂不可下载");
+        }
+    }
+
+    private boolean isScanClean(SysFile file) {
+        return FileVirusScanStatus.CLEAN.name().equals(file.getVirusScanStatus());
     }
 
     private void putObjectWithRetry(String bucketName, String storagePath, String contentType, byte[] content)
@@ -381,16 +412,24 @@ public class FileService {
         vo.setStoragePath(f.getStoragePath());
         vo.setBucketName(f.getBucketName());
         vo.setPresignedUrl(presignedUrl);
-        applyVirusScanPlaceholder(vo);
+        applyVirusScanStatus(f, vo);
         if (f.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(f.getCreatedAt()));
         return vo;
     }
 
-    private void applyVirusScanPlaceholder(SysFileVO vo) {
-        FileVirusScanStatus status = FileVirusScanStatus.NOT_CONFIGURED;
+    private void applyVirusScanStatus(SysFile file, SysFileVO vo) {
+        FileVirusScanStatus status;
+        try {
+            status = FileVirusScanStatus.valueOf(file.getVirusScanStatus());
+        } catch (Exception ignored) {
+            status = FileVirusScanStatus.NOT_SCANNED;
+        }
         vo.setVirusScanStatus(status.name());
         vo.setVirusScanCode(status.code());
-        vo.setVirusScanMessage(status.message());
+        String detail = file.getVirusScanDetail();
+        vo.setVirusScanMessage(detail == null || detail.isBlank()
+                ? status.message()
+                : status.message() + "（" + detail + "）");
         vo.setVirusScanPassed(status.passed());
     }
 }

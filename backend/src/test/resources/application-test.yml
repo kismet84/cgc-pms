@@ -19,6 +19,13 @@ spring:
 minio:
   enabled: false
 
+virus-scan:
+  enabled: false
+
+auth:
+  token-blacklist:
+    enabled: false
+
 jwt:
   # Override TEST_JWT_SECRET in CI environment
   secret: ${TEST_JWT_SECRET:__SET_TEST_JWT_SECRET_IN_ENV__}

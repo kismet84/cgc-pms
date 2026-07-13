@@ -6,6 +6,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.scan.VirusScanner;
 import com.cgcpms.file.service.FileService;
 import com.cgcpms.file.vo.FileVirusScanStatus;
 import com.cgcpms.file.vo.SysFileVO;
@@ -18,8 +19,8 @@ import io.minio.http.Method;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.AopTestUtils;
@@ -53,7 +54,7 @@ class FileServiceTest {
     @Autowired
     private FileService fileService;
 
-    @SpyBean
+    @MockitoSpyBean
     private SysFileMapper sysFileMapper;
 
     @Autowired
@@ -63,17 +64,21 @@ class FileServiceTest {
     private MeterRegistry meterRegistry;
 
     /** Mock MinIO client 避免真实网络连接 */
-    @MockBean
+    @MockitoBean
     private MinioClient minioClient;
 
     /** Mock 权限校验器，使 path traversal 测试可达 */
-    @MockBean
+    @MockitoBean
     private BusinessObjectAuthorizer authorizer;
+
+    @MockitoBean
+    private VirusScanner virusScanner;
 
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
-        clearInvocations(minioClient, authorizer);
+        when(virusScanner.scan(any(byte[].class))).thenReturn(VirusScanner.ScanResult.clean());
+        clearInvocations(minioClient, authorizer, virusScanner);
     }
 
     @AfterEach
@@ -350,8 +355,8 @@ class FileServiceTest {
     }
 
     @Test
-    @DisplayName("upload returns virus scan placeholder without marking legal file as safe scanned")
-    void testUploadReturnsVirusScanPlaceholderWithoutSafePass() throws Exception {
+    @DisplayName("upload persists a clean virus scan result before storage")
+    void testUploadPersistsCleanVirusScanResult() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "scan-placeholder.pdf", "application/pdf", "%PDF-1.4 scan placeholder".getBytes());
         String businessType = "SCAN_PLACEHOLDER";
@@ -361,18 +366,56 @@ class FileServiceTest {
 
         SysFileVO vo = fileService.upload(file, businessType, businessId);
 
-        assertEquals("NOT_CONFIGURED", vo.getVirusScanStatus());
-        assertEquals("VIRUS_SCAN_NOT_CONFIGURED", vo.getVirusScanCode());
-        assertFalse(Boolean.TRUE.equals(vo.getVirusScanPassed()));
-        assertTrue(vo.getVirusScanMessage().contains("未接入病毒扫描能力"));
-        assertFalse(vo.getVirusScanMessage().contains("安全通过"));
+        assertEquals("CLEAN", vo.getVirusScanStatus());
+        assertEquals("VIRUS_SCAN_CLEAN", vo.getVirusScanCode());
+        assertTrue(Boolean.TRUE.equals(vo.getVirusScanPassed()));
+        assertTrue(vo.getVirusScanMessage().contains("扫描通过"));
         assertEquals(1L, fileCountFor(businessType, businessId));
+        verify(virusScanner).scan(any(byte[].class));
         verify(minioClient).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("infected upload is rejected before MinIO and database persistence")
+    void testInfectedUploadFailsClosedBeforeStorage() throws Exception {
+        when(virusScanner.scan(any(byte[].class)))
+                .thenReturn(VirusScanner.ScanResult.infected("Eicar-Signature"));
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "infected.pdf", "application/pdf", "%PDF-1.4 EICAR".getBytes());
+        String businessType = "SCAN_INFECTED";
+        long businessId = Math.abs(System.nanoTime());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> fileService.upload(file, businessType, businessId));
+
+        assertEquals("FILE_VIRUS_DETECTED", error.getCode());
+        assertEquals(0L, fileCountFor(businessType, businessId));
+        verify(minioClient, never()).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
+    @DisplayName("scanner outage rejects upload before MinIO and database persistence")
+    void testScannerUnavailableFailsClosedBeforeStorage() throws Exception {
+        when(virusScanner.scan(any(byte[].class)))
+                .thenReturn(VirusScanner.ScanResult.unavailable("ConnectException"));
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "unavailable.pdf", "application/pdf", "%PDF-1.4 unavailable".getBytes());
+        String businessType = "SCAN_UNAVAILABLE";
+        long businessId = Math.abs(System.nanoTime());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> fileService.upload(file, businessType, businessId));
+
+        assertEquals("FILE_VIRUS_SCAN_UNAVAILABLE", error.getCode());
+        assertEquals(0L, fileCountFor(businessType, businessId));
+        verify(minioClient, never()).putObject(any(PutObjectArgs.class));
     }
 
     @Test
     @DisplayName("reserved virus scan statuses never imply safe pass")
     void testReservedVirusScanStatusesNeverPass() {
+        assertTrue(FileVirusScanStatus.CLEAN.passed());
+        assertFalse(FileVirusScanStatus.INFECTED.passed());
         assertFalse(FileVirusScanStatus.NOT_SCANNED.passed());
         assertFalse(FileVirusScanStatus.NOT_CONFIGURED.passed());
         assertFalse(FileVirusScanStatus.FAILED.passed());
@@ -701,6 +744,8 @@ class FileServiceTest {
         file.setContentType(contentType);
         file.setStoragePath(businessType + "/" + businessId + "/" + fileName);
         file.setBucketName("test-bucket");
+        file.setVirusScanStatus(FileVirusScanStatus.CLEAN.name());
+        file.setVirusScannedAt(java.time.LocalDateTime.now());
         sysFileMapper.insert(file);
         return file;
     }

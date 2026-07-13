@@ -16,9 +16,11 @@ import { useUserStore } from '@/stores/user'
 import {
   exportAlertAudit,
   getAlertList,
+  getAlertProcessingReport,
   getAlertSubscription,
   updateAlertSubscription,
   type AlertListParams,
+  type AlertProcessingReport,
   type AlertProcessStatus,
   type BatchAlertOperationResult,
 } from '@/api/modules/alert'
@@ -55,6 +57,7 @@ const subscriptionVisible = ref(false)
 const subscriptionLoading = ref(false)
 const subscriptionSaving = ref(false)
 const exportLoading = ref(false)
+const processingReport = ref<AlertProcessingReport | null>(null)
 const EXPORT_MAX_RECORDS = 1000
 const EXPORT_LIMIT_REACHED = Symbol('alert-export-limit-reached')
 const subscriptionState = ref<AlertSubscriptionResponse | null>(null)
@@ -424,7 +427,12 @@ async function fetchData() {
   listError.value = null
   await syncRouteQuery()
   try {
-    await store.fetchAlerts(buildAlertListParams())
+    const params = buildAlertListParams()
+    const [, report] = await Promise.all([
+      store.fetchAlerts(params),
+      getAlertProcessingReport(params),
+    ])
+    processingReport.value = report
     syncActiveRecordFromList()
   } catch (error) {
     console.error(error)
@@ -612,50 +620,38 @@ async function handleSaveActiveResult() {
   )
 }
 
-function isSameLocalDay(value: unknown, target = new Date()) {
-  const date = new Date(String(value ?? ''))
-  if (Number.isNaN(date.getTime())) return false
-  return (
-    date.getFullYear() === target.getFullYear() &&
-    date.getMonth() === target.getMonth() &&
-    date.getDate() === target.getDate()
-  )
-}
-
-const kpi = computed(() => {
-  const list = alerts.value
-  const open = list.filter((item) => String(item.processStatus ?? 'OPEN') === 'OPEN').length
-  const high = list.filter((item) => item.severity === 'HIGH').length
-  const today = list.filter((item) => isSameLocalDay(item.triggeredAt)).length
-  const archived = list.filter((item) => String(item.processStatus ?? '') === 'ARCHIVED').length
-  return { open, high, today, archived }
-})
+const kpi = computed(() => ({
+  total: processingReport.value?.totalCount ?? total.value,
+  unread: processingReport.value?.unreadCount ?? 0,
+  high: processingReport.value?.severityCounts?.HIGH ?? 0,
+  archived: processingReport.value?.processStatusCounts?.ARCHIVED ?? 0,
+}))
 
 const kpiCards = computed(() => [
   {
-    key: 'open',
-    titleCn: '待处理',
+    key: 'total',
+    titleCn: '预警总数',
     titleEn: '',
-    value: kpi.value.open,
-    hint: `较昨日 ${Math.max(kpi.value.high - kpi.value.today, 0)}`,
+    value: kpi.value.total,
+    hint: '当前筛选范围',
     icon: BellOutlined,
     tone: 'danger',
+  },
+  {
+    key: 'unread',
+    titleCn: '未读',
+    titleEn: '',
+    value: kpi.value.unread,
+    hint: `已读 ${processingReport.value?.readCount ?? 0}`,
+    icon: WarningOutlined,
+    tone: 'warning',
   },
   {
     key: 'high',
     titleCn: '高危',
     titleEn: '',
     value: kpi.value.high,
-    hint: `较昨日 ${Math.max(kpi.value.open - kpi.value.archived, 0)}`,
-    icon: WarningOutlined,
-    tone: 'warning',
-  },
-  {
-    key: 'today',
-    titleCn: '今日触发',
-    titleEn: '',
-    value: kpi.value.today,
-    hint: `当前页 ${alerts.value.length}`,
+    hint: '完整筛选结果',
     icon: ThunderboltOutlined,
     tone: 'primary',
   },

@@ -309,7 +309,7 @@ public class StlSettlementQueryService {
             return List.of();
         }
 
-        Map<Long, PayApplication> applicationsById = payApplicationMapper.selectBatchIds(
+        Map<Long, PayApplication> applicationsById = payApplicationMapper.selectByIds(
                         payRecords.stream()
                                 .map(PayRecord::getPayApplicationId)
                                 .filter(Objects::nonNull)
@@ -437,13 +437,13 @@ public class StlSettlementQueryService {
         Set<Long> partnerIds = records.stream().map(StlSettlement::getPartnerId).filter(Objects::nonNull).collect(Collectors.toSet());
 
         Map<Long, String> projectNames = projectIds.isEmpty() ? Collections.emptyMap()
-                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                : pmProjectMapper.selectByIds(projectIds).stream()
                 .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         Map<Long, String> contractNames = contractIds.isEmpty() ? Collections.emptyMap()
-                : ctContractMapper.selectBatchIds(contractIds).stream()
+                : ctContractMapper.selectByIds(contractIds).stream()
                 .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
         Map<Long, String> partnerNames = partnerIds.isEmpty() ? Collections.emptyMap()
-                : mdPartnerMapper.selectBatchIds(partnerIds).stream()
+                : mdPartnerMapper.selectByIds(partnerIds).stream()
                 .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
 
         return new StlSettlementAssembler.NameMaps(projectNames, contractNames, partnerNames);
@@ -457,7 +457,7 @@ public class StlSettlementQueryService {
         if (subjectIds.isEmpty()) {
             return Map.of();
         }
-        return costSubjectMapper.selectBatchIds(subjectIds).stream()
+        return costSubjectMapper.selectByIds(subjectIds).stream()
                 .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
     }
 

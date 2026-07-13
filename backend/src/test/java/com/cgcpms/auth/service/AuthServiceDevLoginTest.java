@@ -83,7 +83,7 @@ class AuthServiceDevLoginTest {
         when(sysUserRoleMapper.selectCount(any())).thenReturn(1L);
         when(sysUserMapper.selectById(defaultUser.getId())).thenReturn(defaultUser);
         when(sysUserRoleMapper.selectList(any())).thenReturn(List.of(userRole));
-        when(sysRoleMapper.selectBatchIds(any())).thenReturn(List.of(superAdminRole));
+        when(sysRoleMapper.selectByIds(any())).thenReturn(List.of(superAdminRole));
         when(sysMenuMapper.selectList(any())).thenReturn(List.of(
                 menu("inventory:transaction:add"),
                 menu("requisition:add"),

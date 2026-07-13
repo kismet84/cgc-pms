@@ -185,7 +185,7 @@ public class SysUserService {
 
         // Verify all roles belong to current tenant and validate role level
         if (roleIds != null && !roleIds.isEmpty()) {
-            List<SysRole> roles = sysRoleMapper.selectBatchIds(roleIds);
+            List<SysRole> roles = sysRoleMapper.selectByIds(roleIds);
             if (roles.size() != roleIds.size())
                 throw new BusinessException("ROLE_NOT_FOUND", "部分角色不存在");
             Long currentTenantId = UserContext.getCurrentTenantId();
@@ -245,7 +245,7 @@ public class SysUserService {
                 new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId, userIds));
         if (userRoles.isEmpty()) return Collections.emptyMap();
         List<Long> roleIds = userRoles.stream().map(SysUserRole::getRoleId).distinct().toList();
-        var roleMap = sysRoleMapper.selectBatchIds(roleIds).stream()
+        var roleMap = sysRoleMapper.selectByIds(roleIds).stream()
                 .collect(Collectors.toMap(SysRole::getId, SysRole::getRoleName));
         return userRoles.stream().collect(Collectors.groupingBy(
                 SysUserRole::getUserId,
@@ -267,7 +267,7 @@ public class SysUserService {
                 new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
         if (userRoles.isEmpty()) return Collections.emptyList();
         List<Long> roleIds = userRoles.stream().map(SysUserRole::getRoleId).toList();
-        return sysRoleMapper.selectBatchIds(roleIds).stream()
+        return sysRoleMapper.selectByIds(roleIds).stream()
                 .map(SysRole::getRoleName)
                 .collect(Collectors.toList());
     }

@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
  * Project overview aggregation service.
  * <p>
  * All sub-queries are batch (selectList with tenantId + projectId filter),
- * never per-row queries. User names are batch-loaded via selectBatchIds.
+ * never per-row queries. User names are batch-loaded via selectByIds.
  */
 @Slf4j
 @Service
@@ -147,7 +147,7 @@ public class ProjectOverviewService {
 
             Map<Long, SysUser> userMap = Collections.emptyMap();
             if (!userIds.isEmpty()) {
-                List<SysUser> users = sysUserMapper.selectBatchIds(userIds);
+                List<SysUser> users = sysUserMapper.selectByIds(userIds);
                 userMap = users.stream()
                         .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
             }

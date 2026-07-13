@@ -88,8 +88,8 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("local profile still allows explicit blacklist-service fallback")
-    void localAllowsBlacklistServiceFallback() throws Exception {
+    @DisplayName("local profile allows explicitly disabled blacklist service")
+    void localAllowsExplicitlyDisabledBlacklistService() throws Exception {
         JwtUtils jwtUtils = mock(JwtUtils.class);
         JwtProperties jwtProperties = mock(JwtProperties.class);
         CookieUtils cookieUtils = mock(CookieUtils.class);
@@ -111,8 +111,10 @@ class JwtAuthenticationFilterTest {
                 .build());
         when(blacklistProvider.getIfAvailable()).thenReturn(null);
 
+        MockEnvironment localEnvironment = env("local");
+        localEnvironment.setProperty("auth.token-blacklist.enabled", "false");
         ExposedJwtAuthenticationFilter localFilter = new ExposedJwtAuthenticationFilter(
-                jwtUtils, jwtProperties, cookieUtils, new ObjectMapper(), blacklistProvider, env("local"));
+                jwtUtils, jwtProperties, cookieUtils, new ObjectMapper(), blacklistProvider, localEnvironment);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/protected");
         request.setServletPath("/protected");
         request.addHeader("Authorization", "Bearer local-token");
