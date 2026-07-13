@@ -12,4 +12,5 @@
 - [第40条主线 M0：历史阻塞状态归一化验收报告](mainline-40-m0-historical-blocker-normalization-acceptance-2026-07-13.md)
 - [ISSUE-040-001：预警批量评估独立权限码修复验收报告](ISSUE-040-001-预警批量评估独立权限码修复验收报告.md)
 - [ISSUE-040-018：AutoPilot 存量问题优先补货机制验收报告](ISSUE-040-018-AutoPilot存量问题优先补货机制验收报告.md)
+- [AutoPilot Codex stdin 启动参数修复验收报告](autopilot-codex-stdin-launcher-fix-2026-07-13.md)
 - [ISSUE-040-002～006：M1 五项历史风险复验与修复验收报告](ISSUE-040-002-006-M1五项历史风险复验与修复验收报告.md)

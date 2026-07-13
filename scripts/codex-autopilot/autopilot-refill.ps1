@@ -160,6 +160,7 @@ an aggregate parent with children, or an evidence-incomplete item into Ready. Ne
 Return JSON matching $SchemaPath.
 "@
   $args = @('exec','--ephemeral','--sandbox','danger-full-access','--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$RepoRoot,'--output-schema',$SchemaPath,'--output-last-message',$OutputPath,'-')
+  $args = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments $args)
   $startInfo = [Diagnostics.ProcessStartInfo]::new(); $startInfo.FileName = $codex.fileName
   $startInfo.Arguments = (@($codex.argumentPrefix) + $args | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
   $startInfo.WorkingDirectory = $RepoRoot; $startInfo.UseShellExecute = $false; $startInfo.RedirectStandardInput = $true; $startInfo.RedirectStandardOutput = $true; $startInfo.RedirectStandardError = $true

@@ -6,6 +6,11 @@ $repoRoot = (Resolve-Path (Join-Path $scriptDir '..\..')).Path
 $config = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
 . (Join-Path $scriptDir 'autopilot-command.ps1')
 
+$normalizedStdinArgs = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments @('exec','--ephemeral','-'))
+if ($normalizedStdinArgs.Count -ne 2 -or $normalizedStdinArgs[-1] -ne '--ephemeral') { throw 'redirected stdin arguments must omit the trailing Codex prompt marker' }
+$unchangedArgs = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments @('exec','--help'))
+if (($unchangedArgs -join '|') -ne 'exec|--help') { throw 'Codex arguments without a trailing stdin marker must remain unchanged' }
+
 if ($env:OS -eq 'Windows_NT') {
   $codexInvocation = Resolve-AutopilotCodexInvocation
   if ([IO.Path]::GetFileName($codexInvocation.fileName) -notin @('powershell.exe','powershell')) { throw "AutoPilot must use the PowerShell host for the npm Codex shim on Windows, actual=$($codexInvocation.fileName)" }

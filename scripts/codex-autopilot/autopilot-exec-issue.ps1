@@ -271,9 +271,14 @@ function Invoke-ExecutorProcess {
   } else {
     [pscustomobject]@{ fileName = Resolve-ExecutorCommand $Command; argumentPrefix = @() }
   }
+  $effectiveArguments = if ($Command -match '^codex(?:\.exe|\.cmd|\.ps1)?$') {
+    @(Get-AutopilotCodexRedirectedStdinArguments -Arguments $Arguments)
+  } else {
+    @($Arguments)
+  }
   $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
   $startInfo.FileName = $invocation.fileName
-  $startInfo.Arguments = (@($invocation.argumentPrefix) + @($Arguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
+  $startInfo.Arguments = (@($invocation.argumentPrefix) + @($effectiveArguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
   $startInfo.WorkingDirectory = $WorkingDirectory
   $startInfo.UseShellExecute = $false
   $startInfo.RedirectStandardOutput = $true
@@ -306,7 +311,7 @@ function Invoke-ExecutorProcess {
   $logLines = @(
     "executor.startedAt=$startedAt"
     "executor.command=$($startInfo.FileName)"
-    "executor.args=$($Arguments -join ' ')"
+    "executor.args=$($effectiveArguments -join ' ')"
     "executor.cwd=$WorkingDirectory"
     "executor.timeoutSeconds=$TimeoutSeconds"
     "executor.timedOut=$timedOut"
