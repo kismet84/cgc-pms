@@ -9,6 +9,11 @@ public class SubTaskVO {
     private String projectId;
     private String contractId;
     private String partnerId;
+    private String predecessorTaskId;
+    private String predecessorTaskName;
+    private String predecessorStatus;
+    private String predecessorPlannedEndDate;
+    private String predecessorActualEndDate;
     private String taskCode;
     private String taskName;
     private String workArea;

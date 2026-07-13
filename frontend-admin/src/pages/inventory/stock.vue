@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
+import { useUserStore } from '@/stores/user'
 import {
   useStockLedger,
   TXN_TYPE_COLOR,
@@ -18,6 +19,7 @@ import StockTxnDetailDrawer from './components/StockTxnDetailDrawer.vue'
 import StockAnalysisPanel from './components/StockAnalysisPanel.vue'
 
 const referenceStore = useReferenceStore()
+const userStore = useUserStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -26,6 +28,10 @@ const {
   loading,
   listError,
   stock,
+  safetyThresholdDraft,
+  replenishmentTargetDraft,
+  replenishmentLeadDaysDraft,
+  thresholdSaving,
   txnList,
   txnTotal,
   txnPageNo,
@@ -42,8 +48,6 @@ const {
   detailItem,
   showDetail,
   closeDetail,
-  fetchKpi,
-  fetchWarehouses,
   handleSearch,
   handleReset,
   onProjectChange,
@@ -55,12 +59,20 @@ const {
   kpiMax,
   kpiPct,
   lowStockWarn,
+  handleReplenish,
+  handleReplenishmentSettingsSave,
   inOutStats,
   visibleGridColumns,
   showEmptyState,
   hasActiveFilters,
   init,
 } = useStockLedger({ route, router })
+
+const canEditStock = computed(
+  () =>
+    userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role)) ||
+    userStore.hasPermission('inventory:stock:edit'),
+)
 
 // ---- 移动端检测 ----
 const MOBILE_BP = 768
@@ -125,6 +137,49 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </span>
             </div>
             <div>
+              <span style="font-size: 13px; color: var(--text-secondary)">安全库存阈值：</span>
+              <a-input-number
+                v-model:value="safetyThresholdDraft"
+                :min="0"
+                :precision="4"
+                :disabled="!canEditStock"
+                style="width: 140px"
+              />
+            </div>
+            <div>
+              <span style="font-size: 13px; color: var(--text-secondary)">人工补货目标量：</span>
+              <a-input-number
+                v-model:value="replenishmentTargetDraft"
+                :min="0"
+                :precision="4"
+                :disabled="!canEditStock"
+                placeholder="未填则补到安全阈值"
+                style="width: 180px"
+              />
+            </div>
+            <div>
+              <span style="font-size: 13px; color: var(--text-secondary)"
+                >人工补货提前期（自然日）：</span
+              >
+              <a-input-number
+                v-model:value="replenishmentLeadDaysDraft"
+                :min="0"
+                :max="3650"
+                :precision="0"
+                :disabled="!canEditStock"
+                placeholder="未填则不预填日期"
+                style="width: 180px"
+              />
+              <a-button
+                v-if="canEditStock"
+                type="link"
+                :loading="thresholdSaving"
+                @click="handleReplenishmentSettingsSave"
+              >
+                保存
+              </a-button>
+            </div>
+            <div>
               <span style="font-size: 13px; color: var(--text-secondary)">物料：</span>
               <span style="font-weight: 600">
                 {{ stock.materialName || getMaterialName(stock.materialId) }}
@@ -183,6 +238,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             :loading="loading"
             :grid-columns="visibleGridColumns"
             :fmt-qty="fmtQty"
+            :safety-stock-qty="Number(stock?.safetyStockQty ?? 0)"
             @sort-change="handleSortChange"
             @show-detail="showDetail"
           />
@@ -226,7 +282,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
                   <span class="lg-card-label">变动后余量</span>
                   <span
                     class="lg-card-value lg-card-money"
-                    :style="{ color: Number(row.availableAfter) < 10 ? '#ef4444' : 'var(--text)' }"
+                    :style="{
+                      color:
+                        Number(row.availableAfter) < Number(stock?.safetyStockQty ?? 0)
+                          ? '#ef4444'
+                          : 'var(--text)',
+                    }"
                   >
                     {{ fmtQty(row.availableAfter) }}
                   </span>
@@ -278,7 +339,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
 
       <!-- 右侧分析面板 -->
-      <StockAnalysisPanel :low-stock-warn="lowStockWarn" :kpi="kpi" :in-out-stats="inOutStats" />
+      <StockAnalysisPanel
+        :low-stock-warn="lowStockWarn"
+        :kpi="kpi"
+        :in-out-stats="inOutStats"
+        @replenish="handleReplenish"
+      />
     </div>
   </div>
 </template>

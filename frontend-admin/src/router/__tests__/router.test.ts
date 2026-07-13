@@ -102,6 +102,14 @@ describe('router lazy loading', () => {
     expect(typeof cashJournalRoute?.component).toBe('function')
   })
 
+  it('registers the site daily log route with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const dailyRoute = rootRoute?.children?.find((c) => c.path === 'site/daily-log')
+    expect(dailyRoute?.name).toBe('SiteDailyLog')
+    expect(typeof dailyRoute?.component).toBe('function')
+    expect(router.resolve('/site/daily-log').meta.permission).toBe('site:daily:query')
+  })
+
   it.each([
     ['/cash-journal', 'cashbook:journal:query'],
     ['/contract/ledger', 'contract:query'],
@@ -298,17 +306,20 @@ describe('router lazy loading', () => {
     ['/cash-journal', ['payment:app:query']],
     ['/approval/process', ['workflow:task:query']],
     ['/dashboard', ['alert:view']],
-  ])('navigates a logged-in unauthorized user from %s to the Forbidden route', async (path, permissions) => {
-    const userStore = useUserStore()
-    userStore.setUserInfo(buildUserInfo({ roles: ['USER'], permissions }))
-    const testRouter = createRouter({ history: createMemoryHistory(), routes })
-    testRouter.beforeEach(handleAuthGuard)
+  ])(
+    'navigates a logged-in unauthorized user from %s to the Forbidden route',
+    async (path, permissions) => {
+      const userStore = useUserStore()
+      userStore.setUserInfo(buildUserInfo({ roles: ['USER'], permissions }))
+      const testRouter = createRouter({ history: createMemoryHistory(), routes })
+      testRouter.beforeEach(handleAuthGuard)
 
-    await testRouter.push(path)
+      await testRouter.push(path)
 
-    expect(testRouter.currentRoute.value.name).toBe('Forbidden')
-    expect(testRouter.currentRoute.value.path).toBe('/403')
-  })
+      expect(testRouter.currentRoute.value.name).toBe('Forbidden')
+      expect(testRouter.currentRoute.value.path).toBe('/403')
+    },
+  )
 
   it('allows a logged-in user to enter the permission-free Forbidden route without a redirect loop', async () => {
     const userStore = useUserStore()
@@ -322,16 +333,28 @@ describe('router lazy loading', () => {
     expect(testRouter.currentRoute.value.meta.permission).toBeUndefined()
   })
 
-  it.each(['ADMIN', 'SUPER_ADMIN'])('allows %s through a protected route without a duplicated permission grant', async (role) => {
-    const userStore = useUserStore()
-    userStore.setUserInfo(buildUserInfo({ roles: [role], permissions: [] }))
+  it.each(['ADMIN', 'SUPER_ADMIN'])(
+    'allows %s through a protected route without a duplicated permission grant',
+    async (role) => {
+      const userStore = useUserStore()
+      userStore.setUserInfo(buildUserInfo({ roles: [role], permissions: [] }))
 
-    const result = await handleAuthGuard({
-      path: '/cash-journal',
-      fullPath: '/cash-journal',
-      meta: { permission: 'cashbook:journal:query' },
-    } as never)
+      const result = await handleAuthGuard({
+        path: '/cash-journal',
+        fullPath: '/cash-journal',
+        meta: { permission: 'cashbook:journal:query' },
+      } as never)
 
-    expect(result).toBe(true)
+      expect(result).toBe(true)
+    },
+  )
+})
+
+describe('inventory permission contracts', () => {
+  it('uses the same list permissions as inventory menus and backend controllers', () => {
+    expect(router.resolve('/inventory/stock').meta.permission).toBe('inventory:stock:list')
+    expect(router.resolve('/inventory/purchase-request').meta.permission).toBe(
+      'purchase:request:list',
+    )
   })
 })

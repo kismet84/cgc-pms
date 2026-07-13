@@ -24,7 +24,11 @@ import {
 import type { PageParams, PageResult } from '@/types/api'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import { useUserStore } from '@/stores/user'
 import {
   canAccessWorkflowBusinessEntry,
@@ -112,8 +116,7 @@ function hydrateFromRouteQuery() {
   filterInstanceStatus.value = readStringQuery(route.query.instanceStatus) ?? ''
   const startTime = readStringQuery(route.query.startTime)
   const endTime = readStringQuery(route.query.endTime)
-  filterTimeRange.value =
-    startTime && endTime ? [dayjs(startTime), dayjs(endTime)] : null
+  filterTimeRange.value = startTime && endTime ? [dayjs(startTime), dayjs(endTime)] : null
   pageNo.value = readPositiveIntQuery(route.query.pageNo, 1)
   pageSize.value = readPositiveIntQuery(route.query.pageSize, 20)
 }

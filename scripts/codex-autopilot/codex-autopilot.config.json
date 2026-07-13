@@ -1,6 +1,6 @@
 {
   "repoRoot": "D:\\projects-test\\cgc-pms",
-  "baseBranch": "master",
+  "baseBranch": "develop/1.5",
   "worktreeRoot": "D:\\projects-test\\cgc-pms\\.worktrees",
   "autopilotDir": "D:\\projects-test\\cgc-pms\\.codex-autopilot",
   "mode": "codex-desktop-automation",

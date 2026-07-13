@@ -256,12 +256,19 @@ class TenantBoundaryTask2Test {
     }
 
     @Test
-    @DisplayName("T-BOUND-6: SubTask create ignores client-supplied tenantId")
+    @DisplayName("T-BOUND-6: SubTask create ignores client tenantId and rejects cross-tenant project")
     void testSubTaskCreateIgnoresClientTenantId() {
         TestUserContext.setAdmin(TENANT_A, USER_A);
+        SubTask crossTenantTask = new SubTask();
+        crossTenantTask.setTaskName("跨租户项目分包任务");
+        crossTenantTask.setProjectId(tenantBProjectId);
+        crossTenantTask.setStatus("NOT_STARTED");
+        crossTenantTask.setTenantId(TENANT_B);
+        assertThrows(BusinessException.class, () -> subTaskService.create(crossTenantTask));
+
         SubTask task = new SubTask();
         task.setTaskName("租户A分包任务");
-        task.setProjectId(tenantBProjectId); // project is tenant B
+        task.setProjectId(10001L);
         task.setStatus("NOT_STARTED");
         // Client tries to inject tenant B
         task.setTenantId(TENANT_B);

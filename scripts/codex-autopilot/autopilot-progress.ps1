@@ -44,3 +44,28 @@ function Get-AutopilotProgressFingerprint {
   $sha = [Security.Cryptography.SHA256]::Create()
   try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($source)))).Replace('-', '') } finally { $sha.Dispose() }
 }
+
+function Get-AutopilotActiveLongCommand {
+  param([int]$RootPid, [object[]]$Declarations, [datetimeoffset]$StartedAt)
+  if ($RootPid -le 0 -or @($Declarations).Count -eq 0) { return $null }
+  $rows = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue)
+  $descendants = [Collections.Generic.HashSet[int]]::new()
+  [void]$descendants.Add($RootPid)
+  $changed = $true
+  while ($changed) {
+    $changed = $false
+    foreach ($row in $rows) {
+      if ($descendants.Contains([int]$row.ParentProcessId) -and $descendants.Add([int]$row.ProcessId)) { $changed = $true }
+    }
+  }
+  foreach ($declaration in @($Declarations)) {
+    $expectedSeconds = [int]$declaration.expectedSeconds
+    if ($expectedSeconds -le 600) { continue }
+    $command = [string]$declaration.command
+    $match = $rows | Where-Object { $_.ProcessId -ne $RootPid -and $descendants.Contains([int]$_.ProcessId) -and $_.CommandLine -and $_.CommandLine.IndexOf($command, [StringComparison]::OrdinalIgnoreCase) -ge 0 } | Select-Object -First 1
+    if ($match -and ([datetimeoffset]::Now - [datetimeoffset]$match.CreationDate).TotalSeconds -lt $expectedSeconds) {
+      return [pscustomobject]@{ command = $command; expectedSeconds = $expectedSeconds; processId = [int]$match.ProcessId }
+    }
+  }
+  return $null
+}

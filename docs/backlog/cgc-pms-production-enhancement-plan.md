@@ -211,7 +211,7 @@ CGC-PMS 的产品定位建议定义为：
 
 #### 落地证据
 
-1. 主线27已完成，计划书 `docs/plans/第27条主线-CI-CD上线门禁任务计划书.md` 已落地。
+1. 主线27已完成，计划书 `docs/archive/v1.0/plans/第27条主线-CI-CD上线门禁任务计划书.md` 已封存。
 2. PR #332 已合并，merge commit 为 `2b5a0b676b5ca832c5220f6851ffe7570d2608e3`。
 3. PR CI run `28917813795` 全绿；master push CI run `28918221456` 全绿。
 4. master 分支保护已配置 `strict=true`，required checks 为 `backend-test`、`backend-test-mysql`、`backend-dependency-scan`、`frontend-lint`、`type-check`、`frontend-build`、`frontend-test`、`frontend-dependency-audit`、`sql-safety-scan`、`e2e`、`supply-chain-security`。
@@ -270,10 +270,10 @@ CGC-PMS 的产品定位建议定义为：
 
 #### 落地证据
 
-1. 计划书 `docs/plans/第28条主线-预警中心M1生产化增强任务计划书.md` 已提交，提交为 `927d085e6 docs: add mainline 28 alert center plan`。
+1. 计划书 `docs/archive/v1.0/plans/第28条主线-预警中心M1生产化增强任务计划书.md` 已提交并封存，提交为 `927d085e6 docs: add mainline 28 alert center plan`。
 2. 后端 M1 实现已提交，提交为 `ec7a683b9 feat: harden alert center backend m1`。
 3. 前端 M1 实现已提交，提交为 `e30f39864 feat: harden alert center frontend m1`。
-4. 验收报告 `docs/quality/第28条主线-预警中心M1生产化增强验收报告.md` 已提交，提交为 `02e3bad4a docs: add mainline 28 alert acceptance report`。
+4. 验收报告 `docs/archive/v1.0/quality/第28条主线-预警中心M1生产化增强验收报告.md` 已提交并封存，提交为 `02e3bad4a docs: add mainline 28 alert acceptance report`。
 5. 验收报告记录了目标后端测试、前端 type-check/build、浏览器验收和运行态刷新证据，结论为“通过 / 非阻塞”。
 
 #### 剩余风险

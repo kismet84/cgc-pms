@@ -1,0 +1,214 @@
+# CGC-PMS 项目地图
+
+## 2026-07-13 增量：develop/1.5 全量审计根因闭环
+
+- 原全量审计的 7 项阻塞已完成本地闭环：测试态全局写限流隔离、陈旧菜单数字 ID 契约、前端 lint 与 3 项静态契约、SQL 安全标记、Playwright/合法空态 E2E、`master` 分支保护。
+- 后端最终 `verify` 为 184 suites、1723 tests、0 failures、0 errors、1 skipped；另补结算金额快照直接测试，并修复 Dashboard 合同到期测试夹具从每月 13 日起漂移的问题。
+- 前端主机依赖已恢复；413 条纯 Prettier 告警已治理至 lint 0 error / 0 warning；ECharts 已升级到 6.1.0、vue-echarts 升级到 8.0.1，依赖审计为 0 漏洞；类型检查/构建/bundle 通过、91 files / 505 tests 全过；用户提供的 Chrome 149 完成 UI smoke 7/7，内置浏览器也已真实到达驾驶舱。
+- 供应链门禁确认 `trivy fs` 不覆盖 post-build JAR，现由 `supply-chain-security` 对构建目录执行 `trivy rootfs`；本地识别 fat JAR 并得到 HIGH/CRITICAL 0。
+- `master` 已启用 `enforce_admins=true` 与 `required_conversation_resolution=true`，原 11 个 required checks、`strict=true`、禁止 force push/delete 保持不变。
+- 当前状态为“本地整改通过、上线仍阻塞”：本轮未获 commit/push 授权，尚无同一待合并 SHA 的远端 11 checks 全绿证据；不得以本地通过替代远端上线门禁。
+
+## 2026-07-12 增量：AutoPilot Windows PowerShell 5.1 编码阻塞
+
+- 当前 AutoPilot 统一控制面在 Windows PowerShell 5.1 `-File` 入口稳定产生 ParserError；显式 UTF-8 AST 解析无错误，根因是含中文的 UTF-8 无 BOM 脚本被系统 ANSI/GBK 解码。
+- 该缺口直接阻塞 Ready 选单、实施和正式收口，按 `ISSUE-037-022` 进入最小治理 Ready；范围仅限编码兼容、控制面回归与状态回写，不替代产品方向。
+- 实施回写：`ISSUE-037-022` 已统一脚本源码 BOM 与运行期显式 UTF-8 读取；Windows PowerShell 5.1 控制面自测、连续 runner 自测及真实 `ISSUE-037-022` 路由均通过，Ready 准入恢复为可用。
+
+## 2026-07-12 增量：CI/CD 与上线门禁 v1.5 复验
+
+- `ISSUE-037-021` 已完成只读复验：当前 master commit `781b41661cd96b2a2f7eed825f98ff3d9bdf137b` 的 11 个 required checks 中 `frontend-lint`、`frontend-test`、`e2e` 为 failure，结论为不通过、阻塞、不可上线。
+- required checks 与现行 workflow job 一一对应且 `strict=true`；`enforce_admins=false` 与未启用 push restrictions 仍保留绕过风险。
+- 红灯与治理缺口已按责任域进入 Blocked；本次未修改业务代码、workflow 或远端设置。
+
+## 2026-07-12 增量：系统审查与 Ready 恢复
+
+- `PI-2026-07-12-12` 的停止动作保持为历史事实，但“无合格 Candidate”因候选范围过窄和地图回写滞后被后续复核撤销。
+- `ISSUE-037-017` 已完成：共享 `BaseEntity.remark` 恢复正常 JSON 写入，ID、租户、审计和逻辑删除字段继续只读；未修改 Controller、Service、前端或数据库。
+- 插件 Ready 预演修复了标题正则缺少多行匹配的问题；合法的二、三级标题现可通过 Select Gate，并有最小回归脚本保护。
+- `ISSUE-037-018` 已完成：执行器 300/600 秒 inspect/retire、一次 repair、第二次 stall blocked、退役证据和有界长命令声明已闭环；PID 复用与延迟启动计时边界有回归保护。
+- 本轮只修复共享根因并保护 ID、租户和审计字段，不扩成 DTO 重构或全接口治理。
+
+## 2026-07-12 增量：WBS 软删除编号冲突
+
+- `ISSUE-037-015` 验收稳定复现：当天自动编号只查询未删除任务，历史软删除编号会被复用；再次删除复用编号的任务时，`(tenant_id, task_code, deleted_flag)` 唯一键冲突并返回 409。
+- `ISSUE-037-016` 已完成：逻辑删除前把编号改为按任务 ID 唯一的墓碑值，修复复用编号再次删除的冲突；未改表、编号展示规则或全局软删除框架。
+
+## 2026-07-12 增量：WBS 单前置 FS 状态门禁
+
+- 现有分包任务已支持单前置 FS、同项目/环/日期校验和延期风险展示。
+- `ISSUE-037-015` 已完成：统一 Service 在有效前置未完成时拒绝后续任务进入 `IN_PROGRESS` / `COMPLETED`，前端同步禁用并提示。
+- 结果继续保持单前置、无新状态、无关系表、无自动排程和无数据迁移；多前置与完整计划平台仍未实现。
+
+## 2026-07-12 增量：现场日报与领料出库候选
+
+- 日报已有同日已审批到货、计划任务和审计历史，但尚未呈现同日已审批并真实出库的领料事实。
+- 现有 `mat_requisition` / `mat_requisition_item` 已具备租户、项目、领料日期、审批状态、出库标记、物料和数量，可在不新增表的前提下形成只读联动。
+- `ISSUE-037-014` 已完成：只展示同租户、同项目、同日期、`APPROVED` 且 `stock_out_flag = 1` 的领料明细；不把领料解释为已安装，不披露价格、金额、合同或供应商信息。
+
+## 2026-07-12 增量：现场日报变更历史
+
+- 日报写操作已进入统一操作审计，但 CREATE 未绑定业务 ID，详情页也未展示可读历史。
+- `ISSUE-037-013` 已完成：CREATE 审计归属具体日报，详情只读展示最小变更记录；未建设字段级版本或独立历史表。
+
+## 2026-07-12 增量：计划任务与现场日报对照
+
+- 分包 WBS 已具备项目、计划日期、状态、进度和单前置 FS；现场日报尚未呈现当天计划任务。
+- `ISSUE-037-012` 已完成：日报详情只读展示计划日期覆盖当天的同项目任务，连接计划与每日现场事实；未新增排程或日报任务副本。
+
+## 2026-07-12 增量：材料到货与现场日报联动
+
+- 现场日报已具备项目/日期、草稿提交、附件、天气摘要和在场人数，但尚未展示已有材料验收事实。
+- 材料验收已具备项目、验收日期、审批状态、供应商和物料数量；审批通过后原子触发库存与成本，日报不得复制或改写该事实。
+- `ISSUE-037-011` 已完成：日报详情只读聚合同项目同日已审批验收明细，作为现场到货证据；设备、消耗、安装量和生产率继续后置。
+
+## 地图基线
+
+| 项目 | 当前值 |
+| --- | --- |
+| 产品版本 | `1.5.0-dev.0` |
+| 分支 | `develop/1.5` |
+| Commit | 当前 `develop/1.5` 工作区 |
+| 生成时间 | 2026-07-12 |
+| 证据类型 | 当前代码、配置、现行规范、测试入口静态核对 |
+| 验证新鲜度 | 业务测试和真实角色运行态待本轮后续复验 |
+| 下次刷新 | 下一条产品 Candidate 完成后，或当前事实变化时 |
+
+> 本地图中的 `Partial` 不等于功能不存在，表示真实代码链路已经存在，但尚未取得 v1.5 当前周期的完整运行或业务验收证据。v1.0 历史测试结论不用于升级状态。
+
+## 产品定位
+
+CGC-PMS 是面向建筑工程总包企业的项目经营与全过程管理平台，主线是项目、合同成本、采购库存、分包结算、付款发票、审批预警和角色驾驶舱的一体化管理。
+
+明确不是：
+
+- 通用软件研发项目管理工具。
+- 通用 ERP 的完整替代品。
+- 以多智能体、MCP 或编码工具为产品卖点的平台。
+
+## 核心业务闭环
+
+```text
+项目立项
+  → 合同 / 签证 / 采购 / 分包
+  → 成本与收入归集
+  → 收货 / 库存 / 领料 / 计量
+  → 付款 / 发票 / 结算
+  → 审批 / 通知 / 预警
+  → 驾驶舱与经营分析
+```
+
+## 技术地图
+
+```text
+Vue 3 + TypeScript + Vite
+        ↓ /api
+Spring Boot 3 + Java 21 + Spring Security + MyBatis-Plus
+        ↓
+MySQL/H2 + Redis + MinIO
+        ↓
+Docker Compose + Nginx + Actuator + Prometheus
+```
+
+| 层级 | 现行入口 |
+| --- | --- |
+| 前端入口 | `frontend-admin/src/main.ts`、`frontend-admin/src/App.vue` |
+| 前端路由 | `frontend-admin/src/router/` |
+| 页面 | `frontend-admin/src/pages/` |
+| API 封装 | `frontend-admin/src/api/modules/` |
+| 后端入口 | `backend/src/main/java/com/cgcpms/CgcPmsApplication.java` |
+| 后端业务域 | `backend/src/main/java/com/cgcpms/` |
+| MySQL migration | `backend/src/main/resources/db/migration/` |
+| H2 migration | `backend/src/main/resources/db/migration-h2/` |
+| 部署 | `deploy/`、`docker-compose*.yml` |
+
+## 当前规模快照
+
+以下是路径级粗计数，不代表完成度：
+
+| 指标 | 数量 |
+| --- | ---: |
+| 后端一级业务/技术域 | 32 |
+| Controller 文件 | 53 |
+| 前端 Vue 文件 | 129 |
+| MySQL Flyway migration | 134 |
+
+## 业务能力地图
+
+| 业务域 | 前端证据 | 后端证据 | 测试入口示例 | 状态 | 当前缺口 |
+| --- | --- | --- | --- | --- | --- |
+| 项目与成员 | `pages/project/`、`api/modules/project.ts` | `project/` | `PmProjectControllerTest`、`ProjectOverviewServiceTest`、`ProjectLedgerProduction.test.ts` | Partial | v1.5 真实角色、项目数据范围和运行态待复验 |
+| 合同与付款条件 | `pages/contract/`、`api/modules/contract.ts` | `contract/` | `CtContractServiceTest`、`ContractApprovalIntegrationTest`、`ContractLedgerPage.test.ts` | Partial | 合同履约、金额口径和审批联动需当前复验 |
+| 变更与签证 | `pages/variation/`、`api/modules/variation.ts` | `variation/` | `VarOrderServiceTest`、`VarOrderControllerMockMvcTest`、`VariationOrderProduction.test.ts` | Partial | 变更收入/成本联动和审批边界待复验 |
+| 成本与目标成本 | `pages/cost/`、`pages/cost-target/` | `cost/`、`revenue/`、`overhead/`、`accounting/` | `CostSummaryServiceTest`、`CostLedgerServiceTest`、`CostSummaryProduction.test.ts` | Partial | 多来源成本、月份快照和下钻口径待复验 |
+| 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 已完成安全阈值、人工补货目标量和自然日提前期预填；供应商级提前期、工作日历和预测仍缺失 |
+| 收货、仓库与库存 | `pages/receipt/`、`pages/inventory/` | `receipt/`、`inventory/` | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts` | Partial | 已维护安全阈值并联动 KPI/预警；目标量、全量建议、预测和跨仓调拨仍缺 |
+| 领料 | `pages/requisition/` | `requisition/` | `MatRequisitionServiceTest`、`useRequisitionForm.test.ts` | Partial | 与计划需用量、施工部位和损耗分析尚未闭环 |
+| 分包与计量 | `pages/subcontract/` | `subcontract/` | `SubMeasureServiceTest`、`SubTaskControllerTest`、`subcontract/measure.test.ts` | Partial | 已完成单前置 FS、状态门禁、延期风险和软删除编号冲突修复；仍无多前置、多类型、自动排程和完整履约档案 |
+| 结算 | `pages/settlement/` | `settlement/` | `StlSettlementServiceTest`、`StlSettlementControllerMockMvcTest`、`settlement/index.test.ts` | Partial | 合同、变更、计量、付款汇总需当前一致性复验 |
+| 付款与资金日记账 | `pages/payment/`、`pages/cash-journal/` | `payment/`、`accounting/` | `PaymentFinancialConsistencyTest`、`PayRecordCashJournalIntegrationTest`、`payment/save-chain.test.ts` | Partial | 金额、财务回写、附件和权限需当前复验 |
+| 发票与识别 | `pages/invoice/` | `invoice/` | `InvoiceServiceTest`、`InvoiceRecognitionTest`、`invoice-pdf.test.ts` | Partial | 识别可靠性、付款关联和文件安全需当前复验 |
+| 审批、抄送与通知 | `pages/approval/` | `workflow/`、`notification/` | `WorkflowCoreServiceTest`、`ApproverResolverTenantIntegrationTest`、`ApprovalWorkList.test.ts` | Partial | 真实角色矩阵、跨业务状态一致性待复验 |
+| 预警 | `pages/alert/` | `alert/` | `AlertEvaluationServiceTest`、`AlertControllerTest`、`alert/index.test.ts` | Partial | 规则治理、通知渠道和抑制升级仍是后续方向 |
+| 驾驶舱与报表 | `pages/dashboard/`、`pages/report/` | `dashboard/` | `DashboardServiceTest`、`DashboardControllerTest`、`DashboardDataLoading.test.ts` | Partial | 指标来源、下钻和不同角色数据边界待复验 |
+| 用户、角色、菜单与审计 | `pages/system/`、`api/modules/system.ts` | `auth/`、`system/`、`audit/` | `WorkflowControllerAuthTest`、`system/permissions/index.test.ts` | Partial | 不能用超级管理员替代真实角色验收 |
+| 文件 | `api/modules/file.ts` | `file/` | 现有文件安全与业务绑定测试 | Partial | 上传、病毒扫描占位和业务绑定边界需当前复验 |
+
+## 角色驾驶舱地图
+
+| 角色 | 当前业务基础 | 状态 | 边界 |
+| --- | --- | --- | --- |
+| 项目经理 | 项目总览、待办、预警、审批、合同履约 | Partial | 不用经营财务图表冒充执行协同 |
+| 商务经理 | 合同、变更、成本、结算、付款、预警 | Partial | 现有成本经理语义统一为商务经理 |
+| 采购经理 | 采购、验收、库存、领料 | Partial | 不复用商务经理利润/结算主视图 |
+| 生产经理 | 验收、领料、库存、分包计量近似数据 | Partial | 不是完整进度、劳务、机械和产值驾驶舱 |
+| 总工程师 | 当前只有零散设计变更相关数据 | Frozen | 必须先建立技术方案、设计协调、技术审核和重大技术问题对象 |
+
+## 数据与安全边界
+
+| 边界 | 当前规则 | 地图结论 |
+| --- | --- | --- |
+| 租户 | 后端强制隔离，Service 必须校验 | 代码与规范存在，当前跨租户回归待复验 |
+| 项目 | 大多数业务对象的主线维度 | 当前项目成员和接口范围待真实角色复验 |
+| 权限 | `@PreAuthorize` 是安全边界，前端隐藏仅为体验 | 不能仅靠菜单可见性判定通过 |
+| 审批 | 合同、变更、付款、结算等必须校验状态 | 跨业务状态一致性是高风险验收项 |
+| 金额 | 成本、合同、采购、库存、分包、付款、结算共同影响 | 任何改动必须给出来源、月份和回滚证据 |
+| 数据库 | 只新增 migration，不修改已应用脚本 | v1.5 业务候选默认优先无 migration 的最小闭环 |
+
+## 工程与实施地图
+
+| 能力 | 当前入口 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| CI 门禁 | `.github/workflows/` | Partial | 本地整改与 11 项门禁映射已通过，`enforce_admins=true`、`required_conversation_resolution=true`；等待本轮整改 commit/push 后同一待合并 SHA 的远端 required checks 全绿证据 |
+| 本地运行 | `scripts/rebuild.py`、Docker Compose | Partial | ISSUE-037-001 已完成 8080、5173、dev-login health gate 与真实角色浏览器验收 |
+| 现场日报验收直达 | `DevAuthController`、`/site/daily-log` | Implemented | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据 |
+| Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner | Implemented | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护 |
+| 候选补货 | `autopilot-refill.ps1` | Implemented | 先读 Ad-hoc；长期计划仅接纳第 7–9 章开发计划，排除现状/对标/差距/目标等描述性标题 |
+| 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 已具备隔离执行、本地提交、上限停止、300/600 秒停滞处置、一次有限重派、第二次 blocked 和有界长命令声明 |
+| 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-021 正式验收报告 |
+
+## 当前明确缺口
+
+### 产品候选
+
+- 采购补货建议：已完成数量预填、安全阈值、可空人工目标量和可空自然日提前期计划日期预填；供应商级提前期、工作日历、预测与全量建议治理仍后置。
+- 现场日报 / 施工日志：`ISSUE-037-005` 已建立日报对象、状态、项目范围与附件链，`ISSUE-037-007` 已增加人工天气摘要和可空在场人数；人员明细、设备材料、移动离线和质量安全继续后置。
+- WBS 任务依赖与延期预警：`ISSUE-037-004` 已在分包任务上完成单前置 FS、项目数据范围和前置延期风险；仍不支持多前置、多类型、依赖连线、拖拽、自动改期或独立计划模型。
+- 供应商交付档案：`ISSUE-037-002` 已用订单明细与已审批验收累计数量还原交付完成日，并区分按期完成、迟交完成和逾期未完成；质量、价格和退货仍不具备稳定口径，页面明确不是综合评级。
+- 后端接口无前端入口治理：`ISSUE-037-019` 静态基线纳入 53 个 Controller、321 个唯一 HTTP 方法；分类为有用户入口 219、前端调用但无独立页面 57、内部/集成/运维 4、需补用户入口 30、待废弃 0、需要确认 11。独立静态复核通过，真实角色与运行态仍待按域验收，不是新业务域。
+- 驾驶舱项目数据范围：`ISSUE-037-003` 已统一项目经理与管理驾驶舱的指定项目、全项目任务/审批/合同/风险聚合，空关联与不可见项目 fail-close。
+
+### 工程治理候选
+
+- 子智能体超时、悬挂线程退役与有限重派治理。
+- 实体直绑更新字段白名单、前端重复错误提示和接口—入口映射仍需按独立证据拆分，不因备注契约修复自动视为完成。
+
+工程治理候选必须与产品候选分组排序，默认不能用泛化工具或流程改进替代产品方向判断。若当前证据证明治理缺口直接阻塞已选产品目标、安全边界或正式验收，可按 `缺口修复` 或 `运维治理` 进入 Ready；必须绑定产品目标、阻塞证据、解除条件、非目标和回滚方式。
+
+## Unknown 与待复验
+
+- 当前 CI 红灯与分支保护绕过风险的解除时间；目标 commit 变化后需重新核验。
+- 当前本地 Docker、后端和前端运行态。
+- 五类驾驶舱角色的真实账号与数据可见范围。
+- 当前全量后端、前端单元测试结果。
+- 现有长期计划中所有“已完成”项在 v1.5 的复验状态。

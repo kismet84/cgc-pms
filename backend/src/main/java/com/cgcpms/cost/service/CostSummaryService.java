@@ -184,8 +184,8 @@ public class CostSummaryService {
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal costDeviation = dynamicCost.subtract(targetCost);
             BigDecimal confirmedRevenue = projectConfirmedRevenue;
-            // expectedProfit = confirmedRevenue - dynamicCost (使用已确认收入)
-            BigDecimal expectedProfit = confirmedRevenue.subtract(dynamicCost);
+            // Keep subject rows aligned with project/batch summaries and the V27 backfill contract.
+            BigDecimal expectedProfit = projectContractIncome.subtract(dynamicCost);
 
             CostSummary summary = new CostSummary();
             summary.setTenantId(tenantId);

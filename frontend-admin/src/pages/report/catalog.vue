@@ -28,10 +28,7 @@ const isAdmin = computed(() =>
 
 const visibleItems = computed(() =>
   items.value.filter(
-    (item) =>
-      !item.permissionCode ||
-      isAdmin.value ||
-      userStore.hasPermission(item.permissionCode),
+    (item) => !item.permissionCode || isAdmin.value || userStore.hasPermission(item.permissionCode),
   ),
 )
 

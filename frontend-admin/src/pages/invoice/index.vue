@@ -204,11 +204,7 @@ defineExpose({
           <!-- 表格 -->
           <div class="lg-table-wrap">
             <div v-if="listError" class="invoice-list-feedback">
-              <a-result
-                status="error"
-                title="发票列表加载失败"
-                :sub-title="listError"
-              >
+              <a-result status="error" title="发票列表加载失败" :sub-title="listError">
                 <template #extra>
                   <a-button type="primary" @click="fetchData">重试</a-button>
                 </template>

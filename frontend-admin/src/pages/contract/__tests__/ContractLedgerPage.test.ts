@@ -64,7 +64,9 @@ describe('ContractLedgerPage modal flows', () => {
     expect(composableSource).toMatch(/pageSize\.value = readQueryNumber\('pageSize', 20\)/)
     expect(composableSource).toMatch(/function syncQueryToRoute\(\)/)
     expect(composableSource).toMatch(/router\.replace\(\{ query \}\)/)
-    expect(composableSource).toMatch(/restoreFilterFromRoute\(\)[\s\S]*referenceStore\.fetchProjects/)
+    expect(composableSource).toMatch(
+      /restoreFilterFromRoute\(\)[\s\S]*referenceStore\.fetchProjects/,
+    )
     expect(composableSource).toMatch(/syncQueryToRoute\(\)[\s\S]*getContractLedger\(params\)/)
   })
 })

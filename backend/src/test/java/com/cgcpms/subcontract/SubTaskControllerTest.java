@@ -24,6 +24,8 @@ class SubTaskControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private Long taskId;
+    private Long predecessorTaskId;
+    private Long dependentTaskId;
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
@@ -52,13 +54,120 @@ class SubTaskControllerTest {
         Assertions.assertNotNull(taskId);
     }
 
-    @Test @Order(4) @DisplayName("POST /sub-tasks missing required -> 400")
+    @Test @Order(4) @DisplayName("POST /sub-tasks creates a same-project FS dependency")
+    void testCreateFsDependency() throws Exception {
+        String predecessorResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"前置任务\",\"plannedStartDate\":\"2026-07-01\",\"plannedEndDate\":\"2026-07-10\",\"progressPercent\":0,\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        predecessorTaskId = Long.parseLong(predecessorResponse.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+
+        String dependentResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"predecessorTaskId\":" + predecessorTaskId
+                                + ",\"plannedStartDate\":\"2026-07-10\",\"plannedEndDate\":\"2026-07-20\",\"progressPercent\":0,\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        dependentTaskId = Long.parseLong(dependentResponse.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+
+        mockMvc.perform(g("/sub-tasks/" + dependentTaskId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.predecessorTaskId").value(predecessorTaskId.toString()))
+                .andExpect(jsonPath("$.data.predecessorTaskName").value("前置任务"))
+                .andExpect(jsonPath("$.data.predecessorStatus").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.data.predecessorPlannedEndDate").value("2026-07-10"));
+        mockMvc.perform(g("/sub-tasks").cookie(adminCookie())
+                        .param("projectId", "10001").param("taskName", "后续任务"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].predecessorTaskName").value("前置任务"));
+    }
+
+    @Test @Order(5) @DisplayName("POST and PUT /sub-tasks reject invalid FS dates and cycles")
+    void testRejectsInvalidFsDatesAndCycles() throws Exception {
+        mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"错误FS任务\",\"predecessorTaskId\":" + predecessorTaskId
+                                + ",\"plannedStartDate\":\"2026-07-09\",\"plannedEndDate\":\"2026-07-20\",\"progressPercent\":0,\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(u("/sub-tasks/" + predecessorTaskId).cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"前置任务\",\"predecessorTaskId\":" + dependentTaskId
+                                + ",\"plannedStartDate\":\"2026-07-01\",\"plannedEndDate\":\"2026-07-10\",\"progressPercent\":0,\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(d("/sub-tasks/" + predecessorTaskId).cookie(adminCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUB_TASK_DEPENDENCY_IN_USE"));
+        mockMvc.perform(g("/sub-tasks/" + predecessorTaskId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.taskCode", startsWith("SUB-")));
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"predecessorTaskId\":null,\"plannedStartDate\":\"2026-07-10\",\"plannedEndDate\":\"2026-07-20\",\"progressPercent\":0,\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(g("/sub-tasks/" + dependentTaskId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.predecessorTaskId").doesNotExist());
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"predecessorTaskId\":" + predecessorTaskId
+                                + ",\"plannedStartDate\":\"2026-07-10\",\"plannedEndDate\":\"2026-07-20\",\"progressPercent\":0,\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test @Order(6) @DisplayName("POST and PUT enforce predecessor completion gate")
+    void testPredecessorCompletionGate() throws Exception {
+        mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"未完成前置创建门禁\",\"predecessorTaskId\":" + predecessorTaskId
+                                + ",\"plannedStartDate\":\"2026-07-10\",\"actualStartDate\":\"2026-07-10\",\"progressPercent\":10,\"status\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUB_TASK_PREDECESSOR_NOT_COMPLETED"));
+
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"actualStartDate\":\"2026-07-10\",\"progressPercent\":10,\"status\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUB_TASK_PREDECESSOR_NOT_COMPLETED"));
+
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"actualStartDate\":\"2026-07-10\",\"actualEndDate\":\"2026-07-11\",\"progressPercent\":100,\"status\":\"COMPLETED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUB_TASK_PREDECESSOR_NOT_COMPLETED"));
+
+        mockMvc.perform(u("/sub-tasks/" + predecessorTaskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"前置任务\",\"actualStartDate\":\"2026-07-01\",\"actualEndDate\":\"2026-07-10\",\"progressPercent\":100,\"status\":\"COMPLETED\"}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"actualStartDate\":\"2026-07-10\",\"progressPercent\":10,\"status\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"predecessorTaskId\":" + taskId
+                                + ",\"plannedStartDate\":\"2026-07-15\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUB_TASK_PREDECESSOR_NOT_COMPLETED"));
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"predecessorTaskId\":null}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"predecessorTaskId\":" + predecessorTaskId + "}"))
+                .andExpect(status().isOk());
+
+        String crossProjectResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":2071032241708793858,\"taskName\":\"跨项目前置\",\"progressPercent\":0,\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Long crossProjectPredecessorId = Long.parseLong(crossProjectResponse.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+        mockMvc.perform(u("/sub-tasks/" + dependentTaskId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"后续任务\",\"predecessorTaskId\":" + crossProjectPredecessorId + "}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SUB_TASK_DEPENDENCY_INVALID"));
+    }
+
+    @Test @Order(7) @DisplayName("POST /sub-tasks missing required -> 400")
     void testCreate_Missing() throws Exception {
         mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
     }
 
-    @Test @Order(5) @DisplayName("POST /sub-tasks rejects inconsistent schedule data without persisting")
+    @Test @Order(8) @DisplayName("POST /sub-tasks rejects inconsistent schedule data without persisting")
     void testCreate_InvalidScheduleData() throws Exception {
         String suffix = String.valueOf(System.nanoTime());
         String[] invalidBodies = {
@@ -86,7 +195,7 @@ class SubTaskControllerTest {
 
     }
 
-    @Test @Order(6) @DisplayName("PUT /sub-tasks/{id} rejects blank status without persisting")
+    @Test @Order(9) @DisplayName("PUT /sub-tasks/{id} rejects blank status without persisting")
     void testUpdate_BlankStatus() throws Exception {
         String createResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"projectId\":10001,\"taskName\":\"blank-status-test\",\"progressPercent\":20,\"status\":\"IN_PROGRESS\"}"))
@@ -102,7 +211,7 @@ class SubTaskControllerTest {
         mockMvc.perform(d("/sub-tasks/" + id).cookie(adminCookie())).andExpect(status().isOk());
     }
 
-    @Test @Order(7) @DisplayName("GET /sub-tasks/{id} -> 200")
+    @Test @Order(10) @DisplayName("GET /sub-tasks/{id} -> 200")
     void testGetById() throws Exception {
         Assertions.assertNotNull(taskId);
         mockMvc.perform(g("/sub-tasks/" + taskId).cookie(adminCookie()))
@@ -117,7 +226,7 @@ class SubTaskControllerTest {
                 .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
     }
 
-    @Test @Order(8) @DisplayName("GET /sub-tasks filters project schedule rows for gantt")
+    @Test @Order(11) @DisplayName("GET /sub-tasks filters project schedule rows for gantt")
     void testListScheduleRowsByProject() throws Exception {
         Assertions.assertNotNull(taskId);
         mockMvc.perform(g("/sub-tasks").cookie(adminCookie())
@@ -134,7 +243,7 @@ class SubTaskControllerTest {
                 .andExpect(jsonPath("$.data.records[0].progressPercent").value("35.50"));
     }
 
-    @Test @Order(9) @DisplayName("PUT /sub-tasks/{id} -> 200")
+    @Test @Order(12) @DisplayName("PUT /sub-tasks/{id} -> 200")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(taskId);
         String body = "{\"projectId\":10001,\"contractId\":30001,\"taskCode\":\"ST-UPD-" + System.nanoTime()
@@ -143,9 +252,32 @@ class SubTaskControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(10) @DisplayName("DELETE /sub-tasks/{id} -> 200")
+    @Test @Order(13) @DisplayName("DELETE permits reusing and deleting the same daily task code")
+    void testDeleteReusedDailyTaskCode() throws Exception {
+        String firstResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"软删除编号复用-1\",\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Long firstId = Long.parseLong(firstResponse.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+        String firstCode = mockMvc.perform(g("/sub-tasks/" + firstId).cookie(adminCookie()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()
+                .replaceAll(".*\"taskCode\":\"([^\"]+)\".*", "$1");
+        mockMvc.perform(d("/sub-tasks/" + firstId).cookie(adminCookie())).andExpect(status().isOk());
+
+        String secondResponse = mockMvc.perform(p("/sub-tasks").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"projectId\":10001,\"taskName\":\"软删除编号复用-2\",\"status\":\"NOT_STARTED\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Long secondId = Long.parseLong(secondResponse.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+        mockMvc.perform(g("/sub-tasks/" + secondId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.taskCode").value(firstCode));
+        mockMvc.perform(d("/sub-tasks/" + secondId).cookie(adminCookie())).andExpect(status().isOk());
+    }
+
+    @Test @Order(14) @DisplayName("DELETE /sub-tasks/{id} -> 200")
     void testDelete() throws Exception {
         Assertions.assertNotNull(taskId);
+        mockMvc.perform(d("/sub-tasks/" + dependentTaskId).cookie(adminCookie())).andExpect(status().isOk());
+        mockMvc.perform(d("/sub-tasks/" + predecessorTaskId).cookie(adminCookie())).andExpect(status().isOk());
         mockMvc.perform(d("/sub-tasks/" + taskId).cookie(adminCookie()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }

@@ -4,7 +4,7 @@
 # M-020: Orchestrates daily backup via systemd timer or cron
 #
 # Scheduling options:
-#   systemd timer: see docs/10-部署运维手册.md for setup instructions
+#   systemd timer: see docs/standards/10-部署运维手册.md for setup instructions
 #   cron:         0 2 * * * /opt/cgc-pms/scripts/backup-scheduler.sh all >> /var/log/cgc-pms-backup.log 2>&1
 
 set -euo pipefail

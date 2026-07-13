@@ -82,7 +82,9 @@ function submit() {
         <select v-model="form.accountId">
           <option value="" disabled>请选择</option>
           <option v-for="account in enabledAccounts" :key="account.id" :value="account.id">
-            {{ account.accountName }}（{{ account.accountType === 'BANK' ? account.bankAccountNo : '现金' }}）
+            {{ account.accountName }}（{{
+              account.accountType === 'BANK' ? account.bankAccountNo : '现金'
+            }}）
           </option>
         </select>
       </label>
@@ -95,7 +97,13 @@ function submit() {
       </label>
       <label>
         <span>金额 *</span>
-        <input v-model="form.amount" type="number" min="0.01" step="0.01" :disabled="sourceLocked" />
+        <input
+          v-model="form.amount"
+          type="number"
+          min="0.01"
+          step="0.01"
+          :disabled="sourceLocked"
+        />
       </label>
       <label>
         <span>业务日期 *</span>
@@ -132,13 +140,42 @@ function submit() {
 </template>
 
 <style scoped>
-.cash-journal-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-label { display: grid; gap: 6px; color: #4b5563; }
-label span { font-size: 13px; }
+.cash-journal-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+label {
+  display: grid;
+  gap: 6px;
+  color: #4b5563;
+}
+label span {
+  font-size: 13px;
+}
 input,
 select,
-textarea { width: 100%; min-height: 36px; padding: 6px 10px; border: 1px solid #d9d9d9; border-radius: 6px; background: #fff; }
-textarea { min-height: 80px; resize: vertical; }
-.full-row { grid-column: 1 / -1; }
-@media (max-width: 560px) { .cash-journal-form-grid { grid-template-columns: 1fr; } .full-row { grid-column: auto; } }
+textarea {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+}
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+.full-row {
+  grid-column: 1 / -1;
+}
+@media (max-width: 560px) {
+  .cash-journal-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .full-row {
+    grid-column: auto;
+  }
+}
 </style>

@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { formatLocalDateAfterDays } from '../composables/useStockLedger'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const pageSource = readFileSync(resolve(currentDir, '../stock.vue'), 'utf-8')
-const composableSource = readFileSync(resolve(currentDir, '../composables/useStockLedger.ts'), 'utf-8')
+const composableSource = readFileSync(
+  resolve(currentDir, '../composables/useStockLedger.ts'),
+  'utf-8',
+)
 
 describe('stock ledger production hardening', () => {
   it('hydrates and persists filters through route query', () => {
@@ -15,7 +19,9 @@ describe('stock ledger production hardening', () => {
     expect(composableSource).toContain('readStringQuery(route.query.warehouseId)')
     expect(composableSource).toContain('readStringQuery(route.query.materialId)')
     expect(composableSource).toContain('readPositiveIntQuery(route.query.pageNo, 1)')
-    expect(composableSource).toContain('await router.replace({ path: route.path, query: nextQuery })')
+    expect(composableSource).toContain(
+      'await router.replace({ path: route.path, query: nextQuery })',
+    )
   })
 
   it('tracks explicit loaded and error states with retry support', () => {
@@ -24,5 +30,40 @@ describe('stock ledger production hardening', () => {
     expect(pageSource).toContain('<a-result')
     expect(pageSource).toContain('title="库存台账加载失败"')
     expect(pageSource).toContain('<LgEmptyState description="暂无符合条件的库存流水">')
+  })
+
+  it('starts replenishment only from the selected tenant-scoped warehouse project', () => {
+    expect(composableSource).toContain('function handleReplenish()')
+    expect(composableSource).toContain(
+      'warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId',
+    )
+    expect(composableSource).toContain("path: '/inventory/purchase-request'")
+    expect(composableSource).toContain('const replenishmentTargetQty = Number(')
+    expect(composableSource).toContain(
+      'stock.value?.replenishmentTargetQty ?? stock.value?.safetyStockQty',
+    )
+    expect(composableSource).toContain(
+      'const suggestedQuantity = Math.max(0, replenishmentTargetQty - quantity).toFixed(4)',
+    )
+    expect(composableSource).toContain('quantity: suggestedQuantity')
+    expect(pageSource).toContain('@replenish="handleReplenish"')
+  })
+
+  it('atomically maintains safety threshold and optional replenishment target', () => {
+    expect(composableSource).toContain('updateStockReplenishmentSettings')
+    expect(composableSource).toContain('Number(stock.value?.safetyStockQty)')
+    expect(pageSource).toContain('安全库存阈值')
+    expect(pageSource).toContain('人工补货目标量')
+    expect(pageSource).toContain('handleReplenishmentSettingsSave')
+  })
+
+  it('prefills a local calendar date only when lead days are configured', () => {
+    expect(formatLocalDateAfterDays(1, new Date(2026, 0, 31))).toBe('2026-02-01')
+    expect(formatLocalDateAfterDays(1, new Date(2026, 11, 31))).toBe('2027-01-01')
+    expect(composableSource).toContain('stock.value.replenishmentLeadDays != null')
+    expect(composableSource).toContain(
+      'plannedDate: formatLocalDateAfterDays(stock.value.replenishmentLeadDays)',
+    )
+    expect(pageSource).toContain('人工补货提前期（自然日）')
   })
 })

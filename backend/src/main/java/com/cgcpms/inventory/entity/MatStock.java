@@ -35,6 +35,17 @@ public class MatStock extends BaseEntity {
     /** 可用数量，精度18,4 */
     private BigDecimal availableQty;
 
+    /** 安全库存阈值，按租户内仓库+物料库存项维护 */
+    private BigDecimal safetyStockQty;
+
+    /** 人工补货目标量；NULL 表示回退到安全库存阈值 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private BigDecimal replenishmentTargetQty;
+
+    /** 人工补货提前期（自然日）；NULL 表示不预填计划日期 */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private Integer replenishmentLeadDays;
+
     /** 乐观锁版本号，MyBatis-Plus @Version 自动在 update 时递增并作为 WHERE 条件 */
     @Version
     private Integer version;

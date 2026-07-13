@@ -33,7 +33,7 @@ if [ -n "$MODIFIED_MIGRATIONS" ]; then
   echo "============================================================"
   echo "Already-applied migrations should NEVER be modified in-place."
   echo "Instead: create a new V{next}__description.sql migration."
-  echo "See: docs/07-数据库与迁移规范.md"
+  echo "See: docs/standards/07-数据库与迁移规范.md"
   echo "============================================================"
   echo ""
 fi

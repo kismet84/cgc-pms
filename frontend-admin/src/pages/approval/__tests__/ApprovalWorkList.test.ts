@@ -90,7 +90,9 @@ describe('approval work list route titles', () => {
     expect(source).toContain('const hasLoaded = ref(false)')
     expect(source).toContain('const listError = ref<string | null>(null)')
     expect(source).toContain('const showEmptyState = computed(')
-    expect(source).toContain('<a-result status="error" title="审批列表加载失败" :sub-title="listError">')
+    expect(source).toContain(
+      '<a-result status="error" title="审批列表加载失败" :sub-title="listError">',
+    )
     expect(source).toContain('<LgEmptyState :description="tableEmptyText()">')
     expect(source).toContain(
       '<a-button v-if="hasActiveFilters" @click="handleFilterReset">清空筛选</a-button>',
@@ -99,9 +101,10 @@ describe('approval work list route titles', () => {
   })
 
   it('filters approval tabs with server-side query params', () => {
-    expect(source).toContain(
-      "import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'",
-    )
+    expect(source).toContain("from '@/composables/listPageQuery'")
+    expect(source).toContain('readPositiveIntQuery')
+    expect(source).toContain('readStringQuery')
+    expect(source).toContain('replaceListQuery')
     expect(source).toContain("const filterKeyword = ref('')")
     expect(source).toContain("const filterBusinessType = ref('')")
     expect(source).toContain("const filterInstanceStatus = ref('')")

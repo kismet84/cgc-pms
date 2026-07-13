@@ -17,8 +17,8 @@ jobs:
   backend-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -29,7 +29,7 @@ jobs:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Upload backend test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-reports-${{ github.run_number }}-${{ github.sha }}
           path: |
@@ -38,13 +38,13 @@ jobs:
           if-no-files-found: ignore
       - name: Upload backend jar
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: backend/target/cgc-pms-backend.jar
       - name: Upload backend coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}
           path: backend/target/site/jacoco
@@ -55,7 +55,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Scan backend high and critical library vulnerabilities
         run: |
           docker run --rm -v "$PWD:/workspace" aquasec/trivy:0.65.0 \
@@ -95,8 +95,8 @@ jobs:
         ports:
           - 6379:6379
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -110,7 +110,7 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
       - name: Upload MySQL smoke test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-mysql-test-reports-${{ github.run_number }}-${{ github.sha }}
           path: backend/target/surefire-reports
@@ -119,11 +119,11 @@ jobs:
   frontend-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v4
+          package_json_file: frontend-admin/package.json
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -138,7 +138,7 @@ jobs:
           pnpm lint:check 2>&1 | tee .ci-artifacts/lint-check.txt
       - name: Upload frontend lint evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-lint-report-${{ github.run_number }}-${{ github.sha }}
           path: frontend-admin/.ci-artifacts/lint-check.txt
@@ -147,11 +147,11 @@ jobs:
   type-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v4
+          package_json_file: frontend-admin/package.json
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -162,11 +162,11 @@ jobs:
   frontend-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v4
+          package_json_file: frontend-admin/package.json
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -177,7 +177,7 @@ jobs:
         run: cd frontend-admin && pnpm check:bundle-size
       - name: Upload build artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin/dist
@@ -185,11 +185,11 @@ jobs:
   frontend-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v4
+          package_json_file: frontend-admin/package.json
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -200,7 +200,7 @@ jobs:
           COVERAGE_DIR: coverage-ci
       - name: Upload frontend coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.FRONTEND_COVERAGE_ARTIFACT }}
           path: frontend-admin/coverage-ci
@@ -208,11 +208,11 @@ jobs:
   frontend-dependency-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v4
+          package_json_file: frontend-admin/package.json
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -228,13 +228,37 @@ jobs:
       id-token: write
       attestations: write
     steps:
+      - name: Set daily Trivy cache key
+        run: echo "TRIVY_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+      - name: Restore Trivy vulnerability databases
+        uses: actions/cache@v6
+        with:
+          path: .trivy-cache
+          key: trivy-java-db-${{ runner.os }}-${{ env.TRIVY_CACHE_DATE }}
+          restore-keys: |
+            trivy-java-db-${{ runner.os }}-
       - name: Download backend jar
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.BACKEND_JAR_ARTIFACT }}
           path: artifacts/backend
+      - name: Scan built backend jar
+        run: |
+          mkdir -p .trivy-cache
+          docker run --rm \
+            -v "$PWD/.trivy-cache:/root/.cache/trivy" \
+            -v "$PWD/artifacts/backend:/workspace:ro" \
+            aquasec/trivy:0.65.0 \
+            rootfs \
+            --scanners vuln \
+            --pkg-types library \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --format table \
+            --timeout 10m \
+            /workspace
       - name: Download frontend build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: artifacts/frontend-dist
@@ -273,7 +297,7 @@ jobs:
           subject-path: artifacts/frontend-dist.tar.gz
           sbom-path: artifacts/frontend-dist.spdx.json
       - name: Upload generated SBOMs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.SBOM_ARTIFACT }}
           path: |
@@ -309,22 +333,22 @@ jobs:
         ports:
           - 6379:6379
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
-          version: 11
-      - uses: actions/setup-node@v4
+          package_json_file: frontend-admin/package.json
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'pnpm'
           cache-dependency-path: frontend-admin/pnpm-lock.yaml
       - name: Download frontend build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin/dist
@@ -376,7 +400,7 @@ jobs:
           PLAYWRIGHT_DEV_LOGIN_PATH: /api/auth/dev-login?redirect=/dashboard
       - name: Upload E2E failure evidence
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-failure-evidence-${{ github.run_number }}-${{ github.sha }}
           path: |
@@ -388,7 +412,7 @@ jobs:
   sql-safety-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run SQL injection safety scan
         shell: pwsh
         run: ./scripts/check-sql-safety.ps1

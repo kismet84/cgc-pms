@@ -27,28 +27,26 @@ const {
   mockRouterReplace,
   mockRoute,
   mockMessage,
-} = vi.hoisted(
-  () => ({
-    mockExportAlertAudit: vi.fn(),
-    mockGetAlertList: vi.fn(),
-    mockGetAlertSubscription: vi.fn(),
-    mockUpdateAlertSubscription: vi.fn(),
-    mockDownloadBlobFile: vi.fn(),
-    mockRouterPush: vi.fn(),
-    mockRouterReplace: vi.fn(),
-    mockRoute: {
-      path: '/alert',
-      query: {},
-      meta: {},
-    },
-    mockMessage: {
-      success: vi.fn(),
-      error: vi.fn(),
-      info: vi.fn(),
-      warning: vi.fn(),
-    },
-  }),
-)
+} = vi.hoisted(() => ({
+  mockExportAlertAudit: vi.fn(),
+  mockGetAlertList: vi.fn(),
+  mockGetAlertSubscription: vi.fn(),
+  mockUpdateAlertSubscription: vi.fn(),
+  mockDownloadBlobFile: vi.fn(),
+  mockRouterPush: vi.fn(),
+  mockRouterReplace: vi.fn(),
+  mockRoute: {
+    path: '/alert',
+    query: {},
+    meta: {},
+  },
+  mockMessage: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  },
+}))
 
 function buildSubscriptionResponse(
   overrides: Partial<AlertSubscriptionResponse> = {},
@@ -851,9 +849,15 @@ describe('alert/index.vue', () => {
     const [blob, filename] = mockDownloadBlobFile.mock.calls[0] as [Blob, string]
     const csv = await blob.text()
     expect(filename).toMatch(/^alerts-\d{4}-\d{2}-\d{2}\.csv$/)
-    expect(csv).toContain('"告警ID","项目","规则域","规则类型","细分类","严重度","处理状态","已读","触发时间","消息摘要"')
-    expect(csv).toContain('"ALERT-010","PRJ-01 测试项目一","采购类","合同超期","采购交付","高","待处理","未读","2026-07-07 10:00:00","首条导出消息 包含换行"')
-    expect(csv).toContain('"ALERT-011","PRJ-02 测试项目二","合同类","合同到期","其他","低","已归档","已读","2026-07-08 09:00:00","第二条导出消息"')
+    expect(csv).toContain(
+      '"告警ID","项目","规则域","规则类型","细分类","严重度","处理状态","已读","触发时间","消息摘要"',
+    )
+    expect(csv).toContain(
+      '"ALERT-010","PRJ-01 测试项目一","采购类","合同超期","采购交付","高","待处理","未读","2026-07-07 10:00:00","首条导出消息 包含换行"',
+    )
+    expect(csv).toContain(
+      '"ALERT-011","PRJ-02 测试项目二","合同类","合同到期","其他","低","已归档","已读","2026-07-08 09:00:00","第二条导出消息"',
+    )
     expect(mockMessage.success).toHaveBeenCalledWith('已导出当前筛选结果')
 
     mockAlertStore.alerts = []
@@ -895,10 +899,7 @@ describe('alert/index.vue', () => {
     expect(mockDownloadBlobFile).toHaveBeenCalledTimes(1)
     expect(mockMessage.success).toHaveBeenCalledWith('已导出当前筛选结果')
     expect(mockMessage.warning).toHaveBeenCalledWith('导出已完成，审计确认补记失败')
-    expect(warnSpy).toHaveBeenCalledWith(
-      'alert export audit confirm failed',
-      expect.any(Error),
-    )
+    expect(warnSpy).toHaveBeenCalledWith('alert export audit confirm failed', expect.any(Error))
 
     warnSpy.mockRestore()
   })
@@ -1008,9 +1009,10 @@ describe('alert/index.vue', () => {
     expect(pageSource).toContain('triggeredAtRange')
     expect(pageSource).toContain('alertDomain')
     expect(pageSource).toContain('ruleType')
-    expect(pageSource).toContain(
-      "import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'",
-    )
+    expect(pageSource).toContain("from '@/composables/listPageQuery'")
+    expect(pageSource).toContain('readPositiveIntQuery')
+    expect(pageSource).toContain('readStringQuery')
+    expect(pageSource).toContain('replaceListQuery')
     expect(pageSource).toContain('const route = useRoute()')
     expect(pageSource).toContain('const hasLoaded = ref(false)')
     expect(pageSource).toContain('const listError = ref<string | null>(null)')
@@ -1050,9 +1052,13 @@ describe('alert/index.vue', () => {
     expect(tablePanelSource).toContain("handleChangeStatus(row, 'PROCESSED')")
     expect(tablePanelSource).toContain('<template #triggeredAt="{ row }">')
     expect(tablePanelSource).toContain('class="alert-message-button"')
-    expect(tablePanelSource).toContain('<a-result status="error" title="预警列表加载失败" :sub-title="listError">')
+    expect(tablePanelSource).toContain(
+      '<a-result status="error" title="预警列表加载失败" :sub-title="listError">',
+    )
     expect(tablePanelSource).toContain('<LgEmptyState description="暂无符合条件的预警记录">')
-    expect(tablePanelSource).toContain('<a-button type="primary" @click="handleRetry">重试</a-button>')
+    expect(tablePanelSource).toContain(
+      '<a-button type="primary" @click="handleRetry">重试</a-button>',
+    )
     expect(tablePanelSource).toContain('.alert-toolbar-left')
     expect(tablePanelSource).toContain('flex-wrap: wrap')
 
@@ -1230,8 +1236,10 @@ describe('alert 子组件 DOM/结构证据', () => {
     expect(downloadUtilSource).toContain('setTimeout(() => URL.revokeObjectURL(url), 1000)')
     expect(alertPageSource).toContain("import { downloadBlobFile } from '@/utils/download'")
     expect(alertPageSource).toContain('const EXPORT_MAX_RECORDS = 1000')
-    expect(alertPageSource).toContain("getAlertList(buildAlertListParams(1, 200))")
-    expect(alertPageSource).toContain('downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)')
+    expect(alertPageSource).toContain('getAlertList(buildAlertListParams(1, 200))')
+    expect(alertPageSource).toContain(
+      'downloadBlobFile(blob, `alerts-${new Date().toISOString().slice(0, 10)}.csv`)',
+    )
     expect(alertPageSource).toContain('buildAlertExportFilterSignature')
     expect(alertPageSource).toContain("keyword=${params.keyword ? 'present' : 'empty'}")
     expect(alertPageSource).toContain('void confirmExportAudit(exportParams, exportAlerts.length)')

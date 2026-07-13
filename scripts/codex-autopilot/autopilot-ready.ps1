@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 function Get-AutopilotIssueBlocks {
   param([Parameter(Mandatory)][string]$Path)

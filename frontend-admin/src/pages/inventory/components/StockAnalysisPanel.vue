@@ -2,10 +2,12 @@
 import type { StockKpiVO } from '@/types/inventory'
 
 defineProps<{
-  lowStockWarn: { name: string; qty: number }[]
+  lowStockWarn: { name: string; qty: number; threshold: number }[]
   kpi: StockKpiVO
   inOutStats: { inPct: number; outPct: number }
 }>()
+
+defineEmits<{ replenish: [] }>()
 </script>
 
 <template>
@@ -23,20 +25,22 @@ defineProps<{
           <div v-for="w in lowStockWarn" :key="w.name" class="lg-type-row">
             <span
               class="lg-type-dot"
-              :style="{ background: w.qty < 5 ? '#ef4444' : 'var(--kpi-overdue)' }"
+              :style="{ background: w.qty < w.threshold / 2 ? '#ef4444' : 'var(--kpi-overdue)' }"
             ></span>
             <span class="lg-type-label">{{ w.name }}</span>
             <span class="lg-type-bar-wrap">
               <span
                 class="lg-type-bar"
                 :style="{
-                  width: Math.min(100, (w.qty / 10) * 100) + '%',
-                  background: w.qty < 5 ? '#ef4444' : 'var(--kpi-overdue)',
+                  width: Math.min(100, (w.qty / w.threshold) * 100) + '%',
+                  background: w.qty < w.threshold / 2 ? '#ef4444' : 'var(--kpi-overdue)',
                 }"
               ></span>
             </span>
             <span class="lg-type-num" style="color: #ef4444">{{ w.qty }}</span>
-            <span class="lg-type-pct"></span>
+            <a-button class="lg-type-pct" type="link" size="small" @click="$emit('replenish')">
+              补货
+            </a-button>
           </div>
           <div v-if="lowStockWarn.length === 0" class="lg-type-row">
             <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>

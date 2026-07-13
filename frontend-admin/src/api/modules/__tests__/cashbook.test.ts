@@ -54,7 +54,12 @@ describe('cashbook API contracts', () => {
   })
 
   it('uses the create, update and controlled state endpoints', async () => {
-    const data = { direction: 'IN' as const, amount: '12.30', businessDate: '2026-07-10', summary: '收款' }
+    const data = {
+      direction: 'IN' as const,
+      amount: '12.30',
+      businessDate: '2026-07-10',
+      summary: '收款',
+    }
     await createCashJournalEntry(data)
     await updateCashJournalEntry('10', data)
     await archiveCashJournalEntry('10')
@@ -62,26 +67,38 @@ describe('cashbook API contracts', () => {
     await reopenCashJournalEntry('10', '管理员修正')
 
     expect(requestMock).toHaveBeenNthCalledWith(1, {
-      url: '/cash-journal-entries', method: 'post', data,
+      url: '/cash-journal-entries',
+      method: 'post',
+      data,
     })
     expect(requestMock).toHaveBeenNthCalledWith(2, {
-      url: '/cash-journal-entries/10', method: 'put', data,
+      url: '/cash-journal-entries/10',
+      method: 'put',
+      data,
     })
     expect(requestMock).toHaveBeenNthCalledWith(3, {
-      url: '/cash-journal-entries/10/archive', method: 'post',
+      url: '/cash-journal-entries/10/archive',
+      method: 'post',
     })
     expect(requestMock).toHaveBeenNthCalledWith(4, {
-      url: '/cash-journal-entries/10/reverse', method: 'post', data: { reason: '录入错误' },
+      url: '/cash-journal-entries/10/reverse',
+      method: 'post',
+      data: { reason: '录入错误' },
     })
     expect(requestMock).toHaveBeenNthCalledWith(5, {
-      url: '/cash-journal-entries/10/reopen', method: 'post', data: { reason: '管理员修正' },
+      url: '/cash-journal-entries/10/reopen',
+      method: 'post',
+      data: { reason: '管理员修正' },
     })
   })
 
   it('uses the fund account endpoints', async () => {
     const account = {
-      accountCode: 'BANK-01', accountName: '基本户', accountType: 'BANK' as const,
-      openingDate: '2026-07-01', openingBalance: '100.00',
+      accountCode: 'BANK-01',
+      accountName: '基本户',
+      accountType: 'BANK' as const,
+      openingDate: '2026-07-01',
+      openingBalance: '100.00',
     }
     await getFundAccounts()
     await getManageableFundAccounts()
@@ -91,10 +108,20 @@ describe('cashbook API contracts', () => {
 
     expect(requestMock).toHaveBeenNthCalledWith(1, { url: '/fund-accounts', method: 'get' })
     expect(requestMock).toHaveBeenNthCalledWith(2, { url: '/fund-accounts/manage', method: 'get' })
-    expect(requestMock).toHaveBeenNthCalledWith(3, { url: '/fund-accounts', method: 'post', data: account })
-    expect(requestMock).toHaveBeenNthCalledWith(4, { url: '/fund-accounts/20', method: 'put', data: account })
+    expect(requestMock).toHaveBeenNthCalledWith(3, {
+      url: '/fund-accounts',
+      method: 'post',
+      data: account,
+    })
+    expect(requestMock).toHaveBeenNthCalledWith(4, {
+      url: '/fund-accounts/20',
+      method: 'put',
+      data: account,
+    })
     expect(requestMock).toHaveBeenNthCalledWith(5, {
-      url: '/fund-accounts/20/enabled', method: 'put', params: { enabled: false },
+      url: '/fund-accounts/20/enabled',
+      method: 'put',
+      params: { enabled: false },
     })
   })
 })

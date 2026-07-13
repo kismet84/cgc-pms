@@ -1,6 +1,8 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $readyLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-ready.ps1'
 if (Test-Path -LiteralPath $readyLibrary) { . $readyLibrary }
+$commandLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-command.ps1'
+if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
 
 function Test-AutopilotDomainContinuationAllowed {
   param([string[]]$RecentTitles, [string]$Domain, [string]$FocusText)
@@ -25,14 +27,14 @@ function Get-AutopilotRefillDecision {
   $readyPath = Join-Path $backlog 'ready-issues.md'
   $readyText = if (Test-Path -LiteralPath $readyPath) { Get-Content -LiteralPath $readyPath -Raw -Encoding UTF8 } else { '' }
   $readyCount = if (Test-Path -LiteralPath $readyPath) { @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $RepoRoot).Count } else { 0 }
-  if ($readyCount -ge 3) { return [pscustomobject]@{ action = 'READY_SUFFICIENT'; targetReadyCount = $readyCount; candidates = @(); reason = 'Ready queue already has at least three items' } }
+  if ($readyCount -ge 1) { return [pscustomobject]@{ action = 'READY_SUFFICIENT'; targetReadyCount = $readyCount; candidates = @(); reason = 'Ready queue already has at least one item' } }
 
   $focusPath = Join-Path $backlog 'current-focus.md'; $blockedPath = Join-Path $backlog 'blocked-issues.md'
   $focusText = if (Test-Path -LiteralPath $focusPath) { Get-Content -LiteralPath $focusPath -Raw -Encoding UTF8 } else { '' }
   $blockedText = if (Test-Path -LiteralPath $blockedPath) { Get-Content -LiteralPath $blockedPath -Raw -Encoding UTF8 } else { '' }
   $focusMatch = [regex]::Match($focusText, '(?im)当前\s*focus[：:]\s*([^\r\n]+)')
   if ($focusMatch.Success -and $blockedText -match [regex]::Escape($focusMatch.Groups[1].Value.Trim())) {
-    return [pscustomobject]@{ action = 'UNBLOCK_FIRST'; targetReadyCount = [Math]::Min(5, [Math]::Max(3, $readyCount)); candidates = @([pscustomobject]@{ name = $focusMatch.Groups[1].Value.Trim(); status = 'BlockedPrerequisite'; source = 'blocked-issues.md' }); reason = 'current focus prerequisite is blocked' }
+    return [pscustomobject]@{ action = 'UNBLOCK_FIRST'; targetReadyCount = 1; candidates = @([pscustomobject]@{ name = $focusMatch.Groups[1].Value.Trim(); status = 'BlockedPrerequisite'; source = 'blocked-issues.md' }); reason = 'current focus prerequisite is blocked' }
   }
 
   $adHocPath = Join-Path $backlog 'ad-hoc-plan.md'
@@ -44,12 +46,13 @@ function Get-AutopilotRefillDecision {
     }
     $candidates = @($candidates | Sort-Object @{Expression={ if ($_.status -eq 'ReadyToSplit') { 0 } else { 1 } }} | Select-Object -Unique name,status,source)
   }
-  $needed = [Math]::Max(0, 3 - $readyCount)
+  $needed = [Math]::Max(0, 1 - $readyCount)
   if ($candidates.Count -lt $needed) {
     $planPath = Join-Path $backlog 'cgc-pms-production-enhancement-plan.md'
     if (Test-Path -LiteralPath $planPath) {
       $planText = Get-Content -LiteralPath $planPath -Raw -Encoding UTF8
       foreach ($match in [regex]::Matches($planText, '(?m)^###\s+([0-9]+(?:\.[0-9]+)+)\s+(.+?)\s*$')) {
+        if ([int]$match.Groups[1].Value.Split('.')[0] -lt 7) { continue }
         $name = $match.Groups[2].Value.Trim()
         if ($candidates.name -notcontains $name) { $candidates += [pscustomobject]@{ name = $name; status = 'Candidate'; source = "long-term:$($match.Groups[1].Value)" } }
       }
@@ -84,13 +87,7 @@ function Import-AutopilotReadyPlan {
 
 function Invoke-AutopilotReadyPlanner {
   param([string]$RepoRoot, [object[]]$Candidates, [string]$OutputPath, [string]$SchemaPath, [string]$Model = 'gpt-5.6-sol', [string]$Thinking = 'high', [int]$TimeoutSeconds = 1200)
-  $codex = if (Get-Command Resolve-AutopilotCodexCommand -ErrorAction SilentlyContinue) { Resolve-AutopilotCodexCommand } else {
-    $command = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($command) { $command.Source } else {
-      $package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue
-      if ($package) { Join-Path $package.InstallLocation 'app\resources\codex.exe' } else { throw 'Codex CLI command is unavailable' }
-    }
-  }
+  $codex = Resolve-AutopilotCodexInvocation
   $candidateJson = $Candidates | ConvertTo-Json -Depth 5 -Compress
   $prompt = @"
 Act as the fresh AutoPilot Planner for cgc-pms. Read AGENTS.override.md, AGENTS.md, docs/backlog/current-focus.md,
@@ -101,8 +98,8 @@ state explicit non-goals/migration/risk/runtime/reviewer requirements, and must 
 Return JSON matching $SchemaPath.
 "@
   $args = @('exec','--ephemeral','--sandbox','danger-full-access','--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$RepoRoot,'--output-schema',$SchemaPath,'--output-last-message',$OutputPath,'-')
-  $startInfo = [Diagnostics.ProcessStartInfo]::new(); $startInfo.FileName = $codex
-  $startInfo.Arguments = ($args | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
+  $startInfo = [Diagnostics.ProcessStartInfo]::new(); $startInfo.FileName = $codex.fileName
+  $startInfo.Arguments = (@($codex.argumentPrefix) + $args | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
   $startInfo.WorkingDirectory = $RepoRoot; $startInfo.UseShellExecute = $false; $startInfo.RedirectStandardInput = $true; $startInfo.RedirectStandardOutput = $true; $startInfo.RedirectStandardError = $true
   $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo; [void]$process.Start()
   $stdoutTask = $process.StandardOutput.ReadToEndAsync(); $stderrTask = $process.StandardError.ReadToEndAsync(); $process.StandardInput.Write($prompt); $process.StandardInput.Close()

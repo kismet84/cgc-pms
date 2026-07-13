@@ -165,6 +165,7 @@ describe('SidebarMenu', () => {
       '成本目标',
       '成本台账',
       '成本核对',
+      '现场日报',
     ])
 
     expect(wrapper.find('[data-menu-key="/cost-target/index"]').exists()).toBe(true)

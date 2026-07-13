@@ -265,7 +265,7 @@
     "release-skills": {
       "source": "jimliu/baoyu-skills",
       "sourceType": "github",
-      "skillPath": ".claude/skills/release-skills/SKILL.md",
+      "skillPath": ".agents/skills/release-skills/SKILL.md",
       "computedHash": "5409cb532b40552f455827f69938193f6b3f3b7e853565e816eee4fa147ab8c7"
     }
   }

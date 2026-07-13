@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [string]$IssueId = "",
@@ -15,13 +15,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$commandLibrary = Join-Path $PSScriptRoot 'autopilot-command.ps1'
+if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
 
 function Read-JsonFile {
   param([string]$Path)
   if (!(Test-Path $Path)) {
     throw "Config not found: $Path"
   }
-  return Get-Content -Raw $Path | ConvertFrom-Json
+  return Get-Content -Encoding UTF8 -Raw $Path | ConvertFrom-Json
 }
 
 function Get-IssueBlocks {
@@ -31,7 +33,7 @@ function Get-IssueBlocks {
     return @()
   }
 
-  $text = Get-Content -Raw $Path
+  $text = Get-Content -Encoding UTF8 -Raw $Path
   $matches = [regex]::Matches($text, "(?ms)^###\s+(ISSUE-[0-9-]+[^\r\n]*)\r?\n(.*?)(?=^###\s+ISSUE-|\z)")
   $issues = @()
   foreach ($match in $matches) {
@@ -97,7 +99,7 @@ function Test-ExcludedBusinessPath {
   if ($normalized.StartsWith("./")) {
     $normalized = $normalized.Substring(2)
   }
-  return $normalized -match '^(?:\.codex-autopilot/|\.omc/|\.omo/|\.opencode/|\.claude/|\.mimocode/|graphify-out/|\.sisyphus/|\.archive/)'
+  return $normalized -match '^(?:\.codex-autopilot/|\.omc/|\.omo/|\.opencode/|\.claude/|\.mimocode/|graphify-out/|\.sisyphus/|\.archive/|archive/v1\.0/private/)'
 }
 
 function Get-BusinessPathsFromStatusLine {
@@ -264,9 +266,14 @@ function Invoke-ExecutorProcess {
     return '"' + ($Argument.Replace('"', '\"')) + '"'
   }
 
+  $invocation = if ($Command -match '^codex(?:\.exe|\.cmd|\.ps1)?$') {
+    Resolve-AutopilotCodexInvocation -Command 'codex'
+  } else {
+    [pscustomobject]@{ fileName = Resolve-ExecutorCommand $Command; argumentPrefix = @() }
+  }
   $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-  $startInfo.FileName = Resolve-ExecutorCommand $Command
-  $startInfo.Arguments = (@($Arguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
+  $startInfo.FileName = $invocation.fileName
+  $startInfo.Arguments = (@($invocation.argumentPrefix) + @($Arguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
   $startInfo.WorkingDirectory = $WorkingDirectory
   $startInfo.UseShellExecute = $false
   $startInfo.RedirectStandardOutput = $true
@@ -282,7 +289,7 @@ function Invoke-ExecutorProcess {
   $stderrTask = $process.StandardError.ReadToEndAsync()
 
   if ($StdinPath) {
-    $process.StandardInput.Write((Get-Content -Raw -LiteralPath $StdinPath))
+    $process.StandardInput.Write((Get-Content -Encoding UTF8 -Raw -LiteralPath $StdinPath))
     $process.StandardInput.Close()
   }
 
@@ -402,8 +409,8 @@ function Invoke-ConfiguredIssueExecutor {
     -BeforeFingerprints $beforeFingerprints `
     -AfterFingerprints $afterFingerprints
   $requireChangedFiles = if ($null -ne $executor.requireChangedFiles) { [bool]$executor.requireChangedFiles } else { $true }
-  $logText = if (Test-Path $logPath) { Get-Content -Raw -LiteralPath $logPath } else { "" }
-  $logTail = if (Test-Path $logPath) { @((Get-Content -Tail 40 -LiteralPath $logPath) -join "`n") } else { @() }
+  $logText = if (Test-Path $logPath) { Get-Content -Encoding UTF8 -Raw -LiteralPath $logPath } else { "" }
+  $logTail = if (Test-Path $logPath) { @((Get-Content -Encoding UTF8 -Tail 40 -LiteralPath $logPath) -join "`n") } else { @() }
 
   if ($exitCode -ne 0) {
     $failureCategory = Get-ExecutorFailureCategory $command $logText

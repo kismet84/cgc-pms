@@ -29,6 +29,7 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
@@ -83,6 +84,8 @@ import java.util.stream.Stream;
 @Service
 public class DashboardProjectBusinessService extends DashboardSharedSupport {
 
+    private final ProjectAccessChecker projectAccessChecker;
+
     public DashboardProjectBusinessService(
             CostSummaryService costSummaryService,
             CostSummaryMapper costSummaryMapper,
@@ -109,8 +112,10 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
             TechItemMapper techItemMapper,
             MdPartnerMapper partnerMapper,
             MdMaterialMapper materialMapper,
-            SysUserMapper userMapper) {
+            SysUserMapper userMapper,
+            ProjectAccessChecker projectAccessChecker) {
         super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
+        this.projectAccessChecker = projectAccessChecker;
     }
 
     public ProjectManagerDashboardVO getProjectManagerView(Long projectId) {
@@ -126,6 +131,10 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         }
 
         PmProject project = requireProject(tenantId, projectId);
+        projectAccessChecker.checkAccess(project, "查看项目经理驾驶舱");
+        if (!"ACTIVE".equals(project.getStatus())) {
+            throw new BusinessException("PROJECT_ACCESS_DENIED", "无权查看非进行中项目驾驶舱");
+        }
 
         ProjectManagerDashboardVO vo = new ProjectManagerDashboardVO();
         vo.setProjectId(projectId.toString());
@@ -161,11 +170,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
 
         // Lagging projects: planned end date in the past, not completed
         // NOT filtered by month — current-state indicator
-        List<PmProject> tenantProjects = projectMapper.selectList(
-                new LambdaQueryWrapper<PmProject>()
-                        .eq(PmProject::getTenantId, tenantId)
-                        .eq(PmProject::getStatus, "ACTIVE"));
-        List<DashboardProjectSummaryVO> lagging = tenantProjects.stream()
+        List<DashboardProjectSummaryVO> lagging = Stream.of(project)
                 .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(LocalDate.now())
                         && !"COMPLETED".equals(p.getStatus()))
                 .map(this::toProjectSummary)
@@ -330,10 +335,11 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         vo.setProjectId(null);
         vo.setProjectName("全部项目");
 
-        List<PmProject> activeProjects = projectMapper.selectList(
+        List<PmProject> activeProjects = projectAccessChecker.filterAccessible(projectMapper.selectList(
                 new LambdaQueryWrapper<PmProject>()
                         .eq(PmProject::getTenantId, tenantId)
-                        .eq(PmProject::getStatus, "ACTIVE"));
+                        .eq(PmProject::getStatus, "ACTIVE")));
+        Set<Long> visibleProjectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toSet());
 
         // Pending tasks for current user (tenant-wide, already not scoped to project)
         Long currentUserId = UserContext.getCurrentUserId();
@@ -354,6 +360,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         Map<Long, WfInstance> instanceMap = batchLoadInstances(pendingTasks);
         Map<Long, String> activeProjectNameMap = projectNameMap(activeProjects);
         List<DashboardTaskItemVO> taskItems = pendingTasks.stream()
+                .filter(t -> isVisibleWorkflowTask(t, instanceMap, tenantId, visibleProjectIds))
                 .filter(t -> isProjectManagerWorkflowTask(t, instanceMap.get(t.getInstanceId())))
                 .map(t -> toTaskItem(t, instanceMap.get(t.getInstanceId()), activeProjectNameMap))
                 .collect(Collectors.toList());
@@ -384,6 +391,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         }
         Map<Long, WfInstance> approvalInstanceMap = batchLoadInstances(allPendingApprovals);
         List<WfTask> projectManagerPendingApprovals = allPendingApprovals.stream()
+                .filter(t -> isVisibleWorkflowTask(t, approvalInstanceMap, tenantId, visibleProjectIds))
                 .filter(t -> isProjectManagerWorkflowTask(t, approvalInstanceMap.get(t.getInstanceId())))
                 .collect(Collectors.toList());
         List<DashboardTaskItemVO> pendingApprovals = projectManagerPendingApprovals.stream()
@@ -395,12 +403,14 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
 
         // Expiring contracts: tenant-wide within 30 days
         LocalDate cutoff = LocalDate.now().plusDays(30);
-        List<CtContract> expiringContracts = ctContractMapper.selectList(
-                new LambdaQueryWrapper<CtContract>()
-                        .eq(CtContract::getTenantId, tenantId)
-                        .le(CtContract::getEndDate, cutoff)
-                        .ge(CtContract::getEndDate, LocalDate.now())
-                        .eq(CtContract::getContractStatus, "PERFORMING"));
+        List<CtContract> expiringContracts = visibleProjectIds.isEmpty()
+                ? Collections.emptyList()
+                : ctContractMapper.selectList(new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getTenantId, tenantId)
+                .in(CtContract::getProjectId, visibleProjectIds)
+                .le(CtContract::getEndDate, cutoff)
+                .ge(CtContract::getEndDate, LocalDate.now())
+                .eq(CtContract::getContractStatus, "PERFORMING"));
         if (selectedMonth != null) {
             expiringContracts = expiringContracts.stream()
                     .filter(c -> c.getEndDate() != null
@@ -412,6 +422,17 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         vo.setExpiringContractCount((long) expiringContracts.size());
 
         return vo;
+    }
+
+    private boolean isVisibleWorkflowTask(WfTask task,
+                                          Map<Long, WfInstance> instanceMap,
+                                          Long tenantId,
+                                          Set<Long> visibleProjectIds) {
+        WfInstance instance = instanceMap.get(task.getInstanceId());
+        return instance != null
+                && Objects.equals(tenantId, instance.getTenantId())
+                && instance.getProjectId() != null
+                && visibleProjectIds.contains(instance.getProjectId());
     }
 
     private BusinessManagerDashboardVO getBusinessManagerViewAllProjects(Long tenantId) {

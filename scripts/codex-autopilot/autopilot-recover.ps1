@@ -65,7 +65,7 @@ function Register-AutopilotCloseout {
   $parent = Split-Path -Parent $LedgerPath
   if ($parent -and !(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
   if (Test-Path -LiteralPath $LedgerPath) {
-    foreach ($line in Get-Content -LiteralPath $LedgerPath) {
+    foreach ($line in Get-Content -Encoding UTF8 -LiteralPath $LedgerPath) {
       try { if (($line | ConvertFrom-Json).key -eq $Key) { return $false } } catch {}
     }
   }

@@ -26,7 +26,9 @@ public class FileController {
     @AuditedOperation(type = "UPLOAD", businessType = "FILE", businessIdExpression = "#businessId")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:upload')"
             + " or (#businessType != null and #businessType.equalsIgnoreCase('CASH_JOURNAL')"
-            + " and hasAuthority('cashbook:journal:maintain'))")
+            + " and hasAuthority('cashbook:journal:maintain'))"
+            + " or (#businessType != null and #businessType.equalsIgnoreCase('SITE_DAILY_LOG')"
+            + " and hasAuthority('site:daily:edit'))")
     @RateLimit(maxRequests = 20, windowSeconds = 60, key = RateLimitKey.USER)
     public ApiResponse<SysFileVO> upload(
             @RequestParam MultipartFile file,
@@ -38,7 +40,7 @@ public class FileController {
     @GetMapping("/{id}/url")
     @AuditedOperation(type = "DOWNLOAD", businessType = "FILE", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')"
-            + " or hasAuthority('cashbook:journal:query')")
+            + " or hasAuthority('cashbook:journal:query') or hasAuthority('site:daily:query')")
     public ApiResponse<String> getUrl(@PathVariable Long id) {
         return ApiResponse.success(fileService.getPresignedUrl(id));
     }
@@ -46,7 +48,7 @@ public class FileController {
     @DeleteMapping("/{id}")
     @AuditedOperation(type = "DELETE", businessType = "FILE", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:delete')"
-            + " or hasAuthority('cashbook:journal:maintain')")
+            + " or hasAuthority('cashbook:journal:maintain') or hasAuthority('site:daily:edit')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         fileService.delete(id);
         return ApiResponse.success();
@@ -55,7 +57,9 @@ public class FileController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')"
             + " or (#businessType != null and #businessType.equalsIgnoreCase('CASH_JOURNAL')"
-            + " and hasAuthority('cashbook:journal:query'))")
+            + " and hasAuthority('cashbook:journal:query'))"
+            + " or (#businessType != null and #businessType.equalsIgnoreCase('SITE_DAILY_LOG')"
+            + " and hasAuthority('site:daily:query'))")
     public ApiResponse<List<SysFileVO>> listByBusiness(
             @RequestParam String businessType,
             @RequestParam Long businessId) {

@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -33,7 +33,7 @@ try {
     validationCommands = @('git diff --check'); riskLevel = '低'; migration = '不需要'
   }
   $worktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId $issue.issueId -BaseCommit $baseCommit
-  if ((Get-Content -LiteralPath (Join-Path $worktree.path 'docs\quality\base.md') -Raw).Trim() -ne 'base') { throw 'main dirty content leaked into worktree' }
+  if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $worktree.path 'docs\quality\base.md') -Raw).Trim() -ne 'base') { throw 'main dirty content leaked into worktree' }
   'repair-diff' | Set-Content -LiteralPath (Join-Path $worktree.path 'docs\quality\repair.md') -Encoding UTF8
   $dirtyReuseRejected = $false
   try { New-AutopilotIssueWorktree -RepoRoot $root -IssueId $issue.issueId -BaseCommit $baseCommit | Out-Null } catch { $dirtyReuseRejected = $true }
@@ -52,7 +52,7 @@ try {
   $issueB.readyContentHash = 'ready-hash-b'
   $contextBPath = Join-Path $root 'context-b.json'
   New-AutopilotContextPack -Issue $issueB -Phase 'implement' -RepoRoot $root -Worktree $worktree.path -OutputPath $contextBPath | Out-Null
-  if ((Get-Content -LiteralPath $contextBPath -Raw) -match 'ISSUE-900-010|executor\.log') { throw 'previous Issue leaked into next context' }
+  if ((Get-Content -Encoding UTF8 -LiteralPath $contextBPath -Raw) -match 'ISSUE-900-010|executor\.log') { throw 'previous Issue leaked into next context' }
 
   $violationRejected = $false
   try { Assert-AutopilotAllowedChanges -ChangedPaths @('deploy/prod.yml') -AllowedPaths $issue.allowedPaths -ForbiddenPaths $issue.forbiddenPaths } catch { $violationRejected = $true }

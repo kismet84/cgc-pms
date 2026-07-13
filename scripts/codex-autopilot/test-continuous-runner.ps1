@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = "Stop"
 
@@ -7,6 +7,8 @@ $Runner = Join-Path $ScriptDir "autopilot-run-continuous.ps1"
 $StartScript = Join-Path $ScriptDir "autopilot-start.ps1"
 $Executor = Join-Path $ScriptDir "autopilot-exec-issue.ps1"
 $StatusScript = Join-Path $ScriptDir "autopilot-status.ps1"
+$RepoRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
+$CheckpointScript = Join-Path $RepoRoot "plugins\cgc-pms-autopilot\scripts\autopilot-checkpoint.ps1"
 $KillScript = Join-Path $ScriptDir "autopilot-kill.ps1"
 $ReadinessScript = Join-Path $ScriptDir "autopilot-readiness-check.ps1"
 $TempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("cgc-pms-autopilot-runner-test-" + [guid]::NewGuid().ToString("N"))
@@ -175,7 +177,7 @@ function Set-IssueStatus {
   )
 
   $ReadyPath = Join-Path $Root "docs\backlog\ready-issues.md"
-  $text = Get-Content -Raw $ReadyPath
+  $text = Get-Content -Encoding UTF8 -Raw $ReadyPath
   $text = $text -replace "(?m)^状态[：:].*$", "状态：$Status"
   $text | Out-File -Encoding utf8 $ReadyPath
 }
@@ -278,7 +280,7 @@ function Get-RunEvents {
   if (!(Test-Path $eventPath)) {
     throw "Expected events.jsonl to exist"
   }
-  return @(Get-Content -LiteralPath $eventPath | ForEach-Object { $_ | ConvertFrom-Json })
+  return @(Get-Content -Encoding UTF8 -LiteralPath $eventPath | ForEach-Object { $_ | ConvertFrom-Json })
 }
 
 function Assert-EventSchema {
@@ -300,7 +302,7 @@ function Get-LatestResult {
   if (!$resultPath) {
     throw "Expected result.json to exist"
   }
-  return Get-Content -Raw $resultPath.FullName | ConvertFrom-Json
+  return Get-Content -Encoding UTF8 -Raw $resultPath.FullName | ConvertFrom-Json
 }
 
 try {
@@ -363,13 +365,13 @@ try {
   $ReadyDoneResult = Get-LatestResult $ReadyRoot
   Assert-ResultSchema $ReadyDoneResult
   if ($ReadyDoneResult.status -ne "done") {
-    $executorLog = @($ReadyDoneResult.artifacts | Where-Object { $_ -like '*executor.log' } | ForEach-Object { if (Test-Path $_) { Get-Content -LiteralPath $_ -Raw } }) -join "`n"
+    $executorLog = @($ReadyDoneResult.artifacts | Where-Object { $_ -like '*executor.log' } | ForEach-Object { if (Test-Path $_) { Get-Content -Encoding UTF8 -LiteralPath $_ -Raw } }) -join "`n"
     throw "Expected real executor status done. Actual: $($ReadyDoneResult | ConvertTo-Json -Compress -Depth 8) Log: $executorLog"
   }
   if ($ReadyDoneResult.failureCategory -ne "none") { throw "Expected real executor failureCategory none. Actual: $($ReadyDoneResult | ConvertTo-Json -Compress -Depth 8)" }
   $ReadyNoopEvents = Get-RunEvents $ReadyRoot
   if (!($ReadyNoopEvents | Where-Object { $_.event -eq "executor.result" -and $_.status -eq "done" })) { throw "Expected executor result event" }
-  $ReadyLimitState = Get-Content -Raw (Join-Path $ReadyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $ReadyLimitState = Get-Content -Encoding UTF8 -Raw (Join-Path $ReadyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($ReadyLimitState.iterationLimit -ne 2) { throw "Expected state.iterationLimit=2" }
   if ($ReadyLimitState.iterationCompleted -ne 0) { throw "Expected state.iterationCompleted=0" }
   if ($ReadyLimitState.remainingIterations -ne 2) { throw "Expected state.remainingIterations=2" }
@@ -680,7 +682,7 @@ try {
   $SplitOutput = Invoke-Runner $SplitRoot
   Assert-Contains $SplitOutput "SPLIT_MODE"
   Assert-Contains $SplitOutput "DRY_RUN_NO_BACKLOG_WRITE"
-  $SplitReadyAfterDryRun = Get-Content -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
+  $SplitReadyAfterDryRun = Get-Content -Encoding UTF8 -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterDryRun "状态：Ready"
   $SplitEvents = Get-RunEvents $SplitRoot
   if (!($SplitEvents | Where-Object { $_.event -eq "split.dry_run" -and $_.shouldSplitBacklog })) { throw "Expected dry-run split event" }
@@ -690,7 +692,7 @@ try {
   Assert-Contains $ExplainSplitOutput "nextAction=SPLIT_BACKLOG"
   Assert-Contains $ExplainSplitOutput "shouldSplitBacklog=true"
   Assert-Contains $ExplainSplitOutput "wouldCreateReadyIssueDrafts=1"
-  $SplitReadyAfterExplain = Get-Content -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
+  $SplitReadyAfterExplain = Get-Content -Encoding UTF8 -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterExplain "状态：Ready"
   if (Test-Path (Join-Path $SplitRoot ".codex-autopilot\run.lock")) { throw "ExplainNextAction should not leave run.lock" }
 
@@ -715,11 +717,11 @@ try {
   Assert-Contains $ApplyOutput "REFILL_ROUND_COMPLETE"
   Assert-NotContains $ApplyOutput "READY_ISSUE_FOUND"
   Assert-NotContains $ApplyOutput "EXECUTOR_RESULT_WRITTEN"
-  $ApplyReady = Get-Content -Raw (Join-Path $ApplyRoot "docs\backlog\ready-issues.md")
+  $ApplyReady = Get-Content -Encoding UTF8 -Raw (Join-Path $ApplyRoot "docs\backlog\ready-issues.md")
   Assert-Contains $ApplyReady "状态：Ready"
   Assert-Contains $ApplyReady "验证命令："
   Assert-Contains $ApplyReady "来源锚点："
-  $ApplyState = Get-Content -Raw (Join-Path $ApplyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $ApplyState = Get-Content -Encoding UTF8 -Raw (Join-Path $ApplyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($ApplyState.mode -ne "continuous-runner") { throw "Expected state.mode=continuous-runner" }
   if ($ApplyState.lastAction -ne "BACKLOG_SPLIT_APPLIED") { throw "Expected state.lastAction=BACKLOG_SPLIT_APPLIED" }
   if ($ApplyState.status -ne "REFILLING") { throw "Expected state.status=REFILLING" }
@@ -811,7 +813,7 @@ try {
   }
 
   $NoExecutorConfig = Join-Path $TempRoot "no-executor.config.json"
-  $ActualConfig = Get-Content -Raw (Join-Path $ScriptDir "codex-autopilot.config.json") | ConvertFrom-Json
+  $ActualConfig = Get-Content -Encoding UTF8 -Raw (Join-Path $ScriptDir "codex-autopilot.config.json") | ConvertFrom-Json
   $ActualConfig.PSObject.Properties.Remove("issueExecutor")
   $ActualConfig | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 $NoExecutorConfig
   $NoExecutorReadiness = Invoke-Readiness (Split-Path -Parent (Split-Path -Parent $ScriptDir)) $NoExecutorConfig | ConvertFrom-Json
@@ -882,16 +884,22 @@ try {
 "@ -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $LimitOneRoot -Apply -MaxIterations 1) "READY_ISSUE_FOUND"
   Set-IssueStatus $LimitOneRoot "Done"
-  $LimitOnePreState = Get-Content -Raw (Join-Path $LimitOneRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $LimitOnePreState = Get-Content -Encoding UTF8 -Raw (Join-Path $LimitOneRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($LimitOnePreState.worktree -and (Test-Path $LimitOnePreState.worktree)) { & git -C $LimitOneRoot worktree remove --force $LimitOnePreState.worktree 2>$null | Out-Null }
   $LimitOnePreState.worktree = ''
   $LimitOnePreState | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $LimitOneRoot ".codex-autopilot\state.json") -Encoding UTF8
   $LimitOneDoneOutput = Invoke-Runner $LimitOneRoot -Apply -MaxIterations 1
   Assert-Contains $LimitOneDoneOutput "STOP_ITERATION_LIMIT_REACHED"
-  $LimitOneState = Get-Content -Raw (Join-Path $LimitOneRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $LimitOneState = Get-Content -Encoding UTF8 -Raw (Join-Path $LimitOneRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($LimitOneState.iterationCompleted -ne 1) { throw "Expected MaxIterations=1 to count one completed issue. Actual: $($LimitOneState | ConvertTo-Json -Compress -Depth 8)" }
   if ($LimitOneState.remainingIterations -ne 0) { throw "Expected MaxIterations=1 remainingIterations=0" }
   if ($LimitOneState.stopReason -ne "STOP_ITERATION_LIMIT_REACHED") { throw "Expected STOP_ITERATION_LIMIT_REACHED stopReason" }
+  if (Test-Path (Join-Path $LimitOneRoot ".codex-autopilot\enabled.flag")) { throw "Iteration limit must disable future dispatch" }
+  $LimitCheckpoint = & powershell -NoProfile -ExecutionPolicy Bypass -File $CheckpointScript -RepoRoot $LimitOneRoot -AsJson | ConvertFrom-Json
+  if ($LimitCheckpoint.decision -ne 'limit_reached') { throw "Checkpoint must report limit_reached, got $($LimitCheckpoint.decision)" }
+  $LimitStatus = & powershell -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $LimitOneRoot | ConvertFrom-Json
+  if ($LimitStatus.lastIssue -ne $LimitOneState.iterationLastCountedIssue) { throw "Status must expose iterationLastCountedIssue as lastIssue" }
+  if ($LimitStatus.recoveryAction -ne 'NONE') { throw "Terminal limit state must not advertise NEW_RUN recovery" }
 
   $LimitTwoRoot = New-Fixture -Name "limit-two" -Enabled -Ready @"
 # Ready Issues
@@ -914,14 +922,14 @@ try {
 "@ -Plan "# Plan`n"
   Assert-Contains (Invoke-Runner $LimitTwoRoot -Apply -MaxIterations 2) "READY_ISSUE_FOUND"
   Set-IssueStatus $LimitTwoRoot "Blocked"
-  $LimitTwoPreState = Get-Content -Raw (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $LimitTwoPreState = Get-Content -Encoding UTF8 -Raw (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($LimitTwoPreState.worktree -and (Test-Path $LimitTwoPreState.worktree)) { & git -C $LimitTwoRoot worktree remove --force $LimitTwoPreState.worktree 2>$null | Out-Null }
   $LimitTwoPreState.worktree = ''
   $LimitTwoPreState | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") -Encoding UTF8
   $LimitTwoDoneOutput = Invoke-Runner $LimitTwoRoot -Apply -MaxIterations 2
   Assert-Contains $LimitTwoDoneOutput "STOP_CURRENT_ISSUE_BLOCKED"
   Assert-NotContains $LimitTwoDoneOutput "STOP_ITERATION_LIMIT_REACHED"
-  $LimitTwoState = Get-Content -Raw (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $LimitTwoState = Get-Content -Encoding UTF8 -Raw (Join-Path $LimitTwoRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($LimitTwoState.iterationCompleted -ne 1) { throw "Expected the prior done executor result to consume one completion quota" }
   if ($LimitTwoState.remainingIterations -ne 1) { throw "Expected MaxIterations=2 remainingIterations=1" }
 
@@ -976,7 +984,7 @@ try {
   Assert-Contains $RepairOutput "remainingIterations=0"
   Assert-Contains $RepairOutput "STOP_ITERATION_LIMIT_REACHED"
   Assert-NotContains $RepairOutput "READY_ISSUE_FOUND"
-  $RepairState = Get-Content -Raw (Join-Path $RepairRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $RepairState = Get-Content -Encoding UTF8 -Raw (Join-Path $RepairRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($RepairState.iterationCompleted -ne 3) { throw "Expected repaired state.iterationCompleted=3" }
   if ($RepairState.remainingIterations -ne 0) { throw "Expected repaired state.remainingIterations=0" }
 
@@ -995,7 +1003,7 @@ try {
 }
 "@ | Out-File -Encoding utf8 (Join-Path $StartStateRoot ".codex-autopilot\state.json")
   & powershell -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $StartStateRoot 2>&1 | Out-String | Out-Null
-  $StartState = Get-Content -Raw (Join-Path $StartStateRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $StartState = Get-Content -Encoding UTF8 -Raw (Join-Path $StartStateRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($StartState.iterationCompleted -ne 2) { throw "Expected start to preserve iterationCompleted" }
   if ($StartState.remainingIterations -ne 1) { throw "Expected start to preserve remainingIterations" }
   if ($StartState.startedAt -ne "2026-07-09T13:29:13") { throw "Expected start to preserve startedAt" }
@@ -1006,7 +1014,7 @@ try {
   if (Test-Path (Join-Path $EmptyRoot ".codex-autopilot\state.json")) { throw "Dry-run should not write state.json" }
   $EmptyApplyOutput = Invoke-Runner $EmptyRoot -Apply
   Assert-Contains $EmptyApplyOutput "STOP_READY_AND_POOL_EMPTY"
-  $EmptyState = Get-Content -Raw (Join-Path $EmptyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
+  $EmptyState = Get-Content -Encoding UTF8 -Raw (Join-Path $EmptyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($EmptyState.stopReason -ne "STOP_READY_AND_POOL_EMPTY") { throw "Expected state.stopReason=STOP_READY_AND_POOL_EMPTY" }
 
   Write-Host "continuous runner self-test passed"

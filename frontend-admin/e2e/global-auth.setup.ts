@@ -4,12 +4,21 @@ import { chromium } from '@playwright/test'
 
 const authStateFile = 'e2e/.auth/admin.json'
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
-const DEV_LOGIN_PATH = process.env.PLAYWRIGHT_DEV_LOGIN_PATH ?? '/api/auth/dev-login?redirect=/dashboard'
+const DEV_LOGIN_PATH =
+  process.env.PLAYWRIGHT_DEV_LOGIN_PATH ?? '/api/auth/dev-login?redirect=/dashboard'
+const BROWSER_CHANNEL = process.env.PLAYWRIGHT_BROWSER_CHANNEL
+const BROWSER_EXECUTABLE_PATH = process.env.PLAYWRIGHT_EXECUTABLE_PATH
 
 export default async function globalAuthSetup() {
   mkdirSync(dirname(authStateFile), { recursive: true })
 
-  const browser = await chromium.launch()
+  const browser = await chromium.launch(
+    BROWSER_EXECUTABLE_PATH
+      ? { executablePath: BROWSER_EXECUTABLE_PATH }
+      : BROWSER_CHANNEL
+        ? { channel: BROWSER_CHANNEL }
+        : undefined,
+  )
   try {
     const context = await browser.newContext({ baseURL: BASE_URL })
     const page = await context.newPage()

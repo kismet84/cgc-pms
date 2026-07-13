@@ -250,6 +250,23 @@ public class MatReceiptService {
 
         Long tenantId = UserContext.getCurrentTenantId();
 
+        for (MatReceiptItem item : items) {
+            BigDecimal actual = item.getActualQuantity();
+            BigDecimal qualified = item.getQualifiedQuantity() != null
+                    ? item.getQualifiedQuantity() : BigDecimal.ZERO;
+            if (actual == null || actual.signum() <= 0 || qualified.signum() < 0
+                    || qualified.compareTo(actual) > 0) {
+                throw new BusinessException("RECEIPT_QUANTITY_INVALID", "实收数量必须大于 0，合格数量必须在 0 到实收数量之间");
+            }
+            if (item.getOrderItemId() != null) {
+                MatPurchaseOrderItem orderItem = matPurchaseOrderItemMapper.selectById(item.getOrderItemId());
+                if (orderItem == null || receipt.getOrderId() == null
+                        || !receipt.getOrderId().equals(orderItem.getOrderId())) {
+                    throw new BusinessException("ORDER_ITEM_MISMATCH", "采购订单明细不属于当前验收单");
+                }
+            }
+        }
+
         // Subtract old item quantities from order items before deletion
         LambdaQueryWrapper<MatReceiptItem> oldItemWrapper = new LambdaQueryWrapper<>();
         oldItemWrapper.eq(MatReceiptItem::getReceiptId, receiptId)

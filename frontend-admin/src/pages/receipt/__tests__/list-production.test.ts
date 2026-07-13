@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const pageSource = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-const composableSource = readFileSync(resolve(currentDir, '../composables/useReceiptList.ts'), 'utf-8')
+const composableSource = readFileSync(
+  resolve(currentDir, '../composables/useReceiptList.ts'),
+  'utf-8',
+)
 
 describe('receipt list production hardening', () => {
   it('hydrates and persists filters through route query', () => {
@@ -14,7 +17,9 @@ describe('receipt list production hardening', () => {
     expect(composableSource).toContain('readStringQuery(route.query.projectId)')
     expect(composableSource).toContain('readStringQuery(route.query.receiptCode)')
     expect(composableSource).toContain('readPositiveIntQuery(route.query.pageNo, 1)')
-    expect(composableSource).toContain('await router.replace({ path: route.path, query: nextQuery })')
+    expect(composableSource).toContain(
+      'await router.replace({ path: route.path, query: nextQuery })',
+    )
   })
 
   it('tracks explicit loaded and error states with retry support', () => {

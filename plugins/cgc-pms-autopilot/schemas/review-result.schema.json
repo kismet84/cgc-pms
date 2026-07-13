@@ -6,9 +6,9 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "issueId", "decision", "findings", "reviewedDiffHash", "reviewedAt"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "type": "integer", "const": 1 },
     "issueId": { "type": "string", "pattern": "^ISSUE-[0-9-]+$" },
-    "decision": { "enum": ["pass", "needs_repair", "blocked"] },
+    "decision": { "type": "string", "enum": ["pass", "needs_repair", "blocked"] },
     "findings": {
       "type": "array",
       "items": {
@@ -16,7 +16,7 @@
         "additionalProperties": false,
         "required": ["severity", "file", "line", "risk", "requiredEvidence"],
         "properties": {
-          "severity": { "enum": ["blocking", "non_blocking"] },
+          "severity": { "type": "string", "enum": ["blocking", "non_blocking"] },
           "file": { "type": "string" },
           "line": { "type": ["integer", "null"], "minimum": 1 },
           "risk": { "type": "string", "minLength": 1 },

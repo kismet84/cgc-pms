@@ -23,7 +23,11 @@ import {
 import { useReferenceStore } from '@/stores/reference'
 import type { SubTaskVO } from '@/types/subcontract'
 import type { SelectOption } from '@/types/ui'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import {
@@ -48,6 +52,7 @@ const loading = ref(false)
 const hasLoaded = ref(false)
 const listError = ref<string | null>(null)
 const tableData = ref<SubTaskVO[]>([])
+const predecessorTasks = ref<SubTaskVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
@@ -62,6 +67,7 @@ const formData = reactive<Partial<SubTaskVO>>({
   projectId: undefined,
   contractId: undefined,
   partnerId: undefined,
+  predecessorTaskId: undefined,
   taskName: '',
   workArea: '',
   plannedStartDate: undefined,
@@ -75,6 +81,31 @@ const formData = reactive<Partial<SubTaskVO>>({
 const formPartnerName = computed(
   () => contractList.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
 )
+const predecessorOptions = computed(() =>
+  predecessorTasks.value.filter(
+    (task) => task.projectId === formData.projectId && task.id !== editingId.value,
+  ),
+)
+const predecessorStartBlocked = computed(() => {
+  const predecessor = predecessorOptions.value.find(
+    (task) => task.id === formData.predecessorTaskId,
+  )
+  return predecessor != null && predecessor.status !== 'COMPLETED'
+})
+
+async function loadPredecessorOptions(projectId?: string) {
+  if (!projectId) {
+    predecessorTasks.value = []
+    return
+  }
+  try {
+    const res = await getSubTaskList({ pageNum: 1, pageSize: 1000, projectId })
+    predecessorTasks.value = res.records
+  } catch {
+    predecessorTasks.value = []
+    message.error('加载同项目前置任务失败，请稍后重试')
+  }
+}
 
 function filterSelectOption(input: string, option: SelectOption) {
   return option.label?.toLowerCase().includes(input.toLowerCase()) ?? false
@@ -193,6 +224,7 @@ function handleAdd() {
     projectId: undefined,
     contractId: undefined,
     partnerId: undefined,
+    predecessorTaskId: undefined,
     taskName: '',
     workArea: '',
     plannedStartDate: undefined,
@@ -213,6 +245,7 @@ function handleEdit(record: SubTaskVO) {
     projectId: record.projectId,
     contractId: record.contractId,
     partnerId: record.partnerId,
+    predecessorTaskId: record.predecessorTaskId,
     taskName: record.taskName,
     workArea: record.workArea,
     plannedStartDate: record.plannedStartDate,
@@ -223,6 +256,7 @@ function handleEdit(record: SubTaskVO) {
     status: record.status,
     remark: record.remark,
   })
+  loadPredecessorOptions(record.projectId)
   modalVisible.value = true
 }
 
@@ -272,7 +306,7 @@ async function handleModalOk() {
     fetchData()
   } catch (e: unknown) {
     console.error(e)
-    message.error('操作失败，请稍后重试')
+    message.error(e instanceof Error && e.message ? e.message : '操作失败，请稍后重试')
   }
 }
 
@@ -352,7 +386,24 @@ const wbsTimelineRows = computed(() => {
       row.status !== 'COMPLETED' &&
       progress < 100
 
-    return { row, hasPlan, left, width, isDelayed }
+    let predecessorRisk: 'INCOMPLETE' | 'LATE' | undefined
+    if (
+      row.predecessorTaskId &&
+      row.plannedStartDate &&
+      row.predecessorActualEndDate &&
+      row.predecessorActualEndDate > row.plannedStartDate
+    ) {
+      predecessorRisk = 'LATE'
+    } else if (
+      row.predecessorTaskId &&
+      row.plannedStartDate &&
+      row.plannedStartDate <= todayKey &&
+      row.predecessorStatus !== 'COMPLETED'
+    ) {
+      predecessorRisk = 'INCOMPLETE'
+    }
+
+    return { row, hasPlan, left, width, isDelayed, predecessorRisk }
   })
 })
 
@@ -512,7 +563,10 @@ onMounted(() => {
             </div>
             <div v-else-if="showEmptyState" class="subcontract-task-list-feedback">
               <LgEmptyState description="暂无符合条件的分包任务">
-                <a-button v-if="filter.keyword || filter.projectId || filter.status" @click="handleReset">
+                <a-button
+                  v-if="filter.keyword || filter.projectId || filter.status"
+                  @click="handleReset"
+                >
                   清空筛选
                 </a-button>
                 <a-button v-else type="primary" @click="handleAdd">新建任务</a-button>
@@ -576,14 +630,27 @@ onMounted(() => {
               <a-tag color="blue">只读</a-tag>
             </div>
             <div v-if="wbsTimelineRows.length" class="subcontract-task-wbs-list">
-              <div v-for="item in wbsTimelineRows" :key="item.row.id" class="subcontract-task-wbs-row">
+              <div
+                v-for="item in wbsTimelineRows"
+                :key="item.row.id"
+                class="subcontract-task-wbs-row"
+              >
                 <div class="subcontract-task-wbs-meta">
                   <strong>{{ item.row.taskCode || '-' }}</strong>
                   <span>{{ item.row.taskName || '-' }}</span>
                 </div>
                 <div class="subcontract-task-wbs-dates">
-                  <span>计划：{{ item.row.plannedStartDate || '未设置计划日期' }} ~ {{ item.row.plannedEndDate || '未设置计划日期' }}</span>
-                  <span>实际：{{ item.row.actualStartDate || '-' }} ~ {{ item.row.actualEndDate || '-' }}</span>
+                  <span
+                    >计划：{{ item.row.plannedStartDate || '未设置计划日期' }} ~
+                    {{ item.row.plannedEndDate || '未设置计划日期' }}</span
+                  >
+                  <span
+                    >实际：{{ item.row.actualStartDate || '-' }} ~
+                    {{ item.row.actualEndDate || '-' }}</span
+                  >
+                  <span v-if="item.row.predecessorTaskId"
+                    >前置：{{ item.row.predecessorTaskName || item.row.predecessorTaskId }}</span
+                  >
                 </div>
                 <div class="subcontract-task-wbs-progress">
                   <a-progress
@@ -595,6 +662,10 @@ onMounted(() => {
                     {{ STATUS_LABEL[item.row.status] ?? item.row.status }}
                   </a-tag>
                   <a-tag v-if="item.isDelayed" color="error">已延期</a-tag>
+                  <a-tag v-if="item.predecessorRisk === 'INCOMPLETE'" color="warning"
+                    >前置未完成</a-tag
+                  >
+                  <a-tag v-if="item.predecessorRisk === 'LATE'" color="error">前置迟交</a-tag>
                 </div>
                 <div class="subcontract-task-gantt-track">
                   <span
@@ -701,7 +772,9 @@ onMounted(() => {
                 (v: string) => {
                   formData.contractId = undefined
                   formData.partnerId = undefined
+                  formData.predecessorTaskId = undefined
                   referenceStore.fetchContracts({ projectId: v })
+                  loadPredecessorOptions(v)
                 }
               "
               :filter-option="filterSelectOption"
@@ -733,6 +806,24 @@ onMounted(() => {
           </a-form-item>
           <a-form-item label="施工区域">
             <a-input v-model:value="formData.workArea" placeholder="请输入施工区域" />
+          </a-form-item>
+          <a-form-item label="前置任务（FS）">
+            <a-select
+              v-model:value="formData.predecessorTaskId"
+              placeholder="请选择同项目前置任务"
+              allow-clear
+              show-search
+              :filter-option="filterSelectOption"
+            >
+              <a-select-option
+                v-for="task in predecessorOptions"
+                :key="task.id"
+                :value="task.id"
+                :label="`${task.taskCode || '-'} ${task.taskName}`"
+              >
+                {{ task.taskCode || '-' }} {{ task.taskName }}
+              </a-select-option>
+            </a-select>
           </a-form-item>
           <a-form-item label="计划开始日期">
             <a-date-picker
@@ -774,10 +865,17 @@ onMounted(() => {
           <a-form-item label="状态">
             <a-select v-model:value="formData.status" placeholder="请选择状态">
               <a-select-option value="NOT_STARTED">未开始</a-select-option>
-              <a-select-option value="IN_PROGRESS">进行中</a-select-option>
-              <a-select-option value="COMPLETED">已完成</a-select-option>
+              <a-select-option value="IN_PROGRESS" :disabled="predecessorStartBlocked"
+                >进行中</a-select-option
+              >
+              <a-select-option value="COMPLETED" :disabled="predecessorStartBlocked"
+                >已完成</a-select-option
+              >
               <a-select-option value="SUSPENDED">已暂停</a-select-option>
             </a-select>
+            <div v-if="predecessorStartBlocked" class="form-tip">
+              前置任务未完成，当前任务不能开工或完成
+            </div>
           </a-form-item>
           <a-form-item label="备注">
             <a-textarea v-model:value="formData.remark" :rows="1" placeholder="请输入备注" />

@@ -18,8 +18,17 @@
 - 做外科手术式修改：只改必要文件，遵循现有命名、目录、异常处理和测试风格。
 - 解决错误或工具陷阱后，优先在当前会话中沉淀可复用结论；只有在当前运行环境允许且用户明确要求时，才写入 `memory/` 并更新 `memory/MEMORY.md`。
 - `AGENTS.md` 为仓库级协作规则入口；`CLAUDE.md` 若存在则属于本地 AI 协作配置，不影响系统运行。
+- `codebase-memory-mcp` 只允许用于本地索引与只读查询；禁止由其创建、修改、删除或覆盖 `AGENTS.md`、`AGENTS.override.md`，禁止运行会自动改写智能体规则、Codex 配置、skills 或 hooks 的 `codebase-memory-mcp install` / `uninstall` 入口。需要升级时只能在用户明确授权后替换独立安装目录中的二进制，不得改写仓库规则文件。
 - 不要发送无信息量 commentary；需要进度同步时，只保留与当前任务直接相关的最小更新。
-- 任务执行完后及时清理node.js、自动化/Playwright 残留
+- 任务结束只做清理预览；仅清理本任务创建且确认无用的临时进程和产物，不影响用户已有运行环境，不得盲删。
+
+## 产品演进基本流程
+
+- 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
+- `docs/backlog/cgc-pms-production-enhancement-plan.md` 只作为研究和候选输入，不能直接生成 Ready；产品 Candidate 必须引用当前项目地图和迭代决策证据。
+- 工程治理 Candidate 默认不能替代产品方向；仅当当前证据证明它直接阻塞已选产品目标、安全边界或正式验收时，才可按 `缺口修复` 或 `运维治理` 进入 Ready，并明确关联目标、阻塞证据、解除条件、非目标和回滚方式。
+- Ready 以证据和字段完整为准，不为凑数量放宽门槛；1 条合格 Ready 即可实施，队列上限仍为 5 条。
+- 主线或 Ready Issue 完成后，必须回写项目地图；若结果影响候选排序，同步刷新竞品差距或迭代决策。
 
 ## 自动经验记录
 
@@ -42,9 +51,9 @@
 ## 项目与运行入口
 
 - 项目目录：`backend/` 后端、`frontend-admin/` 前端、`deploy/` 部署、`docs/` 文档中心。
-- 快速启动、本地访问地址、运行态刷新、常见验证：`docs/01-快速开始.md`
-- 系统分层、模块域、数据与部署架构：`docs/02-系统架构.md`
-- Docker、生产部署、回滚、备份、监控：`docs/10-部署运维手册.md`
+- 快速启动、本地访问地址、运行态刷新、常见验证：`docs/standards/01-快速开始.md`
+- 系统分层、模块域、数据与部署架构：`docs/standards/02-系统架构.md`
+- Docker、生产部署、回滚、备份、监控：`docs/standards/10-部署运维手册.md`
 - 前端本地验收默认入口：`http://localhost:5173`
 - 前后端重启后的统一稳定等待时间按 `180秒` 执行；后端至少等待 `180秒` 后再做 health / Flyway / 接口验收，前端至少等待 `180秒` 并确认 Vite ready 后，再做 Playwright UI 验收。
 - 若 Docker 连续多次不可用（如 `dockerDesktopLinuxEngine` 管道不存在、`docker ps` 无法连接、`5173/8080` 均拒绝连接），在需要运行态验收且用户允许运维动作时，先尝试重启 WSL2 与 Docker Desktop，再等待 `180秒` 后复查 `docker ps`、后端 health、前端入口；不得把 Docker 不可用伪装成业务失败或验收通过。
@@ -53,11 +62,11 @@
 ## 质量与避坑入口
 
 - 高频陷阱索引：`memory/MEMORY.md`。
-- 测试规范与测试数据隔离：`docs/09-测试规范.md`。
-- 后端开发规范：`docs/04-后端开发规范.md`。
-- 前端开发规范与 `lg-*` 设计系统：`docs/05-前端开发规范.md`、`frontend-admin/src/assets/styles/global.css`。
-- 数据库与迁移规范：`docs/07-数据库与迁移规范.md`。
-- UI 基线：`docs/00-UI-Design-Baselines-and-Code-Specifications.md`。
+- 测试规范与测试数据隔离：`docs/standards/09-测试规范.md`。
+- 后端开发规范：`docs/standards/04-后端开发规范.md`。
+- 前端开发规范与 `lg-*` 设计系统：`docs/standards/05-前端开发规范.md`、`frontend-admin/src/assets/styles/global.css`。
+- 数据库与迁移规范：`docs/standards/07-数据库与迁移规范.md`。
+- UI 基线：`docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md`。
 - CI、页面异常、接口失败先分三类再定性：`工具配置/规则加载问题`、`环境前置问题`、`真实质量/安全问题`；不要把所有红灯都直接归因为业务代码缺陷。
 
 ## 触发协议
@@ -83,9 +92,9 @@ docs/prompt/lark-confirmation-flow.md
 ## 文档入口
 
 - 文档索引：`docs/README.md`
-- 快速开始：`docs/01-快速开始.md`
-- 系统架构：`docs/02-系统架构.md`
-- 业务模块说明：`docs/03-业务模块说明.md`
-- API 契约：`docs/06-API契约规范.md`
-- 权限与审批：`docs/08-权限与审批流程.md`
-- 安全规范：`docs/11-安全规范.md`
+- 快速开始：`docs/standards/01-快速开始.md`
+- 系统架构：`docs/standards/02-系统架构.md`
+- 业务模块说明：`docs/standards/03-业务模块说明.md`
+- API 契约：`docs/standards/06-API契约规范.md`
+- 权限与审批：`docs/standards/08-权限与审批流程.md`
+- 安全规范：`docs/standards/11-安全规范.md`

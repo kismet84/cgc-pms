@@ -9,7 +9,11 @@ import {
 } from '@/api/modules/invoice'
 import type { InvoiceVO, PayRecordBrief } from '@/types/invoice'
 import { VERIFY_STATUS_LABEL } from '@/types/invoice'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
 import {
   buildActionColumn,
   buildAmountColumn,
@@ -45,8 +49,8 @@ export function useInvoiceList({ route, router }: UseInvoiceListOptions) {
   const queryReady = ref(false)
 
   const payRecordList = ref<PayRecordBrief[]>([])
-  const hasActiveFilters = computed(
-    () => Boolean(filter.keyword || filter.payRecordId || filter.verifyStatus),
+  const hasActiveFilters = computed(() =>
+    Boolean(filter.keyword || filter.payRecordId || filter.verifyStatus),
   )
 
   const gridColumns = computed(() => [

@@ -17,6 +17,7 @@ import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -43,11 +44,13 @@ import java.util.stream.Collectors;
 public class MatStockService {
 
     private static final int MAX_RETRIES = 3;
+    private static final BigDecimal DEFAULT_SAFETY_STOCK_QTY = new BigDecimal("10.0000");
 
     private final MatStockMapper matStockMapper;
     private final MatStockTxnMapper matStockTxnMapper;
     private final MatWarehouseMapper matWarehouseMapper;
     private final MdMaterialMapper mdMaterialMapper;
+    private final ProjectAccessChecker projectAccessChecker;
 
     /**
      * 入库：增加指定仓库+物料的可用库存。
@@ -81,6 +84,7 @@ public class MatStockService {
                 stock.setWarehouseId(warehouseId);
                 stock.setMaterialId(materialId);
                 stock.setAvailableQty(quantity);
+                stock.setSafetyStockQty(DEFAULT_SAFETY_STOCK_QTY);
                 stock.setVersion(0);
                 matStockMapper.insert(stock);
             } catch (DuplicateKeyException e) {
@@ -303,12 +307,12 @@ public class MatStockService {
         stockWrapper.gt(MatStock::getAvailableQty, BigDecimal.ZERO);
         kpi.setMaterialTypeCount(matStockMapper.selectCount(stockWrapper));
 
-        // 低库存物料数（可用量 > 0 且 < 10）
+        // 低库存物料数（保持既有零库存排除口径，阈值按库存项配置）
         LambdaQueryWrapper<MatStock> lowStockWrapper = new LambdaQueryWrapper<>();
         lowStockWrapper.eq(MatStock::getTenantId, tenantId);
         lowStockWrapper.in(MatStock::getWarehouseId, warehouseIds);
         lowStockWrapper.gt(MatStock::getAvailableQty, BigDecimal.ZERO);
-        lowStockWrapper.lt(MatStock::getAvailableQty, new BigDecimal("10"));
+        lowStockWrapper.apply("available_qty < safety_stock_qty"); // SQL-SAFETY: fixed-sql-fragment
         kpi.setLowStockCount(matStockMapper.selectCount(lowStockWrapper));
 
         // 出入库次数
@@ -323,6 +327,57 @@ public class MatStockService {
         kpi.setTxnOutCount(outCount);
 
         return kpi;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock updateSafetyStockThreshold(Long stockId, BigDecimal safetyStockQty) {
+        validateQuantity(safetyStockQty, "INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值");
+        MatStock stock = loadAuthorizedStock(stockId, "维护安全库存阈值");
+        BigDecimal normalizedSafety = safetyStockQty.setScale(4);
+        if (stock.getReplenishmentTargetQty() != null
+                && normalizedSafety.compareTo(stock.getReplenishmentTargetQty()) > 0) {
+            throw new BusinessException("INVALID_REPLENISHMENT_SETTINGS", "安全库存阈值不能高于人工补货目标量");
+        }
+        stock.setSafetyStockQty(normalizedSafety);
+        updateStockOrThrow(stock);
+        return stock;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock updateReplenishmentSettings(Long stockId, BigDecimal safetyStockQty,
+                                                BigDecimal replenishmentTargetQty,
+                                                Integer replenishmentLeadDays) {
+        return updateReplenishmentSettings(stockId, safetyStockQty, replenishmentTargetQty,
+                replenishmentLeadDays, true);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock updateReplenishmentSettings(Long stockId, BigDecimal safetyStockQty,
+                                                BigDecimal replenishmentTargetQty,
+                                                Integer replenishmentLeadDays,
+                                                boolean replenishmentLeadDaysSpecified) {
+        validateQuantity(safetyStockQty, "INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值");
+        if (replenishmentTargetQty != null) {
+            validateQuantity(replenishmentTargetQty, "INVALID_REPLENISHMENT_TARGET", "人工补货目标量");
+        }
+        BigDecimal normalizedSafety = safetyStockQty.setScale(4);
+        BigDecimal normalizedTarget = replenishmentTargetQty == null ? null : replenishmentTargetQty.setScale(4);
+        if (normalizedTarget != null && normalizedTarget.compareTo(normalizedSafety) < 0) {
+            throw new BusinessException("INVALID_REPLENISHMENT_SETTINGS", "人工补货目标量不能低于安全库存阈值");
+        }
+        if (replenishmentLeadDays != null
+                && (replenishmentLeadDays < 0 || replenishmentLeadDays > 3650)) {
+            throw new BusinessException("INVALID_REPLENISHMENT_LEAD_DAYS", "人工补货提前期必须为 0 到 3650 的整数");
+        }
+
+        MatStock stock = loadAuthorizedStock(stockId, "维护补货设置");
+        stock.setSafetyStockQty(normalizedSafety);
+        stock.setReplenishmentTargetQty(normalizedTarget);
+        if (replenishmentLeadDaysSpecified) {
+            stock.setReplenishmentLeadDays(replenishmentLeadDays);
+        }
+        updateStockOrThrow(stock);
+        return stock;
     }
 
     public MatStockVO toStockVO(MatStock entity) {
@@ -440,6 +495,9 @@ public class MatStockService {
         vo.setWarehouseId(entity.getWarehouseId());
         vo.setMaterialId(entity.getMaterialId());
         vo.setAvailableQty(entity.getAvailableQty());
+        vo.setSafetyStockQty(entity.getSafetyStockQty());
+        vo.setReplenishmentTargetQty(entity.getReplenishmentTargetQty());
+        vo.setReplenishmentLeadDays(entity.getReplenishmentLeadDays());
         vo.setCreatedTime(entity.getCreatedTime() != null ? entity.getCreatedTime().toString() : null);
         vo.setUpdatedTime(entity.getUpdatedTime() != null ? entity.getUpdatedTime().toString() : null);
 
@@ -451,6 +509,32 @@ public class MatStockService {
             vo.setUnit(mat.getUnit());
         }
         return vo;
+    }
+
+    private void validateQuantity(BigDecimal value, String code, String label) {
+        if (value == null || value.signum() < 0 || value.scale() > 4) {
+            throw new BusinessException(code, label + "必须为非负数且最多 4 位小数");
+        }
+    }
+
+    private MatStock loadAuthorizedStock(Long stockId, String action) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        MatStock stock = matStockMapper.selectById(stockId);
+        if (stock == null || !tenantId.equals(stock.getTenantId())) {
+            throw new BusinessException("STOCK_NOT_FOUND", "库存记录不存在");
+        }
+        MatWarehouse warehouse = matWarehouseMapper.selectById(stock.getWarehouseId());
+        if (warehouse == null || !tenantId.equals(warehouse.getTenantId()) || !"ENABLE".equals(warehouse.getStatus())) {
+            throw new BusinessException("STOCK_NOT_FOUND", "库存记录不存在");
+        }
+        projectAccessChecker.checkAccess(warehouse.getProjectId(), action);
+        return stock;
+    }
+
+    private void updateStockOrThrow(MatStock stock) {
+        if (matStockMapper.updateById(stock) != 1) {
+            throw new BusinessException("STOCK_CONCURRENT_CONFLICT", "库存记录已变更，请刷新后重试");
+        }
     }
 
     /**

@@ -57,7 +57,7 @@ function New-AutopilotIssueWorktree {
 
 function Get-AutopilotWorktreeChanges {
   param([Parameter(Mandatory)][string]$Worktree)
-  return @(& git -C $Worktree status --porcelain=v1 | ForEach-Object {
+  return @(& git -C $Worktree status --porcelain=v1 --untracked-files=all | ForEach-Object {
     $raw = if ($_.Length -ge 4) { $_.Substring(3).Trim() } else { '' }
     if ($raw -match '\s+->\s+') { ($raw -split '\s+->\s+')[-1].Trim('"') } elseif ($raw) { $raw.Trim('"') }
   } | Where-Object { $_ } | Select-Object -Unique)

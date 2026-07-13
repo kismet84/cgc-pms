@@ -1,2054 +1,948 @@
+# Ready Issues
+
 ## Ready 队列状态
 
-- 当前无合格 Ready；`ISSUE-008-035`、`ISSUE-008-036`、`ISSUE-008-037` 已串行完成。
-- 本次 `启动迭代-3` 已达到 `3/3` 实施型上限，停止下一任务派发。
-- 上一轮 `ISSUE-008-032` 至 `ISSUE-008-034` 已完成并保留历史证据，不计入本轮。
-- `ISSUE-008-022` 至 `ISSUE-008-031` 已完成并转 Done；既有两轮 `10/10` 历史仍由下列记录、`done-issues.md` 和正式质量报告保留，不计入本轮。
-- `ISSUE-008-021` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `10/10` 个实施型 Ready Issue。
-- `ISSUE-008-020` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `9/10` 个实施型 Ready Issue。
-- `ISSUE-008-019` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `8/10` 个实施型 Ready Issue。
-- `ISSUE-008-018：通知平台平台化缺口-M4：同告警重复通知抑制与站内信频控回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `7/10` 个实施型 Ready Issue。
-- `ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `6/10` 个实施型 Ready Issue。
-- `ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `5/10` 个实施型 Ready Issue。
-- `ISSUE-008-015：报表中心平台化缺口-M6：导出审计留痕与目录一致性回归` 已于 2026-07-10 完成正式收口，并计入 `启动迭代-10` 的第 `4/10` 个实施型 Ready Issue。
-- 未证明完全无关联前，仍不并行续接其他 P2 平台化题。
+v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-## 任务来源
+当前 Ready 队列为空；`ISSUE-037-021` 已完成只读复验，但上线门禁仍阻塞，未解除项已进入 `blocked-issues.md`。
 
-- 临时计划书：`docs/backlog/ad-hoc-plan.md`
-- 长期总任务池：`docs/backlog/cgc-pms-production-enhancement-plan.md`
-- 本文件是当前执行队列，不是任务源全集。
-- 当本文件合格 Ready 少于 3 条时，AutoPilot 应先读取临时计划书中的 `ReadyToSplit` / 高优先级 `Candidate`，再读取长期总任务池，并按 `docs/backlog/current-focus.md` 补货，目标形成 3–5 条合格 Ready；若已有未执行 Ready，补货后总数不得超过 5。临时计划条目不得直接实施，必须先进入本文件成为合格 Ready Issue；无法形成至少 3 条时必须写明具体原因。3–5 条不代表允许并行，只有完全无关联、无任何代码关联的 Ready Issue 才可并行，不能证明完全无关联时按串行处理。补货轮只更新 backlog，不直接修改业务代码；连续执行模式补货完成后，若仍未命中 `stop.flag` / `pause.flag` 且已形成合格 Ready Issue，必须继续进入下一轮。
+### ISSUE-037-022：Windows PowerShell 5.1 AutoPilot 脚本编码兼容修复
 
-## Ready 编写约束
-
-- 每条新 Ready 必须显式写明 `任务性质`；可选值至少包括：`能力新增`、`缺口修复`、`回归证明`、`运维治理`。
-- `回归证明` 类 Ready 只允许证明既有能力、既有配置或既有链路真实生效；不得把“证明生效”改写成“能力新增完成”或“整个平台化完成”。
-- 同一能力域连续进入 `3` 条 Ready 后，继续拆同域 Ready 前必须先在 `current-focus.md` 记录候选域对比和未切换原因；连续进入 `5` 条后，必须再写清继续理由，否则不应继续同域续跑。
-- 同一类非阻塞告警、观察项或建议若已连续 `3` 次在正式报告中重复出现，下一条 Ready 不得继续仅做旁路备注；必须优先拆为治理型 Ready，或在不满足执行前置时转入 `blocked-issues.md`。
-- Ready 的“剩余风险”必须在收口时回流到 `ready-issues.md`、`blocked-issues.md` 或 `current-focus.md` 之一，不得只留在质量报告。
-
-## AutoPilot 自动合并门禁
-
-- Ready Issue 在允许修改范围内完成实现与自审后，允许自动合并；`autoPush=false`，不自动推送。
-- 自动合并前必须同时满足：
-  - 该 Issue 自带验证命令全部通过。
-  - `git diff --check` 通过。
-  - 自审结论为 PASS。
-  - 已更新 iteration report。
-  - 已更新 backlog 的 done/blocked 状态。
-  - 合并前再次确认不存在 `.codex-autopilot/stop.flag` 或 `.codex-autopilot/pause.flag`。
-- 任一门禁失败即转为 blocked，不进入人工等待态。
-
-## 运行前置与验证命令规范
-
-- 浏览器验收前必须先检查 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`。
-- 任一 health gate 不通，先归类为环境前置类；执行 runtime refresh，稳定等待 `180秒` 后复验，不直接判业务代码失败。
-- Docker / backend / frontend 未启动或端口不通，按环境前置类处理；恢复失败再 blocked。
-- PowerShell 下包含逗号的 Maven `-Dtest=` 参数必须整体加引号，避免参数拆分或 `ParserError`。
-- 验证命令中的测试类、测试方法选择器、脚本入口必须先校验存在；若不存在，归类为 Ready Issue 配置问题，可做最小等价替换，但必须在正式报告写明替换前后内容与原因。
-
-## 执行顺序建议
-
-1. `ISSUE-008-035`：先收紧项目成员后端项目级访问边界。
-2. `ISSUE-008-036`：再补项目成员按钮权限正向显示回归，依赖 035 的最终权限口径。
-3. `ISSUE-008-037`：最后补操作审计日志承载页；与前两条同属接口入口治理，未证明完全无关联，保持串行。
-
-### ISSUE-008-035：项目成员项目级访问范围治理
-
-优先级：P1
+优先级：P0
 任务性质：缺口修复
-类型：后端 / 权限 / 项目隔离 / 测试
-状态：Done（2026-07-11；计入本轮第 1/3 条）
+类型：AutoPilot / 控制面 / Windows PowerShell 5.1 / 编码兼容
+状态：Done（2026-07-12；计入 `启动迭代-1` 第 1/1 条）
 自动合并：auto-merge/local-commit-only
-来源锚点：`ISSUE-008-032` 非阻塞后续；`docs/quality/10b-project-isolation-first-package-closure-2026-07-01.md`
-依赖：无；本轮第 1 条。
-是否需要新增 migration：否。
+来源锚点：`docs/product-intelligence/project-map.md` 的 Ready 准入控制面、`docs/product-intelligence/evolution-decision.md` 的 v1.5 AutoPilot 准入与正式验收边界
+关联产品目标：恢复 v1.5 本地 AutoPilot 的合格 Ready 选单、实施、验证和收口控制面，使产品迭代仍受 stop/pause、Ready、A-F 与 no-push 门禁约束。
+阻塞证据：在当前 `develop/1.5` HEAD 上，`powershell -File scripts/codex-autopilot/autopilot-run-continuous.ps1` 稳定产生 ParserError；脚本为 UTF-8 无 BOM，Windows PowerShell 5.1 按系统 ANSI/GBK 解码，显式 UTF-8 读入后的 AST 解析错误为 0，且工作区 hash 与 HEAD blob 一致。
+解除条件：控制面及其 PowerShell 脚本在 Windows PowerShell 5.1 默认 `-File` 入口下均可解析；控制面自测、连续 runner 自测和 `git diff --check` 通过；本轮 runner 能继续选单或按规则补货。
+Migration：不需要
+依赖：仅使用仓库现有 PowerShell 自测与 AST 解析器；不新增工具、依赖、调度器或运行态服务。
+风险等级：中
+运行态要求：仅需 Windows PowerShell 5.1；不要求 Docker、backend、frontend、数据库、5173/8080、dev-login 或浏览器，不得修改业务运行态。
+Reviewer要求：主线程必须复核修复仅改变脚本编码兼容与回归断言，不改变 stop/pause、Ready 解析、执行路由、业务代码或生产边界；输出直接用于通过/不通过裁决。
+归档报告：`docs/quality/ISSUE-037-022-Windows-PowerShell-5.1-AutoPilot-脚本编码兼容修复验收报告.md`
+最小回滚：回退本 Issue 对 PowerShell 脚本编码、控制面自测和状态文档的差异；无业务代码、数据、schema 或运行态恢复动作。
 目标：
-- 将项目成员查询、新增、修改、删除统一接入既有 `ProjectAccessChecker`，不再只校验同租户项目归属。
-- 复用现有项目访问规则，不新增第二套权限抽象。
+- 为 Windows PowerShell 5.1 `-File` 入口提供最小、可验证的 UTF-8 解析兼容。
+- 用现有控制面自测固化所有 AutoPilot PowerShell 脚本的默认解析断言，避免中文内容再次使控制面失效。
+非目标：
+- 不修改业务接口、页面、权限、租户、审批、金额、数据库 migration 或产品功能。
+- 不升级 PowerShell，不引入第二套 runner、编码转换器、调度器或外部依赖。
+- 不处理 `ISSUE-037-021` 的 GitHub CI 红灯或分支保护问题。
 允许修改：
-- `backend/src/main/java/com/cgcpms/project/service/PmProjectMemberService.java`
-- `backend/src/test/java/com/cgcpms/project/**`
-- `docs/quality/**`、`docs/iterations/**`、`docs/backlog/**`
-禁止修改：
-- Controller 权限码、已应用 migration、生产配置、项目数据范围枚举
-验收标准：
-- 同租户但无项目访问权的用户读取或维护项目成员时 fail-close；管理员和有权用户不回退。
-- 所有入口复用同一服务级项目访问检查，并有稳定正负测试。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=PmProjectMemberServiceTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-035-project-member-access-scope.md`
-
-### ISSUE-008-036：项目成员操作按钮权限正向显示回归
-
-优先级：P2
-任务性质：回归证明
-类型：前端 / 权限可见性 / 测试
-状态：Done（2026-07-11；回归证明；计入本轮第 2/3 条）
-自动合并：auto-merge/local-commit-only
-来源锚点：`ISSUE-008-032` 非阻塞后续
-依赖：`ISSUE-008-035` 已完成；本轮第 2 条，当前可执行。
-是否需要新增 migration：否。
-目标：
-- 为 `project:member:add/edit/delete` 三项权限补齐正向显示测试，同时保留无权限隐藏断言。
-- 只证明既有权限控制生效，不改权限模型或页面结构。
-允许修改：
-- `frontend-admin/src/pages/project/__tests__/members.test.ts`
-- 必要时同页既有测试辅助代码
-- `docs/quality/**`、`docs/iterations/**`、`docs/backlog/**`
-禁止修改：
-- 后端、路由、权限码、页面重构、migration、生产配置
-验收标准：
-- 每项权限分别控制对应按钮；全权限时三个操作入口均可见，无权限时均不可见。
-验证命令：
-- `cd frontend-admin; pnpm test:unit src/pages/project/__tests__/members.test.ts`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-036-project-member-positive-permission-visibility.md`
-
-### ISSUE-008-037：操作审计日志最小承载页
-
-优先级：P2
-任务性质：缺口修复
-类型：前端 / 审计日志 / 路由 / 测试
-状态：Done（2026-07-11；计入本轮第 3/3 条）
-自动合并：auto-merge/local-commit-only
-来源锚点：`ISSUE-008-032` 遗留的 `/audit-logs` 无承载页缺口
-依赖：`ISSUE-008-036` 已完成；本轮第 3 条，当前可执行。
-是否需要新增 migration：否；复用现有 `/audit-logs` 查询接口与 `audit:query` 权限。
-目标：
-- 新增只读审计日志列表与系统设置入口，支持既有分页和最小筛选。
-- 复用项目现有表格、请求和异常态模式，不新增审计后端能力或通用页面框架。
-允许修改：
-- `frontend-admin/src/api/modules/audit.ts`
-- `frontend-admin/src/pages/system/audit/index.vue`
-- 对应最小测试
-- `frontend-admin/src/router/index.ts`、`frontend-admin/src/router/navigation.ts`
-- `docs/quality/**`、`docs/iterations/**`、`docs/backlog/**`
-禁止修改：
-- 后端、migration、审计采集口径、敏感请求/响应体展示、导出、生产配置
-验收标准：
-- 仅有 `audit:query` 或管理员可见/可达；列表覆盖 loading、empty、error/retry 和分页。
-- 页面不展示请求体、响应体、Token、Cookie 等敏感内容。
-验证命令：
-- `cd frontend-admin; pnpm test:unit src/pages/system/audit/__tests__/index.test.ts src/router/__tests__/router.test.ts`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-037-operation-audit-log-page.md`
-
-## P1
-
-### ISSUE-032-002：invoice 与 migration 全量测试红灯项目关系治理
-
-优先级：P1
-类型：后端 / 测试治理 / invoice / migration
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M2；`docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md`
-是否需要新增 migration：否；如确认必须新增表/字段，先转 Blocked 并回报人工裁决。
-目标：
-- 归因 `InvoiceValidationTest` 查询接口 `400` 与 `MigrationSoftDeleteBehaviorTest` 的 `发票缺少项目关系`。
-- 明确是测试夹具未补项目关系、接口契约断言漂移，还是发票项目关系真实约束缺陷。
-允许修改：
-- `backend/src/test/java/com/cgcpms/invoice/**`
-- `backend/src/test/java/com/cgcpms/MigrationSoftDeleteBehaviorTest.java`
-- `backend/src/main/java/com/cgcpms/invoice/**`
-- `docs/quality/**`
+- `scripts/codex-autopilot/*.ps1`
+- `plugins/cgc-pms-autopilot/scripts/*.ps1`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
 - `docs/iterations/**`
-- `docs/backlog/**`
+- `docs/quality/ISSUE-037-022-Windows-PowerShell-5.1-AutoPilot-脚本编码兼容修复验收报告.md`
 禁止修改：
-- 已应用 Flyway migration
-- 生产凭据、生产数据库连接、生产发布配置
-- 放宽发票租户、项目或状态校验
-验收标准：
-- `InvoiceValidationTest` 三个当前失败查询用例完成分类并收敛。
-- `MigrationSoftDeleteBehaviorTest#payInvoiceDeleteIsLogicalAndAllowsRecreate` 完成分类并收敛。
-- 质量报告明确项目关系约束是否为真实业务口径，不能只把 `400` 改成测试期望。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=InvoiceValidationTest,MigrationSoftDeleteBehaviorTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-032-002-invoice-migration-full-test-red-governance.md`
-
-### ISSUE-032-003：dashboard、purchase、revenue 全量测试红灯种子数据治理
-
-优先级：P1
-类型：后端 / 测试治理 / dashboard / purchase / revenue
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M2；`docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md`
-是否需要新增 migration：否。
-目标：
-- 归因 `DashboardChiefEngineerServiceTest` 的 `No value present`、`PurchaseRequestServiceTest` 的 `项目不存在`、`ContractRevenueServiceTest` 的提交断言失败。
-- 优先收敛测试种子数据前置，不先改生产查询或审批逻辑。
-允许修改：
-- `backend/src/test/java/com/cgcpms/dashboard/**`
-- `backend/src/test/java/com/cgcpms/purchase/**`
-- `backend/src/test/java/com/cgcpms/revenue/**`
-- `backend/src/main/java/com/cgcpms/dashboard/**`
-- `backend/src/main/java/com/cgcpms/purchase/**`
-- `backend/src/main/java/com/cgcpms/revenue/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 无证据修改驾驶舱、采购、收入生产口径
-验收标准：
-- 三个失败类当前失败项完成分类并收敛。
-- 如只是种子数据问题，修复应落在测试夹具或测试前置，不改生产代码。
-- 如确认生产逻辑存在真实缺陷，质量报告必须标明影响范围和阻塞等级。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=DashboardChiefEngineerServiceTest,PurchaseRequestServiceTest,ContractRevenueServiceTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-032-003-dashboard-purchase-revenue-full-test-red-governance.md`
-
-### ISSUE-032-004：Phase2 与 Phase4 历史集成链路红灯治理
-
-优先级：P1
-类型：后端 / 测试治理 / 集成链路
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M2；`docs/quality/mainline-32-m2-backend-full-test-red-triage-2026-07-09.md`
-是否需要新增 migration：否；涉及金额口径或审批状态机变更时先转 Blocked。
-目标：
-- 归因 `Phase2FullChainIntegrationTest` 的合同可用余额、付款审批状态链路失败。
-- 归因 `Phase4IntegrationTest` 的抄送 / 矩阵审批业务对象失败。
-- 在 workflow、invoice、dashboard/purchase/revenue 专项完成或有明确结论后再执行，避免重复修底层夹具问题。
-允许修改：
-- `backend/src/test/java/com/cgcpms/Phase2FullChainIntegrationTest.java`
-- `backend/src/test/java/com/cgcpms/Phase4IntegrationTest.java`
-- 必要时限于相关主链路的 `backend/src/main/java/com/cgcpms/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- 已应用 Flyway migration
-- 生产凭据、生产数据库连接、生产发布配置
-- 未经证据重写金额口径、审批状态机或租户隔离规则
-验收标准：
-- `Phase2FullChainIntegrationTest`、`Phase4IntegrationTest` 当前失败项完成分类并收敛。
-- 若依赖前序专项，应在报告中引用对应结论，不重复引入临时夹具。
-- 明确剩余红灯是否仍阻塞后端全量门禁。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=Phase2FullChainIntegrationTest,Phase4IntegrationTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-032-004-phase-integration-full-test-red-governance.md`
-
-### ISSUE-032-006：Mockito 动态 agent 与 Spring Boot generated password 提示治理
-
-优先级：P1
-类型：构建兼容性 / 运行提示 / 后端治理
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M4；`docs/quality/mainline-30-core-flow-regression-acceptance-2026-07-08.md`；`docs/quality/mainline-32-m4-build-compatibility-debt-2026-07-09.md`
-是否需要新增 migration：否。
-目标：
-- 收敛 Mockito 动态 agent 未来兼容性告警，避免未来 JDK / 安全策略升级时从 warning 演变为测试门禁失败。
-- 收敛 Spring Boot generated password 开发提示，减少开发/验收日志噪音，但不重做当前 JWT / dev-login 鉴权链路。
-允许修改：
-- `backend/pom.xml`
-- `backend/src/main/resources/application*.yml`
-- `backend/src/main/java/com/cgcpms/auth/config/**`
-- `backend/src/test/java/com/cgcpms/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 登录体系重构、权限模型重构、无证据的大范围测试框架迁移
-验收标准：
-- Mockito 动态 agent 告警完成最小治理或被明确降级为可接受观察项，并留下可复验命令。
-- Spring Boot generated password 提示完成最小治理或被明确限定在不影响现有鉴权链路的范围内。
-- 质量报告必须明确两类提示的最终分类、是否阻塞、剩余风险；无明确反证前维持非阻塞。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AuthControllerTest,AuthServiceDevLoginTest,WorkflowCoreServiceTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-032-006-build-compatibility-warning-governance.md`
-
-### ISSUE-032-007：UI / 可访问性 / 登录页品牌 / 440px 移动端复验基线
-
-优先级：P1
-类型：前端 / 质量复验 / UI 基线
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M6；`docs/quality/ui-consistency-audit-2026-06-26.md`；`docs/quality/mainline-32-m6-ui-quality-regression-entry-2026-07-09.md`
-是否需要新增 migration：否。
-目标：
-- 统一复验 UI 一致性、可访问性、登录页品牌和 `440px` 移动端布局四类遗留，形成当前基线。
-- 先分类为设计一致性问题、真实功能风险、环境前置问题或观察项，不直接承诺全站整改。
-允许修改：
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `frontend-admin/src/**`
 - `backend/**`
+- `frontend-admin/**`
 - `deploy/**`
-- 运行环境、生产凭据、生产数据库连接、生产发布配置
-- 把本轮扩大为全站 UI 重构、设计系统重写或移动端专项实现
+- `.github/workflows/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- 生产凭据、生产数据库连接、生产发布配置、仓库外文件
 验收标准：
-- 至少覆盖合同台账、成本汇总、结算列表、项目列表、系统字典、登录页六类页面或入口。
-- 至少留下一轮 `1600 x 1200` 与 `440 x 956` 的正式复验结论或明确前置阻塞。
-- 明确列出 UI 一致性、可访问性、登录页品牌、`440px` 布局四类问题的“通过 / 不通过 / 观察项”。
-- 不把历史截图或旧报告直接当成当前已验证事实。
+- `scripts/codex-autopilot/*.ps1` 在 Windows PowerShell 5.1 默认文件解码下 AST 解析错误为 0。
+- `test-control-plane.ps1` 在修复前因脚本 ParserError 断言失败，修复后通过；相关连续 runner 自测通过。
+- 实际控制面入口不再出现本轮 ParserError，并继续遵守 stop/pause/enabled、Ready 与 no-push 边界。
+- 修改只收敛编码兼容、回归断言和正式状态文档；`git diff --check` 通过。
 验证命令：
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-control-plane.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-continuous-runner.ps1`
 - `git diff --check`
-归档报告：`docs/quality/issue-032-007-ui-accessibility-mobile-baseline.md`
 
-### ISSUE-032-008：覆盖率与 E2E CI 基线复验
+### ISSUE-037-017：BaseEntity 备注写入契约修复
+
+优先级：P0
+任务性质：缺口修复
+类型：共享实体 / JSON 契约 / 数据正确性 / 后端测试
+状态：Done（2026-07-12；计入 `启动迭代-10` 第 1/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-13`
+Migration：不需要
+依赖：复用现有 `BaseEntity` 与 Spring/Jackson 配置；不新增 DTO、依赖或兼容层。
+风险等级：中
+运行态要求：共享 JSON 契约专项通过；不要求 Docker、前端或真实浏览器。
+Reviewer要求：复核 `remark` 可反序列化且可序列化，ID、租户、创建/更新人和时间仍保持只读；确认无 Controller、Service、前端或数据库扩散。
+归档报告：`docs/quality/ISSUE-037-017-BaseEntity备注写入契约修复验收报告.md`
+目标：
+- 修复客户端提交 `remark` 时被 Jackson 静默忽略的问题。
+- 保持共享实体其余受保护字段的反序列化边界不变。
+非目标：
+- 不修改业务 Controller、Service、Mapper、前端页面或数据库。
+- 不开展 DTO 重构、实体直绑更新白名单审计或历史数据回填。
+允许修改：
+- `backend/src/main/java/com/cgcpms/common/entity/BaseEntity.java`
+- `backend/src/test/java/com/cgcpms/common/entity/BaseEntityJsonContractTest.java`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/**/controller/**`
+- `backend/src/main/java/com/cgcpms/**/service/**`
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`、生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- JSON 中的 `remark` 能反序列化到 `BaseEntity`，序列化仍返回备注。
+- JSON 中的 `id`、`tenantId`、`createdBy`、`createdAt`、`updatedBy`、`updatedAt` 继续被反序列化忽略。
+- 实现仅移除 `remark` 的只读标记，不改变其他共享字段、业务接口或数据库结构。
+- 专项测试和 `git diff --check` 通过；回滚只恢复该标记并移除契约测试。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=BaseEntityJsonContractTest" test`
+- `git diff --check`
+
+### ISSUE-037-016：WBS 软删除编号冲突修复
 
 优先级：P1
-类型：测试治理 / CI 基线复验
-状态：Done
+任务性质：缺口修复
+类型：分包 WBS / 逻辑删除 / 唯一键 / 测试稳定性
+状态：Done（2026-07-12；计入 `启动迭代-5` 第 3/5 条）
 自动合并：auto-merge/local-commit-only
-来源锚点：`docs/plans/第32条主线-既有未解决问题统一治理任务计划书.md` M6；`docs/quality/quality-hardening-acceptance.md`；`docs/quality/mainline-32-m6-ui-quality-regression-entry-2026-07-09.md`
-是否需要新增 migration：否。
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-11`
+Migration：不需要
+依赖：复用现有 `SubTaskService.delete()`、MyBatis Plus 逻辑删除和任务 ID。
+风险等级：中
+运行态要求：后端专项通过；不要求 Docker、前端或真实浏览器。
+Reviewer要求：复核租户/项目访问、被引用任务禁止删除、墓碑编号唯一性、事务原子性和无跨表扩散。
+归档报告：`docs/quality/ISSUE-037-016-WBS软删除编号冲突修复验收报告.md`
 目标：
-- 复验后端/前端覆盖率与 E2E CI 的当前基线，区分“声明阈值”“当前测量”“CI 实际执行”三层事实。
-- 在没有新基线前，不直接提高阈值，不直接硬上门禁。
+- 修复当天编号被历史软删除记录复用后，再次逻辑删除触发唯一键冲突的问题。
+- 保持现有任务编号生成、引用保护、租户/项目权限和 API 语义。
+非目标：
+- 不新增 migration，不修改 `SUB-yyyyMMdd-XXX` 生成格式，不重构全局软删除。
+- 不清理或批量改写历史数据，不修改其他业务表。
 允许修改：
-- `docs/quality/**`
+- `backend/src/main/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/TenantBoundaryTask2Test.java`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/**`
+- `deploy/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 删除前在同一事务内把 `task_code` 改为基于任务 ID 的唯一墓碑值，再执行既有逻辑删除；墓碑值长度不超过 64。
+- 同日创建→删除→再次创建复用业务编号→再次删除全部成功，不出现 `DATA_CONFLICT`。
+- 被后续任务引用时仍先返回 `SUB_TASK_DEPENDENCY_IN_USE`，不得提前改写编号。
+- 不放宽租户/项目访问，不新增 migration 或其他表修改；失败必须整体回滚。
+- 恢复 `ISSUE-037-015` 为规避 H2 冲突而移除的两处测试清理，并与新增回归共同通过。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest,TenantBoundaryTask2Test" test`
+- `git diff --check`
+
+### ISSUE-037-015：WBS 单前置 FS 开工门禁
+
+优先级：P1
+任务性质：缺口修复
+类型：分包 WBS / 单前置 FS / 状态门禁 / 项目数据范围 / 前后端 / 测试
+状态：Done（2026-07-12；计入 `启动迭代-5` 第 2/5 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Odoo 19 Task Dependencies 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-10`
+Migration：不需要
+依赖：复用现有 `SubTask.predecessorTaskId`、`SubTaskService.validateDependencyConsistency()`、同项目/租户/环/日期校验、前端前置任务选项和状态下拉。
+风险等级：中
+运行态要求：后端专项、前端分包任务单测和类型检查通过；不要求 Docker 或真实浏览器。
+Reviewer要求：必须复核创建/更新/更换前置/清空前置、旧客户端省略字段兼容、租户/项目 fail-close、前置状态读取、状态绕过和前端仅做体验不替代后端门禁。
+归档报告：`docs/quality/ISSUE-037-015-WBS单前置FS开工门禁验收报告.md`
+目标：
+- 将现有单前置 FS 从只读风险提示补成后端状态门禁。
+- 有效前置任务未 `COMPLETED` 时，后续任务不得创建或更新为 `IN_PROGRESS` / `COMPLETED`。
+- 前端选择未完成前置时禁用对应状态选项并显示最小提示，减少无效提交。
+非目标：
+- 不新增 WAITING 状态、多前置、依赖类型、lag、工作日历、自动排程、拖拽、关键路径或跨项目依赖。
+- 不改变无前置任务、前置已完成任务、`NOT_STARTED` / `SUSPENDED` 的既有保存语义。
+- 不修改权限、审批、日报、生产部署或数据库 migration。
+允许修改：
+- `backend/src/main/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/subcontract/**`
+- `backend/src/test/java/com/cgcpms/TenantBoundaryTask2Test.java`
+- `frontend-admin/src/types/subcontract.ts`
+- `frontend-admin/src/pages/subcontract/task.vue`
+- `frontend-admin/src/pages/subcontract/__tests__/task.test.ts`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 创建或更新任务时，若最终有效 `predecessorTaskId` 非空且前置状态不是 `COMPLETED`，最终状态为 `IN_PROGRESS` 或 `COMPLETED` 必须以稳定业务错误拒绝。
+- 前置已完成、无前置、显式清空前置、最终状态为 `NOT_STARTED` 或 `SUSPENDED` 保持既有行为；旧客户端省略 `predecessorTaskId` 时沿用现有前置并正确门禁。
+- 更换前置后按新前置状态判断；跨租户、跨项目、自依赖、间接环和 FS 日期校验继续 fail-close，不得被状态门禁绕过。
+- 后端门禁位于统一 Service 校验路径，不能只靠 Controller 或前端；不得新增逐任务列表查询以外的无界扫描。
+- 前端根据当前所选前置任务状态禁用 `IN_PROGRESS` / `COMPLETED` 并显示原因；服务端拒绝仍需显示错误，不新增状态或写入口。
+- 至少覆盖创建、更新、省略字段、更换/清空前置、已完成/未完成前置、跨项目/环/日期既有回归和前端禁用提示；回滚为移除状态门禁与前端禁用，不涉及数据迁移。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest,TenantBoundaryTask2Test" test`
+- `cd frontend-admin; pnpm test:unit src/pages/subcontract/__tests__/task.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-014：现场日报当日已审批领料只读联动
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 领料出库 / 跨域只读聚合 / 项目数据范围 / 前后端 / 测试
+状态：Done（2026-07-12；计入 `启动迭代-5` 第 1/5 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Productivity 与 Odoo 19 validated stock moves 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-09`
+Migration：不需要
+依赖：复用现有 `site_daily_log`、`mat_requisition`、`mat_requisition_item`、物料主数据、`ProjectAccessChecker` 与日报详情 API；不新建日报材料表。
+风险等级：中
+运行态要求：后端专项、前端日报单测和类型检查通过；真实 API 或浏览器验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：必须复核租户/项目/日期范围、仅 `APPROVED` 且 `stock_out_flag = 1`、批量查询、数量精度、敏感金额字段不出参、日报权限不放宽领料写能力及前端只读边界。
+归档报告：`docs/quality/ISSUE-037-014-现场日报当日已审批领料只读联动验收报告.md`
+目标：
+- 在现场日报详情只读展示同租户、同项目、日报日期当天已审批且已真实出库的领料明细。
+- 展示领料单号、物料、数量、单位和使用部位，复用既有审批出库事实，避免重复录入。
+- 草稿与已提交日报均可查看；领料联动不参与日报提交、修改或附件状态机。
+非目标：
+- 不新增日报材料表，不从日报创建或修改领料单，不自动生成库存、成本或安装量动作。
+- 不把领料数量解释为已安装或已消耗，不展示 DRAFT、APPROVING、REJECTED 或未出库领料单。
+- 不返回单价、金额、合同、供应商，不修改领料审批、库存出库、成本生成、权限模型、migration 或生产部署。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/requisition/**`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 日报详情只聚合同租户、同项目、`requisition_date = report_date`、`approval_status = APPROVED` 且 `stock_out_flag = 1` 的领料单；跨租户、跨项目、其他日期、其他状态或未出库记录不得出现。
+- 每条明细只返回领料单 ID/编号、明细 ID、物料 ID/名称/单位、领料数量和使用部位；数量保持数据库精度，不转为浮点数，不返回单价、金额、合同或供应商。
+- 日报不存在或无项目访问权继续沿用既有 fail-close；联动查询发生在项目访问校验之后，不新增 `requisition:query` 或领料写权限。
+- 查询使用批量领料单、明细和物料读取，禁止按明细逐条查询；无命中返回空列表。
+- 前端详情以只读区域展示领料明细和空态，不提供新增、编辑、删除、提交审批、库存或成本写入口，文案不得声称已安装。
+- 至少覆盖 APPROVED/非 APPROVED、出库标记、租户/项目/日期隔离、空列表、数量字符串、敏感字段不出现和前端只读渲染；回滚为移除聚合字段和展示区，不涉及数据迁移。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-013：现场日报变更历史只读展示
+
+优先级：P1
+任务性质：缺口修复
+类型：现场生产 / 项目日报 / 操作审计 / 变更历史 / 租户边界 / 前后端 / 测试
+状态：Done（2026-07-12；计入 `启动迭代-3` 第 3/3 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Change History 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-08`
+Migration：不需要
+依赖：复用现有 `@AuditedOperation`、`sys_operation_audit_log`、日报详情 API 与项目访问校验；不新建历史表。
+风险等级：中
+运行态要求：后端专项、前端日报单测和类型检查通过；真实 API 或浏览器验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：必须复核 CREATE businessId 绑定、租户/businessType/businessId 精确过滤、失败事件可见性、敏感字段不出参、用户 ID 最小展示和无审计写路径新增。
+归档报告：`docs/quality/ISSUE-037-013-现场日报变更历史只读展示验收报告.md`
+目标：
+- 修正日报 CREATE 审计记录缺少 businessId，使新建、修改、提交都能归属具体日报。
+- 在日报详情只读展示操作类型、用户 ID、成功/失败和操作时间，形成最小变更历史。
+- 复用统一操作审计表，不创建日报专用历史副本。
+非目标：
+- 不做字段级前后值 diff、版本恢复、审计导出、审批轨迹或用户快照。
+- 不向前端返回 sourceIp、requestPath、errorCode、durationMs 等安全/运维字段。
+- 不修改统一审计表结构、异步写入机制、权限模型或生产部署。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/audit/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 日报 CREATE 的 `@AuditedOperation` 使用 `businessIdExpression = "#log.id"`，插入成功后记录具体日报 ID；UPDATE/SUBMIT 既有表达式保持不变。
+- 详情只查询当前 tenant、`business_type = SITE_DAILY_LOG`、`business_id = 日报ID` 的审计记录，并按创建时间倒序。
+- 返回 operationType、userId、successFlag、createdAt；不返回 IP、路径、错误码、耗时或其他审计内部字段。
+- 日报不存在或无项目访问权继续 fail-close；审计查询必须发生在项目访问校验之后。
+- 前端详情只读展示动作、用户 ID、结果和时间；无记录显示空态，不提供删除、重放、恢复或导出。
+- 至少覆盖 CREATE 表达式、租户/业务类型/业务 ID 过滤、成功/失败映射、空列表和前端敏感字段不出现；回滚为移除详情历史与 CREATE 表达式。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-012：现场日报当日计划任务只读联动
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 分包 WBS / 跨域只读聚合 / 项目数据范围 / 前后端 / 测试
+状态：Done（2026-07-12；计入 `启动迭代-3` 第 2/3 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Scheduled Work 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-07`
+Migration：不需要
+依赖：复用现有 `site_daily_log`、`sub_task` 计划日期/状态/进度、`ProjectAccessChecker` 与日报详情 API；不新建日报计划表。
+风险等级：中
+运行态要求：后端专项、前端日报单测和类型检查通过；真实 API 或浏览器验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：必须复核租户/项目/日期范围、计划日期闭区间、空日期排除、批量查询、最小字段披露、日报权限不放宽写能力及前端只读边界。
+归档报告：`docs/quality/ISSUE-037-012-现场日报当日计划任务只读联动验收报告.md`
+目标：
+- 在日报详情只读展示计划日期区间覆盖日报日期的同项目分包 WBS 任务。
+- 展示任务编号、名称、作业区域、计划开始/结束、状态和进度，帮助现场日报对照当天计划。
+- 复用既有任务事实，不从日报创建、修改或完成任务。
+非目标：
+- 不新增日报计划/排程表，不实现拖拽排程、自动改期、关键路径、多前置或资源负载。
+- 不展示合同金额、供应商敏感信息或任务审批，不替代分包任务页面。
+- 不修改分包任务写接口、权限、migration、生产部署。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/subcontract/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 只返回同租户、同项目，且 `planned_start_date <= report_date <= planned_end_date` 的任务；任一计划日期为空、跨租户、跨项目或区间不覆盖时不得出现。
+- 返回任务 ID/编号/名称、作业区域、计划开始/结束、状态和字符串进度；不返回合同金额、供应商信息或写操作能力。
+- 日报不存在或无项目访问权继续 fail-close；联动查询复用 `site:daily:query` 的项目语境，不新增任务写权限。
+- 后端单次批量查询并按计划开始/任务编号排序；无命中返回空列表。
+- 前端详情只读展示计划任务和空态，不提供新建、编辑、删除、进度更新或跳转写入口。
+- 至少覆盖日期闭区间、空日期排除、租户/项目隔离、空列表、进度字符串和前端只读渲染；回滚为移除聚合字段与展示区。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-011：现场日报已审批材料到货只读联动
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 材料验收 / 跨域只读聚合 / 项目数据范围 / 前后端 / 测试
+状态：Done（2026-07-12；计入 `启动迭代-3` 第 1/3 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log Deliveries/Productivity 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-06`；`docs/backlog/ad-hoc-plan.md` 的“现场日报已审批材料到货只读联动”候选
+Migration：不需要
+依赖：复用现有 `site_daily_log`、`mat_receipt`、`mat_receipt_item`、物料/供应商主数据、`ProjectAccessChecker` 与日报详情页；不新建日报材料表。
+风险等级：中
+运行态要求：后端专项、前端日报单测和类型检查通过；真实 API 或浏览器验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现后必须复核租户/项目/日期范围、仅 `APPROVED` 验收单、批量查询、数量精度、空列表、日报权限和前端只读边界；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-011-现场日报已审批材料到货只读联动验收报告.md`
+目标：
+- 在现场日报详情中只读展示同租户、同项目、日报日期当天已审批的材料验收到货明细。
+- 展示验收单号、供应商、物料、实收数量和合格数量，复用既有验收事实，避免重复录入。
+- 草稿与已提交日报均可查看；到货联动不参与日报提交、修改或附件状态机。
+非目标：
+- 不新增日报材料/配送表，不从日报创建或修改验收单，不自动生成采购、库存或成本动作。
+- 不展示 DRAFT、APPROVING、REJECTED 验收单，不扩展到设备、材料消耗、安装量或生产率。
+- 不修改验收审批、库存入库、成本生成、权限模型、生产部署或历史 migration。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/api/modules/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/receipt/**`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- 日报详情只聚合同租户、同项目、`receipt_date = report_date` 且 `approval_status = APPROVED` 的验收单；跨租户、跨项目和其他日期记录不得出现。
+- 每条到货明细返回验收单 ID/编号、供应商名称、物料 ID/名称、实收数量和合格数量；数量保持数据库精度，不转为浮点数。
+- 日报不存在或无项目访问权继续沿用既有 fail-close；联动查询不得新增 `receipt:query` 要求或绕过 `site:daily:query`。
+- 查询使用批量 receipt/item/物料/供应商读取，禁止按明细逐条查询；无命中返回空列表。
+- 前端详情以只读区域展示到货明细和空态，不提供新增、编辑、删除、跳过审批或库存写入口。
+- 至少覆盖 APPROVED/非 APPROVED、租户/项目/日期隔离、空列表、数量字符串和前端只读渲染；回滚为移除聚合字段和展示区，不涉及数据迁移。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+## v1.5 准入要求
+
+每条 Ready Issue 必须包含：编号、任务性质、目标、范围、非目标、验收标准、真实存在的验证命令、风险与回滚方式、归档报告路径。
+
+只有状态为 `Ready` 且字段完整的任务才能进入 AutoPilot 实施；候选项不能直接执行。
+
+### ISSUE-037-005：现场日报最小闭环
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 状态流转 / 附件 / 项目数据范围 / 前后端 / Migration / 测试
+状态：Done（2026-07-12；计入本轮第 5/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log 官方事实；`docs/product-intelligence/evolution-decision.md`；`docs/backlog/ad-hoc-plan.md` 的“现场日报 / 施工日志”候选
+Migration：需要
+依赖：复用现有 `ProjectAccessChecker`、`sys_file`/MinIO 文件链和项目列表；不接入通用审批流。
+风险等级：中
+运行态要求：后端专项、前端单测/路由/类型检查通过；浏览器或真实 API 验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现完成后必须独立复核同项目同日唯一、草稿/提交不可逆边界、项目数据范围、附件对象授权和跨租户引用；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-005-现场日报最小闭环验收报告.md`
+目标：
+- 建立按项目和日期归档的现场日报事实对象，记录当日施工内容、问题/延误和次日计划。
+- 提供草稿创建/修改、提交后只读的最小状态闭环，并在现有前端增加可达的列表与表单入口。
+- 复用现有文件能力，以 `SITE_DAILY_LOG` 业务类型关联日报附件，读写都执行租户和项目范围校验。
+非目标：
+- 不实现移动端、离线、天气接口、定位、语音、人员/班组/设备/材料结构化子表、质量安全巡检、RFI/Submittal 或日报统计驾驶舱。
+- 不接入通用审批模板，不新增驳回/撤回/重新提交；提交只表示日报定稿。
+- 不重构文件平台、项目权限模型、路由框架或生产部署配置。
+允许修改：
+- `backend/src/main/resources/db/migration/V141__create_site_daily_log.sql`
+- `backend/src/main/resources/db/migration-h2/V141__create_site_daily_log.sql`
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/main/java/com/cgcpms/file/auth/BusinessObjectAuthorizer.java`
+- `backend/src/main/java/com/cgcpms/file/controller/FileController.java`
+- `backend/src/test/java/com/cgcpms/TenantBoundaryTask2Test.java`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/api/modules/site-daily-log.ts`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `frontend-admin/src/router/index.ts`
+- `frontend-admin/src/router/navigation.ts`
+- `frontend-admin/src/router/__tests__/router.test.ts`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- 已应用的 `backend/src/main/resources/db/migration/V1__*.sql` 至 `V140__*.sql`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- 生产凭据、生产数据库连接、生产发布配置
+- 新增天气、人员、设备、材料、质量、安全、定位或离线同步表
+验收标准：
+- `site_daily_log` 按当前租户、项目、日报日期保持有效记录唯一；字段最小限定为施工内容、问题/延误、次日计划、状态、提交人/时间和审计字段。
+- 列表、详情、创建、修改、提交全部复用 `ProjectAccessChecker`；跨租户项目、同租户无项目访问权和伪造 projectId 均 fail-close。
+- 只有 `DRAFT` 可修改和增删附件；日报本体不提供删除接口。`SUBMITTED` 正文只读且提交不可重复，不接入审批流。
+- `SITE_DAILY_LOG` 注册进文件业务对象授权；读取/列表/下载要求 `site:daily:query` 并允许读取 `SUBMITTED`，上传/删除附件要求 `site:daily:edit` 且只允许 `DRAFT`；对象不存在、跨租户/跨项目或无项目访问权时 fail-close。
+- `FileController` 与 `BusinessObjectAuthorizer` 使用同一权限口径：日报附件读为 `site:daily:query`，附件上传/删除为 `site:daily:edit`，不得要求现场角色持有泛化 `file:*` 权限。
+- 前端提供项目、日期、状态筛选以及 loading/empty/error；能创建/编辑草稿、查看详情、提交定稿，并对提交态隐藏写入口。
+- 前端附件复用现有上传、列表、下载、删除 API；不新建第二套文件存储或附件表。
+- 迁移提供 MySQL/H2 镜像、唯一约束与项目/日期查询索引；回滚边界为回退应用后删除新表和文件业务类型注册，不改写历史 migration。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogControllerTest,SiteDailyLogServiceTest,TenantBoundaryTask2Test,BusinessObjectAuthorizerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts src/router/__tests__/router.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-009：库存项人工补货目标量联动
+
+优先级：P1
+任务性质：能力新增
+类型：库存 / 采购补货 / 配置关系 / 项目数据范围 / 前后端 / Migration / 测试
+状态：Done（2026-07-12；计入本轮第 9/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Odoo Inventory Reordering Rules 19 最小/最大库存事实；`docs/product-intelligence/evolution-decision.md`；`docs/backlog/ad-hoc-plan.md` 的“人工补货目标量”候选
+Migration：需要
+依赖：复用 `ISSUE-037-006` 的安全库存阈值、`inventory:stock:edit`、stock→warehouse→project 范围校验和采购申请预填链；不新增规则表。
+风险等级：中
+运行态要求：后端专项、前端单测和类型检查通过；真实 API 前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现后必须独立复核 NULL 回退、目标量与安全阈值原子关系、旧接口兼容、项目/租户/权限、乐观锁、KPI 不变和四位小数建议数量；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-009-库存项人工补货目标量联动验收报告.md`
+目标：
+- 为仓库+物料库存项增加可选人工补货目标量；NULL 表示未单独配置，建议数量继续回退到安全库存阈值。
+- 提供一次原子保存安全阈值和目标量的设置接口，始终保持非空目标量大于等于安全阈值。
+- 低库存触发后按“目标量（或安全阈值）-当前可用量”生成四位小数采购申请预填数量。
+非目标：
+- 目标量不是库存硬上限，不阻止超量入库，不建设最大库存控制或库存容量约束。
+- 不实现供货周期、需求预测、历史消耗模型、自动下单、供应商选择、跨仓调拨或全量补货工作台。
+- 不修改采购申请审批、KPI 低库存触发口径、权限模型或生产部署。
+允许修改：
+- `backend/src/main/resources/db/migration/V144__add_stock_replenishment_target.sql`
+- `backend/src/main/resources/db/migration-h2/V144__add_stock_replenishment_target.sql`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- 已应用的 `backend/src/main/resources/db/migration/V1__*.sql` 至 `V143__*.sql`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `frontend-admin/src/pages/inventory/purchase-request.vue`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- V144 MySQL/H2 仅增加 `replenishment_target_qty DECIMAL(18,4) NULL`，不回填旧数据；首次入库保持 NULL。
+- 新设置接口一次接收安全阈值与可空目标量；两者非负、最多 4 位小数，目标量非空时必须大于等于安全阈值，使用现有 `@Version` 原子更新。
+- 原有 `PUT /inventory/stock/{id}/safety-threshold` 保持兼容；若已有目标量，新安全阈值不得高于目标量。
+- 设置接口继续使用 `inventory:stock:edit`，复用租户、启用仓库和 `ProjectAccessChecker`；跨租户、无项目范围、禁用仓库或伪造 stockId fail-close。
+- KPI 低库存仍为 `availableQty > 0 AND availableQty < safetyStockQty`，目标量不参与触发；VO 返回 `replenishmentTargetQty`。
+- 前端一次维护安全阈值和可空人工补货目标量，明确“未填则补到安全阈值”；保存后刷新库存/KPI。
+- 补货建议只在低库存时产生，数量按 `(replenishmentTargetQty ?? safetyStockQty) - availableQty` 固定四位小数；NULL 回退与 0/非空值语义有测试。
+- 至少覆盖迁移兼容、关系校验、NULL 回退、旧接口兼容、权限/项目范围、KPI 不变和前端建议数量；回滚为移除 V144 列和新设置接口，不改写 V142。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockServiceTest,MatStockControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/inventory/__tests__/stock-production.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-010：库存项人工补货提前期与计划日期预填
+
+优先级：P1
+任务性质：能力新增
+类型：库存 / 采购补货 / 时间计划 / 项目数据范围 / 前后端 / Migration / 测试
+状态：Done（2026-07-12；计入本轮第 10/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Odoo 19 Lead Times 与 Replenishment Report 官方事实；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-12-05`；`docs/backlog/ad-hoc-plan.md` 的“库存项人工补货提前期”候选
+Migration：需要
+依赖：复用 `ISSUE-037-009` 的库存组合设置、`inventory:stock:edit`、stock→warehouse→project 范围校验、补货路由预填链及采购申请明细现有 `plannedDate`；不修改采购后端。
+风险等级：中
+运行态要求：后端专项、库存/采购申请前端专项和类型检查通过；真实 API 前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现后必须独立复核 NULL/0 语义、整数边界、本地自然日和 `YYYY-MM-DD` 公式、旧设置兼容、项目/租户/权限、乐观锁及采购页面 query 清理；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-010-库存项人工补货提前期与计划日期预填验收报告.md`
+目标：
+- 为仓库+物料库存项增加可空人工补货提前期（自然日）；NULL 保持旧行为不预填日期，0 表示当前本地日期。
+- 将提前期纳入现有补货组合设置与 VO，继续使用同一库存项乐观锁和权限范围。
+- 从低库存发起补货时，按“当前本地日期 + 提前期自然日”生成 `YYYY-MM-DD`，预填采购申请明细计划日期。
+非目标：
+- 不建设供应商级提前期/价目表，不声称为预计到货承诺或供应商交期预测。
+- 不处理工作日历、节假日、时区服务、采购确认时长、历史交付学习、自动下单或全量补货报告。
+- 不修改采购申请后端实体、API、审批状态机、权限模型或生产部署。
+允许修改：
+- `backend/src/main/resources/db/migration/V145__add_stock_replenishment_lead_days.sql`
+- `backend/src/main/resources/db/migration-h2/V145__add_stock_replenishment_lead_days.sql`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/stock.vue`
+- `frontend-admin/src/pages/inventory/composables/useStockLedger.ts`
+- `frontend-admin/src/pages/inventory/purchase-request.vue`
+- `frontend-admin/src/pages/inventory/__tests__/stock-production.test.ts`
+- `frontend-admin/src/pages/inventory/__tests__/purchase-request.test.ts`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- 已应用的 `backend/src/main/resources/db/migration/V1__*.sql` 至 `V144__*.sql`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- 采购申请后端 DTO、Service、Controller、Entity 与数据库表
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- V145 MySQL/H2 仅增加 `replenishment_lead_days INT NULL`，不回填；首次入库保持 NULL。
+- 组合设置接口接收可空整数 `replenishmentLeadDays`，只允许 0 至 3650；负数、超上限和小数请求 fail-close，并与安全阈值/目标量同次 `@Version` 更新。
+- NULL 表示补货跳转不携带 `plannedDate`；0 表示当前本地日期；正数按当前本地日期加自然日，格式固定 `YYYY-MM-DD`，不做工作日调整。
+- 采购申请预填只接受严格 `YYYY-MM-DD` 且可还原为同一日期的 query；无效日期提示并不写入，成功或失败后都清理 `plannedDate` 与既有补货 query。
+- 设置接口继续使用 `inventory:stock:edit` 和现有租户/启用仓库/项目范围；旧安全阈值接口保持兼容，KPI 与补货数量公式不变。
+- 至少覆盖迁移、NULL/0/正数、整数边界、日期跨月/年、无效 query、旧设置兼容、权限范围和前端 query 清理；回滚为移除 V145 列和前端日期预填，不改写历史 migration。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockServiceTest,MatStockControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/inventory/__tests__/stock-production.test.ts src/pages/inventory/__tests__/purchase-request.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-008：现场日报 dev-login 直达路由白名单修复
+
+优先级：P1
+任务性质：缺口修复
+类型：本地验收 / dev-login / 路由安全 / 回归测试
+状态：Done（2026-07-12；计入本轮第 8/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md` 的现场日报可达性事实；`docs/product-intelligence/evolution-decision.md` 的 ISSUE-037-007 运行态回写；`docs/backlog/current-focus.md` 的 `/site` 非阻塞观察；`docs/backlog/ad-hoc-plan.md` 的直达路由候选
+Migration：不需要
+依赖：复用现有 `DevAuthController.normalizeRedirect()` 站内前缀白名单和前端 `/site/daily-log` 路由；仅 dev/local 生效。
+风险等级：低
+运行态要求：AuthController 专项通过；真实 dev-login 必须保留 302 Location `/site/daily-log`，前端跟随跳转 200。
+Reviewer要求：实现后必须独立复核只新增 `/site` 站内前缀，`//`、站外 URL、`..` 路径遍历仍回落 `/`，且 dev-login 仍只在 dev/local 启用。
+归档报告：`docs/quality/ISSUE-037-008-现场日报dev-login直达路由验收报告.md`
+目标：
+- 让本地 dev-login 的 `redirect=/site/daily-log` 保留目标路径，支持现场日报真实角色验收直达。
+- 通过现有安全归一化逻辑添加最小 `/site` 站内前缀，不改变 cookie、登录或权限行为。
+非目标：
+- 不放宽任意 URL、协议相对 URL、站外域名或路径遍历，不改为通配符/正则全放行。
+- 不修改正式登录、生产 profile、前端路由、现场日报业务、权限、部署或代理配置。
+- 不为其他未核验路由批量补白名单。
+允许修改：
+- `backend/src/main/java/com/cgcpms/auth/controller/DevAuthController.java`
+- `backend/src/test/java/com/cgcpms/auth/controller/AuthControllerTest.java`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- `backend/src/main/java/com/cgcpms/auth/config/SecurityConfig.java`
+- `backend/src/main/java/com/cgcpms/auth/service/**`
+- `frontend-admin/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- `redirect=/site/daily-log` 返回 302，Location 精确为 `/site/daily-log`，并继续设置现有访问/刷新 cookie。
+- `redirect=//evil.example`、完整站外 URL、含 `..` 的 `/site/../system` 仍安全回落 `/`；不得因新增前缀绕过校验。
+- `@Profile({"dev", "local"})` 和 `auth.dev-login.enabled` 条件不变，生产仍不启用该入口。
+- 只修改一个白名单前缀及对应测试/归档；回滚为移除 `/site` 前缀，不涉及数据迁移。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AuthControllerTest" test`
+- `git diff --check`
+
+### ISSUE-037-007：现场日报天气摘要与在场人数补强
+
+优先级：P1
+任务性质：能力新增
+类型：现场生产 / 项目日报 / 状态边界 / 前后端 / Migration / 测试
+状态：Done（2026-07-12；计入本轮第 7/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Procore Daily Log 官方事实；`docs/product-intelligence/evolution-decision.md`；`docs/backlog/ad-hoc-plan.md` 的“现场日报天气摘要与在场人数”候选
+Migration：需要
+依赖：复用现有 `site_daily_log`、`SiteDailyLogService` 的项目范围与 DRAFT→SUBMITTED 状态闭环、现有页面和权限；不新增子表。
+风险等级：低
+运行态要求：后端专项、前端单测和类型检查通过；真实 API 验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现完成后必须独立复核 NULL/0 人数语义、整数边界、天气长度、草稿原子更新、提交后不可变、项目/租户范围和旧数据兼容；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-007-现场日报天气摘要与在场人数补强验收报告.md`
+目标：
+- 在现有现场日报草稿中增加人工天气摘要与可选在场人数，补足现场日报最小事实维度。
+- `onSiteHeadcount=NULL` 表示未填写，`0` 表示明确无人；已提交日报继续保持正文和新增字段只读。
+- 在现有创建/编辑/查看表单中维护和展示两字段，不新增入口、权限或工作流。
+非目标：
+- 不接天气 API，不自动采集天气，不建设天气枚举、预报、定位或历史气象服务。
+- 不建立人员名单、班组、考勤、工时、劳务实名制、设备、材料、质量安全子表或统计驾驶舱。
+- 不实现移动端、离线同步，不修改附件授权、日报唯一约束、提交状态机或通用审批。
+允许修改：
+- `backend/src/main/resources/db/migration/V143__add_site_daily_weather_headcount.sql`
+- `backend/src/main/resources/db/migration-h2/V143__add_site_daily_weather_headcount.sql`
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- 已应用的 `backend/src/main/resources/db/migration/V1__*.sql` 至 `V142__*.sql`
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- V143 MySQL/H2 镜像只为 `site_daily_log` 增加 `weather_summary VARCHAR(200) NULL` 与 `on_site_headcount INT NULL`；旧数据升级后保持 NULL，不回填伪造事实。
+- 天气摘要可空且最多 200 字；在场人数可空，只接受 0 至 100000 的整数，负数、超上限或小数请求 fail-close。
+- 创建和修改均保存两字段；修改继续使用现有 `tenant_id + id + status=DRAFT` 原子条件，SUBMITTED 状态不得修改新增字段。
+- 列表/详情返回两字段并继续执行既有项目/租户范围；不新增或放宽 `site:daily:query/edit` 权限。
+- 前端创建、编辑、查看表单显示人工天气摘要和在场人数；未填写人数显示“未填写”，0 显示“0”，不把两者混同。
+- 至少覆盖字段创建/更新/映射、NULL/0、长度/整数边界、提交后只读和前端表单测试；回滚边界为回退应用后移除 V143 两列，不改写 V141。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogControllerTest,SiteDailyLogServiceTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-006：库存项安全库存阈值与补货建议联动
+
+优先级：P1
+任务性质：能力新增
+类型：库存 / 采购补货 / 项目数据范围 / 权限 / 前后端 / Migration / 测试
+状态：Done（2026-07-12；计入本轮第 6/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/product-intelligence/project-map.md`；`docs/product-intelligence/competitor-analysis.md` 的 Odoo Inventory Reordering Rules 19 官方事实；`docs/product-intelligence/evolution-decision.md`；`docs/backlog/ad-hoc-plan.md` 的“安全库存阈值配置”候选
+Migration：需要
+依赖：复用现有 `mat_stock`、库存台账、项目归属仓库、采购申请补货预填链、`ProjectAccessChecker` 和正式 `PURCHASE_MANAGER` 角色；不新增补货建议表。
+风险等级：中
+运行态要求：后端专项、前端单测与类型检查通过；真实 API 验收前执行 health gate，环境刷新后稳定等待 180 秒。
+Reviewer要求：实现完成后必须独立复核租户/项目数据范围、阈值精度和非负边界、零库存既有口径、动态 KPI 与补货数量的一致性，以及新增权限最小授权；证据不足不得通过。
+归档报告：`docs/quality/ISSUE-037-006-库存项安全库存阈值与补货建议联动验收报告.md`
+目标：
+- 为每个租户内“仓库 + 物料”库存余额维护安全库存阈值，既有记录默认 `10.0000`，保持当前行为兼容。
+- 将库存 KPI、当前库存预警和采购申请补货预填数量统一改为使用库存项阈值，消除前后端固定常量分叉。
+- 在现有库存台账当前库存区域提供最小阈值维护入口，保存后立即刷新当前库存和 KPI。
+非目标：
+- 不实现最大库存、供应商供货周期、需求预测、历史消耗建模、全量补货工作台、跨仓调拨或自动下单。
+- 不改变“可用量等于零不计入低库存 KPI/当前预警”的既有口径，不新增库存建议或策略表。
+- 不重构采购申请审批、库存出入库、仓库管理、菜单框架或生产部署配置。
+允许修改：
+- `backend/src/main/resources/db/migration/V142__add_stock_safety_threshold.sql`
+- `backend/src/main/resources/db/migration-h2/V142__add_stock_safety_threshold.sql`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/**`
+- `docs/product-intelligence/**`、`docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+- `.codex-autopilot/state.json`
+禁止修改：
+- `deploy/**`
+- 已应用的 `backend/src/main/resources/db/migration/V1__*.sql` 至 `V141__*.sql`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `frontend-admin/src/pages/inventory/purchase-request.vue`
+- 生产凭据、生产数据库连接、生产发布配置
+验收标准：
+- V142 MySQL/H2 镜像为 `mat_stock` 增加 `safety_stock_qty DECIMAL(18,4) NOT NULL DEFAULT 10.0000`，并新增独立 `inventory:stock:edit` 按钮权限；该权限只新增授予正式 `PURCHASE_MANAGER`，管理员继续由角色兜底，普通只读库存角色不授予；既有库存记录升级后行为不变。
+- 阈值更新 API 只接受大于等于 `0` 且最多 4 位小数的值；按当前租户定位库存，并通过库存所属仓库项目执行 `ProjectAccessChecker`，跨租户、无项目访问权、禁用仓库或伪造 stockId 均 fail-close。
+- 库存读取继续使用 `inventory:stock:list`，阈值维护使用 `inventory:stock:edit`（管理员角色保持兜底）；不得复用出入库写权限 `inventory:transaction:add`。
+- `MatStockVO` 返回 `safetyStockQty`；KPI 低库存条件统一为 `available_qty > 0 AND available_qty < safety_stock_qty`，零库存不计入。
+- 前端当前库存预警、阈值可见性和补货按钮均使用 `safetyStockQty`；建议数量精确为 `safetyStockQty - availableQty`，继续复用现有采购申请预填路径。
+- 阈值保存成功后刷新当前库存和 KPI；无库存记录、只读用户、非法精度或负数不得出现可用写入结果。
+- 至少覆盖默认阈值兼容、动态 KPI、更新边界、项目/租户隔离、采购经理可写、仅 `inventory:stock:list` 权限用户拒绝、前端动态预警与补货数量测试；回滚边界为回退应用后移除新增权限与列，不改写历史 migration。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockServiceTest,MatStockControllerTest" test`
+- `cd frontend-admin; pnpm test:unit src/pages/inventory/__tests__/stock-production.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-018：子智能体超时、悬挂执行线程退役与有限重派治理
+
+优先级：P0
+任务性质：运维治理
+类型：AutoPilot / 执行器生命周期 / 悬挂检测 / 有限重派 / 状态证据 / PowerShell 测试
+状态：Done（2026-07-12；计入 `启动迭代-10` 第 2/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/ad-hoc-plan.md` 的“子智能体超时、悬挂线程退役与有限重派治理” Candidate；`AGENTS.override.md` 的悬挂线程处置规则；现有 `scripts/codex-autopilot/autopilot-run-continuous.ps1` 与 `scripts/codex-autopilot/test-executor-stall.ps1` 的部分实现证据
+关联目标：保障 v1.5 AutoPilot 下一主线准入、连续执行和正式验收不会复用已悬挂执行单元，也不会无限重派。
+阻塞证据：现有 runner 已能在 300 秒记录 inspect、600 秒终止并新起一次 repair，但持久 state 未记录线程开始/最后进展/退役状态/超时原因，第二次超时只进入通用 BLOCKED，且长命令声明尚无可验证闭环。
+解除条件：专项测试证明 5 分钟只读核验、10 分钟永久退役、仅一次新线程缩小范围重派、第二次超时同步 blocked，以及已声明长命令不被静默误判。
+Migration：不需要
+依赖：复用现有连续 runner、原子 state、progress fingerprint、context pack、executor prompt 和临时 Git fixture；不新增依赖、服务或调度器。
+风险等级：中
+运行态要求：仅需 Windows PowerShell、Git 与临时目录自测试；不要求 Docker、backend、frontend、数据库、5173/8080 或真实浏览器，测试不得改动当前业务运行态。
+Reviewer要求：必须独立复核超时阈值、只读 inspect、进程树终止、旧 executorPid 永久退役、单次新线程重派、第二次超时 blocked 归档、长命令声明的有界豁免、state/schema 一致性及 no push/stop/pause 边界；输出直接用于通过/不通过裁决。
+归档报告：`docs/quality/ISSUE-037-018-子智能体超时悬挂线程退役与有限重派治理验收报告.md`
+目标：
+- 在现有 runner 的部分实现上补齐最小生命周期闭环：连续 300 秒无新证据时只做只读状态核验，连续 600 秒无新证据时终止执行进程树并永久退役该 executorPid。
+- 首次超时只允许以新 executorPid 重派一次，重派必须进入 repair、缩小任务范围并携带缺失上下文；同一 Issue 第二次超时不得再启动第三个执行单元，必须进入 BLOCKED 并同步 `docs/backlog/blocked-issues.md`。
+- 持久状态或正式事件证据至少记录 issue/task、executorPid、startedAt、lastProgressAt、retryCount、timeoutReason、retiredAt/retiredStatus；预计超过 600 秒的命令在派工上下文中显式记录命令与预计时长，并保持总超时上限。
+非目标：
+- 不建设通用分布式任务平台、线程池、队列、Dashboard、MCP 服务或跨机器恢复。
+- 不修改任何业务接口、页面、数据库、权限、审批、金额、租户或项目数据逻辑。
+- 不扩大 repair 次数，不复用已退役 executorPid，不自动 push，不发布生产，不连接或重置数据库。
+允许修改：
+- `scripts/codex-autopilot/autopilot-run-continuous.ps1`
+- `scripts/codex-autopilot/autopilot-state.ps1`
+- `scripts/codex-autopilot/autopilot-progress.ps1`
+- `scripts/codex-autopilot/autopilot-context.ps1`
+- `scripts/codex-autopilot/autopilot-exec-issue.ps1`
+- `scripts/codex-autopilot/codex-autopilot.config.json`
+- `scripts/codex-autopilot/test-executor-stall.ps1`
+- `scripts/codex-autopilot/test-state-machine.ps1`
+- `scripts/codex-autopilot/test-progress-fingerprint.ps1`
+- `plugins/cgc-pms-autopilot/schemas/loop-state.schema.json`
+- `plugins/cgc-pms-autopilot/schemas/context-pack.schema.json`
+- `plugins/cgc-pms-autopilot/examples/loop-state.example.json`
+- `plugins/cgc-pms-autopilot/references/owner-boundary.md`
+- `plugins/cgc-pms-autopilot/references/rerun-policy.md`
+- `docs/backlog/**`、`docs/iterations/**`、`docs/quality/**`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `deploy/**`
+- `AGENTS.md`、`AGENTS.override.md`
+- `.github/workflows/**`
+- 生产凭据、生产数据库连接、生产发布配置、仓库外文件
+验收标准：
+- 无新 worktree 内容、进程树活动或显式进展证据达到 300 秒时，只写一次 inspect 证据，不终止、不重派；恢复进展后重新计时。
+- 无新证据达到 600 秒时，终止该执行进程树并把对应 executorPid 记录为 retired；后续状态转换和 repair 不得再次引用该 executorPid。
+- 首次 stall timeout 只创建一个新 executorPid，retryCount 精确为 1，repair context 明确缩小剩余范围并包含首次超时原因；即使 `repair.maxRepairAttempts` 大于 1，也不得因 stall 产生第二次重派。
+- 同一 Issue 的新执行单元再次 stall timeout 后不创建第三个 executorPid，最终 state 为 BLOCKED，并在 `docs/backlog/blocked-issues.md` 写明失败分类、两个退役执行单元证据、解除条件、未完成验收项和安全恢复方式。
+- 每次 inspect/retire/重派/blocked 证据均可关联 issueId、executorPid、startedAt、lastProgressAt、retryCount、timeoutReason 和时间；state、schema、example 与原子写入校验保持一致。
+- 派工上下文对预计超过 600 秒的命令记录原始命令和预计秒数；仅在声明的后代进程仍存活且未超过预计时长时避免按“无证据”误杀，绝不绕过 issueExecutor 总超时、stop/pause checkpoint 或进程树终止。
+- 专项测试使用临时仓库稳定证明“300 秒只 inspect”“600 秒退役”“恰好一次新线程重派”“第二次超时 blocked”“长命令声明有界且超时仍终止”，并清理自身临时目录；不要求修改或启动业务运行态。
+- 回滚只恢复本 Issue 的 runner/state/context/config/schema/test/文档差异；无数据迁移、业务数据回填或生产恢复动作。
+验证命令：
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-executor-stall.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-state-machine.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-progress-fingerprint.ps1`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File plugins/cgc-pms-autopilot/scripts/validate-loop-artifacts.ps1`
+- `git diff --check`
+
+### ISSUE-037-019：后端接口无前端入口只读盘点与治理裁决
+
+优先级：P0
+任务性质：回归证明
+类型：工程治理 / 接口可达性 / 前后端映射 / 只读审计 / 正式验收
+状态：Done（2026-07-12；计入 `启动迭代-10` 第 3/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/ad-hoc-plan.md` 的“后端接口无前端入口治理” Candidate；`docs/product-intelligence/project-map.md` 的现有能力可达性缺口；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-11-01` 候选决策卡；`docs/未来开发计划.md` 的“权限、租户、项目数据边界”验收边界
+关联产品目标：为 v1.5 真实角色与正式验收建立“后端能力是否存在用户可达入口”的当前事实基线，避免把后端已实现误判为用户可用，也不以工程治理替代下一项产品方向。
+阻塞证据：当前迭代决策明确记录“没有最新接口—入口全量差异报告”；因此无法对无入口接口逐项裁决为需入口、仅内部使用或待废弃，也无法为真实角色的前端可达性正式验收提供完整清单。
+解除条件：形成覆盖当前用户态 Controller、前端 API 封装、路由、页面与菜单证据的逐项差异报告；所有未映射接口均有唯一分类、证据、责任域和后续处置，独立 Reviewer 复核通过。
+Migration：不需要
+依赖：仅复用当前 `backend/src/main/java/com/cgcpms/**/controller/**`、`frontend-admin/src/api/modules/**`、`frontend-admin/src/router/**`、`frontend-admin/src/pages/**`、`frontend-admin/src/layouts/**` 与现有菜单定义；不新增依赖、扫描框架或持久化对象。
+风险等级：中
+运行态要求：静态只读盘点，不要求 Docker、backend、frontend、数据库、5173/8080、dev-login 或真实浏览器；不得据此宣称真实角色运行态可见性已经通过，若静态证据冲突则标记“需要确认”而不是启动或修改业务运行态。
+Reviewer要求：必须由独立 Reviewer 交叉核对 Controller 映射与权限注解、前端 request 调用、路由/页面/菜单证据，复核路径参数归一化、动态菜单和内部接口误报；至少抽查每个业务域一条“有入口”与全部“需补入口/待废弃/需要确认”项，输出直接用于通过/不通过裁决。
+归档报告：`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`
+最小回滚：删除本 Issue 新增的正式报告并回退本 Issue 对项目地图、迭代决策、backlog 与 iteration 状态的文档差异；无代码、配置、数据库或运行态恢复动作。
+目标：
+- 只读枚举 `backend/src/main/java/com/cgcpms/**/controller/**` 中面向应用的 HTTP 方法、规范化路径、Controller 方法和权限注解，并与前端 API 封装、路由、页面及菜单证据建立可追溯映射。
+- 对每个未形成用户入口的接口唯一裁决为“前端调用但无独立页面”“仅内部/集成/回调/运维”“需补用户入口”“待废弃”或“需要确认”，记录证据、误报风险、责任域与最小后续动作。
+- 输出当前快照的总数与分类计数，保证分项之和等于纳入范围总数，并把结论回写项目地图、迭代决策和 Ad-hoc 状态；本 Issue 只产出治理事实与后续拆题依据。
+非目标：
+- 不新增、修改或删除任何后端接口、Controller、Service、Entity、Mapper、权限注解、数据库 migration、前端 API、路由、菜单、页面、按钮或样式。
+- 不为所有后端接口机械创建页面，不把内部接口、回调、下载、聚合子资源或开发接口自动判为缺口，不扩成 DTO 重构、OpenAPI 平台或通用扫描器。
+- 不做真实角色浏览器验收，不连接或重置数据库，不启动/重建运行态，不发布生产，不自动 push；盘点结论不等同于后续入口实现已经完成。
+允许修改：
+- `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/backlog/ad-hoc-plan.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
 - `docs/iterations/**`
-- `docs/backlog/**`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `deploy/**`
+- `scripts/**`
+- `plugins/**`
+- `.github/workflows/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- 生产凭据、生产数据库连接、生产发布配置、仓库外文件
+验收标准：
+- 报告明确盘点日期、分支、提交基线、纳入/排除口径和路径归一化规则；覆盖应用 Controller 的组合类级/方法级映射，并保留 Controller 文件与方法、HTTP 方法、规范化 URL、权限注解证据。
+- 每个纳入接口均能追溯到前端 API 调用及路由/页面/菜单证据，或进入且只进入一个未映射分类；动态路径参数、查询参数、聚合子资源和复用同一页面的多个接口不得因字符串不完全一致被重复或误判。
+- “需补用户入口”“待废弃”“需要确认”逐项写明用户/业务价值、权限与租户风险、当前证据、责任域、最小后续动作和是否允许拆新 Ready；没有证据的项保持“需要确认”。
+- 分类汇总满足“有用户入口 + 前端调用但无独立页面 + 仅内部/集成/回调/运维 + 需补用户入口 + 待废弃 + 需要确认 = 纳入接口总数”，重复项为 0；排除项单列理由，不计入分母。
+- 项目地图与迭代决策仅回写本次事实基线和候选裁决；Ad-hoc Candidate 只有在报告与独立复核通过后才可标记 Done，真实入口补建、接口废弃或运行态验收必须另拆 Ready。
+- 最终正式报告给出通过/不通过、阻塞/非阻塞、依据和剩余风险；剩余风险同步进入 `docs/backlog/ready-issues.md`、`docs/backlog/blocked-issues.md` 或 `docs/backlog/current-focus.md`，不得只留在质量报告。
+验证命令：
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/ready-lint.ps1 -IssueTitle ISSUE-037-019`
+- `cd backend; .\mvnw.cmd "-DskipTests" compile`
+- `cd frontend-admin; pnpm test:unit src/router/__tests__/router.test.ts src/api/modules/__tests__/system-modules.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
+### ISSUE-037-020：长期计划描述性标题误入候选修复
+
+优先级：P0
+任务性质：缺口修复
+类型：AutoPilot / 候选准入 / 长期计划解析 / PowerShell 回归
+状态：Done（2026-07-12；计入 `启动迭代-10` 第 4/10 条）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `2.1 当前技术栈` 节被 `scripts/codex-autopilot/autopilot-refill.ps1` 产出为 `long-term:2.1` Candidate；`docs/backlog/current-focus.md` 要求 Ready 为空时先刷新产品情报，不得从长期计划凑任务
+关联产品目标：恢复 v1.5 产品情报补货与下一主线准入的候选准确性，避免把现状、对标、优势或总体目标标题误当作可实施产品方向。
+阻塞证据：本轮 Planner 实际收到 `{"name":"当前技术栈","status":"Candidate","source":"long-term:2.1"}`；当前解析器匹配长期计划全部 `### N.N` 标题，而 `2.1` 位于“当前功能现状”且项目地图已记录相同技术基线，没有待实现闭环。
+解除条件：长期计划补货只返回开发计划章节中的候选，不再返回 `2.1 当前技术栈` 等描述性章节；Ad-hoc 优先级、单条 Ready 目标、stop/pause、blocked-first 和合法长期候选行为保持不变。
+Migration：不需要
+依赖：仅复用现有 `Get-AutopilotRefillDecision` 与 `scripts/codex-autopilot/test-refill.ps1` 临时目录自测；不新增依赖、配置或调度器。
+风险等级：中
+运行态要求：仅需 Windows PowerShell 和临时目录自测；不要求 Docker、backend、frontend、数据库、5173/8080、dev-login 或浏览器，不得启动或修改业务运行态。
+Reviewer要求：必须由独立 Reviewer 复核长期计划章节边界、Ad-hoc 优先顺序、合法开发计划候选保留、描述性标题排除及 stop/pause/blocked-first 行为；输出直接用于通过/不通过裁决。
+归档报告：`docs/quality/ISSUE-037-020-长期计划描述性标题误入候选修复验收报告.md`
+最小回滚：回退本 Issue 对 `autopilot-refill.ps1`、`test-refill.ps1` 和状态文档的差异；无业务代码、数据、schema 或运行态恢复动作。
+目标：
+- 在现有长期计划候选提取处增加最小章节准入边界，使 `2.1 当前技术栈` 等现状/分析标题不再进入 fresh Planner。
+- 在现有 refill 自测中覆盖误候选回归，同时证明至少一个真实开发计划标题仍可进入 Planner；不新建第二套解析器。
+非目标：
+- 不修改或校准技术栈，不升级 Vue、Java、Spring、数据库、中间件、依赖或部署组件。
+- 不修改业务接口、页面、权限、租户、审批、金额、数据库 migration、产品功能或生产配置。
+- 不重写长期计划，不从长期计划直接生成业务 Ready，不扩建通用 Markdown AST、候选评分器或新调度器。
+允许修改：
+- `scripts/codex-autopilot/autopilot-refill.ps1`
+- `scripts/codex-autopilot/test-refill.ps1`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/iterations/**`
+- `docs/quality/ISSUE-037-020-长期计划描述性标题误入候选修复验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `deploy/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `.github/workflows/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- 生产凭据、生产数据库连接、生产发布配置、仓库外文件
+验收标准：
+- 空 Ready、空 Ad-hoc 的临时仓库包含 `2.1 当前技术栈` 与至少一个开发计划标题时，refill 决策不选择 `long-term:2.1`，且仍能选择合法开发计划 Candidate。
+- 现有 Ad-hoc `ReadyToSplit` / `Candidate` 优先级和单条 Ready 目标保持不变；已有 Ready、stop.flag、pause.flag 与当前 focus blocked 前置仍分别返回既有决策。
+- 修改只收敛长期计划候选提取及其最小回归测试，不新增依赖或并行解析实现；`git diff --check` 通过。
+- 正式报告给出通过/不通过、阻塞/非阻塞、依据和剩余风险；剩余风险同步进入 backlog 或 Current Focus，不只留在质量报告。
+验证命令：
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/test-refill.ps1`
+- `git diff --check`
+
+### ISSUE-037-021：CI/CD 与上线门禁 v1.5 现状复验与红灯分类裁决
+
+优先级：P0
+任务性质：回归证明
+类型：CI/CD / GitHub Actions / 分支保护 / 上线门禁 / 只读审计 / 正式裁决
+状态：Done（2026-07-12；回归证明完成，裁决为不通过 / 阻塞 / 不可上线）
+自动合并：auto-merge/local-commit-only
+来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 的 `7.1 P0-1：CI/CD 与上线门禁`；`docs/未来开发计划.md` 的“CI/CD 与上线门禁复验”；`docs/backlog/current-focus.md` 的 v1.0 证据不得直接作为 v1.5 验收证据约束
+关联产品目标：为 v1.5 下一主线准入和正式上线裁决建立当前、可追溯的 CI/CD 门禁事实，不以 v1.0 绿灯或旧分支保护快照替代当前证据。
+阻塞证据：2026-07-12 只读核验显示 master 最近 5 次 CI push run 均为 failure；最新 run 29146534529 的 frontend-lint、frontend-test、e2e 失败，而 master required checks 仍要求这 11 个核心 job 且 strict=true，因此当前不能给出上线门禁通过结论。
+解除条件：完成最新失败日志分类；核对现行 workflow job 与 master required checks 一一对应；本地可复现入口结果与远端证据无矛盾；正式报告明确通过/不通过并把未解除项同步到 Ready、Blocked 或 Current Focus。
+Migration：不需要
+依赖：GitHub CLI 已认证且对 `kismet84/cgc-pms` 具有 actions 与 branch protection 只读权限；复用现有 `.github/workflows/ci.yml`、前后端构建测试入口和 `scripts/check-sql-safety.ps1`，不新增扫描器或依赖。
+风险等级：高
+运行态要求：需要 GitHub 网络只读访问、Java 21、Node.js 22、pnpm 11；默认不启动 Docker、backend、frontend 或浏览器，不触发 workflow rerun；若为复现 e2e 才先执行 8080/5173/dev-login health gate，环境刷新后稳定等待 180 秒，且不得连接生产或重置数据。
+Reviewer要求：必须由独立 Reviewer 复核远端 run/job/step 证据、失败三分类、workflow 与 required checks 对应关系、strict/enforce_admins/PR review 配置、产物与回滚信息；输出直接用于通过/不通过和是否可上线裁决，任何红灯或证据缺失均不得判通过。
+归档报告：`docs/quality/ISSUE-037-021-CI-CD与上线门禁v1.5复验报告.md`
+最小回滚：仅回退本 Issue 新增的正式报告及 product-intelligence/backlog/iteration 状态文档；无代码、workflow、远端设置、数据库或运行态恢复动作。
+目标：
+- 以当前 master 分支保护、required checks、最新 CI runs 和现行 `.github/workflows/ci.yml` 为准，复验 CI/CD 与上线门禁，不沿用 v1.0 完成结论。
+- 对最新失败的 workflow/job/step 按工具配置类、环境前置类、真实质量/安全类逐项分类，记录 commit、run URL、失败关键词、复现结果和解除条件。
+- 形成唯一正式裁决；未解除红灯按责任域拆入 Ready 或 Blocked，本 Issue 不直接修业务代码或远端设置。
+非目标：
+- 不修复 frontend-lint、frontend-test、e2e 或其他业务/测试代码失败，不修改 workflow，不触发 rerun、commit、push、merge、release 或生产发布。
+- 不升级 Actions、Node、Java、pnpm、Maven、Spring Boot 或依赖，不新增 CI 平台、扫描器、发布系统或通用门禁框架。
+- 不连接生产数据库，不重置测试数据，不把本地单项通过替代远端 required checks 全绿。
+允许修改：
+- `docs/quality/ISSUE-037-021-CI-CD与上线门禁v1.5复验报告.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/iterations/**`
+- `.codex-autopilot/state.json`
 禁止修改：
 - `backend/**`
 - `frontend-admin/**`
 - `.github/workflows/**`
-- 运行环境、生产凭据、生产数据库连接、生产发布配置
-- 在无新基线前直接把覆盖率或 E2E 升级为硬门禁整改任务
-验收标准：
-- 正式报告中明确区分后端覆盖率、前端覆盖率、E2E CI 三类现状。
-- 每类都要写清“当前测量是否已复验”“配置阈值是什么”“CI 是否真阻断”。
-- 若因工具、环境或脚本入口导致无法复验，必须按工具配置类或环境前置类归档，不得直接判业务代码失败。
-- 不把 `docs/quality/quality-hardening-acceptance.md` 的旧数字直接当作当前已验证结论。
-验证命令：
-- `git diff --check`
-归档报告：`docs/quality/issue-032-008-coverage-e2e-baseline.md`
-
-## P2
-
-### ISSUE-008-032：后端接口无前端入口治理-M1：业务接口与路由/API 模块映射基线
-
-优先级：P2
-任务性质：运维治理
-类型：接口治理 / 前端路由 / 导航 / API 模块 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/ad-hoc-plan.md` 高优先级 Candidate `后端接口无前端入口治理`
-依赖：无；本轮第 1 条已完成，后续 `ISSUE-008-033`、`ISSUE-008-034` 亦已串行完成。
-是否需要新增 migration：否；不得新增或修改数据库结构。
-目标：
-- 以现有非 dev/test 后端业务 Controller、前端 API modules、router 和 navigation 为事实源，形成“已有前端入口 / 合法后台复用接口 / 运维专用接口 / 高置信缺口”映射基线。
-- 只修复能复用现有页面、API 模块和路由的高置信入口缺口；不存在高置信缺口时允许 no-op，但必须留下可复验的分类证据，不得把治理回归表述为新业务能力。
-- 避免为了清零清单新增占位页面、重复 API 封装或新的入口注册抽象。
-允许修改：
-- `frontend-admin/src/router/index.ts`
-- `frontend-admin/src/router/navigation.ts`
-- `frontend-admin/src/router/__tests__/router.test.ts`
-- `frontend-admin/src/layouts/components/__tests__/SidebarMenu.test.ts`
-- `frontend-admin/src/api/modules/**`
-- 与已存在页面直接相关的前端测试；前端业务文件总计不超过 6 个
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/**`
-- `frontend-admin/src/pages/**` 中新增业务页面或占位页
-- `backend/src/main/resources/db/migration/**`
+- `scripts/**`
+- `plugins/**`
 - `deploy/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 把内部回调、文件下载、聚合子接口、dev/test/actuator 接口强行注册成侧边栏菜单
+- `AGENTS.md`、`AGENTS.override.md`
+- 生产凭据、生产数据库连接、GitHub 分支保护、required checks、Actions runs、release、仓库外文件
 验收标准：
-- 正式报告列出本轮纳入范围及四类分类结果，明确每个高置信缺口的后端路径、现有前端承载页、权限和处理结论。
-- router、navigation 与现有 API module 的入口映射保持一致；修复项不得造成无权限用户可见或可达。
-- 若结论为 no-op，必须证明未发现可在本范围内直接修复的高置信缺口，并把需要新页面/新业务裁决的项留在 backlog，而不是伪装成已完成入口建设。
+- 报告记录核验时间、分支、commit、最新 master push/PR run、逐 job/step 结论和 URL；至少覆盖 required 的 backend-test、backend-test-mysql、backend-dependency-scan、frontend-lint、type-check、frontend-build、frontend-test、frontend-dependency-audit、sql-safety-scan、e2e、supply-chain-security。
+- master 分支保护的 strict、required checks、enforce_admins、PR review 与限制项均有当前 API 证据；required checks 与 `.github/workflows/ci.yml` job 名称逐项比对，缺失、多余、不可触发或可绕过项不得忽略。
+- 最新红灯逐项先分类；frontend-lint、frontend-test、e2e 的失败日志至少记录失败 step、关键词和最小复现，不能仅凭 job 名猜测根因，一次性波动需复核后再升级为阻塞。
+- 本地只读复验入口均执行并记录；本地与远端不一致时以当前远端 required checks 为上线裁决依据并解释差异，不修改业务代码或 workflow 掩盖红灯。
+- 只有目标 commit 的 11 个 required checks 全部 success、分支保护与 workflow 对应且无绕过风险时才允许结论为“通过 / 非阻塞 / 可上线”；否则必须为“不通过 / 阻塞 / 不可上线或需要确认”。
+- 每个未解除项写明责任域、失败分类、解除条件、最小安全恢复方式并同步到 Ready、Blocked 或 Current Focus；回滚仅删除本 Issue 文档差异。
 验证命令：
-- `cd frontend-admin; pnpm test:unit src/router/__tests__/router.test.ts src/layouts/components/__tests__/SidebarMenu.test.ts`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/ready-lint.ps1 -IssueTitle ISSUE-037-021`
+- `cd backend; .\mvnw.cmd verify`
+- `cd frontend-admin; pnpm lint:check`
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm build`
+- `cd frontend-admin; pnpm test:coverage`
+- `cd frontend-admin; pnpm audit --audit-level high --registry=https://registry.npmjs.org`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-sql-safety.ps1`
 - `git diff --check`
-归档报告：`docs/quality/issue-008-032-backend-api-frontend-entry-governance.md`
 
-### ISSUE-008-033：WBS 平台化缺口-M5：现有任务日期派生的延期风险可见性
-
-优先级：P2
-任务性质：缺口修复
-类型：WBS / 分包任务 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/ad-hoc-plan.md` 高优先级 Candidate `WBS 任务依赖与延期预警`；`ISSUE-008-022`、`ISSUE-008-023`、`ISSUE-008-026`
-依赖：`ISSUE-008-032` 已完成；本轮第 2 条已完成，后续 `ISSUE-008-034` 亦已串行完成。
-是否需要新增 migration：否；只复用 `sub_task.planned_end_date`、`actual_end_date`、`progress_percent`、`status` 等现有字段。
-目标：
-- 在现有分包任务/WBS 页面按计划完成日期、实际完成日期、进度和状态派生延期风险提示，让逾期未完成任务可见并可复验。
-- 本轮不实现前置任务依赖；当前模型无 predecessor/dependency 字段，若必须依赖持久化才能完成目标则转 Blocked，不得临时新增字段。
-- 只声明“现有任务日期派生的延期风险可见性”，不表述为自动排程、依赖网络或完整预警平台完成。
-允许修改：
-- `frontend-admin/src/pages/subcontract/task.vue`
-- `frontend-admin/src/pages/subcontract/__tests__/task.test.ts`
-- 与现有任务展示直接相关的前端类型或小组件；前端业务文件总计不超过 4 个
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 新建 `schedule_*`、依赖关系或预警持久化表
-- 新增拖拽排程、关键路径、基线版本、依赖网络编辑器
-验收标准：
-- 计划完成日期早于当前日期且未完成的任务展示明确延期状态；完成态或 `100%` 进度不误报。
-- 缺少计划完成日期时保持可理解的降级展示，不猜测截止日期；日期边界使用可控时钟或等价稳定断言。
-- 现有 WBS 编码、计划/实际日期、进度和状态展示不回退，项目/租户过滤仍由现有后端链路负责。
-- 报告明确前置任务依赖未实施及原因，不把局部提示包装成完整延期预警能力。
-验证命令：
-- `cd frontend-admin; pnpm test:unit src/pages/subcontract/__tests__/task.test.ts`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-033-wbs-derived-delay-visibility.md`
-
-### ISSUE-008-034：供应商履约档案-M1：交期表现摘要与采购订单下钻
-
-优先级：P2
-任务性质：缺口修复
-类型：供应商履约 / 采购驾驶舱 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/ad-hoc-plan.md` 高优先级 Candidate `供应商履约档案`；`ISSUE-008-024`、`ISSUE-008-025`、`ISSUE-008-027`
-依赖：`ISSUE-008-033` 已完成；本轮第 3 条已完成并达到 `3/3` 上限。
-是否需要新增 migration：否；复用现有 `supplierScores`、合作方 `partnerId` 与采购订单 `partnerId` 查询参数，不新增履约档案或评分事实表。
-目标：
-- 将采购驾驶舱现有供应商交期表现摘要补成可下钻入口，按 `partnerId` 进入已存在的采购订单列表筛选结果。
-- 保持现有订单数、逾期未完成数、交期达成率和表现评分口径，不扩展质量、价格、服务或综合评级。
-- 只声明“采购订单交期履约摘要与下钻”，不表述为完整供应商履约档案平台完成。
-允许修改：
-- `frontend-admin/src/pages/dashboard/components/DashboardPurchaseView.vue`
-- `frontend-admin/src/pages/dashboard/__tests__/DashboardPurchaseView.test.ts`
-- `frontend-admin/src/pages/purchase/order.vue`
-- `frontend-admin/src/pages/purchase/__tests__/order.test.ts`
-- `frontend-admin/src/types/dashboard.ts`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 新增供应商履约、评分、黑名单或档案表
-- 新增询价、比价、定标、质量/价格/服务综合评分或外部供应商平台集成
-验收标准：
-- 每条供应商交期表现可使用现有 `partnerId` 下钻到采购订单页，目标页正确恢复 `partnerId` 筛选且不丢失权限守卫。
-- 无 `partnerId` 或无评分数据时保持现有空态/降级态，不生成不可达链接。
-- 现有供应商名称、订单数、逾期数、交期达成率和表现评分展示不回退；下钻不改变既有评分口径。
-- 报告明确本轮不形成独立供应商档案，不把订单交期摘要包装成综合供应商评级。
-验证命令：
-- `cd frontend-admin; pnpm test:unit src/pages/dashboard/__tests__/DashboardPurchaseView.test.ts src/pages/purchase/__tests__/order.test.ts`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-034-supplier-delivery-summary-drilldown.md`
-
-### ISSUE-008-031：通知平台平台化缺口-M7：占位渠道发送记录与跳过原因可见性回归
-
-优先级：P2
-任务性质：回归证明
-类型：通知平台 / 后端 / 前端 / 测试
-状态：Done（2026-07-10；现有能力回归证明/no-op；计入本轮第 10 个实施型 Ready Issue）
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台`；`docs/quality/issue-008-029-notification-channel-rendering-regression.md`
-依赖：`ISSUE-008-029` 与 `ISSUE-008-030` 已完成；继续串行执行，避免共享 backlog / iteration 文档冲突。
-是否需要新增 migration：否；复用现有通知发送记录与预警页订阅展示，不新增 `notification_*` 表。
-目标：
-- 基于现有通知分发器和预警页订阅弹窗，补齐邮件、企业微信、短信等占位渠道的发送记录状态、跳过原因和前端可见性回归。
-- 确保未配置、已配置但未实现、重复抑制三类跳过不会被误记为发送成功。
-- 只声明现有通知平台占位渠道治理，不表述为外部渠道真实打通。
-允许修改：
-- `backend/src/main/java/com/cgcpms/alert/notification/**`
-- `backend/src/test/java/com/cgcpms/alert/notification/AlertNotificationDispatcherTest.java`
-- `frontend-admin/src/pages/alert/index.vue`
-- `frontend-admin/src/pages/alert/__tests__/index.test.ts`
-- `frontend-admin/src/api/modules/alert.ts`
-- `frontend-admin/src/types/alert.ts`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 新增邮件、短信、企业微信、钉钉、WebSocket/SSE 真实外部发送能力
-验收标准：
-- 未配置占位渠道写入 `SKIPPED` 记录并带可识别跳过原因，不误记为 `SENT`。
-- 已配置但未实现的占位渠道写入 `SKIPPED` 记录并带可识别跳过原因，不触发真实外部发送。
-- 同告警同用户同事件重复站内通知仍只允许一条有效发送记录，重复项可追踪为跳过。
-- 前端订阅弹窗或通知记录可见文案不把占位渠道包装成已打通外部渠道。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest" test`
-- `cd frontend-admin; pnpm test:unit src/pages/alert/__tests__/index.test.ts`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-031-notification-placeholder-send-record-visibility.md`
-
-### ISSUE-008-022：WBS 平台化缺口-M2：计划/实际日期、进度与状态一致性回归
-
-优先级：P2
-任务性质：缺口修复
-类型：WBS / 分包任务 / 后端 / 测试
-状态：Done（2026-07-10；计入本轮第 1 个实施型 Ready Issue）
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图`；`docs/quality/issue-008-008-wbs-进度计划与甘特图.md`
-依赖：无；本轮第一执行项。与 `ISSUE-008-024` 代码域独立，可双路并行。
-是否需要新增 migration：否；必须复用现有 `sub_task` 字段与现有接口。若确认缺少完成目标所需的持久化字段，立即转 Blocked，不得临时新增或修改已应用 migration。
-目标：
-- 在现有分包任务/WBS 载体上补齐计划开始/完成、实际开始/完成、进度百分比和状态之间的最小一致性边界。
-- 从共享写入/更新链路修复根因并留下回归断言，不在单个调用方重复加临时判断。
-- 只声明现有 WBS 载体的一致性闭环，不表述为完整 `schedule` 平台完成。
-允许修改：
-- `backend/src/main/java/com/cgcpms/subcontract/**`
-- `backend/src/test/java/com/cgcpms/subcontract/SubTaskControllerTest.java`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `frontend-admin/**`
-- `deploy/**`
-- 新建 `schedule_*` 表、引入新排程模块、放宽租户/项目鉴权
-验收标准：
-- 进度百分比保持 `0~100`；无效值被明确拒绝且不落库。
-- 完成态、实际完成时间和 `100%` 进度的关系遵循现有业务口径并有测试保护；不得凭 Ready 猜测新状态机。
-- 计划结束早于开始、实际结束早于开始等非法时间组合有统一校验；合法的未开始/进行中/完成组合不回退。
-- 现有项目、租户过滤与 WBS 编码生成断言继续通过。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-022-wbs-progress-date-status-consistency.md`
-
-### ISSUE-008-023：WBS 平台化缺口-M3：项目内 WBS 树与只读甘特展示最小落地
-
-优先级：P2
-任务性质：能力新增
-类型：WBS / 甘特展示 / 前端 / 后端契约回归
-状态：Done（2026-07-10；计入本轮第 4 个实施型 Ready Issue）
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图`；`docs/quality/issue-008-008-wbs-进度计划与甘特图.md`
-依赖：必须等待 `ISSUE-008-022` 收口；不得与 `008-022` 并行修改同域文件。
-是否需要新增 migration：否；只消费现有分包任务字段与接口，不新增任务依赖、基线、里程碑或变更日志表。
-目标：
-- 基于现有项目内任务行，提供最小只读 WBS 层级和时间条展示，让现有 WBS 编码、任务名、计划日期、实际日期、进度和状态可见。
-- 优先复用现有前端组件、CSS 和已安装依赖；不得引入甘特图库或拖拽排程抽象。
-- 不伪造父子关系或依赖线；现有数据没有可靠层级/依赖时，明确以 WBS 编码排序的平铺/分组降级展示。
-允许修改：
-- `frontend-admin/src/**` 中现有分包任务页面、API、类型和对应测试；最多 8 个前端文件
-- `backend/src/test/java/com/cgcpms/subcontract/SubTaskControllerTest.java`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/java/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 新增 npm 依赖、拖拽排程、任务依赖编辑、基线管理、计划变更审计、完整 schedule 模块
-验收标准：
-- 用户只能看到当前项目/租户已授权任务；前端不绕过现有后端过滤。
-- 空数据、缺失计划日期和跨期任务均有稳定降级展示，不出现脚本异常。
-- 展示至少覆盖 WBS 编码、任务名、计划起止、实际起止、进度、状态；不把只读展示包装为完整甘特平台。
-- 若新增前端测试入口，先校验测试文件/选择器存在；不存在时以 type-check、build 和最小等价既有测试收口并在报告说明。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest" test`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-023-wbs-readonly-gantt-view.md`
-
-### ISSUE-008-024：供应商评分平台化缺口-M2：交期评分范围、排序与空值一致性回归
-
-优先级：P2
-任务性质：缺口修复
-类型：供应商评分 / 采购驾驶舱 / 后端 / 测试
-状态：Done（2026-07-10；计入本轮第 2 个实施型 Ready Issue）
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强`；`docs/quality/issue-008-009-供应商评分与采购增强.md`
-依赖：无；与 `ISSUE-008-022` 代码域独立，可双路并行。
-是否需要新增 migration：否；只复用现有采购订单和当前 `supplierScores` 聚合。若需要新评分事实表、质量/价格/服务字段，立即转 Blocked。
-目标：
-- 固化现有交期达成率的项目/权限范围、逾期判定、空供应商、零订单和同分排序语义。
-- 修复应落在现有共享聚合链路，不增加第二套评分器。
-- 评分仍只代表现有采购订单交期表现，不扩写为质量、价格、服务或综合供应商评级。
-允许修改：
-- `backend/src/main/java/com/cgcpms/dashboard/**`
-- `backend/src/test/java/com/cgcpms/dashboard/DashboardMaterialRoleServiceTest.java`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `frontend-admin/**`
-- `deploy/**`
-- 新建 supplier_score/询价/报价/比价/定标/黑名单/补货表
-- 使用越权项目订单或伪造不存在的质量、价格、服务数据
-验收标准：
-- 评分只聚合当前用户可访问项目范围内的采购订单，不跨租户、不跨项目泄漏。
-- 空供应商不生成伪评分；零订单不出现除零或 NaN；同分排序有稳定次序。
-- 逾期未完成订单与已完成订单的口径延续现有定义，并由边界测试保护。
-- 原 `testPurchaseView_SupplierScores` 与新增边界断言通过。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=DashboardMaterialRoleServiceTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-024-supplier-delivery-score-boundaries.md`
-
-### ISSUE-008-025：供应商评分平台化缺口-M3：采购驾驶舱评分排名可见性最小落地
-
-优先级：P2
-任务性质：能力新增
-类型：供应商评分 / 采购驾驶舱 / 前端 / 契约回归
-状态：Done（2026-07-10；计入本轮第 3 个实施型 Ready Issue）
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强`；`docs/quality/issue-008-009-供应商评分与采购增强.md`
-依赖：必须等待 `ISSUE-008-024` 收口；不得与 `008-024` 并行修改供应商评分契约。
-是否需要新增 migration：否；只展示现有 `PurchaseManagerDashboardVO.supplierScores`，不新建供应商评分数据模型。
-目标：
-- 在现有采购经理驾驶舱展示交期评分排名，明确订单数、逾期未完成数、交期达成率和当前评分口径。
-- 复用现有驾驶舱卡片/表格样式与类型，不新增通用评分框架或图表依赖。
-- 页面文案必须说明这是“采购订单交期表现”，不得展示为综合供应商评级。
-允许修改：
-- `frontend-admin/src/**` 中现有采购经理驾驶舱页面、类型和对应测试；最多 6 个前端文件
-- `backend/src/test/java/com/cgcpms/dashboard/DashboardMaterialRoleServiceTest.java`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/java/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 新增 npm 依赖、询价/比价/定标页面、黑名单、综合评分配置器
-验收标准：
-- 有数据时按后端稳定顺序展示供应商、订单数、逾期数、交期达成率/评分；无数据时显示明确空态。
-- 页面不自行重新计算评分，不扩展后端契约，不暴露无权限项目数据。
-- 文案不把交期评分误称为综合评分；现有采购驾驶舱布局和可访问性不回退。
-- 若新增前端测试入口，先校验存在；不存在时以 type-check、build 和最小等价既有测试收口并在报告说明。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=DashboardMaterialRoleServiceTest" test`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-025-supplier-score-ranking-visibility.md`
-
-### ISSUE-008-026：WBS 平台化缺口-M4：只读甘特真实渲染与降级态验收治理
-
-优先级：P2
-任务性质：回归证明
-类型：WBS / 甘特展示 / 前端 / 测试
-状态：Done（2026-07-10；计入本轮第 5 个实施型 Ready Issue）
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图`；`ISSUE-008-023` 的只读甘特展示收口
-依赖：`ISSUE-008-023` 已完成并转 Done；不得与 `008-023` 并行修改同一前端页面或类型文件。
-是否需要新增 migration：否；只验证现有只读展示、空态、缺失日期和跨期任务降级，不新增任务依赖、基线或里程碑模型。
-目标：
-- 用最小真实渲染验收补齐 WBS 只读甘特展示的浏览器/组件层证据，避免只停留在源码字符串或类型检查。
-- 覆盖空数据、缺失计划日期、跨期任务、进度边界和状态展示的稳定降级。
-- 不扩展为拖拽排程、依赖线编辑、计划变更审计或完整 schedule 模块。
-允许修改：
-- `frontend-admin/src/**` 中现有分包任务 / WBS 展示页面、类型和对应测试；最多 6 个前端文件
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/java/**`
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 新增 npm 依赖、拖拽排程、任务依赖编辑、基线管理、计划变更审计、完整 schedule 模块
-验收标准：
-- 至少一组前端真实渲染或组件测试证明：有数据时展示 WBS 编码、任务名、计划起止、实际起止、进度和状态。
-- 至少一组降级断言证明：空数据、缺失计划日期、跨期任务不触发脚本异常，页面给出可理解空态或降级展示。
-- 不绕过现有后端项目/租户过滤，不把只读展示包装为完整甘特平台。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-026-wbs-gantt-rendering-regression.md`
-
-### ISSUE-008-021：规则治理中心平台化缺口-M3：规则侧去重时窗与重复预警抑制生效回归
-
-优先级：P2
-类型：规则治理中心 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.2 规则治理中心` 节“去重策略 / 抑制策略”；`docs/quality/issue-008-006-规则治理中心.md`；`docs/quality/issue-008-020-rule-governance-config-effectiveness.md`；`docs/quality/issue-008-018-notification-dedup-frequency-guard.md`
-是否需要新增 migration：否；优先复用现有 `alert_rule_config.dedup_hours`、`AlertRuleEvaluator` 与 `AlertEvaluationServiceTest`，不新增规则治理表结构。
-目标：
-- 补齐 `alert_rule_config.dedup_hours` 在规则评估侧的最小生效回归，证明同一规则、同一业务对象在去重窗口内不会重复生成第二条告警，而超出窗口后仍可再次生成。
-- 明确“规则侧重复告警抑制”与已完成的“通知平台分发侧抑制 / 并发幂等”边界，避免把通知发送去重当成规则治理已闭环。
-- 不扩大为规则治理中心页面、规则设计器、执行日志、效果分析、外部渠道通知或新一轮 migration。
-允许修改：
-- `backend/src/main/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `frontend-admin/**`
-- `deploy/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 新增规则治理表、规则设计器、执行日志页、效果分析页
-- 邮件、短信、企业微信、钉钉、WebSocket 等外部渠道真实接入
-- 借机放宽预警域、租户、角色、项目边界或把现有规则评估链路改造成大范围通用规则引擎
-验收标准：
-- 至少一组后端回归证明：同一规则、同一业务对象在 `dedup_hours` 窗口内重复评估时，不会生成第二条有效告警。
-- 至少一组后端回归证明：超出 `dedup_hours` 窗口或显式缩小窗口后，规则可重新生成新的告警，不会被永久抑制。
-- 至少一组后端回归证明：不同规则类型、不同业务键或不同项目边界不会被错误串并，既有 `enabled`、`threshold_ratio`、`window_days`、`severity_override` 生效语义不回退。
-- 不新增 migration，不修改已应用 migration；不把通知平台分发侧抑制、并发幂等或发送记录语义误包装为本 Issue 收口依据。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-021-rule-governance-dedup-suppression-window.md`
-
-### ISSUE-008-020：规则治理中心平台化缺口-M2：阈值/窗口/严重度配置生效回归
-
-优先级：P2
-类型：规则治理中心 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.2 规则治理中心` 节“规则阈值 / 执行周期 / 抑制策略”；`docs/quality/issue-008-006-规则治理中心.md`；`docs/quality/mainline-15-m2-alert-rule-governance-acceptance-2026-07-03.md`
-是否需要新增 migration：否；优先复用现有 `alert_rule_config`、`AlertRuleEvaluator` 与 `AlertEvaluationServiceTest`，不新增规则治理表结构。
-目标：
-- 补齐 `alert_rule_config` 中 `threshold_ratio`、`window_days`、`severity_override` 三类现有字段的最小生效回归，避免当前只有 `enabled=0` 有正式验证、其余配置字段停留在“存在但未证实生效”状态。
-- 验证规则配置生效边界应落在现有告警生成链路，不新增规则设计器、规则详情页、执行日志页、效果分析页或新一轮 migration。
-- 不扩大为完整规则治理中心建设，不串入通知平台、权限模型、项目数据隔离或外部渠道能力。
-允许修改：
-- `backend/src/main/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `frontend-admin/**`
-- `deploy/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 新增规则治理表、通用规则设计器、执行日志页、效果分析页
-- 借机放宽告警域、租户、角色、项目边界或把固定字段改造成大范围可配置引擎
-验收标准：
-- 至少一组后端回归证明：`threshold_ratio` 调整后，金额/比例型规则的触发阈值随配置变化而变化，不再只依赖硬编码默认值。
-- 至少一组后端回归证明：`window_days` 调整后，时效类规则的扫描窗口随配置变化而变化，不回退到固定默认天数。
-- 至少一组后端回归证明：`severity_override` 生效后，生成的预警严重度与配置一致，且未配置时仍保留既有默认严重度。
-- 不新增 migration，不修改已应用 migration；既有 `enabled`、`dedup_hours`、订阅偏好、通知分发和告警处理状态口径不回退。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-020-rule-governance-config-effectiveness.md`
-
-### ISSUE-008-019：通知平台平台化缺口-M5：并发重复分发幂等与发送记录一致性回归
-
-优先级：P2
-类型：通知平台 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节“同类通知不会重复轰炸 / 所有通知有发送记录”；`docs/quality/issue-008-018-notification-dedup-frequency-guard.md`
-是否需要新增 migration：否；优先复用现有 `AlertNotificationDispatcher`、`AlertNotificationSendRecord`、`NotificationService` 与既有测试基座，不新增通知平台表结构。
-目标：
-- 补齐同一 `tenantId + alertId + targetUserId + eventType + IN_APP` 在并发重复触发时的最小幂等语义，避免串行场景已抑制、并发场景仍重复落站内信或重复记 `SENT`。
-- 约束并发竞争下的发送记录一致性：允许留下明确 `SKIPPED`/抑制原因，但不能让同一并发批次产生多条有效 `SENT` 记录。
-- 不扩大为模板中心、失败重试队列、全局频控配置、外部渠道真实接入或通知平台新表设计。
-允许修改：
-- `backend/src/main/java/com/cgcpms/alert/notification/**`
-- `backend/src/main/java/com/cgcpms/notification/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/notification/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `frontend-admin/**`
-- `deploy/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 邮件、短信、企业微信、钉钉、WebSocket 等外部渠道真实接入
-- 模板中心、失败重试队列、全局可配置频控、权限模型重构
-验收标准：
-- 至少一组后端并发回归证明：同一 `alertId + targetUserId + eventType + IN_APP` 在并发重复分发时，最终只产生一条有效站内通知或一条有效 `SENT` 发送记录。
-- 至少一组后端并发回归证明：被抑制的并发重复分发必须留下明确 `SKIPPED`/原因，不能误记为第二条 `SENT`。
-- 至少一组后端回归证明：不同事件类型、不同告警 ID 或不同目标用户不会被错误串并，既有串行抑制语义不回退。
-- 不放宽预警域、租户、角色和项目边界；既有订阅偏好、占位渠道语义、SSE 通知链路与发送记录留痕不回退。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest,NotificationServiceTest,AlertEvaluationServiceTest" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-019-notification-concurrency-idempotency.md`
-
-### ISSUE-008-018：通知平台平台化缺口-M4：同告警重复通知抑制与站内信频控回归
-
-优先级：P2
-类型：通知平台 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节“同类通知不会重复轰炸”；`docs/quality/issue-008-007-通知平台.md`；`docs/quality/issue-008-016-notification-status-subscription-consistency.md`；`docs/quality/issue-008-017-notification-channel-visibility-send-record-semantics.md`
-是否需要新增 migration：否；优先复用现有 `AlertLog.dedupKey`、`AlertNotificationDispatcher`、`AlertNotificationSendRecord` 与 `NotificationService`，不新增通知平台表结构。
-目标：
-- 补齐同一用户、同一告警、同一事件类型在短时间内被重复分发时的最小抑制语义，避免站内通知和发送记录对同一条告警连续轰炸。
-- 回归“规则侧已做告警去重，但分发侧仍可能重复发送”的边界，确保通知平台最小能力从“能发、有记录”推进到“不会对同一告警重复刷屏”。
-- 不扩大为邮件、短信、企业微信、钉钉真实接入，不建设模板中心、失败重试队列、全局频控配置或新表结构。
-- 允许修改：
-- `backend/src/main/java/com/cgcpms/alert/**`
-- `backend/src/main/java/com/cgcpms/notification/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/notification/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-- 禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `frontend-admin/**`
-- `deploy/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 邮件、短信、企业微信、钉钉等外部渠道真实接入
-- 通知模板中心、失败重试队列、全局可配置频控、权限模型重构
-- 验收标准：
-- 至少一组后端回归证明：同一 `alertId + targetUserId + eventType + IN_APP` 在一次串行操作中重复触发时，只保留一条有效站内通知，不产生重复刷屏。
-- 至少一组后端回归证明：发送记录对被抑制的重复分发写明明确状态或原因，不能把被抑制记录误记为 `SENT`。
-- 至少一组后端/服务回归证明：不同事件类型（如 `ALERT_CREATED` 与 `STATUS_CHANGED`）或不同告警 ID 不会被错误合并，既有通知链路不回退。
-- 不放宽预警域、角色、租户和项目边界；既有订阅偏好、占位渠道跳过语义和发送记录留痕不回退。
-- 验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest,AlertEvaluationServiceTest,AlertControllerTest" test`
-- `git diff --check`
-- 归档报告：`docs/quality/issue-008-018-notification-dedup-frequency-guard.md`
-### ISSUE-008-017：通知平台平台化缺口-M3：占位渠道可见性与发送记录语义回归
-
-优先级：P2
-类型：通知平台 / 后端 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节“用户可配置接收渠道 / 所有通知有发送记录”；`docs/quality/issue-008-007-通知平台.md`；`docs/quality/issue-008-016-notification-status-subscription-consistency.md`
-是否需要新增 migration：否；优先复用现有 `AlertNotificationDispatcher`、`AlertNotificationChannelProperties`、`AlertSubscriptionService`、`AlertController` 与预警页订阅弹窗，不新增通知平台表结构。
-目标：
-- 补齐当前“只有 `IN_APP` 真正可达，`EMAIL / WECHAT / SMS` 仍是未配置或未实现占位渠道”这一事实，在后端发送记录与前端订阅可见性上的最小一致性闭环。
-- 回归未配置/未实现渠道的发送记录语义，确保不会被误记为已发送成功，也不会在预警页把占位渠道误展示成当前可用能力。
-- 不扩大为邮件、短信、企业微信、钉钉真实接入，不新增模板中心、重试队列、频控或新表结构。
-允许修改：
-- `backend/src/main/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `frontend-admin/src/pages/alert/**`
-- `frontend-admin/src/api/modules/alert.ts`
-- `frontend-admin/src/types/alert.ts`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 邮件、短信、企业微信、钉钉等外部渠道真实接入
-- 通知模板中心、重试队列、频控策略、权限模型重构
-验收标准：
-- 至少一组后端回归证明：当订阅中请求 `EMAIL / WECHAT / SMS` 等占位渠道时，`alert_notification_send_record` 会保留明确的 `sendStatus/failReason`，不会被误记为 `SENT`。
-- 至少一组后端/接口回归证明：订阅接口返回的“可选渠道/有效渠道”与当前真实可达能力一致，不把未配置或未实现渠道冒充为当前可用渠道。
-- 至少一组前端回归证明：预警页订阅弹窗和订阅摘要/明细对占位渠道的展示与保存保持一致；当前仅支持站内信时，不把 `EMAIL / WECHAT / SMS` 展示成用户可直接生效的能力。
-- 不放宽预警域、角色、租户和项目边界；既有“预警创建通知”和“状态变更通知”路径不回退。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AlertNotificationDispatcherTest,AlertControllerTest,AlertEvaluationServiceTest" test`
-- `cd frontend-admin; pnpm vitest run src/pages/alert/__tests__/index.test.ts`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-017-notification-channel-visibility-send-record-semantics.md`
-
-### ISSUE-008-016：通知平台平台化缺口-M2：状态变更通知与订阅偏好一致性回归
-
-优先级：P2
-类型：通知平台 / 后端 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节；`docs/quality/issue-008-007-通知平台.md`
-是否需要新增 migration：否；优先复用现有 `AlertEvaluationService`、`AlertSubscriptionService`、`AlertNotificationDispatcher` 与预警页订阅弹窗，不新增通知平台表结构。
-目标：
-- 补齐“预警状态变更通知”这一段平台化最小闭环，确保 `PROCESSED / ARCHIVED / INVALID` 通知链路与订阅偏好保持一致。
-- 回归 `notifyOnStatusChanged`、`minSeverity`、预警域和通知渠道配置在 API、分发与前端展示上的一致性。
-- 不扩大为邮件、短信、企业微信、钉钉或 WebSocket / SSE 外部渠道接入，不重做通知模板中心。
-允许修改：
-- `backend/src/main/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `frontend-admin/src/pages/alert/**`
-- `frontend-admin/src/api/modules/alert.ts`
-- `frontend-admin/src/types/alert.ts`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据、生产数据库连接、生产发布配置
-- 邮件、短信、企业微信、钉钉等外部渠道接入
-- 通知中心大范围重构、模板系统重构、权限模型重构
-验收标准：
-- 至少一组后端回归证明：当用户关闭 `notifyOnStatusChanged` 或提高 `minSeverity` 后，状态变更通知不会越过订阅偏好发送。
-- 至少一组后端回归证明：允许接收状态变更通知的用户在 `PROCESSED / ARCHIVED / INVALID` 场景下能收到符合当前渠道配置的通知，且不因渠道大小写/空白差异被静默跳过。
-- 订阅 API 与预警页订阅弹窗对有效配置的展示和保存保持一致；用户覆盖仍只能收窄默认范围，不能放大角色默认域/渠道边界。
-- 不放宽预警域、角色、租户和项目边界；既有“预警创建通知”路径不回退。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=AlertEvaluationServiceTest,AlertControllerTest,AlertNotificationDispatcherTest" test`
-- `cd frontend-admin; pnpm vitest run src/pages/alert/__tests__/index.test.ts`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-016-notification-status-subscription-consistency.md`
-
-### ISSUE-008-001：经营总览报表口径与来源下钻回归
-
-优先级：P2
-类型：报表中心 / 后端 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“项目经营总览报表”
-是否需要新增 migration：否；优先复用现有 dashboard / cost / revenue / contract 数据与接口，不新增报表定义表。
-目标：
-- 建立项目经营总览报表的最小可用口径，确保汇总指标能追溯到现有来源单据或下钻数据。
-- 不扩大为完整报表中心、异步导出平台或报表定义模型。
-允许修改：
-- `backend/src/main/java/com/cgcpms/dashboard/**`
-- `backend/src/main/java/com/cgcpms/cost/**`
-- `backend/src/main/java/com/cgcpms/revenue/**`
-- `backend/src/main/java/com/cgcpms/contract/**`
-- `backend/src/test/java/com/cgcpms/dashboard/**`
-- `backend/src/test/java/com/cgcpms/cost/**`
-- `backend/src/test/java/com/cgcpms/revenue/**`
-- `backend/src/test/java/com/cgcpms/contract/**`
-- `frontend-admin/src/pages/dashboard/**`
-- `frontend-admin/src/api/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据、生产数据库连接、外部报表平台
-- 新增通用报表中心、异步导出任务表、报表定义表
-验收标准：
-- 经营总览核心金额、成本、利润、付款或风险指标至少一组有稳定回归断言。
-- 合法下钻能定位到现有来源数据；缺失来源时不伪造明细。
-- 不放宽 dashboard 现有鉴权、租户与项目边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-001-management-report-source-drilldown.md`
-
-### ISSUE-008-002：合同履约报表口径回归
-
-优先级：P2
-类型：报表中心 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“合同履约报表”
-是否需要新增 migration：否；优先复用现有 contract / payment 数据结构。
-目标：
-- 回归合同履约报表的合同金额、变更金额、付款进度和履约状态口径。
-- 不改合同业务语义，不新增合同履约专用表。
-允许修改：
-- `backend/src/main/java/com/cgcpms/contract/**`
-- `backend/src/main/java/com/cgcpms/payment/**`
-- `backend/src/test/java/com/cgcpms/contract/**`
-- `backend/src/test/java/com/cgcpms/payment/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 合同状态机重构、生产数据库连接、通用报表中心新增表
-验收标准：
-- 合同金额、变更金额和付款进度之间有稳定断言。
-- 履约状态与来源合同、付款记录一致，不出现静默漏算或重复累计。
-- 不放宽合同查询的租户、项目和角色边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-002-contract-performance-report.md`
-
-### ISSUE-008-003：成本动态汇总报表口径回归
-
-优先级：P2
-类型：报表中心 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“成本动态汇总报表”
-是否需要新增 migration：否；优先复用现有 cost / dashboard 成本汇总口径。
-目标：
-- 回归目标成本、实际成本、动态成本和偏差金额的汇总口径。
-- 不新增成本快照表，不扩大为完整成本报表中心。
-允许修改：
-- `backend/src/main/java/com/cgcpms/cost/**`
-- `backend/src/main/java/com/cgcpms/dashboard/**`
-- `backend/src/test/java/com/cgcpms/cost/**`
-- `backend/src/test/java/com/cgcpms/dashboard/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 成本核算模型重构、生产数据库连接、通用报表中心新增表
-验收标准：
-- 至少覆盖一组目标成本、实际成本、动态成本、偏差金额的稳定断言。
-- 汇总值与现有成本来源数据一致，不重复累计、不漏计。
-- 不放宽成本数据的租户、项目和角色边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-003-cost-dynamic-summary-report.md`
-
-### ISSUE-008-004：预警处理报表口径回归
-
-优先级：P2
-类型：报表中心 / 后端 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“预警处理报表”
-是否需要新增 migration：否；优先复用现有 alert 列表、状态和统计口径。
-目标：
-- 回归预警数量、严重度、处理状态和处理结果的报表口径。
-- 不扩大为规则治理中心 M2，不新增预警规则表。
-允许修改：
-- `backend/src/main/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `frontend-admin/src/pages/alert/**`
-- `frontend-admin/src/api/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 规则治理中心新增表、预警规则引擎重构、生产数据库连接
-验收标准：
-- 预警总数、严重度分布、已读/处理状态至少一组有稳定断言。
-- 报表口径与预警列表筛选结果一致。
-- 不放宽预警域、角色、租户和项目边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-004-alert-processing-report.md`
-
-### ISSUE-008-005：审批效率报表口径回归
-
-优先级：P2
-类型：报表中心 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.1 报表中心` 节“审批效率报表”
-是否需要新增 migration：否；优先复用现有 workflow 任务、实例和状态数据。
-目标：
-- 回归审批效率报表的待办数量、已办数量、超时/耗时和审批状态口径。
-- 不改审批状态机，不新增审批分析专用表。
-允许修改：
-- `backend/src/main/java/com/cgcpms/workflow/**`
-- `backend/src/test/java/com/cgcpms/workflow/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 审批状态机重构、生产数据库连接、通用报表中心新增表
-验收标准：
-- 待办、已办、超时或平均耗时至少一组有稳定断言。
-- 报表统计与审批中心列表口径一致。
-- 不放宽审批数据的租户、项目、发起人和处理人边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-005-workflow-efficiency-report.md`
-
-### ISSUE-004-007：合同清单金额与付款条件回归
-
-优先级：P1
-类型：回归 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“合同 → 合同清单 → 付款条件”
-目标：
-- 回归合同主表、合同清单和付款条件之间的金额、日期与状态口径，确保来源单据与汇总字段一致。
-- 不改合同业务语义，不扩大为合同模块重构或数据库结构调整。
-允许修改：
-- `backend/src/main/java/com/cgcpms/contract/**`
-- `backend/src/test/java/com/cgcpms/contract/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 合同业务重构、生产数据库连接
-验收标准：
-- 合同金额、清单合计与付款条件汇总在测试中可稳定断言。
-- 状态、日期与金额字段不出现前后不一致或回写缺失。
-- 不引入新的越权、跨租户或跨项目读取路径。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-004-007-contract-payment-terms-regression.md`
-
-### ISSUE-004-008：签证变更成本与收入调整回归
-
-优先级：P1
-类型：回归 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“签证 / 变更 → 成本 / 收入调整”
-目标：
-- 回归签证、合同变更对成本与收入调整链路的影响，确保调整结果与来源单据一致。
-- 不扩大为收入模块重构，不修改已存在的 migration。
-允许修改：
-- `backend/src/main/java/com/cgcpms/variation/**`
-- `backend/src/main/java/com/cgcpms/contract/**`
-- `backend/src/main/java/com/cgcpms/cost/**`
-- `backend/src/main/java/com/cgcpms/revenue/**`
-- `backend/src/test/java/com/cgcpms/variation/**`
-- `backend/src/test/java/com/cgcpms/contract/**`
-- `backend/src/test/java/com/cgcpms/cost/**`
-- `backend/src/test/java/com/cgcpms/revenue/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 收入口径重构、生产数据库连接
-验收标准：
-- 签证/变更金额对成本或收入调整结果有稳定断言。
-- 调整后的汇总口径与来源单据一致，不出现重复累计或漏记。
-- 不放宽租户、项目或业务状态边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-004-008-variation-cost-revenue-regression.md`
-
-### ISSUE-004-009：付款审批与财务回写状态同步回归
-
-优先级：P1
-类型：回归 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“付款申请 → 审批 → 财务回写”
-目标：
-- 回归付款申请从审批通过到财务回写的状态同步口径，确保付款状态、审批状态与回写结果一致。
-- 不改审批状态机定义，不扩大为财务集成改造。
-允许修改：
-- `backend/src/main/java/com/cgcpms/payment/**`
-- `backend/src/main/java/com/cgcpms/workflow/**`
-- `backend/src/test/java/com/cgcpms/payment/**`
-- `backend/src/test/java/com/cgcpms/workflow/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 财务生产集成、审批状态机重构、生产数据库连接
-验收标准：
-- 付款审批通过、驳回、财务回写后三类状态同步关系有稳定断言。
-- 付款记录不会出现“审批状态已完成但财务状态未同步”之类静默不一致。
-- 不新增对外部财务系统的真实连接或生产配置变更。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-004-009-payment-workflow-finance-regression.md`
-
-### ISSUE-004-010：审批流转通知与预警联动回归
-
-优先级：P1
-类型：回归 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“审批中心 → 状态流转 → 通知 / 预警”
-目标：
-- 回归审批状态流转到通知与预警的联动口径，确保关键流转事件能触发正确的通知或预警信号。
-- 不扩大为通知平台或预警规则中心重构。
-允许修改：
-- `backend/src/main/java/com/cgcpms/workflow/**`
-- `backend/src/main/java/com/cgcpms/notification/**`
-- `backend/src/main/java/com/cgcpms/alert/**`
-- `backend/src/test/java/com/cgcpms/workflow/**`
-- `backend/src/test/java/com/cgcpms/notification/**`
-- `backend/src/test/java/com/cgcpms/alert/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 通知外部渠道接入、预警规则中心重构、生产数据库连接
-验收标准：
-- 至少覆盖审批提交、审批完成、审批异常三类流转下的通知/预警联动断言。
-- 通知与预警不重复触发、不静默丢失。
-- 不放宽现有权限、租户与项目边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-004-010-workflow-notification-alert-regression.md`
-
-### ISSUE-004-011：驾驶舱汇总指标来源单据下钻回归
-
-优先级：P1
-类型：回归 / 后端 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.4 P1-1` 节“驾驶舱 → 汇总指标 → 来源单据下钻”
-目标：
-- 回归驾驶舱汇总指标与来源单据下钻链路，确保指标可解释、来源可定位。
-- 不扩大为驾驶舱重设计或新增报表中心能力。
-允许修改：
-- `backend/src/main/java/com/cgcpms/dashboard/**`
-- `backend/src/main/java/com/cgcpms/cost/**`
-- `backend/src/main/java/com/cgcpms/revenue/**`
-- `backend/src/test/java/com/cgcpms/dashboard/**`
-- `backend/src/test/java/com/cgcpms/cost/**`
-- `backend/src/test/java/com/cgcpms/revenue/**`
-- `frontend-admin/src/pages/dashboard/**`
-- `frontend-admin/src/api/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 驾驶舱大改版、报表中心扩展、生产数据库连接
-验收标准：
-- 至少一组核心驾驶舱指标与来源单据之间存在稳定回归断言。
-- 下钻入口或接口在合法场景可定位来源单据，非法或缺失来源时不伪造结果。
-- 不放宽驾驶舱现有鉴权与数据边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-004-011-dashboard-source-drilldown-regression.md`
-
-### ISSUE-006-009：上传文件 hash 生成与重复文件口径回归
-
-优先级：P1
-类型：后端 / 文件安全 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件 hash”
-目标：
-- 回归上传链路中的文件 hash 生成、持久化与重复文件判定口径，确保同内容文件不会绕过既有审计与业务绑定约束。
-- 不引入外部查毒服务，不改变对象存储生产配置，不扩大为文件中心重构。
-允许修改：
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `frontend-admin/src/pages/**`
-- `frontend-admin/src/components/**`
-- `frontend-admin/src/api/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 病毒扫描服务、生产对象存储配置
-验收标准：
-- 后端对上传文件生成稳定 hash，并对重复上传场景给出明确、可断言的处理结果。
-- 合法非重复文件上传不回退，既有业务绑定与审计逻辑不被绕过。
-- 若前端需要提示，提示口径与后端返回一致，不误导为网络或权限问题。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-006-009-file-hash-duplication-guard.md`
-
-### ISSUE-006-010：文件业务对象绑定完整性回归
-
-优先级：P1
-类型：后端 / 文件安全 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件必须绑定业务对象”
-目标：
-- 回归文件与业务对象的绑定校验，确保孤儿附件、错误业务对象或越权绑定在后端被拒绝。
-- 不改变现有权限模型，不扩展为通用附件中心改造。
-允许修改：
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `frontend-admin/src/pages/**`
-- `frontend-admin/src/components/**`
-- `frontend-admin/src/api/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 权限模型重构、生产对象存储配置
-验收标准：
-- 后端拒绝未绑定业务对象、绑定对象不存在或绑定关系非法的上传/关联请求。
-- 合法业务对象绑定路径不回退，既有下载、删除、鉴权接口保持可用。
-- 前端失败提示与后端错误原因一致，不误报为成功或上传完成。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-006-010-file-biz-binding-integrity.md`
-
-### ISSUE-006-011：发票识别记录与人工确认审计回归
-
-优先级：P1
-类型：后端 / 审计 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“识别记录、人工确认记录”
-目标：
-- 回归发票识别与人工确认链路的审计记录，确保识别成功、识别失败、人工确认三类关键动作均可追踪。
-- 不改变发票识别业务口径，不引入外部平台依赖。
-允许修改：
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `frontend-admin/src/pages/**`
-- `frontend-admin/src/components/**`
-- `frontend-admin/src/api/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 发票识别供应商配置、外部平台接入
-验收标准：
-- 识别成功、识别失败、人工确认三类操作均有稳定审计断言，包含必要但不敏感的上下文字段。
-- 审计记录不得泄露票据图片直链、凭据、token 或完整敏感载荷。
-- 合法识别与人工确认流程不回退，前端提示与后端结果一致。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-006-011-invoice-recognition-audit-regression.md`
-
-### ISSUE-006-012：病毒扫描预留状态与失败兜底回归
-
-优先级：P1
-类型：后端 / 文件安全 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“病毒扫描预留接口”
-目标：
-- 回归病毒扫描预留状态、错误码或扩展点口径，确保在未接入真实查毒服务时，系统行为明确且不误判为已完成安全扫描。
-- 不新增病毒扫描服务，不连接外部文件网关，不改变生产对象存储配置。
-允许修改：
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `frontend-admin/src/pages/**`
-- `frontend-admin/src/components/**`
-- `frontend-admin/src/api/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 新增病毒扫描服务、生产对象存储配置
-验收标准：
-- 系统对“未扫描”“扫描失败”“未接入查毒能力”等预留状态有明确口径，不伪装为安全通过。
-- 未接入真实查毒服务时，合法上传主流程仍按既定策略工作，不引入误拦截或静默放行。
-- 前端提示与后端返回一致，不使用“上传成功且已安全扫描”之类误导性文案。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-006-012-virus-scan-placeholder-regression.md`
-
-### ISSUE-007-015：访问日志 traceId/requestId 透传与响应头回归
-
-优先级：P1
-类型：后端 / 可观测性 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“日志字段：traceId/requestId”
-目标：
-- 回归访问日志中的 `traceId`、`requestId` 字段透传、生成与响应头回写，确保成功请求、匿名请求、异常请求均可稳定关联。
-- 不放宽鉴权边界，不扩大为整套日志平台改造。
-允许修改：
-- `backend/src/main/java/com/cgcpms/**`
-- `backend/src/test/java/com/cgcpms/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-- 外部日志平台、生产部署配置
-验收标准：
-- 成功请求、匿名请求、异常请求三类路径均能稳定产出 `traceId/requestId`，缺失时有明确兜底规则。
-- 若请求已携带相关标识，日志与响应头透传口径一致；若未携带，系统生成值可被测试稳定断言。
-- 日志与响应头不得泄露 token、cookie、密码、完整请求体等敏感内容。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-007-015-trace-request-id-regression.md`
-
-### ISSUE-005-003：采购与收货列表页生产化补强
-
-优先级：P1
-类型：前端 / 生产化 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“采购列表、收货列表”
-目标：
-- 补强采购列表与收货列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
-- 不扩展详情页重构、新业务字段或后端接口语义。
-允许修改：
-- `frontend-admin/src/pages/purchase/**`
-- `frontend-admin/src/pages/receipt/**`
-- `frontend-admin/src/api/modules/purchase.ts`
-- `frontend-admin/src/api/modules/receipt.ts`
-- `frontend-admin/src/composables/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 查询条件刷新后可回显，分页参数不丢失。
-- loading、empty、error、retry 状态可达且不遮挡主要操作。
-- 无权限按钮不可见的既有逻辑不回退。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-005-003-purchase-receipt-list-production.md`
-
-### ISSUE-005-004：库存与领料列表页生产化补强
-
-优先级：P1
-类型：前端 / 生产化 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“库存列表、领料列表”
-目标：
-- 补强库存列表与领料列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
-- 不改库存数量业务口径，不扩展后端接口语义。
-允许修改：
-- `frontend-admin/src/pages/inventory/**`
-- `frontend-admin/src/pages/requisition/**`
-- `frontend-admin/src/api/modules/inventory.ts`
-- `frontend-admin/src/api/modules/requisition.ts`
-- `frontend-admin/src/composables/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 查询条件刷新后可回显，分页参数不丢失。
-- loading、empty、error、retry 状态可达且不遮挡主要操作。
-- 库存数量和领料状态展示不因前端补强改变业务含义。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-005-004-inventory-requisition-list-production.md`
-
-### ISSUE-005-006：预警与审批列表页生产化补强
-
-优先级：P1
-类型：前端 / 生产化 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“预警列表、审批列表”
-目标：
-- 补强预警列表与审批列表的筛选回显、分页参数保留、loading/empty/error 态与重试入口。
-- 不改预警规则、审批状态机或后端权限边界。
-允许修改：
-- `frontend-admin/src/pages/alert/**`
-- `frontend-admin/src/pages/approval/**`
-- `frontend-admin/src/stores/alert.ts`
-- `frontend-admin/src/api/modules/alert.ts`
-- `frontend-admin/src/api/modules/workflow.ts`
-- `frontend-admin/src/composables/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 查询条件刷新后可回显，分页参数不丢失。
-- loading、empty、error、retry 状态可达且不遮挡主要操作。
-- 预警权限域、审批待办/已办/我发起口径不回退。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-005-006-alert-approval-list-production.md`
-
-### ISSUE-005-007：列表页导出与批量操作权限态回归
-
-优先级：P1
-类型：前端 / 权限 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.5 P1-2` 节“批量操作、权限按钮控制、导出权限”
-目标：
-- 回归核心列表页导出按钮、批量操作按钮和权限态展示。
-- 不新增导出后端能力，不改变权限模型。
-允许修改：
-- `frontend-admin/src/pages/project/**`
-- `frontend-admin/src/pages/contract/**`
-- `frontend-admin/src/pages/purchase/**`
-- `frontend-admin/src/pages/receipt/**`
-- `frontend-admin/src/pages/inventory/**`
-- `frontend-admin/src/pages/requisition/**`
-- `frontend-admin/src/pages/subcontract/**`
-- `frontend-admin/src/pages/settlement/**`
-- `frontend-admin/src/pages/payment/**`
-- `frontend-admin/src/pages/invoice/**`
-- `frontend-admin/src/pages/alert/**`
-- `frontend-admin/src/pages/approval/**`
-- `frontend-admin/src/composables/**`
-- `frontend-admin/src/stores/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 无权限时导出和批量操作入口不可见或不可用。
-- 有权限时既有可用入口不回退。
-- 不通过前端按钮隐藏替代后端权限校验；本轮只回归前端权限态。
-验证命令：
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-005-007-list-export-batch-permission.md`
-
-### ISSUE-006-006：文件上传大小与 MIME/扩展名校验回归
-
-优先级：P1
-类型：安全 / 后端 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件上传限制”
-目标：
-- 回归文件大小、MIME、扩展名三类上传限制，确保非法文件在后端被拒绝，前端提示不误导。
-- 不新增病毒扫描服务，不改变生产对象存储配置。
-允许修改：
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `frontend-admin/src/pages/**`
-- `frontend-admin/src/components/**`
-- `frontend-admin/src/api/**`
-- `frontend-admin/src/types/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 非白名单扩展名、伪造 MIME、超大文件均不可上传。
-- 前端提示与后端拒绝原因一致，不只依赖前端校验。
-- 不影响合法 PDF/Word/Excel/图片上传。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-006-006-file-upload-validation.md`
-
-### ISSUE-006-007：私有桶默认策略与公开 URL 禁用回归
-
-优先级：P1
-类型：安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“文件访问控制”
-目标：
-- 回归文件访问必须经鉴权接口或临时链接，不暴露公开桶直链。
-- 不修改生产 MinIO 配置，不连接生产对象存储。
-允许修改：
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 文件服务不返回永久公开 URL。
-- 未授权下载仍被拒绝。
-- 合法授权下载路径不回退。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`
-- `git diff --check`
-归档报告：`docs/quality/issue-006-007-private-bucket-public-url-regression.md`
-
-### ISSUE-006-008：文件下载临时链接过期与鉴权失败提示回归
-
-优先级：P1
-类型：安全 / 后端 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.6 P1-3` 节“临时访问链接设置过期时间”
-目标：
-- 回归下载临时链接的过期时间、鉴权失败响应和前端失败提示。
-- 不新增外部文件网关，不改变权限模型。
-允许修改：
-- `backend/src/main/java/com/cgcpms/file/**`
-- `backend/src/test/java/com/cgcpms/file/**`
-- `frontend-admin/src/pages/**`
-- `frontend-admin/src/components/**`
-- `frontend-admin/src/api/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 临时链接具备明确过期时间。
-- 过期或无权下载时返回可识别错误。
-- 前端下载失败提示清晰，合法下载不回退。
-验证命令：
-- `cd backend; .\mvnw.cmd "-Dtest=*File*" test`
-- `cd frontend-admin; pnpm type-check`
-- `cd frontend-admin; pnpm build`
-- `git diff --check`
-归档报告：`docs/quality/issue-006-008-file-download-expiry-auth-prompt.md`
-
-### ISSUE-007-009：JVM 与数据库连接池指标回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“监控指标”
-目标：
-- 回归 actuator 暴露 JVM 与数据库连接池关键指标，确保本地监控入口可用。
-- 不引入外部监控平台，不修改生产部署配置。
-允许修改：
-- `backend/src/main/java/com/cgcpms/**`
-- `backend/src/main/resources/**`
-- `backend/src/test/java/com/cgcpms/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- health/metrics 可读取 JVM 与 datasource 相关指标。
-- 指标缺失时有明确测试失败或质量报告说明。
-- 不放宽鉴权边界。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `git diff --check`
-归档报告：`docs/quality/issue-007-009-jvm-datasource-metrics-regression.md`
-
-### ISSUE-007-010：备份清单脱敏与恢复演练报告模板回归
-
-优先级：P1
-类型：运维 / 文档 / 归档
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `7.7 P1-4` 节“备份范围、恢复演练”
-目标：
-- 回归备份范围清单、敏感配置脱敏要求和恢复演练报告模板。
-- 不执行真实备份恢复，不读取生产凭据。
-允许修改：
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-- `docs/**`
-禁止修改：
-- `backend/src/main/resources/db/migration/**`
-- `deploy/**`
-- 生产凭据与外部平台配置
-验收标准：
-- 清单覆盖数据库、MinIO 文件、配置文件、密钥、日志归档。
-- 模板包含恢复耗时、恢复数据范围和失败原因字段。
-- 文档不得包含真实密钥或生产连接串。
-验证命令：
-- `git diff --check`
-归档报告：`docs/quality/issue-007-010-backup-scope-redaction-restore-template.md`
-
-## 已完成/历史
-
-### ISSUE-005-008：核心列表列宽/固定列/金额日期格式统一回归
-
-优先级：P1
-类型：前端 / 生产化 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-005-008-list-format-column-consistency.md`
-
-### ISSUE-007-008：预警批处理执行结果指标回归
-
-优先级：P1
-类型：运维 / 安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-008-alert-batch-result-metrics.md`
-
-### ISSUE-007-009：JVM 与数据库连接池指标回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-009-jvm-datasource-metrics-regression.md`
-
-### ISSUE-007-010：备份清单脱敏与恢复演练报告模板回归
-
-优先级：P1
-类型：运维 / 文档 / 归档
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-010-backup-scope-redaction-restore-template.md`
-
-### ISSUE-007-011：CPU/内存/进程指标回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-011-process-memory-metrics-regression.md`
-
-### ISSUE-007-012：Redis 健康与黑名单降级告警回归
-
-优先级：P1
-类型：运维 / 安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-012-redis-blacklist-observability.md`
-
-### ISSUE-007-007：登录失败与文件失败次数指标回归
-
-优先级：P1
-类型：运维 / 安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-007-login-file-failure-metrics.md`
-
-### ISSUE-007-003：操作审计字段与文件操作审计回归
-
-优先级：P1
-类型：运维 / 安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-003-operation-audit-file-actions.md`
-
-### ISSUE-007-004：接口性能与错误率监控指标回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-004-actuator-metrics-regression.md`
-
-### ISSUE-007-005：访问日志 projectId/status/duration/exception 字段回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-005-access-log-fields-regression.md`
-
-### ISSUE-007-006：备份范围与恢复演练报告模板补强
-
-优先级：P1
-类型：运维 / 文档 / 归档
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-006-backup-scope-restore-drill-template.md`
-
-### ISSUE-006-005：发票识别失败原因与人工确认口径回归
-
-优先级：P1
-类型：安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-006-005-invoice-recognition-manual-confirmation.md`
-
-### ISSUE-006-004：发票识别重复发票与付款关联回归
-
-优先级：P1
-类型：安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-006-004-invoice-duplicate-payment-link.md`
-
-### ISSUE-006-003：附件删除鉴权与审计回归
-
-优先级：P1
-类型：安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-006-003-file-delete-auth-audit.md`
-
-### ISSUE-006-002：附件下载鉴权与临时链接回归
-
-优先级：P1
-类型：安全 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-006-002-file-download-auth-temp-link.md`
-
-### ISSUE-007-001：访问日志上下文与备份清单补强
-
-优先级：P1
-类型：运维 / 文档 / 后端
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-001-access-log-backup-checklist.md`
-
-### ISSUE-007-002：MinIO 健康指标与文件失败监控回归
-
-优先级：P1
-类型：运维 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-007-002-minio-health-upload-monitoring.md`
-
-### ISSUE-000-001：搭建本地 Codex AutoPilot 第一轮治理框架
-
-优先级：P0  
-类型：治理 / 脚本  
-状态：Done  
-自动合并：否  
-归档报告：`docs/iterations/iteration-2026-07-08-report.md`
-
-### ISSUE-004-002：采购收货库存数量一致性回归
-
-优先级：P0
-类型：回归 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-004-002-purchase-receipt-inventory-regression.md`
-
-### ISSUE-004-003：付款发票审批状态链路回归
-
-优先级：P0
-类型：回归 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-004-003-payment-invoice-workflow-regression.md`
-
-### ISSUE-004-004：领料出库与项目成本归集回归
-
-优先级：P0
-类型：回归 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-004-004-requisition-stock-cost-regression.md`
-
-### ISSUE-004-005：分包计量与结算状态链路回归
-
-优先级：P0
-类型：回归 / 后端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-004-005-subcontract-settlement-regression.md`
-
-### ISSUE-004-006：审批中心待办/已办/我发起统一筛选回归
-
-优先级：P0
-类型：回归 / 后端 / 前端 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-004-006-approval-workbench-regression.md`
-
-### ISSUE-005-002：项目与合同列表页生产化补强
-
-优先级：P1
-类型：前端 / 生产化
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-005-002-project-contract-list-production.md`
-
-### ISSUE-005-001：付款与发票列表页生产化补强
-
-优先级：P1
-类型：前端 / 生产化
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-005-001-payment-invoice-list-production.md`
-
-### ISSUE-005-006：预警与审批列表页生产化补强
-
-优先级：P1
-类型：前端 / 生产化 / 测试
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-005-006-alert-approval-list-production.md`
-
-### ISSUE-006-001：文件上传白名单与发票识别失败兜底
-
-优先级：P1
-类型：安全 / 后端 / 前端
-状态：Done
-自动合并：auto-merge/local-commit-only
-归档报告：`docs/quality/issue-006-001-file-upload-invoice-recognition.md`
-
-### ISSUE-008-006：规则治理中心 最小可行回归
-
-优先级：P2
-类型：生产增强 / 回归 / 最小实现
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.2 规则治理中心` 节
-是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
-目标：
-- 基于现有架构补齐“规则治理中心”的一轮最小可验收能力或回归断言。
-- 不扩大为完整平台化改造，不连接生产环境。
-允许修改：
-- `backend/**`
-- `frontend-admin/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- 已应用 Flyway migration
-- 生产凭据、生产数据库连接、生产发布配置
-- 与本 Issue 无关的大范围重构或新依赖
-验收标准：
-- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
-- 不放宽现有鉴权、租户、项目边界。
-- 更新 iteration 或 quality 报告，并同步 backlog 状态。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-006-规则治理中心.md`
-
-### ISSUE-008-007：通知平台 最小可行回归
-
-优先级：P2
-类型：生产增强 / 回归 / 最小实现
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.3 通知平台` 节
-是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
-目标：
-- 基于现有架构补齐“通知平台”的一轮最小可验收能力或回归断言。
-- 不扩大为完整平台化改造，不连接生产环境。
-允许修改：
-- `backend/**`
-- `frontend-admin/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- 已应用 Flyway migration
-- 生产凭据、生产数据库连接、生产发布配置
-- 与本 Issue 无关的大范围重构或新依赖
-验收标准：
-- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
-- 不放宽现有鉴权、租户、项目边界。
-- 更新 iteration 或 quality 报告，并同步 backlog 状态。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-007-通知平台.md`
-
-### ISSUE-008-008：WBS、进度计划与甘特图 最小可行回归
-
-优先级：P2
-类型：生产增强 / 回归 / 最小实现
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.4 WBS、进度计划与甘特图` 节
-是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
-目标：
-- 基于现有架构补齐“WBS、进度计划与甘特图”的一轮最小可验收能力或回归断言。
-- 不扩大为完整平台化改造，不连接生产环境。
-允许修改：
-- `backend/**`
-- `frontend-admin/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- 已应用 Flyway migration
-- 生产凭据、生产数据库连接、生产发布配置
-- 与本 Issue 无关的大范围重构或新依赖
-验收标准：
-- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
-- 不放宽现有鉴权、租户、项目边界。
-- 更新 iteration 或 quality 报告，并同步 backlog 状态。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-008-wbs-进度计划与甘特图.md`
-
-### ISSUE-008-009：供应商评分与采购增强 最小可行回归
-
-优先级：P2
-类型：生产增强 / 回归 / 最小实现
-状态：Done
-自动合并：auto-merge/local-commit-only
-来源锚点：`docs/backlog/cgc-pms-production-enhancement-plan.md` 第 `8.5 供应商评分与采购增强` 节
-是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
-目标：
-- 基于现有架构补齐“供应商评分与采购增强”的一轮最小可验收能力或回归断言。
-- 不扩大为完整平台化改造，不连接生产环境。
-允许修改：
-- `backend/**`
-- `frontend-admin/**`
-- `docs/quality/**`
-- `docs/iterations/**`
-- `docs/backlog/**`
-禁止修改：
-- 已应用 Flyway migration
-- 生产凭据、生产数据库连接、生产发布配置
-- 与本 Issue 无关的大范围重构或新依赖
-验收标准：
-- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
-- 不放宽现有鉴权、租户、项目边界。
-- 更新 iteration 或 quality 报告，并同步 backlog 状态。
-验证命令：
-- `cd backend; .\mvnw.cmd test`
-- `cd frontend-admin; pnpm type-check`
-- `git diff --check`
-归档报告：`docs/quality/issue-008-009-供应商评分与采购增强.md`
+执行复验结果（2026-07-12，独立 Reviewer 已完成）：
+- 目标 master commit `781b41661cd96b2a2f7eed825f98ff3d9bdf137b` 的 frontend-lint、frontend-test、e2e required checks 为 failure；当前裁决为不通过 / 阻塞 / 不可上线。
+- 未解除项已按前端质量、E2E、仓库治理三个责任域写入 `blocked-issues.md`；本 Issue 不越界修复或修改远端设置。
+- 正式证据：`docs/quality/ISSUE-037-021-CI-CD与上线门禁v1.5复验报告.md`。
+- Reviewer 结论：报告证据与失败分类通过复核；上线裁决仍为不通过 / 阻塞 / 不可上线。

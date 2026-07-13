@@ -1,52 +1,53 @@
 package com.cgcpms.audit;
 
 import com.cgcpms.audit.event.OperationAuditEvent;
-import com.cgcpms.audit.service.OperationAuditService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import com.cgcpms.audit.entity.OperationAuditLog;
+import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @ActiveProfiles("local")
-@DisplayName("OperationAuditService — 异步审计持久化测试")
+@DisplayName("OperationAuditService — 审计持久化测试")
 class OperationAuditServiceTest {
 
     @Autowired
     private ApplicationEventPublisher publisher;
 
-    @Autowired
-    private OperationAuditService auditService;
+    @MockitoBean
+    private OperationAuditLogMapper mapper;
 
-    private static CountDownLatch latch;
+    @Test
+    @DisplayName("事件发布返回前应完成审计写入")
+    void auditShouldBePersistedBeforePublishReturns() {
+        AtomicReference<Thread> persistenceThread = new AtomicReference<>();
+        doAnswer(invocation -> {
+            persistenceThread.set(Thread.currentThread());
+            return 1;
+        }).when(mapper).insert(any(OperationAuditLog.class));
+        OperationAuditEvent event = OperationAuditEvent.builder()
+                .tenantId(0L).userId(1L).operationType("UPDATE")
+                .businessType("SITE_DAILY_LOG").businessId("1")
+                .successFlag(true).createdAt(LocalDateTime.now()).build();
+        Thread publisherThread = Thread.currentThread();
 
-    @BeforeEach
-    void setUp() {
-        latch = new CountDownLatch(1);
-    }
-
-    @AfterEach
-    void tearDown() {
-        latch = null;
-    }
-
-    /**
-     * Helper: 发布事件并使用 CountDownLatch 等待异步处理完成。
-     */
-    private void publishAndWait(OperationAuditEvent event) throws InterruptedException {
         publisher.publishEvent(event);
-        latch.await(3, TimeUnit.SECONDS);
+
+        verify(mapper).insert(any(OperationAuditLog.class));
+        assertSame(publisherThread, persistenceThread.get());
     }
 
     @Test
@@ -70,8 +71,6 @@ class OperationAuditServiceTest {
 
         // 不应抛出任何异常（包括 Mapper 异常不应该传播）
         assertDoesNotThrow(() -> publisher.publishEvent(event));
-        // 等待异步处理完成
-        Thread.sleep(500);
     }
 
     @Test
@@ -99,8 +98,6 @@ class OperationAuditServiceTest {
             publisher.publishEvent(event0);
             publisher.publishEvent(event999);
         });
-        // 等待异步处理完成
-        Thread.sleep(500);
     }
 
     @Test

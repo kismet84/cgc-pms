@@ -14,6 +14,13 @@
   "worktree": "D:/projects-test/cgc-pms/.worktrees/autopilot/issue-900-001",
   "branch": "codex/autopilot/issue-900-001",
   "executorPid": null,
+  "executorStartedAt": "2026-07-11T12:00:00+08:00",
+  "lastProgressAt": "2026-07-11T12:05:00+08:00",
+  "retryCount": 0,
+  "timeoutReason": null,
+  "retiredAt": null,
+  "retiredStatus": null,
+  "retiredExecutors": [],
   "lastCommit": null,
   "failureFingerprint": null
 }

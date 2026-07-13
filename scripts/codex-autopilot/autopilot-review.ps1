@@ -1,4 +1,13 @@
 $ErrorActionPreference = 'Stop'
+$commandLibrary = Join-Path $PSScriptRoot 'autopilot-command.ps1'
+if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
+
+function Write-AutopilotReviewDiff {
+  param([Parameter(Mandatory)][string]$Text, [Parameter(Mandatory)][string]$OutputPath)
+  $parent = Split-Path -Parent $OutputPath
+  if ($parent -and !(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+  [IO.File]::WriteAllText($OutputPath, $Text, [Text.UTF8Encoding]::new($false))
+}
 
 function New-AutopilotReviewRequest {
   param(
@@ -65,19 +74,6 @@ function Test-AutopilotCodeRepairAllowed {
   return $FailureCategory -eq 'quality_security' -and $StopReason -in @('STOP_VERIFICATION_FAILED','STOP_REVIEW_NEEDS_REPAIR')
 }
 
-function Resolve-AutopilotCodexCommand {
-  $command = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
-  if ($command) { return $command.Source }
-  if (Get-Command Get-AppxPackage -ErrorAction SilentlyContinue) {
-    $package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue
-    if ($package) {
-      $candidate = Join-Path $package.InstallLocation 'app\resources\codex.exe'
-      if (Test-Path -LiteralPath $candidate) { return $candidate }
-    }
-  }
-  throw 'Codex CLI command is unavailable'
-}
-
 function Invoke-AutopilotReviewer {
   param(
     [string]$Worktree,
@@ -88,12 +84,12 @@ function Invoke-AutopilotReviewer {
     [string]$Thinking = 'high',
     [int]$TimeoutSeconds = 1200
   )
-  $codex = Resolve-AutopilotCodexCommand
+  $codex = Resolve-AutopilotCodexInvocation
   $prompt = "Act as an independent reviewer. Read only the structured request at $RequestPath and files it references. Return JSON matching $SchemaPath."
   $arguments = @('exec','--ephemeral','--sandbox','read-only','--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$Worktree,'--output-schema',$SchemaPath,'--output-last-message',$ResultPath,'-')
   $startInfo = [Diagnostics.ProcessStartInfo]::new()
-  $startInfo.FileName = $codex
-  $startInfo.Arguments = ($arguments | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
+  $startInfo.FileName = $codex.fileName
+  $startInfo.Arguments = (@($codex.argumentPrefix) + $arguments | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
   $startInfo.WorkingDirectory = $Worktree
   $startInfo.UseShellExecute = $false
   $startInfo.RedirectStandardInput = $true

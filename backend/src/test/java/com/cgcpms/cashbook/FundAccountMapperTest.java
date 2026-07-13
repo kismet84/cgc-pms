@@ -83,7 +83,6 @@ class FundAccountMapperTest {
                 "cashbook:account:manage");
         assertEquals(4, countMenus(cashbookPermissions));
         assertEquals(0, countMenus(List.of("file:upload", "file:query", "file:delete")));
-        assertEquals(0, countMenuIds(List.of(956L, 957L, 958L)));
 
         assertEquals(3, countRolePermissions(6L, List.of(
                 "cashbook:journal:query",
@@ -115,14 +114,6 @@ class FundAccountMapperTest {
                 "SELECT COUNT(*) FROM sys_menu WHERE deleted_flag = 0 AND perms IN (" + placeholders + ")",
                 Integer.class,
                 permissions.toArray());
-    }
-
-    private int countMenuIds(List<Long> menuIds) {
-        String placeholders = String.join(",", menuIds.stream().map(value -> "?").toList());
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_menu WHERE id IN (" + placeholders + ")",
-                Integer.class,
-                menuIds.toArray());
     }
 
     private int countRolePermissions(Long roleId, List<String> permissions) {

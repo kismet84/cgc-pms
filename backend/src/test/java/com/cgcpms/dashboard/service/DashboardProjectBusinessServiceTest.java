@@ -3,6 +3,8 @@ package com.cgcpms.dashboard.service;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.TestUserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -43,6 +45,8 @@ import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.tech.entity.TechItem;
 import com.cgcpms.tech.mapper.TechItemMapper;
@@ -73,6 +77,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @DisplayName("Dashboard project and business views")
 class DashboardProjectBusinessServiceTest extends DashboardServiceTestSupport {
+
+    @Autowired private SysRoleMapper sysRoleMapper;
 
     @Test
     @Transactional
@@ -227,6 +233,97 @@ class DashboardProjectBusinessServiceTest extends DashboardServiceTestSupport {
         assertNull(vo.getProjectId());
         assertEquals("全部项目", vo.getProjectName());
         assertTrue(vo.getPendingTaskCount() >= 1);
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("1.2a PM view: specified and all-project views respect SELF project scope")
+    void testPMView_RespectsProjectDataScope() {
+        SeedResult visible = seed("PM_SELF_VISIBLE");
+        SeedResult hidden = seed("PM_SELF_HIDDEN");
+        SeedResult completed = seed("PM_SELF_COMPLETED");
+        long scopedUserId = 88_101L;
+        assignProjectTasksTo(visible.projectId, scopedUserId);
+        assignProjectTasksTo(hidden.projectId, scopedUserId);
+        applySelfScope(visible.projectId, hidden.projectId, scopedUserId);
+        PmProject completedProject = projectMapper.selectById(completed.projectId);
+        completedProject.setCreatedBy(scopedUserId);
+        completedProject.setProjectManagerId(null);
+        completedProject.setStatus("COMPLETED");
+        projectMapper.updateById(completedProject);
+
+        BusinessException denied = assertThrows(BusinessException.class,
+                () -> dashboardService.getProjectManagerView(hidden.projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", denied.getCode());
+        BusinessException inactiveDenied = assertThrows(BusinessException.class,
+                () -> dashboardService.getProjectManagerView(completed.projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", inactiveDenied.getCode());
+
+        ProjectManagerDashboardVO specified = dashboardService.getProjectManagerView(visible.projectId);
+        assertEquals(List.of(visible.projectId.toString()), specified.getLaggingProjects().stream()
+                .map(DashboardProjectSummaryVO::getProjectId).toList());
+
+        ProjectManagerDashboardVO all = dashboardService.getProjectManagerView(null);
+        assertEquals(1L, all.getPendingTaskCount());
+        assertEquals(1L, all.getPendingApprovalCount());
+        assertEquals(1L, all.getExpiringContractCount());
+        assertTrue(all.getPendingTasks().stream()
+                .allMatch(item -> visible.projectId.toString().equals(item.getProjectId())));
+        assertTrue(all.getPendingApprovals().stream()
+                .allMatch(item -> visible.projectId.toString().equals(item.getProjectId())));
+        assertTrue(all.getExpiringContracts().stream()
+                .allMatch(item -> visible.projectId.toString().equals(item.getProjectId())));
+        assertEquals(List.of(visible.projectId.toString()), all.getLaggingProjects().stream()
+                .map(DashboardProjectSummaryVO::getProjectId).toList());
+
+        TestUserContext.setUser(TENANT_ID, scopedUserId + 99, "dashboard-self-empty",
+                UserContext.getCurrentRoles());
+        ProjectManagerDashboardVO empty = dashboardService.getProjectManagerView(null);
+        assertEquals(0L, empty.getPendingTaskCount());
+        assertEquals(0L, empty.getPendingApprovalCount());
+        assertEquals(0L, empty.getExpiringContractCount());
+        assertEquals(0L, empty.getLaggingProjectCount());
+        assertTrue(empty.getPendingTasks().isEmpty());
+        assertTrue(empty.getPendingApprovals().isEmpty());
+        assertTrue(empty.getExpiringContracts().isEmpty());
+        assertTrue(empty.getLaggingProjects().isEmpty());
+    }
+
+    private void assignProjectTasksTo(Long projectId, long approverId) {
+        List<Long> instanceIds = wfInstanceMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfInstance>()
+                                .eq(WfInstance::getTenantId, TENANT_ID)
+                                .eq(WfInstance::getProjectId, projectId))
+                .stream().map(WfInstance::getId).toList();
+        wfTaskMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getTenantId, TENANT_ID)
+                        .in(WfTask::getInstanceId, instanceIds))
+                .forEach(task -> {
+                    task.setApproverId(approverId);
+                    wfTaskMapper.updateById(task);
+                });
+    }
+
+    private void applySelfScope(Long visibleProjectId, Long hiddenProjectId, long scopedUserId) {
+        PmProject visible = projectMapper.selectById(visibleProjectId);
+        visible.setCreatedBy(scopedUserId);
+        visible.setProjectManagerId(null);
+        projectMapper.updateById(visible);
+        PmProject hidden = projectMapper.selectById(hiddenProjectId);
+        hidden.setCreatedBy(scopedUserId + 1);
+        hidden.setProjectManagerId(null);
+        projectMapper.updateById(hidden);
+
+        String roleCode = "PM_DASH_SELF_" + System.nanoTime();
+        SysRole role = new SysRole();
+        role.setTenantId(TENANT_ID);
+        role.setRoleCode(roleCode);
+        role.setRoleName("PM dashboard SELF scope");
+        role.setRoleType("CUSTOM");
+        role.setStatus("ENABLE");
+        role.setDataScope("SELF");
+        sysRoleMapper.insert(role);
+        TestUserContext.setUser(TENANT_ID, scopedUserId, "pm-dashboard-self", List.of(roleCode));
     }
 
     // ========================================================================

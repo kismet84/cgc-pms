@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$IssueId = 'READY-DRY-RUN',
     [ValidateSet('dry-run', 'classify', 'closeout', 'full')]
     [string]$Scenario = 'dry-run',
@@ -76,8 +76,8 @@ function Resolve-ReadyIssueSelection {
             }
         }
 
-        $content = Get-Content -LiteralPath $RequestedPath -Raw
-        $looksReady = ($content -match '^##\s+') -and ($content -match '验证命令：')
+        $content = Get-Content -Encoding UTF8 -LiteralPath $RequestedPath -Raw
+        $looksReady = ($content -match '(?m)^#{2,3}\s+') -and ($content -match '验证命令：')
         $isDryRunMarker = ($RequestedIssueId -eq 'READY-DRY-RUN')
         $matchesIssue = $isDryRunMarker -or ($content -match [regex]::Escape($RequestedIssueId))
         if (-not $looksReady) {

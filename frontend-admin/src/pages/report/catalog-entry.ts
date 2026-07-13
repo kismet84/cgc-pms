@@ -23,8 +23,6 @@ export function hasReportCatalogExportEntry(
   resolve: Router['resolve'],
 ) {
   return (
-    item.exportSupport &&
-    item.status === 'available' &&
-    canOpenReportCatalogPage(item, resolve)
+    item.exportSupport && item.status === 'available' && canOpenReportCatalogPage(item, resolve)
   )
 }

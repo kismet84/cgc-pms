@@ -1,104 +1,47 @@
 # 文档中心
 
-本文档中心是 `cgc-pms` 当前有效的项目知识入口。旧测试数量、覆盖率、上线结论如果没有重新验证，均视为历史信息。
+本目录是 cgc-pms v1.5 当前知识入口。历史测试数量、覆盖率和上线结论均不得替代当前验证。
 
-## 当前优先级
+## 规则优先级
 
-1. 根目录 [AGENTS.override.md](../AGENTS.override.md)
-2. 根目录 [AGENTS.md](../AGENTS.md)
-3. 本目录下的专题规范
-4. `.archive/` 中的历史资料
+1. [AGENTS.override.md](../AGENTS.override.md)
+2. [AGENTS.md](../AGENTS.md)
+3. [现行规范](standards/)
+4. [v1.0 文档归档](archive/v1.0/)
 
-## 按角色阅读
+## 现行规范
 
-| 角色 | 必读 | 补充 |
-|------|------|------|
-| 项目总负责人 | [AGENTS.override.md](../AGENTS.override.md) | [03 业务模块说明](03-业务模块说明.md)、[09 测试规范](09-测试规范.md) |
-| 产品/需求负责人 | [03 业务模块说明](03-业务模块说明.md) | [08 权限与审批流程](08-权限与审批流程.md) |
-| 前端设计师 | [05 前端开发规范](05-前端开发规范.md) | [00 UI 基线](00-UI-Design-Baselines-and-Code-Specifications.md)、[prompt/frontend-docker-ui-test-rules.md](prompt/frontend-docker-ui-test-rules.md) |
-| 后端设计师 | [04 后端开发规范](04-后端开发规范.md) | [06 API 契约规范](06-API契约规范.md)、[02 系统架构](02-系统架构.md) |
-| 数据库与迁移负责人 | [07 数据库与迁移规范](07-数据库与迁移规范.md) | [09 测试规范](09-测试规范.md) |
-| 测试验收员 | [09 测试规范](09-测试规范.md) | [prompt/frontend-docker-ui-test-rules.md](prompt/frontend-docker-ui-test-rules.md) |
-| 安全审计员 | [11 安全规范](11-安全规范.md) | [04 后端开发规范](04-后端开发规范.md)、[09 测试规范](09-测试规范.md) |
-| 部署运维负责人 | [10 部署运维手册](10-部署运维手册.md) | [01 快速开始](01-快速开始.md) |
-| 代码质量审计员 | [04 后端开发规范](04-后端开发规范.md)、[05 前端开发规范](05-前端开发规范.md) | [09 测试规范](09-测试规范.md)、[11 安全规范](11-安全规范.md) |
+| 编号 | 文档 |
+| --- | --- |
+| 00 | [UI 设计基线](standards/00-UI-Design-Baselines-and-Code-Specifications.md) |
+| 01 | [快速开始](standards/01-快速开始.md) |
+| 02 | [系统架构](standards/02-系统架构.md) |
+| 03 | [业务模块说明](standards/03-业务模块说明.md) |
+| 04 | [后端开发规范](standards/04-后端开发规范.md) |
+| 05 | [前端开发规范](standards/05-前端开发规范.md) |
+| 06 | [API 契约规范](standards/06-API契约规范.md) |
+| 07 | [数据库与迁移规范](standards/07-数据库与迁移规范.md) |
+| 08 | [权限与审批流程](standards/08-权限与审批流程.md) |
+| 09 | [测试规范](standards/09-测试规范.md) |
+| 10 | [部署运维手册](standards/10-部署运维手册.md) |
+| 11 | [安全规范](standards/11-安全规范.md) |
+| 12 | [Codex Subagents 实施方案](standards/12-codex-subagents-implementation-plan.md) |
+| 13 | [驾驶舱摘要字段规范](standards/13-驾驶舱摘要字段生成与展示规范.md) |
 
-## 按任务阅读
+## 当前工作入口
 
-| 任务 | 入口 |
-|------|------|
-| 新成员启动 | [01 快速开始](01-快速开始.md) |
-| 理解系统结构 | [02 系统架构](02-系统架构.md) |
-| 梳理业务范围 | [03 业务模块说明](03-业务模块说明.md) |
-| 开发后端接口 | [04 后端开发规范](04-后端开发规范.md)、[06 API 契约规范](06-API契约规范.md) |
-| 开发前端页面 | [05 前端开发规范](05-前端开发规范.md)、[00 UI 基线](00-UI-Design-Baselines-and-Code-Specifications.md) |
-| 改数据库结构 | [07 数据库与迁移规范](07-数据库与迁移规范.md) |
-| 改权限或审批 | [08 权限与审批流程](08-权限与审批流程.md) |
-| 验收或回归 | [09 测试规范](09-测试规范.md) |
-| 部署、备份、恢复 | [10 部署运维手册](10-部署运维手册.md) |
-| 安全加固 | [11 安全规范](11-安全规范.md) |
-| 自适应执行路由/条件派工 | [AGENTS.override.md](../AGENTS.override.md) |
-| AutoPilot 无人值守运行与验收 | [第 36 条主线验收报告](quality/autopilot-unattended-acceptance.md)、[无人值守资格报告](quality/autopilot-unattended-qualification.md) |
+- [用户手册](manuals/README.md)
+- [培训材料](training/README.md)
+- [CI 失败排障手册](runbook/ci-failure-triage.md)
+- [Prompt 索引](prompt/README.md)
+- [当前 backlog](backlog/current-focus.md)
+- [产品情报：项目地图、竞品分析与迭代决策](product-intelligence/README.md)
+- [v1.5 计划书](plans/README.md)
+- [v1.5 质量报告](quality/README.md)
+- [v1.5 迭代记录](iterations/README.md)
+- [未来开发计划](未来开发计划.md)
+- [历史开发记录](历史开发记录.md)
 
-## 主线文档
+## 历史边界
 
-| 编号 | 文档 | 状态 |
-|------|------|------|
-| 00 | [UI 设计基线](00-UI-Design-Baselines-and-Code-Specifications.md) | 前端页面改造基线 |
-| 01 | [快速开始](01-快速开始.md) | 当前有效 |
-| 02 | [系统架构](02-系统架构.md) | 当前有效 |
-| 03 | [业务模块说明](03-业务模块说明.md) | 当前有效 |
-| 04 | [后端开发规范](04-后端开发规范.md) | 当前有效 |
-| 05 | [前端开发规范](05-前端开发规范.md) | 当前有效 |
-| 06 | [API 契约规范](06-API契约规范.md) | 当前有效 |
-| 07 | [数据库与迁移规范](07-数据库与迁移规范.md) | 当前有效 |
-| 08 | [权限与审批流程](08-权限与审批流程.md) | 当前有效 |
-| 09 | [测试规范](09-测试规范.md) | 当前有效 |
-| 10 | [部署运维手册](10-部署运维手册.md) | 当前有效 |
-| 11 | [安全规范](11-安全规范.md) | 当前有效 |
-
-## 用户手册与培训
-
-- [docs/manuals/README.md](manuals/README.md)：当前有效的用户手册入口；对当前上线收口非阻塞，对试点交付与培训落地是阻塞项。
-- [docs/training/README.md](training/README.md)：当前有效的培训材料入口；`.archive/` 下旧手册只作历史参考，不替代当前材料。
-
-## Prompt 文档
-
-Prompt 类文档索引见 [prompt/README.md](prompt/README.md)。
-
-## 质量与审计
-
-### 当前有效结论入口（第 21 条主线最终收口）
-
-AutoPilot 专项当前入口：[第 36 条主线 AutoPilot 无人值守验收报告](quality/autopilot-unattended-acceptance.md)；适用范围为本地低/中风险串行、`autoPush=false`，不替代业务上线裁决。
-
-1. [第 21 条主线最终质量归档与收口报告](quality/mainline-21-legacy-governance-closure-2026-07-05.md)：**当前有效最终收口入口**，口径为“通过 / 非阻塞 / 可关闭第 21 条主线”。
-2. [第 21 条主线 P0-2：上线前总控状态校准与决策包重建报告](quality/mainline-21-p0-2-release-control-calibration-2026-07-05.md)：第 21 条阶段总控校准入口，口径为“通过 / 非阻塞 / 可进入 P1”。
-3. [第 13 条主线收口报告](quality/mainline-13-closeout-2026-07-03.md)：历史上线准备结论入口，仅作背景回看，不再替代当前最终收口或当前总控校准。
-4. [第 13 条主线历史阻断项复核报告](quality/mainline-13-historical-blockers-review-2026-07-03.md)：历史 blocker 复核入口，仅作背景回看。
-
-以下旧报告均只作为历史背景，不得替代上面 2026-07-05 当前校准结论。
-
-| 日期 | 文档 | 当前使用方式 |
-|------|------|--------------|
-| 2026-07-05 | [第 21 条主线 P0-2：上线前总控状态校准与决策包重建报告](quality/mainline-21-p0-2-release-control-calibration-2026-07-05.md) | 当前阶段总控校准入口；用于回看 P0-2 校准证据 |
-| 2026-07-03 | [第 13 条主线收口报告](quality/mainline-13-closeout-2026-07-03.md) | 历史上线准备结论 |
-| 2026-07-03 | [第 13 条主线历史阻断项复核报告](quality/mainline-13-historical-blockers-review-2026-07-03.md) | 历史 blocker 复核入口 |
-| 2026-06-25 | [上线前代码审计报告](quality/code-audit-2026-06-25-pre-release.md) | 历史审计结论；上线前需重新验证 |
-| 2026-06-25 | [全量代码审计报告](quality/code-audit-2026-06-25-full-repo.md) | 历史审计结论；用于回看问题类型 |
-| 2026-06-25 | [Vite 大 chunk 警告专项审计](quality/code-audit-2026-06-25-vite-large-chunk-warning.md) | 历史专项结论 |
-| 2026-06-24 | [UI 重构检查清单](quality/ui-refactor-checklist.md) | 历史迁移追踪 |
-| 2026-06-23 | [质量加固验收](quality/quality-hardening-acceptance.md) | 历史验收记录 |
-
-## 当前交付状态
-
-- 已放行：商务经理、项目经理、采购经理、生产经理
-- 已冻结：总工程师
-- 当前默认演示环境已补齐采购经理、生产经理的最小 demo 数据；这类页面不再以空态作为默认验收结果
-- 当前驾驶舱验收以 `docs/03-业务模块说明.md` 中的第一阶段、第二阶段边界为准
-
-## 其他资料
-
-- [历史开发记录](历史开发记录.md)：只记录已发生事实。
-- [未来开发计划](未来开发计划.md)：只保留未完成计划和待验证事项。
-- `.archive/`：旧版文档归档，不作为当前规范直接执行。
+v1.0 及更早的计划、质量报告、迭代报告、问题报告和 backlog 快照统一从 [v1.0 文档归档](archive/v1.0/README.md) 查阅。Git 忽略的本地私有封存不属于项目运行依赖，也不得作为当前规范引用。

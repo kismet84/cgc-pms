@@ -22,7 +22,10 @@ const ATableStub = defineComponent({
       const rows = (props.dataSource as Array<Record<string, unknown>>) ?? []
 
       return h('table', { class: 'table-stub' }, [
-        h('thead', columns.map((column) => h('th', String(column.title ?? '')))),
+        h(
+          'thead',
+          columns.map((column) => h('th', String(column.title ?? ''))),
+        ),
         h(
           'tbody',
           rows.length
@@ -105,6 +108,8 @@ describe('DashboardPurchaseView', () => {
             partnerName: '华北钢材',
             orderCount: 8,
             overdueOrderCount: 1,
+            lateCompletedCount: 2,
+            overdueIncompleteCount: 1,
             onTimeDeliveryRate: '87.50',
             performanceScore: '88',
           },
@@ -116,6 +121,8 @@ describe('DashboardPurchaseView', () => {
     expect(text).toContain('供应商采购订单交期表现')
     expect(text).toContain('仅展示采购订单交期表现，不代表供应商综合评级')
     expect(text).toContain('华北钢材')
+    expect(text).toContain('迟交完成数')
+    expect(text).toContain('逾期未完成数')
     expect(text).toContain('8')
     expect(text).toContain('1')
     expect(text).toContain('87.50%')

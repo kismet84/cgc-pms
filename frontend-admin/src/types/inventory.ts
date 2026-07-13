@@ -22,6 +22,9 @@ export interface MatStockVO {
   warehouseId: string
   materialId: string
   availableQty: string
+  safetyStockQty: string
+  replenishmentTargetQty?: string | null
+  replenishmentLeadDays?: number | null
   version: number
   createdTime?: string
   updatedTime?: string

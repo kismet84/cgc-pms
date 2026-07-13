@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -40,10 +41,13 @@ class MatStockControllerTest {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
-    private static final long WAREHOUSE_ID = 100L;
+    private static final long WAREHOUSE_ID = 1L;
     private static final long MATERIAL_ID = 1001L;
 
     private Cookie adminCookie() {
@@ -51,6 +55,13 @@ class MatStockControllerTest {
                 ADMIN_ID, ADMIN_USERNAME, TENANT_ID,
                 List.of("ADMIN"),
                 List.of());
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    private Cookie purchaseManagerCookie(List<String> permissions) {
+        String token = jwtUtils.generateToken(
+                7L, "purchase_manager", TENANT_ID,
+                List.of("PURCHASE_MANAGER"), permissions);
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
@@ -69,13 +80,14 @@ class MatStockControllerTest {
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"warehouseId":100,"materialId":1001,"quantity":"100.0000"}"""))
+                                {"warehouseId":1,"materialId":1001,"quantity":"100.0000"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.id").exists())
                 .andExpect(jsonPath("$.data.warehouseId").value(WAREHOUSE_ID))
                 .andExpect(jsonPath("$.data.materialId").value(MATERIAL_ID))
                 .andExpect(jsonPath("$.data.availableQty").exists())
+                .andExpect(jsonPath("$.data.safetyStockQty").value(10.0000))
                 .andExpect(jsonPath("$.data.tenantId").doesNotExist())
                 .andExpect(jsonPath("$.data.version").doesNotExist())
                 .andExpect(jsonPath("$.data.deletedFlag").doesNotExist());
@@ -95,7 +107,7 @@ class MatStockControllerTest {
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"warehouseId":100,"materialId":1001,"quantity":"50.0000"}"""))
+                                {"warehouseId":1,"materialId":1001,"quantity":"50.0000"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.id").exists())
@@ -155,8 +167,105 @@ class MatStockControllerTest {
         mockMvc.perform(postWithApi("/inventory/stock/in")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"warehouseId":100,"materialId":1001,"quantity":"100.0000"}"""))
+                                {"warehouseId":1,"materialId":1001,"quantity":"100.0000"}"""))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("采购经理可维护安全库存阈值")
+    void testPurchaseManagerCanUpdateSafetyThreshold() throws Exception {
+        Long stockId = jdbcTemplate.queryForObject(
+                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
+                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/safety-threshold")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"125.5000\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.safetyStockQty").value(125.5000));
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("仅库存读取权限不能维护安全库存阈值")
+    void testStockListOnlyCannotUpdateSafetyThreshold() throws Exception {
+        Long stockId = jdbcTemplate.queryForObject(
+                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
+                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/safety-threshold")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"30.0000\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("采购经理可原子维护安全库存与补货目标量")
+    void testPurchaseManagerCanUpdateReplenishmentSettings() throws Exception {
+        Long stockId = jdbcTemplate.queryForObject(
+                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
+                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\",\"replenishmentLeadDays\":7}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.safetyStockQty").value(100.0000))
+                .andExpect(jsonPath("$.data.replenishmentTargetQty").value(150.0000))
+                .andExpect(jsonPath("$.data.replenishmentLeadDays").value(7));
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.replenishmentLeadDays").value(7));
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\",\"replenishmentLeadDays\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.replenishmentLeadDays").doesNotExist());
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("补货目标量低于安全库存时拒绝保存")
+    void testRejectsTargetBelowSafetyThreshold() throws Exception {
+        Long stockId = jdbcTemplate.queryForObject(
+                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
+                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"99.9999\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("补货提前期拒绝小数和越界值")
+    void testRejectsInvalidReplenishmentLeadDays() throws Exception {
+        Long stockId = jdbcTemplate.queryForObject(
+                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
+                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+
+        for (String value : List.of("-1", "3651", "1.5")) {
+            mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                            .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":null,\"replenishmentLeadDays\":" + value + "}"))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     // ---- helpers ----
@@ -167,5 +276,9 @@ class MatStockControllerTest {
 
     private MockHttpServletRequestBuilder postWithApi(String pathWithinContext) {
         return post("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder putWithApi(String pathWithinContext) {
+        return put("/api" + pathWithinContext).contextPath("/api");
     }
 }

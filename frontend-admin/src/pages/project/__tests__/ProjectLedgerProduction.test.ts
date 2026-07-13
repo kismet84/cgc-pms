@@ -61,7 +61,9 @@ describe('ProjectLedgerProduction source guards', () => {
     expect(source).toMatch(/pageSize\.value = readQueryNumber\('pageSize', 20\)/)
     expect(source).toMatch(/function syncQueryToRoute\(\)/)
     expect(source).toMatch(/router\.replace\(\{ query \}\)/)
-    expect(source).toMatch(/restoreFilterFromRoute\(\)[\s\S]*await fetchDictData\(PROJECT_TYPE_DICT\)/)
+    expect(source).toMatch(
+      /restoreFilterFromRoute\(\)[\s\S]*await fetchDictData\(PROJECT_TYPE_DICT\)/,
+    )
     expect(source).toMatch(/syncQueryToRoute\(\)[\s\S]*getProjectList/)
   })
 

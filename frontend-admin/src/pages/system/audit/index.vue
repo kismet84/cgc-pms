@@ -99,7 +99,10 @@ onMounted(fetchData)
         size="small"
       >
         <template #bodyCell="{ column, record }">
-          <a-tag v-if="column.dataIndex === 'successFlag'" :color="record.successFlag === 1 ? 'success' : 'error'">
+          <a-tag
+            v-if="column.dataIndex === 'successFlag'"
+            :color="record.successFlag === 1 ? 'success' : 'error'"
+          >
             {{ record.successFlag === 1 ? '成功' : '失败' }}
           </a-tag>
         </template>

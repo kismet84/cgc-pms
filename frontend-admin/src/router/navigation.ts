@@ -31,6 +31,7 @@ export const navigationItems: NavigationItem[] = [
       '/cost/ledger',
       '/cost/summary',
       '/cost-target',
+      '/site/daily-log',
     ],
     children: [
       { key: '/project/list', label: '项目列表' },
@@ -39,6 +40,7 @@ export const navigationItems: NavigationItem[] = [
       { key: '/cost-target/index', label: '成本目标' },
       { key: '/cost/ledger', label: '成本台账' },
       { key: '/cost/summary', label: '成本核对' },
+      { key: '/site/daily-log', label: '现场日报', permission: 'site:daily:query' },
     ],
   },
   {

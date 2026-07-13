@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [switch]$DryRun,
@@ -15,7 +15,7 @@ function Read-JsonFile {
   if (!(Test-Path $Path)) {
     throw "Config not found: $Path"
   }
-  return Get-Content -Raw $Path | ConvertFrom-Json
+  return Get-Content -Encoding UTF8 -Raw $Path | ConvertFrom-Json
 }
 
 function Test-Checkpoint {
@@ -40,7 +40,7 @@ function Read-RunLock {
     return $null
   }
   try {
-    return Get-Content -Raw $LockPath | ConvertFrom-Json
+    return Get-Content -Encoding UTF8 -Raw $LockPath | ConvertFrom-Json
   } catch {
     return [pscustomobject]@{
       owner = "unknown"
@@ -378,12 +378,12 @@ function Get-SplitCandidates {
     return @()
   }
 
-  $focus = Get-Content -Raw $FocusPath
-  $ready = if (Test-Path $ReadyPath) { Get-Content -Raw $ReadyPath } else { "" }
+  $focus = Get-Content -Encoding UTF8 -Raw $FocusPath
+  $ready = if (Test-Path $ReadyPath) { Get-Content -Encoding UTF8 -Raw $ReadyPath } else { "" }
   $forbidden = "财务|生产数据库|生产发布|总工程师|BIM|AI"
   $allowed = "报表|规则治理|通知|WBS|进度|甘特图|供应商|采购增强"
   $candidates = @()
-  foreach ($line in Get-Content $PlanPath) {
+  foreach ($line in Get-Content -Encoding UTF8 $PlanPath) {
     if ($line -match "^#{2,3}\s+([0-9]+\.[0-9]+)\s+(.+)$") {
       $section = $matches[1].Trim()
       $name = $matches[2].Trim()
@@ -480,7 +480,7 @@ function Add-ReadyIssueDrafts {
     return 0
   }
 
-  $readyText = if (Test-Path $ReadyPath) { Get-Content -Raw $ReadyPath } else { "# Ready Issues`r`n" }
+  $readyText = if (Test-Path $ReadyPath) { Get-Content -Encoding UTF8 -Raw $ReadyPath } else { "# Ready Issues`r`n" }
   $drafts = @()
   for ($index = 0; $index -lt $Candidates.Count; $index++) {
     $issueId = Get-NextIssueId $readyText $Candidates[$index].section ($index + 1)
@@ -538,6 +538,13 @@ function Write-State {
     worktree = if ($script:CurrentWorktree) { $script:CurrentWorktree } else { '' }
     branch = if ($script:CurrentBranch) { $script:CurrentBranch } else { (& git -C $RepoRoot branch --show-current 2>$null | Select-Object -First 1) }
     executorPid = $script:ExecutorPid
+    executorStartedAt = $script:ExecutorStartedAt
+    lastProgressAt = $script:LastProgressAt
+    retryCount = $script:Attempt
+    timeoutReason = $script:TimeoutReason
+    retiredAt = $script:RetiredAt
+    retiredStatus = $script:RetiredStatus
+    retiredExecutors = @($script:RetiredExecutors)
     lastCommit = $script:LastCommit
     failureFingerprint = $script:FailureFingerprint
     enabled = Test-Path (Join-Path $AutoDir 'enabled.flag')
@@ -638,7 +645,7 @@ function Get-IssueBodyByTitle {
     return ""
   }
 
-  $text = Get-Content -Raw $ReadyPath
+  $text = Get-Content -Encoding UTF8 -Raw $ReadyPath
   $pattern = "(?ms)^###\s+" + [regex]::Escape($Title) + "\r?\n(.*?)(?=^###\s+ISSUE-|\z)"
   $match = [regex]::Match($text, $pattern)
   if (!$match.Success) {
@@ -693,7 +700,7 @@ function Get-IterationProgressFromRuns {
     }
 
     try {
-      $result = Get-Content -Raw $resultPath | ConvertFrom-Json
+      $result = Get-Content -Encoding UTF8 -Raw $resultPath | ConvertFrom-Json
     } catch {
       return
     }
@@ -755,7 +762,7 @@ function Initialize-IterationProgress {
   $script:IterationLimit = [int]$Limit
   $statePath = Join-Path $AutoDir "state.json"
   if (Test-Path $statePath) {
-    $state = Get-Content -Raw $statePath | ConvertFrom-Json
+    $state = Get-Content -Encoding UTF8 -Raw $statePath | ConvertFrom-Json
     $runProgress = [pscustomobject]@{ completedCount = 0; latestIssueRef = ''; completedIssueIds = @(); completedIssueRefs = @() }
     if ($null -ne $state.iterationCompleted) {
       $script:IterationCompleted = [int]$state.iterationCompleted
@@ -795,7 +802,7 @@ function Get-StopReasonForEmptyPool {
     return "STOP_READY_AND_POOL_EMPTY"
   }
 
-  $text = Get-Content -Raw $ReadyPath
+  $text = Get-Content -Encoding UTF8 -Raw $ReadyPath
   if ($text -match "(?m)^状态[：:]\s*(Blocked|阻塞)\b") {
     return "STOP_CURRENT_ISSUE_BLOCKED"
   }
@@ -880,6 +887,27 @@ function Get-ExecutorCommand {
   return "powershell -NoProfile -ExecutionPolicy Bypass -File `"$executorPath`" -RepoRoot `"$RepoRoot`" -ConfigPath `"$ConfigPath`" -Title `"$IssueTitle`""
 }
 
+function Write-ExecutorStallBlockedIssue {
+  param([string]$RepoRoot, [object]$Issue, [object[]]$RetiredExecutors)
+  $path = Join-Path $RepoRoot 'docs\backlog\blocked-issues.md'
+  $existing = if (Test-Path -LiteralPath $path) { Get-Content -LiteralPath $path -Raw -Encoding UTF8 } else { "# Blocked Issues`r`n" }
+  if ($existing -match "(?m)^###\s+$([regex]::Escape($Issue.lint.issueId))\b") { return $path }
+  $rows = @($RetiredExecutors | ForEach-Object { "- executorPid=$($_.executorPid)，startedAt=$($_.startedAt)，lastProgressAt=$($_.lastProgressAt)，retiredAt=$($_.retiredAt)，retryCount=$($_.retryCount)" })
+  $block = @"
+
+### $($Issue.lint.issueId)：执行单元连续两次 stall timeout
+
+- 失败分类：环境前置 / executor_stall_timeout。
+- 退役证据：
+$($rows -join "`r`n")
+- 解除条件：补齐缺失上下文或拆小剩余范围后，由人工确认重新进入 Ready。
+- 未完成验收项：该 Issue 的实现、验证、独立复核与归档尚未完成。
+- 安全恢复方式：保持两个 executorPid 永久退役，从干净 checkpoint 创建全新执行单元；不得复用旧 PID 或启动第三次自动重派。
+"@
+  [IO.File]::WriteAllText($path, ($existing.TrimEnd() + "`r`n" + $block.TrimStart()), [Text.UTF8Encoding]::new($false))
+  return $path
+}
+
 function Invoke-ChildWithHeartbeat {
   param(
     [string[]]$Arguments,
@@ -887,7 +915,9 @@ function Invoke-ChildWithHeartbeat {
     [int]$TimeoutSeconds,
     [int]$StallInspectSeconds = 300,
     [int]$StallTerminateSeconds = 600,
-    [int]$HeartbeatMilliseconds = 30000
+    [int]$HeartbeatMilliseconds = 30000,
+    [object[]]$LongRunningCommands = @(),
+    [string]$Task = ''
   )
   function Stop-ChildProcessTree([Diagnostics.Process]$Child) {
     & taskkill.exe /PID $Child.Id /T /F 2>$null | Out-Null
@@ -903,14 +933,24 @@ function Invoke-ChildWithHeartbeat {
   $startInfo.RedirectStandardError = $true
   $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo
   [void]$process.Start()
+  $startedAt = [datetimeoffset]::Now
   $script:ExecutorPid = $process.Id
+  $script:ExecutorStartedAt = $startedAt.ToString('o')
+  $script:LastProgressAt = $script:ExecutorStartedAt
+  $script:TimeoutReason = $null
+  $script:RetiredAt = $null
+  $script:RetiredStatus = $null
   Write-State $autoDir 'EXECUTING' $false 'EXECUTOR_RUNNING' $script:RunLock.issueId 'EXECUTING' ''
+  if ($script:Attempt -gt 0) {
+    $previousRetirement = @($script:RetiredExecutors | Select-Object -Last 1)[0]
+    Write-RunEvent 'executor.stall.retry' ([pscustomobject]@{ issueId = $script:RunLock.issueId; task = $Task; status = 'RETRY'; executorPid = $process.Id; startedAt = $startedAt.ToString('o'); lastProgressAt = $startedAt.ToString('o'); retryCount = $script:Attempt; timeoutReason = 'previous executor produced no new evidence; scope limited to unfinished acceptance items'; retiredAt = $previousRetirement.retiredAt; retiredStatus = $previousRetirement.retiredStatus })
+  }
   $stdoutTask = $process.StandardOutput.ReadToEndAsync(); $stderrTask = $process.StandardError.ReadToEndAsync()
   $deadline = [datetimeoffset]::Now.AddSeconds($TimeoutSeconds)
   $timedOut = $false
   $stallTimedOut = $false
   $stallInspected = $false
-  $lastProgressAt = [datetimeoffset]::Now
+  $lastProgressAt = $startedAt
   $progressFingerprint = Get-AutopilotProgressFingerprint -Worktree $WorkingDirectory -RootPid $process.Id
   while (!$process.WaitForExit($HeartbeatMilliseconds)) {
     if ($script:RunLock) { Write-RunLock (Join-Path $autoDir 'run.lock') $script:RunLock }
@@ -918,28 +958,40 @@ function Invoke-ChildWithHeartbeat {
     if ($currentFingerprint -ne $progressFingerprint) {
       $progressFingerprint = $currentFingerprint
       $lastProgressAt = [datetimeoffset]::Now
+      $script:LastProgressAt = $lastProgressAt.ToString('o')
       $stallInspected = $false
     }
     $idleSeconds = ([datetimeoffset]::Now - $lastProgressAt).TotalSeconds
+    if ([datetimeoffset]::Now -ge $deadline) { $timedOut = $true; Stop-ChildProcessTree $process; break }
     if (!$stallInspected -and $idleSeconds -ge $StallInspectSeconds) {
       $stallInspected = $true
-      Write-RunEvent 'executor.stall.inspect' ([pscustomobject]@{ issueId = $script:RunLock.issueId; status = 'INSPECT'; reason = 'no worktree progress'; idleSeconds = [int]$idleSeconds; executorPid = $process.Id })
+      Write-RunEvent 'executor.stall.inspect' ([pscustomobject]@{ issueId = $script:RunLock.issueId; task = $Task; status = 'INSPECT'; reason = 'no worktree or process progress'; idleSeconds = [int]$idleSeconds; executorPid = $process.Id; startedAt = $startedAt.ToString('o'); lastProgressAt = $lastProgressAt.ToString('o'); retryCount = $script:Attempt; timeoutReason = 'no new evidence'; retiredAt = $null; retiredStatus = $null })
     }
     if ($idleSeconds -ge $StallTerminateSeconds) {
+      $activeLongCommand = Get-AutopilotActiveLongCommand -RootPid $process.Id -Declarations $LongRunningCommands -StartedAt $startedAt
+      if ($activeLongCommand) {
+        Write-RunEvent 'executor.stall.long-command' ([pscustomobject]@{ issueId = $script:RunLock.issueId; task = $Task; status = 'RUNNING'; executorPid = $process.Id; command = $activeLongCommand.command; commandPid = $activeLongCommand.processId; expectedSeconds = $activeLongCommand.expectedSeconds; startedAt = $startedAt.ToString('o'); lastProgressAt = $lastProgressAt.ToString('o'); retryCount = $script:Attempt; timeoutReason = 'declared long command active'; retiredAt = $null; retiredStatus = $null })
+        continue
+      }
       $timedOut = $true
       $stallTimedOut = $true
-      Write-RunEvent 'executor.stall.terminate' ([pscustomobject]@{ issueId = $script:RunLock.issueId; status = 'TERMINATE'; reason = 'no worktree progress'; idleSeconds = [int]$idleSeconds; executorPid = $process.Id })
+      $retiredAt = [datetimeoffset]::Now.ToString('o')
+      $retired = [pscustomobject]@{ issueId = $script:RunLock.issueId; task = $Task; executorPid = $process.Id; startedAt = $startedAt.ToString('o'); lastProgressAt = $lastProgressAt.ToString('o'); retryCount = $script:Attempt; timeoutReason = 'no new evidence'; retiredAt = $retiredAt; retiredStatus = 'RETIRED' }
+      $script:RetiredExecutors += $retired
+      $script:TimeoutReason = $retired.timeoutReason
+      $script:RetiredAt = $retiredAt
+      $script:RetiredStatus = 'RETIRED'
+      Write-RunEvent 'executor.stall.retire' $retired
       Stop-ChildProcessTree $process
       break
     }
-    if ([datetimeoffset]::Now -ge $deadline) { $timedOut = $true; Stop-ChildProcessTree $process; break }
   }
   $process.WaitForExit()
   $script:ExecutorPid = $null
   $stdout = $stdoutTask.GetAwaiter().GetResult(); $stderr = $stderrTask.GetAwaiter().GetResult()
   if ($stdout) { Write-Host $stdout.TrimEnd() }
   if ($stderr) { Write-Warning $stderr.TrimEnd() }
-  return [pscustomobject]@{ exitCode = if ($timedOut) { 124 } else { $process.ExitCode }; timedOut = $timedOut; stallTimedOut = $stallTimedOut }
+  return [pscustomobject]@{ exitCode = if ($timedOut) { 124 } else { $process.ExitCode }; timedOut = $timedOut; stallTimedOut = $stallTimedOut; executorPid = $process.Id }
 }
 
 function Invoke-IssueExecutor {
@@ -979,7 +1031,8 @@ function Invoke-IssueExecutor {
   $issueDir = Join-Path $script:RunContext.dir $Issue.lint.issueId
   New-Item -ItemType Directory -Path $issueDir -Force | Out-Null
   $contextPath = Join-Path $issueDir ("$Phase-$Attempt\context.json")
-  New-AutopilotContextPack -Issue $Issue.contract -Phase $Phase -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextPath -PreviousPhaseSummary $PreviousSummary | Out-Null
+  $longRunningCommands = if ($config.issueExecutor.longRunningCommands) { @($config.issueExecutor.longRunningCommands) } else { @() }
+  New-AutopilotContextPack -Issue $Issue.contract -Phase $Phase -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextPath -PreviousPhaseSummary $PreviousSummary -LongRunningCommands $longRunningCommands | Out-Null
   Write-State $autoDir 'EXECUTING' $false 'EXECUTOR_START' $Issue.title 'EXECUTING' ''
   $executorArgs = @(
     '-NoProfile','-ExecutionPolicy','Bypass','-File',$executorPath,
@@ -998,11 +1051,18 @@ function Invoke-IssueExecutor {
   $stallInspectSeconds = if ($config.issueExecutor.stallInspectSeconds) { [int]$config.issueExecutor.stallInspectSeconds } else { 300 }
   $stallTerminateSeconds = if ($config.issueExecutor.stallTerminateSeconds) { [int]$config.issueExecutor.stallTerminateSeconds } else { 600 }
   $heartbeatMilliseconds = if ($config.issueExecutor.heartbeatMilliseconds) { [int]$config.issueExecutor.heartbeatMilliseconds } else { 30000 }
-  $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds
+  $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds -LongRunningCommands $longRunningCommands -Task $Phase
   if ($childResult.exitCode -ne 0) {
     if ($childResult.stallTimedOut -and $config.repair -and $config.repair.enabled -eq $true -and $Attempt -lt 1) {
       Write-State $autoDir 'REPAIRING' $false 'EXECUTOR_STALL_REPAIR' $Issue.title 'executor timed out without worktree progress' ''
-      Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt ($Attempt + 1) -Phase 'repair' -PreviousSummary 'executor timed out without worktree progress'
+      Write-RunEvent 'executor.stall.retry-request' ([pscustomobject]@{ issueId = $Issue.lint.issueId; task = 'repair'; status = 'RETRY_REQUESTED'; executorPid = $childResult.executorPid; startedAt = $script:ExecutorStartedAt; lastProgressAt = $script:LastProgressAt; retryCount = 1; timeoutReason = 'no new evidence; retry scope limited to unfinished acceptance items with missing context supplied'; retiredAt = $script:RetiredAt; retiredStatus = $script:RetiredStatus })
+      Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt 1 -Phase 'repair' -PreviousSummary '首次 executor 因 600 秒无新证据已退役；仅处理未完成验收项，补充缺失上下文，不得扩大范围或再次重派。'
+      return
+    }
+    if ($childResult.stallTimedOut) {
+      $blockedPath = Write-ExecutorStallBlockedIssue -RepoRoot $RepoRoot -Issue $Issue -RetiredExecutors $script:RetiredExecutors
+      Write-RunEvent 'executor.stall.blocked' ([pscustomobject]@{ issueId = $Issue.lint.issueId; task = $Phase; status = 'BLOCKED'; stopReason = 'STOP_EXECUTOR_STALL_RETRY_EXHAUSTED'; executorPid = $childResult.executorPid; startedAt = $script:ExecutorStartedAt; lastProgressAt = $script:LastProgressAt; retryCount = 1; timeoutReason = 'second executor stalled; automatic retry exhausted'; retiredAt = $script:RetiredAt; retiredStatus = $script:RetiredStatus; evidencePath = $blockedPath })
+      Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_STALL_BLOCKED' $Issue.title 'executor_stall_timeout' 'STOP_EXECUTOR_STALL_RETRY_EXHAUSTED'
       return
     }
     Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_PROCESS_FAILED' $Issue.title 'tool_config' 'STOP_EXECUTOR_PROCESS_FAILED'
@@ -1082,7 +1142,7 @@ function Invoke-IssueExecutor {
         Write-State $autoDir 'REVIEWING' $false 'VERIFICATION_COMPLETED' $Issue.title 'REVIEWING' ''
         $reviewDir = Join-Path $issueDir 'review'; New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
         $diffPath = Join-Path $reviewDir 'final.diff'
-        Get-AutopilotDiffText -Worktree $worktree.path -BaseCommit $baseCommit | Set-Content -LiteralPath $diffPath -Encoding UTF8
+        Write-AutopilotReviewDiff -Text (Get-AutopilotDiffText -Worktree $worktree.path -BaseCommit $baseCommit) -OutputPath $diffPath
         $requestPath = Join-Path $reviewDir 'request.json'
         $request = New-AutopilotReviewRequest -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $worktree.path 'docs\backlog\ready-issues.md') -DiffPath $diffPath -EvidencePaths $evidencePaths -OutputPath $requestPath
         if (!$config.issueReviewer -or $config.issueReviewer.enabled -ne $true) {
@@ -1186,10 +1246,23 @@ $script:RunLock = $null
 $script:CurrentWorktree = ''
 $script:CurrentBranch = ''
 $script:ExecutorPid = $null
+$script:ExecutorStartedAt = $null
+$script:LastProgressAt = $null
+$script:TimeoutReason = $null
+$script:RetiredAt = $null
+$script:RetiredStatus = $null
+$script:RetiredExecutors = @()
 $script:LastCommit = $null
 $script:FailureFingerprint = $null
 $script:Attempt = 0
 Initialize-IterationProgress $autoDir $readyPath $MaxIterations ([bool]$DryRun -or [bool]$ExplainNextAction)
+$existingStatePath = Join-Path $autoDir 'state.json'
+if (Test-Path -LiteralPath $existingStatePath) {
+  try {
+    $existingState = Get-Content -LiteralPath $existingStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($existingState.PSObject.Properties.Name -contains 'retiredExecutors') { $script:RetiredExecutors = @($existingState.retiredExecutors) }
+  } catch { $script:RetiredExecutors = @() }
+}
 $script:RunContext = New-RunContext $autoDir
 Write-RunEvent "runner.start" ([pscustomobject]@{
   decision = if ($ExplainNextAction) { "EXPLAIN_NEXT_ACTION" } elseif ($applyMode) { "APPLY_BACKLOG_SPLIT" } else { "DRY_RUN" }
@@ -1251,6 +1324,7 @@ try {
 
   if ($null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
     Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = "STOP_ITERATION_LIMIT_REACHED"; stopReason = "STOP_ITERATION_LIMIT_REACHED" })
+    Remove-Item -LiteralPath (Join-Path $autoDir 'enabled.flag') -Force -ErrorAction SilentlyContinue
     Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" ([bool]$DryRun) "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
     Write-Host "STOP_ITERATION_LIMIT_REACHED"
     exit 0

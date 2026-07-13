@@ -12,10 +12,7 @@ function toNumber(value: string | number | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export function formatWanAmount(
-  value: string | number | undefined,
-  fallback = '0.00',
-): string {
+export function formatWanAmount(value: string | number | undefined, fallback = '0.00'): string {
   const parsed = toNumber(value)
   if (parsed == null) return fallback
   return (parsed / 10000).toLocaleString('zh-CN', {
@@ -32,10 +29,7 @@ export function formatWanAmountWithUnit(
   return amount ? `${amount} 万元` : fallback
 }
 
-export function formatCurrencyAmount(
-  value: string | number | undefined,
-  fallback = '-',
-): string {
+export function formatCurrencyAmount(value: string | number | undefined, fallback = '-'): string {
   const parsed = toNumber(value)
   if (parsed == null) return fallback
   return parsed.toLocaleString('zh-CN', {

@@ -35,6 +35,13 @@ auth:
   csrf:
     enabled: false
 
+# Unrelated integration tests share a cached Spring context and the in-memory
+# fallback counter store. Keep global write throttling off by default in the
+# test classpath; GlobalWriteRateLimitFilterTest enables it explicitly.
+rate-limit:
+  global-write:
+    enabled: false
+
 logging:
   level:
     root: WARN

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  readPositiveIntQuery,
-  readStringQuery,
-  replaceListQuery,
-} from '../listPageQuery'
+import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '../listPageQuery'
 
 describe('listPageQuery helpers', () => {
   it('reads string query values and ignores array tails', () => {

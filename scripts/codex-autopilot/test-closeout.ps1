@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -32,8 +32,8 @@ try {
   & git -C $root switch -q $baseBranch
   $result = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base
   if (!$result.commit -or !$result.merged) { throw 'closeout did not commit and merge' }
-  if ((Get-Content -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Raw) -notmatch '状态：Done') { throw 'Ready was not closed as Done' }
-  if ((Get-Content -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Raw) -notmatch 'ISSUE-900-040') { throw 'done ledger was not updated' }
+  if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Raw) -notmatch '状态：Done') { throw 'Ready was not closed as Done' }
+  if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Raw) -notmatch 'ISSUE-900-040') { throw 'done ledger was not updated' }
   $again = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base
   if ($again.commit -ne $result.commit -or !$again.idempotent) { throw 'closeout retry was not idempotent' }
   Write-Host 'closeout self-test passed'

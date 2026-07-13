@@ -29,6 +29,7 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
@@ -83,6 +84,8 @@ import java.util.stream.Stream;
 @Service
 public class DashboardMaterialRoleService extends DashboardSharedSupport {
 
+    private final ProjectAccessChecker projectAccessChecker;
+
     public DashboardMaterialRoleService(
             CostSummaryService costSummaryService,
             CostSummaryMapper costSummaryMapper,
@@ -109,8 +112,10 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
             TechItemMapper techItemMapper,
             MdPartnerMapper partnerMapper,
             MdMaterialMapper materialMapper,
-            SysUserMapper userMapper) {
+            SysUserMapper userMapper,
+            ProjectAccessChecker projectAccessChecker) {
         super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
+        this.projectAccessChecker = projectAccessChecker;
     }
 
     public PurchaseManagerDashboardVO getPurchaseManagerView(Long projectId) {
@@ -120,7 +125,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
     public PurchaseManagerDashboardVO getPurchaseManagerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
         YearMonth selectedMonth = parseDashboardMonth(month);
-        List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
+        List<PmProject> projects = resolvePurchaseProjects(tenantId, projectId);
         List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
         Map<Long, String> projectNameMap = projectNameMap(projects);
 
@@ -173,12 +178,13 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                     .collect(Collectors.toList());
         }
 
-        List<MatReceipt> receipts = receiptMapper.selectList(new LambdaQueryWrapper<MatReceipt>()
+        List<MatReceipt> allReceipts = receiptMapper.selectList(new LambdaQueryWrapper<MatReceipt>()
                 .eq(MatReceipt::getTenantId, tenantId)
                 .in(MatReceipt::getProjectId, projectIds)
                 .orderByDesc(MatReceipt::getReceiptDate));
+        List<MatReceipt> receipts = allReceipts;
         if (selectedMonth != null) {
-            receipts = receipts.stream()
+            receipts = allReceipts.stream()
                     .filter(r -> r.getReceiptDate() != null
                             && !r.getReceiptDate().isBefore(selectedMonth.atDay(1))
                             && !r.getReceiptDate().isAfter(selectedMonth.atEndOfMonth()))
@@ -190,8 +196,14 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                 .collect(Collectors.toList());
 
         // Merge order scopes so partner/order summary maps cover both purchaseOrders and overdueOrders
+        List<MatPurchaseOrder> scoreOrders = allOrders.stream()
+                .filter(o -> o.getPartnerId() != null && o.getDeliveryDate() != null)
+                .filter(o -> "APPROVED".equals(o.getApprovalStatus()) && !"CANCELLED".equals(o.getOrderStatus()))
+                .filter(o -> o.getDeliveryDate().isBefore(LocalDate.now()))
+                .filter(o -> selectedMonth == null || YearMonth.from(o.getDeliveryDate()).equals(selectedMonth))
+                .collect(Collectors.toList());
         List<MatPurchaseOrder> mapOrders = selectedMonth != null
-                ? Stream.concat(orders.stream(), overdueOrders.stream()).distinct().collect(Collectors.toList())
+                ? Stream.of(orders, overdueOrders, scoreOrders).flatMap(Collection::stream).distinct().collect(Collectors.toList())
                 : orders;
         Map<Long, String> partnerNameMap = partnerNameMap(tenantId, mapOrders, receipts);
         Map<Long, String> ownerNameMap = ownerNameMap(tenantId, requests);
@@ -238,21 +250,63 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                 .limit(5)
                 .map(r -> toBusinessItem("MATERIAL_RECEIPT", r, projectNameMap, partnerNameMap, receiptSummaryMap))
                 .collect(Collectors.toList()));
-        vo.setSupplierScores(supplierScores(orders, partnerNameMap));
+        vo.setSupplierScores(supplierScores(scoreOrders, allReceipts, partnerNameMap));
         return vo;
     }
 
-    private List<DashboardSupplierScoreVO> supplierScores(List<MatPurchaseOrder> orders, Map<Long, String> partnerNameMap) {
+    private List<PmProject> resolvePurchaseProjects(Long tenantId, Long projectId) {
+        if (projectId != null) {
+            PmProject project = requireProject(tenantId, projectId);
+            projectAccessChecker.checkAccess(project, "查看采购驾驶舱");
+            return List.of(project);
+        }
+        List<PmProject> projects = projectMapper.selectList(new LambdaQueryWrapper<PmProject>()
+                .eq(PmProject::getTenantId, tenantId)
+                .eq(PmProject::getStatus, "ACTIVE"));
+        return projectAccessChecker.filterAccessible(projects);
+    }
+
+    private List<DashboardSupplierScoreVO> supplierScores(List<MatPurchaseOrder> orders,
+                                                           List<MatReceipt> receipts,
+                                                           Map<Long, String> partnerNameMap) {
+        if (orders.isEmpty()) return Collections.emptyList();
+        Set<Long> orderIds = orders.stream().map(MatPurchaseOrder::getId).collect(Collectors.toSet());
+        List<MatPurchaseOrderItem> orderItems = purchaseOrderItemMapper.selectList(
+                new LambdaQueryWrapper<MatPurchaseOrderItem>().in(MatPurchaseOrderItem::getOrderId, orderIds));
+        Map<Long, List<MatPurchaseOrderItem>> orderItemsByOrder = orderItems.stream()
+                .collect(Collectors.groupingBy(MatPurchaseOrderItem::getOrderId));
+
+        List<MatReceipt> approvedReceipts = receipts.stream()
+                .filter(r -> "APPROVED".equals(r.getApprovalStatus()) && r.getOrderId() != null
+                        && orderIds.contains(r.getOrderId()) && r.getReceiptDate() != null)
+                .sorted(Comparator.comparing(MatReceipt::getReceiptDate))
+                .collect(Collectors.toList());
+        Set<Long> receiptIds = approvedReceipts.stream().map(MatReceipt::getId).collect(Collectors.toSet());
+        Map<Long, List<MatReceiptItem>> receiptItemsByReceipt = receiptIds.isEmpty()
+                ? Collections.emptyMap()
+                : receiptItemMapper.selectList(new LambdaQueryWrapper<MatReceiptItem>()
+                        .in(MatReceiptItem::getReceiptId, receiptIds)).stream()
+                .collect(Collectors.groupingBy(MatReceiptItem::getReceiptId));
+        Map<Long, List<MatReceipt>> receiptsByOrder = approvedReceipts.stream()
+                .collect(Collectors.groupingBy(MatReceipt::getOrderId));
+
         return orders.stream()
-                .filter(o -> o.getPartnerId() != null)
                 .collect(Collectors.groupingBy(MatPurchaseOrder::getPartnerId))
                 .entrySet().stream()
                 .map(entry -> {
                     long orderCount = entry.getValue().size();
-                    long overdueCount = entry.getValue().stream()
-                            .filter(o -> o.getDeliveryDate() != null && o.getDeliveryDate().isBefore(LocalDate.now()))
-                            .filter(o -> !"COMPLETED".equals(o.getOrderStatus()) && !"CANCELLED".equals(o.getOrderStatus()))
-                            .count();
+                    long lateCompletedCount = 0;
+                    long overdueIncompleteCount = 0;
+                    for (MatPurchaseOrder order : entry.getValue()) {
+                        LocalDate completedAt = deliveryCompletedAt(order, orderItemsByOrder,
+                                receiptsByOrder, receiptItemsByReceipt);
+                        if (completedAt == null) {
+                            overdueIncompleteCount++;
+                        } else if (completedAt.isAfter(order.getDeliveryDate())) {
+                            lateCompletedCount++;
+                        }
+                    }
+                    long overdueCount = lateCompletedCount + overdueIncompleteCount;
                     BigDecimal onTimeRate = BigDecimal.valueOf(orderCount - overdueCount)
                             .multiply(BigDecimal.valueOf(100))
                             .divide(BigDecimal.valueOf(orderCount), 2, RoundingMode.HALF_UP);
@@ -262,6 +316,8 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                     score.setPartnerName(partnerNameMap.get(entry.getKey()));
                     score.setOrderCount(orderCount);
                     score.setOverdueOrderCount(overdueCount);
+                    score.setLateCompletedCount(lateCompletedCount);
+                    score.setOverdueIncompleteCount(overdueIncompleteCount);
                     score.setOnTimeDeliveryRate(onTimeRate.toPlainString());
                     score.setPerformanceScore(onTimeRate.setScale(0, RoundingMode.HALF_UP).toPlainString());
                     return score;
@@ -272,6 +328,30 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                         .thenComparingLong(s -> Long.parseLong(s.getPartnerId())))
                 .limit(5)
                 .collect(Collectors.toList());
+    }
+
+    private LocalDate deliveryCompletedAt(MatPurchaseOrder order,
+                                           Map<Long, List<MatPurchaseOrderItem>> orderItemsByOrder,
+                                           Map<Long, List<MatReceipt>> receiptsByOrder,
+                                           Map<Long, List<MatReceiptItem>> receiptItemsByReceipt) {
+        List<MatPurchaseOrderItem> items = orderItemsByOrder.getOrDefault(order.getId(), Collections.emptyList());
+        if (items.isEmpty() || items.stream().anyMatch(i -> i.getQuantity() == null || i.getQuantity().signum() <= 0)) {
+            return null;
+        }
+        Map<Long, BigDecimal> received = new HashMap<>();
+        for (MatReceipt receipt : receiptsByOrder.getOrDefault(order.getId(), Collections.emptyList())) {
+            for (MatReceiptItem item : receiptItemsByReceipt.getOrDefault(receipt.getId(), Collections.emptyList())) {
+                if (item.getOrderItemId() != null && item.getActualQuantity() != null
+                        && item.getActualQuantity().signum() > 0) {
+                    received.merge(item.getOrderItemId(), item.getActualQuantity(), BigDecimal::add);
+                }
+            }
+            if (items.stream().allMatch(i -> received.getOrDefault(i.getId(), BigDecimal.ZERO)
+                    .compareTo(i.getQuantity()) >= 0)) {
+                return receipt.getReceiptDate();
+            }
+        }
+        return null;
     }
 
     // ========================================================================

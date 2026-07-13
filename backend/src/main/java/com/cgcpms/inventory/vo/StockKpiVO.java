@@ -13,7 +13,7 @@ public class StockKpiVO implements Serializable {
     /** 仓库总数 */
     private long warehouseCount;
 
-    /** 低库存物料数（可用量 < 10） */
+    /** 低库存物料数（可用量 > 0 且小于库存项安全阈值） */
     private long lowStockCount;
 
     /** 当前页出入库统计：入库条数 */

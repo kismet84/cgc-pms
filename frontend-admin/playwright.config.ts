@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:5173'
 const webServerCommand = process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? 'pnpm dev'
+const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL
+const browserExecutablePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH
 
 export default defineConfig({
   testDir: './e2e',
@@ -21,7 +23,14 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(browserExecutablePath
+          ? { launchOptions: { executablePath: browserExecutablePath } }
+          : browserChannel
+            ? { channel: browserChannel }
+            : {}),
+      },
     },
   ],
   webServer: {

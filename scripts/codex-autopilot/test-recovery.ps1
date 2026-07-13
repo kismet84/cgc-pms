@@ -44,7 +44,7 @@ try {
   $ledger = Join-Path $autoDir 'closeouts.ndjson'
   Register-AutopilotCloseout -LedgerPath $ledger -Key $key1 | Out-Null
   Register-AutopilotCloseout -LedgerPath $ledger -Key $key1 | Out-Null
-  if (@(Get-Content -LiteralPath $ledger).Count -ne 1) { throw 'duplicate closeout was registered' }
+  if (@(Get-Content -Encoding UTF8 -LiteralPath $ledger).Count -ne 1) { throw 'duplicate closeout was registered' }
 
   Write-Host 'recovery self-test passed'
 } finally {

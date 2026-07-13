@@ -1,10 +1,19 @@
 import { ref, reactive, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { getStockLedger, getStockKpi, getWarehouseList } from '@/api/modules/inventory'
+import {
+  getStockLedger,
+  getStockKpi,
+  getWarehouseList,
+  updateStockReplenishmentSettings,
+} from '@/api/modules/inventory'
 import { useReferenceStore } from '@/stores/reference'
-import { readPositiveIntQuery, readStringQuery, replaceListQuery } from '@/composables/listPageQuery'
-import type { WarehouseVO, MatStockTxnVO, StockKpiVO } from '@/types/inventory'
+import {
+  readPositiveIntQuery,
+  readStringQuery,
+  replaceListQuery,
+} from '@/composables/listPageQuery'
+import type { WarehouseVO, MatStockTxnVO, StockKpiVO, MatStockVO } from '@/types/inventory'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // ---- 交易类型 ----
@@ -55,6 +64,15 @@ export function getSourceTypeColor(type: string | null | undefined): string {
   return SOURCE_TYPE_COLOR[type] ?? 'default'
 }
 
+export function formatLocalDateAfterDays(days: number, baseDate = new Date()): string {
+  const date = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())
+  date.setDate(date.getDate() + days)
+  const year = String(date.getFullYear()).padStart(4, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export function useStockLedger({
   route,
   router,
@@ -78,22 +96,18 @@ export function useStockLedger({
   const loading = ref(false)
   const hasLoaded = ref(false)
   const listError = ref<string | null>(null)
-  const stock = ref<{
-    warehouseId: string
-    materialId: string
-    availableQty: string
-    warehouseName?: string
-    materialName?: string
-    materialCode?: string
-    unit?: string
-  } | null>(null)
+  const stock = ref<MatStockVO | null>(null)
+  const safetyThresholdDraft = ref<number | null>(null)
+  const replenishmentTargetDraft = ref<number | null>(null)
+  const replenishmentLeadDaysDraft = ref<number | null>(null)
+  const thresholdSaving = ref(false)
   const txnList = ref<MatStockTxnVO[]>([])
   const txnTotal = ref(0)
   const txnPageNo = ref(1)
   const txnPageSize = ref(20)
   const queryReady = ref(false)
-  const hasActiveFilters = computed(
-    () => Boolean(filter.projectId || filter.warehouseId || filter.materialId || filter.keyword),
+  const hasActiveFilters = computed(() =>
+    Boolean(filter.projectId || filter.warehouseId || filter.materialId || filter.keyword),
   )
   const hasRequiredFilters = computed(() => Boolean(filter.warehouseId && filter.materialId))
 
@@ -138,6 +152,9 @@ export function useStockLedger({
 
   function resetTxnState() {
     stock.value = null
+    safetyThresholdDraft.value = null
+    replenishmentTargetDraft.value = null
+    replenishmentLeadDaysDraft.value = null
     txnList.value = []
     txnTotal.value = 0
   }
@@ -168,6 +185,10 @@ export function useStockLedger({
       })
       if (mySeq !== fetchSeq) return
       stock.value = res.stock
+      safetyThresholdDraft.value = res.stock ? Number(res.stock.safetyStockQty) : null
+      replenishmentTargetDraft.value =
+        res.stock?.replenishmentTargetQty == null ? null : Number(res.stock.replenishmentTargetQty)
+      replenishmentLeadDaysDraft.value = res.stock?.replenishmentLeadDays ?? null
       if (res.txns) {
         txnList.value = res.txns.records ?? []
         txnTotal.value = Number(res.txns.total ?? 0)
@@ -308,19 +329,72 @@ export function useStockLedger({
 
   // ---- 右侧分析面板 ----
   const lowStockWarn = computed(() => {
-    const items: { name: string; qty: number }[] = []
+    const items: { name: string; qty: number; threshold: number }[] = []
+    const safetyStockQty = Number(stock.value?.safetyStockQty)
     if (
       stock.value &&
-      Number(stock.value.availableQty) < 10 &&
+      Number(stock.value.availableQty) < safetyStockQty &&
       Number(stock.value.availableQty) > 0
     ) {
       items.push({
         name: stock.value.materialName || getMaterialName(stock.value.materialId),
         qty: Number(stock.value.availableQty),
+        threshold: safetyStockQty,
       })
     }
     return items
   })
+
+  function handleReplenish() {
+    const quantity = Number(stock.value?.availableQty)
+    const safetyStockQty = Number(stock.value?.safetyStockQty)
+    const replenishmentTargetQty = Number(
+      stock.value?.replenishmentTargetQty ?? stock.value?.safetyStockQty,
+    )
+    if (!stock.value || quantity <= 0 || quantity >= safetyStockQty) return
+    const suggestedQuantity = Math.max(0, replenishmentTargetQty - quantity).toFixed(4)
+    const projectId = warehouseList.value.find((w) => w.id === stock.value?.warehouseId)?.projectId
+    if (!projectId) {
+      message.warning('当前仓库缺少项目归属，无法发起补货申请')
+      return
+    }
+    router.push({
+      path: '/inventory/purchase-request',
+      query: {
+        prefill: 'replenishment',
+        projectId,
+        materialId: stock.value.materialId,
+        quantity: suggestedQuantity,
+        ...(stock.value.replenishmentLeadDays != null
+          ? { plannedDate: formatLocalDateAfterDays(stock.value.replenishmentLeadDays) }
+          : {}),
+      },
+    })
+  }
+
+  async function handleReplenishmentSettingsSave() {
+    if (!stock.value || safetyThresholdDraft.value == null) return
+    thresholdSaving.value = true
+    try {
+      const updated = await updateStockReplenishmentSettings(
+        stock.value.id,
+        String(safetyThresholdDraft.value),
+        replenishmentTargetDraft.value == null ? null : String(replenishmentTargetDraft.value),
+        replenishmentLeadDaysDraft.value,
+      )
+      stock.value = updated
+      safetyThresholdDraft.value = Number(updated.safetyStockQty)
+      replenishmentTargetDraft.value =
+        updated.replenishmentTargetQty == null ? null : Number(updated.replenishmentTargetQty)
+      replenishmentLeadDaysDraft.value = updated.replenishmentLeadDays ?? null
+      await fetchKpi()
+      message.success('补货设置已更新')
+    } catch (e: unknown) {
+      console.error(e)
+    } finally {
+      thresholdSaving.value = false
+    }
+  }
 
   const inOutStats = computed(() => {
     const inCount = Number(kpi.value.txnInCount) || 0
@@ -375,7 +449,12 @@ export function useStockLedger({
   } = useColumnSettings('stock_ledger_cols', gridColumns)
 
   const showEmptyState = computed(
-    () => hasLoaded.value && !loading.value && !listError.value && hasRequiredFilters.value && !txnList.value.length,
+    () =>
+      hasLoaded.value &&
+      !loading.value &&
+      !listError.value &&
+      hasRequiredFilters.value &&
+      !txnList.value.length,
   )
 
   function init() {
@@ -397,6 +476,10 @@ export function useStockLedger({
     hasRequiredFilters,
     showEmptyState,
     stock,
+    safetyThresholdDraft,
+    replenishmentTargetDraft,
+    replenishmentLeadDaysDraft,
+    thresholdSaving,
     txnList,
     txnTotal,
     txnPageNo,
@@ -434,6 +517,8 @@ export function useStockLedger({
     kpiMax,
     kpiPct,
     lowStockWarn,
+    handleReplenish,
+    handleReplenishmentSettingsSave,
     inOutStats,
     gridColumns,
     visibleGridColumns,

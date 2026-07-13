@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -73,7 +73,7 @@ New-Item -ItemType Directory -Path $quality -Force | Out-Null
   for ($index = 1; $index -le 20; $index++) {
     $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 20 -MaxLoops 2 -ApplyBacklogSplit 2>&1 | Out-String
     if ($output -notmatch 'EXECUTOR_RESULT_WRITTEN') { throw "canary $index did not execute: $output" }
-    $result = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Filter result.json -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json }
+    $result = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Filter result.json -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Get-Content -Encoding UTF8 -LiteralPath $_.FullName -Raw | ConvertFrom-Json }
     if ($result.status -ne 'done' -or !$result.gitSummary.commit -or @($result.evidencePaths).Count -eq 0) { throw "canary $index lacks completion integrity" }
     if (!$result.firstPassSuccess -or $result.manualInterventionCount -ne 0 -or $result.scopeViolationCount -ne 0) { throw "canary $index lacks unattended qualification fields" }
   }

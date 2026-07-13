@@ -21,7 +21,7 @@ try {
   $exitCode = $LASTEXITCODE
   $ErrorActionPreference = $old
   if ($exitCode -ne 0) { throw "unbounded runner failed: $output" }
-  $state = Get-Content -LiteralPath (Join-Path $autoDir 'state.json') -Raw | ConvertFrom-Json
+  $state = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $autoDir 'state.json') -Raw | ConvertFrom-Json
   if ($state.completedImplementationIssues -ne 2 -or @($state.completedIssueIds).Count -ne 2) { throw "unbounded run corrupted completed state: $output" }
   Write-Host 'unbounded state self-test passed'
 } finally {

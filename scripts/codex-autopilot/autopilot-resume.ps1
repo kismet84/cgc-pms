@@ -12,7 +12,7 @@ if (!(Test-Path $AutoDir)) {
 Remove-Item (Join-Path $AutoDir "pause.flag") -ErrorAction SilentlyContinue
 
 if (Test-Path $StatePath) {
-  $State = Get-Content -Raw $StatePath | ConvertFrom-Json
+  $State = Get-Content -Encoding UTF8 -Raw $StatePath | ConvertFrom-Json
   $State.status = "STARTING"
   $State.lastHeartbeatAt = $Now
   $State | ConvertTo-Json | Out-File -Encoding utf8 $StatePath

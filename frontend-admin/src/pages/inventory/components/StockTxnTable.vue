@@ -14,6 +14,7 @@ const props = defineProps<{
   loading: boolean
   gridColumns: Record<string, unknown>[]
   fmtQty: (val: string | number) => string
+  safetyStockQty: number
 }>()
 
 const visibleGridColumns = computed(() => props.gridColumns)
@@ -57,8 +58,8 @@ const emit = defineEmits<{
         <span
           class="lg-money"
           :style="{
-            color: Number(row.availableAfter) < 10 ? '#ef4444' : 'var(--text)',
-            fontWeight: Number(row.availableAfter) < 10 ? 700 : 600,
+            color: Number(row.availableAfter) < safetyStockQty ? '#ef4444' : 'var(--text)',
+            fontWeight: Number(row.availableAfter) < safetyStockQty ? 700 : 600,
           }"
         >
           {{ fmtQty(row.availableAfter) }}

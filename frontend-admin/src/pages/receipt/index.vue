@@ -145,7 +145,9 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts(
-    filter.projectId ? { projectId: filter.projectId, contractType: 'PURCHASE' } : { contractType: 'PURCHASE' },
+    filter.projectId
+      ? { projectId: filter.projectId, contractType: 'PURCHASE' }
+      : { contractType: 'PURCHASE' },
   )
   referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })
   init()
@@ -293,11 +295,7 @@ onMounted(() => {
 
           <div class="lg-table-wrap">
             <div v-if="listError" class="receipt-list-feedback">
-              <a-result
-                status="error"
-                title="验收列表加载失败"
-                :sub-title="listError"
-              >
+              <a-result status="error" title="验收列表加载失败" :sub-title="listError">
                 <template #extra>
                   <a-button type="primary" @click="fetchData">重试</a-button>
                 </template>

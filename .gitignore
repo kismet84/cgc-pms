@@ -86,6 +86,7 @@ admin-state.json
 .sisyphus/
 .superpowers/
 .worktrees/
+archive/v1.0/private/
 .trae/
 backend/nul
 graphify-out/

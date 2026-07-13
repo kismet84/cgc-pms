@@ -1,4 +1,4 @@
-param()
+﻿param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -60,9 +60,9 @@ if ($attempt -lt 2) { Write-Error 'deterministic first-attempt failure'; exit 1 
   $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $ErrorActionPreference = $old
   $canonical = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Directory | Where-Object Name -notmatch '-repair-' | Select-Object -First 1
-  $result = Get-Content -LiteralPath (Join-Path $canonical.FullName 'result.json') -Raw | ConvertFrom-Json
+  $result = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $canonical.FullName 'result.json') -Raw | ConvertFrom-Json
   if ($result.status -ne 'done' -or !$result.gitSummary.commit) { throw "repair integration did not close: $output" }
-  if ([int](Get-Content -LiteralPath (Join-Path $root 'docs\quality\attempt.txt') -Raw) -ne 2) { throw 'repair did not use exactly one fresh retry' }
+  if ([int](Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\quality\attempt.txt') -Raw) -ne 2) { throw 'repair did not use exactly one fresh retry' }
   if (!(Test-Path -LiteralPath (Join-Path $canonical.FullName 'ISSUE-991-001\repair-1\context.json'))) { throw 'repair context was not isolated' }
   Write-Host 'repair integration self-test passed'
 } finally {

@@ -51,16 +51,16 @@ try {
   $deduplicated = Add-AutopilotCompletedIssue -Path $statePath -IssueId 'ISSUE-TEST-001'
   if ($deduplicated.completedImplementationIssues -ne 1) { throw 'duplicate issue incremented completion count' }
 
-  $beforeInvalidWrite = Get-Content -LiteralPath $statePath -Raw
+  $beforeInvalidWrite = Get-Content -Encoding UTF8 -LiteralPath $statePath -Raw
   $invalid = New-TestState
   $invalid.schemaVersion = 99
   $invalidRejected = $false
   try { Write-AutopilotStateAtomic -Path $statePath -State $invalid } catch { $invalidRejected = $true }
   if (!$invalidRejected) { throw 'unknown schemaVersion was accepted' }
-  if ((Get-Content -LiteralPath $statePath -Raw) -ne $beforeInvalidWrite) { throw 'rejected write replaced valid state' }
+  if ((Get-Content -Encoding UTF8 -LiteralPath $statePath -Raw) -ne $beforeInvalidWrite) { throw 'rejected write replaced valid state' }
 
   Write-AutopilotEvent -Path $eventsPath -RunId 'run-test' -IssueId 'ISSUE-TEST-001' -From 'IDLE' -To 'CHECKPOINT' -Reason 'test' -EvidencePath 'evidence.json' | Out-Null
-  $event = (Get-Content -LiteralPath $eventsPath -Tail 1) | ConvertFrom-Json
+  $event = (Get-Content -Encoding UTF8 -LiteralPath $eventsPath -Tail 1) | ConvertFrom-Json
   foreach ($field in 'runId','issueId','from','to','timestamp','reason','evidencePath') {
     if ($event.PSObject.Properties.Name -notcontains $field) { throw "event missing $field" }
   }

@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 统一项目数据范围访问判定器。
@@ -38,6 +39,10 @@ public class ProjectAccessChecker {
      */
     public void checkAccess(Long projectId, String requiredPermission) {
         PmProject project = projectMapper.selectById(projectId);
+        checkAccess(project, requiredPermission);
+    }
+
+    public void checkAccess(PmProject project, String requiredPermission) {
         if (project == null) {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
@@ -48,41 +53,35 @@ public class ProjectAccessChecker {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
 
-        // 管理员/超级管理员可访问所有项目
         List<String> roles = UserContext.getCurrentRoles();
-        if (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")) {
-            return;
-        }
-
         Long currentUserId = UserContext.getCurrentUserId();
-        if (currentUserId != null && currentUserId.equals(project.getProjectManagerId())) {
-            return;
-        }
-
-        // 解析用户的数据范围
         String dataScope = resolveEffectiveDataScope();
-        switch (dataScope) {
-            case "ALL":
-                return;
-            case "SELF":
-                if (currentUserId != null && currentUserId.equals(project.getCreatedBy())) {
-                    return;
-                }
-                break;
-            case "DEPT":
-            case "CUSTOM":
-                // DEPT/CUSTOM 数据范围尚未实现，拒绝访问（fail-close）
-                log.warn("PROJECT_ACCESS_DENIED: 数据范围 {} 未实现，用户 {} 无法访问项目 {}",
-                        dataScope, UserContext.getCurrentUserId(), projectId);
-                break;
-            default:
-                log.warn("PROJECT_ACCESS_DENIED: 未知数据范围 {}，用户 {} 无法访问项目 {}",
-                        dataScope, UserContext.getCurrentUserId(), projectId);
-                break;
-        }
+        if (isAccessible(project, roles, currentUserId, dataScope)) return;
+
+        log.warn("PROJECT_ACCESS_DENIED: 数据范围 {}，用户 {} 无法访问项目 {}",
+                dataScope, currentUserId, project.getId());
 
         throw new BusinessException("PROJECT_ACCESS_DENIED",
                 "无权" + (requiredPermission != null ? requiredPermission : "访问") + "该项目");
+    }
+
+    public List<PmProject> filterAccessible(List<PmProject> projects) {
+        if (projects == null || projects.isEmpty()) return List.of();
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<String> roles = UserContext.getCurrentRoles();
+        Long userId = UserContext.getCurrentUserId();
+        String dataScope = resolveEffectiveDataScope();
+        return projects.stream()
+                .filter(p -> Objects.equals(tenantId, p.getTenantId()))
+                .filter(p -> isAccessible(p, roles, userId, dataScope))
+                .toList();
+    }
+
+    private boolean isAccessible(PmProject project, List<String> roles, Long userId, String dataScope) {
+        if (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")) return true;
+        if (userId != null && userId.equals(project.getProjectManagerId())) return true;
+        if ("ALL".equals(dataScope)) return true;
+        return "SELF".equals(dataScope) && userId != null && userId.equals(project.getCreatedBy());
     }
 
     private String resolveEffectiveDataScope() {

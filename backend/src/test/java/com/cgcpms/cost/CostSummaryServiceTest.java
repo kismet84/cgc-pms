@@ -3,6 +3,8 @@ package com.cgcpms.cost;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostSummary;
@@ -67,6 +69,9 @@ class CostSummaryServiceTest {
     @Autowired
     private PayApplicationMapper payApplicationMapper;
 
+    @Autowired
+    private CtContractMapper contractMapper;
+
     private Long testProjectId;
 
     @BeforeEach
@@ -112,6 +117,7 @@ class CostSummaryServiceTest {
         payRecordMapper.deleteById(80001L);
         payRecordMapper.deleteById(80002L);
         payApplicationMapper.deleteById(80001L);
+        contractMapper.deleteById(80005L);
         costSummaryMapper.physicalDeleteByTenantAndProject(TENANT_ID, 80005L);
         projectMapper.deleteById(80005L);
         TestUserContext.clear();
@@ -504,6 +510,18 @@ class CostSummaryServiceTest {
         project.setCreatedBy(USER_PROJECT_CREATOR);
         projectMapper.insert(project);
 
+        CtContract contract = new CtContract();
+        contract.setId(80005L);
+        contract.setTenantId(TENANT_ID);
+        contract.setProjectId(reportProjectId);
+        contract.setContractCode("CT-COST-SUM-REPORT");
+        contract.setContractName("成本动态汇总报表合同");
+        contract.setContractType("MAIN");
+        contract.setContractAmount(new BigDecimal("5000000.00"));
+        contract.setCurrentAmount(BigDecimal.ZERO);
+        contract.setContractStatus("PERFORMING");
+        contractMapper.insert(contract);
+
         CostSubject subject = new CostSubject();
         subject.setId(80004L);
         subject.setSubjectName("报表回归科目");
@@ -551,6 +569,8 @@ class CostSummaryServiceTest {
         assertEquals(0, new BigDecimal("4000000.00").compareTo(new BigDecimal(subjectSummary.getTargetCost())));
         assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(subjectSummary.getActualCost())));
         assertEquals(0, new BigDecimal("200000.00").compareTo(new BigDecimal(subjectSummary.getDynamicCost())));
+        assertEquals(0, new BigDecimal("4800000.00").compareTo(new BigDecimal(subjectSummary.getExpectedProfit())),
+                "科目 expectedProfit 应与项目级口径一致，按 contractIncome-dynamicCost 计算");
         assertEquals(0, new BigDecimal("-3800000.00").compareTo(new BigDecimal(subjectSummary.getCostDeviation())));
     }
 
