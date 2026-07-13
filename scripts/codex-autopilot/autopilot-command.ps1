@@ -4,13 +4,7 @@ function Get-AutopilotCodexRedirectedStdinArguments {
   param([string[]]$Arguments)
 
   $normalized = @($Arguments)
-  if ($normalized.Count -eq 0 -or $normalized[-1] -ne '-') {
-    return $normalized
-  }
-  if ($normalized.Count -eq 1) {
-    return @()
-  }
-  return @($normalized[0..($normalized.Count - 2)])
+  return @($normalized | Where-Object { $_ -ne '-' })
 }
 
 function Resolve-AutopilotCodexInvocation {

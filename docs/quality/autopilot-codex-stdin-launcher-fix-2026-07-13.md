@@ -11,7 +11,7 @@
 
 Windows PowerShell 通过 `-File codex.ps1` 启动 Codex 时，会把参数末尾单独的 `-` 解释为非法参数名。三条控制面路径已经重定向 stdin，Codex 在没有显式 prompt 参数时会自动读取 stdin，因此末尾标记没有必要。
 
-公共启动器新增参数规范化，只在 Codex 参数最后一项为 `-` 时移除该标记；其他参数保持不变。Planner、Executor、Reviewer 均在创建进程前使用同一规范化函数，不改变模型、推理强度、sandbox、审批、工作目录或输出 schema。
+公共启动器新增参数规范化，移除 Codex 参数中的独立 stdin prompt 标记；Executor 会在配置参数之后追加模型与推理参数，因此不能只检查最后一项。其他参数及顺序保持不变。Planner、Executor、Reviewer 均在创建进程前使用同一规范化函数，不改变模型、推理强度、sandbox、审批、工作目录或输出 schema。
 
 ## 验收证据
 

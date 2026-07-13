@@ -6,8 +6,8 @@ $repoRoot = (Resolve-Path (Join-Path $scriptDir '..\..')).Path
 $config = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
 . (Join-Path $scriptDir 'autopilot-command.ps1')
 
-$normalizedStdinArgs = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments @('exec','--ephemeral','-'))
-if ($normalizedStdinArgs.Count -ne 2 -or $normalizedStdinArgs[-1] -ne '--ephemeral') { throw 'redirected stdin arguments must omit the trailing Codex prompt marker' }
+$normalizedStdinArgs = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments @('exec','--ephemeral','-','--model','gpt-5.6-sol'))
+if (($normalizedStdinArgs -join '|') -ne 'exec|--ephemeral|--model|gpt-5.6-sol') { throw 'redirected stdin arguments must omit the Codex prompt marker even when route arguments are appended later' }
 $unchangedArgs = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments @('exec','--help'))
 if (($unchangedArgs -join '|') -ne 'exec|--help') { throw 'Codex arguments without a trailing stdin marker must remain unchanged' }
 
