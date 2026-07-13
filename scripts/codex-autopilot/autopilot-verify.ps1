@@ -2,6 +2,11 @@ $ErrorActionPreference = 'Stop'
 $contextScript = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-context.ps1'
 if (Test-Path -LiteralPath $contextScript) { . $contextScript }
 
+function Test-AutopilotPostExecutionVerificationRequired {
+  param([Parameter(Mandatory)][string]$Command)
+  return $Command -notmatch '(?i)scripts[\\/]codex-autopilot[\\/]ready-lint\.ps1'
+}
+
 function Invoke-AutopilotVerificationCommand {
   param(
     [Parameter(Mandatory)][string]$IssueId,
