@@ -266,6 +266,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '资金日记账', icon: 'AccountBookOutlined' },
       },
       {
+        path: 'accounting-entry',
+        name: 'AccountingEntry',
+        component: () => import('@/pages/accounting-entry/index.vue'),
+        meta: { title: '会计凭证', icon: 'AccountBookOutlined', permission: 'accounting:query' },
+      },
+      {
         path: 'inventory',
         name: 'Inventory',
         redirect: '/inventory/warehouse',

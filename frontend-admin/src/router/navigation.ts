@@ -72,11 +72,12 @@ export const navigationItems: NavigationItem[] = [
     key: '/settlement-domain',
     label: '结算收付',
     icon: 'AccountBookOutlined',
-    matchPrefixes: ['/settlement', '/payment', '/cash-journal', '/invoice'],
+    matchPrefixes: ['/settlement', '/payment', '/cash-journal', '/accounting-entry', '/invoice'],
     children: [
       { key: '/settlement/list', label: '结算台账' },
       { key: '/payment/application', label: '付款申请' },
       { key: '/cash-journal', label: '资金日记账', permission: 'cashbook:journal:query' },
+      { key: '/accounting-entry', label: '会计凭证', permission: 'accounting:query' },
       { key: '/invoice', label: '发票管理' },
     ],
   },

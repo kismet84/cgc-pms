@@ -102,6 +102,17 @@ describe('router lazy loading', () => {
     expect(typeof cashJournalRoute?.component).toBe('function')
   })
 
+  it('registers the accounting entry route with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const accountingRoute = rootRoute?.children?.find((c) => c.path === 'accounting-entry')
+
+    expect(accountingRoute?.name).toBe('AccountingEntry')
+    expect(accountingRoute?.meta?.title).toBe('会计凭证')
+    expect(accountingRoute?.meta?.permission).toBe('accounting:query')
+    expect(typeof accountingRoute?.component).toBe('function')
+    expect(router.resolve('/accounting-entry').meta.permission).toBe('accounting:query')
+  })
+
   it('registers the site daily log route with query permission', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const dailyRoute = rootRoute?.children?.find((c) => c.path === 'site/daily-log')

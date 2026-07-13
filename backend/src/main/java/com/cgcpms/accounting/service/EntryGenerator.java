@@ -53,8 +53,8 @@ public class EntryGenerator {
     public AccountingEntry generateEntry(String sourceType, Long sourceId, String entryType) {
         EntryGenerationStrategy strategy = strategyMap.get(sourceType);
         if (strategy == null) {
-            log.info("未找到凭证生成策略，跳过 sourceType={}", sourceType);
-            return null;
+            throw new BusinessException("ENTRY_SOURCE_UNSUPPORTED",
+                    "来源类型尚未配置会计凭证生成策略：" + sourceType);
         }
 
         Long tenantId = UserContext.getCurrentTenantId();
