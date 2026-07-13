@@ -2,8 +2,8 @@
 
 ## 场景1：Ready 空
 
-- 输入：`ready` 队列为空，`current-issues.json` 存在合格 `OPEN` / `OBSERVATION` 叶子问题
-- 预期：A 优先从存量问题拆题；保留 `[stock:<issueKey>]`；不写业务代码；输出新的 Ready 或明确停止原因
+- 输入：`ready` 队列为空，知识图谱健康、Git 游标覆盖当前 HEAD，且存在合格 `OPEN` / `OBSERVATION` 叶子问题
+- 预期：A 从有界图谱查询发现存量候选，再按 `sourceRefs` 和当前分支事实核实；保留 `[stock:<issueKey>]`；不写业务代码；输出新的 Ready 或明确停止原因
 - 通过条件：只有 backlog/计划层动作，没有业务代码 diff
 
 ## 场景1a：存量问题过滤与后备顺序
@@ -11,6 +11,18 @@
 - 输入：同时存在生产 `RELEASE_GATE`、`FROZEN`、`NEEDS_CONFIRMATION`、聚合父问题、合格存量叶子问题、当前 focus 阻塞和 Ad-hoc Candidate
 - 预期：只选择合格存量叶子问题；其余存量项不自动拆 Ready。合格存量问题耗尽后，才按当前 focus 可解除阻塞 → Ad-hoc Candidate → 产品情报刷新推进
 - 通过条件：长期增强计划不能直接生成 Ready；没有 Ready Planner 时正式补货 fail-close，不生成宽范围通用草稿
+
+## 场景1c：图谱异常或游标过期
+
+- 输入：Neo4j 不可用，或 Git 游标落后当前 HEAD 且单次 `autopilot-refill` 增量刷新后仍不一致
+- 预期：分别输出 `STOP_KG_REFILL_UNAVAILABLE` 或 `STOP_KG_REFILL_STALE`；不读取 `current-issues.json` 静默补货
+- 通过条件：不创建 Ready、不创建 issue worktree、不启动 executor；失败分类可区分 `environment_prereq`、`tool_config` 与数据一致性 `quality_security`
+
+## 场景1d：Ready 范围契约矛盾
+
+- 输入：精确允许文件被禁止目录覆盖，或允许子树被禁止父树完全覆盖
+- 预期：ready lint 返回 `READY_SCOPE_CONTRADICTION` / `ready_issue_config`
+- 通过条件：executor/worktree 均未创建；宽允许目录配合更窄禁止子目录仍通过前置检查，并继续受运行时 forbidden 优先门禁保护
 
 ## 场景1b：无 Ready 证据直接调用 runner
 

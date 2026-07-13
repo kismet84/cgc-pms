@@ -21,6 +21,8 @@ npm install
 npm run schema
 npm run collect
 npm run status
+npm run issues -- --view summary --current-only
+npm run issues -- --view list --current-only --priority P0 --limit 20
 npm test
 ```
 
@@ -54,6 +56,10 @@ codex mcp add cgc-pms-knowledge-graph -- node D:\projects-test\cgc-pms\tools\kno
 ```
 
 需要明细时使用 `{ "view": "list", "parentIssueKey": "A-01", "limit": 100 }`；可按 `status`、`classification`、`priority`、`blocking` 和关键字继续过滤。默认只返回 `current=true` 的问题，摘要查询不展开文档正文或历史版本。
+
+自动化脚本使用同一查询函数的 CLI：`node src/cli.js issues`。支持 `--view`、`--limit`、`--status`、`--classification`、`--priority`、`--parent-issue-key`、`--blocking`、`--current-only` 和 `--query`；成功只向 stdout 输出一个与 `kg_list_issues` 同构的 JSON 文档，参数、连接、Schema 或查询失败写 stderr 并返回非零退出码。
+
+AutoPilot 补货先检查 `status` 中最近采集状态、失败数、当前问题计数和 `source=git` 游标；游标落后当前 HEAD 时最多触发一次 `collect --trigger autopilot-refill`，复查仍不一致即安全停止。不得为维持循环静默回退到 `current-issues.json` 文件扫描；该文件仍是问题状态的正式写回源，图谱只是发现与排序索引。
 
 ## Schema
 

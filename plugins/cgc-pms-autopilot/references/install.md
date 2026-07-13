@@ -19,11 +19,12 @@
 ## 使用顺序
 
 1. 项目统一控制面：`scripts/codex-autopilot/autopilot-run-continuous.ps1`
-2. 插件兼容预演：`autopilot-loop-runner.ps1 -DryRun`
-3. `autopilot-checkpoint.ps1`
-4. `ready-issue-writer.ps1` 或 `issue-closeout.ps1`
-5. `test-failure-classifier.ps1`
-6. `local-commit-closeout.ps1 -DryRun`
+2. 存量问题查询/补货：`node tools/knowledge-graph/src/cli.js status` 后执行有界 `issues` 查询；AutoPilot 要求 Git 游标覆盖当前 HEAD
+3. 插件兼容预演：`autopilot-loop-runner.ps1 -DryRun`
+4. `autopilot-checkpoint.ps1`
+5. `ready-issue-writer.ps1` 或 `issue-closeout.ps1`
+6. `test-failure-classifier.ps1`
+7. `local-commit-closeout.ps1 -DryRun`
 
 运行态 `state.json`、`run.lock`、events、executor/reviewer 日志只保存在 `.codex-autopilot/`，不得提交为项目事实。正式事实仍写入 `docs/backlog/**`、`docs/iterations/**`、`docs/quality/**` 和本地 Git commit。
 
@@ -63,5 +64,6 @@
 - 每轮最多并行 3 个完全无关联且无代码关联的 Ready Issue，不能证明无关联时串行。
 - 测试数据重置必须同时满足 dev/test/demo、host 为 localhost/127.0.0.1、存在 `ALLOW_TEST_DATA_RESET` marker。
 - `autoPush=false` / `no push` 禁止自动 push；显式 push 必须获得用户授权并通过其他门禁。
-- 收口需通过对应验证与 `git diff --check`、更新 iteration/backlog 并复查 flag；Ready 为空时先从 `current-issues.json` 拆合格存量问题，存量问题耗尽后再处理当前 focus/阶段可解除阻塞，停止条件按项目规则执行。
+- 收口需通过对应验证与 `git diff --check`、更新 iteration/backlog 并复查 flag；Ready 为空时先从健康且 HEAD 游标新鲜的知识图谱发现合格存量问题并按来源核实，`current-issues.json` 仅作为正式写回源。图谱异常时安全停止，不静默回退文件选题；存量问题耗尽后再处理当前 focus/阶段可解除阻塞。
+- Ready allow/forbid 完全覆盖矛盾在 executor/worktree 前归类为 `ready_issue_config`；运行时 forbidden 优先门禁继续作为最后一道安全边界。
 - 不自动发布生产，不连接生产数据库，不删除仓库外文件。

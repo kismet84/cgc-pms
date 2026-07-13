@@ -60,6 +60,13 @@ function New-Fixture {
   "maxParallelIssues": $MaxParallelIssues,
   "parallelSafetyMode": "$ParallelSafetyMode",
   "autoPush": false,
+  "issueGraph": {
+    "enabled": true,
+    "cli": "scripts/codex-autopilot/mock-kg-cli.cjs",
+    "refreshWhenHeadDiffers": true,
+    "allowRegistryFallback": false,
+    "queryLimit": 200
+  },
   "issueExecutor": {
     "command": "powershell",
     "args": [
@@ -104,6 +111,25 @@ if ("$ExecutorMode" -eq "commit") {
 }
 Write-Host "mock executor completed for `$IssueId"
 "@ | Out-File -Encoding utf8 (Join-Path $ScriptDir "mock-issue-executor.ps1")
+  @'
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFileSync } = require('node:child_process');
+const root = path.resolve(__dirname, '..', '..');
+const register = JSON.parse(fs.readFileSync(path.join(root, 'docs', 'backlog', 'current-issues.json'), 'utf8').replace(/^\uFEFF/, ''));
+const command = process.argv[2] || 'status';
+if (command === 'status') {
+  const head = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  console.log(JSON.stringify([{ lastRunStatus: 'SUCCESS', lastRunFailures: 0, currentIssues: register.issues.length, cursors: [{ source: 'git', cursor: head }] }]));
+} else if (command === 'issues') {
+  console.log(JSON.stringify({ total: register.issues.length, returned: register.issues.length, issues: register.issues }));
+} else if (command === 'collect') {
+  console.log(JSON.stringify({ status: 'SUCCESS' }));
+} else {
+  console.error(`unknown mock command: ${command}`);
+  process.exitCode = 1;
+}
+'@ | Out-File -Encoding utf8 (Join-Path $ScriptDir "mock-kg-cli.cjs")
   $Ready | Out-File -Encoding utf8 (Join-Path $BacklogDir "ready-issues.md")
   $Focus | Out-File -Encoding utf8 (Join-Path $BacklogDir "current-focus.md")
   $Plan | Out-File -Encoding utf8 (Join-Path $BacklogDir "cgc-pms-production-enhancement-plan.md")
@@ -646,6 +672,32 @@ try {
   Assert-Contains $MissingFieldOutput "selectedIssue=ISSUE-100-001"
   Assert-Contains $MissingFieldOutput "目标"
 
+  $ContradictionRoot = New-Fixture -Name "ready-scope-contradiction" -Enabled -Ready @"
+# Ready Issues
+
+### ISSUE-100-009：Runner scope contradiction
+
+目标：
+- Reject contradictory scope before execution.
+允许修改：
+- ``deploy/docker-compose.dev.yml``
+禁止修改：
+- ``deploy/**``
+验收标准：
+- Executor and worktree are not created.
+状态：Ready
+来源锚点：``docs/plans/source.md``
+验证命令：
+- ``git diff --check``
+归档报告：``docs/quality/issue-100-009.md``
+"@ -Plan "# Plan`n"
+  $ContradictionOutput = Invoke-Runner $ContradictionRoot -Apply
+  Assert-Contains $ContradictionOutput "STOP_READY_LINT_FAILED"
+  Assert-Contains $ContradictionOutput "failureCategory=ready_issue_config"
+  Assert-Contains $ContradictionOutput "errorCode=READY_SCOPE_CONTRADICTION"
+  if (Test-Path (Join-Path $ContradictionRoot 'docs\quality\mock-execution.txt')) { throw 'scope contradiction started the executor' }
+  if (Test-Path (Join-Path $ContradictionRoot '.worktrees')) { throw 'scope contradiction created an issue worktree' }
+
   $ReadyLint = Join-Path $ScriptDir "ready-lint.ps1"
   $ReadyLintOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $ReadyLint -RepoRoot $ReadyRoot -IssueTitle "ISSUE-100-001：Runner ready branch" 2>&1 | Out-String
   $ReadyLintJson = $ReadyLintOutput | ConvertFrom-Json
@@ -691,7 +743,7 @@ try {
 "@
   $SplitOutput = Invoke-Runner $SplitRoot
   Assert-Contains $SplitOutput "SPLIT_MODE"
-  Assert-Contains $SplitOutput "candidateSource=current-issues.json"
+  Assert-Contains $SplitOutput "candidateSource=knowledge-graph"
   Assert-Contains $SplitOutput "splitCandidate[1]=[stock:OBS-STOCK-001]"
   Assert-Contains $SplitOutput "DRY_RUN_NO_BACKLOG_WRITE"
   $SplitReadyAfterDryRun = Get-Content -Encoding UTF8 -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
@@ -704,7 +756,7 @@ try {
   Assert-Contains $ExplainSplitOutput "nextAction=SPLIT_BACKLOG"
   Assert-Contains $ExplainSplitOutput "shouldSplitBacklog=true"
   Assert-Contains $ExplainSplitOutput "wouldCreateReadyIssueDrafts=1"
-  Assert-Contains $ExplainSplitOutput "candidateSource=current-issues.json"
+  Assert-Contains $ExplainSplitOutput "candidateSource=knowledge-graph"
   $SplitReadyAfterExplain = Get-Content -Encoding UTF8 -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterExplain "状态：Ready"
   if (Test-Path (Join-Path $SplitRoot ".codex-autopilot\run.lock")) { throw "ExplainNextAction should not leave run.lock" }

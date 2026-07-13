@@ -18,35 +18,108 @@ function Test-AutopilotReadyPlanningAllowed {
   return $Action -eq 'PLAN_READY'
 }
 
+function Invoke-AutopilotKnowledgeGraphCli {
+  param(
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [Parameter(Mandatory)][string]$CliPath,
+    [Parameter(Mandatory)][string[]]$Arguments,
+    [scriptblock]$CommandInvoker
+  )
+  if ($CommandInvoker) { return & $CommandInvoker $CliPath $Arguments $RepoRoot }
+  $startInfo = [Diagnostics.ProcessStartInfo]::new()
+  $startInfo.FileName = 'node'
+  $quoted = @($CliPath) + @($Arguments) | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }
+  $startInfo.Arguments = $quoted -join ' '
+  $startInfo.WorkingDirectory = $RepoRoot
+  $startInfo.UseShellExecute = $false
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo
+  [void]$process.Start()
+  $stdout = $process.StandardOutput.ReadToEnd(); $stderr = $process.StandardError.ReadToEnd()
+  $process.WaitForExit()
+  if ($process.ExitCode -ne 0) { throw "knowledge graph CLI failed (exit=$($process.ExitCode)): $($stderr.Trim())" }
+  if (!$stdout.Trim()) { throw 'knowledge graph CLI returned empty output' }
+  return $stdout | ConvertFrom-Json
+}
+
+function Get-AutopilotKnowledgeGraphIssueSnapshot {
+  param(
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [scriptblock]$CommandInvoker
+  )
+  try {
+    $configPath = Join-Path $RepoRoot 'scripts\codex-autopilot\codex-autopilot.config.json'
+    if (!(Test-Path -LiteralPath $configPath -PathType Leaf)) { throw 'AutoPilot config is missing' }
+    $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (!$config.issueGraph -or $config.issueGraph.enabled -ne $true) { throw 'issueGraph.enabled must be true' }
+    if ($config.issueGraph.allowRegistryFallback -eq $true) { throw 'issueGraph.allowRegistryFallback must remain false' }
+    $cliPath = [string]$config.issueGraph.cli
+    if (!$cliPath) { throw 'issueGraph.cli is required' }
+    $cliFull = if ([IO.Path]::IsPathRooted($cliPath)) { $cliPath } else { Join-Path $RepoRoot $cliPath }
+    if (!(Test-Path -LiteralPath $cliFull -PathType Leaf) -and !$CommandInvoker) { throw "issueGraph.cli does not exist: $cliPath" }
+    $limit = [Math]::Max(1, [Math]::Min([int]$config.issueGraph.queryLimit, 200))
+    $head = (& git -C $RepoRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or !$head) { throw 'cannot resolve current Git HEAD' }
+
+    $readStatus = {
+      $value = Invoke-AutopilotKnowledgeGraphCli -RepoRoot $RepoRoot -CliPath $cliFull -Arguments @('status') -CommandInvoker $CommandInvoker
+      if ($value -is [array]) { return $value | Select-Object -First 1 }
+      return $value
+    }
+    $status = & $readStatus
+    $gitCursor = @($status.cursors | Where-Object { $_.source -eq 'git' } | Select-Object -First 1)[0]
+    $healthyRun = !$status.lastRunStatus -or ([string]$status.lastRunStatus).ToUpperInvariant() -in @('SUCCESS','SUCCEEDED','COMPLETED')
+    $failures = if ($null -eq $status.lastRunFailures) { 0 } else { [int]$status.lastRunFailures }
+    if (!$healthyRun -or $failures -ne 0 -or $null -eq $status.currentIssues) { throw 'knowledge graph status is unhealthy or incomplete' }
+    $refreshed = $false
+    if (!$gitCursor -or [string]$gitCursor.cursor -ne $head) {
+      if ($config.issueGraph.refreshWhenHeadDiffers -ne $true) {
+        return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_security'; message = 'git cursor differs from current HEAD and refresh is disabled'; issues = @() }
+      }
+      $null = Invoke-AutopilotKnowledgeGraphCli -RepoRoot $RepoRoot -CliPath $cliFull -Arguments @('collect','--trigger','autopilot-refill') -CommandInvoker $CommandInvoker
+      $refreshed = $true
+      $status = & $readStatus
+      $gitCursor = @($status.cursors | Where-Object { $_.source -eq 'git' } | Select-Object -First 1)[0]
+      $healthyRun = !$status.lastRunStatus -or ([string]$status.lastRunStatus).ToUpperInvariant() -in @('SUCCESS','SUCCEEDED','COMPLETED')
+      $failures = if ($null -eq $status.lastRunFailures) { 0 } else { [int]$status.lastRunFailures }
+      if (!$healthyRun -or $failures -ne 0 -or !$gitCursor -or [string]$gitCursor.cursor -ne $head) {
+        return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_security'; message = 'knowledge graph remains stale or unhealthy after one refresh'; issues = @() }
+      }
+    }
+    $issueResult = Invoke-AutopilotKnowledgeGraphCli -RepoRoot $RepoRoot -CliPath $cliFull -Arguments @('issues','--view','list','--current-only','--limit',[string]$limit) -CommandInvoker $CommandInvoker
+    if ($null -eq $issueResult.total -or $null -eq $issueResult.issues) { throw 'knowledge graph issues response does not match the expected schema' }
+    if ([int]$status.currentIssues -ne [int]$issueResult.total) {
+      return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_security'; message = 'status currentIssues differs from issues query total'; issues = @() }
+    }
+    return [pscustomobject]@{ available = $true; source = 'knowledge-graph'; head = $head; cursor = [string]$gitCursor.cursor; refreshed = $refreshed; issues = @($issueResult.issues) }
+  } catch {
+    $message = $_.Exception.Message
+    $category = if ($message -match 'ECONNREFUSED|connection|connectivity|Neo4j|socket|port') { 'environment_prereq' } else { 'tool_config' }
+    return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_UNAVAILABLE'; failureCategory = $category; message = $message; issues = @() }
+  }
+}
+
 function Get-AutopilotStockIssueCandidates {
   param(
     [Parameter(Mandatory)][string]$RepoRoot,
+    [Parameter(Mandatory)][object]$KnowledgeGraphSnapshot,
     [int]$Limit = 5
   )
 
   $backlog = Join-Path $RepoRoot 'docs\backlog'
-  $registerPath = Join-Path $backlog 'current-issues.json'
-  if (!(Test-Path -LiteralPath $registerPath)) { return @() }
-
-  try {
-    $register = Get-Content -LiteralPath $registerPath -Raw -Encoding UTF8 | ConvertFrom-Json
-  } catch {
-    throw "current-issues.json is invalid: $($_.Exception.Message)"
-  }
-  if ($register.schemaVersion -ne 1 -or $register.PSObject.Properties.Name -notcontains 'issues') {
-    throw 'current-issues.json does not match the supported schemaVersion=1 contract'
-  }
+  $issues = @($KnowledgeGraphSnapshot.issues)
 
   $existingText = ''
   foreach ($name in @('ready-issues.md', 'done-issues.md', 'blocked-issues.md')) {
     $path = Join-Path $backlog $name
     if (Test-Path -LiteralPath $path) { $existingText += "`n" + (Get-Content -LiteralPath $path -Raw -Encoding UTF8) }
   }
-  $parentKeys = @($register.issues | Where-Object { $_.parentIssueKey } | ForEach-Object { [string]$_.parentIssueKey } | Select-Object -Unique)
+  $parentKeys = @($issues | Where-Object { $_.parentIssueKey } | ForEach-Object { [string]$_.parentIssueKey } | Select-Object -Unique)
   $priorityOrder = @{ P0 = 0; P1 = 1; P2 = 2 }
   $statusOrder = @{ OPEN = 0; OBSERVATION = 1 }
 
-  $candidates = foreach ($issue in @($register.issues)) {
+  $candidates = foreach ($issue in $issues) {
     $issueKey = [string]$issue.issueKey
     $marker = "[stock:$issueKey]"
     if (!$issueKey -or $issue.blocking -eq $true) { continue }
@@ -59,7 +132,7 @@ function Get-AutopilotStockIssueCandidates {
     [pscustomobject]@{
       name = [string]$issue.title
       status = [string]$issue.status
-      source = 'current-issues.json'
+      source = 'knowledge-graph'
       issueKey = $issueKey
       marker = $marker
       priority = [string]$issue.priority
@@ -78,7 +151,7 @@ function Get-AutopilotStockIssueCandidates {
 }
 
 function Get-AutopilotRefillDecision {
-  param([Parameter(Mandatory)][string]$RepoRoot)
+  param([Parameter(Mandatory)][string]$RepoRoot, [object]$KnowledgeGraphSnapshot)
   $autoDir = Join-Path $RepoRoot '.codex-autopilot'
   $backlog = Join-Path $RepoRoot 'docs\backlog'
   if (Test-Path -LiteralPath (Join-Path $autoDir 'stop.flag')) { return [pscustomobject]@{ action = 'STOP'; targetReadyCount = 0; candidates = @(); reason = 'stop.flag present' } }
@@ -88,7 +161,11 @@ function Get-AutopilotRefillDecision {
   if ($readyCount -ge 1) { return [pscustomobject]@{ action = 'READY_SUFFICIENT'; targetReadyCount = $readyCount; candidates = @(); reason = 'Ready queue already has at least one item' } }
 
   $needed = [Math]::Max(0, 1 - $readyCount)
-  $stockCandidates = @(Get-AutopilotStockIssueCandidates -RepoRoot $RepoRoot -Limit ([Math]::Min($needed, 5 - $readyCount)))
+  if (!$KnowledgeGraphSnapshot) { $KnowledgeGraphSnapshot = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $RepoRoot }
+  if ($KnowledgeGraphSnapshot.available -ne $true) {
+    return [pscustomobject]@{ action = [string]$KnowledgeGraphSnapshot.stopReason; targetReadyCount = $readyCount; candidates = @(); reason = [string]$KnowledgeGraphSnapshot.message; failureCategory = [string]$KnowledgeGraphSnapshot.failureCategory }
+  }
+  $stockCandidates = @(Get-AutopilotStockIssueCandidates -RepoRoot $RepoRoot -KnowledgeGraphSnapshot $KnowledgeGraphSnapshot -Limit ([Math]::Min($needed, 5 - $readyCount)))
   if ($stockCandidates.Count -gt 0) {
     return [pscustomobject]@{
       action = 'PLAN_READY'
@@ -147,14 +224,18 @@ function Invoke-AutopilotReadyPlanner {
   $codex = Resolve-AutopilotCodexInvocation
   $candidateJson = $Candidates | ConvertTo-Json -Depth 5 -Compress
   $prompt = @"
-Act as the fresh AutoPilot Planner for cgc-pms. Read AGENTS.override.md, AGENTS.md, docs/backlog/current-issues.json,
-docs/backlog/current-focus.md, docs/backlog/ready-issues.md, docs/backlog/blocked-issues.md, docs/backlog/ad-hoc-plan.md,
-docs/product-intelligence/project-map.md and docs/product-intelligence/evolution-decision.md.
-Turn only these candidates into 1..5 strict Ready Issue Markdown blocks: $candidateJson
+Act as the fresh AutoPilot Planner for cgc-pms. Read AGENTS.override.md, AGENTS.md, docs/backlog/current-focus.md,
+docs/backlog/ready-issues.md, docs/backlog/blocked-issues.md, docs/backlog/ad-hoc-plan.md,
+docs/product-intelligence/project-map.md and docs/product-intelligence/evolution-decision.md. Do not scan the complete
+current-issues.json registry to discover alternatives; discovery has already been bounded by the knowledge graph.
+Turn only these knowledge-graph candidates into 1..5 strict Ready Issue Markdown blocks: $candidateJson
+Before producing a block, verify that candidate against its sourceRefs, current branch code/configuration, and the unique
+backlog carrier. Explicitly decide whether the issue still exists, user value is clear, acceptance is executable,
+dependencies are satisfied, and it is not duplicated by Ready/Done/Blocked. If verification fails, do not create Ready.
 Each block must satisfy scripts/codex-autopilot/autopilot-ready.ps1, use real existing paths and validation entrypoints,
 state explicit non-goals/migration/risk/runtime/reviewer requirements, and must not modify business code.
-For a current-issues.json candidate, preserve its exact marker as a line like 存量问题键：[stock:ISSUE_KEY], cite the
-registry and sourceRefs, keep the smallest executable acceptance slice, and require closeout to update/remove that source
+For a stock candidate, preserve its exact marker as a line like 存量问题键：[stock:ISSUE_KEY], cite the
+formal registry and sourceRefs, keep the smallest executable acceptance slice, and require closeout to update/remove that source
 issue in current-issues.json after verification. Never turn RELEASE_GATE, blocking=true, FROZEN, NEEDS_CONFIRMATION,
 an aggregate parent with children, or an evidence-incomplete item into Ready. Never split directly from the long-term plan.
 Return JSON matching $SchemaPath.

@@ -2,8 +2,8 @@
 
 ## A 需求/架构分析
 
-- 输入：`ready` / `current-issues` / `blocked` / `current-focus`、计划书、既有规则
-- 输出：问题分类、最小实现边界、依赖判断、建议验证命令、是否需要重新分档、图谱路由判断、查询目的、命中摘要、交叉核验
+- 输入：`ready` / `blocked` / `current-focus`、知识图谱有界候选及其 `sourceRefs`、计划书、既有规则
+- 输出：图谱健康与 HEAD 游标结论、问题分类、候选当前事实核实、最小实现边界、依赖判断、建议验证命令、是否需要重新分档、查询目的、命中摘要、交叉核验
 
 ## B 前端/UI 实现
 
@@ -36,3 +36,5 @@
 2. D/E/F 输出必须短、稳定、可复核，不复制真实长日志。
 3. 若输入边界不清，先补 repair-request 或任务说明，不直接扩 scope。
 4. loop runner 只负责串联 phase 和建议动作，不替代主线程最终裁决。
+5. 知识图谱只负责发现、筛选和关联导航；候选进入 Ready 前必须核实当前分支事实与唯一正式载体，图谱异常或过期时 fail-close。
+6. Ready allow/forbid 完全覆盖矛盾属于 `ready_issue_config`，必须在 executor/worktree 前拒绝；合法窄禁止 carve-out 不得误伤。

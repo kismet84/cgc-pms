@@ -173,7 +173,7 @@ function Get-ReadyIssues {
     return @(Get-AutopilotReadyIssues -Path $ReadyPath -RepoRoot $RepoRoot | ForEach-Object {
       [pscustomobject]@{
         title = $_.title; status = 'Ready'; body = $_.body; contract = $_
-        lint = [pscustomobject]@{ status = 'pass'; issueId = $_.issueId; title = $_.title; readyContentHash = $_.readyContentHash; errors = @(); warnings = @() }
+        lint = [pscustomobject]@{ status = 'pass'; issueId = $_.issueId; title = $_.title; readyContentHash = $_.readyContentHash; failureCategory = 'none'; errorCode = ''; errors = @(); warnings = @() }
       }
     })
   } catch {
@@ -183,7 +183,7 @@ function Get-ReadyIssues {
     $title = $match.Groups[1].Value.Trim()
     return @([pscustomobject]@{
       title = $title; status = 'Ready'; body = $match.Groups[2].Value; contract = $null
-      lint = [pscustomobject]@{ status = 'fail'; issueId = ([regex]::Match($title, '^(ISSUE-[0-9-]+)')).Groups[1].Value; title = $title; readyContentHash = ''; errors = @($_.Exception.Message); warnings = @() }
+      lint = [pscustomobject]@{ status = 'fail'; issueId = ([regex]::Match($title, '^(ISSUE-[0-9-]+)')).Groups[1].Value; title = $title; readyContentHash = ''; failureCategory = 'ready_issue_config'; errorCode = $(if ($_.Exception.Message -match 'READY_SCOPE_CONTRADICTION') { 'READY_SCOPE_CONTRADICTION' } else { 'READY_CONTRACT_INVALID' }); errors = @($_.Exception.Message); warnings = @() }
     })
   }
 }
@@ -1235,12 +1235,16 @@ try {
           decision = "STOP"
           status = "fail"
           stopReason = "STOP_READY_LINT_FAILED"
-          missingGate = "ready-lint"
+           missingGate = "ready-lint"
+           failureCategory = $readyIssues[0].lint.failureCategory
+           errorCode = $readyIssues[0].lint.errorCode
         })
         Write-State $autoDir "STOP_READY_LINT_FAILED" ([bool]$DryRun) "STOP" $readyIssues[0].title "STOP_READY_LINT_FAILED" "STOP_READY_LINT_FAILED"
         Write-Host "STOP_READY_LINT_FAILED"
         Write-Host "selected=$($readyIssues[0].title)"
-        Write-Host "missingGate=ready-lint"
+         Write-Host "missingGate=ready-lint"
+         Write-Host "failureCategory=$($readyIssues[0].lint.failureCategory)"
+         Write-Host "errorCode=$($readyIssues[0].lint.errorCode)"
         foreach ($errorItem in @($readyIssues[0].lint.errors)) {
           Write-Host "lintError=$errorItem"
         }
@@ -1318,6 +1322,14 @@ try {
       Write-Host 'BACKLOG_SPLIT_APPLIED'
       Write-Host "createdReadyIssueDrafts=$($imported.createdCount)"
       Write-Host 'REFILL_ROUND_COMPLETE'
+      exit 0
+    }
+    if ($refillDecision.action -in @('STOP_KG_REFILL_UNAVAILABLE','STOP_KG_REFILL_STALE')) {
+      Write-RunEvent 'refill.graph-stop' ([pscustomobject]@{ decision = 'STOP'; status = $refillDecision.action; stopReason = $refillDecision.action; reason = $refillDecision.reason; failureCategory = $refillDecision.failureCategory })
+      Write-State $autoDir 'BLOCKED' $false 'STOP' '' $refillDecision.reason $refillDecision.action
+      Write-Host $refillDecision.action
+      Write-Host "failureCategory=$($refillDecision.failureCategory)"
+      Write-Host "refillReason=$($refillDecision.reason)"
       exit 0
     }
     if ($refillDecision.action -eq 'UNBLOCK_FIRST') {

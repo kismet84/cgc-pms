@@ -43,6 +43,7 @@ $parseFailures = @(
 if ($parseFailures.Count -gt 0) { throw "AutoPilot scripts must parse through Windows PowerShell -File defaults: $($parseFailures | ConvertTo-Json -Compress -Depth 4)" }
 
 if ($config.controlPlane -ne 'scripts\codex-autopilot\autopilot-run-continuous.ps1') { throw 'single controlPlane is not configured' }
+if (!$config.issueGraph -or $config.issueGraph.enabled -ne $true -or $config.issueGraph.allowRegistryFallback -ne $false -or [int]$config.issueGraph.queryLimit -gt 200) { throw 'knowledge-graph-first refill fail-close config is invalid' }
 if ([int]$config.maxParallel -ne 1 -or [int]$config.maxParallelIssues -ne 1) { throw 'unattended rollout must start with maxParallel=1' }
 if (@($config.issueExecutor.args) -contains 'gpt-5.5') { throw 'executor still pins a legacy model' }
 foreach ($profile in 'mechanical','normal','highRisk','formalReview') {

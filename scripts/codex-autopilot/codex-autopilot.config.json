@@ -17,6 +17,13 @@
   "parallelSafetyMode": "strict-independent-only",
   "maxFilesChangedPerIssue": 20,
   "maxRunMinutes": 90,
+  "issueGraph": {
+    "enabled": true,
+    "cli": "tools/knowledge-graph/src/cli.js",
+    "refreshWhenHeadDiffers": true,
+    "allowRegistryFallback": false,
+    "queryLimit": 200
+  },
   "cycleIntervalMinutes": 30,
   "issueExecutor": {
     "command": "codex",

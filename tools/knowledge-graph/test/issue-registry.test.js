@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { loadConfig } from "../src/config.js";
 import { loadIssueRegister, parseIssueRegister } from "../src/issue-registry.js";
 
-test("current issue register is valid, unique, and preserves the A-01 24+11 invariant", () => {
+test("current issue register is valid, unique, and preserves the A-01 21+11 invariant", () => {
   const config = loadConfig();
   const { register, sha256 } = loadIssueRegister(config.repoRoot);
   assert.equal(register.schemaVersion, 1);
   assert.match(sha256, /^[a-f0-9]{64}$/);
-  assert.equal(register.issues.length, 57);
+  assert.equal(register.issues.length, 54);
 
   const a01Children = register.issues.filter((issue) => issue.parentIssueKey === "A-01");
-  assert.equal(a01Children.filter((issue) => issue.status === "OPEN").length, 24);
+  assert.equal(a01Children.filter((issue) => issue.status === "OPEN").length, 21);
   assert.equal(a01Children.filter((issue) => issue.status === "NEEDS_CONFIRMATION").length, 11);
   assert.equal(register.issues.filter((issue) => issue.blocking).length, 3);
 });

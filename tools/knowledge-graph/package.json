@@ -10,6 +10,7 @@
     "collect:scheduled": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/collect.ps1 -Trigger scheduled",
     "schedule:dry-run": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-schedule.ps1",
     "status": "node src/cli.js status",
+    "issues": "node src/cli.js issues",
     "acceptance": "node src/acceptance.js",
     "mcp": "node src/server.js",
     "test": "node --test",

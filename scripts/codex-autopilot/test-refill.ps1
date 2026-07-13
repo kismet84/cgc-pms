@@ -10,12 +10,23 @@ $backlog = Join-Path $root 'docs\backlog'
 New-Item -ItemType Directory -Path $autoDir,$backlog -Force | Out-Null
 try {
   function Write-CurrentIssues([object[]]$Issues) {
+    $script:GraphIssues = @($Issues)
     [ordered]@{
       schemaVersion = 1
       versionScope = 'v1.5'
       updatedAt = '2026-07-13T14:00:00+08:00'
       issues = $Issues
     } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $backlog 'current-issues.json') -Encoding UTF8
+  }
+  function Get-TestKnowledgeGraphSnapshot {
+    return [pscustomobject]@{
+      available = $true
+      source = 'knowledge-graph'
+      head = 'test-head'
+      cursor = 'test-head'
+      refreshed = $false
+      issues = @($script:GraphIssues)
+    }
   }
   function New-StockIssue([string]$Key,[string]$Title,[string]$Status,[string]$Classification,[string]$Priority,[bool]$Blocking,[string]$Parent = '') {
     return [ordered]@{
@@ -45,33 +56,33 @@ try {
     (New-StockIssue 'OBS-LOCAL' 'Local observation' 'OBSERVATION' 'NON_BLOCKING_OBSERVATION' 'P2' $false)
   )
 
-  $decision = Get-AutopilotRefillDecision -RepoRoot $root
+  $decision = Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot (Get-TestKnowledgeGraphSnapshot)
   if ($decision.action -ne 'PLAN_READY' -or $decision.targetReadyCount -ne 1 -or $decision.candidates.Count -ne 1) { throw 'refill must select exactly one eligible stock issue' }
-  if ($decision.candidates[0].issueKey -ne 'A-01-LEAF' -or $decision.candidates[0].source -ne 'current-issues.json') { throw 'stock issue priority or aggregate/release/confirmation filtering failed' }
+  if ($decision.candidates[0].issueKey -ne 'A-01-LEAF' -or $decision.candidates[0].source -ne 'knowledge-graph') { throw 'knowledge graph issue priority or aggregate/release/confirmation filtering failed' }
   if ($decision.candidates[0].marker -ne '[stock:A-01-LEAF]') { throw 'stock issue marker was not preserved for deduplication' }
 
   Write-CurrentIssues @(
     (New-StockIssue 'REL-GATE' 'Production release gate' 'RELEASE_GATE' 'RELEASE_PREREQUISITE' 'P0' $true),
     (New-StockIssue 'NEEDS-HUMAN' 'Needs human confirmation' 'NEEDS_CONFIRMATION' 'NEEDS_CONFIRMATION' 'P0' $false)
   )
-  $adHocDecision = Get-AutopilotRefillDecision -RepoRoot $root
+  $adHocDecision = Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot (Get-TestKnowledgeGraphSnapshot)
   if ($adHocDecision.action -ne 'PLAN_READY' -or $adHocDecision.candidates[0].name -ne 'Candidate A' -or $adHocDecision.candidates[0].source -ne 'ad-hoc-plan.md') { throw 'ad-hoc candidate was not used after eligible stock issues were exhausted' }
 
   '# Ad-hoc' | Set-Content -LiteralPath (Join-Path $backlog 'ad-hoc-plan.md') -Encoding UTF8
   "# Plan`n### 2.1 当前技术栈`n### 8.1 报表中心" | Set-Content -LiteralPath (Join-Path $backlog 'cgc-pms-production-enhancement-plan.md') -Encoding UTF8
-  $longTermDecision = Get-AutopilotRefillDecision -RepoRoot $root
+  $longTermDecision = Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot (Get-TestKnowledgeGraphSnapshot)
   if ($longTermDecision.action -ne 'NO_CANDIDATES' -or $longTermDecision.candidates.Count -ne 0 -or $longTermDecision.reason -notmatch 'refresh product intelligence') { throw 'long-term plan was still allowed to bypass stock/ad-hoc evidence gates' }
 
   'stop' | Set-Content -LiteralPath (Join-Path $autoDir 'stop.flag') -Encoding UTF8
-  if ((Get-AutopilotRefillDecision -RepoRoot $root).action -ne 'STOP') { throw 'stop flag did not stop refill' }
+  if ((Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot (Get-TestKnowledgeGraphSnapshot)).action -ne 'STOP') { throw 'stop flag did not stop refill' }
   Remove-Item -LiteralPath (Join-Path $autoDir 'stop.flag')
 
   'pause' | Set-Content -LiteralPath (Join-Path $autoDir 'pause.flag') -Encoding UTF8
-  if ((Get-AutopilotRefillDecision -RepoRoot $root).action -ne 'PAUSE') { throw 'pause flag did not stop refill' }
+  if ((Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot (Get-TestKnowledgeGraphSnapshot)).action -ne 'PAUSE') { throw 'pause flag did not stop refill' }
   Remove-Item -LiteralPath (Join-Path $autoDir 'pause.flag')
 
   "# Blocked Issues`n### ISSUE-1：Candidate A prerequisite`n状态：Blocked" | Set-Content -LiteralPath (Join-Path $backlog 'blocked-issues.md') -Encoding UTF8
-  $unblockDecision = Get-AutopilotRefillDecision -RepoRoot $root
+  $unblockDecision = Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot (Get-TestKnowledgeGraphSnapshot)
   if ($unblockDecision.action -ne 'UNBLOCK_FIRST') { throw 'current focus blocker was not prioritized' }
   if ($unblockDecision.targetReadyCount -ne 1) { throw 'blocked prerequisite still forced a three-item target' }
   if (Test-AutopilotReadyPlanningAllowed -Action 'UNBLOCK_FIRST') { throw 'blocked prerequisite was allowed into Ready Planner' }
@@ -110,9 +121,51 @@ Reviewer要求：不需要
 "@
   }
   (New-PlannedBlock 'ISSUE-901-000') | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
-  $sufficientDecision = Get-AutopilotRefillDecision -RepoRoot $root
+  $sufficientDecision = Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot (Get-TestKnowledgeGraphSnapshot)
   if ($sufficientDecision.action -ne 'READY_SUFFICIENT' -or $sufficientDecision.targetReadyCount -ne 1) { throw 'one valid Ready issue was not treated as sufficient' }
+
   '# Ready Issues' | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
+  $unavailable = [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_UNAVAILABLE'; failureCategory = 'environment_prereq'; message = 'neo4j unavailable'; issues = @() }
+  $unavailableDecision = Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot $unavailable
+  if ($unavailableDecision.action -ne 'STOP_KG_REFILL_UNAVAILABLE' -or $unavailableDecision.failureCategory -ne 'environment_prereq') { throw 'unavailable graph did not stop refill safely' }
+  $stale = [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_security'; message = 'git cursor stale after refresh'; issues = @() }
+  if ((Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot $stale).action -ne 'STOP_KG_REFILL_STALE') { throw 'stale graph did not stop refill safely' }
+
+  $configDir = Join-Path $root 'scripts\codex-autopilot'
+  New-Item -ItemType Directory -Path $configDir -Force | Out-Null
+  '{"issueGraph":{"enabled":true,"cli":"mock-kg.js","refreshWhenHeadDiffers":true,"allowRegistryFallback":false,"queryLimit":200}}' |
+    Set-Content -LiteralPath (Join-Path $configDir 'codex-autopilot.config.json') -Encoding UTF8
+  & git -C $root init -q 2>$null
+  & git -C $root config user.email 'kg-refill@test.local'
+  & git -C $root config user.name 'KG Refill Test'
+  & git -C $root add .
+  & git -C $root commit -qm 'fixture'
+  $testHead = (& git -C $root rev-parse HEAD).Trim()
+  $script:KgCalls = 0
+  $refreshingInvoker = {
+    param($CliPath,$Arguments,$RepoRoot)
+    $script:KgCalls++
+    $command = $Arguments[0]
+    if ($command -eq 'collect') { return [pscustomobject]@{ status = 'SUCCESS' } }
+    if ($command -eq 'issues') { return [pscustomobject]@{ total = 0; issues = @() } }
+    $cursor = if ($script:KgCalls -eq 1) { 'stale-head' } else { $testHead }
+    return [pscustomobject]@{ lastRunStatus = 'SUCCEEDED'; lastRunFailures = 0; currentIssues = 0; cursors = @([pscustomobject]@{ source = 'git'; cursor = $cursor }) }
+  }
+  $refreshedSnapshot = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $root -CommandInvoker $refreshingInvoker
+  if (!$refreshedSnapshot.available -or !$refreshedSnapshot.refreshed -or $script:KgCalls -ne 4) { throw 'stale graph was not refreshed exactly once before issue query' }
+
+  $alwaysStaleInvoker = {
+    param($CliPath,$Arguments,$RepoRoot)
+    if ($Arguments[0] -eq 'collect') { return [pscustomobject]@{ status = 'SUCCESS' } }
+    if ($Arguments[0] -eq 'issues') { return [pscustomobject]@{ total = 0; issues = @() } }
+    return [pscustomobject]@{ lastRunStatus = 'SUCCESS'; lastRunFailures = 0; currentIssues = 0; cursors = @([pscustomobject]@{ source = 'git'; cursor = 'still-stale' }) }
+  }
+  $staleAfterRefresh = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $root -CommandInvoker $alwaysStaleInvoker
+  if ($staleAfterRefresh.stopReason -ne 'STOP_KG_REFILL_STALE' -or $staleAfterRefresh.failureCategory -ne 'quality_security') { throw 'post-refresh cursor mismatch was not classified as data consistency failure' }
+
+  $unavailableInvoker = { param($CliPath,$Arguments,$RepoRoot) throw 'ECONNREFUSED localhost:7687' }
+  $environmentStop = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $root -CommandInvoker $unavailableInvoker
+  if ($environmentStop.stopReason -ne 'STOP_KG_REFILL_UNAVAILABLE' -or $environmentStop.failureCategory -ne 'environment_prereq') { throw 'Neo4j outage was not classified as environment prerequisite' }
 
   $planPath = Join-Path $root 'ready-plan.json'
   [ordered]@{ readyBlocks = @((New-PlannedBlock 'ISSUE-901-001'),(New-PlannedBlock 'ISSUE-901-002'),(New-PlannedBlock 'ISSUE-901-003')) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $planPath -Encoding UTF8

@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-13 增量：知识图谱优先问题路由与 Ready 契约门禁
+
+- 第41条主线将普通存量问题查询和 AutoPilot 补货统一到 `kg_status` / `kg_list_issues` 同语义入口；脚本侧通过轻量 `issues` CLI 复用 `listIssues`，不复制 Cypher、不建立第二份问题缓存。
+- AutoPilot 仅在最近采集健康、失败数为零、问题计数一致且 Git 游标覆盖当前 HEAD 时读取图谱候选；游标落后最多执行一次 `autopilot-refill` 增量采集，仍不一致或 Neo4j/CLI 异常时安全停止，不静默回退文件选题。`current-issues.json` 继续承担唯一正式写回源。
+- 候选进入 Ready 前必须按 `sourceRefs`、当前代码/配置和唯一载体核实；Ready allow/forbid 的可证明完全覆盖矛盾在 executor/worktree 前以 `ready_issue_config` 拒绝，合法“宽允许 + 窄禁止”安全 carve-out 与运行时 forbidden 优先门禁保持有效。
+
 ## 2026-07-13 增量：系统菜单详情管理员入口
 
 - `ISSUE-040-021` 在既有 admin-only `/system/permissions` 权限清单页增加“查看详情”入口；详情目标来自完整菜单树，目录、菜单、按钮及无权限码节点均可选择，选择后按需调用既有详情接口。
@@ -241,7 +247,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 本地运行 | `scripts/rebuild.py`、Docker Compose | Partial | ISSUE-037-001 已完成 8080、5173、dev-login health gate 与真实角色浏览器验收 |
 | 现场日报验收直达 | `DevAuthController`、`/site/daily-log` | Implemented | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据 |
 | Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner | Implemented | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护 |
-| 候选补货 | `autopilot-refill.ps1` | Implemented | 先读 Ad-hoc；长期计划仅接纳第 7–9 章开发计划，排除现状/对标/差距/目标等描述性标题 |
+| 候选补货 | `autopilot-refill.ps1`、知识图谱 `issues` CLI | Implemented | 先过图谱健康与 HEAD 游标门禁，再有界拉取并核实存量候选；图谱异常 fail-close，不回退文件或长期计划凑任务 |
 | 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 已具备隔离执行、本地提交、上限停止、300/600 秒停滞处置、一次有限重派、第二次 blocked 和有界长命令声明 |
 | 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-021 正式验收报告 |
 | Windows MySQL 备份恢复与本机凭据轮换 | `scripts/mysql-backup.ps1`、`scripts/mysql-restore.ps1`、`deploy/.env`（忽略） | Implemented（本地） | ISSUE-040-006 已修复二进制安全问题，隔离恢复与轮换后均保留 74 表；MySQL/Redis/MinIO/JWT/Jasypt 注入、旧 JWT 失效和新登录通过。未来生产轮换由上线门禁重新验收 |

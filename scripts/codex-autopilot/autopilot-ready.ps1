@@ -77,6 +77,35 @@ function Get-AutopilotSha256 {
   try { return ([BitConverter]::ToString($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Text)))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
 }
 
+function ConvertTo-AutopilotPathRule {
+  param([string]$Rule)
+  return ([string]$Rule).Trim().Replace('\', '/').TrimStart('./').TrimEnd('/')
+}
+
+function Test-AutopilotPathRuleCovers {
+  param([string]$CoverRule, [string]$TargetRule)
+  $cover = ConvertTo-AutopilotPathRule $CoverRule
+  $target = ConvertTo-AutopilotPathRule $TargetRule
+  if (!$cover -or !$target) { return $false }
+  if ($cover.Equals($target, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+  if (!$cover.EndsWith('/**', [StringComparison]::Ordinal)) { return $false }
+  $base = $cover.Substring(0, $cover.Length - 3).TrimEnd('/')
+  if (!$base) { return $true }
+  return $target.StartsWith($base + '/', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Assert-AutopilotReadyScopeContract {
+  param([string]$IssueId, [string[]]$AllowedPaths, [string[]]$ForbiddenPaths)
+  foreach ($allowed in @($AllowedPaths)) {
+    foreach ($forbidden in @($ForbiddenPaths)) {
+      if (Test-AutopilotPathRuleCovers -CoverRule $forbidden -TargetRule $allowed) {
+        $conflictPath = ConvertTo-AutopilotPathRule $allowed
+        throw "READY_SCOPE_CONTRADICTION issueId=$IssueId allowed=$allowed forbidden=$forbidden conflictPath=$conflictPath"
+      }
+    }
+  }
+}
+
 function ConvertTo-AutopilotReadyIssue {
   param([object]$Block, [string]$RepoRoot)
   $errors = @()
@@ -99,6 +128,7 @@ function ConvertTo-AutopilotReadyIssue {
   $allowedPaths = @(Get-AutopilotCodeValues (Get-AutopilotSectionLines $Block.body '允许修改'))
   if ($allowedPaths.Count -eq 0) { $errors += '允许修改必须包含代码格式路径' }
   $forbiddenPaths = @(Get-AutopilotCodeValues (Get-AutopilotSectionLines $Block.body '禁止修改'))
+  Assert-AutopilotReadyScopeContract -IssueId $Block.issueId -AllowedPaths $allowedPaths -ForbiddenPaths $forbiddenPaths
   $commands = @(Get-AutopilotCodeValues (Get-AutopilotSectionLines $Block.body '验证命令'))
   if ($commands.Count -eq 0) { $errors += '验证命令必须包含代码格式命令' }
   foreach ($command in $commands) {
