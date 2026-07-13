@@ -33,6 +33,17 @@ try {
   [ordered]@{pid=999999;runId='dead';issueId='ISSUE-040-022'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $autoDir 'run.lock') -Encoding UTF8
   $decision = Get-AutopilotRecoveryDecision -AutoDir $autoDir
   if ($decision.action -ne 'RESUME_VALIDATION') { throw "implemented checkpoint did not resume validation: $($decision | ConvertTo-Json -Compress)" }
+
+  'control-plane' | Set-Content -LiteralPath (Join-Path $root 'autopilot-control.ps1') -Encoding UTF8
+  & git -C $root add autopilot-control.ps1
+  & git -C $root commit -qm 'fix control plane'
+  $advancedBase = (& git -C $root rev-parse HEAD).Trim()
+  $decision = Get-AutopilotRecoveryDecision -AutoDir $autoDir -PermittedBaseAdvancePaths @('autopilot-control.ps1')
+  if ($decision.action -ne 'RESUME_VALIDATION') { throw "permitted disjoint base advance did not resume validation: $($decision | ConvertTo-Json -Compress)" }
+  $forwardedCheckpoint = Read-AutopilotIssueCheckpoint $path
+  if ($forwardedCheckpoint.baseCommit -ne $advancedBase -or [int]$forwardedCheckpoint.metrics.manualRecoveryCount -ne 1 -or $forwardedCheckpoint.phase -ne 'IMPLEMENTED') { throw 'permitted base advance did not rebind the durable checkpoint' }
+  $base = $advancedBase
+  $diffHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree -BaseCommit $base
   $duplicateBlocked = $false
   try { Set-AutopilotIssueCheckpointPhase -Path $path -Phase IMPLEMENTING -IncrementDispatch implementation | Out-Null } catch { $duplicateBlocked = $_.Exception.Message -match 'duplicate implementation dispatch' }
   if (!$duplicateBlocked) { throw 'duplicate implementation dispatch was not blocked' }

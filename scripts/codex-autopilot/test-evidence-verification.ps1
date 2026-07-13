@@ -40,6 +40,11 @@ try {
   if (Test-AutopilotPostExecutionVerificationRequired -Command 'powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot .') { throw 'post-execution verification attempted to rerun the pre-dispatch Ready lint' }
   if (!(Test-AutopilotPostExecutionVerificationRequired -Command 'git diff --check')) { throw 'post-execution verification skipped a required non-lint command' }
 
+  $secondEvidencePath = Join-Path $root 'evidence-02.json'
+  Copy-Item -LiteralPath $evidencePath -Destination $secondEvidencePath
+  $recoveredEvidencePaths = @(Get-AutopilotConcatenatedEvidencePaths -Message ("Cannot find path '$evidencePath$secondEvidencePath' because it does not exist."))
+  if ($recoveredEvidencePaths.Count -ne 2 -or $recoveredEvidencePaths[0] -ne $evidencePath -or $recoveredEvidencePaths[1] -ne $secondEvidencePath) { throw 'concatenated verification evidence paths were not recovered independently' }
+
   $classifier = Join-Path (Resolve-Path (Join-Path $scriptDir '..\..')) 'plugins\cgc-pms-autopilot\scripts\test-failure-classifier.ps1'
   $classification = & $classifier -ErrorText 'No tests matching selector MissingTest' -ExitCode 1 | ConvertFrom-Json
   if ($classification.category -ne 'ready_issue_config' -or !$classification.failureFingerprint) { throw 'selector failure classification or fingerprint is missing' }

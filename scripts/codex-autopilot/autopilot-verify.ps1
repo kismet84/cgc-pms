@@ -74,6 +74,12 @@ function Assert-AutopilotEvidenceCurrent {
   return $true
 }
 
+function Get-AutopilotConcatenatedEvidencePaths {
+  param([AllowEmptyString()][string]$Message)
+  if ([string]::IsNullOrWhiteSpace($Message)) { return @() }
+  return @([regex]::Matches($Message, '(?i)[a-z]:\\.*?evidence(?:-\d+)?\.json') | ForEach-Object { $_.Value } | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+}
+
 function Get-AutopilotRetryBudget {
   param([string]$Category, [string]$Subcategory = '')
   if ($Category -in @('tool_config','environment_prereq','ready_issue_config','unknown')) { return 1 }

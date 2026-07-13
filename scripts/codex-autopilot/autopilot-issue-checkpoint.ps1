@@ -228,6 +228,36 @@ function Set-AutopilotIssueCheckpointPhase {
   return Write-AutopilotIssueCheckpointAtomic -Path $Path -Checkpoint $checkpoint
 }
 
+function Move-AutopilotIssueCheckpointBaseForward {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$BaseCommit,
+    [Parameter(Mandatory)][string]$DiffHash
+  )
+  if ($BaseCommit -notmatch '^[a-f0-9]{40}$') { throw 'forwarded Issue checkpoint has invalid base commit' }
+  if ($DiffHash -notmatch '^[a-f0-9]{64}$') { throw 'forwarded Issue checkpoint has invalid diff hash' }
+  $checkpoint = Read-AutopilotIssueCheckpoint $Path
+  $now = [datetimeoffset]::Now
+  $phaseStarted = [datetimeoffset]$checkpoint.phaseStartedAt
+  $durations = $checkpoint.metrics.phaseDurationsSeconds
+  $previousPhase = [string]$checkpoint.phase
+  $prior = [int](Get-AutopilotCheckpointProperty $durations $previousPhase 0)
+  Set-AutopilotCheckpointProperty $durations $previousPhase ($prior + [Math]::Max(0, [int][Math]::Round(($now - $phaseStarted).TotalSeconds)))
+  Set-AutopilotCheckpointProperty $checkpoint 'baseCommit' $BaseCommit.ToLowerInvariant()
+  Set-AutopilotCheckpointProperty $checkpoint 'phase' 'IMPLEMENTED'
+  Set-AutopilotCheckpointProperty $checkpoint 'phaseStartedAt' $now.ToString('o')
+  Set-AutopilotCheckpointProperty $checkpoint 'quarantineReason' $null
+  Set-AutopilotCheckpointProperty $checkpoint.artifacts 'evidencePaths' @()
+  Set-AutopilotCheckpointProperty $checkpoint.artifacts 'reviewRequestPath' ''
+  Set-AutopilotCheckpointProperty $checkpoint.artifacts 'reviewResultPath' ''
+  Set-AutopilotCheckpointProperty $checkpoint.evidence 'diffHash' $DiffHash
+  Set-AutopilotCheckpointProperty $checkpoint.evidence 'verificationDiffHash' ''
+  Set-AutopilotCheckpointProperty $checkpoint.evidence 'reviewDiffHash' ''
+  Set-AutopilotCheckpointProperty $checkpoint.metrics 'manualRecoveryCount' ([int]$checkpoint.metrics.manualRecoveryCount + 1)
+  Set-AutopilotCheckpointProperty $checkpoint.metrics 'wallClockSeconds' ([Math]::Max(0, [int][Math]::Round(($now - [datetimeoffset]$checkpoint.createdAt).TotalSeconds)))
+  return Write-AutopilotIssueCheckpointAtomic -Path $Path -Checkpoint $checkpoint
+}
+
 function Remove-AutopilotIssueCheckpoint {
   param([Parameter(Mandatory)][string]$Path, [switch]$Closed)
   $checkpoint = Read-AutopilotIssueCheckpoint $Path

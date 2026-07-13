@@ -1035,10 +1035,21 @@ function Invoke-IssueExecutor {
   }
   if (Test-Path -LiteralPath $resultPath) {
     $result = Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($resuming -and $script:RecoveryDecision.action -eq 'RESUME_VALIDATION' -and [string]$result.status -eq 'blocked' -and [string]$result.failureCategory -eq 'environment' -and [string]$result.stopReason -eq 'STOP_VERIFICATION_FAILED') {
-      $result.status = 'done'; $result.failureCategory = 'none'; $result.nextAction = 'VERIFY'; $result.stopReason = ''
-      $result.validation = @()
-      Write-RunEvent 'validation.environment-retry' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='RETRY_VALIDATION'; status='RECOVERED'; reason='one classified environment prerequisite retry uses the preserved implementation diff' })
+    if ($resuming -and $script:RecoveryDecision.action -eq 'RESUME_VALIDATION' -and [string]$result.status -eq 'blocked') {
+      if ([string]$result.failureCategory -eq 'environment' -and [string]$result.stopReason -eq 'STOP_VERIFICATION_FAILED') {
+        $result.status = 'done'; $result.failureCategory = 'none'; $result.nextAction = 'VERIFY'; $result.stopReason = ''
+        $result.validation = @()
+        Write-RunEvent 'validation.environment-retry' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='RETRY_VALIDATION'; status='RECOVERED'; reason='one classified environment prerequisite retry uses the preserved implementation diff' })
+      } elseif ([string]$result.stopReason -eq 'STOP_EVIDENCE_STALE') {
+        $evidenceFailure = @($result.validation | Where-Object { $_.name -eq 'evidence-current' } | Select-Object -Last 1)
+        $recoveredPaths = if ($evidenceFailure.Count -eq 1) { @(Get-AutopilotConcatenatedEvidencePaths -Message ([string]$evidenceFailure[0].message)) } else { @() }
+        if ($recoveredPaths.Count -ge 2) {
+          $result.status = 'done'; $result.failureCategory = 'none'; $result.nextAction = 'VERIFY'; $result.stopReason = ''
+          $result.validation = @($result.validation | Where-Object { $_.name -in @('executor-command','execution-artifacts') })
+          $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase IMPLEMENTED -IncrementToolConfigBlock
+          Write-RunEvent 'validation.evidence-path-recovery' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='RETRY_VALIDATION'; status='RECOVERED'; reason='concatenated evidence paths were individually recovered and will be rebound to the forwarded base'; recoveredEvidenceCount=$recoveredPaths.Count })
+        }
+      }
     }
     if ($result.status -eq 'done') {
       if (!$resuming) {
@@ -1441,7 +1452,7 @@ if ($ExplainNextAction) {
 
 try {
   if ($applyMode) {
-    $recovery = Get-AutopilotRecoveryDecision -AutoDir $autoDir
+    $recovery = Get-AutopilotRecoveryDecision -AutoDir $autoDir -PermittedBaseAdvancePaths @($config.controlPlaneCanary.fingerprintPaths)
     if ($recovery.action -eq 'REFUSE_SECOND_INSTANCE') { Write-Host 'RUN_LOCK_ACTIVE'; throw 'Another AutoPilot run is active.' }
     $resumeActions = @('RESUME_VALIDATION','RESUME_REVIEW','RESUME_CLOSEOUT','RESUME_SCORE_AND_CLOSEOUT','RESUME_MERGE_AND_REGISTER','RESUME_FINALIZE')
     if ($recovery.action -eq 'CLEAN_CLOSED_CHECKPOINT') {
