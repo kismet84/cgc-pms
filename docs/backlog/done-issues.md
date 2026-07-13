@@ -23,3 +23,8 @@ v1.0 已完成任务及其报告入口保留在 [backlog 快照](../archive/v1.0
 
 状态：Done
 归档报告：`docs/quality/ISSUE-040-019-系统菜单新建管理员入口验收报告.md`
+
+### ISSUE-040-020：系统菜单删除管理员入口与安全约束
+
+状态：Done
+归档报告：`docs/quality/ISSUE-040-020-系统菜单删除管理员入口验收报告.md`
