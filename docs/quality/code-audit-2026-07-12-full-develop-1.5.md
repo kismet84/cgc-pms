@@ -103,6 +103,8 @@ trivy rootfs --scanners vuln --pkg-types library --severity HIGH,CRITICAL --exit
 - PR #334 首轮 `backend-test` 在 `Phase3IntegrationTest.test03_dynamicCostFormula` 暴露公式漂移：科目行使用 `confirmedRevenue-dynamicCost`，而 V27 回填、项目级汇总、批量汇总和既有契约均使用 `contractIncome-dynamicCost`。该失败分类为真实质量/数据一致性问题，不是工具或环境波动。
 - 已恢复科目行公式契约，并在 `CostSummaryServiceTest.testRefreshSummaryDynamicCostReportAmounts` 固定“合同收入与确认收入可区分”的回归数据。修复前该断言稳定失败，修复后目标测试与 `Phase3IntegrationTest` 共 8 项通过，后端全量 `verify` 再次通过。
 - 公式修复提交 `27410fa2` 的 CI 全量运行 11 个 required checks 全绿，`build-summary` 同步成功；GitHub 复读结果为 `mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`。
+- Node 24 action 治理首轮验证发现 `pnpm/action-setup@v6` 的 `version: 11` 会范围漂移并在自安装更新时失败，分类为工具配置兼容性问题；改为读取 `frontend-admin/package.json` 中带校验哈希的精确 `pnpm@11.0.9` 后根因解除。
+- 配置提交 `b455ca53` 的 11 个 required checks 全绿，E2E、artifact 上传下载、Trivy 缓存与构建后供应链扫描均通过；逐 job 复读 12 条 annotation，Node 20 命中为 0，GitHub 状态恢复 `MERGEABLE/CLEAN`。
 - 因此：**全量审计整改通过，远端合并门禁通过；PR 可进入人工审阅/合并，但本次授权不包含执行合并。**
 
 ## 依赖与格式治理补充闭环
@@ -114,4 +116,3 @@ trivy rootfs --scanners vuln --pkg-types library --severity HIGH,CRITICAL --exit
 ## 剩余风险
 
 1. Trivy Java DB 冷缓存首次下载约 891.5 MiB，国内网络较慢；CI 已加入按日缓存和历史缓存回退，因此该风险只剩首次冷启动时延，不影响扫描正确性或已完成的 0 命中结论。
-2. CI 的 Node.js 20 弃用注解来自 GitHub Actions 运行时迁移提示，当前 actions 已被强制运行在 Node.js 24 且所有门禁通过；这是非阻塞的上游 action 升级观察项，不影响本次代码质量裁决。

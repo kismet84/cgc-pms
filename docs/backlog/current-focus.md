@@ -19,10 +19,10 @@
 
 - `docs/quality/code-audit-2026-07-12-full-develop-1.5.md` 的 7 项原阻塞已完成本地根因闭环；后端 1723 tests、前端 505 tests、MySQL 8 Flyway、SQL safety、构建后 JAR Trivy、UI smoke 与内置浏览器验收均通过。
 - `master` 分支保护已启用管理员强制与 required conversation resolution，11 个 required checks 和 strict 语义保持不变。
-- 当前唯一上线阻塞：整改已获 commit/push 授权并进入远端取证阶段；在同一待合并 SHA 的 11 个 required checks 全绿前仍不可上线。
+- PR #334 最新配置提交的 11 个 required checks 已全绿，GitHub 复读为 `MERGEABLE/CLEAN`；当前无 CI 合并门禁阻塞，本次仍未执行合并或生产发布。
 - 已完成依赖与格式治理：413 条纯 Prettier 告警已降为 0，ECharts 6.1.0 / vue-echarts 8.0.1 升级后 `pnpm audit --audit-level moderate` 为 0 漏洞；格式化后全量前端与 E2E 通过。
 - Trivy Java DB 已在 `supply-chain-security` 增加按 UTC 日期缓存与历史缓存回退；国内网络风险收敛为首次冷缓存下载时延，不采用未经项目验证的第三方镜像。
-- GitHub Actions 当前仍产生 Node.js 20 弃用注解；runner 已强制切换到 Node.js 24 且门禁全绿，列为非阻塞的上游 action 版本治理观察项。
+- GitHub Actions Node.js 20 弃用注解已关闭：官方 actions 已升级到声明 Node 24 的主版本，`pnpm/action-setup@v6` 改为读取 `frontend-admin/package.json` 的精确 `packageManager`；全量 CI 后 Node 20 annotation 为 0。
 - 本机临时项：损坏 ACL 的旧 `node_modules` 已隔离并尝试清理，残留文件仍受原 ACL 保护；用户 Chrome 与 Trivy DB 缓存位于 `.codex-autopilot/runs/`，均不进入版本管理或运行构建。
 
 ## 当前方向决策
