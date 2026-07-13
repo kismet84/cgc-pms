@@ -19,6 +19,14 @@ export function createMenu(data: CreateMenuPayload) {
   })
 }
 
+/** 删除菜单 */
+export function deleteMenu(menuId: number | string) {
+  return request<void>({
+    url: `/system/menus/${menuId}`,
+    method: 'delete',
+  })
+}
+
 /** 获取角色列表 */
 export function getRoles() {
   return request<SysRoleVO[]>({

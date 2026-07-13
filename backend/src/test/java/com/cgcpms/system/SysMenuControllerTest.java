@@ -3,6 +3,7 @@ package com.cgcpms.system;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.ratelimit.FallbackRateLimitCounterStore;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class SysMenuControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
+    @Autowired private ObjectMapper objectMapper;
     @Autowired private FallbackRateLimitCounterStore counterStore;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
 
@@ -140,6 +142,56 @@ class SysMenuControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test @Order(9) @DisplayName("DELETE /system/menus/{id} ADMIN -> 200")
+    void testDelete_Admin() throws Exception {
+        long menuId = createDeletableMenu("管理员删除菜单");
+        mockMvc.perform(d("/system/menus/" + menuId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(10) @DisplayName("DELETE /system/menus/{id} SUPER_ADMIN -> 200")
+    void testDelete_SuperAdmin() throws Exception {
+        long menuId = createDeletableMenu("超级管理员删除菜单");
+        mockMvc.perform(d("/system/menus/" + menuId)
+                        .cookie(cookie(List.of("SUPER_ADMIN"), List.of())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(11) @DisplayName("DELETE /system/menus/{id} system:menu:delete -> 200")
+    void testDelete_WithPermission() throws Exception {
+        long menuId = createDeletableMenu("权限码删除菜单");
+        mockMvc.perform(d("/system/menus/" + menuId)
+                        .cookie(cookie(List.of("USER"), List.of("system:menu:delete"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(12) @DisplayName("DELETE /system/menus/{id} without role or permission -> 403 and target remains")
+    void testDelete_Forbidden() throws Exception {
+        long menuId = createDeletableMenu("越权删除保留菜单");
+        mockMvc.perform(d("/system/menus/" + menuId)
+                        .cookie(cookie(List.of("USER"), List.of("system:menu:query"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(d("/system/menus/" + menuId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    private long createDeletableMenu(String menuName) throws Exception {
+        String response = mockMvc.perform(p("/system/menus").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentId\":0,\"menuName\":\"" + menuName
+                                + "\",\"menuType\":\"MENU\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(response).path("data").asLong();
+    }
+
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }
     private MockHttpServletRequestBuilder p(String p) { return post("/api" + p).contextPath("/api"); }
+    private MockHttpServletRequestBuilder d(String p) { return delete("/api" + p).contextPath("/api"); }
 }

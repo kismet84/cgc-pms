@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
-import { createMenu, getMenuTree, getRoles } from '@/api/modules/system'
+import { createMenu, deleteMenu, getMenuTree, getRoles } from '@/api/modules/system'
 import { useUserStore } from '@/stores/user'
 import type { CreateMenuPayload, MenuTreeVO, SysRoleVO } from '@/types/system'
 
@@ -23,11 +23,15 @@ const userStore = useUserStore()
 const createOpen = ref(false)
 const creating = ref(false)
 const createForm = reactive<CreateMenuPayload>(defaultCreateForm())
+const deleteOpen = ref(false)
+const deleting = ref(false)
+const deleteTargetId = ref<number | string>()
 
 const isAdmin = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
 const canCreateMenu = computed(() => isAdmin.value)
+const canDeleteMenu = computed(() => isAdmin.value)
 const parentTreeData = computed(() => [
   {
     title: '根节点',
@@ -35,6 +39,8 @@ const parentTreeData = computed(() => [
     children: toParentTreeData(menuTree.value),
   },
 ])
+const deleteTreeData = computed(() => toDeleteTreeData(menuTree.value))
+const selectedDeleteMenu = computed(() => findMenu(menuTree.value, deleteTargetId.value))
 
 const rows = computed(() => flattenPermissions(menuTree.value, boundMenuIds.value))
 const boundMenuIds = computed(() => {
@@ -101,6 +107,30 @@ function toParentTreeData(nodes: MenuTreeVO[]): Array<{
     }))
 }
 
+function toDeleteTreeData(nodes: MenuTreeVO[]): Array<{
+  title: string
+  value: number | string
+  menuType: string
+  children?: ReturnType<typeof toDeleteTreeData>
+}> {
+  return nodes.map((node) => ({
+    title: node.menuName,
+    value: node.id,
+    menuType: node.menuType,
+    children: toDeleteTreeData(node.children ?? []),
+  }))
+}
+
+function findMenu(nodes: MenuTreeVO[], id?: number | string): MenuTreeVO | undefined {
+  if (id === undefined || id === null || id === '') return undefined
+  for (const node of nodes) {
+    if (String(node.id) === String(id)) return node
+    const child = findMenu(node.children ?? [], id)
+    if (child) return child
+  }
+  return undefined
+}
+
 function openCreate() {
   Object.assign(createForm, defaultCreateForm())
   createOpen.value = true
@@ -108,6 +138,17 @@ function openCreate() {
 
 function closeCreate() {
   if (!creating.value) createOpen.value = false
+}
+
+function openDelete() {
+  deleteTargetId.value = undefined
+  deleteOpen.value = true
+}
+
+function closeDelete() {
+  if (deleting.value) return
+  deleteOpen.value = false
+  deleteTargetId.value = undefined
 }
 
 function errorMessage(error: unknown, fallback: string) {
@@ -153,10 +194,44 @@ async function submitCreate() {
   }
 }
 
+async function submitDelete() {
+  const target = selectedDeleteMenu.value
+  if (!target) {
+    message.error('请选择要删除的菜单')
+    return
+  }
+
+  deleting.value = true
+  let deleted = false
+  try {
+    await deleteMenu(target.id)
+    deleted = true
+    const [nextMenus, nextRoles] = await loadData()
+    if (findMenu(nextMenus, target.id)) {
+      throw new Error('刷新后的菜单树仍包含已删除目标')
+    }
+    menuTree.value = nextMenus
+    roles.value = nextRoles
+    message.success(`菜单“${target.menuName}”已删除`)
+    deleteOpen.value = false
+    deleteTargetId.value = undefined
+  } catch (error: unknown) {
+    console.error(error)
+    const detail = errorMessage(error, deleted ? '请手动刷新权限清单' : '菜单删除失败')
+    message.error(deleted ? `菜单已删除，但刷新权限清单失败：${detail}` : detail)
+  } finally {
+    deleting.value = false
+  }
+}
+
+function loadData() {
+  return Promise.all([getMenuTree(), getRoles()])
+}
+
 async function fetchData() {
   loading.value = true
   try {
-    const [nextMenus, nextRoles] = await Promise.all([getMenuTree(), getRoles()])
+    const [nextMenus, nextRoles] = await loadData()
     menuTree.value = nextMenus
     roles.value = nextRoles
   } catch (e: unknown) {
@@ -195,6 +270,15 @@ onMounted(fetchData)
             >
               <template #icon><PlusOutlined /></template>
               新建菜单
+            </a-button>
+            <a-button
+              v-if="canDeleteMenu"
+              danger
+              data-testid="delete-menu-open"
+              @click="openDelete"
+            >
+              <template #icon><DeleteOutlined /></template>
+              删除菜单
             </a-button>
             <a-button title="刷新权限清单" aria-label="刷新权限清单" @click="fetchData">
               <template #icon><ReloadOutlined /></template>
@@ -295,6 +379,40 @@ onMounted(fetchData)
             @click="submitCreate"
           >
             创建
+          </a-button>
+        </div>
+      </a-form>
+    </a-modal>
+
+    <a-modal :open="deleteOpen" title="删除菜单" :footer="null" @cancel="closeDelete">
+      <a-form layout="vertical">
+        <a-form-item label="目标菜单" required>
+          <a-tree-select
+            v-model:value="deleteTargetId"
+            data-testid="delete-menu-target"
+            :tree-data="deleteTreeData"
+            tree-default-expand-all
+            placeholder="请选择目录、菜单或按钮"
+          />
+        </a-form-item>
+        <a-alert type="warning" show-icon>
+          <template #message>删除操作不可逆</template>
+          <template #description>
+            <span data-testid="delete-menu-warning">
+              将删除“{{ selectedDeleteMenu?.menuName ?? '未选择' }}”。有子节点或角色引用时后端会拒绝删除；此处不提供级联删除或强制解绑。
+            </span>
+          </template>
+        </a-alert>
+        <div class="lg-form-actions">
+          <a-button :disabled="deleting" @click="closeDelete">取消</a-button>
+          <a-button
+            danger
+            type="primary"
+            :loading="deleting"
+            data-testid="delete-menu-submit"
+            @click="submitDelete"
+          >
+            确认删除
           </a-button>
         </div>
       </a-form>

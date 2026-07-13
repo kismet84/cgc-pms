@@ -23,7 +23,14 @@ import {
   updateDictType,
 } from '../dict'
 import { deleteFile, getFileUrl, listFiles, uploadFile } from '../file'
-import { createMenu, getMenuTree, getRoles, getUserList, updateRoleMenus } from '../system'
+import {
+  createMenu,
+  deleteMenu,
+  getMenuTree,
+  getRoles,
+  getUserList,
+  updateRoleMenus,
+} from '../system'
 
 describe('system-related API modules', () => {
   beforeEach(() => {
@@ -65,6 +72,17 @@ describe('system-related API modules', () => {
     expect(createPayload).not.toHaveProperty('tenantId')
     expect(createPayload).not.toHaveProperty('children')
     expect(createPayload).not.toHaveProperty('createdAt')
+  })
+
+  it('builds a bodyless menu deletion request', () => {
+    deleteMenu('13')
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/menus/13',
+      method: 'delete',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
   })
 
   it('builds alert requests', () => {
