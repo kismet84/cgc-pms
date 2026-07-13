@@ -1158,11 +1158,12 @@ function Invoke-IssueExecutor {
       $result | Add-Member -NotePropertyName verificationBaseCommit -NotePropertyValue $baseCommit -Force
       $result | Add-Member -NotePropertyName verifiedDiffHash -NotePropertyValue $(if ($result.status -eq 'done') { Get-AutopilotDiffHash -Worktree $worktree.path -BaseCommit $baseCommit } else { '' }) -Force
       $result | Add-Member -NotePropertyName reviewRequired -NotePropertyValue ([bool]$effectiveRoute.reviewRequired) -Force
-      $result | Add-Member -NotePropertyName attempt -NotePropertyValue $Attempt -Force
-      $result | Add-Member -NotePropertyName firstPassSuccess -NotePropertyValue ($Attempt -eq 0 -and $result.status -eq 'done') -Force
+      $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+      $effectiveAttempt = Get-AutopilotEffectiveTaskAttempt -InvocationAttempt $Attempt -RepairDispatchCount ([int](Get-AutopilotCheckpointProperty $checkpoint.metrics 'repairDispatchCount' 0))
+      $result | Add-Member -NotePropertyName attempt -NotePropertyValue $effectiveAttempt -Force
+      $result | Add-Member -NotePropertyName firstPassSuccess -NotePropertyValue ($effectiveAttempt -eq 0 -and $result.status -eq 'done') -Force
       $result | Add-Member -NotePropertyName manualInterventionCount -NotePropertyValue 0 -Force
       $result | Add-Member -NotePropertyName scopeViolationCount -NotePropertyValue $(if ($result.stopReason -eq 'STOP_SCOPE_VIOLATION') { 1 } else { 0 }) -Force
-      $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
       foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
         $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $checkpoint.metrics $metricName 0) -Force
       }

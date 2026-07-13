@@ -46,6 +46,11 @@ function Get-AutopilotTaskScoreKey {
   return Get-AutopilotSha256 "$IssueId|$ImplementationCommit|$ScoringVersion"
 }
 
+function Get-AutopilotEffectiveTaskAttempt {
+  param([int]$InvocationAttempt, [int]$RepairDispatchCount)
+  return [Math]::Max([Math]::Max(0, $InvocationAttempt), [Math]::Max(0, $RepairDispatchCount))
+}
+
 function Test-AutopilotTaskScoringActive {
   param([object]$Config)
   if ($null -eq $Config -or (Get-AutopilotScoreProperty $Config 'enabled' $false) -ne $true) { return $false }

@@ -4,6 +4,10 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-task-score.ps1')
 
+if ((Get-AutopilotEffectiveTaskAttempt -InvocationAttempt 0 -RepairDispatchCount 0) -ne 0) { throw 'clean first attempt was not preserved' }
+if ((Get-AutopilotEffectiveTaskAttempt -InvocationAttempt 0 -RepairDispatchCount 2) -ne 2) { throw 'recovery entry erased durable repair attempts' }
+if ((Get-AutopilotEffectiveTaskAttempt -InvocationAttempt 1 -RepairDispatchCount 0) -ne 1) { throw 'explicit repair attempt was not preserved' }
+
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-task-score-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root -Force | Out-Null
 try {
