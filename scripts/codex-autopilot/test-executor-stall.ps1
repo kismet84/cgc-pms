@@ -64,6 +64,15 @@ Start-Sleep -Seconds 20
   & git -C $root add .
   & git -C $root commit -qm 'stall base'
   . (Join-Path $scriptDir 'autopilot-progress.ps1')
+  $cpuWorker = Start-Process powershell -ArgumentList '-NoProfile','-Command','$until=[datetime]::UtcNow.AddSeconds(4); while([datetime]::UtcNow -lt $until){ [Math]::Sqrt(12345) | Out-Null }' -PassThru -WindowStyle Hidden
+  try {
+    $fingerprintBeforeCpu = Get-AutopilotProgressFingerprint -Worktree $root -RootPid $cpuWorker.Id
+    Start-Sleep -Seconds 1
+    $fingerprintAfterCpu = Get-AutopilotProgressFingerprint -Worktree $root -RootPid $cpuWorker.Id
+    if ($fingerprintBeforeCpu -ne $fingerprintAfterCpu) { throw 'child-process CPU activity was incorrectly treated as durable progress' }
+  } finally {
+    if (!$cpuWorker.HasExited) { & taskkill.exe /PID $cpuWorker.Id /T /F 2>$null | Out-Null }
+  }
   $longChild = Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 30' -PassThru -WindowStyle Hidden
   try {
     Start-Sleep -Seconds 1

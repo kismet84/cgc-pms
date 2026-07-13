@@ -1,24 +1,5 @@
 $ErrorActionPreference = 'Stop'
 
-function Get-AutopilotProcessTreeSnapshot {
-  param([int]$RootPid)
-  if ($RootPid -le 0) { return '' }
-  $processRows = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Select-Object ProcessId,ParentProcessId)
-  $ids = [Collections.Generic.HashSet[int]]::new()
-  [void]$ids.Add($RootPid)
-  $changed = $true
-  while ($changed) {
-    $changed = $false
-    foreach ($row in $processRows) {
-      if ($ids.Contains([int]$row.ParentProcessId) -and $ids.Add([int]$row.ProcessId)) { $changed = $true }
-    }
-  }
-  return (@($ids | Sort-Object | ForEach-Object {
-    $process = Get-Process -Id $_ -ErrorAction SilentlyContinue
-    if ($process) { '{0}:{1:F3}' -f $process.Id, $process.CPU }
-  }) -join '|')
-}
-
 function Get-AutopilotWorktreeContentSnapshot {
   param([Parameter(Mandatory)][string]$Worktree)
   $rows = @()
@@ -40,7 +21,7 @@ function Get-AutopilotWorktreeContentSnapshot {
 
 function Get-AutopilotProgressFingerprint {
   param([Parameter(Mandatory)][string]$Worktree, [int]$RootPid = 0)
-  $source = (Get-AutopilotWorktreeContentSnapshot -Worktree $Worktree) + "`nprocess=" + (Get-AutopilotProcessTreeSnapshot -RootPid $RootPid)
+  $source = Get-AutopilotWorktreeContentSnapshot -Worktree $Worktree
   $sha = [Security.Cryptography.SHA256]::Create()
   try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($source)))).Replace('-', '') } finally { $sha.Dispose() }
 }

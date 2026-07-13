@@ -18,7 +18,7 @@
 ## 2026-07-13 AutoPilot 启动迭代-10 恢复状态
 
 - `ISSUE-040-022` 已从重复 BC 启动中安全恢复到 D/E/F：业务实现专项、类型检查、差异检查、独立 Reviewer 与 Issue worktree 浏览器验收均通过；本批完成 1/10。
-- `pause.flag` 保持生效，不再派发下一项 Ready。菜单列表收口后仅处理本批直接暴露的 `OPS-AUTOPILOT-STALL-FINGERPRINT` 控制面阻塞，不重新执行 BC。
+- `pause.flag` 保持生效，不再派发下一项 Ready。`OPS-AUTOPILOT-STALL-FINGERPRINT` 已修复并复验：纯子进程 CPU 活动不再刷新进度，既有 inspect/retire、一次有限重派和总超时门禁保持通过；该唯一问题已从当前台账移除。
 - A-01 当前守恒为有用户入口228、前端调用无独立页面58、内部/集成/运维4、需补入口20、待废弃0、需要确认11，共321；`A-01-MENU-LIST` 已从当前问题台账移除。
 
 ## 2026-07-13 项目知识图谱治理状态

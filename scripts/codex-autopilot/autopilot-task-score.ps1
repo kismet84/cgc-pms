@@ -165,7 +165,13 @@ function New-AutopilotTaskScoreEvidenceFromResult {
   $validation = @($Result.validation)
   $failedStatuses = @('fail','failed','quality_security')
   $validationPassed = $validation.Count -gt 0 -and @($validation | Where-Object { $failedStatuses -contains ([string]$_.status) }).Count -eq 0
-  $sourceRefs = @([string]$ReportPath) + @($Result.evidencePaths)
+  $sourceRefs = foreach ($rawRef in @([string]$ReportPath) + @($Result.evidencePaths)) {
+    $sourceRef = [string]$rawRef
+    if (!$sourceRef -or $sourceRef -match '(?i)(?:^|[\\/])(?:\.codex-autopilot|\.agent-runtime|test-results|playwright-report)(?:[\\/]|$)') { continue }
+    $sourceRefMatch = [regex]::Match($sourceRef, '(?i).*?(docs(?:\\|/).+)$')
+    if ($sourceRefMatch.Success) { $sourceRef = $sourceRefMatch.Groups[1].Value.Replace('\','/') }
+    $sourceRef
+  }
   return [ordered]@{
     issueId = [string]$Result.issueId
     implementationCommit = $ImplementationCommit

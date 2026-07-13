@@ -67,6 +67,16 @@ try {
   if (Add-AutopilotTaskScoreToReport -ReportPath $report -Score $score) { throw 'duplicate score was appended' }
   if ((Get-Content -LiteralPath $report -Raw -Encoding UTF8) -notmatch [regex]::Escape($score.key)) { throw 'score key missing from iteration report' }
 
+  $formalDir = Join-Path $root 'docs\quality'
+  New-Item -ItemType Directory -Path $formalDir -Force | Out-Null
+  $formalReport = Join-Path $formalDir 'issue-test-002.md'
+  "本轮新增后续项：0`r`n本轮关闭后续项：1`r`n本轮后续项净变化：-1" | Set-Content -LiteralPath $formalReport -Encoding UTF8
+  $formalResult = [pscustomobject]@{ issueId='ISSUE-TEST-002';status='done';attempt=0;firstPassSuccess=$true;scopeViolationCount=0;validation=@([pscustomobject]@{status='pass'});evidencePaths=@('evidence/test.json','.codex-autopilot/runs/transient/evidence.json') }
+  $formalEvidence = New-AutopilotTaskScoreEvidenceFromResult -Result $formalResult -ReportPath $formalReport -ImplementationCommit ('b' * 40) -StockIssueTarget $true
+  if (@($formalEvidence.sourceRefs | Where-Object { [IO.Path]::IsPathRooted([string]$_) -or $_ -match '\.worktrees' }).Count -gt 0) { throw 'formal score sourceRefs leaked an absolute or worktree-local path' }
+  if (@($formalEvidence.sourceRefs) -notcontains 'docs/quality/issue-test-002.md') { throw 'formal report sourceRef was not normalized to a repository path' }
+  if (@($formalEvidence.sourceRefs | Where-Object { $_ -match '\.codex-autopilot' }).Count -gt 0) { throw 'formal score sourceRefs retained a transient run artifact path' }
+
   Write-Host 'task scoring self-test passed'
 } finally {
   Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue

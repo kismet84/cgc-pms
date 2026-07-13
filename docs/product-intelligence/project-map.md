@@ -5,7 +5,7 @@
 - `ISSUE-040-022` 在既有 admin-only `/system/permissions` 页面增加“菜单列表”只读入口，按需调用无 body、无 params 的 `GET /system/menus`，复用 `SysMenuVO[]`，关闭后重新打开会重新获取确定性快照。
 - 页面仅 ADMIN/SUPER_ADMIN 可见；后端既有 ADMIN/SUPER_ADMIN 或 `system:menu:query` 授权、当前租户过滤、`orderNum` 升序与字段白名单保持不变。真实页面展示目录、菜单、按钮及空权限码节点，字段固定为名称、类型、父节点、路径、权限码、排序、状态和可见性。
 - `A-01-MENU-LIST` 已关闭；A-01 当前守恒为有用户入口228、前端调用但无独立页面58、内部/集成/运维4、需补入口20、待废弃0、需要确认11，共321。本切片未扩展为菜单编辑、动态路由或完整菜单管理平台。
-- 本轮控制面暴露的 stall CPU 噪声误判已唯一登记为 `OPS-AUTOPILOT-STALL-FINGERPRINT`；它阻止继续派发，但不改变本 Issue 的业务通过结论。
+- 本轮控制面暴露的 `OPS-AUTOPILOT-STALL-FINGERPRINT` 已修复并从唯一台账移除：进度指纹不再纳入子进程树 CPU 累计值，只认持久化工作树变化；显式声明的有界长命令继续使用独立豁免门禁。
 
 ## 2026-07-13 增量：全部历史任务专项复盘
 

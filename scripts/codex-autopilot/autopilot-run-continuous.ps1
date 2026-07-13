@@ -882,7 +882,7 @@ function Invoke-ChildWithHeartbeat {
     if ([datetimeoffset]::Now -ge $deadline) { $timedOut = $true; Stop-ChildProcessTree $process; break }
     if (!$stallInspected -and $idleSeconds -ge $StallInspectSeconds) {
       $stallInspected = $true
-      Write-RunEvent 'executor.stall.inspect' ([pscustomobject]@{ issueId = $script:RunLock.issueId; task = $Task; status = 'INSPECT'; reason = 'no worktree or process progress'; idleSeconds = [int]$idleSeconds; executorPid = $process.Id; startedAt = $startedAt.ToString('o'); lastProgressAt = $lastProgressAt.ToString('o'); retryCount = $script:Attempt; timeoutReason = 'no new evidence'; retiredAt = $null; retiredStatus = $null })
+      Write-RunEvent 'executor.stall.inspect' ([pscustomobject]@{ issueId = $script:RunLock.issueId; task = $Task; status = 'INSPECT'; reason = 'no durable worktree progress'; idleSeconds = [int]$idleSeconds; executorPid = $process.Id; startedAt = $startedAt.ToString('o'); lastProgressAt = $lastProgressAt.ToString('o'); retryCount = $script:Attempt; timeoutReason = 'no new evidence'; retiredAt = $null; retiredStatus = $null })
     }
     if ($idleSeconds -ge $StallTerminateSeconds) {
       $activeLongCommand = Get-AutopilotActiveLongCommand -RootPid $process.Id -Declarations $LongRunningCommands -StartedAt $startedAt
