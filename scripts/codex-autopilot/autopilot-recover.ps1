@@ -47,7 +47,7 @@ function Remove-AutopilotResidualWorktree {
   $worktreeFull = [IO.Path]::GetFullPath($Worktree).TrimEnd('\')
   if (!$worktreeFull.StartsWith($repoFull + '\.worktrees\', [StringComparison]::OrdinalIgnoreCase)) { throw 'residual worktree is outside the repository isolation root' }
   $branch = (& git -C $Worktree branch --show-current 2>$null | Select-Object -First 1).Trim()
-  & git -C $RepoRoot worktree remove --force $Worktree | Out-Null
+  & git -c core.longpaths=true -C $RepoRoot worktree remove --force $Worktree | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'failed to remove residual issue worktree' }
   if ($branch) { & git -C $RepoRoot branch -D $branch 2>$null | Out-Null }
   return [pscustomobject]@{ removed=$true; branch=$branch }
