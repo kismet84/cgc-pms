@@ -234,6 +234,9 @@ backlog carrier. Explicitly decide whether the issue still exists, user value is
 dependencies are satisfied, and it is not duplicated by Ready/Done/Blocked. If verification fails, do not create Ready.
 Each block must satisfy scripts/codex-autopilot/autopilot-ready.ps1, use real existing paths and validation entrypoints,
 state explicit non-goals/migration/risk/runtime/reviewer requirements, and must not modify business code.
+In 禁止修改, put only actual forbidden path rules in backticks. Never repeat an allowed path there, including inside
+carve-out or exception prose, because every code-formatted value in that section is parsed as a forbidden rule. Rely on
+允许修改 as the positive allowlist and omit explanatory exception paths from 禁止修改.
 For a stock candidate, preserve its exact marker as a line like 存量问题键：[stock:ISSUE_KEY], cite the
 formal registry and sourceRefs, keep the smallest executable acceptance slice, and require closeout to update/remove that source
 issue in current-issues.json after verification. Never turn RELEASE_GATE, blocking=true, FROZEN, NEEDS_CONFIRMATION,
